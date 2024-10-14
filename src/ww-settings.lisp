@@ -179,6 +179,14 @@
 ;Reset certain user defined functions, when defined on previous load.
 
 
+(let* ((root (asdf:system-source-directory :wouldwork))
+       (src-dir (merge-pathnames "src/" root))
+       (target-path (merge-pathnames "problem.lisp" src-dir))
+       (source-path (merge-pathnames "problem-blocks3.lisp" src-dir)))
+  (unless (probe-file target-path)
+    (uiop:copy-file source-path target-path)))
+
+
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 

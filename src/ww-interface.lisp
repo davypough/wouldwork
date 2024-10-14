@@ -10,8 +10,8 @@
   (format t "~%
 THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
-(run <problem-name>) eg, (run \"blocks3\")
-   -- load and solve a problem
+(run <problem-name>) eg, (run \"blocks3\") or (run blocks3)
+   -- load and solve a problem 
 
 (run-test-problems) alias (run-test)
    -- solve all test problems
@@ -20,7 +20,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
    -- lists all currently specifed problems
       in the src directory (use these names with run)
 
-(stage <problem-name>) eg, (stage \"blocks3\")
+(stage <problem-name>) eg, (stage \"blocks3\") or (stage blocks3)
   -- loads a problem into wouldwork in preparation for solving or debugging,
      without attempting to solve it
 
@@ -429,7 +429,11 @@ any such settings appearing in the problem specification file.
 (defparameter *current-problem-name* (string *problem-name*))  ;normally specified in problem.lisp
 
 
-(defun run (problem-name &key (with-reload-p t))  ; (keep-globals-p nil))
+(defmacro run (problem-name &key (with-reload-p t))
+  `(%run (string-downcase (format nil "~A" (quote ,problem-name))) :with-reload-p ,with-reload-p))
+
+
+(defun %run (problem-name &key (with-reload-p t))  ; (keep-globals-p nil))
   "Loads, reloads and solves a single problem."
   (unless (string-equal problem-name *current-problem-name*)
     (setf *debug* 0)
@@ -446,12 +450,17 @@ any such settings appearing in the problem specification file.
              (format t "The problem \"~a\" was not found. Please check spelling (and the path)." problem-name)))))
 
 
-(defun stage (problem-name)
+(defmacro stage (problem-name)
+  `(%stage (string-downcase (format nil "~A" (quote ,problem-name)))))
+
+
+(defun %stage (problem-name)
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
   (with-silenced-compilation
     (reload-with-new-problem problem-name)))
+
 
 (defun solve ()
   (ww-solve))
