@@ -170,6 +170,38 @@
                       (translate happening-property 'pre)))))
 
 
+(defun check-problem-parameter (param val)
+  (case param
+    (*problem-name* t)
+    (*depth-cutoff* (unless (typep val 'fixnum)
+                      (error "Can't set *depth-cutoff* to ~S. Must be an integer
+                              where n<=0 means no cutoff." val)))
+    (*tree-or-graph* (unless (member val '(tree graph))
+                       (error "Can't set *tree-or-graph* to ~S. Must be either tree or graph." val)))
+    (*problem-type* (unless (member val '(planning csp))
+                      (error "Can't set *problem-type* to ~S.
+                              Must be either planning or csp (ie, constraint satisfaction problem)." val)))
+    (*solution-type* (unless (member val '(first every min-length min-time min-value max-value))
+                       (error "Can't set *solution-type* to ~S. Must be one of
+                               first, every, min-length, min-time, min-value, or max-value." val)))
+    (*progress-reporting-interval* (unless (and (typep val 'fixnum) (> val 0))
+                                     (error "Can't set *progress-reporting-interval* to ~S.
+                                             Must be an integer > 0." val)))
+    (*branch* (unless (typep val 'fixnum)
+                (error "Can't set *branch* to ~S. Must be an integer
+                        where n < 1 means search all branches." val)))
+    (*debug* (unless (and (typep val 'fixnum) (>= val 0) (<= val 5))
+                (error "Can't set *debug* to ~S. Must be an integer between 0 and 5." val)))
+    (*probe* (unless (or (null val)
+                         (and (listp val) (>= (length val) 3) (<= (length val) 4) (symbolp (first val)) (listp (second val))
+                              (and (typep (third val) 'fixnum) (> (third val) 0))))
+                (error "Can't set *probe* to ~S. Must be a list whose first element is an action,
+                        whose second element is a list of instances for that action,
+                        whose third element is the depth>0,
+                        and whose optional fourth element is how many times to skip over previous instances." val)))
+    (otherwise (error "~S is not a valid parameter name in (ww-set ~S ~S)." param param val))))
+
+
 (defun header-p (item)
   (member item *parameter-headers*))  ;header
 

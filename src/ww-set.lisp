@@ -7,7 +7,9 @@
 
 (defmacro ww-set (param val)
   "Allows resetting of user parameters during and after loading."
-    `(case ',param
+  `(progn
+     (check-problem-parameter ',param ',val)  ;catch errors before setting
+     (case ',param
        ((*depth-cutoff* *tree-or-graph* *solution-type*
          *progress-reporting-interval* *randomize-search* *branch*)
         (progn (setq ,param ,(if (symbolp val) `',val val))
@@ -41,7 +43,7 @@
           (setq ,param ,(if (symbolp val) `',val val))
           (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param)))
        (otherwise
-        (format t "~%~A is not a valid parameter name in ww-set.~%" ',param))))
+        (format t "~%~A is not a valid parameter name in ww-set.~%" ',param)))))
 
 
 (defun save-repl-parameters ()
