@@ -8,7 +8,7 @@
 (defmacro ww-set (param val)
   "Allows resetting of user parameters during and after loading."
   `(progn
-     (check-problem-parameter ',param ',val)  ;catch errors before setting
+     (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
        ((*depth-cutoff* *tree-or-graph* *solution-type*
          *progress-reporting-interval* *randomize-search* *branch*)
@@ -16,16 +16,20 @@
                (save-repl-parameters)
                ,(if (symbolp val) `',val val)))
        (*debug*
-        (progn (setq *debug* ,(if (symbolp val) `',val val))
+        (progn (when *ww-loading*
+                 (error "Please remove (ww-set *debug* ~S) from the current problem specification file.
+                         Instead, enter it at the REPL after loading/staging)." ',val))
+               (setq *debug* ,(if (symbolp val) `',val val))
                (if (or (> *debug* 0) *probe*)
                    (pushnew :ww-debug *features*)
                    (setf *features* (remove :ww-debug *features*)))
                (save-repl-parameters)
                ,(if (symbolp val) `',val val)))
        (*probe*
-        (progn 
-          (unless (listp ',val)
-            (error "*probe* value must be an unquoted list"))
+        (progn
+          (when *ww-loading*
+            (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
+                    Instead, enter it at the REPL after loading/staging." ',val))   (ut::prt ',val)
           (setq *probe* ',val)
           (setf *debug* 0)
           (setq *counter* 1)
@@ -41,9 +45,7 @@
        ((*problem-name* *problem-type*)
         (if *ww-loading*
           (setq ,param ,(if (symbolp val) `',val val))
-          (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param)))
-       (otherwise
-        (format t "~%~A is not a valid parameter name in ww-set.~%" ',param)))))
+          (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param))))))
 
 
 (defun save-repl-parameters ()

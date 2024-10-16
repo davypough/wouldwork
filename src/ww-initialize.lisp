@@ -94,7 +94,7 @@
 
 (defun display-all ()  ;alias
   (display-current-parameters))
-(defun display-params ()  ;alias
+(defun params ()  ;alias
   (display-current-parameters))
 
   

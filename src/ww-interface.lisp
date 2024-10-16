@@ -34,7 +34,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
    -- employs a basic profiler on the currently staged problem,
       for analyzing the efficiency of action rules in the problem specification
 
-(display-current-parameters) alias (display-params)
+(display-current-parameters) alias (params)
    -- displays all parameters associated with the currently staged problem
 
 (ww-set <problem-parameter> <new-value>)
