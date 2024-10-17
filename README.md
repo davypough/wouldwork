@@ -41,58 +41,44 @@ The Wouldwork Planner is yet one more in a long line of classical planners.  A b
 
 -Output diagnostics describing details of the search
 
-For additional information, please see the Wouldwork User Manual.
-Dave Brown, davypough@gmail.com
+For additional information, please see the Wouldwork User Manual,
+or email Dave Brown at davypough@gmail.com
+
 
 # Quickstart Setup:
-
-1. Install (or update) SBCL and Quicklisp
-2. Start SBCL from the command line
-3. At the SBCL prompt, enter `(ql:quickload :wouldwork)`
-4. Enter `(in-package :ww)` to switch from the cl-user package to the wouldwork package
-5. Enter `(run-test-problems)` to verify everything is loaded & working properly
-6. Enter `(list-all)` to display all pre-defined problem specifications in the src directory
-7. Create your own problem specification by emulating any of the `problem-<name>.lisp` files in the src directory
-8. Enter `(run "<name>")` to tell Wouldwork to search for a solution to your problem.
-
+1)	Install the SBCL Common Lisp release for your computer from http://www.sbcl.org/platform-table.html
+2)	Install Quicklisp from https://www.quicklisp.org/beta/ 
+3)	Clone or download the Wouldwork repository to your computer from https://github.com/davypough/quick-wouldwork placing it in your ~/quicklisp/local-projects/ directory (the path to the project files should then be ~/quicklisp/local-projects/quick-wouldwork/)
+4)	Start SBCL from your terminal command prompt.
+5)	At the SBCL prompt, enter (ql:quickload :wouldwork)
+6)	Enter (in-package :ww) to switch the current package from cl-user to wouldwork.
+7)	Enter (run-test) to verify everything is loaded and running properly.
+8)	Review the printout from any of the test problems to see the format of solutions.
+9)	Look at the sample problem specifications (eg, problem-blocks3.lisp) in the src directory to become acquainted with how problems are defined.
 
 # Additional Information
 
 1. INSTALLING WOULDWORK TO A CUSTOM DIRECTORY
 
-Choose a local folder and git clone or download the Wouldwork repository there:
-(eg, `git clone git@github.com:gwangjinkim/Wouldwork.git`)
+After cloning or downloading the quick-wouldwork repo to your chosen local directory,
+make sure Quicklisp is installed. Then tell Quicklisp where your directory is with
+`(push #p"/path/to/your/directory/quick-wouldwork/") ql:*local-project-directories*)`
+and `(ql:register-local-projects)`. You should be able to load Wouldwork with
+`(progn (ql:quickload :wouldwork) (in-package :ww))`. 
 
-Open SBCL and define this function:
-```
-    (defun add-folder (folder)
-      "Adds the given FOLDER to Quicklisp's local project directories."
-      (let ((absolute-path (uiop:ensure-directory-pathname folder)))
-        (unless (probe-file absolute-path)
-          (error "The folder ~A does not exist." folder))
-        ;; Add folder to *local-project-directories* if it's not already there
-        (unless (member absolute-path ql:*local-project-directories* :test #'equal)
-          (push absolute-path ql:*local-project-directories*)
-          (format t "Added ~A to Quicklisp's local project directories.~%" absolute-path))))
-```
-And add the folder to your quicklisp `*local-project-directories*` by calling:
-`(add-folder #P"/path/to/your/directory/containing/Wouldwork/")`
+2. ACCESS MORE HELP
 
-You could do directly `(push your-directory-path ql:*local-project-directories*)`, but the checks ensure 
-that there are no typos and that the format is correct (Note that directories in Common Lisp should
-end - like in elisp - with a "/").
+After loading Wouldwork with `(ql:quickload "wouldwork")` and `(in-package :ww)`,
+you can get more technical help by entering `(help)` at the REPL prompt.
 
-Now, `ql:*local-project-directories*` contains this directory, so that Quicklisp knows how to find Wouldwork.
+3. ROSWELL
 
+If you are using roswell, then your `local-projects` folder is usually in 
+`~/.roswell/local-projects/`. Also, if you want to use roswell SBCL,
+then you have to start with `ros run`
 
-2. INSTALLING WOULDWORK TO THE LOCAL-PROJECTS DIRECTORY
+4. PORTABILITY
 
-Or easier: Just go to `~/quicklisp/local-projects/` and `git clone git@github.com:gwangjinkim/Wouldwork.git` there.
-
-Be aware: When you are using roswell, then your `local-projects` folder is usually in 
-`~/.roswell/local-projects/`. Also, if you want to use your roswell SBCL, then you have to start with `ros run`.
-
-
-3. ACCESS MORE HELP
-
-After loading Wouldwork with `(ql:quickload "wouldwork")` and `(in-package :ww)`, you can get more technical help by entering `(help)` at the SBCL prompt.
+For efficiency purposes, Wouldwork was originally designed to take advantage of some non-standard features in SBCL.
+However, it has since been extended with generic libraries to also run on CCL, although not with parallel multi-threading.
+As a result, expect somewhat slower performance with CCL for large problems.
