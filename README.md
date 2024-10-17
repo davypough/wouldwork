@@ -62,7 +62,7 @@ or email Dave Brown at davypough@gmail.com
 
 After cloning or downloading the quick-wouldwork repo to your chosen local directory,
 make sure Quicklisp is installed. Then tell Quicklisp where your directory is with
-`(push #p"/path/to/your/directory/quick-wouldwork/") ql:*local-project-directories*)`
+`(push #p"/path/to/your/directory/quick-wouldwork/" ql:*local-project-directories*)`
 and `(ql:register-local-projects)`. You should be able to load Wouldwork with
 `(progn (ql:quickload :wouldwork) (in-package :ww))`. 
 
