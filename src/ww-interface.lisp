@@ -438,11 +438,11 @@ any such settings appearing in the problem specification file.
 
 (defun %run (problem-name &key (with-reload-p t))  ; (keep-globals-p nil))
   "Loads, reloads and solves a single problem."
-  (unless (string-equal problem-name *current-problem-name*)
+  (unless (string-equal problem-name *problem-name*)
     (setf *debug* 0)
     (setf *probe* nil)
     (makunbound '*keep-globals-p*))  ;forget user repl set globals if switching problems
-  (setf *current-problem-name* problem-name)
+  (setf *problem-name* problem-name)
   (with-silenced-compilation
       (cond ((member problem-name (list-all) :test #'string=)
              (if with-reload-p
@@ -461,7 +461,7 @@ any such settings appearing in the problem specification file.
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
-  (unless (string-equal problem-name *current-problem-name*)
+  (unless (string-equal problem-name *problem-name*)
     (setf *debug* 0)
     (setf *probe* nil)
     (makunbound '*keep-globals-p*))  ;forget user repl set globals if switching problems

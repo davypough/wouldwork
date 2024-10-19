@@ -14,7 +14,7 @@
 
 (defun init ()
   (format t "~&Initializing...")
-  (setf *current-problem-name* *problem-name*)
+  ;(setf *current-problem-name* *problem-name*)
   (setf *query-names* (nreverse *query-names*))
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec

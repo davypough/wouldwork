@@ -180,10 +180,10 @@
 
 
 (define-global *problem-name* 'unspecified  ;default name
-  "Name of the current problem, assigned in problem.lisp by user.")
+  "Name of the current problem, reassigned in problem.lisp by user.")
 
 
-(define-global *current-problem-name* "unspecified")
+;(define-global *current-problem-name* "unspecified")
 
 
 (let* ((root (asdf:system-source-directory :wouldwork))
@@ -192,7 +192,7 @@
        (source-path (merge-pathnames "problem-blocks3.lisp" src-dir)))
   (unless (probe-file target-path)  ;does problem.lisp already exist?
     (uiop:copy-file source-path target-path)  ;create problem.lisp
-    (setf *current-problem-name* "blocks3")))
+    (setf *problem-name* 'blocks3)))
 
 
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -289,10 +289,10 @@
 (define-global *branch* -1
   "If n>0, explore only the nth branch from the *start-state*.")
 
-(unless (boundp '*problem-name*)
-  (define-global *problem-name* 'unspecified
-    "Name of the current problem, assigned in problem.lisp by user."))
-(declaim (type symbol *problem-name*))
+;(unless (boundp '*problem-name*)
+;  (define-global *problem-name* 'unspecified
+;    "Name of the current problem, assigned in problem.lisp by user."))
+;(declaim (type symbol *problem-name*))
 
 (define-global *problem-type* 'planning
   "Spedify whether it's a planning problem or constraint satisfaction problem.")
