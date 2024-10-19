@@ -192,11 +192,11 @@ any such settings appearing in the problem specification file.
 
 
 (defun display-globals ()
-  (format t "~& 
+  (format t "~&*problem-name* ~A~% 
                *depth-cutoff* ~A~%*tree-or-graph* ~A~%*solution-type* ~A~%
                *progress-reporting-interval* ~A~%*randomize-search* ~A~%*branch* ~A~%*probe* ~A~%                                    *debug* ~A~%*features*~%~A~%~%"
            ;*keep-globals-p*
-            *depth-cutoff* *tree-or-graph* *solution-type*
+            *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
             *progress-reporting-interval* *randomize-search* *branch* *probe*
             *debug* ;*threads*
             *features*))
@@ -206,12 +206,13 @@ any such settings appearing in the problem specification file.
   "Save the values of the globals (*keep-globals-p* *debug* *features*) in the vals.lisp file."
   (display-current-parameters)  ;(display-globals)
   (save-to-file (list ;*keep-globals-p*
-                      *depth-cutoff* *tree-or-graph* *solution-type*
+                      *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
                       *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*
                       *features* #|*threads*|#)
                 *globals-file*)) ;; this stores global var values
 
 (defun set-globals (&key ;(keep-globals-p *keep-globals-p*)
+                         (problem-name *problem-name*)
                          (depth-cutoff *depth-cutoff*)
                          (tree-or-graph *tree-or-graph*)
                          (solution-type *solution-type*)
@@ -225,6 +226,7 @@ any such settings appearing in the problem specification file.
   "Set multiple globals at once in keywords argument format."
   ;(display-globals)
   (setf ;*keep-globals-p* keep-globals-p
+        *problem-name* problem-name
         *depth-cutoff* depth-cutoff
         *tree-or-graph* tree-or-graph
         *solution-type* solution-type
@@ -246,7 +248,7 @@ any such settings appearing in the problem specification file.
   (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0 *features*)))
     (destructuring-bind 
         (;keep-globals-p
-         tmp-depth-cutoff tmp-tree-or-graph tmp-solution-type
+         tmp-problem-name tmp-depth-cutoff tmp-tree-or-graph tmp-solution-type
          tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug tmp-features)
         (let ((vals (or (ignore-errors (read-from-file *globals-file*))
                         default-values)))
@@ -259,6 +261,7 @@ any such settings appearing in the problem specification file.
           ;      default-values)))
       ;(when keep-globals-p
         (setf ;*keep-globals-p* keep-globals-p
+              *problem-name* tmp-problem-name
               *depth-cutoff* tmp-depth-cutoff
               *tree-or-graph* tmp-tree-or-graph
               *solution-type* tmp-solution-type
@@ -361,7 +364,7 @@ any such settings appearing in the problem specification file.
   '("problem-blocks3.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp"
     "problem-queens8.lisp" "problem-captjohn-csp.lisp" "problem-quern.lisp" 
-    "problem-graveyard.lisp" "problem-sentry.lisp" "problem-crossword5-11.lisp"
+    "problem-graveyard.lisp" "problem-sentry.lisp" ;"problem-crossword5-11.lisp"
     "problem-array-path.lisp" "problem-tiles1a-heuristic.lisp" ;"problem-tiles7a-heuristic.lisp" takes too long in non-sbcl
     "problem-triangle-xy.lisp" "problem-triangle-xyz.lisp" "problem-triangle-heuristic.lisp"
     "problem-triangle-macros.lisp" "problem-triangle-macros-one.lisp"
@@ -404,16 +407,16 @@ any such settings appearing in the problem specification file.
                    (format t "~%=====================================================~%")
                    (format t "Processing problem: \"~A\"~%" problem-name)
                    (format t "=====================================================~%")
-                   (handler-case
+                   ;(handler-case
                        (progn
                          (if with-reload-p
                              (reload-with-new-problem problem-name :problem-file problem-file)  ; :keep-globals-p keep-globals-p)
                              (exchange-problem-file problem-name problem-file))
                          (incf problems-processed)
-                         (solve))
-                     (error (e)
-                       (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)
-                       (format t "Skipping to next problem.~%"))))))
+                         (solve)))))
+                      ; (error (e)
+                      ;    (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)))))
+                      ;    (format t "Skipping to next problem.~%")))))
       (format t "~%~%Final Summary:~%")
       (format t "Total problems in list: ~D~%" total-problems)
       (format t "Problems processed: ~D~%" problems-processed)
@@ -426,7 +429,7 @@ any such settings appearing in the problem specification file.
 (setf (fdefinition 'run-test) #'run-test-problems)
 
 
-(defparameter *current-problem-name* (string *problem-name*))  ;normally specified in problem.lisp
+;(defparameter *current-problem-name* (string *problem-name*))  ;normally specified in problem.lisp
 
 
 (defmacro run (problem-name &key (with-reload-p t))
@@ -458,6 +461,10 @@ any such settings appearing in the problem specification file.
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
+  (unless (string-equal problem-name *current-problem-name*)
+    (setf *debug* 0)
+    (setf *probe* nil)
+    (makunbound '*keep-globals-p*))  ;forget user repl set globals if switching problems
   (with-silenced-compilation
     (reload-with-new-problem problem-name)))
 

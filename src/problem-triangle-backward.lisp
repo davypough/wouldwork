@@ -207,7 +207,7 @@
 
 
 (define-goal  ;pegs remaining
-  `(peg-count ,*final-peg-count*))
+  (peg-count #.*final-peg-count*))
   ;(not (contents> 1 1 6 $any-peg))))  ;use only if searching all the way to initial state
      
      

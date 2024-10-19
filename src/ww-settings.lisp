@@ -179,12 +179,20 @@
 ;Reset certain user defined functions, when defined on previous load.
 
 
+(define-global *problem-name* 'unspecified  ;default name
+  "Name of the current problem, assigned in problem.lisp by user.")
+
+
+(define-global *current-problem-name* "unspecified")
+
+
 (let* ((root (asdf:system-source-directory :wouldwork))
        (src-dir (merge-pathnames "src/" root))
        (target-path (merge-pathnames "problem.lisp" src-dir))
        (source-path (merge-pathnames "problem-blocks3.lisp" src-dir)))
-  (unless (probe-file target-path)
-    (uiop:copy-file source-path target-path)))
+  (unless (probe-file target-path)  ;does problem.lisp already exist?
+    (uiop:copy-file source-path target-path)  ;create problem.lisp
+    (setf *current-problem-name* "blocks3")))
 
 
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -259,9 +267,6 @@
 
 (define-global *start-time* 0
   "Stores time at beginning of the search.")
-
-(define-global *problem-name* 'unspecified
-  "Name of the current problem, assigned in problem.lisp by user.")
 
 (define-global *problem-type* 'planning
   "Spedify whether it's a planning problem or constraint satisfaction problem.")

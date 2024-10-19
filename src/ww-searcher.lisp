@@ -136,7 +136,7 @@
   "Main search program."
   (when (fboundp 'bounding-function?)
     (setf *upper-bound*
-          (funcall 'bounding-function? *start-state*)))
+          (funcall (symbol-function 'bounding-function?) *start-state*)))
   (let ((fixed-idb (fixedp *relations*))
         (parallelp (> *threads* 0)))
     (declare (ignorable parallelp))
@@ -173,10 +173,11 @@
   (setf *search-tree* nil)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
-  (if (> *threads* 0)
-    ;(with-open-stream (*standard-output* (make-broadcast-stream)) ;ignore *standard-output*
-    (process-threads)
-    (search-serial))
+  #+sbcl (if (> *threads* 0)
+           ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
+           (process-threads)
+           (search-serial))
+  #-sbcl (search-serial)
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
       (summarize-search-results (if (eql *solution-type* 'first)
@@ -655,7 +656,7 @@
                      (if (= (hash-table-count *state-codes*) 0)  ;if in backward search
                        nominal-path
                        (append nominal-path 
-                               (reverse (gethash (funcall 'encode-state 
+                               (reverse (gethash (funcall (symbol-function 'encode-state)
                                                           (list-database (problem-state.idb goal-state)))
                                                  *state-codes*)))))
              :goal goal-state)))
@@ -741,5 +742,6 @@
   (if (> *threads* 0)
     (format t "~%working with ~D thread(s)...~2%" *threads*)
     (format t "~%working...~%"))
-  (time (dfs))
+  #+sbcl (time (dfs))
+  #-sbcl (dfs)  ;(the-cost-of-nothing:bench (dfs))
   (in-package :ww))

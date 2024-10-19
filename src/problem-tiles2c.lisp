@@ -69,20 +69,20 @@
       
 
 (define-init
-  `(loc H1 ,(vectorize '((0 1) (0 2))))  ;initial locations of all parts of a tile
-  `(loc V1 ,(vectorize '((0 3) (1 3))))
-  `(loc SQ1 ,(vectorize '((0 4))))
-  `(loc S1 ,(vectorize '((0 5) (0 6) (1 4) (1 5))))
-  `(loc H2 ,(vectorize '((1 0) (1 1))))
-  `(loc SQ2 ,(vectorize '((1 2))))
-  `(loc S2 ,(vectorize '((2 1) (2 2) (3 0) (3 1))))
-  `(loc H3 ,(vectorize '((2 3) (2 4))))
-  `(loc V2 ,(vectorize '((2 5) (3 5))))
-  `(loc SQ3 ,(vectorize '((2 6))))
-  `(loc H4 ,(vectorize '((3 2) (3 3))))
-  `(loc SQ4 ,(vectorize '((3 4))))
-  `(empty ,(vectorize '((0 0) (1 6) (2 0) (3 6)))))
+  (loc H1 #.(vectorize '((0 1) (0 2))))  ;initial locations of all parts of a tile
+  (loc V1 #.(vectorize '((0 3) (1 3))))
+  (loc SQ1 #.(vectorize '((0 4))))
+  (loc S1 #.(vectorize '((0 5) (0 6) (1 4) (1 5))))
+  (loc H2 #.(vectorize '((1 0) (1 1))))
+  (loc SQ2 #.(vectorize '((1 2))))
+  (loc S2 #.(vectorize '((2 1) (2 2) (3 0) (3 1))))
+  (loc H3 #.(vectorize '((2 3) (2 4))))
+  (loc V2 #.(vectorize '((2 5) (3 5))))
+  (loc SQ3 #.(vectorize '((2 6))))
+  (loc H4 #.(vectorize '((3 2) (3 3))))
+  (loc SQ4 #.(vectorize '((3 4))))
+  (empty #.(vectorize '((0 0) (1 6) (2 0) (3 6)))))
 
 
 (define-goal
-  `(loc H1 ,(vectorize '((1 2) (1 3)))))
+  (loc H1 #.(vectorize '((1 2) (1 3)))))

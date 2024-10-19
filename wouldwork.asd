@@ -20,6 +20,8 @@
                #-sbcl :trivial-backtrace
                #-sbcl :metering)
   :serial t
+  ;:around-compile (lambda (thunk)
+  ;                  (print (funcall thunk)))
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
@@ -35,8 +37,8 @@
 		                     (:file "ww-translator")
 		                     (:file "ww-installer")
 		                     (:file "ww-set")
-		                     (:file "problem")
                              (:file "ww-interface")
+		                     (:file "problem")
 		                     (:file "ww-searcher")
 		                     (:file "ww-planner")
 		                     #+sbcl (:file "ww-parallel")

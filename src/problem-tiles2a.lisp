@@ -64,20 +64,20 @@
       
 
 (define-init
-  `(loc H1 ,(make-ht-set :test #'equal :size 2 :initial-contents '((0 . 1) (0 . 2))))  ;initial locations of all parts of a tile
-  `(loc V1 ,(make-ht-set :test #'equal :size 2 :initial-contents '((0 . 3) (1 . 3))))
-  `(loc SQ1 ,(make-ht-set :test #'equal :size 1 :initial-contents '((0 . 4))))
-  `(loc S1 ,(make-ht-set :test #'equal :size 4 :initial-contents '((0 . 5) (0 . 6) (1 . 4) (1 . 5))))
-  `(loc H2 ,(make-ht-set :test #'equal :size 2 :initial-contents '((1 . 0) (1 . 1))))
-  `(loc SQ2 ,(make-ht-set :test #'equal :size 1 :initial-contents '((1 . 2))))  ;initial locations of all parts of a tile
-  `(loc S2 ,(make-ht-set :test #'equal :size 4 :initial-contents '((2 . 1) (2 . 2) (3 . 0) (3 . 1))))
-  `(loc H3 ,(make-ht-set :test #'equal :size 2 :initial-contents '((2 . 3) (2 . 4))))
-  `(loc V2 ,(make-ht-set :test #'equal :size 2 :initial-contents '((2 . 5) (3 . 5))))
-  `(loc SQ3 ,(make-ht-set :test #'equal :size 1 :initial-contents '((2 . 6))))
-  `(loc H4 ,(make-ht-set :test #'equal :size 2 :initial-contents '((3 . 2) (3 . 3))))  ;initial locations of all parts of a tile
-  `(loc SQ4 ,(make-ht-set :test #'equal :size 1 :initial-contents '((3 . 4))))
-  `(empty ,(make-ht-set :test #'equal :size 4 :initial-contents '((0 . 0) (1 . 6) (2 . 0) (3 . 6)))))
+  (loc H1 #.(make-ht-set :test #'equal :size 2 :initial-contents '((0 . 1) (0 . 2))))  ;initial locations of all parts of a tile
+  (loc V1 #.(make-ht-set :test #'equal :size 2 :initial-contents '((0 . 3) (1 . 3))))
+  (loc SQ1 #.(make-ht-set :test #'equal :size 1 :initial-contents '((0 . 4))))
+  (loc S1 #.(make-ht-set :test #'equal :size 4 :initial-contents '((0 . 5) (0 . 6) (1 . 4) (1 . 5))))
+  (loc H2 #.(make-ht-set :test #'equal :size 2 :initial-contents '((1 . 0) (1 . 1))))
+  (loc SQ2 #.(make-ht-set :test #'equal :size 1 :initial-contents '((1 . 2))))  ;initial locations of all parts of a tile
+  (loc S2 #.(make-ht-set :test #'equal :size 4 :initial-contents '((2 . 1) (2 . 2) (3 . 0) (3 . 1))))
+  (loc H3 #.(make-ht-set :test #'equal :size 2 :initial-contents '((2 . 3) (2 . 4))))
+  (loc V2 #.(make-ht-set :test #'equal :size 2 :initial-contents '((2 . 5) (3 . 5))))
+  (loc SQ3 #.(make-ht-set :test #'equal :size 1 :initial-contents '((2 . 6))))
+  (loc H4 #.(make-ht-set :test #'equal :size 2 :initial-contents '((3 . 2) (3 . 3))))  ;initial locations of all parts of a tile
+  (loc SQ4 #.(make-ht-set :test #'equal :size 1 :initial-contents '((3 . 4))))
+  (empty #.(make-ht-set :test #'equal :size 4 :initial-contents '((0 . 0) (1 . 6) (2 . 0) (3 . 6)))))
 
 
 (define-goal
-  `(loc H1 ,(make-ht-set :test #'equal :size 2 :initial-contents '((1 . 2) (1 . 3)))))
+  (loc H1 #.(make-ht-set :test #'equal :size 2 :initial-contents '((1 . 2) (1 . 3)))))

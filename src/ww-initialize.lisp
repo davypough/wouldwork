@@ -14,6 +14,7 @@
 
 (defun init ()
   (format t "~&Initializing...")
+  (setf *current-problem-name* *problem-name*)
   (setf *query-names* (nreverse *query-names*))
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
@@ -27,7 +28,7 @@
     (format t "~%NOTE: There are no defined actions.~%"))
   (when (fboundp 'heuristic?)
     (format t "~&Applying heuristic function to start state... = ~A "
-              (setf (problem-state.heuristic *start-state*) (funcall 'heuristic? *start-state*)))
+              (setf (problem-state.heuristic *start-state*) (funcall (symbol-function 'heuristic?) *start-state*)))
     (format t "done~%")
     (when *randomize-search*
       (format t "~%NOTE: Defining a heuristic? search function is incompatible with randomize-search setting.")
@@ -81,7 +82,7 @@
 
 
 (defun display-current-parameters ()
-  (format t "~%Current parameter settings:")
+  (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *tree-or-graph* *solution-type*
            *depth-cutoff* *progress-reporting-interval*
            *threads* *randomize-search* *debug* *probe*)

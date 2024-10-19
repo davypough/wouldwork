@@ -192,43 +192,43 @@
 
 
 (define-init  ;possible coords of the reference location of each tile based on its shape initially
-  `(remaining A  ,(loop for row from 0 to 13 append (loop for col from 4 to 17 collect (cons row col))))
-  `(remaining B  ,(loop for row from 0 to 12 append (loop for col from 3 to 16 collect (cons row col))))
-  `(remaining C  ,(loop for row from 0 to 14 append (loop for col from 0 to 13 collect (cons row col))))
-  `(remaining D  ,(loop for row from 0 to 12 append (loop for col from 3 to 17 collect (cons row col))))
-  `(remaining E  ,(loop for row from 0 to 13 append (loop for col from 3 to 16 collect (cons row col))))
-  `(remaining F  ,(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
-  `(remaining G  ,(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
-  `(remaining H  ,(loop for row from 0 to 14 append (loop for col from 0 to 13 collect (cons row col))))
-  `(remaining I  ,(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
-  `(remaining EMPTY ,(loop for row from 0 to 20 append (loop for col from 0 to 20 collect (cons row col))))  ;initial 441 emptys
+  (remaining A  #.(loop for row from 0 to 13 append (loop for col from 4 to 17 collect (cons row col))))
+  (remaining B  #.(loop for row from 0 to 12 append (loop for col from 3 to 16 collect (cons row col))))
+  (remaining C  #.(loop for row from 0 to 14 append (loop for col from 0 to 13 collect (cons row col))))
+  (remaining D  #.(loop for row from 0 to 12 append (loop for col from 3 to 17 collect (cons row col))))
+  (remaining E  #.(loop for row from 0 to 13 append (loop for col from 3 to 16 collect (cons row col))))
+  (remaining F  #.(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
+  (remaining G  #.(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
+  (remaining H  #.(loop for row from 0 to 14 append (loop for col from 0 to 13 collect (cons row col))))
+  (remaining I  #.(loop for row from 0 to 14 append (loop for col from 0 to 14 collect (cons row col))))
+  (remaining EMPTY #.(loop for row from 0 to 20 append (loop for col from 0 to 20 collect (cons row col))))  ;initial 441 emptys
 
   ;relative locations of tile parts that matter for overlapping with other tile parts
-  `(rel-coords A ,(append '((0 . 0) (4 . -4))
+  (rel-coords A #.(append '((0 . 0) (4 . -4))
                           (loop for row from 1 to 7 append (loop for col from -3 to 3 collect (cons row col)))))
 
-  `(rel-coords B ,(append '((0 . 0) (4 . 4) (8 . 0) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
+  (rel-coords B #.(append '((0 . 0) (4 . 4) (8 . 0) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
                           (loop for row from 1 to 7 append (loop for col from -2 to 3 collect (cons row col)))))
 
-  `(rel-coords C ,(append '((3 . 7) (6 . 6) (6 . 5) (6 . 1) (6 . 0))
+  (rel-coords C #.(append '((3 . 7) (6 . 6) (6 . 5) (6 . 1) (6 . 0))
                           (loop for row from 0 to 5 append (loop for col from 0 to 6 collect (cons row col)))))
 
-  `(rel-coords D ,(append '((0 . 0) (1 . 3) (2 . 3) (6 . 3) (7 . 3) (8 . 0) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
+  (rel-coords D #.(append '((0 . 0) (1 . 3) (2 . 3) (6 . 3) (7 . 3) (8 . 0) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
                           (loop for row from 1 to 7 append (loop for col from -2 to 2 collect (cons row col)))))
 
-  `(rel-coords E ,(append '((0 . 0) (4 . 4) (7 . 3) (7 . 2) (7 . -2) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
+  (rel-coords E #.(append '((0 . 0) (4 . 4) (7 . 3) (7 . 2) (7 . -2) (7 . -3) (6 . -3) (2 . -3) (1 . -3))
                           (loop for row from 1 to 6 append (loop for col from -2 to 3 collect (cons row col)))))
 
-  `(rel-coords F ,(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6))
+  (rel-coords F #.(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6))
                           (loop for row from 1 to 6 append (loop for col from 0 to 5 collect (cons row col)))))
 
-  `(rel-coords G ,(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6))
+  (rel-coords G #.(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6))
                           (loop for row from 1 to 6 append (loop for col from 0 to 5 collect (cons row col)))))
 
-  `(rel-coords H ,(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (3 . 7) (6 . 6) (6 . 5) (6 . 1) (6 . 0) (5 . 0) (1 . 0))
+  (rel-coords H #.(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (3 . 7) (6 . 6) (6 . 5) (6 . 1) (6 . 0) (5 . 0) (1 . 0))
                           (loop for row from 1 to 5 append (loop for col from 1 to 6 collect (cons row col)))))
 
-  `(rel-coords I ,(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6) (6 . 5) (6 . 1) (6 . 0) (5 . 0) (1 . 0))
+  (rel-coords I #.(append '((0 . 0) (0 . 1) (0 . 5) (0 . 6) (1 . 6) (5 . 6) (6 . 6) (6 . 5) (6 . 1) (6 . 0) (5 . 0) (1 . 0))
                           (loop for row from 1 to 5 append (loop for col from 1 to 5 collect (cons row col))))))
 
 #|

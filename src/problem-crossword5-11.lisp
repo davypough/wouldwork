@@ -115,13 +115,8 @@
               (trie-insert *trie-ht* (reverse word-string))
               (trie-insert *trie-ht* word-string))))))
 
-(let ((os (software-type)))
-  (encode-dictionary (in-src (cond ((string= os "Linux")
-                                    "English-words-455K.txt")
-                                   ((string= os "Win32")
-                                    "English-words-455K.txt")
-                                   ((string= os "Darwin")
-                                    "English-words-455K.txt")))))
+(encode-dictionary (in-src "English-words-455K.txt"))
+
 
 (defun trie-search (trie pattern)
   ;Searches a trie of hts for the first word that matches a pattern.
@@ -386,9 +381,9 @@
 
 
 (define-init
-  `(used-fields ,(make-hash-table :test #'eq))
-  `(used-words ,(make-hash-table :test #'eq))
-  `(used-field-ids-ht ,(make-hash-table :test #'eql))
+  (used-fields #.(make-hash-table :test #'eq))
+  (used-words #.(make-hash-table :test #'eq))
+  (used-field-ids-ht #.(make-hash-table :test #'eql))
   (net-word-lengths 0))
 
 

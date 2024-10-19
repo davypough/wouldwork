@@ -381,7 +381,7 @@
 
 
 (define-goal  ;only one peg left
-  `(peg-count ,*final-peg-count*))
+  (peg-count #.*final-peg-count*))
   ;(backward-path-exists state)))  ;only use if paired with backward search
 
 

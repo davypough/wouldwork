@@ -50,7 +50,7 @@ or email Dave Brown at davypough@gmail.com
 2)	Install Quicklisp from https://www.quicklisp.org/beta/ 
 3)	Clone or download the Wouldwork repository to your computer from https://github.com/davypough/quick-wouldwork placing it in your ~/quicklisp/local-projects/ directory (the path to the project files should then be ~/quicklisp/local-projects/quick-wouldwork/)
 4)	Start SBCL from your terminal command prompt.
-5)	At the SBCL prompt, enter (ql:quickload :wouldwork)
+5)	At the SBCL prompt, enter (ql:quickload :wouldwork :force t)
 6)	Enter (in-package :ww) to switch the current package from cl-user to wouldwork.
 7)	Enter (run-test) to verify everything is loaded and running properly.
 8)	Review the printout from any of the test problems to see the format of solutions.
@@ -64,7 +64,7 @@ After cloning or downloading the quick-wouldwork repo to your chosen local direc
 make sure Quicklisp is installed. Then tell Quicklisp where your directory is with
 `(push #p"/path/to/your/directory/quick-wouldwork/" ql:*local-project-directories*)`
 and `(ql:register-local-projects)`. You should be able to load Wouldwork with
-`(progn (ql:quickload :wouldwork) (in-package :ww))`. 
+`(progn (ql:quickload :wouldwork :force t) (in-package :ww))`. 
 
 2. ACCESS MORE HELP
 
@@ -81,4 +81,4 @@ then you have to start with `ros run`
 
 For efficiency purposes, Wouldwork was originally designed to take advantage of some non-standard features in SBCL.
 However, it has since been extended with generic libraries to also run on CCL, although not with parallel multi-threading.
-As a result, expect somewhat slower performance with CCL for large problems.
+As a result, expect significantly slower performance with CCL for large problems.

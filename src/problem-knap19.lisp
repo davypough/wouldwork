@@ -25,7 +25,7 @@
 
 (defparameter *item-structures* nil)  ;the list of data item structures
 (defparameter *num-items* -1)  ;total number of items
-(defparameter *max-weight* -1)  ;max weight allowed
+#.(defparameter *max-weight* -1)  ;max weight allowed
 
 
 (defun create-item-structures (data-file)
@@ -45,8 +45,7 @@
                *item-structures*)))))
 
 
-(create-item-structures (in-src "data-knap19.lisp"))
-;(create-item-structures (in-src "data-knap30.lisp"))  ;name of the data file
+(create-item-structures (in-src "data-knap19.lisp"))  ;path to the data file in the src directory
 
 
 (defparameter *sorted-item-structures*
@@ -155,7 +154,7 @@
 
 
 (define-init
-  `(capacity ,*max-weight*)
+  (capacity #.*max-weight*)
   (contents nil)
   (load 0)
   (worth 0))

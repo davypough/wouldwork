@@ -99,7 +99,7 @@
   (loc U1 ((6 . 1) (7 . 0) (7 . 1) (7 . 2)))
   (loc U2 ((6 . 5) (7 . 4) (7 . 5) (7 . 6)))
   (loc Y1 ((0 . 4) (0 . 5) (1 . 3) (1 . 4)))
-  `(empty ,(loop for row from 2 to 5 append
+  (empty #.(loop for row from 2 to 5 append
                  (loop for col from 2 to 4 collect
                    (cons row col))))
   (Y1-goal-coord (6 . 2)))

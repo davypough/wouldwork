@@ -235,13 +235,7 @@ file        #states     states/sec      time    best
               (trie-insert *trie-ht* word-string))))))
 
 
-(let ((os (software-type)))
-  (encode-dictionary (in-src (cond ((string= os "Linux")
-                                    "English-words-455K.txt")
-                                   ((string= os "Win32")
-                                    "English-words-100K.txt")
-                                   ((string= os "Darwin")
-                                    "English-words-100K.txt")))))
+(encode-dictionary (in-src "English-words-455K.txt"))  ;encodes words in the src directory
 
 
 (defun trie-search (trie pattern)
@@ -387,7 +381,7 @@ file        #states     states/sec      time    best
 
 (define-init
   (current-field start)
-  `(used-word-strings-ht ,(make-hash-table :test #'equal)))
+  (used-word-strings-ht #.(make-hash-table :test #'equal)))
 
 
 (define-init-action initialize-crosscuts&text

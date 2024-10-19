@@ -203,7 +203,7 @@
 
 
 (define-goal  ;only one peg left
-  `(peg-count ,*final-peg-count*))
+  (peg-count #.*final-peg-count*))
 
 
 

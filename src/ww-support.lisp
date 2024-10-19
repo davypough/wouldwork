@@ -64,14 +64,14 @@
   (iter (for soln in *solutions*)
         (for path = (solution.path soln))
         (for db-props = (list-database (problem-state.idb (solution.goal soln))))
-        (setf (gethash (funcall 'encode-state db-props) *state-codes*) path))
+        (setf (gethash (funcall (symbol-function 'encode-state) db-props) *state-codes*) path))
   *state-codes*)
 
 
 (defun backward-path-exists (state)
   "Use in forward search goal to check existence of backward path."
   (declare (type problem-state state))
-  (gethash (funcall 'encode-state (list-database (problem-state.idb state))) *state-codes*))
+  (gethash (funcall (symbol-function 'encode-state) (list-database (problem-state.idb state))) *state-codes*))
 
 
 (defun make-ht-set (&rest args &key (initial-contents nil initial-contents-p) &allow-other-keys)

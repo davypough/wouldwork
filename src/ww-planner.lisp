@@ -117,7 +117,7 @@
             (when (fboundp 'heuristic?)
               (dolist (child-state child-states)
                 (setf (problem-state.heuristic child-state)
-                  (funcall 'heuristic? child-state))))
+                  (funcall (symbol-function 'heuristic?) child-state))))
             (alexandria:appendf children child-states)))))
     (nreverse children)))  ;put first action child states first
 
@@ -213,7 +213,7 @@
 (defun expand (current-node)  ;called from df-bnb1
   "Returns the new states."
   (declare (type node current-node))   
-  (unless (and (fboundp 'prune?) (funcall 'prune? (node.state current-node))) ;don't expand state further if bounded 
+  (unless (and (fboundp 'prune?) (funcall (symbol-function 'prune?) (node.state current-node))) ;don't expand state further if bounded 
     (generate-children current-node)))
 
 

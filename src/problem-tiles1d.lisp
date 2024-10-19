@@ -99,13 +99,13 @@
 
 
 (define-init
-  `(loc SQ ,(make-bv-set '((3 . 2))))  ;initial locations of all parts of a tile
-  `(loc HOR ,(make-bv-set '((1 . 2) (1 . 3))))
-  `(loc VER ,(make-bv-set '((2 . 3) (3 . 3))))
-  `(loc L1 ,(make-bv-set '((0 . 1) (1 . 0) (1 . 1))))
-  `(loc L2 ,(make-bv-set '((2 . 1) (3 . 0) (3 . 1))))
-  `(empty ,(make-bv-set '((0 . 0) (0 . 2) (0 . 3) (2 . 0) (2 . 2)))))
+  (loc SQ #.(make-bv-set '((3 . 2))))  ;initial locations of all parts of a tile
+  (loc HOR #.(make-bv-set '((1 . 2) (1 . 3))))
+  (loc VER #.(make-bv-set '((2 . 3) (3 . 3))))
+  (loc L1 #.(make-bv-set '((0 . 1) (1 . 0) (1 . 1))))
+  (loc L2 #.(make-bv-set '((2 . 1) (3 . 0) (3 . 1))))
+  (empty #.(make-bv-set '((0 . 0) (0 . 2) (0 . 3) (2 . 0) (2 . 2)))))
 
 
 (define-goal
-  `(loc L2 ,(make-bv-set '((0 . 3) (1 . 2) (1 . 3)))))
+  (loc L2 #.(make-bv-set '((0 . 3) (1 . 2) (1 . 3)))))
