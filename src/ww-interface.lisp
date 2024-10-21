@@ -364,7 +364,7 @@ any such settings appearing in the problem specification file.
   '("problem-blocks3.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp"
     "problem-queens8.lisp" "problem-captjohn-csp.lisp" "problem-quern.lisp" 
-    "problem-graveyard.lisp" "problem-sentry.lisp" ;"problem-crossword5-11.lisp"
+    "problem-graveyard.lisp" "problem-sentry.lisp" #+sbcl "problem-crossword5-11.lisp"
     "problem-array-path.lisp" "problem-tiles1a-heuristic.lisp" ;"problem-tiles7a-heuristic.lisp" takes too long in non-sbcl
     "problem-triangle-xy.lisp" "problem-triangle-xyz.lisp" "problem-triangle-heuristic.lisp"
     "problem-triangle-macros.lisp" "problem-triangle-macros-one.lisp"

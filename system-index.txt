@@ -1,0 +1,2 @@
+wouldwork.asd
+wouldwork-tests.asd

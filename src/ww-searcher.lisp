@@ -348,18 +348,18 @@
     (ecase *solution-type*
       (max-value (when (> current-value best-value)
                    #+sbcl (bt:with-lock-held (*lock*)
-                            (format t "~&Higher value state found: ~A in thread ~D~%"
+                            (format t "~%Higher value state found: ~A in thread ~D~%"
                                       (problem-state.value succ-state) (lparallel:kernel-worker-index))
                             (finish-output))
-                   #-sbcl (format t "~&Higher value state found: ~A~%"
+                   #-sbcl (format t "~%Higher value state found: ~A~%"
                                     (problem-state.value succ-state))
                    (push-global succ-state *best-states*)))
       (min-value (when (< current-value best-value)
                    #+sbcl (bt:with-lock-held (*lock*)
-                            (format t "~&Lower value state found: ~A in thread ~D~%"
+                            (format t "~%Lower value state found: ~A in thread ~D~%"
                                       (problem-state.value succ-state) (lparallel:kernel-worker-index))
                             (finish-output))
-                   #-sbcl (format t "~&Lower value state found: ~A~%"
+                   #-sbcl (format t "~%Lower value state found: ~A~%"
                                     (problem-state.value succ-state))
                    (push-global succ-state *best-states*))))))
 
@@ -608,7 +608,7 @@
             (format t "~2%The minimum objective value found = ~:D" (problem-state.value best-state))
             (format t "~2%A minimum value state:~%")
             (print-problem-state best-state)
-            (format t "~%")))
+            (format t "~2%")))
         (max-value
           (let ((best-state (reduce #'(lambda (a b)
                                         (if (>= (problem-state.value a) (problem-state.value b))
@@ -618,7 +618,7 @@
             (format t "~2%The maximum objective value found = ~:D" (problem-state.value best-state))
             (format t "~2%A maximum value state:~%")
             (print-problem-state best-state)
-            (format t "~%")))))
+            (format t "~2%")))))
   (print-search-tree))
 
 
@@ -705,7 +705,7 @@
   "Printout of nodes expanded so far during search modulo reporting interval."
     (when (<= (- *progress-reporting-interval* (- *total-states-processed* *prior-total-states-processed*))
               0)
-        (format t "~%program cycles = ~:D" *program-cycles*)
+        (format t "~2%program cycles = ~:D" *program-cycles*)
         (format t "~%total states processed so far = ~:D" *total-states-processed*)
         (when (eql *tree-or-graph* 'graph)
           (format t "~%ht count: ~:D    ht size: ~:D"
@@ -741,7 +741,7 @@
   "Runs a branch & bound search on the problem specification."
   (if (> *threads* 0)
     (format t "~%working with ~D thread(s)...~2%" *threads*)
-    (format t "~%working...~%"))
+    (format t "~%working...~2%"))
   #+sbcl (time (dfs))
   #-sbcl (dfs)  ;(the-cost-of-nothing:bench (dfs))
   (in-package :ww))
