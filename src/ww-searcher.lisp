@@ -517,7 +517,8 @@
   (let ((path nil))
     (do ((n goal-node (node.parent n)))
         ((null (node.parent n)) path)
-      (push (record-move (node.state (node.parent n)) (node.state n))
+      (push (record-move ;(node.state (node.parent n))
+                         (node.state n))
             path))))
 
   
@@ -651,8 +652,8 @@
              :time (problem-state.time goal-state)
              :value (problem-state.value goal-state)
              :path (let ((nominal-path (append (record-solution-path current-node)
-                                               (list (record-move (node.state current-node)
-                                                     goal-state)))))
+                                               (list (record-move ;(node.state current-node)
+                                                                  goal-state)))))
                      (if (= (hash-table-count *state-codes*) 0)  ;if in backward search
                        nominal-path
                        (append nominal-path 

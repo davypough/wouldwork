@@ -6,12 +6,21 @@
 (in-package :ww)
 
 
-(defun record-move (parent state)
+;(defun record-move (parent state)
+;  "Returns some user-friendly representation of the move from the parent state
+;   to the current state."
+;  (declare (type problem-state state) (ignore parent))
+;  (with-slots (name instantiations time) state
+;    (list time (cons name instantiations))))
+
+
+(defun record-move (state)
   "Returns some user-friendly representation of the move from the parent state
    to the current state."
-  (declare (type problem-state state parent) (ignore parent))
-  (with-slots (name instantiations time) state
-    (list time (cons name instantiations))))
+  (declare (type problem-state state))  ; (ignore parent))
+  (list (problem-state.time state)
+        (cons (problem-state.name state)
+              (problem-state.instantiations state))))
 
 
 (defun do-init-action-updates (state)  ;add init actions to start-state
@@ -220,5 +229,5 @@
 (defun estimate-to-goal (state)
   "Heuristic (h) for estimating distance to a goal state from this state;
    Return 0 to use no heuristic."
-  (declare (type problem-state state) (ignore state))
+  (declare (type problem-state state) (ignorable state))
   0)
