@@ -385,10 +385,10 @@ any such settings appearing in the problem specification file.
    - silenced *compile-print*
    - and certain *debug-print-variable-alist* settings"
   `(let ((*compile-verbose* nil)
-	 (*compile-print* nil)
-	 #+sbcl (sb-ext:*debug-print-variable-alist* '((*print-length* . 30)
-                                                   (*print-level* . 6)
-					                               (*print-pretty* . t))))
+	     (*compile-print* nil))
+	     ;#+sbcl (sb-ext:*debug-print-variable-alist* '((*print-length* . 30)
+         ;                                              (*print-level* . 6)
+     	 ;   			                                (*print-pretty* . t))))
      ,@body))
 
 

@@ -413,6 +413,18 @@
   `(install-init ',literals))
 
 
+#+ignore (defmacro define-init (&rest literals)
+  (cons 'list
+        (mapcar (lambda (lit)
+                  (if (and (listp lit) (eq (car lit) 'sb-int:quasiquote))
+                      (let* ((expanded (macroexpand-1 lit))  ; expands to (list 'symbol (make-hash-table ...))
+                             (sym (cadr expanded))       ; get the quoted symbol
+                             (hash-table (eval (caddr expanded))))  ; eval make-hash-table
+                        (list 'quote (list (cadr sym) hash-table)))  ; unquote the symbol 
+                      `',lit))
+                literals)))
+
+
 (defun install-init (literals)
   (declare (special *relations* *db* *static-db*))
   (format t "~&Creating initial propositional database...")

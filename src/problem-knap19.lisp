@@ -15,7 +15,11 @@
 (ww-set *solution-type* max-value)
 
 
-(defstruct item  ;an item template
+(defvar item nil)  ;prevent compiler warnings
+(defvar create-item-structures nil)
+
+
+#.(defstruct item  ;an item template
   (name nil :type symbol)  ;item name--eg, item3
   (id -1 :type fixnum)  ;item# in sorted list
   (value -1 :type fixnum)  ;value of that item
@@ -23,12 +27,12 @@
   (value/weight -1 :type double-float))  ;the ratio of the item's value/weight
 
 
-(defparameter *item-structures* nil)  ;the list of data item structures
-(defparameter *num-items* -1)  ;total number of items
-#.(defparameter *max-weight* -1)  ;max weight allowed
+#.(defparameter *item-structures* nil)  ;the list of data item structures
+#.(defparameter *num-items* -1)  ;total number of items, update from data-knap19.lisp
+#.(defparameter *max-weight* -1)  ;max weight allowed, update from data-knap19.lisp
 
 
-(defun create-item-structures (data-file)
+#.(defun create-item-structures (data-file)
   ;Read in data from a file.
   (with-open-file (infile data-file :direction :input :if-does-not-exist nil)
     (when (not (streamp infile)) (error "File does not exist!"))
@@ -45,7 +49,7 @@
                *item-structures*)))))
 
 
-(create-item-structures (in-src "data-knap19.lisp"))  ;path to the data file in the src directory
+#.(create-item-structures (in-src "data-knap19.lisp"))  ;path to the data file in the src directory
 
 
 (defparameter *sorted-item-structures*

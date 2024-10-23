@@ -95,8 +95,12 @@
   (every #'eql arguments (rest arguments)))
 
 
-(setq *print-right-margin* 140)
-;Allows non-wrap printing of *search-tree* for deep trees.
+; mainly for debugging
+(setf *print-length* nil)  ; Don't limit number of elements printed
+(setf *print-level* nil)   ; Don't limit nesting depth
+(setf *print-circle* nil)  ; Don't include prior reference #n
+;(setf *print-readably* t)
+(setq *print-right-margin* 140) ;Allows non-wrap printing of *search-tree* for deep trees.
 
 
 (defparameter *global-locks* (make-hash-table))  ;Used for non-sbcl implementations

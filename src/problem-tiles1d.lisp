@@ -17,8 +17,8 @@
 (ww-set *depth-cutoff* 40)
 
 
-(defparameter *row-dimension* 4)  ;the dimensions of the board
-(defparameter *col-dimension* 4)
+#.(defparameter *row-dimension* 4)  ;the dimensions of the board
+#.(defparameter *col-dimension* 4)
 (defparameter *all-coordinates* (coerce (iter (for row from 0 below *row-dimension*)  ;coordinates ordered lexicographically
                                               (appending (iter (for col from 0 below *col-dimension*)
                                                                (collecting (cons row col)))))
@@ -46,7 +46,8 @@
                       (<= (sbit a 1) (sbit b 1))))))))
 
 
-(defun make-bv-set (dotted-pairs)
+(defvar make-bv-set nil)
+#.(defun make-bv-set (dotted-pairs)
   (let ((bv (make-array (* *row-dimension* *col-dimension*) :element-type 'bit :adjustable nil)))
     (dolist (pair dotted-pairs)
       (let* ((row (car pair))

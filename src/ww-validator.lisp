@@ -176,6 +176,8 @@
     (*depth-cutoff* (unless (typep val 'fixnum)
                       (error "Can't set *depth-cutoff* to ~S. Must be an integer
                               where n<=0 means no cutoff." val)))
+    (*randomize-search* (unless (typep val 'boolean)
+                          (error "Can't set *randomize-search* to ~S. Must be either T or NIL." val)))
     (*tree-or-graph* (unless (member val '(tree graph))
                        (error "Can't set *tree-or-graph* to ~S. Must be either tree or graph." val)))
     (*problem-type* (unless (member val '(planning csp))

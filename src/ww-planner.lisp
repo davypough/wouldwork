@@ -98,8 +98,7 @@
                                       precondition-args)))
           #+:ww-debug (when (>= *debug* 5)
                                (let ((*package* (find-package :ww)))
-                                 (ut::prt precondition-variables
-                                          precondition-args pre-results)))
+                                 (ut::prt precondition-variables precondition-args pre-results)))
           (when (null pre-results)
             #+:ww-debug (when (>= *debug* 5)
                           (terpri))

@@ -37,7 +37,7 @@
 
 (defparameter *size* (/ (* *N* (1+ *N*)) 2))  ;total number of positions
 
-(defparameter *final-peg-count* 8)  ;depth-cutoff + 1
+#.(defparameter *final-peg-count* 8)  ;depth-cutoff + 1
 ;(defparameter *final-peg-count* (1- *size*))  ;use if full search backward to start state
 
 (defparameter *reversed-pegs* nil)  ;list of pegs in reverse order

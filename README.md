@@ -68,8 +68,8 @@ and `(ql:register-local-projects)`. You should be able to load Wouldwork with
 
 2. ACCESS MORE HELP
 
-After loading Wouldwork with `(ql:quickload "wouldwork")` and `(in-package :ww)`,
-you can get more technical help by entering `(help)` at the REPL prompt.
+After loading Wouldwork with `(ql:quickload "wouldwork" :force t)` and `(in-package :ww)`,
+you can get more help with REPL commands by entering `(help)` at the REPL prompt.
 
 3. ROSWELL
 

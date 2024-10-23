@@ -32,7 +32,7 @@
 
 (defparameter *init-holes* `((1 1 ,*N*)))  ;coordinates of the initial holes
 
-(defparameter *final-peg-count* 1)  ;number of pegs to be left at the end
+#.(defparameter *final-peg-count* 1)  ;number of pegs to be left at the end
 
 
 (define-types
