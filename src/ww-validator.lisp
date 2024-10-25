@@ -201,7 +201,9 @@
                         whose second element is a list of instances for that action,
                         whose third element is the depth>0,
                         and whose optional fourth element is how many times to skip over previous instances." val)))
-    (*threads* (error "Cannot set *threads* in the REPL. Specify *threads* in ww-settings.lisp instead, and reload."))
+    (*threads* (error "Cannot set *threads* in the REPL or in a problem specification.
+                       Specify the number of *threads* in ww-settings.lisp instead (but only if running SBCL),
+                       then exit SBCL, and reload."))
     (otherwise (error "~S is not a valid parameter name in (ww-set ~S ~S)." param param val))))
 
 

@@ -13,12 +13,12 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (run <problem-name>) eg, (run \"blocks3\") or (run blocks3)
    -- load and solve a problem 
 
-(run-test-problems) alias (run-test)
+(run-test-problems) alias (test)
    -- solve all test problems
 
-(list-problem-names) alias (list-all)
+(list-problem-names) alias (probs)
    -- lists all currently specifed problems
-      in the src directory (use these names with run)
+      in the src directory (use these names with run or stage)
 
 (stage <problem-name>) eg, (stage \"blocks3\") or (stage blocks3)
   -- loads a problem into wouldwork in preparation for solving or debugging,
@@ -48,7 +48,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                               eg, 100000 (how often to report progress)>)
        (ww-set *randomize-search* <t (random depth-first search) or
                                    nil (standard depth-first search)>)
-       (ww-set *branch* <number (eg, search only branch 3 of 10 initial branches)>)
+       (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or
+                         -1 (search all branches)>)
        (ww-set *debug* <one of 0 (no debugging), 1-4 (increasing debugging info),
                                5 (step through search)>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
@@ -204,7 +205,7 @@ any such settings appearing in the problem specification file.
 
 (defun save-globals ()
   "Save the values of the globals (*keep-globals-p* *debug* *features*) in the vals.lisp file."
-  (display-current-parameters)  ;(display-globals)
+  ;(display-globals)
   (save-to-file (list ;*keep-globals-p*
                       *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
                       *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*
@@ -334,12 +335,15 @@ any such settings appearing in the problem specification file.
     (loop for (k nil) on plist by #'cddr
 	  collect k)))
 
+(setf (fdefinition 'probs) #'list-problem-names)
+
 
 (defun exchange-problem-file (problem-name &optional (problem-file "problem.lisp"))
   "Copies problem path to 'src/problem.lisp'"
   (let* ((plist (list-problem-files-plist))
-	 (path (lookup problem-name plist)))
-    (copy-file-content path (in-src problem-file))))
+	(path (lookup problem-name plist)))
+    (copy-file-content path (in-src problem-file))
+    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))))
 
 
 (Defun reload-with-new-problem (problem-name &key (problem-file "problem.lisp") 
@@ -350,11 +354,16 @@ any such settings appearing in the problem specification file.
    the content of the correponsing problem file.
    And then reloads the entire package anew (which leads to re-compilation).
    keep-globals-p determines whether the global variables from the last session should be overtaken."
+  (unless (member (string problem-name) (list-problem-names) :test #'string-equal)
+    (format t "~%Can't find ~A in the list of problem file names.~%" (string problem-name))
+    (format t "Enter (list-problem-names) to see all currently specified problems.~%")
+    (return-from reload-with-new-problem))
   (exchange-problem-file problem-name problem-file)
   ;; (asdf:operate 'asdf:load-op :wouldwork :force-not '(:iterate :alexandria :lparallel)))
   ;(when keep-globals-p
-  ;  (save-globals))                          ;; for persistence of (*keep-globals-p* *debug* *features*) ;*threads*)
-  (asdf:load-system system-name :force t))
+  ;  (save-globals))   ;; for persistence of (*keep-globals-p* *debug* *features*) ;*threads*)
+  (asdf:compile-system system-name :force t)
+  (asdf:load-system system-name))
 
 
 (declaim (ftype (function () t) solve))  ;function solve located in searcher.lisp
@@ -393,7 +402,8 @@ any such settings appearing in the problem specification file.
 
 
 (defun run-test-problems (&key (problem-file "problem.lisp") (with-reload-p t))  ; (keep-globals-p nil))
-  (makunbound '*keep-globals-p*)  ;ignores vals.lisp for all test problems
+  (uiop:delete-file-if-exists (in-src "problem.lisp"))
+  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (with-silenced-compilation
     (let ((problems-to-run *problem-files*)
           (total-problems 0)
@@ -421,10 +431,13 @@ any such settings appearing in the problem specification file.
       (format t "Total problems in list: ~D~%" total-problems)
       (format t "Problems processed: ~D~%" problems-processed)
       (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~%")
+      (uiop:delete-file-if-exists (in-src "problem.lisp"))
+      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
       t)))
 
 
 ;; alias:
+(setf (fdefinition 'test) #'run-test-problems)
 (setf (fdefinition 'run-all) #'run-test-problems)
 (setf (fdefinition 'run-test) #'run-test-problems)
 
@@ -438,11 +451,10 @@ any such settings appearing in the problem specification file.
 
 (defun %run (problem-name &key (with-reload-p t))  ; (keep-globals-p nil))
   "Loads, reloads and solves a single problem."
-  (unless (string-equal problem-name *problem-name*)
+  (unless (string-equal (string problem-name) (string *problem-name*))
     (setf *debug* 0)
     (setf *probe* nil)
-    (makunbound '*keep-globals-p*))  ;forget user repl set globals if switching problems
-  (setf *problem-name* problem-name)
+    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
   (with-silenced-compilation
       (cond ((member problem-name (list-all) :test #'string=)
              (if with-reload-p
@@ -461,10 +473,10 @@ any such settings appearing in the problem specification file.
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
-  (unless (string-equal problem-name *problem-name*)
+  (unless (string-equal (string problem-name) (string *problem-name*))
     (setf *debug* 0)
     (setf *probe* nil)
-    (makunbound '*keep-globals-p*))  ;forget user repl set globals if switching problems
+    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
   (with-silenced-compilation
     (reload-with-new-problem problem-name)))
 

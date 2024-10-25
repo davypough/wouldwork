@@ -426,7 +426,7 @@
 
 
 (defun install-init (literals)
-  (declare (special *relations* *db* *static-db*))
+  ;(declare (special *relations* *db* *static-db*))
   (format t "~&Creating initial propositional database...")
   (check-type literals cons)
   (dolist (literal literals)

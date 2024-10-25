@@ -59,12 +59,6 @@
 #+sbcl (pushnew 'cleanup-resources sb-ext:*exit-hooks*)
 
 
-;; after loading set the global values to what was in "vals.lisp"
-;(defvar *keep-globals-p* nil)   ;; this initializes *keep-globals-p* variable
-;(read-globals)                  ;; this overtakes the globals only when
-                                ;; keep-globals-p in vals.lisp was set to T
-
-
 #-sbcl
 (when (> *threads* 0)
   (error "Note that multi-threading is not available unless running in SBCL.
@@ -183,20 +177,12 @@
 ;Reset certain user defined functions, when defined on previous load.
 
 
-(define-global *problem-name* 'unspecified  ;default name
-  "Name of the current problem, reassigned in problem.lisp by user.")
-
-
-;(define-global *current-problem-name* "unspecified")
-
-
 (let* ((root (asdf:system-source-directory :wouldwork))
        (src-dir (merge-pathnames "src/" root))
-       (target-path (merge-pathnames "problem.lisp" src-dir))
-       (source-path (merge-pathnames "problem-blocks3.lisp" src-dir)))
-  (unless (probe-file target-path)  ;does problem.lisp already exist?
-    (uiop:copy-file source-path target-path)  ;create problem.lisp
-    (setf *problem-name* 'blocks3)))
+       (problem-file (merge-pathnames "problem.lisp" src-dir))
+       (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir)))
+  (unless (probe-file problem-file)
+    (uiop:copy-file blocks3-file problem-file)))  ;default problem.lisp
 
 
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -272,6 +258,9 @@
 (define-global *start-time* 0
   "Stores time at beginning of the search.")
 
+(define-global *problem-name* 'unspecified  ;default name
+  "Name of the current problem, reassigned in problem.lisp by user.")
+
 (define-global *problem-type* 'planning
   "Spedify whether it's a planning problem or constraint satisfaction problem.")
 
@@ -292,31 +281,6 @@
 
 (define-global *branch* -1
   "If n>0, explore only the nth branch from the *start-state*.")
-
-;(unless (boundp '*problem-name*)
-;  (define-global *problem-name* 'unspecified
-;    "Name of the current problem, assigned in problem.lisp by user."))
-;(declaim (type symbol *problem-name*))
-
-(define-global *problem-type* 'planning
-  "Spedify whether it's a planning problem or constraint satisfaction problem.")
-
-(define-global *solution-type* 'first
-  "Specify whether to search for first, min-length, min-time, or every solution.")
-
-(define-global *tree-or-graph* 'graph
-  "Whether there are repeated states (graph) or not (tree); try both.")
-
-(define-global *depth-cutoff* 0
-  "Negative or 0 means no cutoff.")
-
-(define-global *progress-reporting-interval* 100000
-  "Print progress during search after each multiple n of states examined.")
-
-(unless (boundp '*randomize-search*)
-  (define-global *randomize-search* nil
-    "Set to t or nil."))
-(declaim (type (member nil t) *randomize-search*))
 
 (define-global *types* (make-hash-table :test #'eq)
   "Table of all types.")

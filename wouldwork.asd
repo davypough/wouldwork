@@ -19,7 +19,9 @@
                #-sbcl :genhash
                #-sbcl :trivial-backtrace
                #-sbcl :metering)
-  :serial t
+  :perform (compile-op :after (o c)
+                      (declare (ignore o c))
+                      (pushnew :wouldwork *features*))
   ;:around-compile (lambda (thunk)
   ;                  (print (funcall thunk)))
   :components ((:module "src"
