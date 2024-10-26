@@ -41,36 +41,11 @@
       5 - display full nodes + break after each expansion cycle"))
 
 
-(defun cleanup-resources ()
-  #+sbcl
-  (progn (format t "~&Cleaning up resources and shutting down threads...~%")
-         (let ((current-thread sb-thread:*current-thread*))
-           (dolist (thread (sb-thread:list-all-threads))
-             (unless (eq thread current-thread)
-               (when (sb-thread:thread-alive-p thread)
-                 (format t "~&Terminating thread: ~A~%" thread)
-                 (ignore-errors
-                   (sb-thread:terminate-thread thread))))))
-           (format t "~&Cleanup completed.~%"))
-  #-sbcl
-  nil)
-
-
-#+sbcl (pushnew 'cleanup-resources sb-ext:*exit-hooks*)
-
-
 #-sbcl
 (when (> *threads* 0)
   (error "Note that multi-threading is not available unless running in SBCL.
           Please set *threads* in ww-settings.lisp to 0."))
 
-
-(if (> *debug* 0)
-  (pushnew :ww-debug *features*)
-  (setf *features* (remove :ww-debug *features*)))
-
-
-#+sbcl (defparameter *lock* (bt:make-lock))  ;for thread protection
 
 ;#+sbcl
 ;(if (> *threads* 0)
@@ -85,104 +60,9 @@
 ;  (setf *debugger-hook* nil))
 
 
-(defun eql* (&rest arguments)
-  (every #'eql arguments (rest arguments)))
-
-
-; mainly for debugging
-(setf *print-length* nil)  ; Don't limit number of elements printed
-(setf *print-level* nil)   ; Don't limit nesting depth
-(setf *print-circle* nil)  ; Don't include prior reference #n
-;(setf *print-readably* t)
-(setq *print-right-margin* 140) ;Allows non-wrap printing of *search-tree* for deep trees.
-
-
-(defparameter *global-locks* (make-hash-table))  ;Used for non-sbcl implementations
-
-
-#+sbcl
-(defun ensure-global-lock (var-name)
-  "Store one lock for each global variable. Used for non-sbcl implementations."
-  (or (gethash var-name *global-locks*)
-      (setf (gethash var-name *global-locks*)
-            (bordeaux-threads:make-lock (format nil "Lock for ~S" var-name)))))
-
-
-(defmacro define-global (var-name val-form &optional doc-string)
-  `(progn
-     #+sbcl
-     ,(if (> *threads* 0)
-          (if (boundp var-name)
-              `(setf ,var-name ,val-form)
-              `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
-          `(defparameter ,var-name ,val-form ,doc-string))
-     #-sbcl
-     (defparameter ,var-name ,val-form ,doc-string)))
-
-
-(defmacro increment-global (var-name &optional (delta-form 1))
-  `(progn
-     (declaim (type fixnum ,var-name))
-     #+sbcl
-     ,(if (> *threads* 0)
-        `(sb-ext:atomic-incf ,var-name ,delta-form)
-        `(incf ,var-name ,delta-form))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-         ;(incf ,var-name ,delta-form))
-        `(incf ,var-name ,delta-form))))
-
-
-(defmacro push-global (item var-name)
-  `(progn
-     (declaim (type list ,var-name))
-     #+sbcl
-     ,(if (> *threads* 0)
-        `(sb-ext:atomic-push ,item ,var-name)
-        `(push ,item ,var-name))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-        ; (push ,item ,var-name))
-        `(push ,item ,var-name))))
-
-
-(defmacro pop-global (var-name)
-  `(progn
-     (declaim (type list ,var-name))
-     #+sbcl
-     ,(if (> *threads* 0)
-        `(sb-ext:atomic-pop ,var-name)
-        `(pop ,var-name))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-        ; (pop ,var-name))
-       `(pop ,var-name))))
-
-
-(defun reset-globals (symbols)
-  (dolist (symbol symbols)
-    (unintern symbol)))
-
-
-(reset-globals '(goal-fn constraint-fn heuristic? prune? bounding-function?))
-;Reset certain user defined functions, when defined on previous load.
-
-
-(let* ((root (asdf:system-source-directory :wouldwork))
-       (src-dir (merge-pathnames "src/" root))
-       (problem-file (merge-pathnames "problem.lisp" src-dir))
-       (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir)))
-  (unless (probe-file problem-file)
-    (uiop:copy-file blocks3-file problem-file)))  ;default problem.lisp
+;(if (> *debug* 0)  ;this is better handled in ww-set.lisp
+;  (pushnew :ww-debug *features*)
+;  (setf *features* (remove :ww-debug *features*)))
 
 
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

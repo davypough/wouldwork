@@ -82,3 +82,19 @@ then you have to start with `ros run`
 For efficiency purposes, Wouldwork was originally designed to take advantage of some non-standard features in SBCL.
 However, it has since been extended with generic libraries to also run on CCL, although not with parallel multi-threading.
 As a result, expect significantly slower performance with CCL for large problems.
+
+5. WORKFLOW
+
+When you are working on a problem (composing, testing, debugging, etc),
+Wouldwork remembers the last state when your common lisp session is closed.
+This allows you to pick up from where you left off in a previous session
+without having to remember the settings of all the search parameters.
+To cancel the current parameters and start working on a new problem,
+enter `(stage <new-problem-name>)` to load the new problem into Wouldwork.
+Staging assumes that you have created the new `problem-<new-problem-name>.lisp` file
+in the src directory, or that it already exists.
+After correcting any compile errors or warnings during staging, enter (solve)
+to direct Wouldwork to solve the currently staged problem.
+If there are run-time errors, fix the `problem-<new-problem-name>.lisp` file,
+or include diagnostic checkpoints such as `(ut::prt <S-expression>)` in the file,
+or enter `(ww-set *debug* 5)` to step through the search one expansion node at a time.

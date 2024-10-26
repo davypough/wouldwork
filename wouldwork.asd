@@ -29,6 +29,7 @@
                 :components ((:file "packages")
 		                     (:file "ww-utilities")
 		                     (:file "ww-hstack")
+                             (:file "ww-preliminaries")
 		                     (:file "ww-settings")
 		                     (:file "ww-structures")
 		                     (:file "ww-converter")
@@ -43,7 +44,7 @@
 		                     (:file "problem")
 		                     (:file "ww-searcher")
 		                     (:file "ww-planner")
-		                     #+sbcl (:file "ww-parallel")
+		              #+sbcl (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
   ;; Build a binary:
   ;; don't change this line.

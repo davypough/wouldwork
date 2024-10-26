@@ -42,6 +42,10 @@
 ;;;;;;;;;;;;; User Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+(defun eql* (&rest arguments)
+  (every #'eql arguments (rest arguments)))
+
+
 (defun different (sym1 sym2)
   "Determines whether two symbols are different."
   (if (and (symbolp sym1) (symbolp sym2))

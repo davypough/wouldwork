@@ -19,7 +19,7 @@
            #:run-all
            #:list-all
            #:run
-           #:*problem-names*
+          ;#:*test-problem-names*
            #:*problem-folder-paths*
 	   #:get-src-folder-path
 	   #:add-problem-folder

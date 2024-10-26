@@ -369,7 +369,7 @@ any such settings appearing in the problem specification file.
 (declaim (ftype (function () t) solve))  ;function solve located in searcher.lisp
 
 
-(defparameter *problem-files*
+(defparameter *test-problem-files*
   '("problem-blocks3.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp"
     "problem-queens8.lisp" "problem-captjohn-csp.lisp" "problem-quern.lisp" 
@@ -383,9 +383,9 @@ any such settings appearing in the problem specification file.
   "List of all problem filenames which are correct.")
 
 
-(defparameter *problem-names* (mapcar (lambda (pn) (strip-name pn "problem-" ".lisp"))
-				      *problem-files*)
-  "List of all problem names of problem files which are correct.")
+;(defparameter *problem-names* (mapcar (lambda (pn) (strip-name pn "problem-" ".lisp"))
+;				      *test-problem-files*)
+;  "List of all problem names of problem files which are correct.")
 
 
 (defmacro with-silenced-compilation (&body body)
@@ -405,7 +405,7 @@ any such settings appearing in the problem specification file.
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (with-silenced-compilation
-    (let ((problems-to-run *problem-files*)
+    (let ((problems-to-run *test-problem-files*)
           (total-problems 0)
           (problems-processed 0))
       (loop for problem in problems-to-run
@@ -428,11 +428,10 @@ any such settings appearing in the problem specification file.
                       ;    (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)))))
                       ;    (format t "Skipping to next problem.~%")))))
       (format t "~%~%Final Summary:~%")
-      (format t "Total problems in list: ~D~%" total-problems)
+      (format t "Total test problems attempted: ~D~%" total-problems)
       (format t "Problems processed: ~D~%" problems-processed)
       (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~%")
-      (uiop:delete-file-if-exists (in-src "problem.lisp"))
-      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+      (display-current-parameters)
       t)))
 
 
@@ -440,9 +439,6 @@ any such settings appearing in the problem specification file.
 (setf (fdefinition 'test) #'run-test-problems)
 (setf (fdefinition 'run-all) #'run-test-problems)
 (setf (fdefinition 'run-test) #'run-test-problems)
-
-
-;(defparameter *current-problem-name* (string *problem-name*))  ;normally specified in problem.lisp
 
 
 (defmacro run (problem-name &key (with-reload-p t))
