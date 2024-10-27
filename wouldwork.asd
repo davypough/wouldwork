@@ -22,8 +22,8 @@
   :perform (compile-op :after (o c)
                       (declare (ignore o c))
                       (pushnew :wouldwork *features*))
-  ;:around-compile (lambda (thunk)
-  ;                  (print (funcall thunk)))
+;  :around-compile (lambda (thunk)
+;                    (print (funcall thunk)))
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
@@ -39,11 +39,11 @@
 		                     (:file "ww-happenings")
 		                     (:file "ww-translator")
 		                     (:file "ww-installer")
-		                     (:file "ww-set")
                              (:file "ww-interface")
+		                     (:file "ww-set")
 		                     (:file "problem")
-		                     (:file "ww-searcher")
 		                     (:file "ww-planner")
+		                     (:file "ww-searcher")
 		              #+sbcl (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
   :build-operation "program-op"  ;build a binary: binary name: adapt.

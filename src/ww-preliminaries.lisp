@@ -128,8 +128,7 @@
        (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
        (vals-problem-name (when (probe-file vals-file)
                             (with-open-file (in-file vals-file :direction :input)
-                              (let ((first-item (read in-file nil nil)))
-                                (and (symbolp first-item) (string first-item))))))
+                              (string (first (read in-file nil nil))))))
        (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
   (cond ((not (probe-file problem-file))  ;no problem.lisp file?
            (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp

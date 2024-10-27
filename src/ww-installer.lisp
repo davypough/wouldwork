@@ -183,6 +183,25 @@
   (push object *happening-names*))
            
 
+(defun check-happening (happening-object property-list)
+  (check-type happening-object symbol)
+  (check-type property-list cons)
+  (iter (for (happening-keyword happening-property) on property-list by #'cddr)
+        (check-type happening-keyword keyword)
+        (case happening-keyword
+          (:inits (check-type happening-property list)
+                  (iter (for proposition in happening-property)
+                        (check-proposition proposition)))
+          (:events (check-type happening-property list)
+                   (iter (for happening-event in happening-property)
+                         (check-type (first happening-event) (integer 1 *))
+                         (iter (for proposition in (cdr happening-event))
+                               (check-proposition proposition))))
+          (:repeat (check-type happening-property boolean))
+          (:interrupt (check-type happening-property list)
+                      (translate happening-property 'pre)))))
+
+
 (defmacro define-query (name args body)
   `(install-query ',name ',args ',body))
 
