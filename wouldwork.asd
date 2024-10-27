@@ -46,10 +46,18 @@
 		                     (:file "ww-planner")
 		              #+sbcl (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
-  ;; Build a binary:
-  ;; don't change this line.
-  :build-operation "program-op"
-  ;; binary name: adapt.
+  :build-operation "program-op"  ;build a binary: binary name: adapt.
   :build-pathname "wouldwork"
-  ;; entry point: here "main" is an exported symbol. Otherwise, use a double ::
-  :entry-point "wouldwork:main")
+  :entry-point "wouldwork:main")  ;entry point: here "main" is an exported symbol. Otherwise, use a double ::
+
+
+(defmethod asdf:prepare-op ((operation asdf:operation)
+                           (system (eql (asdf:find-system :wouldwork)))
+                           &key)
+  "First delete all compiled files so ASDF will always recompile wouldwork before reloading."
+  (let* ((sys (asdf:find-system :wouldwork))
+         (files (asdf:output-files 'asdf:compile-op sys)))
+    (dolist (file files)
+      (when (probe-file file)
+        (delete-file file))))
+  (call-next-method))

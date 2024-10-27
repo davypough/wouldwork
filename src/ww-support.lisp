@@ -26,7 +26,7 @@
   "Deterministically profiles Wouldwork."
   (sb-profile:reset)
   (sb-profile:profile "WOULDWORK")
-  (solve)
+  (ww-solve)
   (sb-profile:report))
 
 
@@ -35,7 +35,7 @@
   "Deterministically profiles Wouldwork."
   (monitor:reset-all-monitoring)
   (monitor:monitor-all :ww)
-  (solve)
+  (ww-solve)
   (monitor:report-monitoring :all))   ;(monitor:display-monitoring-results))
 
 

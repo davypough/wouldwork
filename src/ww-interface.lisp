@@ -362,11 +362,11 @@ any such settings appearing in the problem specification file.
   ;; (asdf:operate 'asdf:load-op :wouldwork :force-not '(:iterate :alexandria :lparallel)))
   ;(when keep-globals-p
   ;  (save-globals))   ;; for persistence of (*keep-globals-p* *debug* *features*) ;*threads*)
-  (asdf:compile-system system-name :force t)
-  (asdf:load-system system-name))
+  ;(asdf:compile-system system-name :force t)
+  (asdf:load-system system-name :force t))
 
 
-(declaim (ftype (function () t) solve))  ;function solve located in searcher.lisp
+(declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
 
 
 (defparameter *test-problem-files*
@@ -423,7 +423,7 @@ any such settings appearing in the problem specification file.
                              (reload-with-new-problem problem-name :problem-file problem-file)  ; :keep-globals-p keep-globals-p)
                              (exchange-problem-file problem-name problem-file))
                          (incf problems-processed)
-                         (solve)))))
+                         (ww-solve)))))
                       ; (error (e)
                       ;    (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)))))
                       ;    (format t "Skipping to next problem.~%")))))
@@ -456,7 +456,7 @@ any such settings appearing in the problem specification file.
              (if with-reload-p
                  (reload-with-new-problem problem-name)  ; :keep-globals-p keep-globals-p)
                  (exchange-problem-file problem-name)) 
-             (solve))
+             (ww-solve))
             (t
              (format t "The problem \"~a\" was not found. Please check spelling (and the path)." problem-name)))))
 
