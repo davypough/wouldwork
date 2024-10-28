@@ -203,6 +203,13 @@ any such settings appearing in the problem specification file.
             *features*))
 
 
+(defun reset-globals-to-defaults ()
+  (setf *problem-name* 'unspecified *depth-cutoff* 0 *tree-or-graph* 'graph
+        *solution-type* 'planning *progress-reporting-interval* 100000
+        *randomize-search* nil *branch* -1 *probe* nil *debug* 0)
+  (setf *features* (remove :ww-debug *features*)))
+
+
 (defun save-globals ()
   "Save the values of the globals (*keep-globals-p* *debug* *features*) in the vals.lisp file."
   ;(display-globals)
@@ -358,7 +365,8 @@ any such settings appearing in the problem specification file.
     (format t "~%Can't find ~A in the list of problem file names.~%" (string problem-name))
     (format t "Enter (list-problem-names) to see all currently specified problems.~%")
     (return-from reload-with-new-problem))
-  (exchange-problem-file problem-name problem-file)
+  (unless (string-equal (string problem-name) (string *problem-name*))
+    (exchange-problem-file problem-name problem-file))
   ;; (asdf:operate 'asdf:load-op :wouldwork :force-not '(:iterate :alexandria :lparallel)))
   ;(when keep-globals-p
   ;  (save-globals))   ;; for persistence of (*keep-globals-p* *debug* *features*) ;*threads*)
@@ -404,6 +412,7 @@ any such settings appearing in the problem specification file.
 (defun run-test-problems (&key (problem-file "problem.lisp") (with-reload-p t))  ; (keep-globals-p nil))
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+  (reset-globals-to-defaults)
   (with-silenced-compilation
     (let ((problems-to-run *test-problem-files*)
           (total-problems 0)
@@ -431,6 +440,9 @@ any such settings appearing in the problem specification file.
       (format t "Total test problems attempted: ~D~%" total-problems)
       (format t "Problems processed: ~D~%" problems-processed)
       (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~%")
+      (uiop:delete-file-if-exists (in-src "problem.lisp"))
+      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+      (reset-globals-to-defaults)
       (display-current-parameters)
       t)))
 
