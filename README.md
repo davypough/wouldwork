@@ -52,7 +52,7 @@ or email Dave Brown at davypough@gmail.com
 4)	Start SBCL from your terminal command prompt.
 5)	At the SBCL prompt, enter (ql:quickload :wouldwork :force t)
 6)	Enter (in-package :ww) to switch the current package from cl-user to wouldwork.
-7)	Enter (run-test) to verify everything is loaded and running properly.
+7)	Enter (test) to verify everything is loaded and running properly.
 8)	Review the printout from any of the test problems to see the format of solutions.
 9)	Look at the sample problem specifications (eg, problem-blocks3.lisp) in the src directory to become acquainted with how problems are defined.
 

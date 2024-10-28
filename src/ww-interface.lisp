@@ -185,8 +185,8 @@ any such settings appearing in the problem specification file.
 
 (defparameter *globals-file* 
   (merge-pathnames "vals.lisp" (get-package-root :wouldwork))
-  "In the vals.lisp file of this package the values of 
-    and *features* are stored as a list.
+  "In the vals.lisp file of this package the values of parameters
+     are stored as a list.
    This should preserve when reloading the package for problems
    the values of these global variables. The user should not
    have to worry about the changes of these values after reloading.")
@@ -195,12 +195,12 @@ any such settings appearing in the problem specification file.
 (defun display-globals ()
   (format t "~&*problem-name* ~A~% 
                *depth-cutoff* ~A~%*tree-or-graph* ~A~%*solution-type* ~A~%
-               *progress-reporting-interval* ~A~%*randomize-search* ~A~%*branch* ~A~%*probe* ~A~%                                    *debug* ~A~%*features*~%~A~%~%"
+               *progress-reporting-interval* ~A~%*randomize-search* ~A~%*branch* ~A~%*probe* ~A~%                                    *debug* ~A~2%"
            ;*keep-globals-p*
             *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
             *progress-reporting-interval* *randomize-search* *branch* *probe*
-            *debug* ;*threads*
-            *features*))
+            *debug*)) ;*threads*
+            ;*features*))
 
 
 (defun reset-globals-to-defaults ()
@@ -211,12 +211,11 @@ any such settings appearing in the problem specification file.
 
 
 (defun save-globals ()
-  "Save the values of the globals (*keep-globals-p* *debug* *features*) in the vals.lisp file."
-  ;(display-globals)
+  "Save the values of the globals in the vals.lisp file."
   (save-to-file (list ;*keep-globals-p*
                       *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
                       *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*
-                      *features* #|*threads*|#)
+                      #|*features* *threads*|#)
                 *globals-file*)) ;; this stores global var values
 
 (defun set-globals (&key ;(keep-globals-p *keep-globals-p*)
@@ -228,11 +227,10 @@ any such settings appearing in the problem specification file.
                          (randomize-search *randomize-search*)
                          (branch *branch*)
                          (probe *probe*)
-                         (debug *debug*)
-                         (features *features*))
+                         (debug *debug*))
+                         ;(features *features*))
                          ;(threads *threads*))
   "Set multiple globals at once in keywords argument format."
-  ;(display-globals)
   (setf ;*keep-globals-p* keep-globals-p
         *problem-name* problem-name
         *depth-cutoff* depth-cutoff
@@ -242,8 +240,8 @@ any such settings appearing in the problem specification file.
         *randomize-search* randomize-search
         *branch* branch
         *probe* probe
-        *debug* debug
-        *features* features)
+        *debug* debug)
+        ;*features* features)
         ;*threads* threads)
   (save-globals))
 
@@ -253,11 +251,11 @@ any such settings appearing in the problem specification file.
 
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0 *features*)))
+  (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))  ; *features*)))
     (destructuring-bind 
         (;keep-globals-p
          tmp-problem-name tmp-depth-cutoff tmp-tree-or-graph tmp-solution-type
-         tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug tmp-features)
+         tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)  ; tmp-features)
         (let ((vals (or (ignore-errors (read-from-file *globals-file*))
                         default-values)))
           vals)
@@ -277,8 +275,8 @@ any such settings appearing in the problem specification file.
               *randomize-search* tmp-randomize-search
               *branch* tmp-branch
               *probe* tmp-probe
-              *debug* tmp-debug
-              *features* tmp-features))))
+              *debug* tmp-debug))))
+              ;*features* tmp-features))))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;
@@ -369,7 +367,7 @@ any such settings appearing in the problem specification file.
     (exchange-problem-file problem-name problem-file))
   ;; (asdf:operate 'asdf:load-op :wouldwork :force-not '(:iterate :alexandria :lparallel)))
   ;(when keep-globals-p
-  ;  (save-globals))   ;; for persistence of (*keep-globals-p* *debug* *features*) ;*threads*)
+  ;  (save-globals))
   ;(asdf:compile-system system-name :force t)
   (asdf:load-system system-name :force t))
 
@@ -436,14 +434,13 @@ any such settings appearing in the problem specification file.
                       ; (error (e)
                       ;    (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)))))
                       ;    (format t "Skipping to next problem.~%")))))
+      (uiop:delete-file-if-exists (in-src "problem.lisp"))
+      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+      (stage blocks3)
       (format t "~%~%Final Summary:~%")
       (format t "Total test problems attempted: ~D~%" total-problems)
       (format t "Problems processed: ~D~%" problems-processed)
-      (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~%")
-      (uiop:delete-file-if-exists (in-src "problem.lisp"))
-      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
-      (reset-globals-to-defaults)
-      (display-current-parameters)
+      (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~2%")
       t)))
 
 
@@ -461,6 +458,7 @@ any such settings appearing in the problem specification file.
   "Loads, reloads and solves a single problem."
   (unless (string-equal (string problem-name) (string *problem-name*))
     (setf *debug* 0)
+    (setf *features* (remove :ww-debug *features*))
     (setf *probe* nil)
     (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
   (with-silenced-compilation
@@ -483,6 +481,7 @@ any such settings appearing in the problem specification file.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
   (unless (string-equal (string problem-name) (string *problem-name*))
     (setf *debug* 0)
+    (setf *features* (remove :ww-debug *features*))
     (setf *probe* nil)
     (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
   (with-silenced-compilation

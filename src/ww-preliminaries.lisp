@@ -111,13 +111,13 @@
        `(pop ,var-name))))
 
 
-(defun reset-globals (symbols)
+(defun reset-user-fns (symbols)
   (dolist (symbol symbols)
     (unintern symbol)))
 
 
 ;Reset certain user defined functions, when defined on previous load.
-(reset-globals '(goal-fn constraint-fn heuristic? prune? bounding-function?))
+(reset-user-fns '(goal-fn constraint-fn heuristic? prune? bounding-function?))
 
 
 ;Make sure proper problem.lisp exists before loading wouldwork
@@ -129,7 +129,12 @@
          (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
          (vals-problem-name (when (probe-file vals-file)
                               (with-open-file (in-file vals-file :direction :input)
-                                (string (first (read in-file nil nil))))))
+                                (let* ((parameters (read in-file nil nil))
+                                       (problem-name (string (first parameters)))
+                                       (debug (ninth parameters)))
+                                  (when (> debug 0)
+                                    (pushnew :ww-debug *features*))
+                                  problem-name))))
          (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
     (cond ((not (probe-file problem-file))  ;no problem.lisp file?
              (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp
