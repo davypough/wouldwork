@@ -40,6 +40,7 @@
 		                     (:file "ww-translator")
 		                     (:file "ww-installer")
                              (:file "ww-interface")
+                             (:file "ww-problem-tests")
 		                     (:file "ww-set")
 		                     (:file "problem")
 		                     (:file "ww-planner")

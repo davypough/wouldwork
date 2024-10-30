@@ -71,19 +71,13 @@ and `(ql:register-local-projects)`. You should be able to load Wouldwork with
 After loading Wouldwork with `(ql:quickload "wouldwork" :force t)` and `(in-package :ww)`,
 you can get more help with REPL commands by entering `(help)` at the REPL prompt.
 
-3. ROSWELL
-
-If you are using roswell, then your `local-projects` folder is usually in 
-`~/.roswell/local-projects/`. Also, if you want to use roswell SBCL,
-then you have to start with `ros run`
-
-4. PORTABILITY
+3. PORTABILITY
 
 For efficiency purposes, Wouldwork was originally designed to take advantage of some non-standard features in SBCL.
 However, it has since been extended with generic libraries to also run on CCL, although not with parallel multi-threading.
 As a result, expect significantly slower performance with CCL for large problems.
 
-5. WORKFLOW
+4. WORKFLOW
 
 When you are working on a problem (composing, testing, debugging, etc),
 Wouldwork remembers the last state when your common lisp session is closed.

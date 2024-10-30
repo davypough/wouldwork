@@ -9,11 +9,11 @@
 
 (in-package :ww)  ;required
 
-(ww-set 'problem 'smallspace-macro)
+(ww-set *problem-name* smallspace-macro)
 
-(ww-set 'depth-cutoff 19)
+(ww-set *depth-cutoff* 19)
 
-(ww-set 'solution-type 'min-length)
+(ww-set *solution-type* min-length)
 
 
 (define-types

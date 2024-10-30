@@ -375,20 +375,6 @@ any such settings appearing in the problem specification file.
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
 
 
-(defparameter *test-problem-files*
-  '("problem-blocks3.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
-    "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp"
-    "problem-queens8.lisp" "problem-captjohn-csp.lisp" "problem-quern.lisp" 
-    "problem-graveyard.lisp" "problem-sentry.lisp" #+sbcl "problem-crossword5-11.lisp"
-    "problem-array-path.lisp" "problem-tiles1a-heuristic.lisp" ;"problem-tiles7a-heuristic.lisp" takes too long in non-sbcl
-    "problem-triangle-xy.lisp" "problem-triangle-xyz.lisp" "problem-triangle-heuristic.lisp"
-    "problem-triangle-macros.lisp" "problem-triangle-macros-one.lisp"
-    "problem-tsp.lisp" "problem-u2.lisp" "problem-donald.lisp"
-    "problem-knap4a.lisp" "problem-knap4b.lisp" "problem-knap19.lisp"
-    "problem-smallspace.lisp")  ;"problem-crater.lisp")
-  "List of all problem filenames which are correct.")
-
-
 ;(defparameter *problem-names* (mapcar (lambda (pn) (strip-name pn "problem-" ".lisp"))
 ;				      *test-problem-files*)
 ;  "List of all problem names of problem files which are correct.")
@@ -405,49 +391,6 @@ any such settings appearing in the problem specification file.
          ;                                              (*print-level* . 6)
      	 ;   			                                (*print-pretty* . t))))
      ,@body))
-
-
-(defun run-test-problems (&key (problem-file "problem.lisp") (with-reload-p t))  ; (keep-globals-p nil))
-  (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
-  (reset-globals-to-defaults)
-  (with-silenced-compilation
-    (let ((problems-to-run *test-problem-files*)
-          (total-problems 0)
-          (problems-processed 0))
-      (loop for problem in problems-to-run
-            do (progn
-                 (incf total-problems)
-                 (let* ((problem-name (if (string-prefix-p "problem-" problem)
-                                          (subseq problem 8 (- (length problem) 5))
-                                          (subseq problem 0 (- (length problem) 5)))))
-                   (format t "~%=====================================================~%")
-                   (format t "Processing problem: \"~A\"~%" problem-name)
-                   (format t "=====================================================~%")
-                   ;(handler-case
-                       (progn
-                         (if with-reload-p
-                             (reload-with-new-problem problem-name :problem-file problem-file)  ; :keep-globals-p keep-globals-p)
-                             (exchange-problem-file problem-name problem-file))
-                         (incf problems-processed)
-                         (ww-solve)))))
-                      ; (error (e)
-                      ;    (format t "Error occurred while processing problem ~a: ~a~%" problem-name e)))))
-                      ;    (format t "Skipping to next problem.~%")))))
-      (uiop:delete-file-if-exists (in-src "problem.lisp"))
-      (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
-      (stage blocks3)
-      (format t "~%~%Final Summary:~%")
-      (format t "Total test problems attempted: ~D~%" total-problems)
-      (format t "Problems processed: ~D~%" problems-processed)
-      (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~2%")
-      t)))
-
-
-;; alias:
-(setf (fdefinition 'test) #'run-test-problems)
-(setf (fdefinition 'run-all) #'run-test-problems)
-(setf (fdefinition 'run-test) #'run-test-problems)
 
 
 (defmacro run (problem-name &key (with-reload-p t))
