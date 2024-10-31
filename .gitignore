@@ -3,7 +3,6 @@ vals.lisp
 
 # ignore current problem.lisp
 src/problem.lisp
-problem.lisp
 
 # ignore emacs files
 .#*

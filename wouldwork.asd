@@ -22,8 +22,9 @@
   :perform (compile-op :after (o c)
                       (declare (ignore o c))
                       (pushnew :wouldwork *features*))
-;  :around-compile (lambda (thunk)
-;                    (print (funcall thunk)))
+  :around-compile (lambda (next)
+                    (handler-bind (((or style-warning warning) #'muffle-warning))
+                      (funcall next)))
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
