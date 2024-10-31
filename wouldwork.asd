@@ -41,6 +41,7 @@
 		                     (:file "ww-installer")
                              (:file "ww-interface")
                              (:file "ww-problem-tests")
+                             (:file "ww-command-tests")
 		                     (:file "ww-set")
 		                     (:file "problem")
 		                     (:file "ww-planner")

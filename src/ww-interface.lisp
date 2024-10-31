@@ -112,7 +112,7 @@ any such settings appearing in the problem specification file.
 
 ;; -------------------- plist lookup customizable -------------------- ;;
 
-(defun lookup (key plist &key (test #'string=) (default))
+(defun lookup (key plist &key (test #'string-equal) (default))
   "Key value lookup in plist with #'string= or any other function as test.
    The plist-related getf can only handle eql."
   (let ((res nil)
@@ -343,33 +343,20 @@ any such settings appearing in the problem specification file.
 (setf (fdefinition 'probs) #'list-problem-names)
 
 
-(defun exchange-problem-file (problem-name &optional (problem-file "problem.lisp"))
-  "Copies problem path to 'src/problem.lisp'"
+(defun exchange-problem-file (problem-name-str)
+  "Copies problem file to src/problem.lisp"
   (let* ((plist (list-problem-files-plist))
-	(path (lookup problem-name plist)))
-    (copy-file-content path (in-src problem-file))
+	     (problem-file (lookup problem-name-str plist)))
+    (copy-file-content problem-file (in-src "problem.lisp"))
     (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))))
 
 
-(Defun reload-with-new-problem (problem-name &key (problem-file "problem.lisp") 
-                                                  (system-name :wouldwork))
-                                                  ;(keep-globals-p t))
-  "This function is crucial for loading problems.
-   Given a problem-name, it replaces the content of the problem.lisp file by
-   the content of the correponsing problem file.
-   And then reloads the entire package anew (which leads to re-compilation).
-   keep-globals-p determines whether the global variables from the last session should be overtaken."
-  (unless (member (string problem-name) (list-problem-names) :test #'string-equal)
-    (format t "~%Can't find ~A in the list of problem file names.~%" (string problem-name))
-    (format t "Enter (list-problem-names) to see all currently specified problems.~%")
-    (return-from reload-with-new-problem))
-  (unless (string-equal (string problem-name) (string *problem-name*))
-    (exchange-problem-file problem-name problem-file))
-  ;; (asdf:operate 'asdf:load-op :wouldwork :force-not '(:iterate :alexandria :lparallel)))
-  ;(when keep-globals-p
-  ;  (save-globals))
-  ;(asdf:compile-system system-name :force t)
-  (asdf:load-system system-name :force t))
+(defun load-problem (problem-name-str)
+  "Given a problem-name, replace the content of the problem.lisp file by
+   the content of the correponsing problem file, and then reloads everything."
+  (unless (string-equal problem-name-str (string *problem-name*))
+    (exchange-problem-file problem-name-str))
+  (asdf:load-system :wouldwork :force t))
 
 
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
@@ -393,42 +380,37 @@ any such settings appearing in the problem specification file.
      ,@body))
 
 
-(defmacro run (problem-name &key (with-reload-p t))
-  `(%run (string-downcase (format nil "~A" (quote ,problem-name))) :with-reload-p ,with-reload-p))
+(defmacro run (problem-name)
+  "Stages and solves a user specified problem."
+  `(%run ,(string problem-name)))
 
-
-(defun %run (problem-name &key (with-reload-p t))  ; (keep-globals-p nil))
-  "Loads, reloads and solves a single problem."
-  (unless (string-equal (string problem-name) (string *problem-name*))
-    (setf *debug* 0)
-    (setf *features* (remove :ww-debug *features*))
-    (setf *probe* nil)
-    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
-  (with-silenced-compilation
-      (cond ((member problem-name (list-all) :test #'string=)
-             (if with-reload-p
-                 (reload-with-new-problem problem-name)  ; :keep-globals-p keep-globals-p)
-                 (exchange-problem-file problem-name)) 
-             (ww-solve))
-            (t
-             (format t "The problem \"~a\" was not found. Please check spelling (and the path)." problem-name)))))
+(defun %run (problem-name-str)
+  "Stages and solves a user specified problem."
+  (when (%stage problem-name-str)
+    (ww-solve)))
 
 
 (defmacro stage (problem-name)
-  `(%stage (string-downcase (format nil "~A" (quote ,problem-name)))))
-
-
-(defun %stage (problem-name)
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
-  (unless (string-equal (string problem-name) (string *problem-name*))
+  `(%stage ,(string problem-name)))
+
+(defun %stage (problem-name-str)
+  "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
+   specification, and check the current parameters, without asking wouldwork to solve it as run does.
+   Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
+  (unless (member problem-name-str (list-problem-names) :test #'string-equal)
+    (format t "The problem ~A was not found." problem-name-str)
+    (format t "~&Enter (list-all-problems) for a complete list of problems." )
+    (return-from %stage))
+  (unless (string-equal problem-name-str (string *problem-name*))
     (setf *debug* 0)
     (setf *features* (remove :ww-debug *features*))
     (setf *probe* nil)
     (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
   (with-silenced-compilation
-    (reload-with-new-problem problem-name)))
+    (load-problem problem-name-str)))
 
 
 (defun solve ()

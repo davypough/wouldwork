@@ -48,7 +48,7 @@
     "problem-smallspace.lisp"))
 
 
-(defun run-test-problems (&key (problem-file "problem.lisp") (with-reload-p t))  ; (keep-globals-p nil))
+(defun run-test-problems ()
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (reset-globals-to-defaults)
@@ -69,23 +69,20 @@
                    (format t "~%=====================================================~%")
                    (format t "Processing problem: \"~A\"~%" problem-name)
                    (format t "=====================================================~%")
-                   (progn
-                     (if with-reload-p
-                       (reload-with-new-problem problem-name :problem-file problem-file)  ; :keep-globals-p keep-globals-p)
-                       (exchange-problem-file problem-name problem-file))
-                     (incf problems-processed)
-                     (ww-solve)
-                     #+sbcl
-                     (let ((best-solution (ut::if-it (first *solutions*) (solution.path ut::it)))
-                           (best-state (alexandria:hash-table-alist (problem-state.idb (first *best-states*)))))
-                       (unless (equalp (list best-solution best-state)  ;current results
-                                       (gethash problem-name problem-test-solutions))  ;reference solutions
-                         (format t "~%The problem solution above does not match the expected solution:")
-                         (format t "~%~A~2%" (gethash problem-name problem-test-solutions))
-                         (push problem-name failed-problems))
-                       ;(setf (gethash problem-name problem-test-solutions)  ;use to build reference table for subsequent comparison
-                       ;      (list best-solution best-state))
-                       t)))))
+                   (load-problem problem-name)
+                   (incf problems-processed)
+                   (ww-solve)
+                   #+sbcl
+                   (let ((best-solution (ut::if-it (first *solutions*) (solution.path ut::it)))
+                         (best-state (alexandria:hash-table-alist (problem-state.idb (first *best-states*)))))
+                     (unless (equalp (list best-solution best-state)  ;current results
+                                     (gethash problem-name problem-test-solutions))  ;reference solutions
+                       (format t "~%The problem solution above does not match the expected solution:")
+                       (format t "~%~A~2%" (gethash problem-name problem-test-solutions))
+                       (push problem-name failed-problems))
+                     ;(setf (gethash problem-name problem-test-solutions)  ;use to build reference table for subsequent comparison
+                     ;      (list best-solution best-state))
+                     t))))
       (uiop:delete-file-if-exists (in-src "problem.lisp"))
       (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
       (stage blocks3)
@@ -96,7 +93,7 @@
       #+sbcl
       (format t "Failed problems: ~A~%" (reverse failed-problems))
       #+sbcl
-      (format t "Note: A failed problem solution is not necessarily wrong, but different from the reference.")
+      (format t "Note: A failed problem solution is not necessarily wrong, but different from the reference solution.")
       #-sbcl
       (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~2%")
       #+sbcl
