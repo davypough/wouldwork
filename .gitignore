@@ -1,9 +1,3 @@
-# ignore vals.lisp
-vals.lisp
-
-# ignore current problem.lisp
-src/problem.lisp
-
 # ignore emacs files
 .#*
 *~
