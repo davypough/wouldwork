@@ -37,6 +37,11 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (display-current-parameters) alias (params)
    -- displays all parameters associated with the currently staged problem
 
+(reset-parameters)
+  -- normally, parameters are automatically restored from the last session,
+     but this will restore all parameters to their default values
+
+
 (ww-set <problem-parameter> <new-value>)
    -- set a problem parameter to a new value
    eg, (ww-set *solution-type* <one of first, every, min-length, min-time,
@@ -54,7 +59,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                5 (step through search)>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
-           -- see ww-settings.lisp and User Manual for probe format examples
+              see ww-settings.lisp and User Manual for probe format examples
 
 Note that setting any problem parameters at the REPL with ww-set will override
 any such settings appearing in the problem specification file.
@@ -203,11 +208,13 @@ any such settings appearing in the problem specification file.
             ;*features*))
 
 
-(defun reset-globals-to-defaults ()
+(defun reset-parameters ()
+   "Resets global parameters to defaults"
   (setf *problem-name* 'unspecified *depth-cutoff* 0 *tree-or-graph* 'graph
         *solution-type* 'planning *progress-reporting-interval* 100000
         *randomize-search* nil *branch* -1 *probe* nil *debug* 0)
-  (setf *features* (remove :ww-debug *features*)))
+  (setf *features* (remove :ww-debug *features*))
+  (display-current-parameters))
 
 
 (defun save-globals ()

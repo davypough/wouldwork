@@ -60,12 +60,12 @@
   (when (and (> *threads* 0) (> *debug* 1))
     (setf *debug* 1)
     (format t "~%ADVISORY: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
-  (when (eq *problem-name* 'unspecified)
-    (format t "~2%Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
     (if (probe-file vals-file)
       (read-globals)    ;restore globals for old problem.lisp from vals.lisp
       (save-globals)))  ;save globals for new problem.lisp into vals.lisp
+  (when (eq *problem-name* 'unspecified)
+    (format t "~2%Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
   (display-current-parameters)
   (setf *ww-loading* nil))
 

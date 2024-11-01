@@ -92,3 +92,9 @@ to direct Wouldwork to solve the currently staged problem.
 If there are run-time errors, fix the `problem-<new-problem-name>.lisp` file,
 or include diagnostic checkpoints such as `(ut::prt <S-expression>)` in the file,
 or enter `(ww-set *debug* 5)` to step through the search one expansion node at a time.
+
+5. TROUBLESHOOTING
+
+If you modify the Wouldwork program itself, occasionally ASDF will not automatically
+recompile everything that the modification depends on. If this occurs, simply exit SBCL
+and reload. See the User Manual for additional troubleshooting tips.

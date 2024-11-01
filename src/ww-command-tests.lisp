@@ -9,7 +9,7 @@
 
 
 (defun command-test-1 ()
-  "Default blocks3 runs properly if no prior problem.lisp or vals.lisp"
+  "Verify default blocks3 runs properly if no prior problem.lisp or vals.lisp"
   (let* ((root (asdf:system-source-directory :wouldwork))
          (src-dir (merge-pathnames "src/" root))
          (problem-file (merge-pathnames "problem.lisp" src-dir))
@@ -23,7 +23,7 @@
 
 
 (defun command-test-2 ()
-  "Problem properly switches to new problem"
+  "Verify problem properly switches to new problem"
   (if (string-equal (string *problem-name*) "blocks3")
     (progn (run blocks4)
            (assert (string-equal (string *problem-name*) "blocks4")))
@@ -33,7 +33,7 @@
 
 
 (defun command-test-3 ()
-  "Proper notification if requested problem file does not exist"
+  "Verify proper notification if requested problem file does not exist"
   (let* ((output (detect-output (lambda () (%stage "non-existent-problem"))))
          ;; Normalize the expected string to use just LF endings
          (expected (with-output-to-string (s)
@@ -47,11 +47,55 @@ Enter (list-all-problems) for a complete list of problems."
   t)
 
 
-(defun normalize-string (string)
-  "Create a fresh simple string with the same contents"
-  (let ((new-string (make-string (length string))))
-    (replace new-string string)
-    new-string))
+(defun command-test-4 ()
+  "Verify basic ww-set for *depth-cutoff* *tree-or-graph* *solution-type*
+   *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*"
+  (format t "~%Resetting all parameters to defaults...")
+  (reset-parameters)
+  (format t "~&Verifying that blocks3 loads and runs normally...~2%")
+  (run blocks3)  ;verify blocks3 runs successfully before testing commands
+  (format t "~&Verifying that blocks3 runs successfully with new parameters...~2%")
+  (setf *ww-loading* t)
+  (ww-set *problem-name* blocks3)
+  (setf *ww-loading* nil)
+  (ww-set *depth-cutoff* 2)
+  (ww-set *tree-or-graph* graph)
+  (ww-set *solution-type* first)
+  (ww-set *progress-reporting-interval* 10)
+  (ww-set *randomize-search* t)
+  (ww-set *branch* 4)
+  ;(ww-set *probe* (put (C A) 3))  ;produces a compiler note, troubleshoot later
+  (ww-set *debug* 1)
+  (assert (and (eq *problem-name* 'blocks3) (= *depth-cutoff* 2) (eq *tree-or-graph* 'graph)
+               (eq *solution-type* 'first) (= *progress-reporting-interval* 10)
+               (eq *randomize-search* t) (= *branch* 4) ;(equal *probe* '(put (C A) 3))  ;compiler note
+               (= *debug* 1)))
+  (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
+    (with-open-file (in-file vals-file :direction :input)
+      (assert (equal (read in-file nil nil)
+                     '(blocks3 2 graph first 10 t 4 nil 1))))
+    (delete-file vals-file))
+  (solve)  ;solve with new parameters
+  (format t "~%Resetting all parameters to defaults...")
+  (reset-parameters)
+  (format t "~&Restaging blocks3...~2%")
+  (stage blocks3))  ;reset all blocks3 parameters
+
+
+#+ignore (defun command-test-5 ()
+  "Verify detection of incorrect setting for the basic parameter *tree-or-graph*"
+  (run blocks3)
+  (let* ((output (detect-output (lambda () (ww-set *tree-or-graph* alternate))))
+         ;; Normalize the expected string to use just LF endings
+         (expected (with-output-to-string (s)
+                    (loop for char across "Can't set *tree-or-graph* to ALTERNATE. Must be either tree or graph."
+                          do (case (char-code char)
+                               (#.(char-code #\Return)) ; skip CR
+                               (otherwise (write-char char s)))))))
+    (unless (string-equal output expected)
+      (error "Incorrect ww-set of *tree-or-graph* not detected:~%~S" output)))
+  t)
+  
 
 
 (defun detect-output (lambda-expr)
