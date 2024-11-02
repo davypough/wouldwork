@@ -37,11 +37,6 @@
            (unless *ww-loading*
              (save-globals)))
          ',val)
-       ;(*threads*
-       ;    (cond ((member :sbcl *features*)
-       ;             (format t "~%*threads* cannot be changed with ww-set.")
-       ;             (format t "~%Instead, set its value in the file ww-settings.lisp, and then exit and restart SBCL.~2%"))
-       ;          (t (format t "~%Note that multi-threading is not available unless running SBCL.~2%"))))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

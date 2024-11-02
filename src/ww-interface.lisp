@@ -16,6 +16,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (run-test-problems) alias (test)
    -- solve all test problems
 
+(test-commands)
+  -- run a series of tests to exercise potential user REPL commands
+
 (list-problem-names) alias (probs)
    -- lists all currently specifed problems
       in the src directory (use these names with run or stage)
@@ -369,11 +372,6 @@ any such settings appearing in the problem specification file.
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
 
 
-;(defparameter *problem-names* (mapcar (lambda (pn) (strip-name pn "problem-" ".lisp"))
-;				      *test-problem-files*)
-;  "List of all problem names of problem files which are correct.")
-
-
 (defmacro with-silenced-compilation (&body body)
   "Macro to allow certain settings -
    - silenced *compile-verbose*
@@ -381,9 +379,6 @@ any such settings appearing in the problem specification file.
    - and certain *debug-print-variable-alist* settings"
   `(let ((*compile-verbose* nil)
 	     (*compile-print* nil))
-	     ;#+sbcl (sb-ext:*debug-print-variable-alist* '((*print-length* . 30)
-         ;                                              (*print-level* . 6)
-     	 ;   			                                (*print-pretty* . t))))
      ,@body))
 
 

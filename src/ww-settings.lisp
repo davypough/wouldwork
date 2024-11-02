@@ -68,9 +68,6 @@
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defparameter *ww-loading* t
-  "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
-
 (define-global *troubleshoot-current-node* nil
   "A flag telling wouldwork to redo the current node for debugging.")
 

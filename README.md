@@ -1,7 +1,7 @@
 # Wouldwork
 CLASSICAL PLANNING WITH THE WOULDWORK PLANNER
 
-The Wouldwork Planner is yet one more in a long line of classical planners.  A brief listing of some other well-known classical planners would include Fast Forward, LPG, MIPS-XXL, SATPLAN, SGPLAN, Metric-FF Planner, Optop, SHOP3 and PDDL4j.  All of these planners are major developments by small research teams to investigate the performance of a wide variety of planning algorithms.  But each has its own limitations in its ability to specify and deal with certain kinds of problems.  In contrast, the Wouldwork Planner was developed by one individual, not to investigate different planning algorithms, but to extend the baseline capabilities for handling a wider variety of classical problems.  It focuses on the data structures and programming interface that allow a user to flexibly and conveniently specify a problem of modest size, and perform an efficient search for a solution.  The core planning algorithm itself performs a simple depth-first search through state-space, optimized for efficiently examining thousands or millions of states.  The program attempts to combine many of the interface capabilities of the other planners into one package.  Some of the basic features of the user interface include:
+The Wouldwork Planner enables users to solve planning and constraint satisfaction problems without extensive programming experience.  It is yet one more in a long line of classical planners.  A brief listing of some other well-known classical planners would include Fast Forward, LPG, MIPS-XXL, SATPLAN, SGPLAN, Metric-FF Planner, Optop, SHOP3 and PDDL4j.  All of these planners are major developments by small research teams to investigate the performance of a wide variety of planning algorithms.  But each has its own limitations in its ability to specify and deal with certain kinds of problems.  In contrast, the Wouldwork Planner was developed by one individual, not to investigate different planning algorithms, but to extend the baseline capabilities for handling a wider variety of classical problems.  It focuses on the problem templates and program interfaces that allow a user to flexibly and conveniently specify a problem of modest size, and perform an efficient search for a solution.  The core planning algorithm itself performs a simple depth-first search through state-space, optimized for efficiently examining thousands or, in some cases, millions of states per second.  The program attempts to combine many of the interface capabilities of the other planners into one package.  Some of the basic features of the user interface include:
 
 -General conformance with the expressive capabilities of the PDDL language, plus extensions, for problem specification
 
@@ -41,7 +41,10 @@ The Wouldwork Planner is yet one more in a long line of classical planners.  A b
 
 -Output diagnostics describing details of the search
 
-For additional information, please see the Wouldwork User Manual,
+For an example of a simple planning problem, see my medium.com article at:
+https://medium.com/@davypough/traditional-ai-problem-solving-with-wouldwork-fcb0c4a71226 
+
+For additional program details, please see the Wouldwork User Manual,
 or email Dave Brown at davypough@gmail.com
 
 

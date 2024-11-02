@@ -44,7 +44,11 @@
                              (:file "ww-problem-tests")
 		                     (:file "ww-set")
                              (:file "ww-command-tests")
-		                     (:file "problem")
+		                     (:file "problem" 
+                                      :around-compile (lambda (thunk) 
+                                                        ;asdf sometimes doesn't recompile ww-preliminaries
+                                                        (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t) 
+                                                        (funcall thunk)))
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
 		              #+sbcl (:file "ww-parallel")

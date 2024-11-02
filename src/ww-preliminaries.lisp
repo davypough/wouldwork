@@ -6,6 +6,10 @@
 (in-package :ww)
 
 
+(defparameter *ww-loading* t
+  "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
+
+
 #+sbcl 
 (defparameter *lock* (bt:make-lock))  ;for thread protection
 
