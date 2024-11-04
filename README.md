@@ -98,6 +98,9 @@ or enter `(ww-set *debug* 5)` to step through the search one expansion node at a
 
 5. TROUBLESHOOTING
 
+Wouldwork runs best in a terminal window, where you can allocate a lot of memory
+if needed for long runs--eg, >sbcl --dynamic-space-size 10000. If you get into a
+configuration that won't compile or load correctly, try (reset-parameters) to reinitialize.
 If you modify the Wouldwork program itself, occasionally ASDF will not automatically
 recompile everything that the modification depends on. If this occurs, simply exit SBCL
 and reload. See the User Manual for additional troubleshooting tips.
