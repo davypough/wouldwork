@@ -245,6 +245,12 @@
               (collect (translate statement flag)))))
 
 
+(defun translate-equivalent (form flag)
+  "Translates an equivalent statement of logical statements--ie, if the truth values are all the same."
+  `(equivalent ,@(iter (for statement in (cdr form))
+                   (collect (translate statement flag)))))
+
+
 (defun translate-let (form flag)
   "Translates a let clause."
   `(let ,(second form)
@@ -307,6 +313,7 @@
         ((eql (car form) 'doall) (translate-doall form flag))
         ((eql (car form) 'if) (translate-conditional form flag))
         ((eql (car form) 'do) (translate-do form flag))
+        ((eql (car form) 'equivalent) (translate-equivalent form flag))
         ((eql (car form) 'bind) (translate-bind form flag))
         ((eql (car form) 'ww-loop) (translate-ww-loop form flag))
         ((eql (car form) 'setq) (translate-setq form flag))

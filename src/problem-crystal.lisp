@@ -85,24 +85,21 @@
 
 
 (define-goal
-  ;; All active cell sides (forming a connected graph) must be covered
-  (and (or (covered cell5 1) (covered cell2 4))
-       (or (covered cell5 2) (covered cell6 5))
-       (or (covered cell5 3) (covered cell9 6))
-       (or (covered cell5 6) (covered cell1 3))
+  ;; All active cell sides (forming a connected graph) must be covered exactly once
+  (and (not (equivalent (covered cell5 1) (covered cell2 4)))  ;t,nil or nil,t (ie, exclusive or)
+       (not (equivalent (covered cell5 2) (covered cell6 5)))
+       (not (equivalent (covered cell5 3) (covered cell9 6)))
+       (not (equivalent (covered cell5 6) (covered cell1 3)))
 
-       (or (covered cell6 1) (covered cell3 4))
-       (or (covered cell6 2) (covered cell7 5))
-       (or (covered cell6 3) (covered cell10 6))
-       (or (covered cell6 4) (covered cell9 1))
-       (or (covered cell6 6) (covered cell2 3))
+       (not (equivalent (covered cell6 1) (covered cell3 4)))
+       (not (equivalent (covered cell6 2) (covered cell7 5)))
+       (not (equivalent (covered cell6 3) (covered cell10 6)))
+       (not (equivalent (covered cell6 4) (covered cell9 1)))
+       (not (equivalent (covered cell6 6) (covered cell2 3)))
 
-       (or (covered cell3 3) (covered cell7 6))
+       (not (equivalent (covered cell3 3) (covered cell7 6)))
 
-       (or (covered cell4 3) (covered cell8 6))
-       (or (covered cell4 4) (covered cell7 4))
-       (or (covered cell4 5) (covered cell3 2)))
+       (not (equivalent (covered cell4 3) (covered cell8 6)))
+       (not (equivalent (covered cell4 4) (covered cell7 4)))
+       (not (equivalent (covered cell4 5) (covered cell3 2))))
 )
-
-;(and (or (covered cell5 1) (covered cell2 4))
-;     (not (and (covered cell5 1) (covered cell2 4))))

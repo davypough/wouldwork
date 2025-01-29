@@ -34,6 +34,10 @@
         (with-slots (pre-defun-name eff-defun-name precondition-lambda effect-lambda) action
           (compile pre-defun-name (subst-int-code precondition-lambda))
           (compile eff-defun-name (subst-int-code effect-lambda))))
+        ;(setf (action.iprecondition-lambda action)
+        ;  (subst-int-code (copy-tree (action.precondition-lambda action)))))
+        ;(setf (action.ieffect-lambda action)
+        ;  (subst-int-code (copy-tree (action.effect-lambda action)))))
   (iter (for fname in (append *query-names* *update-names*))
         (format t "~&  ~A..." fname)
         (compile fname (subst-int-code (symbol-value fname))))
