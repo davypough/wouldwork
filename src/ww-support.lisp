@@ -16,6 +16,12 @@
      ,@expressions))
 
 
+(defmacro equivalent (form1 form2)
+  "Returns T if the evaluation of both forms is the same (ie, T-T or NIL-NIL), NIL otherwise."
+  `(or (and ,form1 ,form2)
+       (and (null ,form1) (null ,form2))))
+
+
 (defun troubleshoot (error-msg &rest args)
   (apply #'cerror "Troubleshoot the current node" error-msg args)
   (setf *troubleshoot-current-node* t)

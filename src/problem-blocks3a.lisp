@@ -35,6 +35,7 @@
 (define-query cleartop? ($block)
   (not (exists (?b block)
          (on ?b $block))))
+  
 
 
 (define-action put
