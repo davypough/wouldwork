@@ -16,10 +16,10 @@
      ,@expressions))
 
 
-(defmacro equivalent (form1 form2)
-  "Returns T if the evaluation of both forms is the same (ie, T-T or NIL-NIL), NIL otherwise."
-  `(or (and ,form1 ,form2)
-       (and (null ,form1) (null ,form2))))
+(defmacro equivalent (&rest forms)
+  "Returns true if all forms evaluate to nil, or if all forms evaluate to non-nil."
+  `(or (and ,@forms)
+       (and ,@(mapcar (lambda (form) `(null ,form)) forms))))
 
 
 (defun troubleshoot (error-msg &rest args)
