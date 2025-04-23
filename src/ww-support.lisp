@@ -313,12 +313,11 @@
                  (collecting item into types))
               ((eql (first item) 'either)  ;combo type
                  (let ((new-type (intern (ut::interleave+ (ut::sort-symbols (cdr item)))))  ;new combo type
-                       (new-instances (remove-duplicates (iter (for type in (cdr item))
-                                                               (append (gethash type *types*))))))
-                   (setf (gethash new-type *types*) new-instances)
-                   (if (symbolp prior-item)  ;single prior ?variable
-                     (collecting new-type into types)
-                     (appending (make-list (length prior-item) :initial-element new-type) into types))))  ;multiple prior ?variables
+                       (type-instances (mapcar (lambda (type) (gethash type *types*)) (cdr item))))
+                   (setf (gethash new-type *types*)
+                         (if (every #'null type-instances)
+                           '(nil)
+                           (remove-duplicates (apply #'append type-instances))))))  ;multiple prior ?variables
               ((member (first item) *parameter-headers*)  ;subparameter list
                  (multiple-value-bind (additional-?vars additional-types)
                    (dissect-pre-params item)
