@@ -20,7 +20,7 @@
 
 
 (define-types
-  me          (me1)
+  me          (me1)  ;represents the agent in the planning scenario
   gate        (gate1 gate2)
   barrier     (nil)
   jammer      (nil)
@@ -28,48 +28,48 @@
   connector   (connector1 connector2)
   plate       (nil)
   box         (nil)
+  switch      (nil)
   fan         (nil)
   gears       (nil)
   ladder      (nil)
-  rostrum     (nil)
+  rostrum     (nil)  ;a small raised platform
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2)
+  area        (area1 area2 area3 area4 area5 area6 area7 area8)  ;distinct region agent can occupy
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
-  area        (area1 area2 area3 area4 area5 area6 area7 area8)
   cargo       (either connector jammer box fan)  ;what an agent (me) can pickup & carry
   target      (either gate gears gun)  ;what a jammer can jam
-  divider     (either barrier gate)
+  divider     (either gate barrier)
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
-  fixture     (either transmitter receiver gears ladder rostrum)
-  station     (either fixture gate)  ;useful for los determinations
-  support     (either box rostrum))
+  fixture     (either transmitter receiver gears ladder rostrum gun)  ;static location
+  station     (either fixture gate)  ;can have a line-of-sight from a given area
+  support     (either box rostrum))  ;can place things on (top of) a support
 
 
 (define-dynamic-relations
-  (holds me $cargo)  ;can use $cargo instead of $symbol and still check type
-  ;(free me)
-  (loc (either me cargo) $area)
+  (holding me $cargo)  ;can use $cargo instead of $symbol and still check type
+  (loc (either me cargo) $area)  ;$ variable allows bind, rather than full instantiation
   (on (either me cargo) $support)
   (attached fan gears)
-  (jams jammer $target)
-  (connects connector terminus)
+  (jamming jammer $target)
+  (connecting connector terminus)
   (active (either connector receiver gate))
   (color terminus $hue))
 
 
 (define-static-relations
   (adjacent area area)  ;agent can always move to adjacent area unimpeded  
-  (locale fixture $area)  ;locale is a fixed location, loc is dynamic
-  (separates1 barrier $area $area)
-  (separates2 gate $area $area)
-  ;(separates divider $area $area)
+  (locale fixture area)  ;locale is a fixed location, loc is dynamic
+  (separates1 $barrier $area $area)
+  (separates2 $gate $area $area)
+  (separates3> $ladder $area $area)
   ;(climbable> ladder area area)
   ;(height support $real)
   (controls receiver $gate)
   ;clear los from an area to a gate/fixture
-  (los0 area (either gate fixture))  
-  (los1 area divider (either gate fixture))
-  (los2 area divider divider (either gate fixture))
+  (los0 area station)  
+  (los1 area divider station)
+  (los2 area divider divider station)
   ;could see a mobile object in an area from a given area
   (visible0 area area)  
   (visible1 area divider area)
@@ -77,7 +77,7 @@
 
 
 ;(define-complementary-relations  
-;  (holds me $cargo) -> (not (free me)))
+;  (holding me $cargo) -> (not (free me)))
 
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -163,10 +163,23 @@
   (or (adjacent ?area1 ?area2)
       (exists (?b barrier)
         (and (separates1 ?b ?area1 ?area2)
-             (not (bind (holds me1 $any-cargo)))))  ;must drop cargo first
+             (not (bind (holding me1 $cargo1)))))  ;must drop cargo first
       (exists (?g gate)
         (and (separates2 ?g ?area1 ?area2)
-             (not (active ?g))))))
+             (not (active ?g))))
+      (exists (?l ladder)
+        (and (separates3> ?l ?area1 ?area2)
+             (not (bind (holding me1 $cargo2)))))))
+
+
+#+ignore (define-query passable? (?area1 ?area2)
+  (or (adjacent ?area1 ?area2)
+      (and (bind (separates1 $barrier ?area1 ?area2))
+           (not (bind (holding me1 $cargo1))))  ;must drop cargo first
+      (and (bind (separates2 $gate ?area1 ?area2))
+           (not (active $gate)))
+      (and (bind (separates3> $ladder ?area1 ?area2))
+           (not (bind (holding me1 $cargo2))))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -200,14 +213,14 @@
 (define-update chain-activate! (?connector ?hue)
   (do (activate-connector! ?connector ?hue)
       (doall (?r receiver)
-        (if (and (connects ?connector ?r)
+        (if (and (connecting ?connector ?r)
                  (not (active ?r))
                  (bind (color ?r $rhue))
                  (eql $rhue ?hue))
           (activate-receiver! ?r)))
       (doall (?c connector)
         (if (and (different ?c ?connector)
-                 (connects ?connector ?c)
+                 (connecting ?connector ?c)
                  (not (active ?c)))
           (chain-activate! ?c ?hue)))))
 
@@ -215,20 +228,20 @@
 (define-update chain-deactivate! (?connector ?hue)
   (do (deactivate-connector! ?connector ?hue)
       (doall (?r receiver)
-        (if (and (connects ?connector ?r)
+        (if (and (connecting ?connector ?r)
                  (not (exists (?c connector)
-                        (and (connects ?c ?r)
+                        (and (connecting ?c ?r)
                              (bind (color ?c $hue1)
                              (eql $hue1 ?hue))))))
           (deactivate-receiver! ?r)))
       (doall (?c connector)
         (if (and (different ?c ?connector)
-                 (connects ?connector ?c))
-          (do (not (connects ?connector ?c))
+                 (connecting ?connector ?c))
+          (do (not (connecting ?connector ?c))
               (chain-deactivate! ?c ?hue))))
       (doall (?t transmitter ?c connector)  ;reactivate connectors with a transmitter source
         (if (and (not (eql ?c ?connector))
-                 (connects ?c ?t)
+                 (connecting ?c ?t)
                  (not (active ?c))
                  (bind (color ?t $thue)))
           (chain-activate! ?c $thue)))))
@@ -240,14 +253,14 @@
 (define-action connect-to-1-terminus
     2
   (?terminus terminus)
-  (and (bind (holds me1 $cargo))
+  (and (bind (holding me1 $cargo))
        (connector $cargo)
        (bind (loc me1 $area))
        (connectable? $area ?terminus))
   ($cargo ?terminus $area $hue)
-  (assert (not (holds me1 $cargo))
+  (assert (not (holding me1 $cargo))
           (loc $cargo $area)
-          (connects $cargo ?terminus)
+          (connecting $cargo ?terminus)
           (if (and (source? ?terminus)
                    (bind (color ?terminus $hue)))
             (activate-connector! $cargo $hue))))
@@ -256,16 +269,16 @@
 (define-action connect-to-2-terminus
     3
   (combination (?terminus1 ?terminus2) terminus)
-  (and (bind (holds me1 $cargo))
+  (and (bind (holding me1 $cargo))
        (connector $cargo)
        (bind (loc me1 $area))
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2))
   ($cargo ?terminus1 ?terminus2 $area)
-  (assert (not (holds me1 $cargo))
+  (assert (not (holding me1 $cargo))
           (loc $cargo $area)
-          (connects $cargo ?terminus1)
-          (connects $cargo ?terminus2)
+          (connecting $cargo ?terminus1)
+          (connecting $cargo ?terminus2)
           (bind (color ?terminus1 $hue1))
           (bind (color ?terminus2 $hue2))
           (if (or $hue1 $hue2)    ;at least one active
@@ -280,18 +293,18 @@
 (define-action connect-to-3-terminus
     4
   (combination (?terminus1 ?terminus2 ?terminus3) terminus)
-  (and (bind (holds me1 $cargo))
+  (and (bind (holding me1 $cargo))
        (connector $cargo)
        (bind (loc me1 $area))
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2)
        (connectable? $area ?terminus3))
   ($cargo ?terminus1 ?terminus2 ?terminus3 $area)
-  (assert (not (holds me1 $cargo))
+  (assert (not (holding me1 $cargo))
           (loc $cargo $area)
-          (connects $cargo ?terminus1)
-          (connects $cargo ?terminus2)
-          (connects $cargo ?terminus3)
+          (connecting $cargo ?terminus1)
+          (connecting $cargo ?terminus2)
+          (connecting $cargo ?terminus3)
           (bind (color ?terminus1 $hue1))
           (bind (color ?terminus2 $hue2))
           (bind (color ?terminus3 $hue3))
@@ -312,26 +325,26 @@
 (define-action pickup-connector
     1
   (?connector connector)
-  (and (not (bind (holds me1 $any-cargo)))  ;replaces (free me1)
+  (and (not (bind (holding me1 $any-cargo)))  ;replaces (free me1)
        (bind (loc me1 $area))
        (loc ?connector $area))
   (?connector $area)
-  (assert (holds me1 ?connector)
+  (assert (holding me1 ?connector)
           (not (loc ?connector $area))
           (if (bind (color ?connector $hue))
             (chain-deactivate! ?connector $hue))
           (doall (?t terminus)
-            (if (connects ?connector ?t)
-              (not (connects ?connector ?t))))))
+            (if (connecting ?connector ?t)
+              (not (connecting ?connector ?t))))))
 
 
 (define-action drop-cargo
     1
   ()
   (and (bind (loc me1 $area))
-       (bind (holds me1 $cargo)))
+       (bind (holding me1 $cargo)))
   ($cargo $area)
-  (assert (not (holds me1 $cargo))
+  (assert (not (holding me1 $cargo))
           (loc $cargo $area)))
 
 
@@ -342,8 +355,7 @@
        (different $area1 ?area2)
        (passable? $area1 ?area2))
   ($area1 ?area2)
-  (assert (not (loc me1 $area1))
-          (loc me1 ?area2)))
+  (assert (loc me1 ?area2)))
 
 
 ;;;; INITIALIZATION ;;;;

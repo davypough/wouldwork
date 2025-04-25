@@ -340,7 +340,8 @@
        (different $area1 ?area2)
        (passable? $area1 ?area2))
   ($area1 ?area2)
-  (assert (loc me ?area2)))
+  (assert (not (loc me $area1))
+          (loc me ?area2)))
 
 
 ;;;; INITIALIZATION ;;;;

@@ -29,13 +29,17 @@
            (asdf:compile-system :wouldwork :force t)
            (asdf:load-system :wouldwork)))
        (*probe*
-         (destructuring-bind (action instantiations depth &optional (count 1)) ',val
-           (declare (ignore action instantiations depth))
-           (setf ,param ',val)
-           (setf *debug* 0)
-           (setf *counter* count)
-           (unless *ww-loading*
-             (save-globals)))
+         (if (null ',val)
+           (progn (setf ,param nil)
+                  (unless *ww-loading*
+                    (save-globals)))
+           (destructuring-bind (action instantiations depth &optional (count 1)) ',val
+             (declare (ignore action instantiations depth))
+             (setf ,param ',val)
+             (setf *debug* 0)
+             (setf *counter* count)
+             (unless *ww-loading*
+               (save-globals))))
          ',val)
        ((*problem-name* *problem-type*)
           (if *ww-loading*
