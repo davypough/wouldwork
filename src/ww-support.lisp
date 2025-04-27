@@ -212,24 +212,20 @@
     (if (get-prop-fluent-indices proposition)
       ;do if proposition has fluents
       (if int-db
-        (setf (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
-              (remove (get-prop-fluents proposition)
-                      (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
-                      :test #'equal))
-        (setf (gethash (get-fluentless-prop proposition) db)
-              (remove (get-prop-fluents proposition)
-                      (gethash (get-fluentless-prop proposition) db)
-                      :test #'equal)))
+        (or (setf (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
+                  (remove (get-prop-fluents proposition)
+                          (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
+                          :test #'equal))
+            (remhash (convert-to-integer (get-fluentless-prop proposition)) db))
+        (or (setf (gethash (get-fluentless-prop proposition) db)
+                  (remove (get-prop-fluents proposition)
+                          (gethash (get-fluentless-prop proposition) db)
+                          :test #'equal))
+            (remhash (get-fluentless-prop proposition) db)))
       ;do for non-fluent propositions
       (if int-db
-        (setf (gethash (convert-to-integer proposition) db)
-              (remove (get-prop-fluents proposition)
-                      (gethash (convert-to-integer proposition) db)
-                      :test #'equal))
-        (setf (gethash proposition db)
-              (remove (get-prop-fluents proposition)
-                      (gethash proposition db)
-                      :test #'equal))))
+        (remhash (convert-to-integer proposition) db)
+        (remhash proposition db)))
     ;do if proposition has a complement
     (when (gethash (car proposition) *complements*)
       (if int-db

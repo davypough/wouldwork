@@ -218,8 +218,8 @@
         (if (and (connects ?connector ?r)
                  (not (exists (?c connector)
                         (and (connects ?c ?r)
-                             (bind (color ?c $hue1)
-                             (eql $hue1 ?hue))))))
+                             (bind (color ?c $hue1))
+                             (eql $hue1 ?hue)))))
           (deactivate-receiver! ?r)))
       (doall (?c connector)
         (if (and (different ?c ?connector)
@@ -274,7 +274,7 @@
               (if (not (and $hue1 $hue2))  ;both are not active (with different colors)
                 (setq $hue (or $hue1 $hue2)))))
           (if $hue
-                (chain-activate! $cargo $hue))))
+            (chain-activate! $cargo $hue))))
 
 
 (define-action connect-to-3-terminus
@@ -364,7 +364,7 @@
   (adjacent area4 area5)
   (adjacent area6 area7)
   (locale transmitter1 area4)
-  (locale transmitter2 area7)
+  (locale transmitter2 area6)
   (locale receiver1 area4)
   (locale receiver2 area8)
   (color transmitter1 blue)
@@ -377,14 +377,14 @@
   (separates2 gate2 area7 area8)
 
   ;los is from an area to a fixed station
-  (los0 area2 transmitter1)
+  ;(los0 area2 transmitter1)
   (los0 area3 transmitter1)
   (los0 area3 receiver1)
   (los0 area5 transmitter1)
   (los0 area5 receiver1)
   (los0 area5 receiver2)
   (los0 area6 transmitter1)
-  (los0 area6 transmitter2)
+  ;(los0 area6 transmitter2)
   (los0 area7 transmitter2)
   (los0 area8 transmitter1)
   (los1 area7 gate1 transmitter1)
@@ -397,7 +397,7 @@
   ;potentially containing a movable target or terminus
   (visible0 area1 area3)
   (visible0 area1 area4)
-  (visible0 area1 area5)
+  ;(visible0 area1 area5)
   (visible0 area2 area4)
   (visible0 area2 area5)
   (visible0 area2 area6)
@@ -410,15 +410,14 @@
   (visible0 area5 area6)
   (visible0 area5 area8)
   (visible1 area1 gate1 area7) 
-  (visible1 area3 gate1 area7) 
   (visible1 area2 gate1 area7) 
-  (visible1 area4 gate1 area7) 
+  (visible1 area3 gate1 area7) 
+  ;(visible1 area4 gate1 area7) 
   (visible1 area4 gate1 area6) 
+  (visible1 area5 gate1 area6) 
   (visible1 area5 gate1 area7) 
   (visible1 area6 gate2 area8)
-  (visible1 area7 gate2 area8)
-  
-
+  ;(visible1 area7 gate2 area8)
   (visible2 area2 gate1 gate2 area8)
   (visible2 area3 gate1 gate2 area8)
   (visible2 area4 gate1 gate2 area8)
@@ -466,7 +465,6 @@
            (separates2 ?divider ?area1 ?area2)))
   ()
   (assert (visible1 ?area1 ?divider ?area2)))
-
 
 
 ;;;; GOAL ;;;;
