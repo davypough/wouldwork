@@ -7,15 +7,15 @@
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tiles1e)
+(ww-set *problem-name* tiles1e-heuristic)
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* min-length)
+(ww-set *solution-type* first)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 40)
+(ww-set *depth-cutoff* 20)
 
 
 (define-types

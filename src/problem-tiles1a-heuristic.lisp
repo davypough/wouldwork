@@ -10,11 +10,11 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* every)  ;min-length)
+(ww-set *solution-type* first)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 40)
+(ww-set *depth-cutoff* 20)
 
 
 (define-types

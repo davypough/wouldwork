@@ -299,6 +299,8 @@
 (defun update (db literal)
   "Single add or delete from db."
   (declare (type hash-table db))
+  (when *print-updates*
+    (ut::prt literal))
   (if (eql (car literal) 'not)
     (delete-proposition (second literal) db)
     (add-proposition literal db))

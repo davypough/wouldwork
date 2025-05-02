@@ -254,3 +254,6 @@
 
 (define-global *parameter-headers* '(standard product combination dot-product)
   "The different ways values can be combined in a pre-parameter list.")
+
+(define-global *print-updates* nil
+  "Print each database update while T")
