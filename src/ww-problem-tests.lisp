@@ -53,14 +53,15 @@
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (reset-parameters)
   (with-silenced-compilation
-    (let ((problems-to-run *test-problem-files*)
-          #+sbcl
-          (problem-test-solutions (read-hash-table-from-file
-                                    (merge-pathnames "problem-test-solutions.lisp"
-                                                     (asdf:system-source-directory :wouldwork))))
-                                  ;(make-hash-table :test #'equal))  ;use to build reference table for subsequent comparison
-          (problems-processed 0)
-          failed-problems)
+    (let* ((problems-to-run *test-problem-files*)
+           (test-solutions-file (merge-pathnames "problem-test-solutions.lisp"
+                                                 (asdf:system-source-directory :wouldwork)))
+           #+sbcl
+           (problem-test-solutions (if (probe-file test-solutions-file)
+                                     (read-hash-table-from-file test-solutions-file)
+                                     (make-hash-table :test #'equal)))  ;use to build reference table for subsequent comparison
+           (problems-processed 0)
+           failed-problems)
       (loop for problem in problems-to-run
             do (progn
                  (let* ((problem-name (if (string-prefix-p "problem-" problem)
@@ -80,8 +81,9 @@
                        (format t "~%The problem solution above does not match the expected solution:")
                        (format t "~%~A~2%" (gethash problem-name problem-test-solutions))
                        (push problem-name failed-problems))
-                     ;(setf (gethash problem-name problem-test-solutions)  ;use to build reference table for subsequent comparison
-                     ;      (list best-solution best-state))
+                     (unless (probe-file test-solutions-file)
+                       (setf (gethash problem-name problem-test-solutions)  ;use to build reference table for subsequent comparison
+                             (list best-solution best-state)))
                      t))))
       (uiop:delete-file-if-exists (in-src "problem.lisp"))
       (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
@@ -97,8 +99,9 @@
       #-sbcl
       (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~2%")
       #+sbcl
-      (progn ;(write-hash-table-to-file problem-test-solutions  ;use to build reference table for subsequent comparison
-             ;  (merge-pathnames "problem-test-solutions.lisp" (asdf:system-source-directory :wouldwork)))
+      (progn (unless (probe-file test-solutions-file)
+               (write-hash-table-to-file problem-test-solutions  ;use to build reference table for subsequent comparison
+                 (merge-pathnames "problem-test-solutions.lisp" (asdf:system-source-directory :wouldwork))))
              t)
       t)))
 

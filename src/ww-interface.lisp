@@ -364,8 +364,8 @@ any such settings appearing in the problem specification file.
 (defun load-problem (problem-name-str)
   "Given a problem-name, replace the content of the problem.lisp file by
    the content of the correponsing problem file, and then reloads everything."
-  (unless (string-equal problem-name-str (string *problem-name*))
-    (exchange-problem-file problem-name-str))
+  ;(unless (string-equal problem-name-str (string *problem-name*))
+    (exchange-problem-file problem-name-str)
   (asdf:load-system :wouldwork :force t))
 
 
