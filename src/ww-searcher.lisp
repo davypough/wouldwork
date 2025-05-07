@@ -467,9 +467,10 @@
 (defun generate-new-node (current-node succ-state)
   "Produces a new node for a given successor."
   (declare (type node current-node) (type problem-state succ-state))
-  (let ((succ-node (make-node :state succ-state
-                              :depth (1+ (node.depth current-node))
-                              :parent current-node)))
+  (let* ((depth (1+ (node.depth current-node)))
+         (succ-node (make-node :state succ-state
+                               :depth depth
+                               :parent current-node)))
     (when (>= *debug* 3)
       (format t "~%Installing new or updated successor:~%~S~%" succ-node))
     succ-node))

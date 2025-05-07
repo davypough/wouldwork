@@ -1,4 +1,4 @@
-;;; Filename: problem-smallspace-new.lisp
+;;; Filename: problem-smallspace.lisp
 
 
 ;;; Problem specification (in Talos Principle)
@@ -22,7 +22,7 @@
 (define-types
   me          (me1)
   gate        (gate1 gate2)
-  barrier     (nil)
+  barrier     (nil)  ;cannot move cargo thru a barrier
   jammer      (nil)
   gun         (nil)
   connector   (connector1 connector2)
@@ -30,6 +30,7 @@
   box         (nil)
   fan         (nil)
   gears       (nil)
+  switch      (nil)
   ladder      (nil)
   rostrum     (nil)
   transmitter (transmitter1 transmitter2)
@@ -45,27 +46,27 @@
   support     (either box rostrum))
 
 
-(define-dynamic-relations
+(define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds me1 $any-cargo))
   (holds me $cargo)  ;can use $cargo instead of $symbol and still check type
   ;(free me)
   (loc (either me cargo) $area)
-  (on (either me cargo) $support)
-  (attached fan gears)
-  (jams jammer $target)
+  ;(on (either me cargo) $support)
+  ;(attached fan gears)
+  ;(jams jammer $target)
   (connects terminus terminus)
-  (active (either connector receiver gate))
+  (active (either connector receiver gate switch gun gears) $boolean)
   (color terminus $hue))
 
 
 (define-static-relations
   (adjacent area area)  ;agent can always move to adjacent area unimpeded  
-  (locale fixture $area)  ;locale is a fixed location, loc is dynamic
-  (separates1 barrier $area $area)
-  (separates2 gate $area $area)
-  ;(separates divider $area $area)
+  (locale fixture area)  ;locale is a fixed location, loc is dynamic
+  (separates1 barrier area area)
+  (separates2 gate area area)
+  ;(separates divider area area)
   ;(climbable> ladder area area)
   ;(height support $real)
-  (controls receiver $gate)
+  (controls receiver gate)  ;$gate)
   ;clear los from an area to a gate/fixture
   (los0 area (either gate fixture))  
   (los1 area divider (either gate fixture))
@@ -86,7 +87,7 @@
 (define-query source? (?terminus)
   (or (transmitter ?terminus)
       (and (connector ?terminus)
-           (active ?terminus))))
+           (active ?terminus t))))
 
 
 (define-query los-thru-2-dividers? (?area ?station)
@@ -96,14 +97,14 @@
                   (barrier ?d2))
              (and (barrier ?d1)
                   (gate ?d2)
-                  (not (active ?d2)))
+                  (not (active ?d2 t)))
              (and (barrier ?d2)
                   (gate ?d1)
-                  (not (active ?d1)))
+                  (not (active ?d1 t)))
              (and (gate ?d1)
-                  (not (active ?d1))
+                  (not (active ?d1 t))
                   (gate ?d2)
-                  (not (active ?d2)))))))
+                  (not (active ?d2 t)))))))
 
 
 (define-query los-thru-1-divider? (?area ?station)
@@ -111,7 +112,7 @@
     (and (los1 ?area ?d ?station)
          (or (barrier ?d)
              (and (gate ?d)
-                  (not (active ?d)))))))
+                  (not (active ?d t)))))))
 
 
 (define-query los? (?area ?station)
@@ -127,14 +128,14 @@
                   (barrier ?d2))
              (and (barrier ?d1)
                   (gate ?d2)
-                  (not (active ?d2)))
+                  (not (active ?d2 t)))
              (and (barrier ?d2)
                   (gate ?d1)
-                  (not (active ?d1)))
+                  (not (active ?d1 t)))
              (and (gate ?d1)
-                  (not (active ?d1))
+                  (not (active ?d1 t))
                   (gate ?d2)
-                  (not (active ?d2)))))))
+                  (not (active ?d2 t)))))))
 
 
 (define-query visible-thru-1-divider? (?area1 ?area2)
@@ -142,7 +143,7 @@
     (and (visible1 ?area1 ?d ?area2)
          (or (barrier ?d)
              (and (gate ?d)
-                  (not (active ?d)))))))
+                  (not (active ?d t)))))))
 
 
 (define-query visible? (?area1 ?area2)
@@ -166,49 +167,49 @@
              (not (bind (holds me1 $any-cargo)))))  ;must drop cargo first
       (exists (?g gate)
         (and (separates2 ?g ?area1 ?area2)
-             (not (active ?g))))))
+             (not (active ?g t))))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
 (define-update activate-connector! (?connector ?hue)
-  (do (active ?connector)
+  (do (active ?connector t)
       (color ?connector ?hue)))
 
 
 (define-update deactivate-connector! (?connector ?hue)
-  (do (not (active ?connector))
+  (do (not (active ?connector t))
       (not (color ?connector ?hue))))
 
 
 (define-update activate-receiver! (?receiver)
-  (do (active ?receiver)
+  (do (active ?receiver t)
       (doall (?g gate)
         (if (and (controls ?receiver ?g)
-                 (active ?g))
-          (not (active ?g))))))
+                 (active ?g t))
+          (not (active ?g t))))))
 
 
 (define-update deactivate-receiver! (?receiver)
-  (do (not (active ?receiver))
+  (do (not (active ?receiver t))
       (doall (?g gate)
         (if (controls ?receiver ?g)
-          (active ?g)))))
+          (active ?g t)))))
 
 
 (define-update chain-activate! (?connector ?hue)
   (do (activate-connector! ?connector ?hue)
       (doall (?r receiver)
         (if (and (connects ?connector ?r)
-                 (not (active ?r))
+                 (not (active ?r t))
                  (bind (color ?r $rhue))
                  (eql $rhue ?hue))
           (activate-receiver! ?r)))
       (doall (?c connector)
         (if (and (different ?c ?connector)
                  (connects ?connector ?c)
-                 (not (active ?c)))
+                 (not (active ?c t)))
           (chain-activate! ?c ?hue)))))
 
 
@@ -222,7 +223,7 @@
                (not (exists (?c connector)
                       (and (different ?c ?connector)
                            (connects ?c ?r)
-                           (active ?c)
+                           (active ?c t)
                            (bind (color ?c $c-hue))
                            (eql $c-hue ?hue)))))
         (deactivate-receiver! ?r)))
@@ -243,7 +244,7 @@
                      (and (different ?other-connector ?connector)
                           (different ?other-connector ?c)
                           (connects ?c ?other-connector)
-                          (active ?other-connector)
+                          (active ?other-connector t)
                           (bind (color ?other-connector $other-hue))
                           (eql $other-hue ?hue)))))
             ;; No alternative power source found, recursively deactivate
@@ -375,8 +376,8 @@
   (loc connector1 area5)
   (loc connector2 area7)
   ;(free me1)
-  (active gate1)
-  (active gate2)
+  (active gate1 t)
+  (active gate2 t)
   ;static
   (adjacent area1 area2)
   (adjacent area2 area3)
