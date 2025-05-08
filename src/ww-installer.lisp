@@ -33,11 +33,12 @@
         (when (eql (car instances) 'compute)
           (setf instances (eval (second instances))))
         (setf (gethash type *types*) instances)
-        (dolist (instance instances)
-          (check-type instance (or symbol real list))
-          (when (symbolp instance)
-            (setf (gethash (list 'something instance) *static-db*) '(t))
-            (setf (gethash (list type instance) *static-db*) '(t))))))
+        (unless (equal instances '(nil))
+          (dolist (instance instances)
+            (check-type instance (or symbol real list))
+            (when (symbolp instance)
+              (setf (gethash (list 'something instance) *static-db*) t)
+              (setf (gethash (list type instance) *static-db*) t))))))
 
 
 (defun symmetric-type-indexes (types)

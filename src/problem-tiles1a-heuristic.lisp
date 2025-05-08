@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 20)
+(ww-set *depth-cutoff* 40)
 
 
 (define-types

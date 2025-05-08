@@ -31,41 +31,18 @@
 
 (defun translate-simple-atom (form flag)
   "Pre/ante only.
-   Eg, (velocity ?car wheel1 50 $direction) -> (list 'velocity ?car 'wheel1 50 $direction)."
-  `(member t (gethash ,(translate-list form flag)
+   Eg, (velocity ?car wheel1 50) -> (list 'velocity ?car 'wheel1 50) with no fluents"
+  `(eql t (gethash ,(translate-list form flag)
                       ,(if (gethash (car form) *relations*)
                          (if *happening-names*
                            '(merge-db-hdb state)  ;dummy function replaced by merge-idb-hidb
                            (case flag
                              (pre '(problem-state.db state))
                              ((ante eff) 'idb)))
-             '*static-db*))))
+                  '*static-db*))))
 
 
 (defun translate-fluent-atom (form flag)
-  "Pre/ante only."
-  (let* ((fluent-indices (get-prop-fluent-indices form))
-         (fluentless-atom (ut::remove-at-indexes fluent-indices form))
-         (fluents (ut::collect-at-indexes fluent-indices form)))  ;eg, area1, ?area1, or $area1
-    `(member (list ,@(mapcar (lambda (x)
-                               (if (or (varp x)
-                                       (and (consp x)
-                                         (symbolp (car x))
-                                         (or (fboundp (car x))
-                                             (special-operator-p (car x)))))
-                                  x
-                                  `',x))
-                             fluents))
-             (gethash ,(translate-list fluentless-atom flag) 
-                     ,(if (gethash (car form) *relations*)
-                        (case flag
-                          (pre '(problem-state.db state))
-                          ((ante eff) 'idb))
-                        '*static-db*))
-             :test #'equal)))
-
-
-#+ignore (defun translate-fluent-atom (form flag)
   "Pre/ante only."
   (let* ((fluent-indices (get-prop-fluent-indices form))
          (fluentless-atom (ut::remove-at-indexes fluent-indices form))
@@ -144,7 +121,7 @@
               indices))))
 
 
-(defun translate-bind (form flag)
+#+ignore (defun translate-bind (form flag)
   "Translates a binding for a relation form, returns t if there is a binding,
    even NIL. But returns NIL if there is no binding."
   (check-proposition (second form))
@@ -182,6 +159,26 @@
     `(let ((vals ,translation))
               (when vals
                 (progn (setf ,@(mapcan #'list prop-fluents setf-values)) t)))))
+
+
+(defun translate-bind (form flag)
+  "Translates a binding for a relation form, returns t if there is a binding,
+   even NIL. But returns NIL if there is no binding."
+  (check-proposition (second form))
+  (let* ((fluent-indices (get-prop-fluent-indices (second form)))
+         (fluentless-atom (ut::remove-at-indexes fluent-indices (second form)))
+         (prop-fluents (get-prop-fluents (second form))))
+    `(let ((vals (gethash ,(translate-list fluentless-atom flag)
+                         ,(if (gethash (car (second form)) *relations*)
+                            (case flag
+                              (pre '(problem-state.db state))
+                              ((ante eff) 'idb))
+                            '*static-db*))))
+       (when vals
+         (progn (setf ,@(mapcan #'list prop-fluents 
+                               (loop for i from 0 below (length prop-fluents)
+                                    collect `(nth ,i vals))))
+                t)))))
 
 
 (defun translate-existential (form flag)

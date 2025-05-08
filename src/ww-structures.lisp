@@ -53,7 +53,7 @@
         finally (return partial-prop)))
 
 
-(defun list-database (idb)
+#+ignore (defun list-database (idb)
   "Used to printout idb in propositional form."
   (let* ((propositions 
            (iter (for (key val) in-hashtable idb)
@@ -74,7 +74,7 @@
     sorted-props))
 
 
-#+ignore (defun list-database (idb)
+(defun list-database (idb)
   "Used to printout idb in propositional form."
   (let* ((propositions (iter (for (key val) in-hashtable idb)
                              (if (eql val t)

@@ -163,47 +163,28 @@
   (let ((int-db (eql (hash-table-test db) 'eql)))
     (if (get-prop-fluent-indices proposition)
       ;do if proposition has fluents
-      (if int-db
-        (pushnew (get-prop-fluents proposition) 
-                 (gethash (convert-to-integer (get-fluentless-prop proposition)) db) 
-                 :test #'equal)
-        (pushnew (get-prop-fluents proposition)
-                 (gethash (get-fluentless-prop proposition) db)
-                 :test #'equal))
+      (let ((fluentless-prop (get-fluentless-prop proposition))
+            (fluent-values (get-prop-fluents proposition)))
+        (if int-db
+          (setf (gethash (convert-to-integer fluentless-prop) db) fluent-values)
+          (setf (gethash fluentless-prop db) fluent-values))
+        ;handle complement with fluents if it exists
+        (when (gethash (car proposition) *complements*)
+          (let ((complement-prop (get-complement-prop proposition)))
+            (if int-db
+              (remhash (convert-to-integer complement-prop) db)
+              (remhash complement-prop db)))))
       ;do for non-fluent propositions
-      (if int-db
-        (pushnew t (gethash (convert-to-integer proposition) db)
-                   :test #'equal)  
-        (pushnew t (gethash proposition db) 
-                   :test #'equal)))
-    ;do if proposition has a complement
-    (when (gethash (car proposition) *complements*)
-      (if int-db
-        (remhash (convert-to-integer (get-complement-prop proposition)) db)
-        (remhash (get-complement-prop proposition) db)))))
+      (progn
+        (if int-db
+          (setf (gethash (convert-to-integer proposition) db) t)  
+          (setf (gethash proposition db) t))
+        ;handle complement without fluents
+        (when (gethash (car proposition) *complements*)
+          (if int-db
+            (remhash (convert-to-integer (get-complement-prop proposition)) db)
+            (remhash (get-complement-prop proposition) db)))))))
 
-
-#+ignore (defun add-prop (proposition db)
-  "Effectively adds an atomic proposition to the database."
-  (declare (type hash-table db))
-  (let ((int-db (eql (hash-table-test db) 'eql)))
-    (if (get-prop-fluent-indices proposition)
-      ;do if proposition has fluents
-      (if int-db
-        (setf (gethash (convert-to-integer (get-fluentless-prop proposition)) db) 
-              (get-prop-fluents proposition))
-        (setf (gethash (get-fluentless-prop proposition) db)
-              (get-prop-fluents proposition)))
-      ;do for non-fluent propositions
-      (if int-db
-        (setf (gethash (convert-to-integer proposition) db) t)  
-        (setf (gethash proposition db) t)))
-    ;do if proposition has a complement
-    (when (gethash (car proposition) *complements*)
-      (if int-db
-        (remhash (convert-to-integer (get-complement-prop proposition)) db)
-        (remhash (get-complement-prop proposition) db)))))
-  
 
 (defun del-prop (proposition db)
   "Effectively removes an atomic proposition from the database."
@@ -211,29 +192,28 @@
   (let ((int-db (eql (hash-table-test db) 'eql)))
     (if (get-prop-fluent-indices proposition)
       ;do if proposition has fluents
-      (if int-db
-        (or (setf (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
-                  (remove (get-prop-fluents proposition)
-                          (gethash (convert-to-integer (get-fluentless-prop proposition)) db)
-                          :test #'equal))
-            (remhash (convert-to-integer (get-fluentless-prop proposition)) db))
-        (or (setf (gethash (get-fluentless-prop proposition) db)
-                  (remove (get-prop-fluents proposition)
-                          (gethash (get-fluentless-prop proposition) db)
-                          :test #'equal))
-            (remhash (get-fluentless-prop proposition) db)))
+      (let ((fluentless-prop (get-fluentless-prop proposition))
+            (fluent-values (get-prop-fluents proposition)))
+        (if int-db
+          (remhash (convert-to-integer fluentless-prop) db)
+          (remhash fluentless-prop db))
+        ;handle complement with fluents if it exists
+        (when (gethash (car proposition) *complements*)
+          (let ((complement-prop (get-complement-prop proposition)))
+            (if int-db
+              (setf (gethash (convert-to-integer complement-prop) db) fluent-values)
+              (setf (gethash complement-prop db) fluent-values)))))
       ;do for non-fluent propositions
-      (if int-db
-        (remhash (convert-to-integer proposition) db)
-        (remhash proposition db)))
-    ;do if proposition has a complement
-    (when (gethash (car proposition) *complements*)
-      (if int-db
-        (pushnew t (gethash (convert-to-integer (get-complement-prop proposition)) db)
-                   :test #'equal)
-        (pushnew t (gethash (get-complement-prop proposition) db)
-                   :test #'equal)))))
-  
+      (progn
+        (if int-db
+          (remhash (convert-to-integer proposition) db)
+          (remhash proposition db))
+        ;handle complement without fluents
+        (when (gethash (car proposition) *complements*)
+          (if int-db
+            (setf (gethash (convert-to-integer (get-complement-prop proposition)) db) t)
+            (setf (gethash (get-complement-prop proposition) db) t)))))))
+
 
 (defun add-proposition (proposition db)  
   "Adds an atomic proposition and all its symmetries to the database."
