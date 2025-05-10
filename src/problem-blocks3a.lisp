@@ -19,43 +19,37 @@
 
 
 (define-types
-    block (A B C)
-    table (T)
-    target (either block table))
+  block (A B C)
+  table (T)
+  support (either block table))
 
 
 (define-dynamic-relations
-    (on block $symbol))  ;eg, (on A T)
+  (on block $support))  ;eg, (on A T), where $support is a fluent
 
 
-(define-static-relations
-    (height target $real))
-
-
-(define-query cleartop? ($block)
+(define-query cleartop? (?block)
   (not (exists (?b block)
-         (on ?b $block))))
+         (on ?b ?block))))
   
-
 
 (define-action put
     1
-  (standard ?block block ?target target)
-  (and (cleartop? ?block)
-       (cleartop? ?target)
-       (different ?block ?target))
-  (?block ?target)
-  (assert (bind (on ?block $block-support))
-          (not (on ?block $block-support))
-          (on ?block ?target)))
+  (standard ?block block ?target support)
+  (and (cleartop? ?block)                 ;?block must have a clear top
+       (bind (on ?block $block-support))  ;get the $block-support under ?block
+       (and (block ?target)               ;if target is a block (not the table)
+            (cleartop? ?target)))         ;it must have a clear top, otherwise can move to table
+  (?block ?target)                        ;the action description will be (put ?block ?target)
+  (assert (on ?block ?target)))           ;fluent status of ?block updated
 
 
 (define-init
-  (on A T)
-  (on B T)
+  ;(on A T)  ;note: all possible (on block $support) relations must be initially
+  (on B T)  ;instantiated for greatest efficiency
   (on C T))
 
 
 (define-goal
-  (or (and (on C T) (on B C) (on A B))  ;A -> B -> C -> T
+  (or (and (on C T) (on B C) (on A B))    ;A -> B -> C -> T
       (and (on A T) (on B A) (on C B))))  ;C -> B -> A -> T

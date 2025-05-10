@@ -53,7 +53,7 @@
   ;(on (either me cargo) $support)
   ;(attached fan gears)
   ;(jams jammer $target)
-  (connects terminus terminus)
+  (connects terminus terminus $boolean)
   (active (either connector receiver gate switch gun gears) $boolean)
   (color terminus $hue))
 
@@ -66,7 +66,7 @@
   ;(separates divider area area)
   ;(climbable> ladder area area)
   ;(height support $real)
-  (controls receiver gate)  ;$gate)
+  (controls receiver gate)
   ;clear los from an area to a gate/fixture
   (los0 area (either gate fixture))  
   (los1 area divider (either gate fixture))
@@ -97,14 +97,14 @@
                   (barrier ?d2))
              (and (barrier ?d1)
                   (gate ?d2)
-                  (not (active ?d2 t)))
+                  (active ?d2 nil))
              (and (barrier ?d2)
                   (gate ?d1)
-                  (not (active ?d1 t)))
+                  (active ?d1 nil))
              (and (gate ?d1)
-                  (not (active ?d1 t))
+                  (active ?d1 nil)
                   (gate ?d2)
-                  (not (active ?d2 t)))))))
+                  (active ?d2 nil))))))
 
 
 (define-query los-thru-1-divider? (?area ?station)
@@ -112,7 +112,7 @@
     (and (los1 ?area ?d ?station)
          (or (barrier ?d)
              (and (gate ?d)
-                  (not (active ?d t)))))))
+                  (active ?d nil))))))
 
 
 (define-query los? (?area ?station)
@@ -128,14 +128,14 @@
                   (barrier ?d2))
              (and (barrier ?d1)
                   (gate ?d2)
-                  (not (active ?d2 t)))
+                  (active ?d2 nil))
              (and (barrier ?d2)
                   (gate ?d1)
-                  (not (active ?d1 t)))
+                  (active ?d1 nil))
              (and (gate ?d1)
-                  (not (active ?d1 t))
+                  (active ?d1 nil)
                   (gate ?d2)
-                  (not (active ?d2 t)))))))
+                  (active ?d2 nil))))))
 
 
 (define-query visible-thru-1-divider? (?area1 ?area2)
@@ -143,7 +143,7 @@
     (and (visible1 ?area1 ?d ?area2)
          (or (barrier ?d)
              (and (gate ?d)
-                  (not (active ?d t)))))))
+                  (active ?d nil))))))
 
 
 (define-query visible? (?area1 ?area2)
@@ -164,10 +164,10 @@
   (or (adjacent ?area1 ?area2)
       (exists (?b barrier)
         (and (separates1 ?b ?area1 ?area2)
-             (not (bind (holds me1 $any-cargo)))))  ;must drop cargo first
+             (holds me1 nil)))  ;must drop cargo first
       (exists (?g gate)
         (and (separates2 ?g ?area1 ?area2)
-             (not (active ?g t))))))
+             (active ?g nil)))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -178,9 +178,9 @@
       (color ?connector ?hue)))
 
 
-(define-update deactivate-connector! (?connector ?hue)
-  (do (not (active ?connector t))
-      (not (color ?connector ?hue))))
+(define-update deactivate-connector! (?connector)
+  (do (active ?connector nil)
+      (color ?connector nil)))
 
 
 (define-update activate-receiver! (?receiver)
@@ -188,11 +188,11 @@
       (doall (?g gate)
         (if (and (controls ?receiver ?g)
                  (active ?g t))
-          (not (active ?g t))))))
+          (active ?g nil)))))
 
 
 (define-update deactivate-receiver! (?receiver)
-  (do (not (active ?receiver t))
+  (do (active ?receiver nil)
       (doall (?g gate)
         (if (controls ?receiver ?g)
           (active ?g t)))))
@@ -201,28 +201,28 @@
 (define-update chain-activate! (?connector ?hue)
   (do (activate-connector! ?connector ?hue)
       (doall (?r receiver)
-        (if (and (connects ?connector ?r)
-                 (not (active ?r t))
+        (if (and (connects ?connector ?r t)
+                 (active ?r nil)
                  (bind (color ?r $rhue))
                  (eql $rhue ?hue))
           (activate-receiver! ?r)))
       (doall (?c connector)
         (if (and (different ?c ?connector)
-                 (connects ?connector ?c)
-                 (not (active ?c t)))
+                 (connects ?connector ?c t)
+                 (active ?c nil))
           (chain-activate! ?c ?hue)))))
 
 
 (define-update chain-deactivate! (?connector ?hue)
   (do 
     ;; Step 1: Deactivate this connector
-    (deactivate-connector! ?connector ?hue)
+    (deactivate-connector! ?connector)
     ;; Step 2: Deactivate receivers that lost power
     (doall (?r receiver)
-      (if (and (connects ?connector ?r)
+      (if (and (connects ?connector ?r t)
                (not (exists (?c connector)
                       (and (different ?c ?connector)
-                           (connects ?c ?r)
+                           (connects ?c ?r t)
                            (active ?c t)
                            (bind (color ?c $c-hue))
                            (eql $c-hue ?hue)))))
@@ -230,27 +230,27 @@
     ;; Step 3: For each connected connector, check ALL possible power paths
     ;; Including direct transmission paths and paths through other active connectors
     (doall (?c connector)
-      (if (and (connects ?connector ?c)
+      (if (and (connects ?connector ?c t)
                (different ?c ?connector))  ;; Prevent direct self-reference
         ;; Start a careful power source check
         (if (not (or 
                   ;; Check direct transmitter connection
                   (exists (?t transmitter)
-                     (and (connects ?c ?t)
+                     (and (connects ?c ?t t)
                           (bind (color ?t $t-hue))
                           (eql $t-hue ?hue)))
                   ;; Check connection to another active connector (not the one being picked up)
                   (exists (?other-connector connector)
                      (and (different ?other-connector ?connector)
                           (different ?other-connector ?c)
-                          (connects ?c ?other-connector)
+                          (connects ?c ?other-connector t)
                           (active ?other-connector t)
                           (bind (color ?other-connector $other-hue))
                           (eql $other-hue ?hue)))))
             ;; No alternative power source found, recursively deactivate
             (do
               ;; Break the connection before recursion to avoid infinite recursion
-              (not (connects ?connector ?c))
+              (connects ?connector ?c nil)
               (chain-deactivate! ?c ?hue)))))))
 
 
@@ -265,9 +265,9 @@
        (bind (loc me1 $area))
        (connectable? $area ?terminus))
   ($cargo ?terminus $area $hue)
-  (assert (not (holds me1 $cargo))
+  (assert (holds me1 nil)
           (loc $cargo $area)
-          (connects $cargo ?terminus)
+          (connects $cargo ?terminus t)
           (if (and (source? ?terminus)
                    (bind (color ?terminus $hue)))
             (activate-connector! $cargo $hue))))
@@ -282,10 +282,10 @@
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2))
   ($cargo ?terminus1 ?terminus2 $area)
-  (assert (not (holds me1 $cargo))
+  (assert (holds me1 nil)
           (loc $cargo $area)
-          (connects $cargo ?terminus1)
-          (connects $cargo ?terminus2)
+          (connects $cargo ?terminus1 t)
+          (connects $cargo ?terminus2 t)
           (bind (color ?terminus1 $hue1))
           (bind (color ?terminus2 $hue2))
           (if (or $hue1 $hue2)    ;at least one active
@@ -307,11 +307,11 @@
        (connectable? $area ?terminus2)
        (connectable? $area ?terminus3))
   ($cargo ?terminus1 ?terminus2 ?terminus3 $area)
-  (assert (not (holds me1 $cargo))
+  (assert (holds me1 nil)
           (loc $cargo $area)
-          (connects $cargo ?terminus1)
-          (connects $cargo ?terminus2)
-          (connects $cargo ?terminus3)
+          (connects $cargo ?terminus1 t)
+          (connects $cargo ?terminus2 t)
+          (connects $cargo ?terminus3 t)
           (bind (color ?terminus1 $hue1))
           (bind (color ?terminus2 $hue2))
           (bind (color ?terminus3 $hue3))
@@ -332,27 +332,27 @@
 (define-action pickup-connector
     1
   (?connector connector)
-  (and (not (bind (holds me1 $any-cargo))) 
+  (and (holds me1 nil)
        (bind (loc me1 $area))
        (loc ?connector $area))
   (?connector $area)
   (assert (holds me1 ?connector)
-          (not (loc ?connector $area))
+          (loc ?connector nil)
           (if (bind (color ?connector $hue))
             (chain-deactivate! ?connector $hue))
           ;; Finally disconnect this picked up connector from everything
           (doall (?t terminus)
-            (if (connects ?connector ?t)
-              (not (connects ?connector ?t))))))
+            (if (connects ?connector ?t t)
+              (connects ?connector ?t nil)))))
 
 
-(define-action drop-cargo
+(define-action drop
     1
   ()
   (and (bind (loc me1 $area))
-       (bind (holds me1 $cargo)))
+       (bind (holds me1 $cargo)))  ;if $cargo = nil, then bind statement fails
   ($cargo $area)
-  (assert (not (holds me1 $cargo))
+  (assert (holds me1 nil)
           (loc $cargo $area)))
 
 
@@ -363,8 +363,7 @@
        (different $area1 ?area2)
        (passable? $area1 ?area2))
   ($area1 ?area2)
-  (assert (not (loc me1 $area1))
-          (loc me1 ?area2)))
+  (assert (loc me1 ?area2)))
 
 
 ;;;; INITIALIZATION ;;;;

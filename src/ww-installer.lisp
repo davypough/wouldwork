@@ -69,7 +69,74 @@
   `(install-dynamic-relations ',relations))
 
 
+(defun generate-fluent-instances (args-list)
+  "Generate all combinations of instances for a relation signature, 
+   where nil values represent fluent positions."
+  (if (null args-list)
+      (list nil)
+      (let ((first-arg (car args-list))
+            (rest-instances (generate-fluent-instances (cdr args-list))))
+        (cond 
+          ((null first-arg)  ; fluent argument
+           (mapcar (lambda (rest) (cons nil rest)) rest-instances))
+          ((and (listp first-arg) (eql (car first-arg) 'either))  ; 'either' type
+           (alexandria:mappend 
+            (lambda (type)
+              (alexandria:mappend
+               (lambda (instance)
+                 (mapcar (lambda (rest) (cons instance rest))
+                         rest-instances))
+               (gethash type *types*)))
+            (cdr first-arg)))
+          (t  ; regular type
+           (alexandria:mappend
+            (lambda (instance)
+              (mapcar (lambda (rest) (cons instance rest))
+                      rest-instances))
+            (gethash first-arg *types*)))))))
+
+
 (defun install-dynamic-relations (relations)
+  (format t "~&Installing dynamic relations...")
+  (iter (for relation in relations)
+        (check-relation relation)
+        (setf (gethash (car relation) *relations*)
+              (ut::if-it (cdr relation)
+                (sort-either-types ut::it)
+                t))
+        (ut::if-it (iter (for arg in (cdr relation))
+                         (for i from 1)
+                         (when ($varp arg)
+                           (collect i)))
+          (setf (gethash (car relation) *fluent-relation-indices*)
+                ut::it))
+        (finally (maphash (lambda (key val)  ;install implied unary relations
+                            (declare (ignore val))
+                            (setf (gethash key *static-relations*) '(something)))
+                          *types*)
+                 (add-proposition '(always-true) *static-db*)
+                 (setf (gethash 'always-true *static-relations*) '(always-true))))
+  ;; Initialize fluent relations with nil values
+  (iter (for (relation-name fluent-indices) in-hashtable *fluent-relation-indices*)
+        (let* ((relation-types (gethash relation-name *relations*))
+               (args-with-nil (mapcar (lambda (type index)
+                                        (if (member index fluent-indices)
+                                            nil
+                                            type))
+                                      relation-types
+                                      (alexandria:iota (length relation-types) :start 1))))
+          (iter (for instance-list in (generate-fluent-instances args-with-nil))
+                (add-proposition (cons relation-name instance-list) *db*))))
+  ;; Install symmetric relations
+  (iter (for (key val) in-hashtable *relations*)
+    (when (and (not (eql val t))
+               (not (alexandria:setp val))  ;multiple types
+               (not (final-charp #\> key)))   ;not explicitly directed
+      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
+  t)
+
+
+#+ignore (defun install-dynamic-relations (relations)
   (format t "~&Installing dynamic relations...")
   (iter (for relation in relations)
         (check-relation relation)

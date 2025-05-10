@@ -51,9 +51,9 @@
           (format t "~&Make sure the list or vector elements are always ordered canonically (eg, lexicographically),")
           (format t "~&so that Wouldwork can tell if two states are the same or not.~%")
          (return)))
-  (when (and (eql *tree-or-graph* 'graph) (not (fixedp *relations*)))
-    (format t "~%NOTE: In graph search, you could significantly improve search efficiency by")
-    (format t "~&changing each dynamic relation to include at least one fluent ($) variable.~%"))
+  ;(when (and (eql *tree-or-graph* 'graph) (not (fixedp *relations*)))
+  ;  (format t "~%NOTE: In graph search, you could significantly improve search efficiency by")
+  ;  (format t "~&changing each dynamic relation to include at least one fluent ($) variable.~%"))
   (when (and (> *threads* 0) (not (member :sbcl *features*)))
     (format t "~%Note that multi-threading is not available unless running SBCL. Please reset *threads*
                in ww-settings.lisp to 0 and restart wouldwork.~%"))

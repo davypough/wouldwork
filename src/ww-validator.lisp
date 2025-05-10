@@ -55,7 +55,8 @@
             ($varp arg)  ;arg is a $var
             (member arg (gethash type-def *types*))  ;arg is a value of a user defined type
             (and ($varp type-def)  ;arg is a value of a user defined $type
-                 (member arg (gethash (trim-1st-char type-def) *types*)))
+                 (or (null arg)
+                     (member arg (gethash (trim-1st-char type-def) *types*))))
             (and ($varp type-def)  ;arg is a value of a lisp type
                  (typep arg (trim-1st-char type-def)))
             (and (listp type-def)  ;arg is a value of a type combo

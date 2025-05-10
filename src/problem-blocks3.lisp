@@ -20,30 +20,26 @@
 (define-types
     block (A B C)
     table (T)
-    target (either block table))
+    support (either block table))
 
 
 (define-dynamic-relations
-    (on block target))
-
-
-(define-static-relations
-    (height target $real))
+    (on block support))
 
 
 (define-query cleartop? (?block)
-  (not (exists (standard ?b block)
+  (not (exists (?b block)
          (on ?b ?block))))
 
 
 (define-action put
     1
-  (standard ?block block (?block-support ?target) target)
-  (and (cleartop? ?block)
-       (on ?block ?block-support)
-       (cleartop? ?target)
-       (different ?block ?target))
-  (?block ?target)
+  (standard ?block block (?block-support ?target) support)  ;standard (optional) means ?block /= ?support /= ?target 
+  (and (cleartop? ?block)          ;there is no other block on ?block
+       (on ?block ?block-support)  ;?block is on some ?support
+       (and (block ?target)        ;?target is a block (not the table) and
+            (cleartop? ?target)))  ;there is no block on the ?target block
+  (?block ?target)                 ;the action description will be (put ?block ?target)
   (assert (on ?block ?target)
           (not (on ?block ?block-support))))
 
@@ -55,5 +51,5 @@
 
 
 (define-goal
-  (or (and (on C T) (on B C) (on A B))
-      (and (on A T) (on B A) (on C B))))
+  (or (and (on C T) (on B C) (on A B))    ;A -> B -> C -> T
+      (and (on A T) (on B A) (on C B))))  ;C -> B -> A -> T

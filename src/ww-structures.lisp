@@ -77,9 +77,13 @@
 (defun list-database (idb)
   "Used to printout idb in propositional form."
   (let* ((propositions (iter (for (key val) in-hashtable idb)
-                             (if (eql val t)
-                               (collecting (convert-to-proposition key))  ;non-fluent prop
-                               (collecting (convert-to-fluent-proposition key val)))))
+                             (cond
+                               ;; Skip entries where val is a list containing NIL
+                               ((and (listp val) (member nil val)) nil)
+                               ;; Process non-fluent propositions with value T
+                               ((eql val t) (collecting (convert-to-proposition key)))
+                               ;; Process fluent propositions (lists without NIL)
+                               (t (collecting (convert-to-fluent-proposition key val))))))
          (sorted-props (sort (copy-list propositions) #'string< :key (lambda (prop) (format nil "~A" (car prop))))))
     sorted-props))
 

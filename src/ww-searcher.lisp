@@ -38,6 +38,12 @@
        (finish-output))))  ;make sure printout is complete before continuing
 
 
+(defun simple-break ()
+  "Call to simplify debugger printout on a break."
+  (declare (optimize (debug 0)))
+  (break))
+
+
 (defun probe (current-node name instantiations depth &optional (count 1))
   "Breaks when the current node matches action name, instantiations, depth, and count from start--eg, (put (a b) 1)."
   (declare (type node current-node))  ;(ut::prt name instantiations depth current-node) (break)
@@ -137,21 +143,21 @@
   (when (fboundp 'bounding-function?)
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
-  (let ((fixed-idb (fixedp *relations*))
+  (let ((fixed-idb nil)  ;(fixedp *relations*))
         (parallelp (> *threads* 0)))
     (declare (ignorable parallelp))
     (setf *open* 
       (hs::make-hstack :table 
-                         #+sbcl (make-hash-table :test (if fixed-idb 'fixed-keys-ht-equal 'equalp)
+                         #+sbcl (make-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                                  :synchronized parallelp)
-                         #-sbcl (genhash:make-generic-hash-table :test (if fixed-idb 'fixed-keys-ht-equal 'equalp))
+                         #-sbcl (genhash:make-generic-hash-table :test 'equalp)  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp))
                        :keyfn #'node.state.idb))
     (when (eql *tree-or-graph* 'graph)
       (setf *closed* 
-        #+sbcl (make-hash-table :test (if fixed-idb 'fixed-keys-ht-equal 'equalp)
+        #+sbcl (make-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                 :size 100000
                                 :synchronized parallelp)
-        #-sbcl (genhash:make-generic-hash-table :test (if fixed-idb 'fixed-keys-ht-equal 'equalp)
+        #-sbcl (genhash:make-generic-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                                 :size 100000))))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   (setf *program-cycles* 0)
@@ -211,7 +217,7 @@
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
     (print-search-progress *open*)  ;#nodes expanded so far
-    (after-each #+:ww-debug (when (>= *debug* 5) (break)))))
+    (after-each #+:ww-debug (when (>= *debug* 5) (simple-break)))))  ;simplifies debugger printout
 
 
 (defun df-bnb1 (open)

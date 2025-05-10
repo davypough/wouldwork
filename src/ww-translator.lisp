@@ -121,47 +121,26 @@
               indices))))
 
 
-#+ignore (defun translate-bind (form flag)
+(defun translate-bind (form flag)
   "Translates a binding for a relation form, returns t if there is a binding,
    even NIL. But returns NIL if there is no binding."
   (check-proposition (second form))
   (let* ((fluent-indices (get-prop-fluent-indices (second form)))
          (fluentless-atom (ut::remove-at-indexes fluent-indices (second form)))
          (prop-fluents (get-prop-fluents (second form))))
-    `(let ((values-list (gethash ,(translate-list fluentless-atom flag)
-                               ,(if (gethash (car (second form)) *relations*)
-                                  (case flag
-                                    (pre '(problem-state.db state))
-                                    ((ante eff) 'idb))
-                                  '*static-db*))))
-       (when values-list
-         (dolist (vals values-list nil)  ;return nil if no match found
-           (when (listp vals)  ;ensure vals is a list for fluent values
-             (progn (setf ,@(mapcan (lambda (var i)
-                                      `(,var (nth ,i vals)))
-                                    prop-fluents
-                                    (loop for i from 0 below (length prop-fluents)
-                                          collect i)))
-                    (return t))))))))  ;return t when first match found
+    `(let ((vals (gethash ,(translate-list fluentless-atom flag)
+                         ,(if (gethash (car (second form)) *relations*)
+                            (case flag
+                              (pre '(problem-state.db state))
+                              ((ante eff) 'idb))
+                            '*static-db*))))
+       (when vals
+         (setf ,@(mapcan #'list prop-fluents 
+                               (loop for i from 0 below (length prop-fluents)
+                                    collect `(nth ,i vals))))))))
 
 
 #+ignore (defun translate-bind (form flag)
-  "Translates a binding for a relation form, returns t if there is a binding,
-   even NIL. But returns NIL if there is no binding."
-  (check-proposition (second form))
-  (let* ((fluent-indices (get-prop-fluent-indices (second form)))
-         (fluentless-atom (ut::remove-at-indexes fluent-indices (second form)))
-         (prop-fluents (get-prop-fluents (second form)))
-         (translation (translate-simple-atom fluentless-atom flag))
-         (setf-values (loop for i from 0 below (length prop-fluents)
-                            collect `(nth ,i vals))))
-    ;(ut::prt form fluent-indices fluentless-atom prop-fluents translation setf-values)
-    `(let ((vals ,translation))
-              (when vals
-                (progn (setf ,@(mapcan #'list prop-fluents setf-values)) t)))))
-
-
-(defun translate-bind (form flag)
   "Translates a binding for a relation form, returns t if there is a binding,
    even NIL. But returns NIL if there is no binding."
   (check-proposition (second form))
@@ -179,6 +158,7 @@
                                (loop for i from 0 below (length prop-fluents)
                                     collect `(nth ,i vals))))
                 t)))))
+
 
 
 (defun translate-existential (form flag)
