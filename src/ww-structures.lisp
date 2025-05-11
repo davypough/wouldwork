@@ -79,7 +79,7 @@
   (let* ((propositions (iter (for (key val) in-hashtable idb)
                              (cond
                                ;; Skip entries where val is a list containing NIL
-                               ((and (listp val) (member nil val)) nil)
+                               ;((and (listp val) (member nil val)) nil)
                                ;; Process non-fluent propositions with value T
                                ((eql val t) (collecting (convert-to-proposition key)))
                                ;; Process fluent propositions (lists without NIL)
@@ -92,19 +92,6 @@
   "Prints the current database for state.
    Use as (ut::prt (database state)) as diagnostic in rules & functions."
   (list-database (problem-state.idb state)))
-
-
-#+nil (defun print-problem-state (state &optional (stream t) depth)
-  (declare (type problem-state state) (ignore depth))
-  (format stream "<~A ~A ~A ~A ~A ~A~%  ~S~%  ~S>"
-      (problem-state.name state)
-      (problem-state.instantiations state)
-      (problem-state.happenings state)
-      (problem-state.time state)
-      (problem-state.value state)
-      (problem-state.heuristic state)
-      (list-database (problem-state.idb state))
-      (list-database (problem-state.hidb state))))
 
 
 (defun print-problem-state (state &optional (stream t) depth)  ;potential bug here?

@@ -135,25 +135,6 @@
                               ((ante eff) 'idb))
                             '*static-db*))))
        (when vals
-         (setf ,@(mapcan #'list prop-fluents 
-                               (loop for i from 0 below (length prop-fluents)
-                                    collect `(nth ,i vals))))))))
-
-
-#+ignore (defun translate-bind (form flag)
-  "Translates a binding for a relation form, returns t if there is a binding,
-   even NIL. But returns NIL if there is no binding."
-  (check-proposition (second form))
-  (let* ((fluent-indices (get-prop-fluent-indices (second form)))
-         (fluentless-atom (ut::remove-at-indexes fluent-indices (second form)))
-         (prop-fluents (get-prop-fluents (second form))))
-    `(let ((vals (gethash ,(translate-list fluentless-atom flag)
-                         ,(if (gethash (car (second form)) *relations*)
-                            (case flag
-                              (pre '(problem-state.db state))
-                              ((ante eff) 'idb))
-                            '*static-db*))))
-       (when vals
          (progn (setf ,@(mapcan #'list prop-fluents 
                                (loop for i from 0 below (length prop-fluents)
                                     collect `(nth ,i vals))))
