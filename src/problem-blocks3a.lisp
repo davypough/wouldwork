@@ -3,49 +3,48 @@
 
 ;;; Problem specification for a blocks world problem:
 ;;; stack blocks named A, B, and C on a table named T.
-;;; Keep problem-state.idb keys fixed.
-
+;;; Uses fluent variables
 
 (in-package :ww)  ;required
 
 
 (ww-set *problem-name* blocks3a)
 
-(ww-set *problem-type* planning)
+(ww-set *problem-type* planning)  ;use planning vs constraint satisfaction search strategy
 
-(ww-set *solution-type* every)
+(ww-set *solution-type* every)  ;find every possible solution
 
-(ww-set *tree-or-graph* graph)
+(ww-set *tree-or-graph* graph)  ;fast, don't bother to check for repeated states
 
 
 (define-types
   block (A B C)
   table (T)
-  support (either block table))
+  support (either block table))  ;a block or table can be a support (for a block)
 
 
 (define-dynamic-relations
-  (on block $support))  ;eg, (on A T), where $support is a fluent
+  (on block $support))  ;a block can be on a fluent support, allows direct lookup with bind
 
 
 (define-query cleartop? (?block)
-  (not (exists (?b block)
+  (not (exists (?b block)  ;?block has cleartop if there is no block on it
          (on ?b ?block))))
   
 
 (define-action put
     1
-  (standard ?block block ?target support)
-  (and (cleartop? ?block)                 ;?block must have a clear top
-       (bind (on ?block $block-support))  ;get the $block-support under ?block
-       (and (block ?target)               ;if target is a block (not the table)
-            (cleartop? ?target)))         ;it must have a clear top, otherwise can move to table
-  (?block ?target)                        ;the action description will be (put ?block ?target)
-  (assert (on ?block ?target)))           ;fluent status of ?block updated
+  (standard ?block block ?target support)  ;standard (optional) means ?block /= ?target 
+  (and (cleartop? ?block)                  ;?block must have a clear top
+       (bind (on ?block $block-support))   ;get the $block-support under ?block
+       (and (block ?target)                ;if target is a block (not the table)
+            (cleartop? ?target)))          ;it must have a clear top, otherwise can move to table
+  (?block ?target)                         ;the action description will be (put ?block ?target)
+  (assert (on ?block ?target)))            ;fluent status of ?block updated
 
 
 (define-init
-  ;(on A T)  ;note: all possible (on block $support) relations must be initially
+  (on A T)  ;note: all possible (on block $support) relations must be initially
   (on B T)  ;instantiated for greatest efficiency
   (on C T))
 

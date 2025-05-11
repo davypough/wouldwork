@@ -10,25 +10,25 @@
 
 (ww-set *problem-name* blocks3)
 
-(ww-set *problem-type* planning)
+(ww-set *problem-type* planning)  ;use planning vs constraint satisfaction search strategy
 
-(ww-set *solution-type* every)
+(ww-set *solution-type* every)  ;find every possible solution
 
-(ww-set *tree-or-graph* tree)  ;note: preferrable to use blocks3a if graph search wanted
+(ww-set *tree-or-graph* tree)  ;fast, don't bother to check for repeated states
 
 
 (define-types
     block (A B C)
     table (T)
-    support (either block table))
+    support (either block table))  ;a block or table can be a support (for a block)
 
 
 (define-dynamic-relations
-    (on block support))
+    (on block support))  ;a block can be on a support
 
 
 (define-query cleartop? (?block)
-  (not (exists (?b block)
+  (not (exists (?b block)  ;?block has cleartop if there is no block on it
          (on ?b ?block))))
 
 
@@ -40,8 +40,8 @@
        (and (block ?target)        ;?target is a block (not the table) and
             (cleartop? ?target)))  ;there is no block on the ?target block
   (?block ?target)                 ;the action description will be (put ?block ?target)
-  (assert (on ?block ?target)
-          (not (on ?block ?block-support))))
+  (assert (on ?block ?target)      ;new assertion added to state
+          (not (on ?block ?block-support))))  ;previous assertion removed from state
 
 
 (define-init

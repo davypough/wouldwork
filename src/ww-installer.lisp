@@ -117,7 +117,7 @@
                  (add-proposition '(always-true) *static-db*)
                  (setf (gethash 'always-true *static-relations*) '(always-true))))
   ;; Initialize fluent relations with nil values
-  (iter (for (relation-name fluent-indices) in-hashtable *fluent-relation-indices*)
+  #+ignore (iter (for (relation-name fluent-indices) in-hashtable *fluent-relation-indices*)
         (let* ((relation-types (gethash relation-name *relations*))
                (args-with-nil (mapcar (lambda (type index)
                                         (if (member index fluent-indices)

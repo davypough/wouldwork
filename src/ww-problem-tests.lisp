@@ -13,7 +13,7 @@
   '("problem-blocks3.lisp" "problem-blocks3a.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp" "problem-queens8.lisp"
     "problem-captjohn-csp.lisp" "problem-quern.lisp" "problem-graveyard.lisp" "problem-sentry.lisp"
-    #+sbcl "problem-crossword5-11.lisp"  ;takes too long in non-sbcl
+    ;"problem-crossword5-11.lisp"  ;runs out of default memory
     ;"problem-crossword15-18.lisp"  ;runs out of default memory
     "problem-crossword13.lisp" "problem-array-path.lisp"
     "problem-tiles0a-csp.lisp" "problem-tiles1a.lisp" "problem-tiles1a-heuristic.lisp"
