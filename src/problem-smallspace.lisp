@@ -282,7 +282,7 @@
        (bind (loc me1 $area))
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2))
-  ($cargo ?terminus1 ?terminus2 $area)
+  ($cargo ?terminus1 ?terminus2 $area $hue)
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
           (connects $cargo ?terminus1)
@@ -307,7 +307,7 @@
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2)
        (connectable? $area ?terminus3))
-  ($cargo ?terminus1 ?terminus2 ?terminus3 $area)
+  ($cargo ?terminus1 ?terminus2 ?terminus3 $area $hue)
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
           (connects $cargo ?terminus1)
@@ -490,6 +490,118 @@
 
 ;;;; GOAL ;;;;
 
-
 (define-goal  ;always put this last
   (loc me1 area8))
+
+
+;;;;;;;; Invariant Checks for Debugging ;;;;;;;;;;;;;;;
+
+#+ignore (define-invariant active-connector-hue ()
+  ;Connectors are active if and only if they have a hue
+  (doall (?c connector)
+    (equivalent (active ?c)
+                (bind (color ?c $hue)))))
+
+
+#+ignore (define-invariant holds-cargo-location ()
+  ;Cargo cannot be both held and have a location simultaneously
+  (not (and (bind (holds me1 $cargo))
+            (bind (loc $cargo $area)))))
+
+
+#+ignore (define-invariant receiver-activation ()
+  ;A receiver is active if and only if there exists at least one
+  ;connected, active connector of the same color.
+  (doall (?r receiver)
+    (if (bind (color ?r $rhue))
+      (equivalent (active ?r)
+                  (exists (?c connector)
+                    (and (connects ?c ?r)
+                         (active ?c)
+                         (bind (color ?c $chue))
+                         (eql $chue $rhue)))))))
+
+
+#+ignore (define-invariant receiver-gate-control ()
+  ;A receiver is active if and only if all gates it controls are inactive
+  (doall (?r receiver)
+    (if (exists (?g gate)
+          (controls ?r ?g))
+      (equivalent (active ?r)
+                  (forall (?g gate)
+                    (if (controls ?r ?g)
+                      (not (active ?g))))))))
+
+
+#+ignore (define-invariant colored-connector-connection ()
+  ;Any colored connector must have a valid source with matching color,
+  ;either a transmitter or another connector
+  (doall (?c connector)
+    (if (bind (color ?c $hue))
+        (or (exists (?t transmitter)
+              (and (connects ?c ?t)
+                   (bind (color ?t $t-hue))
+                   (eql $t-hue $hue)))
+            (exists (?other connector)
+              (and (different ?other ?c)
+                   (connects ?c ?other)    ; Connected to it
+                   (bind (color ?other $other-hue))
+                   (eql $other-hue $hue)))))))
+
+
+#+ignore (define-invariant connector-self-connection ()
+  ;No connector is connected to itself
+  (doall (?c connector)
+    (not (connects ?c ?c))))
+
+
+#+ignore (define-invariant me1-has-location ()
+  ;Me1 is always located in some area
+  (bind (loc me1 $area)))
+
+
+#+ignore (define-invariant connector-transmitter-source ()
+  ;Every active connector ultimately traces to transmitter sources without cycles
+  (let (($valid-source t)) ; Assume valid until proven otherwise
+    ;; For each active connector, verify it has a valid transmitter source
+    (doall (?c connector)
+      (if (active ?c)
+        (do (setq $visited nil)           ; Track visited connectors
+            (setq $source-found nil)      ; Flag if transmitter found
+            (setq $stack nil)             ; DFS stack
+            (setq $current ?c)            ; Current connector being examined
+            (setq $color nil)             ; Color we're tracing
+            ;; Get the color of this connector
+            (bind (color ?c $col))
+            (setq $color $col)
+            ;; Initialize stack with current connector
+            (push $current $stack)
+            ;; Perform depth-first search to find transmitter or detect cycle
+            (ww-loop while $stack do
+              ;; Pop current connector from stack
+              (setq $current (pop $stack))
+              ;; Only process this connector if we haven't seen it before
+              (unless (member $current $visited)
+                ;; Mark as visited
+                (push $current $visited)
+                ;; Check if current is directly connected to a transmitter of same color
+                (if (exists (?t transmitter)
+                      (and (connects $current ?t)
+                           (bind (color ?t $t-color))
+                           (eql $t-color $color)))
+                  (setq $source-found t)
+                  ;; Otherwise, add connected connectors of same color to stack
+                  (doall (?other connector)
+                    (if (and (different ?other $current)
+                             (connects $current ?other)
+                             (active ?other)
+                             (bind (color ?other $other-color))
+                             (eql $other-color $color))
+                      (push ?other $stack))))))
+            ;; If we've explored all paths and never found a transmitter source,
+            ;; this connector has no valid source (either disconnected or in a cycle)
+            (if (not $source-found)
+              (setq $valid-source nil)))))
+    ;; Return result
+    $valid-source))
+

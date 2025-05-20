@@ -177,8 +177,9 @@
     (*debug* (unless (and (typep val 'fixnum) (>= val 0) (<= val 5))
                 (error "Can't set *debug* to ~S. Must be an integer between 0 and 5." val)))
     (*probe* (unless (or (null val)
-                         (and (listp val) (>= (length val) 3) (<= (length val) 4) (symbolp (first val)) (listp (second val))
-                              (and (typep (third val) 'fixnum) (> (third val) 0))))
+                         (and (listp val) (>= (length val) 3) (<= (length val) 4) (symbolp (first val))
+                              (listp (second val)) (typep (third val) 'fixnum) (> (third val) 0)
+                              (member (first val) (mapcar #'action.name *actions*))))
                 (error "Can't set *probe* to ~S. Must be a list whose first element is an action,
                         whose second element is a list of instances for that action,
                         whose third element is the depth>0,
@@ -249,3 +250,67 @@
 (defun varp (sym)
   (or (?varp sym)
       ($varp sym)))
+
+
+;;;;;;;;;;; User test for an action rule ;;;;;;;;;;;;;;
+
+(defun check-action (action-name &key add)
+  "Test an action by finding a valid instantiation and showing the effect.
+   :ADD is a list of propositions to add to the test state to satisfy preconditions."
+  (let ((action (find action-name *actions* :key #'action.name)))
+    (unless action
+      (format t "Action ~A not found.~%" action-name)
+      (return-from check-action nil))
+    
+    ;; Create test state based on start state
+    (let ((test-state (copy-problem-state *start-state*)))
+      
+      ;; Add any extra propositions needed to satisfy preconditions
+      (when add
+        (dolist (prop add)
+          (add-proposition prop (problem-state.idb test-state)))
+        (format t "~%Added propositions to test state:~%~S~%" add))
+      
+      (format t "~%TESTING ACTION: ~A~%~%" action-name)
+      (format t "BEFORE STATE:~%~A~%~%" (list-database (problem-state.idb test-state)))
+      
+      ;; Try each precondition argument to find one valid instantiation
+      (dolist (arg-set (action.precondition-args action) 
+               (format t "FAILED: No valid instantiation found for action ~A~%" action-name))
+        (let ((result (apply (action.pre-defun-name action) test-state arg-set)))
+          (when result
+            ;; Success - found a valid instantiation
+            (format t "VALID INSTANTIATION: ~A~%" arg-set)
+            
+            ;; Map parameters from precondition result to variables
+            (let* ((param-values (if (eq result t) nil result))
+                   ;; Create a map of variable names to their resolved values
+                   (var-map (if (and (listp result) (not (eq result t)))
+                              (loop for val in result
+                                    for var in (action.precondition-variables action)
+                                    collect (cons var val))
+                              nil))
+                   ;; Get effect variables, with resolved values when available
+                   (effect-var-values 
+                     (mapcar (lambda (var)
+                               (let ((val-pair (assoc var var-map)))
+                                 (if val-pair (cdr val-pair) var)))
+                             (action.effect-variables action))))
+              
+              ;; Show the action with as many resolved variables as possible
+              (format t "ACTION: (~A~{ ~A~})~%~%" 
+                      (action.name action)
+                      (mapcar (lambda (x) 
+                                (if (symbolp x) x (format nil "~A" x)))
+                              effect-var-values)))
+            
+            ;; Apply effect function
+            (let* ((updated-dbs (if (eql result t)
+                                   (funcall (action.eff-defun-name action) test-state)
+                                   (apply (action.eff-defun-name action) test-state result))))
+              
+              ;; Show each update result
+              (dolist (update updated-dbs)
+                (format t "AFTER STATE:~%~A~%~%" 
+                        (list-database (update.changes update))))
+              (return t))))))))

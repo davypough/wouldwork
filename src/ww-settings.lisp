@@ -257,3 +257,6 @@
 
 (define-global *print-updates* nil
   "Print each database update while T")
+
+(define-global *global-invariants* nil
+  "List of invariant query functions to check on every state.")

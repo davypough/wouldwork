@@ -140,6 +140,10 @@
 
 (defun dfs ()
   "Main search program."
+  (when *global-invariants*
+    (unless (validate-global-invariants *start-state* t)
+      (format t "~%Invariant validation failed on initial state.~%")
+      (return-from dfs nil)))
   (when (fboundp 'bounding-function?)
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
@@ -261,13 +265,15 @@
                     (update-search-tree (node.state current-node) (node.depth current-node) ""))
       (update-max-depth-explored (1+ (node.depth current-node)))
       (increment-global *total-states-processed* (length succ-states))
-      (when (= *debug* 6) (break))  ;probe found
+      (when (= *debug* 6) (simple-break))  ;probe found
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
 (defun process-successors (succ-states current-node open)    ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
   (iter (with succ-depth = (1+ (node.depth current-node)))
         (for succ-state in succ-states)
+        (when *global-invariants*
+          (validate-global-invariants succ-state))
         (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (next-iteration)))  ;throw out state if can't better best solution so far
@@ -303,6 +309,22 @@
                 #-sbcl (genhash:hashrem succ-idb *closed*)
                 (progn (finalize-path-depth succ-depth) (next-iteration))))))  ;drop this succ
         (collecting (generate-new-node current-node succ-state))))  ;live successor
+
+
+(defun validate-global-invariants (state &optional (is-start-state nil))
+  "Validate all registered global invariants on the given state.
+   Returns T if all invariants pass, NIL if any fail."
+  (loop for invariant-name in *global-invariants*
+        for fn = (symbol-function invariant-name)
+        unless (funcall fn state)
+        do (troubleshoot "Invariant ~A failed on ~A:~%~A" 
+                        invariant-name
+                        (if is-start-state 
+                            "*START-STATE*" 
+                            "state during planning")
+                        (list-database (problem-state.idb state)))
+           (return-from validate-global-invariants nil))
+  t)
 
 
 (defun idb-in-open (succ-idb open)

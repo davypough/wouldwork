@@ -136,34 +136,6 @@
   t)
 
 
-#+ignore (defun install-dynamic-relations (relations)
-  (format t "~&Installing dynamic relations...")
-  (iter (for relation in relations)
-        (check-relation relation)
-        (setf (gethash (car relation) *relations*)
-              (ut::if-it (cdr relation)
-                (sort-either-types ut::it)
-                t))
-        (ut::if-it (iter (for arg in (cdr relation))
-                         (for i from 1)
-                         (when ($varp arg)
-                           (collect i)))
-          (setf (gethash (car relation) *fluent-relation-indices*)
-                ut::it))
-        (finally (maphash (lambda (key val)  ;install implied unary relations
-                            (declare (ignore val))
-                            (setf (gethash key *static-relations*) '(something)))
-                          *types*)
-                 (add-proposition '(always-true) *static-db*)
-                 (setf (gethash 'always-true *static-relations*) '(always-true))))
-  (iter (for (key val) in-hashtable *relations*)  ;install symmetric relations
-    (when (and (not (eql val t))
-               (not (alexandria:setp val))  ;multiple types
-               (not (final-charp #\> key)))   ;not explicitly directed
-      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
-  t)
-
-
 (defmacro define-static-relations (&rest relations)
   `(install-static-relations ',relations))
 
@@ -289,8 +261,8 @@
              (declare (ignorable ,@new-$vars))
              ,(if (eql (car body) 'let)
                 (let ((declaration (third body)))
-                  (when (not (eql (car declaration) 'declare))
-                    (error "Declare statement required before body of let statement in ~A" name))
+                  ;(when (not (eql (car declaration) 'declare))
+                  ;  (error "Declare statement required before body of let statement in ~A" name))
                   `(let ,(second body)
                      ,(third body)  ;should be a declare statement
                      ,(translate (fourth body) 'pre)))
@@ -550,3 +522,14 @@
            ,(translate form 'pre)))))
   (setf (get 'goal-fn :form) form)
   (fix-if-ignore '(state) (symbol-value 'goal-fn)))  ;(get 'goal-fn 'fn))
+
+
+(defmacro define-invariant (name args body)
+  "Define an invariant condition that must always be true.
+   Registers the invariant for global checking during planning."
+  `(progn
+     ;; First define as a query function
+     (install-query ',name ',args ',body)
+     ;; Then register in the global invariants list
+     (pushnew ',name *global-invariants*)
+     ',name))
