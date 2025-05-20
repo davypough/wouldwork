@@ -257,6 +257,19 @@
 
 
 (defun translate-let (form flag)
+  "Translates a let clause, including binding forms."
+  `(let ,(mapcar (lambda (binding)
+                   (if (consp binding)
+                       ;; Binding with initial value - translate the value
+                       `(,(first binding) ,(translate (second binding) flag))
+                       ;; Just a variable name - keep as is
+                       binding))
+                 (second form))
+     ,@(iter (for statement in (cddr form))
+             (collect (translate statement flag)))))
+
+
+#+ignore (defun translate-let (form flag)
   "Translates a let clause."
   `(let ,(second form)
      ,@(iter (for statement in (cddr form))

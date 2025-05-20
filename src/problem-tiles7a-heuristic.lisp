@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 25)
+(ww-set *depth-cutoff* 22)
 
 (ww-set *progress-reporting-interval* 10000000)
 
@@ -79,9 +79,9 @@
 (define-update check-emptys ()
   (do (bind (emptys $emptys))
       (unless (alexandria:setp $emptys :test #'equal)
-        (troubleshoot "$emptys is not setp: ~A" $emptys))
+        (troubleshoot "In CHECK-EMPTYS, $emptys is not setp: ~A" $emptys))
       (unless (alexandria:sequence-of-length-p $emptys 9)
-        (troubleshoot "$emptys length is not 9: ~A" (length $emptys)))))
+        (troubleshoot "In CHECK-EMPTYS, $emptys length is not 9: ~A" (length $emptys)))))
 
 
 (define-update check-tile-locs (?direction)

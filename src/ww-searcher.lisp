@@ -141,7 +141,7 @@
 (defun dfs ()
   "Main search program."
   (when *global-invariants*
-    (unless (validate-global-invariants *start-state* t)
+    (unless (validate-global-invariants nil *start-state*)
       (format t "~%Invariant validation failed on initial state.~%")
       (return-from dfs nil)))
   (when (fboundp 'bounding-function?)
@@ -273,7 +273,7 @@
   (iter (with succ-depth = (1+ (node.depth current-node)))
         (for succ-state in succ-states)
         (when *global-invariants*
-          (validate-global-invariants succ-state))
+          (validate-global-invariants current-node succ-state))
         (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (next-iteration)))  ;throw out state if can't better best solution so far
@@ -311,18 +311,37 @@
         (collecting (generate-new-node current-node succ-state))))  ;live successor
 
 
-(defun validate-global-invariants (state &optional (is-start-state nil))
-  "Validate all registered global invariants on the given state.
+(defun validate-global-invariants (current-node succ-state)
+  "Validate all registered global invariants on the given succ-state.
+   Returns T if all invariants pass, NIL if any fail.
+   If current-node is nil, this is a start state validation."
+  (loop for invariant-name in *global-invariants*
+        for fn = (symbol-function invariant-name)
+        unless (funcall fn succ-state)
+        do (if (null current-node)
+             (troubleshoot "~%Invariant ~A failed on start state:~2%~A"
+                          invariant-name
+                          succ-state)
+             (troubleshoot "~%Invariant ~A failed during transition:~2%Current node:~%~A~2%Successor state:~%~A" 
+                          invariant-name
+                          current-node
+                          succ-state))
+           (return-from validate-global-invariants nil))
+  t)
+
+
+#+ignore (defun validate-global-invariants (current-node succ-state &optional (is-start-state nil))
+  "Validate all registered global invariants on the given succ-state.
    Returns T if all invariants pass, NIL if any fail."
   (loop for invariant-name in *global-invariants*
         for fn = (symbol-function invariant-name)
-        unless (funcall fn state)
-        do (troubleshoot "Invariant ~A failed on ~A:~%~A" 
+        unless (funcall fn succ-state)
+        do (troubleshoot "~%Invariant ~A failed on ~A:~%~A" 
                         invariant-name
                         (if is-start-state 
                             "*START-STATE*" 
                             "state during planning")
-                        (list-database (problem-state.idb state)))
+                        (list-database (problem-state.idb succ-state)))
            (return-from validate-global-invariants nil))
   t)
 
