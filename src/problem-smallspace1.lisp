@@ -1,15 +1,16 @@
-;;; Filename: problem-smallspace.lisp
+;;; Filename: problem-smallspace1.lisp
 
 
 ;;; Problem specification (in Talos Principle)
 ;;; for the small space problem in Road to Gehenna sigil 
 ;;; dome. First leg to area8.
 ;;; Uses mixed fluent & non-fluent relations
+;;; Separates movement areas from los areas
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* smallspace)
+(ww-set *problem-name* smallspace1)
 
 (ww-set *problem-type* planning)
 
@@ -24,6 +25,7 @@
   me          (me1)
   gate        (gate1 gate2)
   barrier     (nil)  ;cannot move cargo thru a barrier
+  window      (window1 window2)
   jammer      (nil)
   gun         (nil)
   connector   (connector1 connector2)
@@ -37,10 +39,14 @@
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2)
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
-  area        (area1 area2 area3 area4 area5 area6 area7 area8)
+  area        (area1 area2 area3)
+  vantage     (v-R2 v-G2-R2 v-W2-R2 v-G1-G2-R2  ;from vantage region to a fixture
+               v-R1
+               v-T2 v-G2-T2
+               v-T1 v-W1-T1 v-W2-T1 v-G1-T1)
   cargo       (either connector jammer box fan)  ;what an agent (me) can pickup & carry
   target      (either gate gears gun)  ;what a jammer can jam
-  divider     (either barrier gate)
+  divider     (either barrier gate window)
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver gears ladder rostrum)
   station     (either fixture gate)  ;useful for los determinations
@@ -56,27 +62,26 @@
   ;(jams jammer $target)
   (connects terminus terminus)
   (active (either connector receiver gate switch gun gears))
-  (color terminus $hue))
+  (color terminus $hue)
+)
 
 
 (define-static-relations
   (adjacent area area)  ;agent can always move to adjacent area unimpeded  
   (locale fixture area)  ;locale is a fixed location, loc is dynamic
+  (in vantage area)
   (barrier-separates barrier area area)
   (gate-separates gate area area)
+  (window-separates window area area)
   ;(separates divider area area)
   ;(climbable> ladder area area)
   ;(height support $real)
   (controls receiver gate)
-  ;clear los from an area to a gate/fixture
-  (los0 area (either gate fixture))  
-  (los1 area divider (either gate fixture))
-  (los2 area divider divider (either gate fixture))
-  ;could see a mobile object in an area from a given area
-  (visible0 area area)  
-  (visible1 area divider area)
-  (visible2 area divider divider area))
-
+  ;clear los from a vantage region to a gate/fixture
+  (los0 vantage (either gate fixture))
+  (los1 vantage divider (either gate fixture))
+  (los2 vantage divider divider (either gate fixture))
+)
 
 ;(define-complementary-relations  
 ;  (holds me $cargo) -> (not (free me)))
@@ -269,7 +274,7 @@
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
           (connects $cargo ?terminus)
-          (if (and (source? ?terminus)  ;(if (setq $hue (hue-if-source? ?terminus))
+          (if (and (source? ?terminus)
                    (bind (color ?terminus $hue)))
             (activate-connector! $cargo $hue))))
 
@@ -287,8 +292,8 @@
           (loc $cargo $area)
           (connects $cargo ?terminus1)
           (connects $cargo ?terminus2)
-          (bind (color ?terminus1 $hue1))  ;(setq $hue1 (get-hue? ?terminus1))
-          (bind (color ?terminus2 $hue2))  ;(setq $hue2 (get-hue? ?terminus2))
+          (bind (color ?terminus1 $hue1))
+          (bind (color ?terminus2 $hue2))
           (if (or $hue1 $hue2)    ;at least one active
             (if (eql $hue1 $hue2)  ;both active and the same color
               (setq $hue $hue1)
@@ -372,120 +377,63 @@
 
 (define-init
   ;dynamic
-  (loc me1 area5)
-  (loc connector1 area5)
-  (loc connector2 area7)
+  (loc me1 area1)
+  (loc connector1 area1)
+  (loc connector2 area2)
   ;(free me1)
   (active gate1)
   (active gate2)
+
   ;static
-  (adjacent area1 area2)
-  (adjacent area2 area3)
-  (adjacent area3 area4)
-  (adjacent area4 area5)
-  (adjacent area6 area7)
-  (locale transmitter1 area4)
-  (locale transmitter2 area6)
-  (locale receiver1 area4)
-  (locale receiver2 area8)
+  (locale transmitter1 area1)
+  (locale transmitter2 area2)
+  (locale receiver1 area1)
+  (locale receiver2 area3)
   (color transmitter1 blue)
   (color transmitter2 red)
   (color receiver1 blue)
   (color receiver2 red)
   (controls receiver1 gate1)
   (controls receiver2 gate2)
-  (gate-separates gate1 area4 area7)
-  (gate-separates gate2 area7 area8)
+  (gate-separates gate1 area1 area2)
+  (gate-separates gate2 area2 area3)
+  (window-separates window1 area1 area2)
+  (window-separates window2 area1 area3)
 
-  ;los is from an area to a fixed station
-  ;(los0 area2 transmitter1)
-  (los0 area3 transmitter1)
-  (los0 area3 receiver1)
-  (los0 area5 transmitter1)
-  (los0 area5 receiver1)
-  (los0 area5 receiver2)
-  (los0 area6 transmitter1)
-  ;(los0 area6 transmitter2)
-  (los0 area7 transmitter2)
-  (los0 area8 transmitter1)
-  (los1 area7 gate1 transmitter1)
-  (los1 area7 gate2 receiver2)
-  (los1 area8 gate2 transmitter2)
-  (los2 area3 gate1 gate2 receiver2)
-  (los2 area4 gate1 gate2 receiver2)
-
-  ;visibility is from an area to an area 
+  ;visibility is a los from an area to an area 
   ;potentially containing a movable target or terminus
-  (visible0 area1 area3)
-  (visible0 area1 area4)
-  ;(visible0 area1 area5)
-  (visible0 area2 area4)
-  (visible0 area2 area5)
-  (visible0 area2 area6)
-  (visible0 area3 area5)
-  (visible0 area3 area6)
-  (visible0 area3 area7)
-  (visible0 area3 area8)
-  (visible0 area4 area6)
-  (visible0 area4 area8)
-  (visible0 area5 area6)
-  (visible0 area5 area8)
-  (visible1 area1 gate1 area7) 
-  (visible1 area2 gate1 area7) 
-  (visible1 area3 gate1 area7) 
-  ;(visible1 area4 gate1 area7) 
-  (visible1 area4 gate1 area6) 
-  (visible1 area5 gate1 area6) 
-  (visible1 area5 gate1 area7) 
-  (visible1 area6 gate2 area8)
-  ;(visible1 area7 gate2 area8)
-  (visible2 area2 gate1 gate2 area8)
-  (visible2 area3 gate1 gate2 area8)
-  (visible2 area4 gate1 gate2 area8)
+  (visible0 area1 area1)
+  (visible0 area2 area2)
+  (visible0 area3 area3)
+  (visible1 area1 window1 area2) 
+  (visible1 area1 gate1 area2) 
+  (visible1 area1 window2 area3) 
+  (visible1 area2 gate2 area3)
+  (visible2 area1 gate1 gate2 area3)
+  (visible2 area1 window2 gate2 area2)
+
+  ;los is from a vantage to a fixed station
+  (los0 v-T1 transmitter1)
+  (los0 v-T2 transmitter2)
+  (los0 v-R1 receiver1)
+  (los0 v-R2 receiver2)
+  (los1 v-G1-T1 gate1 transmitter1)
+  (los1 v-G2-R2 gate2 receiver2)
+  (los1 v-G2-T2 gate2 transmitter2)
+  (los1 v-W1-T1 window1 transmitter1)
+  (los1 v-W2-T1 window2 transmitter1)
+  (los1 v-W2-R2 window2 receiver2)
+  (los2 v-G1-G2-R2 gate1 gate2 receiver2)
+
+  ;vantage point in which area
+  (in v-G1-G2-R2 area1)
+  (in v-W2-R2 area1)
+  (in v-W-1-T1 area2)
+  (in v-G1-T1 area2)
+  (in v-G2-R2 area2)
+  (in v-G2-T2 area3)
+  (in v-W2-T1 area3)
 )
-
-;;;; INITIALIZATION ACTIONS ;;;;
-
-;init-actions save listing systematic facts
-
- (define-init-action init-los0  
-   ;los exists to any station within its local area
-    0
-  (?station station (?area1 ?area2) area)
-  (or (locale ?station ?area1)             ;for fixtures
-      (gate-separates ?station ?area1 ?area2))  ;for gates
-  ()
-  (assert (los0 ?area1 ?station)))
-
-
- (define-init-action init-visible0-locally  
-   ;any object is visible from its own local area
-    0
-  (?area area)
-  (always-true)
-  ()
-  (assert (visible0 ?area ?area)))
-
-
- (define-init-action init-visible0-via-adjacency  
-   ;any object is visible from an adjacent area
-    0
-  ((?area1 ?area2) area)
-  (adjacent ?area1 ?area2)
-  ()
-  (assert (visible0 ?area1 ?area2)))
-
-
- (define-init-action init-visible1-thru-divider  
-   ;any object is visible thru a divider
-    0
-  (?divider divider (?area1 ?area2) area)
-  (or (and (barrier ?divider)
-           (barrier-separates ?divider ?area1 ?area2))
-      (and (gate ?divider)
-           (gate-separates ?divider ?area1 ?area2)))
-  ()
-  (assert (visible1 ?area1 ?divider ?area2)))
 
 
 ;;;; GOAL ;;;;
@@ -604,4 +552,3 @@
               (setq $valid-source nil)))))
     ;; Return result
     $valid-source))
-

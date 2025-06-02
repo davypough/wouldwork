@@ -137,7 +137,13 @@
        (when vals
          (progn (setf ,@(mapcan #'list prop-fluents 
                                (loop for i from 0 below (length prop-fluents)
-                                    collect `(nth ,i vals))))
+                                    collect ;`(nth ,i vals))))
+                                            (case i
+                                              (0 '(first vals))
+                                              (1 '(second vals)) 
+                                              (2 '(third vals))
+                                              (3 '(fourth vals))
+                                              (otherwise `(nth ,i vals))))))
                 t)))))
 
 

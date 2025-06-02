@@ -10,7 +10,7 @@
 
 (ww-set *problem-name* blocks3)
 
-(ww-set *problem-type* planning)  ;use planning vs constraint satisfaction search strategy
+(ww-set *problem-type* planning)  ;use planning (vs constraint satisfaction) search strategy
 
 (ww-set *solution-type* every)  ;find every possible solution
 
