@@ -138,9 +138,9 @@
 
 
 (define-query passable? (?area1 ?area2)
-  (or ;(exists (?b barrier)
-      ;  (and (separates ?b ?area1 ?area2)
-      ;       (not (bind (holds me1 $cargo)))))  ;must drop cargo first
+  (or (exists (?b barrier)
+        (and (separates ?b ?area1 ?area2)
+             (not (bind (holds me1 $cargo)))))  ;must drop cargo first
       (exists (?g gate)
         (and (separates ?g ?area1 ?area2)
              (not (active ?g))))))

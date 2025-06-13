@@ -134,11 +134,11 @@
   "Creates new states given current state and the new updates."
   (mapcan
       (lambda (updated-db)  ;process one update structure
-        (let ((act-state (initialize-act-state action state updated-db))  ;act-state from action
+        (let ((act-state (initialize-act-state action state updated-db))  ;act-state from action = state+
               net-state new-state)
           (declare (ignorable net-state))
           (when act-state  ;no new act-state if wait action was cancelled
-            (if *happening-names*
+            (if *happening-names*  ;note that act-state = state+
               (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
               (if (and (boundp 'constraint-fn)
                        (symbol-value 'constraint-fn) 
@@ -205,6 +205,21 @@
 
 
 (defun process-followups (net-state updated-db)  ;followups for one update structure from effect
+  "Triggering forms are saved previously during effect apply."
+  (declare (ignorable updated-db))
+  (iter (with state+ = (copy-problem-state net-state))  ;create state+ from net-state
+        (setf (problem-state.idb state+) (update.changes updated-db))  ;set updated idb
+        (for followup in (update.followups updated-db))
+        #+:ww-debug (when (>= *debug* 4)
+                      (ut::prt followup))
+        (for updated-idb = (apply (car followup) state+ (cdr followup)))  ;pass state+ only
+        #+:ww-debug (when (>= *debug* 4)
+                      (ut::prt (list-database updated-idb)))
+        (setf (problem-state.idb net-state) updated-idb)
+    (finally (return-from process-followups net-state))))
+
+
+#+ignore (defun process-followups (net-state updated-db)  ;followups for one update structure from effect
   "Triggering forms are saved previously during effect apply."
   (declare (ignorable updated-db))
   (iter (with idb = (update.changes updated-db))  ;post effect idb

@@ -330,12 +330,15 @@
                     (member (first item) *query-names*))  ;call to a query
                  (collecting item into types))
               ((eql (first item) 'either)  ;combo type
-                 (let ((new-type (intern (ut::interleave+ (ut::sort-symbols (cdr item)))))  ;new combo type
-                       (type-instances (mapcar (lambda (type) (gethash type *types*)) (cdr item))))
-                   (setf (gethash new-type *types*)
-                         (if (every #'null type-instances)
-                           '(nil)
-                           (remove-duplicates (apply #'append type-instances))))))  ;multiple prior ?variables
+                 (let* ((new-type (intern (ut::interleave+ (ut::sort-symbols (cdr item)))))
+                        (type-instances (mapcar (lambda (type) (gethash type *types*)) (cdr item)))
+                        (combined-instances (if (every #'null type-instances)
+                                              '(nil)
+                                              (remove-duplicates (apply #'append type-instances)))))
+                   (setf (gethash new-type *types*) combined-instances)
+                   (if (symbolp prior-item)  ;single prior ?variable
+                     (collecting new-type into types)
+                     (appending (make-list (length prior-item) :initial-element new-type) into types))))
               ((member (first item) *parameter-headers*)  ;subparameter list
                  (multiple-value-bind (additional-?vars additional-types)
                    (dissect-pre-params item)
@@ -374,33 +377,34 @@
                     (member (first item) *parameter-headers*))
                  (collecting (instantiate-type-spec item))))))
 
-                 
-(defun eval-instantiated-spec (instantiated-pre-type-spec &optional state)
+
+(defun eval-instantiated-spec (instantiated-pre-type-spec &optional state-or-state+)
   "Receives possibly nested static or dynamic input from instantiate-type-spec,
-   and evaluates it. State not needed for exists, forall, doall."
+   and evaluates it. Works with state, idb, or context-aware parameter."
   (iter (for item in instantiated-pre-type-spec)
-        (cond ((member item *parameter-headers*) ;collect header
+        (cond ((member item *parameter-headers*)
                  (collecting item into instantiated-spec))
-              ((and (listp item)  ;collect dynamic query, only present if dynamic
+              ((and (listp item)
                     (member (first item) *query-names*))
-                 (collecting (apply (first item) state (cdr item)) into instantiated-spec))
+                 (collecting (apply (first item) state-or-state+ (cdr item)) into instantiated-spec))
               ((and (listp item)
                     (member (first item) *parameter-headers*))
-                 (collecting (eval-instantiated-spec item state) into instantiated-spec))
-              ((listp item)  ;collect list of values
+                 (collecting (eval-instantiated-spec item state-or-state+) into instantiated-spec))
+              ((listp item)
                  (collecting item into instantiated-spec))
               (t (error "Unexpected item ~A in dynamic-spec ~A" item instantiated-pre-type-spec)))
         (finally (return (get-pre-lambda-arg-lists instantiated-spec)))))
-        
+
         
 (defun get-pre-lambda-arg-lists (instantiated-spec)
   "Returns list of instantiations as arg list for a rule precondition."
   (when (or (equal instantiated-spec '(standard))  ;no precondition parameters
-            ;(equal instantiated-spec '(standard (nil)))
             (equal instantiated-spec '(standard nil)))
     (return-from get-pre-lambda-arg-lists '((nil))))
   (let ((header (first instantiated-spec))
         (value-lists (cdr instantiated-spec)))
+    ;(when (some #'null value-lists)
+    ;  (return-from get-pre-lambda-arg-lists '())) ; Return empty - no valid instantiations
     (if (eql header 'dot-product)
       (apply #'mapcar #'list value-lists)
       (let ((product-values (apply #'alexandria:map-product 'list value-lists)))

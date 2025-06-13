@@ -15,6 +15,7 @@
 
 (in-package :ww)
 
+
 #|
 (defun protect (fn &rest args)
   "If multi-threading, protect a function with a lock."
@@ -269,7 +270,7 @@
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
-(defun process-successors (succ-states current-node open)    ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
+(defun process-successors (succ-states current-node open)  ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
   (iter (with succ-depth = (1+ (node.depth current-node)))
         (for succ-state in succ-states)
         (when *global-invariants*

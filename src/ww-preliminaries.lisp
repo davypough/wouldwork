@@ -26,6 +26,13 @@
 ;            (bordeaux-threads:make-lock (format nil "Lock for ~S" var-name)))))
 
 
+(defmacro with-silenced-compilation (&body body)
+  "Macro to suppress normal compilation output while preserving error reporting."
+  `(let ((*compile-verbose* nil)
+         (*compile-print* nil))
+     ,@body))
+
+
 (defun cleanup-resources ()
   "Attempt to shutdown dangling threads safely in SBCL."
   #+sbcl
@@ -115,13 +122,13 @@
        `(pop ,var-name))))
 
 
-(defun reset-user-fns (symbols)
+(defun reset-user-syms (symbols)
   (dolist (symbol symbols)
     (unintern symbol)))
 
 
-;Reset certain user defined functions, when defined on previous load.
-(reset-user-fns '(goal-fn constraint-fn heuristic? prune? bounding-function?))
+;Reset certain user defined symbols, when defined on previous load.
+(reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function? *actions*))
 
 
 ;Make sure proper problem.lisp exists before loading wouldwork

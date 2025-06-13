@@ -18,17 +18,19 @@
     #+:ww-debug (when (>= *debug* 4)
                          (ut::prt action-completion-time))
     (setf (problem-state.time hap-state) action-completion-time)
+    ;; Process each happening event up to action completion time
     (iter (while (setq next-happening (pop next-happenings)))
           (for (object (index time direction)) = next-happening)
           (when (> time action-completion-time)
             (push next-happening following-happenings)  ;keep same happening
             (next-iteration))
           (for (ref-time . hap-updates) = (aref (get object :events) index))
-          (for following-happening = (get-following-happening state object index time direction ref-time))
+          (for following-happening = (get-following-happening act-state object index time direction ref-time))  ;not state
           #+:ww-debug (when (>= *debug* 4)
                                (ut::prt following-happening))
           (when (null following-happening)
             (next-iteration))
+          ;; Apply happening updates to BOTH hidb and hap-state
           (when (/= (first (second following-happening)) index)  ;happening is not interrupted
             (revise (problem-state.hidb act-state) hap-updates)
             (revise (problem-state.idb hap-state) hap-updates)  ;hap-state = state + updates
@@ -51,7 +53,7 @@
         (values net-state act-state)))))  ;act-state is final state
 
 
-(defun get-following-happening (state object index time direction ref-time)
+(defun get-following-happening (act-state object index time direction ref-time)  ;not state
   "Derive the following happening update for an object."
   (let* ((events (get object :events))
          (n (1- (length events)))
@@ -63,16 +65,16 @@
              (setf following-index 0))  ;setup for next update
           (t (setf following-time (+ time (- (first (aref events (1+ index))) ref-time)))
              (setf following-index (1+ index))))
-    (if (interrupt-condition object state)  ;interrupted object results in no updates except time
+    (if (interrupt-condition object act-state)  ;interrupted object results in no updates except time
       `(,object (,index ,following-time ,direction))
       `(,object (,following-index ,following-time ,direction)))))
 
 
-(defun interrupt-condition (object state)
+(defun interrupt-condition (object act-state)  ;not state
   "Determines if the interrupt function for object is satisfied in this state;
    eg, if the object is currently being jammed, and therefore disabled."
-  (declare (type symbol object) (type problem-state state))
-  (funcall (get object :interrupt) state))
+  (declare (type symbol object) (type problem-state act-state))  ;not state
+  (funcall (get object :interrupt) act-state))  ;not state
 
 
 (defun rebound-condition (object new-state)

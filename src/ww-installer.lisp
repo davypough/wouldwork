@@ -116,17 +116,6 @@
                           *types*)
                  (add-proposition '(always-true) *static-db*)
                  (setf (gethash 'always-true *static-relations*) '(always-true))))
-  ;; Initialize fluent relations with nil values
-  #+ignore (iter (for (relation-name fluent-indices) in-hashtable *fluent-relation-indices*)
-        (let* ((relation-types (gethash relation-name *relations*))
-               (args-with-nil (mapcar (lambda (type index)
-                                        (if (member index fluent-indices)
-                                            nil
-                                            type))
-                                      relation-types
-                                      (alexandria:iota (length relation-types) :start 1))))
-          (iter (for instance-list in (generate-fluent-instances args-with-nil))
-                (add-proposition (cons relation-name instance-list) *db*))))
   ;; Install symmetric relations
   (iter (for (key val) in-hashtable *relations*)
     (when (and (not (eql val t))
@@ -197,6 +186,7 @@
           (coerce (getf plist :events) 'simple-vector)))
   (when (getf plist :repeat)
     (setf (get object :repeat) (getf plist :repeat)))
+  (push object *happening-names*)
   (when (getf plist :interrupt)
     (setf (get object :interrupt) (getf plist :interrupt)))
   (ut::if-it (getf plist :interrupt)
@@ -209,7 +199,7 @@
                 ,(translate (getf plist :interrupt) 'pre))))))
   (fix-if-ignore '(state) (symbol-value object))  ; (get object :interrupt))
   ;(when (get object :rebound) 
-  ;  (setf (get object :rebound) `(lambda (state)
+  ;  (setf (get object :rebound) `(lambda (state+)
   ;                                 ,(translate (get object :rebound) 'pre)))
   ;  (setf (the function (get object :rebound-fn)) (compile nil (get object :rebound))))
   (dolist (literal (get object :inits))
@@ -220,8 +210,7 @@
       (when (gethash (caadr literal) *relations*)
         (delete-proposition (second literal) *hap-db*))
       (when (gethash (car literal) *relations*)
-        (add-proposition literal *hap-db*))))
-  (push object *happening-names*))
+        (add-proposition literal *hap-db*)))))
            
 
 (defun check-happening (happening-object property-list)
@@ -248,26 +237,26 @@
 
 
 (defun install-query (name args body)
+  "Revised query function installation with consistent state parameter handling"
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)
   (push name *query-names*)
   (let ((new-$vars (delete-duplicates 
                      (set-difference (get-all-nonspecial-vars #'$varp body) args))))
     (setf (symbol-value name)
-      `(lambda (state ,@args)
+      `(lambda (state-or-state+ ,@args)
          ,(format nil "~A query-fn" name)
+         (declare (ignorable state-or-state+))
          (block ,name
-           (let ,new-$vars
+           (let (,@new-$vars)
              (declare (ignorable ,@new-$vars))
+             ;; Create dynamic binding for context-aware translation
              ,(if (eql (car body) 'let)
-                (let ((declaration (third body)))
-                  ;(when (not (eql (car declaration) 'declare))
-                  ;  (error "Declare statement required before body of let statement in ~A" name))
-                  `(let ,(second body)
-                     ,(third body)  ;should be a declare statement
-                     ,(translate (fourth body) 'pre)))
-                (translate body 'pre)))))))
-  (fix-if-ignore '(state) (symbol-value name)))
+                `(let ,(second body)
+                   ,(third body)
+                   ,(translate (fourth body) 'context-aware))
+                (translate body 'context-aware))))))
+    (fix-if-ignore '(state-or-state+) (symbol-value name))))
 
 
 (defmacro define-update (name args body)
@@ -275,28 +264,30 @@
 
 
 (defun install-update (name args body)
+  "Revised update function installation with explicit effect context"
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
   (push name *update-names*)
-  (ut::if-it (delete-duplicates
-                 (set-difference
-                   (get-all-nonspecial-vars #'$varp body) args))  ;get $vars for let
-      (setf (symbol-value name)
-        `(lambda (state idb ,@args)
-           ,(format nil "~A update-fn" name)
-           (declare (ignorable state))
-           (let (updated-dbs ,@ut::it)
-             (declare (ignorable updated-dbs ,@ut::it))
-             ,(translate body 'eff)
-             idb)))
-      (setf (symbol-value name)
-        `(lambda (state idb ,@args)
-           ,(format nil "~A update-fn" name)
-           (declare (ignorable state))
-           (progn
-             ,(translate body 'eff))
-             idb)))
-  (fix-if-ignore '(idb) (symbol-value name)))
+  (let ((new-$vars (delete-duplicates
+                     (set-difference
+                       (get-all-nonspecial-vars #'$varp body) args))))
+    (if new-$vars
+        (setf (symbol-value name)
+          `(lambda (state+ ,@args)
+             ,(format nil "~A update-fn" name)
+             (declare (ignorable state+))
+             (let (updated-dbs ,@new-$vars)
+               (declare (ignorable updated-dbs ,@new-$vars))
+               ,(translate body 'eff)
+               (problem-state.idb state+))))
+        (setf (symbol-value name)
+          `(lambda (state+ ,@args)
+             ,(format nil "~A update-fn" name)
+             (declare (ignorable state+))
+             (progn
+               ,(translate body 'eff)
+               (problem-state.idb state+)))))
+    (fix-if-ignore '(state+) (symbol-value name))))
 
   
 (defmacro define-constraint (form)
@@ -473,18 +464,6 @@
   `(install-init ',literals))
 
 
-#+ignore (defmacro define-init (&rest literals)
-  (cons 'list
-        (mapcar (lambda (lit)
-                  (if (and (listp lit) (eq (car lit) 'sb-int:quasiquote))
-                      (let* ((expanded (macroexpand-1 lit))  ; expands to (list 'symbol (make-hash-table ...))
-                             (sym (cadr expanded))       ; get the quoted symbol
-                             (hash-table (eval (caddr expanded))))  ; eval make-hash-table
-                        (list 'quote (list (cadr sym) hash-table)))  ; unquote the symbol 
-                      `',lit))
-                literals)))
-
-
 (defun install-init (literals)
   ;(declare (special *relations* *db* *static-db*))
   (format t "~&Creating initial propositional database...")
@@ -521,7 +500,7 @@
               `(declare (ignorable ,@$vars)))
            ,(translate form 'pre)))))
   (setf (get 'goal-fn :form) form)
-  (fix-if-ignore '(state) (symbol-value 'goal-fn)))  ;(get 'goal-fn 'fn))
+  (fix-if-ignore '(state) (symbol-value 'goal-fn)))
 
 
 (defmacro define-invariant (name args body)

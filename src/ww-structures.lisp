@@ -28,13 +28,6 @@
       (print-problem-state ps stream))))  ;print to terminal human readable
 
 
-#+ignore (defmethod print-object ((ps problem-state) stream)
-  (if *print-readably*
-    (call-next-method)  ;lisp readable
-    (print-unreadable-object (ps stream :type t :identity nil)
-      (print-problem-state ps))))  ;print to terminal human readable
-
-
 (defun convert-to-proposition (integer)
   "Converts an integer code back to a proposition."
   (iter (with x = integer)

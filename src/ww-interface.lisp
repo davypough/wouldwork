@@ -372,16 +372,6 @@ any such settings appearing in the problem specification file.
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
 
 
-(defmacro with-silenced-compilation (&body body)
-  "Macro to allow certain settings -
-   - silenced *compile-verbose*
-   - silenced *compile-print*
-   - and certain *debug-print-variable-alist* settings"
-  `(let ((*compile-verbose* nil)
-	     (*compile-print* nil))
-     ,@body))
-
-
 (defmacro run (problem-name)
   "Stages and solves a user specified problem."
   `(%run ,(string problem-name)))
