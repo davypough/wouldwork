@@ -13,19 +13,6 @@
    When nil: Force write operations")
 
 
-(defun forced-read-mode-p ()
-  "Returns t if read mode has been explicitly forced via *proposition-read-mode*."
-  (and (boundp '*proposition-read-mode*)
-       (not (eq *proposition-read-mode* :unbound))
-       (eq *proposition-read-mode* t)))
-
-
-(defun write-operation-p (flag)
-  "Returns t if we should perform write operations (database updates).
-   Write operations occur in effect contexts unless read mode is explicitly forced."
-  (and (eq flag 'eff) (not (forced-read-mode-p))))
-
-
 (defparameter *within-quantifier* nil
   "Dynamic variable indicating whether translation is occurring within a quantifier context.
    When T, IF statements return explicit T/NIL for control flow semantics.
@@ -140,7 +127,32 @@
     (translate-simple-atom form flag)))
 
 
+(defun write-operation-p (flag)
+  "Returns t if we should perform write operations (database updates).
+   Write operations occur in effect contexts unless read mode is explicitly forced."
+  (and (eq flag 'eff) (not (forced-read-mode-p))))
+
+
+(defun forced-read-mode-p ()
+  "Returns t if read mode has been explicitly forced via *proposition-read-mode*."
+  (and (boundp '*proposition-read-mode*)
+       (not (eq *proposition-read-mode* :unbound))
+       (eq *proposition-read-mode* t)))  ;eg, in the condition of an if statement in an effect
+
+
 (defun translate-positive-relation (form flag)
+  "Unified positive relation translation with context-aware read/write determination.
+   Automatically detects whether to perform read operations (queries) or write operations (updates)
+   based on syntactic context rather than just translation flag."
+  (if (write-operation-p flag)
+      ;; Write operation: Effect context and not in forced read-mode
+      `(update (problem-state.idb state+) ,(translate-list form flag))
+      ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
+      (translate-proposition form flag)))
+
+
+
+#+ignore (defun translate-positive-relation (form flag)
   "Unified positive relation translation with context-aware read/write determination.
    Automatically detects whether to perform read operations (queries) or write operations (updates)
    based on syntactic context rather than just translation flag."
@@ -152,6 +164,16 @@
 
 
 (defun translate-negative-relation (form flag)
+  "Unified negative relation translation maintaining read/write context consistency.
+   Preserves negation semantics across both query and update operations."
+  (if (write-operation-p flag)
+      ;; Write operation: Effect context and not in forced read-mode
+      `(update (problem-state.idb state+) (list 'not ,(translate-list (second form) flag)))
+      ;; Read operation: All other cases
+      `(not ,(translate-positive-relation (second form) flag))))
+
+
+#+ignore (defun translate-negative-relation (form flag)
   "Unified negative relation translation maintaining read/write context consistency.
    Preserves negation semantics across both query and update operations."
   (if (write-operation-p flag)
