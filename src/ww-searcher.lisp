@@ -159,11 +159,13 @@
                        :keyfn #'node.state.idb))
     (when (eql *tree-or-graph* 'graph)
       (setf *closed* 
-        #+sbcl (make-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
-                                :size 100000
+        #+sbcl (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+                                :size 200003
+                                :rehash-size 2.7
+                                :rehash-threshold 0.8
                                 :synchronized parallelp)
         #-sbcl (genhash:make-generic-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
-                                                :size 100000))))
+                                                :size 200003))))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
@@ -244,11 +246,11 @@
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
-      #+sbcl (setf (gethash (problem-state.idb (node.state current-node)) *closed*)
+      #+sbcl (setf (gethash (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
                (list (node.depth current-node)
                      (problem-state.time (node.state current-node))
                      (problem-state.value (node.state current-node))))
-      #-sbcl (setf (genhash:hashref (problem-state.idb (node.state current-node)) *closed*)
+      #-sbcl (setf (genhash:hashref (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
                (list (node.depth current-node)
                      (problem-state.time (node.state current-node))
                      (problem-state.value (node.state current-node)))))
@@ -301,7 +303,7 @@
                (finalize-path-depth succ-depth))  ;succ is not better
              (next-iteration)))  ;drop this succ
           (let* ((succ-idb (problem-state.idb succ-state))
-                 (closed-values (get-closed-values succ-idb)))
+                 (closed-values (get-closed-values (idb-to-sorted-alist succ-idb))))
             (when closed-values
               (narrate "State previously closed" succ-state succ-depth)
               (increment-global *repeated-states*)
@@ -367,25 +369,16 @@
                               ght))))
 
 
+(defun idb-to-sorted-alist (idb-hash-table)
+  "Converts an IDB hash table to a sorted alist using Alexandria."
+  (sort (alexandria:hash-table-alist idb-hash-table)
+        #'< :key #'car))  ; Sort by fixnum keys
+
+
 (defun get-closed-values (idb)
   "Returns the closed values (depth time value) for the given idb, or nil if not found."
   #+sbcl (gethash idb *closed*)
   #-sbcl (genhash:hashref idb *closed*))
-
-
-#+ignore (defun get-closed-values (idb)
-  #+sbcl (let ((ht *closed*))
-           (block equality-keys
-             (maphash (lambda (key value)
-                        (when (funcall (hash-table-test ht) idb key)
-                          (return-from equality-keys value)))
-                      ht)))
-  #-sbcl (let ((ght *closed*))
-           (block equalp-keys
-             (genhash:hashmap (lambda (key value)
-                                (when (equalp idb key)  ;note does not ever test with fixed-keys-ht-equal
-                                  (return-from equalp-keys value)))
-                              ght))))
 
 
 (defun goal (state)
@@ -769,6 +762,7 @@
                   #-sbcl (genhash:generic-hash-table-count *closed*)
                   #+sbcl (hash-table-size *closed*)
                   #-sbcl (genhash:generic-hash-table-size *closed*)))
+        (format t "~%*open* length: ~:D" (hs::length-hstack *open*))
         (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
         (iter (while (and *rem-init-successors*
                           (not (idb-in-open (problem-state.idb (node.state (first *rem-init-successors*))) open))))

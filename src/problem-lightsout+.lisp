@@ -16,7 +16,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 8)
+(ww-set *depth-cutoff* 9)
 
 
 (define-types
@@ -690,7 +690,7 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (and (loc me1 area3)
+  (and (loc me1 area2)
        ;(loc connector3 area1)
        ;(connected connector3 transmitter2)
        ;(connected connector3 connector1)
