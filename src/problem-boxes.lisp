@@ -85,7 +85,7 @@
   (?box ?area)
   (assert (not (loc ?box ?area))
           (holding me ?box)
-          (exists (?p plate)
+          (forall (?p plate)
             (if (on ?box ?p)
               (not (on ?box ?p))))))
 

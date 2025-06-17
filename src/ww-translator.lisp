@@ -360,6 +360,42 @@
 
 (defun translate-conditional (form flag)
   "Conditional translation with proper read-mode isolation."
+  ;; Input validation
+  (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
+            (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
+    (error "AND not allowed in <then> or <else> clause of IF statement; use DO: ~A" form))
+  ;; Test translation with forced read-mode
+  (let ((test-translation (let ((*proposition-read-mode* t))
+                            (translate (second form) flag))))
+    (if *within-quantifier*
+        ;; Quantifier context with proper forall semantics
+        (if (fourth form)
+            ;; Explicit else clause exists - return actual values from both branches
+            `(if ,test-translation
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (third form) flag))
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (fourth form) flag)))
+            ;; No explicit else - implicit else should be t for forall semantics
+            `(if ,test-translation
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (third form) flag))
+               t))  ; Neutral element for universal quantification
+        ;; Value context remains unchanged
+        (if (fourth form)
+            `(if ,test-translation
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (third form) flag))
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (fourth form) flag)))
+            `(if ,test-translation
+               ,(let ((*proposition-read-mode* nil))
+                  (translate (third form) flag))
+               nil)))))
+
+
+#+ignore (defun translate-conditional (form flag)
+  "Conditional translation with proper read-mode isolation."
   (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
             (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
     (error "AND not allowed in <then> or <else> clause of IF statement; use DO: ~A" form))
@@ -490,6 +526,13 @@
     `(push (list ',(car base-form) ,@(cdr base-form)) followups)))
 
 
+(defun cl-symbol-p (item)
+ "Return true if item is from the common-lisp package."
+ (and (symbolp item)
+      (eq (symbol-package item) 
+          (find-package :common-lisp))))
+
+
 (defun translate (form flag)  ;test-then distinguishes between if stmt forms
   "Beginning translator for all forms in actions."
   (cond ((atom form) form)  ;atom or (always-true) translates as itself
@@ -514,7 +557,8 @@
         ;((eql (car form) 'cancel-assert) (translate-cancel-assert form flag))
         ((eql (char (format nil "~S" form) 0) #\`) (translate (eval form) flag))
         ;((eql (car form) #+sbcl 'sb-int:quasiquote #+allegro 'excl::backquote) (translate (eval form) flag))
-        ((and (eql (car form) 'not) (gethash (caadr form) *relations*)) (translate-negative-relation form flag))
+        ((and (eql (car form) 'not) (consp (cadr form)) (symbolp (caadr form))
+              (not (cl-symbol-p (caadr form))) (gethash (caadr form) *relations*)) (translate-negative-relation form flag))
         ((member (car form) *connectives*) (translate-connective form flag))
         ((or (gethash (car form) *relations*) (gethash (car form) *static-relations*))
            (translate-positive-relation form flag))

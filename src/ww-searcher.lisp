@@ -368,6 +368,12 @@
 
 
 (defun get-closed-values (idb)
+  "Returns the closed values (depth time value) for the given idb, or nil if not found."
+  #+sbcl (gethash idb *closed*)
+  #-sbcl (genhash:hashref idb *closed*))
+
+
+#+ignore (defun get-closed-values (idb)
   #+sbcl (let ((ht *closed*))
            (block equality-keys
              (maphash (lambda (key value)
