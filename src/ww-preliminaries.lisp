@@ -152,11 +152,7 @@
              (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
           ((probe-file vals-file)  ;does vals.lisp exist?
              (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
-               (progn
-                 ;; Always copy the problem file, regardless of timestamps
-                 (uiop:copy-file vals-problem-file problem-file)
-                 ;; Delete the compiled file to ensure ASDF recompiles it
-                 (uiop:delete-file-if-exists (compile-file-pathname problem-file)))
+               (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
                (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
 
 
