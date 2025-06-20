@@ -16,7 +16,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 9)
+(ww-set *depth-cutoff* 10)
 
 
 (define-types
@@ -44,7 +44,7 @@
   (loc (either me cargo) $area)
   (on (either me cargo) $plate)
   (connected terminus terminus)
-  #+ignore (jams jammer $target)
+  ;(jams jammer $target)
   (active (either receiver plate gate))
   (color connector $hue)
 )
@@ -64,6 +64,51 @@
   (visible1 area $gate area)
   (visible2 area $gate $gate area)
 )
+
+
+;;;; HEURISTIC ;;;;
+
+
+(defun area-distance-penalty (from-area to-area)
+  ;; Simple area distance calculation based on problem topology
+  ;; area1 -> area2 -> area3 (linear arrangement)
+  (cond
+    ((eql from-area to-area) 0)
+    ((or (and (eql from-area 'area1) (eql to-area 'area2))
+         (and (eql from-area 'area2) (eql to-area 'area1))) 1)
+    ((or (and (eql from-area 'area2) (eql to-area 'area3))
+         (and (eql from-area 'area3) (eql to-area 'area2))) 1)
+    ((or (and (eql from-area 'area1) (eql to-area 'area3))
+         (and (eql from-area 'area3) (eql to-area 'area1))) 2)
+    (t 3))) ;; fallback for unexpected cases
+
+
+(define-query heuristic? ()
+  ;; Goal-based heuristic: count unsatisfied goal conditions and add area distance penalties
+  ;; Lower values indicate more promising states
+  (do (setq $h-value 0)
+      ;; Primary component: Unsatisfied goal conditions (weighted by importance)
+      (if (not (loc me1 area2))
+        (setq $h-value (+ $h-value 10)))
+      (if (not (loc connector2 area3))
+        (setq $h-value (+ $h-value 8)))
+      (if (not (connected connector2 connector1))
+        (setq $h-value (+ $h-value 6)))
+      (if (not (connected connector2 transmitter1))
+        (setq $h-value (+ $h-value 6)))
+      (if (not (color connector1 blue))
+        (setq $h-value (+ $h-value 4)))
+      ;; Secondary component: Area distance penalties for misplaced objects
+      (bind (loc me1 $me-area))
+      (bind (loc connector2 $conn2-area))
+      ;; Add distance penalty for me1 not in target area
+      (if (not (eql $me-area 'area2))
+        (setq $h-value (+ $h-value (area-distance-penalty $me-area 'area2))))
+      ;; Add distance penalty for connector2 not in target area  
+      (if (not (eql $conn2-area 'area3))
+        (setq $h-value (+ $h-value (* 2 (area-distance-penalty $conn2-area 'area3)))))
+      ;; Return the computed heuristic value
+      $h-value))
 
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -122,12 +167,65 @@
 
 (define-query passable? (?area1 ?area2)
   (and (not (bind (on me1 $plate)))  ;must step off plate first
-       (or #+ignore (exists (?b barrier)
-             (and (separates ?b ?area1 ?area2)
-                  (not (bind (holds me1 $cargo)))))  ;must drop cargo first
+       (or ;(exists (?b barrier)
+           ;  (and (separates ?b ?area1 ?area2)
+           ;       (not (bind (holds me1 $cargo)))))  ;must drop cargo first
            (exists (?g gate)
              (and (separates ?g ?area1 ?area2)
                   (not (active ?g)))))))
+
+
+(define-query valid-transmitter-hue? (?transmitter ?test-hue)
+  ;; Returns compatible hue if valid, nil if conflict detected
+  (do (bind (chroma ?transmitter $hue))
+      (if (not ?test-hue)
+        $hue                                ; First hue established  
+        (if (eql ?test-hue $hue)
+          ?test-hue                         ; Hues compatible
+          nil))))                           ; Conflict detected
+
+
+(define-query valid-connector-hue? (?connector ?test-hue)
+  ;; Returns compatible hue if valid, nil if conflict detected
+  (if (bind (color ?connector $hue))
+    (if (not ?test-hue)
+      $hue                                ; First hue established
+      (if (eql ?test-hue $hue)
+        ?test-hue                         ; Hues compatible
+        nil))                             ; Conflict detected
+    ?test-hue))                           ; No connector color, preserve test hue
+
+
+(define-query valid-receiver-hue? (?receiver ?test-hue)
+  ;; Returns test-hue if receiver can accept it, nil otherwise
+  (if (and (chroma ?receiver ?test-hue)
+           (not (active ?receiver)))
+    ?test-hue
+    nil))
+
+
+(define-query compatible-transmitters? (?termini-list)
+  ;; Returns hue from transmitters, nil if conflict or no transmitters
+  (do (setq $compatible-hue nil)
+      (ww-loop for $terminus in ?termini-list do
+        (if (transmitter $terminus)
+          (do (setq $candidate-hue (valid-transmitter-hue? $terminus $compatible-hue))
+              (if $candidate-hue
+                (setq $compatible-hue $candidate-hue)
+                (return nil)))))  ;; Immediate return on conflict
+      $compatible-hue))
+
+
+(define-query compatible-connectors? (?termini-list ?transmitter-hue)
+  ;; Returns compatible hue after processing connectors, nil if conflict  
+  (do (setq $compatible-hue ?transmitter-hue)
+      (ww-loop for $terminus in ?termini-list do
+        (if (connector $terminus)
+          (do (setq $candidate-hue (valid-connector-hue? $terminus $compatible-hue))
+              (if $candidate-hue
+                (setq $compatible-hue $candidate-hue)
+                (return nil)))))  ;; Immediate return on conflict
+      $compatible-hue))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -141,6 +239,16 @@
                         (jams ?j ?g)))
                  (all-controllers-active? ?g))
           (not (active ?g))))))
+
+
+(define-update activate-compatible-receivers! (?termini-list ?hue ?area)
+  ;; Activates all receivers in ?termini-list that are compatible with ?hue
+  (if ?hue
+    (ww-loop for $terminus in ?termini-list do
+      (if (and (receiver $terminus)
+               (valid-receiver-hue? $terminus ?hue)
+               (open-los? ?area $terminus))
+        (activate-receiver! $terminus)))))
 
 
 (define-update deactivate-receiver! (?receiver)
@@ -198,175 +306,49 @@
         (chain-activate! ?c ?hue $c-area)))))
 
 
-(define-update connect-1-and-color! (?cargo ?terminus)
-  (do (not (holds me1 ?cargo))
-      (connected ?cargo ?terminus)
-      (setq $hue (hue-if-source? ?terminus))
+(define-update propagate-connect-to-1-terminus! (?cargo ?terminus)
+  ; Propagates a source to a connector (?cargo)
+  (do (setq $hue (hue-if-source? ?terminus))
       (if $hue
         (color ?cargo $hue))))
 
 
-(define-update connect-2-and-color! (?cargo ?terminus1 ?terminus2)
+(define-update propagate-connect-to-2-terminus! (?cargo ?terminus1 ?terminus2 ?area)
+  ; Propagates sources to a connector (?cargo)
   (do 
-    ;; Step 1: Release cargo and establish location
-    (not (holds me1 ?cargo))
-    (bind (loc me1 $area))
-    ;; Step 2: Initialize color tracking variables  
-    (setq $cargo-hue nil)       ;; The color this connector will have
-    (setq $color-conflict nil)  ;; Flag for conflicting source colors
-    ;; Step 3: Connect to transmitters first (highest priority for power source)
-    ;; Check terminus1 for transmitter
-    (if (transmitter ?terminus1)
-      (do (connected ?cargo ?terminus1)
-          (setq $hue1 (hue-if-source? ?terminus1))
-          (if $hue1
-            (do (setq $cargo-hue $hue1)
-                (color ?cargo $cargo-hue)))))
-    ;; Check terminus2 for transmitter
-    (if (and (transmitter ?terminus2) (not $cargo-hue))
-      (do (connected ?cargo ?terminus2)
-          (setq $hue2 (hue-if-source? ?terminus2))
-          (if $hue2
-            (do (setq $cargo-hue $hue2)
-                (color ?cargo $cargo-hue))))
-      ;; If cargo already has color from terminus1 transmitter, check for conflict
-      (if (and (transmitter ?terminus2) $cargo-hue)
-        (do (connected ?cargo ?terminus2)
-            (setq $hue2 (hue-if-source? ?terminus2))
-            (if (and $hue2 (not (eql $cargo-hue $hue2)))
-              (setq $color-conflict t)))))
-    ;; Step 4: Connect to active connectors (secondary power source)
-    ;; Check terminus1 for active connector
-    (if (and (connector ?terminus1) (not $color-conflict) (bind (color ?terminus1 $conn1-hue)))
-      (do (connected ?cargo ?terminus1)
-          (if (not $cargo-hue)
-            (do (setq $cargo-hue $conn1-hue)
-                (color ?cargo $cargo-hue))
-            (if (not (eql $cargo-hue $conn1-hue))
-              (setq $color-conflict t)))))
-    ;; Check terminus2 for active connector
-    (if (and (connector ?terminus2) (not $color-conflict) (bind (color ?terminus2 $conn2-hue)))
-      (do (connected ?cargo ?terminus2)
-          (if (not $cargo-hue)
-            (do (setq $cargo-hue $conn2-hue)
-                (color ?cargo $cargo-hue))
-            (if (not (eql $cargo-hue $conn2-hue))
-              (setq $color-conflict t)))))
-    ;; Step 5: Connect to receivers last and activate if powered
-    ;; Check terminus1 for receiver
-    (if (receiver ?terminus1)
-      (do (connected ?cargo ?terminus1)
-          ;; Activate receiver if connector is properly colored and path is open
-          (if (and $cargo-hue 
-                   (not $color-conflict)
-                   (chroma ?terminus1 $cargo-hue)
-                   (not (active ?terminus1))
-                   (open-los? $area ?terminus1))
-            (activate-receiver! ?terminus1))))
-    ;; Check terminus2 for receiver
-    (if (receiver ?terminus2)
-      (do (connected ?cargo ?terminus2)
-          (if (and $cargo-hue 
-                   (not $color-conflict)
-                   (chroma ?terminus2 $cargo-hue)
-                   (not (active ?terminus2))
-                   (open-los? $area ?terminus2))
-            (activate-receiver! ?terminus2))))
-    ;; Step 6: Handle cascading activations with ordered approach
-    (if (and $cargo-hue (not $color-conflict))
-      (chain-activate! ?cargo $cargo-hue $area))))
+    ;; Create terminus list for uniform processing
+    (setq $termini-list (list ?terminus1 ?terminus2))
+    ;; Process transmitters with built-in conflict detection
+    (setq $transmitter-hue (compatible-transmitters? $termini-list))
+    ;; Process connectors, maintaining transmitter hue or detecting conflicts
+    (setq $final-hue (compatible-connectors? $termini-list $transmitter-hue))
+    ;; Color cargo if we have a valid hue (no conflicts detected)
+    (if $final-hue
+        (color ?cargo $final-hue))
+    ;; Activate all compatible receivers uniformly
+    (activate-compatible-receivers! $termini-list $final-hue ?area)
+    ;; Perform cascading activation if successful
+    (if $final-hue
+        (chain-activate! ?cargo $final-hue ?area))))
 
 
-(define-update connect-3-and-color! (?cargo ?terminus1 ?terminus2 ?terminus3)
+(define-update propagate-connect-to-3-terminus! (?cargo ?terminus1 ?terminus2 ?terminus3 ?area)
+  ; Propagates source terminus to a connector (?cargo)
   (do 
-    ;; Step 1: Release cargo and establish location
-    (not (holds me1 ?cargo))
-    (bind (loc me1 $area))
-    ;; Step 2: Initialize color tracking
-    (setq $cargo-hue nil)
-    (setq $color-conflict nil)
-    ;; Step 3: Connect to transmitters and handle coloring
-    ;; Process terminus1 if transmitter
-    (if (transmitter ?terminus1)
-      (do (connected ?cargo ?terminus1)
-          (setq $hue1 (hue-if-source? ?terminus1))
-          (if $hue1
-            (setq $cargo-hue $hue1))))
-    ;; Process terminus2 if transmitter  
-    (if (transmitter ?terminus2)
-      (do (connected ?cargo ?terminus2)
-          (setq $hue2 (hue-if-source? ?terminus2))
-          (if $hue2
-            (if (not $cargo-hue)
-              (setq $cargo-hue $hue2)
-              ;; Check for conflict with previously set color
-              (if (not (eql $cargo-hue $hue2))
-                (setq $color-conflict t))))))
-    ;; Process terminus3 if transmitter
-    (if (and (transmitter ?terminus3) (not $color-conflict))
-      (do (connected ?cargo ?terminus3)
-          (setq $hue3 (hue-if-source? ?terminus3))
-          (if $hue3
-            (if (not $cargo-hue)
-              (setq $cargo-hue $hue3)
-              (if (not (eql $cargo-hue $hue3))
-                (setq $color-conflict t))))))
-    ;; Step 4: Connect to active connectors (secondary power source)
-    ;; Process terminus1 if active connector
-    (if (and (connector ?terminus1) (bind (color ?terminus1 $conn1-hue)) (not $color-conflict))
-      (do (connected ?cargo ?terminus1)
-          (if (not $cargo-hue)
-            (setq $cargo-hue $conn1-hue)
-            (if (not (eql $cargo-hue $conn1-hue))
-              (setq $color-conflict t)))))
-    ;; Process terminus2 if active connector
-    (if (and (connector ?terminus2) (bind (color ?terminus2 $conn2-hue)) (not $color-conflict))
-      (do (connected ?cargo ?terminus2)
-          (if (not $cargo-hue)
-            (setq $cargo-hue $conn2-hue)
-            (if (not (eql $cargo-hue $conn2-hue))
-              (setq $color-conflict t)))))
-    ;; Process terminus3 if active connector
-    (if (and (connector ?terminus3) (bind (color ?terminus3 $conn3-hue)) (not $color-conflict))
-      (do (connected ?cargo ?terminus3)
-          (if (not $cargo-hue)
-            (setq $cargo-hue $conn3-hue)
-            (if (not (eql $cargo-hue $conn3-hue))
-              (setq $color-conflict t)))))
-    ;; Color the connector if we have a valid hue and no conflicts
-    (if (and $cargo-hue (not $color-conflict))
-      (color ?cargo $cargo-hue))
-    ;; Step 5: Connect to receivers and activate if powered
-    ;; Process terminus1 if receiver
-    (if (receiver ?terminus1)
-      (do (connected ?cargo ?terminus1)
-          (if (and $cargo-hue 
-                   (not $color-conflict)
-                   (chroma ?terminus1 $cargo-hue)
-                   (not (active ?terminus1))
-                   (open-los? $area ?terminus1))
-            (activate-receiver! ?terminus1))))
-    ;; Process terminus2 if receiver
-    (if (receiver ?terminus2)
-      (do (connected ?cargo ?terminus2)
-          (if (and $cargo-hue 
-                   (not $color-conflict)
-                   (chroma ?terminus2 $cargo-hue)
-                   (not (active ?terminus2))
-                   (open-los? $area ?terminus2))
-            (activate-receiver! ?terminus2))))
-    ;; Process terminus3 if receiver
-    (if (receiver ?terminus3)
-      (do (connected ?cargo ?terminus3)
-          (if (and $cargo-hue 
-                   (not $color-conflict)
-                   (chroma ?terminus3 $cargo-hue)
-                   (not (active ?terminus3))
-                   (open-los? $area ?terminus3))
-            (activate-receiver! ?terminus3))))
-    ;; Step 6: Handle cascading activations
-    (if (and $cargo-hue (not $color-conflict))
-      (chain-activate! ?cargo $cargo-hue $area))))
+    ;; Create terminus list for uniform processing
+    (setq $termini-list (list ?terminus1 ?terminus2 ?terminus3))
+    ;; Process transmitters with built-in conflict detection
+    (setq $transmitter-hue (compatible-transmitters? $termini-list))
+    ;; Process connectors, maintaining transmitter hue or detecting conflicts
+    (setq $final-hue (compatible-connectors? $termini-list $transmitter-hue))
+    ;; Color cargo if we have a valid hue (no conflicts detected)
+    (if $final-hue
+        (color ?cargo $final-hue))
+    ;; Activate all compatible receivers uniformly
+    (activate-compatible-receivers! $termini-list $final-hue ?area)
+    ;; Perform cascading activation if successful
+    (if $final-hue
+        (chain-activate! ?cargo $final-hue ?area))))
 
 
 (define-update chain-deactivate! (?connector ?hue)
@@ -418,7 +400,7 @@
 ;;;; ACTIONS ;;;;
 
 
-#+ignore (define-action connect-to-1-terminus
+(define-action connect-to-1-terminus
     1
   (?terminus terminus)
   (and (bind (holds me1 $cargo))
@@ -426,22 +408,23 @@
        (bind (loc me1 $area))
        (connectable? $area ?terminus))
   ($cargo ?terminus $plate)
-  (do 
-    ;; Branch 1: Place connector without using any plate
-    (assert (connect-1-and-color! $cargo ?terminus)
-            (loc $cargo $area))
-    ;; Branch 2: Place connector on each available plate (creates separate branches)
-    (assert (doall (?plate plate)
-              (if (and (locale ?plate $area)
-                       (not (exists (?c cargo)
-                              (on ?c ?plate))))
-                ;; Reordering: activate plate BEFORE connection logic
-                (do (loc $cargo $area)
-                    (setq $plate ?plate)
-                    (on $cargo ?plate)
-                    (activate-plate! ?plate)
-                    ;; NOW perform connection with gates in correct state
-                    (connect-1-and-color! $cargo ?terminus)))))))
+  (do ;; Place connector on the ground; immediate changes first, then propagate those changes
+      (assert (not (holds me1 $cargo))
+              (loc $cargo $area)
+              (connected $cargo ?terminus)
+              (propagate-connect-to-1-terminus! $cargo ?terminus))
+      ;; Place connector on each available plate
+      (doall (?plate plate)
+        (if (and (locale ?plate $area)
+                 (not (exists (?c cargo)
+                        (on ?c ?plate))))
+          (assert (not (holds me1 $cargo))
+                  (loc $cargo $area)
+                  (connected $cargo ?terminus)
+                  (on $cargo ?plate)
+                  (setq $plate ?plate)
+                  (activate-plate! ?plate)
+                  (propagate-connect-to-1-terminus! $cargo ?terminus))))))
 
 
 (define-action connect-to-2-terminus
@@ -453,21 +436,25 @@
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2))
   ($cargo ?terminus1 ?terminus2 $plate)
-  (do ;; Branch 1: Place connector without using any plate
-      (assert (connect-2-and-color! $cargo ?terminus1 ?terminus2)
-              (loc $cargo $area))
-      ;; Branch 2: Place connector on each available plate (creates separate branches)
-      (assert (doall (?plate plate)
-                (if (and (locale ?plate $area)
-                         (not (exists (?c cargo)
-                                (on ?c ?plate))))
-                  ;; Critical reordering: activate plate BEFORE connection logic
-                  (do (loc $cargo $area)           ;; Place cargo in area first
-                      (setq $plate ?plate)         ;; Bind the plate variable
-                      (on $cargo ?plate)           ;; Place cargo on the plate
-                      (activate-plate! ?plate)     ;; Activate plate (opening/closing gates)
-                      ;; NOW perform connections with gates in correct state
-                      (connect-2-and-color! $cargo ?terminus1 ?terminus2)))))))
+  (do ;; Place connector on the ground
+      (assert (not (holds me1 $cargo))
+              (loc $cargo $area)
+              (connected $cargo ?terminus1)
+              (connected $cargo ?terminus2)
+              (propagate-connect-to-2-terminus! $cargo ?terminus1 ?terminus2 $area))
+      ;; Place connector on each available plate
+      (doall (?plate plate)
+        (if (and (locale ?plate $area)
+                 (not (exists (?c cargo)
+                        (on ?c ?plate))))
+          (assert (not (holds me1 $cargo))
+                  (loc $cargo $area)
+                  (connected $cargo ?terminus1)
+                  (connected $cargo ?terminus2)
+                  (on $cargo ?plate)
+                  (setq $plate ?plate)
+                  (activate-plate! ?plate)
+                  (propagate-connect-to-2-terminus! $cargo ?terminus1 ?terminus2 $area))))))
     
 
 (define-action connect-to-3-terminus
@@ -480,20 +467,27 @@
        (connectable? $area ?terminus2)
        (connectable? $area ?terminus3))
   ($cargo ?terminus1 ?terminus2 ?terminus3 $plate)
-  (do ;; Branch 1: Place connector without using any plate
-      (assert (connect-3-and-color! $cargo ?terminus1 ?terminus2 ?terminus3)
-              (loc $cargo $area))
-      ;; Branch 2: Separately, place connector on each available plate
-      (assert (doall (?plate plate)
-                (if (and (locale ?plate $area)
-                         (not (exists (?c cargo)
-                                (on ?c ?plate))))
-                  ;; Critical ordering: activate plate BEFORE connection logic
-                (do (loc $cargo $area)
-                    (setq $plate ?plate)         ; Bind the plate variable  
-                    (on $cargo ?plate)
-                    (activate-plate! ?plate)
-                    (connect-3-and-color! $cargo ?terminus1 ?terminus2 ?terminus3)))))))
+  (do ;; Place connector on the ground
+      (assert (not (holds me1 $cargo))
+              (loc $cargo $area)
+              (connected $cargo ?terminus1)
+              (connected $cargo ?terminus2)
+              (connected $cargo ?terminus3)
+              (propagate-connect-to-3-terminus! $cargo ?terminus1 ?terminus2 ?terminus3 $area))
+      ;; Place connector on each available plate
+      (doall (?plate plate)
+        (if (and (locale ?plate $area)
+                 (not (exists (?c cargo)
+                        (on ?c ?plate))))
+          (assert (not (holds me1 $cargo))
+                  (loc $cargo $area)
+                  (connected $cargo ?terminus1)
+                  (connected $cargo ?terminus2)
+                  (connected $cargo ?terminus3)
+                  (on $cargo ?plate)
+                  (setq $plate ?plate)
+                  (activate-plate! ?plate)
+                  (propagate-connect-to-3-terminus! $cargo ?terminus1 ?terminus2 ?terminus3 $area))))))
 
 
 (define-action pickup-connector
@@ -518,7 +512,7 @@
               (not (connected ?connector ?t))))))
 
 
-#+ignore (define-action drop-cargo
+(define-action drop-cargo
     1
   ()
   (and (bind (loc me1 $area))  ;me1 is always located somewhere
@@ -690,15 +684,28 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (and (loc me1 area2)
+  (and (loc connector1 area1)
+       (on connector1 plate1)
+       (connected connector1 transmitter2)
+       (connected connector1 receiver1)
+       (connected connector1 receiver2)
+       (loc connector2 area3)
+       (connected connector2 transmitter2)
+       (connected connector2 connector1)
+       (loc connector3 area1)
+       (connected connector3 transmitter2)
+       (connected connector3 receiver1)
+       (loc me1 area1)
+
+       ;(loc me1 area1)
        ;(loc connector3 area1)
        ;(connected connector3 transmitter2)
        ;(connected connector3 connector1)
        ;(color connector3 blue)
-       (loc connector2 area3)
-       (connected connector2 connector1)
-       (connected connector2 transmitter1)
-       (color connector1 blue)
+       ;(loc connector2 area3)
+       ;(connected connector2 connector1)
+       ;(connected connector2 transmitter1)
+       ;(color connector1 blue)
 ))
 
 
