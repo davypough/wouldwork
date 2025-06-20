@@ -124,12 +124,11 @@
 
 (defun split-off (open)
   "Removes the bottom node on open and returns a new split-off subopen with it."
-  (let ((subopen (hs::make-hstack :table (make-hash-table :test (if (fixedp *relations*)
-                                                                    'fixed-keys-ht-equal
-                                                                    'equalp)
+  (let ((subopen (hs::make-hstack :table 
+                                  #+sbcl (make-hash-table :test 'equal
                                                           :synchronized (> *threads* 0))
                                   :keyfn (hs::hstack.keyfn open)))
-        (bottom-node (hs::deletef-nth-hstack 0 open)))  ;pops bottom node from open
+        (bottom-node (hs::deletef-nth-hstack 0 open)))
     (hs::push-hstack bottom-node subopen :new-only (eq *tree-or-graph* 'graph))))
 
 

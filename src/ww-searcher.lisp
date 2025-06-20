@@ -39,6 +39,15 @@
        (finish-output))))  ;make sure printout is complete before continuing
 
 
+(defmacro with-search-structures-lock (&body body)
+  "Protects composite operations on *open* and *closed* search structures.
+   Threading mode determined at compile time for optimal performance."
+  (if (> *threads* 0)
+       `(bt:with-lock-held (*lock*)
+          ,@body)
+       `(progn ,@body)))
+
+
 (defun simple-break ()
   "Call to simplify debugger printout on a break."
   (declare (optimize (debug 0)))
@@ -78,6 +87,11 @@
 (defun node.state.idb (node)
   "Gets the idb of a node."
   (problem-state.idb (node.state node)))
+
+
+(defun node.state.idb-alist (node)
+  "Gets the canonical alist representation of a node's idb for efficient hstack lookup."
+  (idb-to-sorted-alist (problem-state.idb (node.state node))))
 
 
 (defun choose-ht-value-test (relations)
@@ -153,10 +167,10 @@
     (declare (ignorable parallelp))
     (setf *open* 
       (hs::make-hstack :table 
-                         #+sbcl (make-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+                         #+sbcl (make-hash-table :test 'equal
                                                  :synchronized parallelp)
-                         #-sbcl (genhash:make-generic-hash-table :test 'equalp)  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp))
-                       :keyfn #'node.state.idb))
+                         #-sbcl (genhash:make-generic-hash-table :test 'equal)
+                       :keyfn #'node.state.idb-alist))
     (when (eql *tree-or-graph* 'graph)
       (setf *closed* 
         #+sbcl (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
@@ -164,7 +178,7 @@
                                 :rehash-size 2.7
                                 :rehash-threshold 0.8
                                 :synchronized parallelp)
-        #-sbcl (genhash:make-generic-hash-table :test 'equalp  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+        #-sbcl (genhash:make-generic-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                                 :size 200003))))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   (setf *program-cycles* 0)
@@ -308,8 +322,8 @@
               (narrate "State previously closed" succ-state succ-depth)
               (increment-global *repeated-states*)
               (if (better-than-closed closed-values succ-state succ-depth)  ;succ has better value
-                #+sbcl (remhash succ-idb *closed*)  ;then reactivate on open below
-                #-sbcl (genhash:hashrem succ-idb *closed*)
+                #+sbcl (remhash (idb-to-sorted-alist succ-idb) *closed*)
+                #-sbcl (genhash:hashrem (idb-to-sorted-alist succ-idb) *closed*)
                 (progn (finalize-path-depth succ-depth) (next-iteration))))))  ;drop this succ
         (collecting (generate-new-node current-node succ-state))))  ;live successor
 
@@ -353,20 +367,12 @@
   "Determines if an idb hash table's contents match the contents of a key in open's table.
    Returns the node in open or nil."
    (declare (type hash-table succ-idb))
-  #+sbcl (let ((ht (hs::hstack.table open)))
-           (block equality-keys
-             (maphash (lambda (open-idb nodes)  ;nodes should contain only one node
-                        ;(unless (hash-table-p open-idb) (bt:with-lock-held (*lock*) (ut::print-ht ht) (terpri)))
-                        (declare (type hash-table open-idb) (type cons nodes))
-                        (when (funcall (hash-table-test ht) succ-idb open-idb)
-                          (return-from equality-keys (car nodes))))
-                      ht)))
-  #-sbcl (let ((ght (hs::hstack.table open)))
-           (block equalp-keys
-             (genhash:hashmap (lambda (open-idb nodes)
-                                (when (equalp succ-idb open-idb)  ;note does not ever test with fixed-keys-ht-equal
-                                  (return-from equalp-keys (car nodes))))
-                              ght))))
+  (let ((canonical-key (idb-to-sorted-alist succ-idb))
+        (ht (hs::hstack.table open)))
+    #+sbcl (let ((nodes (gethash canonical-key ht)))
+             (when nodes (car nodes)))
+    #-sbcl (let ((nodes (genhash:hashref canonical-key ht)))
+             (when nodes (car nodes)))))
 
 
 (defun idb-to-sorted-alist (idb-hash-table)

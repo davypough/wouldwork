@@ -6,6 +6,12 @@
 (in-package :ww)
 
 
+(defmacro with-search-structures-lock (&body body)
+  "Protects composite operations on *open* and *closed* search structures."
+  `(bt:with-lock-held (*lock*)
+     ,@body))
+
+
 (defparameter *ww-loading* t
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
 
