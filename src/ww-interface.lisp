@@ -19,7 +19,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (test-commands)
   -- run a series of tests to exercise potential user REPL commands
 
-(list-problem-names) alias (probs)
+(list-all-problems) alias (probs)
    -- lists all currently specifed problems
       in the src directory (use these names with run or stage)
 
@@ -102,7 +102,6 @@ any such settings appearing in the problem specification file.
          (result (rstrip without-prefix suffix-with-dot)))
     result))
 
-;; -------------------- plist lookup customizable -------------------- ;;
 
 (defun lookup (key plist &key (test #'string-equal) (default))
   "Key value lookup in plist with #'string= or any other function as test.
@@ -224,11 +223,8 @@ any such settings appearing in the problem specification file.
                          (branch *branch*)
                          (probe *probe*)
                          (debug *debug*))
-                         ;(features *features*))
-                         ;(threads *threads*))
   "Set multiple globals at once in keywords argument format."
-  (setf ;*keep-globals-p* keep-globals-p
-        *problem-name* problem-name
+  (setf *problem-name* problem-name
         *depth-cutoff* depth-cutoff
         *tree-or-graph* tree-or-graph
         *solution-type* solution-type
@@ -237,14 +233,12 @@ any such settings appearing in the problem specification file.
         *branch* branch
         *probe* probe
         *debug* debug)
-        ;*features* features)
-        ;*threads* threads)
   (save-globals))
 
 
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))  ; *features*)))
+  (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))
     (destructuring-bind 
         (;keep-globals-p
          tmp-problem-name tmp-depth-cutoff tmp-tree-or-graph tmp-solution-type
@@ -279,7 +273,7 @@ any such settings appearing in the problem specification file.
   "Adds an additional path to a folder containing problem-*.lisp files to the
    global list `*problem-folder-paths*`."
   (let ((path (pathname folder-path)))
-    (if (directory-exists-p path) ;; SBCL specific!
+    (if (directory-exists-p path)
         (push (probe-file path) *problem-folder-paths*)
         (format t "\"~a\" is either not a path to a folder or there are other problems."
                 path))))
@@ -384,7 +378,7 @@ any such settings appearing in the problem specification file.
   (ww-solve))
 
 
-(defun list-all (&optional (prettyp nil))
+(defun list-all-problems (&optional (prettyp nil))
   "List all problem names in the problem folder.
    One-per-line: (list-all t) or (list-all :pretty)"
   (if prettyp

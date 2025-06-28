@@ -69,7 +69,7 @@
                                           (subseq problem 0 (- (length problem) 5))))
                       (should-process t))
                  (format t "~%=====================================================~%")
-                 (format t "Process problem: \"~A\"~%" problem-name)
+                 (format t "Process problem: ~A~%" (string-upcase problem-name))
                  (format t "=====================================================~%")
                  
                  (unless continue-all
