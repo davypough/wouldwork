@@ -69,22 +69,6 @@ any such settings appearing in the problem specification file.
 "))
 
 
-(defun %main (argv)
-  "Parse CLI args."
-  (when (member "-h" argv :test #'equal)
-    ;; To properly parse command line arguments, use a third-party library such as
-    ;; clingon, unix-opts, defmain, adopt… when needed.
-    (help)
-    (uiop:quit))
-  (format t "%main was invoked"))
-
-(defun main ()
-  "Entry point for the executable.
-  Reads command line arguments."
-  ;; uiop:command-line-arguments returns a list of arguments (sans the script name).
-  ;; We defer the work of parsing to %main because we call it also from the Roswell script.
-  (%main (uiop:command-line-arguments)))
-
 ;; -------------------- some basic string functions ------------------ ;;
 
 (defun string-prefix-p (prefix str)
@@ -191,6 +175,7 @@ any such settings appearing in the problem specification file.
         (save-to-file default filename)
         default)))
 
+
 (defparameter *globals-file* 
   (merge-pathnames "vals.lisp" (get-package-root :wouldwork))
   "In the vals.lisp file of this package the values of parameters
@@ -228,6 +213,7 @@ any such settings appearing in the problem specification file.
                       #|*features* *threads*|#)
                 *globals-file*)) ;; this stores global var values
 
+
 (defun set-globals (&key ;(keep-globals-p *keep-globals-p*)
                          (problem-name *problem-name*)
                          (depth-cutoff *depth-cutoff*)
@@ -256,9 +242,6 @@ any such settings appearing in the problem specification file.
   (save-globals))
 
 
-;; the `keep-globals-p` variable decides over whether the values of `vals.lisp`
-;; get transferred to the current session.
-
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
   (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))  ; *features*)))
@@ -269,13 +252,6 @@ any such settings appearing in the problem specification file.
         (let ((vals (or (ignore-errors (read-from-file *globals-file*))
                         default-values)))
           vals)
-          ;(if (= (length vals) (length default-values)) ;; because we change globals often number of values in vals.lisp can differ
-          ;    vals
-          ;    (progn
-          ;      (format t "Using `default-values` (length ~A) because length of vals.lisp differs (~A).~%"
-          ;              (length default-values) (length vals))
-          ;      default-values)))
-      ;(when keep-globals-p
         (setf ;*keep-globals-p* keep-globals-p
               *problem-name* tmp-problem-name
               *depth-cutoff* tmp-depth-cutoff
@@ -321,9 +297,6 @@ any such settings appearing in the problem specification file.
                                                                         (format nil "~a" path)))
                                                    *problem-folder-paths*))
            *problem-folder-paths*))))
-
-;; so using <add-problem-folder> and <remove-problem-folder> each with path,
-;; user kann add or remove custom folder from the global variable.
 
 
 (defun list-problem-files-plist (&optional (prefix "problem-") (suffix "lisp"))
@@ -376,6 +349,7 @@ any such settings appearing in the problem specification file.
   "Stages and solves a user specified problem."
   `(%run ,(string problem-name)))
 
+
 (defun %run (problem-name-str)
   "Stages and solves a user specified problem."
   (when (%stage problem-name-str)
@@ -387,6 +361,7 @@ any such settings appearing in the problem specification file.
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
   `(%stage ,(string problem-name)))
+
 
 (defun %stage (problem-name-str)
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
