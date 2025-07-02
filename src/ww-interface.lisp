@@ -242,10 +242,10 @@ any such settings appearing in the problem specification file.
 
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))
+  (let ((default-values (list 'unspecified 0 'depth-first 'graph 'planning 100000 nil -1 nil 0)))  ;CHANGED: 10 elements, correct defaults
     (destructuring-bind 
          (tmp-problem-name tmp-depth-cutoff tmp-algorithm tmp-tree-or-graph tmp-solution-type
-         tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)
+          tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)
         (let ((vals (or (ignore-errors (read-from-file *globals-file*))
                         default-values)))
           vals)
