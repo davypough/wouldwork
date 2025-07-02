@@ -51,6 +51,7 @@
                                                         (funcall thunk)))
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
+                             (:file "ww-backtracker")
 		              #+sbcl (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
   :build-operation "program-op"  ;build a binary: binary name: adapt.

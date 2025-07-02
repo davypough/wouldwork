@@ -186,18 +186,23 @@ any such settings appearing in the problem specification file.
 
 (defun display-globals ()
   (format t "~&*problem-name* ~A~% 
-               *depth-cutoff* ~A~%*tree-or-graph* ~A~%*solution-type* ~A~%
-               *progress-reporting-interval* ~A~%*randomize-search* ~A~%*branch* ~A~%*probe* ~A~%                                    *debug* ~A~2%"
-           ;*keep-globals-p*
-            *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
+               *depth-cutoff* ~A~%
+               *algorithm* ~A~%
+               *tree-or-graph* ~A~%
+               *solution-type* ~A~%
+               *progress-reporting-interval* ~A~%
+               *randomize-search* ~A~%
+               *branch* ~A~%
+               *probe* ~A~%
+               *debug* ~A~2%"
+            *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *solution-type*
             *progress-reporting-interval* *randomize-search* *branch* *probe*
-            *debug*)) ;*threads*
-            ;*features*))
+            *debug*))
 
 
 (defun reset-parameters ()
    "Resets global parameters to defaults"
-  (setf *problem-name* 'unspecified *depth-cutoff* 0 *tree-or-graph* 'graph
+  (setf *problem-name* 'unspecified *depth-cutoff* 0 *algorithm* 'depth-first *tree-or-graph* 'graph
         *solution-type* 'planning *progress-reporting-interval* 100000
         *randomize-search* nil *branch* -1 *probe* nil *debug* 0)
   (setf *features* (remove :ww-debug *features*))
@@ -206,16 +211,14 @@ any such settings appearing in the problem specification file.
 
 (defun save-globals ()
   "Save the values of the globals in the vals.lisp file."
-  (save-to-file (list ;*keep-globals-p*
-                      *problem-name* *depth-cutoff* *tree-or-graph* *solution-type*
-                      *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*
-                      #|*features* *threads*|#)
+  (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *solution-type*
+                      *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*)
                 *globals-file*)) ;; this stores global var values
 
 
-(defun set-globals (&key ;(keep-globals-p *keep-globals-p*)
-                         (problem-name *problem-name*)
+(defun set-globals (&key (problem-name *problem-name*)
                          (depth-cutoff *depth-cutoff*)
+                         (algorithm *algorithm*)
                          (tree-or-graph *tree-or-graph*)
                          (solution-type *solution-type*)
                          (progress-reporting-interval *progress-reporting-interval*)
@@ -226,6 +229,7 @@ any such settings appearing in the problem specification file.
   "Set multiple globals at once in keywords argument format."
   (setf *problem-name* problem-name
         *depth-cutoff* depth-cutoff
+        *algorithm* algorithm
         *tree-or-graph* tree-or-graph
         *solution-type* solution-type
         *progress-reporting-interval* progress-reporting-interval
@@ -240,15 +244,14 @@ any such settings appearing in the problem specification file.
   "Read and setf values for global variables from vals.lisp file."
   (let ((default-values (list nil 0 'tree 'first 100000 nil -1 nil 0)))
     (destructuring-bind 
-        (;keep-globals-p
-         tmp-problem-name tmp-depth-cutoff tmp-tree-or-graph tmp-solution-type
-         tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)  ; tmp-features)
+         (tmp-problem-name tmp-depth-cutoff tmp-algorithm tmp-tree-or-graph tmp-solution-type
+         tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)
         (let ((vals (or (ignore-errors (read-from-file *globals-file*))
                         default-values)))
           vals)
-        (setf ;*keep-globals-p* keep-globals-p
-              *problem-name* tmp-problem-name
+        (setf *problem-name* tmp-problem-name
               *depth-cutoff* tmp-depth-cutoff
+              *algorithm* tmp-algorithm
               *tree-or-graph* tmp-tree-or-graph
               *solution-type* tmp-solution-type
               *progress-reporting-interval* tmp-progress-reporting-interval
@@ -256,7 +259,6 @@ any such settings appearing in the problem specification file.
               *branch* tmp-branch
               *probe* tmp-probe
               *debug* tmp-debug))))
-              ;*features* tmp-features))))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;

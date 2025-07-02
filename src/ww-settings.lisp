@@ -141,6 +141,11 @@
 (define-global *problem-type* 'planning
   "Spedify whether it's a planning problem or constraint satisfaction problem.")
 
+(define-global *algorithm* 'depth-first
+  "Specify search algorithm: 'depth-first (default) or 'backtracking.
+   depth-first: Traditional DFS with state copying (current behavior)
+   backtracking: DFS with single state and undo operations (memory efficient)")
+
 (define-global *solution-type* 'first
   "Specify whether to search for first, min-length, min-time, or every solution.")
 

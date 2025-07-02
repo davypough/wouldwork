@@ -201,10 +201,21 @@
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
   #+sbcl (if (> *threads* 0)
-           ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
-           (process-threads)
-           (search-serial))
-  #-sbcl (search-serial)
+         ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
+         (if (eql *algorithm* 'backtracking)
+             (error "Parallel processing not supported with backtracking algorithm")
+             (process-threads))
+         (ecase *algorithm*
+           (depth-first (search-serial))
+           (backtracking (search-backtracking))))
+  #-sbcl (ecase *algorithm*
+           (depth-first (search-serial))
+           (backtracking (search-backtracking)))
+;  #+sbcl (if (> *threads* 0)
+;           ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
+;           (process-threads)
+;           (search-serial))
+;  #-sbcl (search-serial)
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
       (summarize-search-results (if (eql *solution-type* 'first)

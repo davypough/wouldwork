@@ -165,6 +165,8 @@
     (*problem-type* (unless (member val '(planning csp))
                       (error "Can't set *problem-type* to ~S.
                               Must be either planning or csp (ie, constraint satisfaction problem)." val)))
+    (*algorithm* (unless (member val '(depth-first backtracking))
+                   (error "Can't set *algorithm* to ~S. Must be either depth-first or backtracking." val)))
     (*solution-type* (unless (member val '(first every min-length min-time min-value max-value))
                        (error "Can't set *solution-type* to ~S. Must be one of
                                first, every, min-length, min-time, min-value, or max-value." val)))

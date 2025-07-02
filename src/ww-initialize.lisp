@@ -87,7 +87,7 @@
 
 (defun display-current-parameters ()
   (format t "~2%Current parameter settings:")
-  (ut::prt *problem-name* *problem-type* *tree-or-graph* *solution-type*
+  (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* *progress-reporting-interval*
            *threads* *randomize-search* *debug* *probe*)
   (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
