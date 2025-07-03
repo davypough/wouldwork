@@ -119,7 +119,7 @@
               (leave)))
           (increment-global *program-cycles* 1)
           (setf *average-branching-factor* (compute-average-branching-factor))
-          (print-search-progress open))))))
+          (print-search-progress))))))
 
 
 (defun split-off (open)

@@ -248,7 +248,7 @@
           (hs::push-hstack succ-node *open* :new-only (eq *tree-or-graph* 'graph)))  ;push lowest heuristic value last
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
-    (print-search-progress *open*)  ;#nodes expanded so far
+    (print-search-progress)  ;#nodes expanded so far
     (after-each #+:ww-debug (when (>= *debug* 5) (simple-break)))))  ;simplifies debugger printout
 
 
@@ -596,7 +596,7 @@
       (when *solutions*
         (format t "~2%Search ended with first solution found." )))
     (exhausted
-      (format t "~2%Search process completed normally.")
+      (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
         (if (eql *tree-or-graph* 'tree)
           (format t "~2%Exhaustive search for every solution (up to the depth cutoff, if any).")
@@ -739,7 +739,7 @@
                         (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
                                   state-depth (solution.value solution))
                         (format t ctrl-str state-depth))))
-          (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
+           (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                (format t "Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)
@@ -761,13 +761,63 @@
     (list-database (problem-state.idb (solution.goal soln)))))
 
 
-(defun print-search-progress (open)
+(defun print-search-progress ()
+  "Print search progress using appropriate global variables"
+  #+sbcl (bt:with-lock-held (*lock*)
+           (printout-search-progress))
+  #-sbcl (printout-search-progress))
+
+
+#+ignore (defun print-search-progress (open)
   #+sbcl (bt:with-lock-held (*lock*)
            (printout-search-progress open))
   #-sbcl (printout-search-progress open))
 
 
-(defun printout-search-progress (open)
+(defun printout-search-progress ()
+  "Printout of nodes expanded so far during search modulo reporting interval."
+  (when (<= (- *progress-reporting-interval* 
+               (- *total-states-processed* *prior-total-states-processed*))
+            0)
+    (format t "~2%program cycles = ~:D" *program-cycles*)
+    (format t "~%total states processed so far = ~:D" *total-states-processed*)
+    (when (eql *tree-or-graph* 'graph)
+      (format t "~%ht count: ~:D    ht size: ~:D"
+              #+sbcl (hash-table-count *closed*)
+              #-sbcl (genhash:generic-hash-table-count *closed*)
+              #+sbcl (hash-table-size *closed*)
+              #-sbcl (genhash:generic-hash-table-size *closed*)))
+    ;; CHANGED: Use algorithm-specific global variables instead of parameter
+    (format t "~%*open* length: ~:D" 
+            (ecase *algorithm*
+              (depth-first (hs::length-hstack *open*))
+              (backtracking (length *choice-stack*))))
+    (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
+    (iter (while (and *rem-init-successors*
+                      (not (idb-in-open (problem-state.idb (node.state (first *rem-init-successors*))) 
+                                        *open*))))
+          (pop-global *rem-init-successors*))
+    (when (< *threads* 2)
+      (format t "~%current progress: in #~:D of ~:D initial branches"
+              (the fixnum (- *num-init-successors*
+                             (length *rem-init-successors*)))
+              *num-init-successors*))
+    (format t "~%average search depth = ~A"
+            (if (> *num-paths* 0)
+                (round (/ *accumulated-depths* *num-paths*))
+                'pending))
+    (format t "~%current average processing speed = ~:D states/sec" 
+            (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
+                      (/ (- (get-internal-real-time) *prior-time*)
+                         internal-time-units-per-second))))
+    (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
+                                                     internal-time-units-per-second)))
+    (finish-output)
+    (setf *prior-time* (get-internal-real-time))
+    (setf *prior-total-states-processed* *total-states-processed*)))
+
+
+#+ignore (defun printout-search-progress (open)
   "Printout of nodes expanded so far during search modulo reporting interval."
     (when (<= (- *progress-reporting-interval* (- *total-states-processed* *prior-total-states-processed*))
               0)

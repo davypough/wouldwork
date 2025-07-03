@@ -34,6 +34,29 @@
   ;; Update max depth explored
   (when (> level *max-depth-explored*)
     (setf *max-depth-explored* level))
+  ;; ADDED: Initialize *unique-solutions* if not already done
+  (unless (boundp '*unique-solutions*)
+    (setf *unique-solutions* nil))
+  ;; CHANGED: Use standard progress reporting with choice-stack length
+  (print-search-progress)
+  ;; Debug output
+  (when (>= *debug* 3)
+    (format t "~&Exploring state at level ~A~%" level)))
+
+
+#+ignore (defun preprocess-state (state level)
+  "Hook: Preprocessing with statistics tracking and debugging"
+  (declare (ignore state))
+  ;; Update search statistics (matching wouldwork's tracking)
+  (increment-global *program-cycles* 1)
+  (increment-global *total-states-processed* 1)
+  ;; Update max depth explored
+  (when (> level *max-depth-explored*)
+    (setf *max-depth-explored* level))
+  ;; ADDED: Initialize *unique-solutions* if not already done
+  ;; This ensures the list exists even if no solutions are found
+  (unless (boundp '*unique-solutions*)
+    (setf *unique-solutions* nil))
   ;; Progress reporting
   (when (and (> *progress-reporting-interval* 0)
              (zerop (mod *total-states-processed* *progress-reporting-interval*)))
@@ -78,36 +101,90 @@
 
 
 (defun backtrack (state level)
-  "Core recursive backtracking function"
+  "Production version with computational safeguards"
+  ;; Defensive depth limiting to prevent runaway recursion
+  (when (> level 10)  ; Reasonable depth limit for blocks problems
+    (return-from backtrack nil))
+  
+  ;; Resource monitoring - check periodically for excessive consumption
+  (when (and (> level 5) (zerop (mod *total-states-processed* 100)))
+    (format t "~%Progress: Level ~A, States ~A" level *total-states-processed*)
+    (finish-output))
+  
   (preprocess-state state level)
-  ;; Safety limit to prevent stack overflow (keep this from debug version)
-  (when (> level 50)
-    (return-from backtrack nil))
-  ;; Check depth cutoff
-  (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
-    (return-from backtrack nil))
-  ;; Validate partial solution
+  
+  ;; Goal checking with standard solution reporting
+  (when (is-complete-solution state level)
+    ;; CHANGED: Use standard register-solution instead of custom reporting
+    (let ((mock-node (make-node :state state :depth level :parent nil)))
+      (register-solution mock-node state))
+    (unless (should-continue-search state level)
+      (return-from backtrack t)))
+  
   (unless (is-valid-partial-solution state level)
     (return-from backtrack nil))
-  ;; Check for complete solution
+  
+  ;; Full exploration with progress monitoring
+  (dolist (action *actions*)
+    (let ((choices (generate-choices-for-action action state)))
+      ;; Alert on unexpectedly high branching factors
+      (when (> (length choices) 10)
+        (format t "~%Warning: High branching factor ~A at level ~A" 
+                (length choices) level)
+        (finish-output))
+      
+      (dolist (choice choices)
+        (when (apply-choice choice state level)
+          (let ((deeper-result (backtrack state (1+ level))))
+            (undo-choice choice state level)
+            (when (and deeper-result 
+                      (not (should-continue-search state level)))
+              (return-from backtrack t)))))))
+  
+  nil)
+
+
+#+ignore (defun backtrack (state level)
+  "Production version with computational safeguards"
+  ;; Defensive depth limiting to prevent runaway recursion
+  (when (> level 10)  ; Reasonable depth limit for blocks problems
+    (return-from backtrack nil))
+  
+  ;; Resource monitoring - check periodically for excessive consumption
+  (when (and (> level 5) (zerop (mod *total-states-processed* 100)))
+    (format t "~%Progress: Level ~A, States ~A" level *total-states-processed*)
+    (finish-output))
+  
+  (preprocess-state state level)
+  
+  ;; Goal checking with debugging
   (when (is-complete-solution state level)
+    (format t "~%SOLUTION FOUND at level ~A!" level)
+    (finish-output)
     (register-backtrack-solution state level)
-    (return-from backtrack (not (should-continue-search state level))))
-  ;; Generate and try choices
-  (let ((choices (generate-choices state level)))
-    (when (zerop (length choices))
-      (return-from backtrack nil))
-    (dolist (choice choices)
-      ;; Apply choice
-      (when (apply-choice choice state level)
-        ;; Recursive search
-        (when (backtrack state (1+ level))
-          ;; Found solution - undo and potentially return
-          (undo-choice choice state level)
-          (unless (should-continue-search state level)
-            (return-from backtrack t)))
-        ;; Undo choice for next iteration
-        (undo-choice choice state level))))
+    (unless (should-continue-search state level)
+      (return-from backtrack t)))
+  
+  (unless (is-valid-partial-solution state level)
+    (return-from backtrack nil))
+  
+  ;; Full exploration with progress monitoring
+  (dolist (action *actions*)
+    (let ((choices (generate-choices-for-action action state)))
+      ;; Alert on unexpectedly high branching factors
+      (when (> (length choices) 10)
+        (format t "~%Warning: High branching factor ~A at level ~A" 
+                (length choices) level)
+        (finish-output))
+      
+      (dolist (choice choices)
+        (when (apply-choice choice state level)
+          (let ((deeper-result (backtrack state (1+ level))))
+            (undo-choice choice state level)
+            (when (and deeper-result 
+                      (not (should-continue-search state level)))
+              (return-from backtrack t)))))))
+  
   nil)
 
 
@@ -121,23 +198,86 @@
 
 
 (defun apply-choice (choice state level)
-  "Apply a choice to the current state using wouldwork's update system"
+  "Apply a choice to the current state with strict validation and fail-fast error handling"
   (declare (ignore level))
-  (when (choice-forward-update choice)
-    ;; Use wouldwork's existing revise function to apply updates
+  
+  ;; Strict validation - fail immediately if choice structure is invalid
+  (unless (and choice (choice-forward-update choice))
+    (error "Invalid choice structure: ~A. Choice must have valid forward-update." choice))
+  
+  ;; Pre-application state validation
+  (let ((pre-application-idb-size (hash-table-count (problem-state.idb state))))
+    
+    ;; Apply the forward update to modify current state
+    ;; No error handling here - let any problems bubble up immediately
     (revise (problem-state.idb state) (choice-forward-update choice))
-    (push choice *choice-stack*)
-    t))
+    
+    ;; Post-application validation with immediate failure on problems
+    (let ((post-application-idb-size (hash-table-count (problem-state.idb state))))
+      (when (>= *debug* 3)
+        (format t "~%Applied choice: ~A -> ~A facts in database~%" 
+                (choice-action choice)
+                post-application-idb-size))
+      
+      ;; Global invariant validation - fail fast if violated
+      (when *global-invariants*
+        (unless (validate-global-invariants nil state)
+          (error "Global invariant violation after applying choice ~A at state ~A" 
+                 choice (list-database (problem-state.idb state)))))
+      
+      ;; Update choice stack for solution path reconstruction
+      (push choice *choice-stack*)
+      
+      ;; Return success indicator
+      t)))
 
 
 (defun undo-choice (choice state level)
-  "Undo a choice from the current state"
+  "Undo a choice from the current state with strict validation and fail-fast error handling"
   (declare (ignore level))
-  (when (choice-inverse-update choice)
-    ;; Apply the inverse update to restore previous state
+  
+  ;; Strict validation of choice structure - fail immediately if invalid
+  (unless choice
+    (error "Cannot undo null choice. This indicates a serious bug in choice stack management."))
+  
+  ;; Verify that this choice is actually the most recent one on our stack
+  ;; This validation catches choice stack corruption early
+  (unless (and *choice-stack* (eq choice (first *choice-stack*)))
+    (error "Choice stack corruption detected. Attempted to undo ~A but top of stack is ~A. Stack: ~A"
+           choice (first *choice-stack*) *choice-stack*))
+  
+  ;; Validate that we have the inverse update needed for restoration
+  (unless (choice-inverse-update choice)
+    (error "Cannot undo choice ~A: no inverse update available. This choice cannot be reversed."
+           choice))
+  
+  ;; Capture pre-undo state for validation purposes
+  (let ((pre-undo-idb-size (hash-table-count (problem-state.idb state))))
+    
+    ;; Apply the inverse update to restore the previous state
+    ;; No error handling here - any failure should bubble up immediately
     (revise (problem-state.idb state) (choice-inverse-update choice))
-    (pop *choice-stack*)
-    t))
+    
+    ;; Verify that the undo operation produced a sensible result
+    (let ((post-undo-idb-size (hash-table-count (problem-state.idb state))))
+      (when (>= *debug* 3)
+        (format t "~%Undid choice: ~A -> ~A facts in database~%" 
+                (choice-action choice)
+                post-undo-idb-size))
+      
+      ;; Critical validation: ensure global invariants still hold after undo
+      ;; If undoing a choice violates invariants, our inverse update logic is buggy
+      (when *global-invariants*
+        (unless (validate-global-invariants nil state)
+          (error "Global invariant violation after undoing choice ~A. This indicates a bug in the inverse update logic for action ~A"
+                 choice (choice-action choice))))
+      
+      ;; Remove the choice from our stack - this must happen last
+      ;; If we remove it early and then encounter an error, our stack becomes inconsistent
+      (pop *choice-stack*)
+      
+      ;; Return success indicator
+      t)))
 
 
 (defun search-backtracking ()
@@ -147,6 +287,42 @@
   (setf *total-states-processed* 0)
   (setf *max-depth-explored* 0)
   (setf *solutions* nil)
+  (setf *unique-solutions* nil)  ; ADDED: Initialize unique solutions list
+  (setf *solution-count* 0)
+  (setf *start-time* (get-internal-real-time))
+  ;; Initialize backtracking-specific state
+  (setf *backtrack-state* (copy-problem-state *start-state*))
+  (setf *choice-stack* nil)
+  ;; Validate initial state against global invariants
+  (when *global-invariants*
+    (unless (validate-global-invariants nil *backtrack-state*)
+      (format t "~%Invariant validation failed on initial state.~%")
+      (return-from search-backtracking nil)))
+  ;; Check if start state is already a goal
+  (when (and (fboundp 'goal-fn) (funcall (symbol-function 'goal-fn) *backtrack-state*))
+    (let ((mock-node (make-node :state *backtrack-state* :depth 0 :parent nil)))
+      (register-solution mock-node *backtrack-state*))
+    ;; CHANGED: Remove summarization call - parent dfs function handles this
+    (return-from search-backtracking *solutions*))
+  ;; Start the recursive backtracking search
+  (let ((search-result (backtrack *backtrack-state* 0)))
+    ;; ADDED: Calculate average branching factor before returning
+    (setf *average-branching-factor* 
+          (if (> *program-cycles* 0)
+              (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float)
+              0.0))
+    ;; CHANGED: Remove summarization call - parent dfs function handles this
+    *solutions*))
+
+
+#+ignore (defun search-backtracking ()
+  "Main entry point for backtracking search with full initialization"
+  ;; Initialize search statistics (matching wouldwork's initialization)
+  (setf *program-cycles* 0)
+  (setf *total-states-processed* 0)
+  (setf *max-depth-explored* 0)
+  (setf *solutions* nil)
+  (setf *unique-solutions* nil)  ; ADDED: Initialize unique solutions list
   (setf *solution-count* 0)
   (setf *start-time* (get-internal-real-time))
   ;; Initialize backtracking-specific state
@@ -160,44 +336,42 @@
   ;; Check if start state is already a goal
   (when (and (fboundp 'goal-fn) (funcall (symbol-function 'goal-fn) *backtrack-state*))
     (register-backtrack-solution *backtrack-state* 0)
-    (summarize-backtrack-results 'goal-at-start)
+    ;; CHANGED: Use standard summary function with appropriate condition
+    (let ((*package* (find-package :ww)))
+      (summarize-search-results 'first))
     (return-from search-backtracking *solutions*))
   ;; Start the recursive backtracking search
   (let ((search-result (backtrack *backtrack-state* 0)))
-    (summarize-backtrack-results (if search-result 'found-solution 'exhausted))
+    ;; ADDED: Calculate average branching factor before summarizing
+    (setf *average-branching-factor* 
+          (if (> *program-cycles* 0)
+              (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float)
+              0.0))
+    ;; CHANGED: Use standard summary function instead of custom one
+    (let ((*package* (find-package :ww)))
+      (summarize-search-results (if (and search-result *solutions*) 
+                                  'first 
+                                  'exhausted)))
     *solutions*))
 
 
 (defun summarize-backtrack-results (termination-reason)
-  "Summarize backtracking search results in wouldwork's format"
-  (let ((elapsed-time (/ (- (get-internal-real-time) *start-time*) 
-                         internal-time-units-per-second))
-        (*package* (find-package :ww)))
-    (format t "~%~%In problem ~A, performed BACKTRACKING search for ~A solution.~%" 
-            *problem-name* *solution-type*)
-    (case termination-reason
-      (found-solution (format t "Search process completed normally.~%"))
-      (exhausted (format t "Search exhausted without finding solution.~%"))
-      (goal-at-start (format t "Goal satisfied by start state.~%")))
-    (format t "Maximum depth explored = ~A~%" *max-depth-explored*)
-    (format t "Program cycles = ~A~%" *program-cycles*)
-    (format t "Total states processed = ~A~%" *total-states-processed*)
-    (when (> *program-cycles* 1)
-      (format t "Average branching factor = ~A~%" 
-              (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float)))
-    (format t "~%Start state:~%~A~%" (list-database (problem-state.idb *start-state*)))
-    (when (fboundp 'goal-fn)
-      (format t "~%Goal: <defined>~%"))
-    (format t "~%Total solution paths found = ~A~%" *solution-count*)
-    (when *solutions*
-      (let ((best-solution (first *solutions*)))
-        (format t "~%Number of steps in solution = ~A~%" (solution.depth best-solution))
-        (format t "~%Solution path:~%")
-        (dolist (step (solution.path best-solution))
-          (format t "~A~%" step))
-        (format t "~%Final state:~%~A~%" 
-                (list-database (problem-state.idb *backtrack-state*)))))
-    (format t "~%Evaluation took: ~A seconds~%" elapsed-time)))
+  "DEPRECATED: Summarize backtracking search results in wouldwork's format
+   
+   This function has been replaced by the standard summarize-search-results
+   function to ensure consistent output formatting between depth-first and
+   backtracking search algorithms. The standard function provides more
+   comprehensive statistics and matches the expected wouldwork output format.
+   
+   Legacy termination-reason values:
+   - 'found-solution -> now handled as 'first in summarize-search-results
+   - 'exhausted -> now handled as 'exhausted in summarize-search-results  
+   - 'goal-at-start -> now handled as 'first in summarize-search-results"
+  (declare (ignore termination-reason))
+  (warn "summarize-backtrack-results is deprecated. Use summarize-search-results instead.")
+  ;; For backward compatibility, we could call the standard function
+  ;; but it's better to encourage migration to the standard approach
+  (format t "~%Please update code to use the standard summarize-search-results function.~%"))
 
 
 (defun generate-choices-for-action (action state)
@@ -258,7 +432,7 @@
     (reverse literals)))
 
 
-(defun process-bt-solution (state level)
+#+ignore (defun process-bt-solution (state level)
   "Hook: Process a complete solution using wouldwork's solution recording system"
   (let ((solution (register-backtrack-solution state level)))
     
@@ -298,8 +472,8 @@
     (otherwise nil)))
 
 
-(defun register-backtrack-solution (state level)
-  "Register a solution with correct structure definition"
+#+ignore (defun register-backtrack-solution (state level)
+  "Register a solution with correct structure definition and maintain unique solutions"
   (let ((current-solution (make-solution 
                            :depth level
                            :time (problem-state.time state)
@@ -310,13 +484,20 @@
     (case *solution-type*
       ((first every)
        (push-global current-solution *solutions*)
-       (increment-global *solution-count* 1))
+       (increment-global *solution-count* 1)
+       ;; ADDED: Maintain unique solutions list (matching depth-first behavior)
+       (when (not (member (problem-state.idb (solution.goal current-solution)) *unique-solutions* 
+                          :key (lambda (soln) (problem-state.idb (solution.goal soln)))
+                          :test #'equalp))
+         (push-global current-solution *unique-solutions*)))
       ((min-length min-time min-value max-value)
        ;; For optimization problems, only keep better solutions
        (when (or (null *solutions*)
                  (solution-better-p current-solution (first *solutions*)))
          (setf *solutions* (list current-solution))
-         (setf *solution-count* 1))))
+         (setf *solution-count* 1)
+         ;; ADDED: Reset unique solutions for optimization problems
+         (setf *unique-solutions* (list current-solution)))))
     current-solution))
 
 

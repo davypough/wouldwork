@@ -51,7 +51,7 @@
 (defun run-test-problems ()
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
-  ;(reset-parameters)
+  (reset-parameters)
   (with-silenced-compilation
     (let* ((problems-to-run *test-problem-files*)
            (test-solutions-file (merge-pathnames "problem-test-solutions.lisp"
