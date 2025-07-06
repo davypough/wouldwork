@@ -125,8 +125,8 @@
 (defun split-off (open)
   "Removes the bottom node on open and returns a new split-off subopen with it."
   (let ((subopen (hs::make-hstack :table 
-                                  #+sbcl (make-hash-table :test 'equal
-                                                          :synchronized (> *threads* 0))
+                                  (make-hash-table :test 'equal
+                                                   :synchronized (> *threads* 0))
                                   :keyfn (hs::hstack.keyfn open)))
         (bottom-node (hs::deletef-nth-hstack 0 open)))
     (hs::push-hstack bottom-node subopen :new-only (eq *tree-or-graph* 'graph))))
@@ -136,3 +136,46 @@
   "Initiate a controlled shutdown of all threads."
   (setf *shutdown-requested* t)
   (format t "Shutdown requested. Waiting for all threads to complete...~%"))
+
+
+(defun deduplicate-parallel-solutions ()
+  "Post-process solutions to create unique solutions list after parallel search.
+   Handles all solution types: first, every, min-length, min-time, min-value, max-value."
+  (case *solution-type*
+    ((first)
+     ;; For 'first' solutions, unique solutions should match regular solutions
+     (setf *unique-solutions* (copy-list *solutions*)))
+    
+    ((every)
+     ;; For 'every' solutions, remove duplicates based on goal state equivalence
+     (setf *unique-solutions*
+           (remove-duplicates *solutions* :test #'solution-equivalent-p)))
+    
+    ((min-length min-time min-value max-value)
+     ;; For optimization problems, unique solutions should match regular solutions
+     ;; since the search algorithm already keeps only the best
+     (setf *unique-solutions* (copy-list *solutions*)))
+    
+    (otherwise
+     ;; Default case: remove duplicates
+     (setf *unique-solutions*
+           (remove-duplicates *solutions* :test #'solution-equivalent-p)))))
+
+
+(defun finalize-parallel-search-results ()
+  "Post-process parallel search results to maintain interface consistency.
+   This function makes the *unique-solutions* initialization functionally necessary."
+  (setf *unique-solutions* 
+        (remove-duplicates *solutions* 
+                          :test #'solution-equivalent-p))
+  (when (>= *debug* 1)
+    (format t "~&Parallel search: ~D solutions, ~D unique~%" 
+            (length *solutions*) (length *unique-solutions*))))
+
+
+(defun solution-equivalent-p (sol1 sol2)
+  "Compare solutions for equivalence"
+  (and sol1 sol2
+       (equalp (problem-state.idb (solution.goal sol1))
+               (problem-state.idb (solution.goal sol2)))))
+

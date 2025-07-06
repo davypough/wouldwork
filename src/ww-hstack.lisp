@@ -25,7 +25,6 @@
   (let ((key (funcall (hstack.keyfn hstk) elt))
         (vector (hstack.vector hstk))
         (table (hstack.table hstk)))
-    #+sbcl
     (if new-only  ;only push if new specified
       (if (nth-value 1 (gethash key table))  ;key is already present
         (values hstk nil)  ;element's key already present, do nothing
@@ -33,16 +32,6 @@
                (vector-push-extend elt vector)
                (values hstk t)))
       (progn (push elt (gethash key table))
-             (vector-push-extend elt vector)
-             (values hstk t)))
-    #-sbcl
-    (if new-only  ;only push if new specified
-      (if (nth-value 1 (genhash:hashref key table))  ;key is already present
-        (values hstk nil)  ;element's key already present, do nothing
-        (progn (setf (genhash:hashref key table) (list elt))
-               (vector-push-extend elt vector)
-               (values hstk t)))
-      (progn (push elt (genhash:hashref key table))
              (vector-push-extend elt vector)
              (values hstk t)))))
 
@@ -54,17 +43,10 @@
          (table (hstack.table hstk))
          (fptr-1 (1- (fill-pointer vector)))
          (key (funcall (hstack.keyfn hstk) (aref vector fptr-1))))  ;key in elt at top of vec stack
-    #+sbcl
     (let ((values (gethash key table)))  ;key guaranteed to be in table with list of values
       (pop values)
       (when (null values)
         (remhash key table))  ;key's value is now nil so remove it
-      (vector-pop vector))
-    #-sbcl
-    (let ((values (genhash:hashref key table)))  ;key guaranteed to be in table with list of values
-      (pop values)
-      (when (null values)
-        (genhash:hashrem key table))  ;key's value is now nil so remove it
       (vector-pop vector))))
 
 
@@ -82,13 +64,6 @@
   (aref (hstack.vector hstk) n))
 
 
-;(defun key-present-hstack (key hstk)
-;  "Test whether a key is present in a hash stack,
-;   returns the value associated with that key."
-;  #-sbcl (gethash key (hstack.table hstk))
-;  #+sbcl (genhash:hashref key (hstack.table hstk)))
-
-
 (defun deletef-nth-hstack (n hstk)
   "Deletes the nth entry in a hash stack and returns it."
   (declare (type fixnum n) (type hstack hstk))
@@ -96,8 +71,7 @@
          (tbl (hstack.table hstk))
          (nth-entry (aref vec n))
          (key (funcall (hstack.keyfn hstk) nth-entry)))
-    #+sbcl (remhash key tbl)
-    #-sbcl (genhash:hashrem key tbl)
+    (remhash key tbl)
     (setf vec (delete-if (constantly t) vec :start n :count 1))
     nth-entry))
 
@@ -114,5 +88,4 @@
 
 (defun clear-hstack (hstk)
   (setf (fill-pointer (hstack.vector hstk)) 0)
-  #+sbcl (clrhash (hstack.table hstk))
-  #-sbcl (genhash:hashclr (hstack.table hstk)))
+  (clrhash (hstack.table hstk)))

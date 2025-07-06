@@ -15,7 +15,7 @@
   :homepage "https://github.com/davypough/quick-wouldwork"
   :bug-tracker "https://github.com/davypough/quick-wouldwork/issues"
   :source-control (:git "https://github.com/davypough/quick-wouldwork.git")
-  :depends-on (:alexandria :iterate #+sbcl :lparallel
+  :depends-on (:alexandria :iterate :lparallel
                #-sbcl :genhash
                #-sbcl :trivial-backtrace
                #-sbcl :metering)
@@ -27,7 +27,7 @@
                       (funcall next)))
   :components ((:module "src"
                 :serial t
-                :components ((:file "packages")
+                :components ((:file "ww-packages")
 		                     (:file "ww-utilities")
 		                     (:file "ww-hstack")
                              (:file "ww-preliminaries")
@@ -52,7 +52,7 @@
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
                              (:file "ww-backtracker")
-		              #+sbcl (:file "ww-parallel")
+		                     (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
   :build-operation "program-op"  ;build a binary: binary name: adapt.
   :build-pathname "wouldwork"

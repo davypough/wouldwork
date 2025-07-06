@@ -41,28 +41,15 @@
       5 - display full nodes + break after each expansion cycle"))
 
 
-#-sbcl
-(when (> *threads* 0)
-  (error "Note that multi-threading is not available unless running in SBCL.
-          Please set *threads* in ww-settings.lisp to 0."))
-
-
-;#+sbcl
 ;(if (> *threads* 0)
 ;  (setf *debugger-hook* #'(lambda (condition original-hook)
 ;                            (declare (ignore original-hook))
 ;                            (bt:with-lock-held (*lock*)
-;                              #+sbcl (sb-debug:print-backtrace)
-;                              #-sbcl (trivial-backtrace:print-backtrace condition)
+;                              (sb-debug:print-backtrace)
 ;                              (format *error-output* "~%~A~2%" condition)
 ;                              (finish-output *error-output*))
 ;                            (abort)))
 ;  (setf *debugger-hook* nil))
-
-
-;(if (> *debug* 0)  ;this is better handled in ww-set.lisp
-;  (pushnew :ww-debug *features*)
-;  (setf *features* (remove :ww-debug *features*)))
 
 
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

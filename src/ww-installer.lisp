@@ -204,7 +204,6 @@
   ;  (setf (the function (get object :rebound-fn)) (compile nil (get object :rebound))))
   (dolist (literal (get object :inits))
     (when (eql (char (format nil "~S" literal) 0) #\`)
-          ;(eql (car literal) #+sbcl 'sb-int:quasiquote #+allegro 'excl::backquote)
       (setq literal (eval literal)))
     (if (eql (car literal) 'not)
       (when (gethash (caadr literal) *relations*)

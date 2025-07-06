@@ -56,7 +56,6 @@
     (let* ((problems-to-run *test-problem-files*)
            (test-solutions-file (merge-pathnames "problem-test-solutions.lisp"
                                                  (asdf:system-source-directory :wouldwork)))
-           #+sbcl
            (problem-test-solutions (if (probe-file test-solutions-file)
                                      (read-hash-table-from-file test-solutions-file)
                                      (make-hash-table :test #'equal)))
@@ -90,7 +89,6 @@
                    (load-problem problem-name)
                    (incf problems-processed)
                    (ww-solve)
-                   #+sbcl
                    (let ((best-solution (ut::if-it (first *solutions*) (solution.path ut::it)))
                          (best-state (alexandria:hash-table-alist (problem-state.idb (first *best-states*)))))
                      (unless (equalp (list best-solution best-state)
@@ -107,15 +105,10 @@
       (stage blocks3)
       (format t "~%~%Final Summary:~%")
       (format t "Total test problems run: ~D~%" (length *test-problem-files*))
-      #+sbcl
       (format t "Test failures: ~D~%" (length failed-problems))
-      #+sbcl
       (format t "Failed problems: ~A~%" (reverse failed-problems))
-      #+sbcl
-      (format t "Note: A failed problem solution is not necessarily wrong, but different from the reference solution.")
-      #-sbcl
-      (format t "~%Note: Problem processing encountered no errors, but the final solutions were not verified.~2%")
-      #+sbcl
+      (format t "Note: A failed problem solution is not necessarily wrong, but different from the reference solution,")
+      (format t "a common occurrence when running in parallel mode.")
       (progn (unless (probe-file test-solutions-file)
                (write-hash-table-to-file problem-test-solutions
                  (merge-pathnames "problem-test-solutions.lisp" (asdf:system-source-directory :wouldwork))))

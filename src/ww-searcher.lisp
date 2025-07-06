@@ -27,7 +27,6 @@
 |#
 
 
-#+sbcl
 (defmacro lprt (&rest vars)
   "Print some variable values in a thread for debugging."
   `(bt:with-lock-held (*lock*)  ;grab lock for uninterrupted printing
@@ -76,11 +75,7 @@
 (declaim (hs::hstack *open*))
 
 
-#+sbcl
 (define-global *closed* (make-hash-table)  ;initialized in dfs
-  "Contains the set of closed state idbs for graph search, idb -> (depth time value).")
-#-sbcl
-(define-global *closed* (genhash:make-generic-hash-table)  ;initialized in dfs
   "Contains the set of closed state idbs for graph search, idb -> (depth time value).")
 
 
@@ -133,11 +128,7 @@
     hash))
 
 
-#+sbcl
 (sb-ext:define-hash-table-test fixed-keys-ht-equal fixed-keys-ht-hash)
-#-sbcl
-(progn (genhash:hashrem 'fixed-keys-ht-equal genhash::*hash-test-designator-map*)
-       (genhash:register-test-designator 'fixed-keys-ht-equal #'fixed-keys-ht-hash #'fixed-keys-ht-equal))
 
 
 (defun fixedp (relations)
@@ -166,20 +157,15 @@
         (parallelp (> *threads* 0)))
     (declare (ignorable parallelp))
     (setf *open* 
-      (hs::make-hstack :table 
-                         #+sbcl (make-hash-table :test 'equal
-                                                 :synchronized parallelp)
-                         #-sbcl (genhash:make-generic-hash-table :test 'equal)
+      (hs::make-hstack :table (make-hash-table :test 'equal
+                                               :synchronized parallelp)
                        :keyfn #'node.state.idb-alist))
     (when (eql *tree-or-graph* 'graph)
-      (setf *closed* 
-        #+sbcl (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
-                                :size 200003
-                                :rehash-size 2.7
-                                :rehash-threshold 0.8
-                                :synchronized parallelp)
-        #-sbcl (genhash:make-generic-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
-                                                :size 200003))))
+      (setf *closed* (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+                                      :size 200003
+                                      :rehash-size 2.7
+                                      :rehash-threshold 0.8
+                                      :synchronized parallelp))))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
@@ -200,22 +186,74 @@
   (setf *search-tree* nil)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
-  #+sbcl (if (> *threads* 0)
-         ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
-         (if (eql *algorithm* 'backtracking)
-             (error "Parallel processing not supported with backtracking algorithm")
-             (process-threads))
-         (ecase *algorithm*
-           (depth-first (search-serial))
-           (backtracking (search-backtracking))))
-  #-sbcl (ecase *algorithm*
-           (depth-first (search-serial))
-           (backtracking (search-backtracking)))
-;  #+sbcl (if (> *threads* 0)
-;           ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
-;           (process-threads)
-;           (search-serial))
-;  #-sbcl (search-serial)
+  (if (> *threads* 0)
+    ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
+    (if (eql *algorithm* 'backtracking)
+      (error "Parallel processing not supported with backtracking algorithm")
+      (progn
+        (process-threads)
+        (finalize-parallel-search-results)))
+    (ecase *algorithm*
+      (depth-first (search-serial))
+      (backtracking (search-backtracking))))
+  (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
+    (unless *shutdown-requested*
+      (summarize-search-results (if (eql *solution-type* 'first)
+                                  'first
+                                  'exhausted)))))
+
+
+#+ignore (defun dfs ()
+  "Main search program."
+  (when *global-invariants*
+    (unless (validate-global-invariants nil *start-state*)
+      (format t "~%Invariant validation failed on initial state.~%")
+      (return-from dfs nil)))
+  (when (fboundp 'bounding-function?)
+    (setf *upper-bound*
+          (funcall (symbol-function 'bounding-function?) *start-state*)))
+  (let ((fixed-idb nil)  ;(fixedp *relations*))
+        (parallelp (> *threads* 0)))
+    (declare (ignorable parallelp))
+    (setf *open* 
+      (hs::make-hstack :table (make-hash-table :test 'equal
+                                               :synchronized parallelp)
+                       :keyfn #'node.state.idb-alist))
+    (when (eql *tree-or-graph* 'graph)
+      (setf *closed* (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+                                      :size 200003
+                                      :rehash-size 2.7
+                                      :rehash-threshold 0.8
+                                      :synchronized parallelp))))
+  (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
+  (setf *program-cycles* 0)
+  (setf *average-branching-factor* 0.0)
+  (setf *total-states-processed* 1)  ;start state is first
+  (setf *prior-total-states-processed* 0)
+  (setf *rem-init-successors* nil)  ;branch nodes from start state
+  (setf *num-init-successors* 0)
+  (setf *max-depth-explored* 0)
+  (setf *num-idle-threads* 0)
+  (setf *accumulated-depths* 0)
+  (setf *repeated-states* 0)
+  (setf *num-paths* 0)
+  (setf *solutions* nil)
+  (unless (boundp '*unique-solutions*)
+    (setf *unique-solutions* nil))
+  (setf *best-states* (list *start-state*))
+  (setf *solution-count* 0)
+  (setf *upper-bound* 1000000)
+  (setf *search-tree* nil)
+  (setf *start-time* (get-internal-real-time))
+  (setf *prior-time* 0)
+  (if (> *threads* 0)
+    ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
+    (if (eql *algorithm* 'backtracking)
+      (error "Parallel processing not supported with backtracking algorithm")
+      (process-threads))
+    (ecase *algorithm*
+      (depth-first (search-serial))
+      (backtracking (search-backtracking))))
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
       (summarize-search-results (if (eql *solution-type* 'first)
@@ -260,9 +298,9 @@
    (when *probe*
      (apply #'probe current-node *probe*))
    (iter
-    (when (>= *debug* 3)
-      (format t "~&-----------------------------------------------------------~%")
-      (format t "~%Current node selected:~%~S~2%" current-node))
+    #+:ww-debug (when (>= *debug* 3)
+                  (format t "~&-----------------------------------------------------------~%")
+                  (format t "~%Current node selected:~%~S~2%" current-node))
     (when (null current-node)  ;open is empty
       (return-from df-bnb1 nil))
     (when (and (> *depth-cutoff* 0) (= (node.depth current-node) *depth-cutoff*))
@@ -271,14 +309,10 @@
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
-      #+sbcl (setf (gethash (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
-               (list (node.depth current-node)
-                     (problem-state.time (node.state current-node))
-                     (problem-state.value (node.state current-node))))
-      #-sbcl (setf (genhash:hashref (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
-               (list (node.depth current-node)
-                     (problem-state.time (node.state current-node))
-                     (problem-state.value (node.state current-node)))))
+      (setf (gethash (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
+        (list (node.depth current-node)
+              (problem-state.time (node.state current-node))
+              (problem-state.value (node.state current-node)))))
     (let ((succ-states (expand current-node)))  ;from generate-children
       (when *troubleshoot-current-node*
         (setf *debug* 5)
@@ -293,7 +327,7 @@
                     (update-search-tree (node.state current-node) (node.depth current-node) ""))
       (update-max-depth-explored (1+ (node.depth current-node)))
       (increment-global *total-states-processed* (length succ-states))
-      (when (= *debug* 6) (simple-break))  ;probe found
+      #+:ww-debug (when (= *debug* 6) (simple-break))  ;probe found
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
@@ -333,8 +367,7 @@
               (narrate "State previously closed" succ-state succ-depth)
               (increment-global *repeated-states*)
               (if (better-than-closed closed-values succ-state succ-depth)  ;succ has better value
-                #+sbcl (remhash (idb-to-sorted-alist succ-idb) *closed*)
-                #-sbcl (genhash:hashrem (idb-to-sorted-alist succ-idb) *closed*)
+                (remhash (idb-to-sorted-alist succ-idb) *closed*)
                 (progn (finalize-path-depth succ-depth) (next-iteration))))))  ;drop this succ
         (collecting (generate-new-node current-node succ-state))))  ;live successor
 
@@ -358,32 +391,14 @@
   t)
 
 
-#+ignore (defun validate-global-invariants (current-node succ-state &optional (is-start-state nil))
-  "Validate all registered global invariants on the given succ-state.
-   Returns T if all invariants pass, NIL if any fail."
-  (loop for invariant-name in *global-invariants*
-        for fn = (symbol-function invariant-name)
-        unless (funcall fn succ-state)
-        do (troubleshoot "~%Invariant ~A failed on ~A:~%~A" 
-                        invariant-name
-                        (if is-start-state 
-                            "*START-STATE*" 
-                            "state during planning")
-                        (list-database (problem-state.idb succ-state)))
-           (return-from validate-global-invariants nil))
-  t)
-
-
 (defun idb-in-open (succ-idb open)
   "Determines if an idb hash table's contents match the contents of a key in open's table.
    Returns the node in open or nil."
    (declare (type hash-table succ-idb))
   (let ((canonical-key (idb-to-sorted-alist succ-idb))
         (ht (hs::hstack.table open)))
-    #+sbcl (let ((nodes (gethash canonical-key ht)))
-             (when nodes (car nodes)))
-    #-sbcl (let ((nodes (genhash:hashref canonical-key ht)))
-             (when nodes (car nodes)))))
+    (let ((nodes (gethash canonical-key ht)))
+      (when nodes (car nodes)))))
 
 
 (defun idb-to-sorted-alist (idb-hash-table)
@@ -394,8 +409,7 @@
 
 (defun get-closed-values (idb)
   "Returns the closed values (depth time value) for the given idb, or nil if not found."
-  #+sbcl (gethash idb *closed*)
-  #-sbcl (genhash:hashref idb *closed*))
+  (gethash idb *closed*))
 
 
 (defun goal (state)
@@ -411,20 +425,16 @@
         (best-value (problem-state.value (first *best-states*))))
     (ecase *solution-type*
       (max-value (when (> current-value best-value)
-                   #+sbcl (bt:with-lock-held (*lock*)
-                            (format t "~%Higher value state found: ~A in thread ~D~%"
-                                      (problem-state.value succ-state) (lparallel:kernel-worker-index))
-                            (finish-output))
-                   #-sbcl (format t "~%Higher value state found: ~A~%"
-                                    (problem-state.value succ-state))
+                   (bt:with-lock-held (*lock*)
+                     (format t "~%Higher value state found: ~A in thread ~D~%"
+                             (problem-state.value succ-state) (lparallel:kernel-worker-index))
+                     (finish-output))
                    (push-global succ-state *best-states*)))
       (min-value (when (< current-value best-value)
-                   #+sbcl (bt:with-lock-held (*lock*)
-                            (format t "~%Lower value state found: ~A in thread ~D~%"
-                                      (problem-state.value succ-state) (lparallel:kernel-worker-index))
-                            (finish-output))
-                   #-sbcl (format t "~%Lower value state found: ~A~%"
-                                    (problem-state.value succ-state))
+                   (bt:with-lock-held (*lock*)
+                     (format t "~%Lower value state found: ~A in thread ~D~%"
+                             (problem-state.value succ-state) (lparallel:kernel-worker-index))
+                     (finish-output))
                    (push-global succ-state *best-states*))))))
 
  
@@ -482,10 +492,9 @@
                 (narrate "State killed by bounding" (node.state current-node) (node.depth current-node))
                 #+:ww-debug (when (>= *debug* 3)
                               (format t "~&current-cost = ~F > *upper-bound* = ~F~%" current-cost *upper-bound*))
-                #+sbcl (bt:with-lock-held (*lock*)
-                         (format t "bounding a state...")
-                         (finish-output))
-                #-sbcl (format t "bounding a state...")
+                (bt:with-lock-held (*lock*)
+                  (format t "bounding a state...")
+                  (finish-output))
                 (return-from bounding-function 'kill-node))
              ((< current-upper *upper-bound*)
                 #+:ww-debug (when (>= *debug* 3)
@@ -519,25 +528,28 @@
     t))
 
 
-(defun narrate (string state depth)
-  (declare (ignorable string state depth))
-  (when (>= *debug* 3)
-    (format t "~%~A:~%~A~%" string state))
-  #+:ww-debug (when (>= *debug* 1)
-                (update-search-tree state depth string))
-  nil)
-
-
-(defun generate-new-node (current-node succ-state)
-  "Produces a new node for a given successor."
-  (declare (type node current-node) (type problem-state succ-state))
-  (let* ((depth (1+ (node.depth current-node)))
-         (succ-node (make-node :state succ-state
-                               :depth depth
-                               :parent current-node)))
-    (when (>= *debug* 3)
-      (format t "~%Installing new or updated successor:~%~S~%" succ-node))
-    succ-node))
+#+ignore (defun update-search-tree (state/choice depth message)
+  "Universal search tree update function for both algorithms"
+  (declare (ignorable state/choice depth message))
+  (when (and (not (> *threads* 0)) (>= *debug* 1))
+    (let* ((is-depth-first (eql *algorithm* 'depth-first))
+           (state-info (if is-depth-first 
+                          state/choice
+                          *backtrack-state*))
+           (entry-info (if is-depth-first
+                          (list (problem-state.name state/choice)  ;ie, state
+                                (problem-state.instantiations state/choice))
+                          (when state/choice
+                            (list (choice-action state/choice)  ;ie, choice
+                                  (choice-instantiations state/choice))))))
+      (push `(,entry-info ,depth ,message
+              ,@(case *debug*
+                  (1 nil)
+                  (2 (list (when state-info
+                             (list-database (problem-state.idb state-info)))
+                           (when state-info
+                             (list-database (problem-state.hidb state-info)))))))
+            *search-tree*))))
 
 
 (defun update-search-tree (state depth message)
@@ -552,6 +564,27 @@
                (2 (list (list-database (problem-state.idb state))
                         (list-database (problem-state.hidb state))))))
           *search-tree*)))
+
+
+(defun narrate (string state depth)
+  (declare (ignorable string state depth))
+  #+:ww-debug (when (>= *debug* 3)
+                (format t "~%~A:~%~A~%" string state))
+  #+:ww-debug (when (>= *debug* 1)
+                (update-search-tree state depth string))
+  nil)
+
+
+(defun generate-new-node (current-node succ-state)
+  "Produces a new node for a given successor."
+  (declare (type node current-node) (type problem-state succ-state))
+  (let* ((depth (1+ (node.depth current-node)))
+         (succ-node (make-node :state succ-state
+                               :depth depth
+                               :parent current-node)))
+    #+:ww-debug (when (>= *debug* 3)
+                  (format t "~%Installing new or updated successor:~%~S~%" succ-node))
+    succ-node))
 
 
 (defun at-max-depth (succ-depth)
@@ -727,24 +760,21 @@
                                                  *state-codes*)))))
              :goal goal-state)))
     (cond ((> *threads* 0)
-             #+(and ww-debug sbcl) (when (>= *debug* 1)
-                                       (lprt))
+             #+:ww-debug (when (>= *debug* 1)
+                           (lprt))
              (let ((ctrl-str "~&New path to goal found at depth = ~:D~%"))
-               #+sbcl (bt:with-lock-held (*lock*)
-                        (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-                          (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
-                                    state-depth (solution.value solution))
-                          (format t ctrl-str state-depth)))
-               #-sbcl (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-                        (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
-                                  state-depth (solution.value solution))
-                        (format t ctrl-str state-depth))))
-           (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
+               (bt:with-lock-held (*lock*)
+                 (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
+                   (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
+                           state-depth (solution.value solution))
+                   (format t ctrl-str state-depth)))))
+          (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                (format t "Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)
                (format t "Time = ~:A~%" (solution.time solution)))))
-    (narrate "Solution found ***" goal-state state-depth)
+    (when (eql *algorithm* 'depth-first)
+      (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solutions*)
     (when (not (member (problem-state.idb (solution.goal solution)) *unique-solutions* 
                        :key (lambda (soln) (problem-state.idb (solution.goal soln)))
@@ -763,15 +793,8 @@
 
 (defun print-search-progress ()
   "Print search progress using appropriate global variables"
-  #+sbcl (bt:with-lock-held (*lock*)
-           (printout-search-progress))
-  #-sbcl (printout-search-progress))
-
-
-#+ignore (defun print-search-progress (open)
-  #+sbcl (bt:with-lock-held (*lock*)
-           (printout-search-progress open))
-  #-sbcl (printout-search-progress open))
+  (bt:with-lock-held (*lock*)
+    (printout-search-progress)))
 
 
 (defun printout-search-progress ()
@@ -783,12 +806,9 @@
     (format t "~%total states processed so far = ~:D" *total-states-processed*)
     (when (eql *tree-or-graph* 'graph)
       (format t "~%ht count: ~:D    ht size: ~:D"
-              #+sbcl (hash-table-count *closed*)
-              #-sbcl (genhash:generic-hash-table-count *closed*)
-              #+sbcl (hash-table-size *closed*)
-              #-sbcl (genhash:generic-hash-table-size *closed*)))
-    ;; CHANGED: Use algorithm-specific global variables instead of parameter
-    (format t "~%*open* length: ~:D" 
+              (hash-table-count *closed*)
+              (hash-table-size *closed*)))
+    (format t "~%frontier nodes: ~:D" 
             (ecase *algorithm*
               (depth-first (hs::length-hstack *open*))
               (backtracking (length *choice-stack*))))
@@ -817,48 +837,10 @@
     (setf *prior-total-states-processed* *total-states-processed*)))
 
 
-#+ignore (defun printout-search-progress (open)
-  "Printout of nodes expanded so far during search modulo reporting interval."
-    (when (<= (- *progress-reporting-interval* (- *total-states-processed* *prior-total-states-processed*))
-              0)
-        (format t "~2%program cycles = ~:D" *program-cycles*)
-        (format t "~%total states processed so far = ~:D" *total-states-processed*)
-        (when (eql *tree-or-graph* 'graph)
-          (format t "~%ht count: ~:D    ht size: ~:D"
-                  #+sbcl (hash-table-count *closed*)
-                  #-sbcl (genhash:generic-hash-table-count *closed*)
-                  #+sbcl (hash-table-size *closed*)
-                  #-sbcl (genhash:generic-hash-table-size *closed*)))
-        (format t "~%*open* length: ~:D" (hs::length-hstack *open*))
-        (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
-        (iter (while (and *rem-init-successors*
-                          (not (idb-in-open (problem-state.idb (node.state (first *rem-init-successors*))) open))))
-              (pop-global *rem-init-successors*))
-        (when (< *threads* 2)
-          (format t "~%current progress: in #~:D of ~:D initial branches"
-                  (the fixnum (- *num-init-successors*
-                                 (length *rem-init-successors*)))
-                  *num-init-successors*))
-        (format t "~%average search depth = ~A"
-                  (if (> *num-paths* 0)
-                    (round (/ *accumulated-depths* *num-paths*))
-                    'pending))
-        (format t "~%current average processing speed = ~:D states/sec" 
-                  (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
-                            (/ (- (get-internal-real-time) *prior-time*)
-                               internal-time-units-per-second))))
-        (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
-                                                       internal-time-units-per-second)))
-        (finish-output)
-        (setf *prior-time* (get-internal-real-time))
-        (setf *prior-total-states-processed* *total-states-processed*)))
-
-
 (defun ww-solve ()
   "Runs a branch & bound search on the problem specification."
   (if (> *threads* 0)
     (format t "~%working with ~D thread(s)...~2%" *threads*)
     (format t "~%working...~2%"))
-  #+sbcl (time (dfs))
-  #-sbcl (dfs)  ;(the-cost-of-nothing:bench (dfs))
+  (time (dfs))
   (in-package :ww))

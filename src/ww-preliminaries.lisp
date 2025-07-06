@@ -16,20 +16,7 @@
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
 
 
-#+sbcl 
 (defparameter *lock* (bt:make-lock))  ;for thread protection
-
-
-;#-sbcl
-;(defparameter *global-locks* (make-hash-table))  ;Use for future non-sbcl multi-thread implementations
-
-
-;#-sbcl
-;(defun ensure-global-lock (var-name)
-;  "Store one lock for each global variable. Use for future non-sbcl implementations."
-;  (or (gethash var-name *global-locks*)
-;      (setf (gethash var-name *global-locks*)
-;            (bordeaux-threads:make-lock (format nil "Lock for ~S" var-name)))))
 
 
 (defmacro with-silenced-compilation (&body body)
@@ -41,21 +28,17 @@
 
 (defun cleanup-resources ()
   "Attempt to shutdown dangling threads safely in SBCL."
-  #+sbcl
-  (progn (format t "~&Cleaning up resources and shutting down threads...~%")
-         (let ((current-thread sb-thread:*current-thread*))
-           (dolist (thread (sb-thread:list-all-threads))
-             (unless (eq thread current-thread)
-               (when (sb-thread:thread-alive-p thread)
-                 (format t "~&Terminating thread: ~A~%" thread)
-                 (ignore-errors
-                   (sb-thread:terminate-thread thread))))))
-           (format t "~&Cleanup completed.~%"))
-  #-sbcl
-  nil)
+  (format t "~&Cleaning up resources and shutting down threads...~%")
+  (let ((current-thread sb-thread:*current-thread*))
+    (dolist (thread (sb-thread:list-all-threads))
+      (unless (eq thread current-thread)
+        (when (sb-thread:thread-alive-p thread)
+          (format t "~&Terminating thread: ~A~%" thread)
+          (ignore-errors
+            (sb-thread:terminate-thread thread))))))
+  (format t "~&Cleanup completed.~%"))
 
 
-#+sbcl
 (pushnew 'cleanup-resources sb-ext:*exit-hooks*)
 
 
@@ -70,62 +53,35 @@
 (defmacro define-global (var-name val-form &optional doc-string)
   "Convenience for defining globals in ww-setting.lisp for single- or multi-threading operation."
   `(progn
-     #+sbcl
      ,(if (> *threads* 0)
-          (if (boundp var-name)
-              `(setf ,var-name ,val-form)
-              `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
-          `(defparameter ,var-name ,val-form ,doc-string))
-     #-sbcl
-     (defparameter ,var-name ,val-form ,doc-string)))
+        (if (boundp var-name)
+          `(setf ,var-name ,val-form)
+          `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
+        `(defparameter ,var-name ,val-form ,doc-string))))
 
 
 (defmacro increment-global (var-name &optional (delta-form 1))
   `(progn
      (declaim (type fixnum ,var-name))
-     #+sbcl
      ,(if (> *threads* 0)
         `(sb-ext:atomic-incf ,var-name ,delta-form)
-        `(incf ,var-name ,delta-form))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-        ;(incf ,var-name ,delta-form))
         `(incf ,var-name ,delta-form))))
 
 
 (defmacro push-global (item var-name)
   `(progn
      (declaim (type list ,var-name))
-     #+sbcl
      ,(if (> *threads* 0)
         `(sb-ext:atomic-push ,item ,var-name)
-        `(push ,item ,var-name))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-        ;(push ,item ,var-name))
         `(push ,item ,var-name))))
 
 
 (defmacro pop-global (var-name)
   `(progn
      (declaim (type list ,var-name))
-     #+sbcl
      ,(if (> *threads* 0)
         `(sb-ext:atomic-pop ,var-name)
-        `(pop ,var-name))
-     #-sbcl
-     ,(if (> *threads* 0)
-        (format t "~2%Sorry, multi-threading only supported in SBCL.
-                   Please set *threads* to 0 in ww-settings.lisp~%")
-        ;`(bordeaux-threads:with-lock-held ((gethash ',var-name *global-locks*))
-        ;(pop ,var-name))
-       `(pop ,var-name))))
+        `(pop ,var-name))))
 
 
 (defun reset-user-syms (symbols)

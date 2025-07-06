@@ -66,7 +66,7 @@ Enter (list-all-problems) for a complete list of problems."
 (defun command-test-4 ()
   "Verify basic ww-set for *depth-cutoff* *tree-or-graph* *solution-type*
    *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*"
-  #+sbcl (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (format t "~%COMMAND-TEST-4: testing that all parameters reset to defaults...~2%")
   (reset-parameters)
   (assert (not (member :ww-debug *features*)))

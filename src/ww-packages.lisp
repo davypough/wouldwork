@@ -7,10 +7,7 @@
   (:nicknames :hs))
 
 (defpackage :wouldwork
-  #+SBCL
   (:use :cl :iterate :sb-ext)
-  #-SBCL
-  (:use :cl :iterate)
   (:nicknames :ww)
   (:shadowing-import-from :iterate)
   (:export #:main

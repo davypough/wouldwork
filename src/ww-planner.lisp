@@ -82,8 +82,8 @@
                        precondition-params precondition-variables
                    dynamic precondition-args)  ; ieffect)
                   action
-        (when (>= *debug* 4)
-          (format t "~%~A" name))
+        #+:ww-debug (when (>= *debug* 4)
+                      (format t "~%~A" name))
         (when dynamic  ;holds the insts with query calls
           (unless (setf precondition-args  ;overrides previous arguments list if dynamic
                     (remove-if (lambda (sublist)
@@ -109,16 +109,16 @@
                         (funcall eff-defun-name state)
                         (apply eff-defun-name state pre-result)))
                     pre-results))
-          (when (>= *debug* 4)
-            (let ((*package* (find-package :ww)))
-              (format t "  UPDATED-DBS/~D =>~%" (length updated-dbs))
-              (iter (for updated-db in updated-dbs)
-                    (for pre-result in pre-results)
-                    (format t "~A~%~A,~A~2%"
-                              pre-result
-                              (or (list-database (update.changes updated-db)) nil)
-                              (update.value updated-db)))
-              (terpri)))
+          #+:ww-debug (when (>= *debug* 4)
+                        (let ((*package* (find-package :ww)))
+                          (format t "  UPDATED-DBS/~D =>~%" (length updated-dbs))
+                          (iter (for updated-db in updated-dbs)
+                                (for pre-result in pre-results)
+                                (format t "~A~%~A,~A~2%"
+                                        pre-result
+                                        (or (list-database (update.changes updated-db)) nil)
+                                        (update.value updated-db)))
+                          (terpri)))
           (when *troubleshoot-current-node*  ;signaled in process-ieffect below
              (return-from generate-children))
           (let ((child-states (get-new-states state action updated-dbs)))  ;keep idb & hidb separate
