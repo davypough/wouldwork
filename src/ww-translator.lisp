@@ -151,35 +151,12 @@
       (translate-proposition form flag)))
 
 
-
-#+ignore (defun translate-positive-relation (form flag)
-  "Unified positive relation translation with context-aware read/write determination.
-   Automatically detects whether to perform read operations (queries) or write operations (updates)
-   based on syntactic context rather than just translation flag."
-  (if (write-operation-p flag)
-      ;; Write operation: Effect context and not in forced read-mode
-      `(update ,(get-database-reference form flag) ,(translate-list form flag))
-      ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
-      (translate-proposition form flag)))
-
-
 (defun translate-negative-relation (form flag)
   "Unified negative relation translation maintaining read/write context consistency.
    Preserves negation semantics across both query and update operations."
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
       `(update (problem-state.idb state+) (list 'not ,(translate-list (second form) flag)))
-      ;; Read operation: All other cases
-      `(not ,(translate-positive-relation (second form) flag))))
-
-
-#+ignore (defun translate-negative-relation (form flag)
-  "Unified negative relation translation maintaining read/write context consistency.
-   Preserves negation semantics across both query and update operations."
-  (if (write-operation-p flag)
-      ;; Write operation: Effect context and not in forced read-mode
-      `(update ,(get-database-reference (second form) flag)
-               (list 'not ,(translate-list (second form) flag)))
       ;; Read operation: All other cases
       `(not ,(translate-positive-relation (second form) flag))))
 
@@ -394,39 +371,6 @@
                nil)))))
 
 
-#+ignore (defun translate-conditional (form flag)
-  "Conditional translation with proper read-mode isolation."
-  (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
-            (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
-    (error "AND not allowed in <then> or <else> clause of IF statement; use DO: ~A" form))
-  ;; Test translation with forced read-mode
-  (let ((test-translation (let ((*proposition-read-mode* t))
-                            (translate (second form) flag))))
-    (if *within-quantifier*
-        ;; Quantifier context with explicit read-mode isolation
-        (if (fourth form)
-            `(if ,test-translation
-               (progn ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation
-                         (translate (third form) flag)) t)
-               (progn ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation  
-                         (translate (fourth form) flag)) nil))
-            `(if ,test-translation
-               (progn ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation
-                         (translate (third form) flag)) t)
-               nil))
-        ;; Value context with explicit read-mode isolation
-        (if (fourth form)
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation
-                  (translate (third form) flag))
-               ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation
-                  (translate (fourth form) flag)))
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil)) ; ← Explicit isolation
-                  (translate (third form) flag))
-               nil)))))
-
-
 (defun translate-assert (form flag)
   "Translates an assert statement with selective write-mode context."
   (ecase flag
@@ -512,11 +456,6 @@
   (let ((*within-quantifier* nil))
     `(loop ,@(loop for item in (cdr form) 
                    collect (translate item flag)))))  ; Called with *within-quantifier* = nil
-
-
-#+ignore (defun translate-ww-loop (form flag)
-  "Translates a ww-loop into a lisp loop with interpreted ww forms."
-  `(loop ,@(loop for item in (cdr form) collect (translate item flag))))
 
 
 (defun translate-followup (form flag)

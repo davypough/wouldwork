@@ -118,27 +118,4 @@
           ((not (probe-file problem-file))
              (uiop:copy-file blocks3-file problem-file)))))
 
-
-#+ignore (eval-when (:load-toplevel :execute)
-  (let* ((root (asdf:system-source-directory :wouldwork))
-         (src-dir (merge-pathnames "src/" root))
-         (problem-file (merge-pathnames "problem.lisp" src-dir))
-         (vals-file (merge-pathnames "vals.lisp" root))
-         (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
-         (vals-problem-name (when (probe-file vals-file)
-                              (with-open-file (in-file vals-file :direction :input)
-                                (let* ((parameters (read in-file nil nil))
-                                       (problem-name (string (first parameters)))
-                                       (debug (ninth parameters)))
-                                  (when (> debug 0)
-                                    (pushnew :ww-debug *features*))
-                                  problem-name))))
-         (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
-    (cond ((not (probe-file problem-file))  ;no problem.lisp file?
-             (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp
-             (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
-          ((probe-file vals-file)  ;does vals.lisp exist?
-             (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
-               (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
-               (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
            

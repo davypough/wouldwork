@@ -203,64 +203,6 @@
                                   'exhausted)))))
 
 
-#+ignore (defun dfs ()
-  "Main search program."
-  (when *global-invariants*
-    (unless (validate-global-invariants nil *start-state*)
-      (format t "~%Invariant validation failed on initial state.~%")
-      (return-from dfs nil)))
-  (when (fboundp 'bounding-function?)
-    (setf *upper-bound*
-          (funcall (symbol-function 'bounding-function?) *start-state*)))
-  (let ((fixed-idb nil)  ;(fixedp *relations*))
-        (parallelp (> *threads* 0)))
-    (declare (ignorable parallelp))
-    (setf *open* 
-      (hs::make-hstack :table (make-hash-table :test 'equal
-                                               :synchronized parallelp)
-                       :keyfn #'node.state.idb-alist))
-    (when (eql *tree-or-graph* 'graph)
-      (setf *closed* (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
-                                      :size 200003
-                                      :rehash-size 2.7
-                                      :rehash-threshold 0.8
-                                      :synchronized parallelp))))
-  (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
-  (setf *program-cycles* 0)
-  (setf *average-branching-factor* 0.0)
-  (setf *total-states-processed* 1)  ;start state is first
-  (setf *prior-total-states-processed* 0)
-  (setf *rem-init-successors* nil)  ;branch nodes from start state
-  (setf *num-init-successors* 0)
-  (setf *max-depth-explored* 0)
-  (setf *num-idle-threads* 0)
-  (setf *accumulated-depths* 0)
-  (setf *repeated-states* 0)
-  (setf *num-paths* 0)
-  (setf *solutions* nil)
-  (unless (boundp '*unique-solutions*)
-    (setf *unique-solutions* nil))
-  (setf *best-states* (list *start-state*))
-  (setf *solution-count* 0)
-  (setf *upper-bound* 1000000)
-  (setf *search-tree* nil)
-  (setf *start-time* (get-internal-real-time))
-  (setf *prior-time* 0)
-  (if (> *threads* 0)
-    ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
-    (if (eql *algorithm* 'backtracking)
-      (error "Parallel processing not supported with backtracking algorithm")
-      (process-threads))
-    (ecase *algorithm*
-      (depth-first (search-serial))
-      (backtracking (search-backtracking))))
-  (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
-    (unless *shutdown-requested*
-      (summarize-search-results (if (eql *solution-type* 'first)
-                                  'first
-                                  'exhausted)))))
-
-
 (defun search-serial ()
   "Branch & Bound DFS serial search."
   (iter

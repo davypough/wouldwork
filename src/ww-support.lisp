@@ -268,6 +268,17 @@
 
 
 (defun update (db literal)
+  "Single add or delete from db. Returns the literal for change tracking."
+  (declare (type hash-table db))
+  (when *print-updates*
+    (ut::prt literal))
+  (if (eql (car literal) 'not)
+    (delete-proposition (second literal) db)
+    (add-proposition literal db))
+  literal)
+
+
+#+ignore (defun update (db literal)
   "Single add or delete from db."
   (declare (type hash-table db))
   (when *print-updates*
@@ -275,6 +286,18 @@
   (if (eql (car literal) 'not)
     (delete-proposition (second literal) db)
     (add-proposition literal db))
+  db)
+
+
+(defun revert-updates (db changes-list)
+  "Undoes a list of changes to restore database to previous state"
+  (declare (type hash-table db))
+  (dolist (change changes-list)
+    (if (eql (car change) 'not)
+        ;; If we deleted something, add it back
+        (add-proposition (second change) db)
+        ;; If we added something, delete it
+        (delete-proposition change db)))
   db)
 
 
