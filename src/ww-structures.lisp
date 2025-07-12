@@ -161,7 +161,7 @@
 
 (defstruct (update (:conc-name update.))
   "Db updates resulting from a successful action instantiation."
-  (changes nil :type hash-table)
+  (changes nil :type (or hash-table list))
   (value 0.0 :type real)
   (instantiations nil :type list)
   (followups nil :type list))  ;next & finally followup function calls

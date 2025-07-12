@@ -121,11 +121,20 @@
                           (terpri)))
           (when *troubleshoot-current-node*  ;signaled in process-ieffect below
              (return-from generate-children))
-          (let ((child-states (get-new-states state action updated-dbs)))  ;keep idb & hidb separate
-            (when (fboundp 'heuristic?)
+          ;(let ((child-states (get-new-states state action updated-dbs)))  ;keep idb & hidb separate
+          ;  (when (fboundp 'heuristic?)
+          ;    (dolist (child-state child-states)
+          ;      (setf (problem-state.heuristic child-state)
+          ;        (funcall (symbol-function 'heuristic?) child-state))))
+          ;  (alexandria:appendf children child-states)))))
+          (let ((child-states (case *algorithm*
+                                (depth-first (get-new-states state action updated-dbs))
+                                (backtracking updated-dbs))))
+            ;; Apply heuristics only for depth-first (complete states)
+            (when (and (eql *algorithm* 'depth-first) (fboundp 'heuristic?))
               (dolist (child-state child-states)
                 (setf (problem-state.heuristic child-state)
-                  (funcall (symbol-function 'heuristic?) child-state))))
+                (funcall (symbol-function 'heuristic?) child-state))))
             (alexandria:appendf children child-states)))))
     (nreverse children)))  ;put first action child states first
 

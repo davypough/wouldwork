@@ -243,9 +243,9 @@
   (let ((new-$vars (delete-duplicates 
                      (set-difference (get-all-nonspecial-vars #'$varp body) args))))
     (setf (symbol-value name)
-      `(lambda (state-or-state+ ,@args)
+      `(lambda (state ,@args)
          ,(format nil "~A query-fn" name)
-         (declare (ignorable state-or-state+))
+         (declare (ignorable state))
          (block ,name
            (let (,@new-$vars)
              (declare (ignorable ,@new-$vars))
@@ -255,7 +255,7 @@
                    ,(third body)
                    ,(translate (fourth body) 'context-aware))
                 (translate body 'context-aware))))))
-    (fix-if-ignore '(state-or-state+) (symbol-value name))))
+    (fix-if-ignore '(state) (symbol-value name))))
 
 
 (defmacro define-update (name args body)
@@ -272,21 +272,21 @@
                        (get-all-nonspecial-vars #'$varp body) args))))
     (if new-$vars
         (setf (symbol-value name)
-          `(lambda (state+ ,@args)
+          `(lambda (state ,@args)
              ,(format nil "~A update-fn" name)
-             (declare (ignorable state+))
+             (declare (ignorable state))
              (let (updated-dbs ,@new-$vars)
                (declare (ignorable updated-dbs ,@new-$vars))
                ,(translate body 'eff)
-               (problem-state.idb state+))))
+               (problem-state.idb state))))
         (setf (symbol-value name)
-          `(lambda (state+ ,@args)
+          `(lambda (state ,@args)
              ,(format nil "~A update-fn" name)
-             (declare (ignorable state+))
+             (declare (ignorable state))
              (progn
                ,(translate body 'eff)
-               (problem-state.idb state+)))))
-    (fix-if-ignore '(state+) (symbol-value name))))
+               (problem-state.idb state)))))
+    (fix-if-ignore '(state) (symbol-value name))))
 
   
 (defmacro define-constraint (form)
@@ -403,8 +403,7 @@
                        :effect-lambda `(lambda (state ,@eff-args ,@eff-extra-?vars)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
-                                         (let (updated-dbs followups ,@(set-difference (set-difference eff-extra-$vars eff-args)
-                                               eff-extra-?vars))
+                                         (let (updated-dbs followups ,@(set-difference (set-difference eff-extra-$vars      eff-args) eff-extra-?vars))
                                            (declare (ignorable ,@eff-extra-$vars))
                                            ,(translate effect 'pre)  ;start as pre, shift to eff in assert
                                            updated-dbs))

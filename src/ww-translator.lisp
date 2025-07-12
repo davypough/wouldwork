@@ -146,7 +146,8 @@
    based on syntactic context rather than just translation flag."
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
-      `(update (problem-state.idb state+) ,(translate-list form flag))
+      `(push (update (problem-state.idb state) ,(translate-list form flag)) changes-list)
+      ;`(update (problem-state.idb state+) ,(translate-list form flag))
       ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
       (translate-proposition form flag)))
 
@@ -156,7 +157,8 @@
    Preserves negation semantics across both query and update operations."
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
-      `(update (problem-state.idb state+) (list 'not ,(translate-list (second form) flag)))
+      `(push (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))) changes-list)
+      ;`(update (problem-state.idb state+) (list 'not ,(translate-list (second form) flag)))
       ;; Read operation: All other cases
       `(not ,(translate-positive-relation (second form) flag))))
 
@@ -372,6 +374,29 @@
 
 
 (defun translate-assert (form flag)
+  "Translates an assert statement with selective write-mode context."
+  (ecase flag
+    (eff (error "Nested ASSERT statements not allowed:~%~A" form))
+    (pre `(let (changes-list)
+            (declare (special changes-list))
+            ,@(mapcar (lambda (statement)
+                        ;; Bind read-mode to nil only for direct assert statements
+                        (let ((*proposition-read-mode* nil))
+                          (translate statement 'eff)))
+                      (cdr form))
+            (push (make-update :changes (case *algorithm*
+                                          (depth-first (copy-idb (problem-state.idb state)))
+                                          (backtracking (nreverse changes-list)))
+                               :value 0.0 
+                               :instantiations (list ?block ?target) 
+                               :followups (nreverse followups))
+                  updated-dbs)
+            ;; revert changes to restore original state
+            (revert-updates (problem-state.idb state) (nreverse changes-list))
+            updated-dbs))))
+
+
+#+ignore (defun translate-assert (form flag)
   "Translates an assert statement with selective write-mode context."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))

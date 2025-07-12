@@ -59,7 +59,7 @@
     (funcall (symbol-function 'goal-fn) state)))
 
 
-(defun generate-choices (state level)
+#+ignore (defun generate-choices (state level)
   "Generate all valid choices from the current state using wouldwork's action system"
   (declare (ignore level))
   (let ((choices '()))
@@ -71,6 +71,18 @@
 
 
 (defun create-inverse-update (forward-literals)
+  "Create logical inverse of forward update with systematic negation handling"
+  (mapcar (lambda (literal)
+            (cond
+             ;; Case 1: Negated literal -> remove negation
+             ((and (listp literal) (eq (car literal) 'not))
+              (second literal))
+             ;; Case 2: Positive literal -> add negation
+             (t `(not ,literal))))
+          forward-literals))
+
+
+#+ignore (defun create-inverse-update (forward-literals)
   "Creates the inverse of a list of literals for undo operations"
   (mapcar (lambda (literal)
             (if (and (listp literal) (eq (car literal) 'not))
@@ -79,7 +91,25 @@
           forward-literals))
 
 
-(defun apply-choice (choice state level)
+#+ignore (defun apply-choice (choice state level)
+  "Apply a choice using the new forward-update format"
+  (unless (and choice (choice-forward-update choice))
+    (error "Invalid choice structure: ~A" choice))
+  
+  ;; Apply changes using WouldWork's revise function
+  (revise (problem-state.idb state) (choice-forward-update choice))
+  
+  ;; Add to choice stack and validate
+  (push choice *choice-stack*)
+  (narrate-bt "Applied choice" choice level)
+  
+  ;; Validate constraints and invariants
+  (and (is-valid-partial-solution state level)
+       (or (not *global-invariants*)
+           (validate-global-invariants nil state))))
+
+
+#+ignore (defun apply-choice (choice state level)
   "Apply a choice to the current state with strict validation and fail-fast error handling"
   
   ;; Strict validation - fail immediately if choice structure is invalid
@@ -120,7 +150,22 @@
       t)))
 
 
-(defun undo-choice (choice state level)
+#+ignore (defun undo-choice (choice state level)
+  "Undo a choice using the inverse-update"
+  (unless (eq choice (first *choice-stack*))
+    (error "Choice stack corruption: attempted to undo ~A but top is ~A"
+           choice (first *choice-stack*)))
+  
+  ;; Apply inverse update to restore previous state
+  (revise (problem-state.idb state) (choice-inverse-update choice))
+  
+  ;; Remove from choice stack
+  (pop *choice-stack*)
+  (narrate-bt "Undid choice" choice level)
+  t)
+
+
+#+ignore (defun undo-choice (choice state level)
   "Undo a choice from the current state with strict validation and fail-fast error handling"
   
   ;; Strict validation of choice structure - fail immediately if invalid
@@ -176,6 +221,55 @@
 
 
 (defun search-backtracking ()
+  "Main entry point for backtracking search with algorithm-compatible processing"
+  
+  ;; Step 1: Initialize search statistics (matching wouldwork's initialization pattern)
+  (setf *program-cycles* 0)
+  (setf *total-states-processed* 0)
+  (setf *max-depth-explored* 0)
+  (setf *solutions* nil)
+  (setf *unique-solutions* nil)
+  (setf *solution-count* 0)
+  (setf *start-time* (get-internal-real-time))
+  (setf *prior-total-states-processed* 0)
+  (setf *prior-time* 0)
+  (setf *average-branching-factor* 0.0)
+  
+  ;; Step 2: Initialize backtracking-specific state infrastructure
+  (setf *backtrack-state* (copy-problem-state *start-state*))
+  (setf *choice-stack* nil)
+  
+  ;; Step 3: Rigorous initial state validation
+  (when *global-invariants*
+    (unless (validate-global-invariants nil *backtrack-state*)
+      (format t "~%Invariant validation failed on initial state.~%")
+      (return-from search-backtracking nil)))
+  
+  ;; Step 4: Check if start state satisfies goal condition
+  (when (and (fboundp 'goal-fn)
+             (funcall (symbol-function 'goal-fn) *backtrack-state*))
+    (let ((dummy-choice (make-choice :act '(initial-state)
+                                     :forward-update nil
+                                     :inverse-update nil
+                                     :level 0)))
+      (narrate-bt "Solution found at initial state ***" dummy-choice 0)
+      (register-solution-bt 0)
+      (return-from search-backtracking *solutions*)))
+  
+  ;; Step 5: Initiate recursive backtracking search
+  (let ((search-result (backtrack *backtrack-state* 0)))
+    (declare (ignore search-result))
+    
+    ;; Step 6: Compute final statistics
+    (setf *average-branching-factor* 
+          (if (> *program-cycles* 0)
+              (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float)
+              0.0))
+    
+    *solutions*))
+
+
+#+ignore (defun search-backtracking ()
   "Main entry point for backtracking search with full initialization"
   ;; Initialize search statistics (matching wouldwork's initialization)
   (setf *program-cycles* 0)
@@ -217,6 +311,46 @@
 
 
 (defun backtrack (state level)
+  "Recursive backtracking search with algorithm-compatible choice processing"
+  
+  ;; Step 1: Prevent runaway recursion with reasonable depth bounds
+  (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
+    (return-from backtrack nil))
+  
+  ;; Step 2: Update search statistics and perform debugging hooks
+  (preprocess-state state level)
+  
+  ;; Step 3: Check for complete solution
+  (when (is-complete-solution state level)
+    (register-solution-bt level)
+    (when (and *choice-stack* (first *choice-stack*))
+      (narrate-bt "Solution found ***" (first *choice-stack*) level))
+    (finish-output)
+    (unless (should-continue-search state level)
+      (return-from backtrack t)))
+  
+  ;; Step 4: Validate partial solution constraints
+  (unless (is-valid-partial-solution state level)
+    (return-from backtrack nil))
+  
+  ;; Step 5: Generate and explore all valid choices
+  (let ((found-any-solution nil))
+    (dolist (action *actions*)
+      (let ((choices (generate-choices-for-action-bt action state level)))
+        (dolist (choice choices)
+          (when (apply-choice-bt choice state level)
+            (let ((deeper-result (backtrack state (1+ level))))
+              (undo-choice-bt choice state level)
+              ;; Track solution discovery without premature termination
+              (when deeper-result
+                (setf found-any-solution t)
+                ;; Only terminate early for 'first solution type
+                (when (eq *solution-type* 'first)
+                  (return-from backtrack t))))))))
+    found-any-solution))
+
+
+#+ignore (defun backtrack (state level)
   "Recursive backtracking search with proper choice-based debugging"
   
   ;; Prevent runaway recursion
@@ -254,7 +388,161 @@
     found-any-solution))
 
 
-(defun generate-choices-for-action (action state)
+(defun apply-choice-bt (choice state level)
+  "Apply choice with rigorous validation and state modification"
+  
+  ;; Step 1: Strict structural validation
+  (unless (and choice 
+               (choice-forward-update choice)
+               (choice-inverse-update choice))
+    (error "Invalid choice structure: ~A. Must have forward and inverse updates." choice))
+  
+  ;; Step 2: Apply forward update to state using WouldWork's mechanism
+  (handler-case
+      (progn
+        (revise (problem-state.idb state) (choice-forward-update choice))
+        
+        ;; Step 3: Update choice stack and provide debugging feedback
+        (push choice *choice-stack*)
+        (narrate-bt (format nil "Applied choice: ~A" (choice-act choice)) choice level)
+        
+        ;; Step 4: Rigorous post-application validation
+        (let ((validation-result
+               (and (is-valid-partial-solution state level)
+                    (or (not *global-invariants*)
+                        (validate-global-invariants nil state)))))
+          
+          ;; Step 5: Handle validation failure with cleanup
+          (unless validation-result
+            (narrate-bt "Choice validation failed - undoing" choice level)
+            (revise (problem-state.idb state) (choice-inverse-update choice))
+            (pop *choice-stack*))
+          
+          validation-result))
+    
+    (error (e)
+      ;; Step 6: Error recovery with state restoration
+      (narrate-bt (format nil "Choice application error: ~A" e) choice level)
+      (when (eq choice (first *choice-stack*))
+        (pop *choice-stack*))
+      nil)))
+
+
+(defun undo-choice-bt (choice state level)
+  "Undo choice with strict validation and error detection"
+  
+  ;; Step 1: Verify choice stack consistency
+  (unless (eq choice (first *choice-stack*))
+    (error "Choice stack corruption detected: attempted to undo ~A but top is ~A. Stack: ~A"
+           choice (first *choice-stack*) *choice-stack*))
+  
+  ;; Step 2: Validate inverse update availability
+  (unless (choice-inverse-update choice)
+    (error "Cannot undo choice ~A: no inverse update available" (choice-act choice)))
+  
+  ;; Step 3: Apply inverse update with error handling
+  (handler-case
+      (progn
+        (revise (problem-state.idb state) (choice-inverse-update choice))
+        
+        ;; Step 4: Update choice stack and provide debugging feedback
+        (pop *choice-stack*)
+        (narrate-bt (format nil "Undid choice: ~A" (choice-act choice)) choice level)
+        
+        ;; Step 5: Post-undo validation
+        (when *global-invariants*
+          (unless (validate-global-invariants nil state)
+            (error "Global invariant violation after undoing choice ~A" (choice-act choice))))
+        
+        t)
+    
+    (error (e)
+      ;; Step 6: Critical error - choice reversal failed
+      (error "Failed to undo choice ~A: ~A. This indicates corruption in inverse update logic." 
+             (choice-act choice) e))))
+
+
+(defun generate-choices-for-action-bt (action state level)
+  "Generate valid choices for action using algorithm-compatible effect processing"
+  (declare (ignore level))
+  
+  ;; Step 1: Validate action structure
+  (unless (and action (action.pre-defun-name action) (action.eff-defun-name action))
+    (return-from generate-choices-for-action-bt nil))
+  
+  ;; Step 2: Execute precondition checking using WouldWork's mechanism
+  (let ((precondition-fn (action.pre-defun-name action))
+        (effect-fn (action.eff-defun-name action))
+        (parameter-combinations (action.precondition-args action)))
+    
+    ;; Step 3: Filter valid precondition instantiations
+    (let ((pre-results 
+           (remove-if #'null 
+                      (mapcar (lambda (pinsts)
+                                (apply precondition-fn state pinsts))
+                              parameter-combinations))))
+      
+      (when pre-results
+        ;; Step 4: Generate effect updates using our new algorithm-compatible lambda
+        (let ((updated-dbs 
+               (mapcan (lambda (pre-result)
+                         (if (eql pre-result t)
+                             (funcall effect-fn state)
+                             (apply effect-fn state pre-result)))
+                       pre-results))
+              (choices '()))
+          
+          ;; Step 5: Convert update structures to choice objects
+          (dolist (updated-db updated-dbs)
+            ;; Critical: Handle our algorithm-dependent :changes format
+            (let* ((forward-literals 
+                    (cond 
+                     ;; New backtracking format: :changes contains list of literals
+                     ((and (eql *algorithm* 'backtracking)
+                           (listp (update.changes updated-db)))
+                      (update.changes updated-db))
+                     ;; Fallback error for unexpected format
+                     (t (error "Unexpected update.changes format for backtracking: ~A. Expected list of literals."
+                               (type-of (update.changes updated-db))))))
+                   (inverse-literals (create-inverse-update forward-literals))
+                   (combined-act (cons (action.name action)
+                                       (update.instantiations updated-db)))
+                   (choice (make-choice 
+                           :act combined-act
+                           :forward-update forward-literals
+                           :inverse-update inverse-literals
+                           :level level)))
+              (push choice choices)))
+          
+          choices)))))
+
+
+#+ignore (defun generate-choices-for-action (action state)
+  "Generate all valid choices for a specific action in the given state"
+  (let ((choices '()))
+    ;; MODIFIED: Use generate-children instead of direct effect calls
+    ;; This ensures compatibility with our new algorithm-dependent effect processing
+    (let ((updated-dbs (generate-children-for-action action state)))
+      (dolist (updated-db updated-dbs)
+        ;; For backtracking, update.changes now contains list of individual changes
+        (let* ((forward-literals (if (listp (update.changes updated-db))
+                                     ;; New backtracking format: list of changes
+                                     (update.changes updated-db)
+                                     ;; Fallback: extract from complete state
+                                     (extract-literals-from-complete-state updated-db state)))
+               (inverse-literals (create-inverse-update forward-literals))
+               (combined-act (cons (action.name action)
+                                   (update.instantiations updated-db)))
+               (choice (make-choice 
+                       :act combined-act
+                       :forward-update forward-literals
+                       :inverse-update inverse-literals
+                       :level 0)))
+          (push choice choices))))
+    choices))
+
+
+#+ignore (defun generate-choices-for-action (action state)
   "Generate all valid choices for a specific action in the given state"
   (let ((choices '()))
     ;; Use wouldwork's exact precondition checking pattern from generate-children
@@ -288,6 +576,25 @@
                              :level 0)))
                 (push choice choices)))))))
     choices))
+
+
+(defun generate-children-for-action (action state)
+  "Generate effect updates for a single action - compatible with our new approach"
+  ;; Use WouldWork's existing precondition checking
+  (let ((precondition-fn (action.pre-defun-name action))
+        (effect-fn (action.eff-defun-name action))
+        (parameter-combinations (action.precondition-args action)))
+    (let ((pre-results 
+           (remove-if #'null (mapcar (lambda (pinsts)
+                                       (apply precondition-fn state pinsts))
+                                     parameter-combinations))))
+      (when pre-results
+        ;; Get effect updates using our new lambda structure
+        (mapcan (lambda (pre-result)
+                  (if (eql pre-result t)
+                      (funcall effect-fn state)
+                      (apply effect-fn state pre-result)))
+                pre-results)))))
 
 
 (defun get-action-parameter-combinations (action state)
@@ -361,7 +668,7 @@
     (otherwise nil)))
 
 
-(defun solution-better-p (new-solution current-best)
+#+ignore (defun solution-better-p (new-solution current-best)
   "Determine if new solution is better than current best"
   (case *solution-type*
     (min-length (< (solution.depth new-solution) (solution.depth current-best)))
@@ -371,7 +678,7 @@
     (otherwise nil)))
 
 
-(defun format-backtrack-context (choice depth)
+#+ignore (defun format-backtrack-context (choice depth)
   "Format debugging output for backtracking context"
   (when choice
     (let ((act (choice-act choice)))
