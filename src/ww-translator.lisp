@@ -19,7 +19,7 @@
    When NIL, IF statements preserve natural value-returning semantics.")
 
 
-(defun get-state-reference (flag)
+#+ignore (defun get-state-reference (flag)
   "Centralized state reference determination"
   (ecase flag
     (pre 'state)  ;for precondition and effect statements outside of assert statements
@@ -30,16 +30,29 @@
 (defun get-database-reference (form flag)
   "Determines appropriate database reference for proposition evaluation.
    Handles static relations, dynamic relations, and happening contexts consistently."
+  (declare (ignore flag))  ; Flag no longer affects database selection
   (if (gethash (car form) *relations*)
       ;; Dynamic relation - check for happening context
       (if *happening-names*
           '(merge-idb-hidb state)
-          `(problem-state.idb ,(get-state-reference flag)))
+          `(problem-state.idb state))  ; Unified state reference
       ;; Static relation - always use static database
       '*static-db*))
 
 
-(defun get-function-state-parameter (function-name flag)
+#+ignore (defun get-database-reference (form flag)
+  "Determines appropriate database reference for proposition evaluation.
+   Handles static relations, dynamic relations, and happening contexts consistently."
+  (if (gethash (car form) *relations*)
+      ;; Dynamic relation - check for happening context
+      (if *happening-names*
+          '(merge-idb-hidb state)
+          `(problem-state.idb state))  ;,(get-state-reference flag)))
+      ;; Static relation - always use static database
+      '*static-db*))
+
+
+#+ignore (defun get-function-state-parameter (function-name flag)
   "Determines appropriate state parameter for function calls based on function type and context.
    Query functions use context-aware selection, update functions use direct context mapping."
   (cond
@@ -96,7 +109,7 @@
   (let ((state-db (if (gethash (car form) *relations*)
                       (if *happening-names*
                           '(merge-idb-hidb state)
-                          `(problem-state.idb ,(get-state-reference flag)))
+                          `(problem-state.idb state))  ;,(get-state-reference flag)))
                       '*static-db*)))
     `(eql t (gethash ,(translate-list form flag) ,state-db))))
 
@@ -164,6 +177,47 @@
 
 
 (defun translate-function-call (form flag)
+  "Simplified function call translation with unified state reference strategy"
+  (check-query/update-call form)
+  (let* ((state-arg 'state)  ; Unified state reference for all contexts
+         (fn-call (append (list (car form) state-arg)
+                          (mapcar (lambda (arg)
+                                    (if (and (symbolp arg) (not (varp arg)))
+                                       `(quote ,arg)
+                                       arg))
+                                  (cdr form)))))
+    ;; Validation: Update functions should only be called in effect contexts
+    (when (and (member (car form) *update-names*)
+               (not (eq flag 'eff)))
+      (error "Update function ~A cannot be called in ~A context" 
+             (car form) flag))
+    `,fn-call))
+
+
+#+ignore (defun translate-function-call (form flag)
+  "Revised function call translation using unified state reference strategy"
+  (check-query/update-call form)
+  (let* ((state-arg (cond
+                     ;; Query functions: pass appropriate state for context
+                     ((member (car form) *query-names*)
+                      'state)
+                     ;; Update functions: always pass state+ (only valid in effect contexts)
+                     ((member (car form) *update-names*)
+                      (if (eq flag 'eff)
+                          'state
+                          (error "Update function ~A cannot be called in ~A context" 
+                                 (car form) flag)))))
+         (fn-call (append (list (car form) state-arg)
+                          (mapcar (lambda (arg)
+                                    (if (and (symbolp arg) (not (varp arg)))
+                                       `(quote ,arg)
+                                       arg))
+                                  (cdr form)))))
+    `,fn-call))
+
+
+
+#+ignore (defun translate-function-call (form flag)
   "Revised function call translation using unified state reference strategy"
   (check-query/update-call form)
   (let* ((state-arg (cond
@@ -238,6 +292,45 @@
 
 
 (defun translate-existential (form flag)
+  "Existential translation with context-dependent semantics.
+   Pre: Query semantics returning T/NIL based on satisfaction
+   Eff: Assertion semantics - assert first satisfying instantiation"
+  (check-form-body form)
+  (let ((parameters (second form))
+        (body (third form)))
+    (check-precondition-parameters parameters)
+    (unless (member (first parameters) *parameter-headers*)
+      (push 'standard parameters))
+    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
+      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+            (type-inst (instantiate-type-spec pre-param-types)))
+        (ecase flag
+          (pre
+           ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
+           (let ((*within-quantifier* t))
+             `(apply #'some (lambda (&rest args)
+                              (destructuring-bind ,pre-param-?vars args
+                                ,(translate body flag)))
+                     ,(if queries
+                        `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                        `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))
+          (eff
+           ;; Assertion semantics - find first satisfying instantiation and assert it
+           `(apply #'some (lambda (&rest args)
+                            (destructuring-bind ,pre-param-?vars args
+                              ;; Check if condition is satisfied for this instantiation
+                              (when ,(let ((*within-quantifier* t))
+                                       (translate body 'pre))
+                                ;; If satisfied, perform the assertion
+                                ,(let ((*within-quantifier* nil))
+                                   (translate body 'eff))
+                                t)))  ; Signal success to terminate 'some
+                   ,(if queries
+                      `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                      `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))))))
+
+
+#+ignore (defun translate-existential (form flag)
   "Existential translation with translation-time quantifier context."
   (check-form-body form)
   (let ((parameters (second form))
@@ -247,15 +340,15 @@
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types))
-            (state-ref (get-state-reference flag)))
+            (type-inst (instantiate-type-spec pre-param-types)))
+            ;(state-ref (get-state-reference flag)))
         ;; Translation-time binding affects the translate call below
         (let ((*within-quantifier* t))
           `(apply #'some (lambda (&rest args)
                            (destructuring-bind ,pre-param-?vars args
                              ,(translate body flag)))  ; Called with *within-quantifier* = t
                   ,(if queries
-                     `(ut::transpose (eval-instantiated-spec ',type-inst ,state-ref))
+                     `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
                      `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))))))
 
 
@@ -271,15 +364,15 @@
       (warn "Found FORALL statement in effect; DOALL is often intended: ~A" form))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types))
-            (state-ref (get-state-reference flag)))
+            (type-inst (instantiate-type-spec pre-param-types)))
+            ;(state-ref (get-state-reference flag)))
         ;; Translation-time binding affects the translate call below
         (let ((*within-quantifier* t))
           `(apply #'every (lambda (&rest args)
                            (destructuring-bind ,pre-param-?vars args
                              ,(translate body flag)))  ; Called with *within-quantifier* = t
                   ,(if queries
-                     `(ut::transpose (eval-instantiated-spec ',type-inst ,state-ref))
+                     `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
                      `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))))))
 
 
@@ -293,8 +386,8 @@
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types))
-            (state-ref (get-state-reference flag)))
+            (type-inst (instantiate-type-spec pre-param-types)))
+            ;(state-ref (get-state-reference flag)))
         ;; Translation-time binding affects the translate call below
         (let ((*within-quantifier* t))
           `(progn
@@ -302,12 +395,40 @@
                             (destructuring-bind ,pre-param-?vars args
                               ,(translate body flag)))  ; Called with *within-quantifier* = t
                     ,(if queries
-                       `(ut::transpose (eval-instantiated-spec ',type-inst ,state-ref))
+                       `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
                        `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))
              t))))))
 
 
 (defun translate-connective (form flag)
+  "Translates logical connectives (and, or, etc.) by recursively translating all operands
+   with consistent context propagation. Preserves the original connective structure while
+   ensuring each operand is translated according to the current context flag.
+   Context Behaviors:
+   - pre: All operands become read operations against original state
+   - eff: All operands follow read/write determination based on syntactic context
+   Read-mode propagation: Connectives preserve current *proposition-read-mode* context,
+   allowing sub-forms to make appropriate read/write decisions.
+   Examples:
+   (and (connected ?a ?b) (color ?a blue))
+   → Precondition: Both operands query state
+   → Effect: Both operands update state (unless in read-mode)"
+  ;; Input validation
+  (check-type form cons "Connective form must be a list")
+  (unless (member (car form) '(and or not))
+    (warn "Translating non-standard connective: ~A" (car form)))
+  (when (< (length form) 2)
+    (error "Connective ~A requires at least one operand in form: ~A" (car form) form))
+  ;; Simplified flag validation - removed context-aware
+  (ecase flag
+    ((pre eff)
+     ;; Preserve connective structure, translate all operands with same context
+     `(,(car form) ,@(mapcar (lambda (operand)
+                               (translate operand flag))
+                             (cdr form))))))
+
+
+#+ignore (defun translate-connective (form flag)
   "Translates logical connectives (and, or, etc.) by recursively translating all operands
    with consistent context propagation. Preserves the original connective structure while
    ensuring each operand is translated according to the current context flag.

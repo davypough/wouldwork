@@ -236,6 +236,29 @@
 
 
 (defun install-query (name args body)
+  "Revised query function installation with read-only semantics"
+  (format t "~&Installing ~A query-fn..." name)
+  (check-query/update-function name args body)
+  (push name *query-names*)
+  (let ((new-$vars (delete-duplicates 
+                     (set-difference (get-all-nonspecial-vars #'$varp body) args))))
+    (setf (symbol-value name)
+      `(lambda (state ,@args)
+         ,(format nil "~A query-fn" name)
+         (declare (ignorable state))
+         (block ,name
+           (let (,@new-$vars)
+             (declare (ignorable ,@new-$vars))
+             ;; Use pre context for read-only query semantics
+             ,(if (eql (car body) 'let)
+                `(let ,(second body)
+                   ,(third body)
+                   ,(translate (fourth body) 'pre))
+                (translate body 'pre))))))
+    (fix-if-ignore '(state) (symbol-value name))))
+
+
+#+ignore (defun install-query (name args body)
   "Revised query function installation with consistent state parameter handling"
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)

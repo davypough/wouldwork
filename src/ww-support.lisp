@@ -392,18 +392,18 @@
                  (collecting (instantiate-type-spec item))))))
 
 
-(defun eval-instantiated-spec (instantiated-pre-type-spec &optional state-or-state+)
+(defun eval-instantiated-spec (instantiated-pre-type-spec &optional state)
   "Receives possibly nested static or dynamic input from instantiate-type-spec,
-   and evaluates it. Works with state, idb, or context-aware parameter."
+   and evaluates it. Works with state, idb parameter."
   (iter (for item in instantiated-pre-type-spec)
         (cond ((member item *parameter-headers*)
                  (collecting item into instantiated-spec))
               ((and (listp item)
                     (member (first item) *query-names*))
-                 (collecting (apply (first item) state-or-state+ (cdr item)) into instantiated-spec))
+                 (collecting (apply (first item) state (cdr item)) into instantiated-spec))
               ((and (listp item)
                     (member (first item) *parameter-headers*))
-                 (collecting (eval-instantiated-spec item state-or-state+) into instantiated-spec))
+                 (collecting (eval-instantiated-spec item state) into instantiated-spec))
               ((listp item)
                  (collecting item into instantiated-spec))
               (t (error "Unexpected item ~A in dynamic-spec ~A" item instantiated-pre-type-spec)))
