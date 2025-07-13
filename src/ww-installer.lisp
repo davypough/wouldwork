@@ -299,7 +299,7 @@
              ,(format nil "~A update-fn" name)
              (declare (ignorable state))
              (let (updated-dbs ,@new-$vars)
-               (declare (ignorable updated-dbs ,@new-$vars))
+               (declare (special changes-list) (ignorable updated-dbs ,@new-$vars))
                ,(translate body 'eff)
                (problem-state.idb state))))
         (setf (symbol-value name)

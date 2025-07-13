@@ -509,7 +509,7 @@
                                           (depth-first (copy-idb (problem-state.idb state)))
                                           (backtracking (nreverse changes-list)))
                                :value 0.0 
-                               :instantiations (list ?block ?target) 
+                               :instantiations (list ,@*eff-param-vars*) 
                                :followups (nreverse followups))
                   updated-dbs)
             ;; revert changes to restore original state
