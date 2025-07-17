@@ -536,7 +536,9 @@
             (push (make-update :changes (case *algorithm*
                                           (depth-first (copy-idb (problem-state.idb state)))
                                           (backtracking changes-list))
-                               :value 0.0 
+                               :value ,(if *objective-value-p*
+                                         '$objective-value
+                                         0.0) 
                                :instantiations (list ,@*eff-param-vars*) 
                                :followups (reverse followups))
                   updated-dbs)
