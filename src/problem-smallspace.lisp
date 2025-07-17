@@ -153,6 +153,31 @@
       (visible-thru-2-dividers? ?area1 ?area2)))
 
 
+(define-query connector-has-valid-line-of-sight? (?connector ?hue)
+  (or 
+    ;; Check direct transmitter connection with current line-of-sight
+    (exists (?t transmitter)
+       (and (connects ?connector ?t)
+            (bind (color ?t $t-hue))
+            (eql $t-hue ?hue)
+            (bind (loc ?connector $c-area))
+            (los? $c-area ?t)))
+    ;; Check if connected to another active connector that has line-of-sight to transmitter
+    (exists (?other-connector connector)
+       (and (different ?other-connector ?connector)
+            (connects ?connector ?other-connector)
+            (active ?other-connector)
+            (bind (color ?other-connector $other-hue))
+            (eql $other-hue ?hue)
+            ;; Verify the other connector has direct transmitter access
+            (exists (?t transmitter)
+              (and (connects ?other-connector ?t)
+                   (bind (color ?t $t2-hue))
+                   (eql $t2-hue ?hue)
+                   (bind (loc ?other-connector $other-area))
+                   (los? $other-area ?t)))))))
+
+
 (define-query connectable? (?area ?terminus)
   (or (los? ?area ?terminus)  ;from connector in area to terminus
       (and (connector ?terminus)
@@ -184,7 +209,7 @@
       (not (color ?connector ?hue))))
 
 
-(define-update activate-receiver! (?receiver)
+#+ignore (define-update activate-receiver! (?receiver)
   (do (active ?receiver)
       (doall (?g gate)
         (if (and (controls ?receiver ?g)
@@ -199,7 +224,48 @@
           (active ?g)))))
 
 
-(define-update chain-activate! (?connector ?hue)
+(define-update chain-activate! (?terminus ?hue)
+  (do
+    ;; Step 1: Activate the terminus based on its type
+    (if (connector ?terminus)
+      (activate-connector! ?terminus ?hue)
+      (if (receiver ?terminus)
+        (do (active ?terminus)
+            ;; Deactivate gates controlled by this receiver
+            (doall (?g gate)
+              (if (and (controls ?terminus ?g)
+                       (active ?g))
+                (not (active ?g)))))))
+    ;; Step 2: Handle cascading effects based on terminus type
+    (if (connector ?terminus)
+      (do
+        ;; Connector activation: activate connected receivers of matching color
+        (doall (?r receiver)
+          (if (and (connects ?terminus ?r)
+                   (not (active ?r))
+                   (bind (color ?r $rhue))
+                   (eql $rhue ?hue))
+            (chain-activate! ?r ?hue)))
+        ;; Connector activation: activate connected connectors
+        (doall (?c connector)
+          (if (and (different ?c ?terminus)
+                   (connects ?terminus ?c)
+                   (not (active ?c)))
+            (chain-activate! ?c ?hue))))
+      (if (receiver ?terminus)
+        ;; Receiver activation: check for newly accessible connectors
+        (doall (?c connector)
+          (if (not (active ?c))
+            (doall (?t transmitter)
+              (if (and (connects ?c ?t)
+                       (bind (color ?t $t-hue))
+                       (eql $t-hue ?hue)
+                       (bind (loc ?c $c-area))
+                       (los? $c-area ?t))
+                (chain-activate! ?c $t-hue)))))))))
+
+
+#+ignore (define-update chain-activate! (?connector ?hue)
   (do (activate-connector! ?connector ?hue)
       (doall (?r receiver)
         (if (and (connects ?connector ?r)
@@ -214,7 +280,54 @@
           (chain-activate! ?c ?hue)))))
 
 
+#+ignore (define-update activate-receiver! (?receiver)
+  (do (active ?receiver)
+      ;; Step 1: Deactivate gates controlled by this receiver
+      (doall (?g gate)
+        (if (and (controls ?receiver ?g)
+                 (active ?g))
+          (not (active ?g))))
+      ;; Step 2: Connector revalidation for newly opened paths
+      (doall (?c connector)
+        (if (not (active ?c))
+          ;; Check for direct transmitter connections with line-of-sight
+          (doall (?t transmitter)
+            (if (and (connects ?c ?t)
+                     (bind (color ?t $t-hue))
+                     (bind (loc ?c $c-area))
+                     (los? $c-area ?t)
+                     (not (active ?c)))  ; Prevent multiple activation
+              (chain-activate! ?c $t-hue)))))))
+
+
+
+
+
 (define-update chain-deactivate! (?connector ?hue)
+  (do 
+    ;; Step 1: Deactivate this connector
+    (deactivate-connector! ?connector ?hue)
+    ;; Step 2: Deactivate receivers that lost power
+    (doall (?r receiver)
+      (if (and (connects ?connector ?r)
+               (not (exists (?c connector)
+                      (and (different ?c ?connector)
+                           (connects ?c ?r)
+                           (active ?c)
+                           (bind (color ?c $c-hue))
+                           (eql $c-hue ?hue)))))
+        (deactivate-receiver! ?r)))
+    ;; Step 3: Connector revalidation
+    (doall (?c connector)
+      (if (and (active ?c)
+               (bind (color ?c $c-hue))
+               (eql $c-hue ?hue))
+        ;; Check if this connector still has valid line-of-sight to power sources
+        (if (not (connector-has-valid-line-of-sight? ?c ?hue))
+          (chain-deactivate! ?c ?hue))))))
+
+
+#+ignore (define-update chain-deactivate! (?connector ?hue)
   (do 
     ;; Step 1: Deactivate this connector
     (deactivate-connector! ?connector ?hue)
@@ -269,7 +382,7 @@
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
           (connects $cargo ?terminus)
-          (if (and (source? ?terminus)  ;(if (setq $hue (hue-if-source? ?terminus))
+          (if (and (source? ?terminus)
                    (bind (color ?terminus $hue)))
             (activate-connector! $cargo $hue))))
 
@@ -285,15 +398,22 @@
   ($cargo ?terminus1 ?terminus2 $area $hue)
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
+          ;; Always establish physical connections
           (connects $cargo ?terminus1)
           (connects $cargo ?terminus2)
-          (bind (color ?terminus1 $hue1))  ;(setq $hue1 (get-hue? ?terminus1))
-          (bind (color ?terminus2 $hue2))  ;(setq $hue2 (get-hue? ?terminus2))
-          (if (or $hue1 $hue2)    ;at least one active
-            (if (eql $hue1 $hue2)  ;both active and the same color
-              (setq $hue $hue1)
-              (if (not (and $hue1 $hue2))  ;both are not active (with different colors)
-                (setq $hue (or $hue1 $hue2)))))
+          ;; Extract source colors systematically
+          (if (source? ?terminus1)
+            (bind (color ?terminus1 $hue1))
+            (setq $hue1 nil))
+          (if (source? ?terminus2)
+            (bind (color ?terminus2 $hue2))
+            (setq $hue2 nil))
+          ;; Determine activation color based on source consensus
+          (if (and $hue1 $hue2)  ; both sources active
+            (if (eql $hue1 $hue2)  ; same color
+              (setq $hue $hue1))  ; activate with consensus color
+            (if (or $hue1 $hue2)  ; exactly one source active
+              (setq $hue (or $hue1 $hue2))))  ; activate with available color
           (if $hue
             (chain-activate! $cargo $hue))))
 
@@ -310,22 +430,35 @@
   ($cargo ?terminus1 ?terminus2 ?terminus3 $area $hue)
   (assert (not (holds me1 $cargo))
           (loc $cargo $area)
+          ;; Always establish physical connections
           (connects $cargo ?terminus1)
           (connects $cargo ?terminus2)
           (connects $cargo ?terminus3)
-          (bind (color ?terminus1 $hue1))
-          (bind (color ?terminus2 $hue2))
-          (bind (color ?terminus3 $hue3))
-          (if (or $hue1 $hue2 $hue3)    ;at least one active
-            (if (eql* $hue1 $hue2 $hue3)  ;exactly three active and the same color
-              (setq $hue $hue1)
-              (if (or (eql $hue1 $hue2)  ;exactly two active and the same color
-                      (eql $hue1 $hue3))
-                (setq $hue $hue1)
-                (if (eql $hue2 $hue3)
-                  (setq $hue $hue2)
-                  (if (not (and $hue1 $hue2 $hue3))  ;all are not active (with different colors)
-                    (setq $hue (or $hue1 $hue2 $hue3)))))))
+          ;; Extract source colors systematically
+          (if (source? ?terminus1)
+            (bind (color ?terminus1 $hue1))
+            (setq $hue1 nil))
+          (if (source? ?terminus2)
+            (bind (color ?terminus2 $hue2))
+            (setq $hue2 nil))
+          (if (source? ?terminus3)
+            (bind (color ?terminus3 $hue3))
+            (setq $hue3 nil))
+          ;; Systematic consensus determination
+          (if (and $hue1 $hue2 $hue3)  ; all three sources active
+            (if (and (eql $hue1 $hue2) (eql $hue2 $hue3))  ; universal consensus
+              (setq $hue $hue1))
+            (if (and $hue1 $hue2)  ; exactly two sources: 1 and 2
+              (if (eql $hue1 $hue2)  ; consensus between active pair
+                (setq $hue $hue1))
+              (if (and $hue1 $hue3)  ; exactly two sources: 1 and 3
+                (if (eql $hue1 $hue3)  ; consensus between active pair
+                  (setq $hue $hue1))
+                (if (and $hue2 $hue3)  ; exactly two sources: 2 and 3
+                  (if (eql $hue2 $hue3)  ; consensus between active pair
+                    (setq $hue $hue2))
+                  ;; exactly one source active
+                  (setq $hue (or $hue1 $hue2 $hue3))))))
           (if $hue
             (chain-activate! $cargo $hue))))
 

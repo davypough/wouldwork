@@ -157,10 +157,10 @@
   "Unified positive relation translation with context-aware read/write determination.
    Automatically detects whether to perform read operations (queries) or write operations (updates)
    based on syntactic context rather than just translation flag."
+  (declare (special changes-list))
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
       `(push (update (problem-state.idb state) ,(translate-list form flag)) changes-list)
-      ;`(update (problem-state.idb state+) ,(translate-list form flag))
       ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
       (translate-proposition form flag)))
 
@@ -168,15 +168,43 @@
 (defun translate-negative-relation (form flag)
   "Unified negative relation translation maintaining read/write context consistency.
    Preserves negation semantics across both query and update operations."
+  (declare (special changes-list))
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
       `(push (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))) changes-list)
-      ;`(update (problem-state.idb state+) (list 'not ,(translate-list (second form) flag)))
       ;; Read operation: All other cases
       `(not ,(translate-positive-relation (second form) flag))))
 
 
 (defun translate-function-call (form flag)
+  "Corrected function call translation with robust update function detection"
+  (check-query/update-call form)
+  (let* ((function-name (car form))
+         (state-arg 'state)
+         (fn-call (append (list function-name state-arg)
+                          (mapcar (lambda (arg)
+                                    (if (and (symbolp arg) (not (varp arg)))
+                                       `(quote ,arg)
+                                       arg))
+                                  (cdr form)))))
+    ;; Enhanced validation with robust update function detection
+    (when (and (update-function-p function-name)
+               (not (eq flag 'eff)))
+      (error "Update function ~A cannot be called in ~A context" 
+             function-name flag))
+    `,fn-call))
+
+
+(defun update-function-p (function-name)
+  "Robust update function detection using multiple criteria"
+  (or (member function-name *update-names*)
+      (and (symbolp function-name)
+           (let ((name-string (symbol-name function-name)))
+             (and (> (length name-string) 0)
+                  (char= (char name-string (1- (length name-string))) #\!))))))
+
+
+#+ignore (defun translate-function-call (form flag)
   "Simplified function call translation with unified state reference strategy"
   (check-query/update-call form)
   (let* ((state-arg 'state)  ; Unified state reference for all contexts
@@ -499,7 +527,7 @@
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
     (pre `(let (changes-list)
-            (declare (special changes-list))
+            (declare (special changes-list))  ;pass to any included update functions
             ,@(mapcar (lambda (statement)
                         ;; Bind read-mode to nil only for direct assert statements
                         (let ((*proposition-read-mode* nil))
@@ -507,33 +535,14 @@
                       (cdr form))
             (push (make-update :changes (case *algorithm*
                                           (depth-first (copy-idb (problem-state.idb state)))
-                                          (backtracking (nreverse changes-list)))
+                                          (backtracking changes-list))
                                :value 0.0 
                                :instantiations (list ,@*eff-param-vars*) 
-                               :followups (nreverse followups))
+                               :followups (reverse followups))
                   updated-dbs)
             ;; revert changes to restore original state
-            (revert-updates (problem-state.idb state) (nreverse changes-list))
+            (revert-updates (problem-state.idb state) changes-list)
             updated-dbs))))
-
-
-#+ignore (defun translate-assert (form flag)
-  "Translates an assert statement with selective write-mode context."
-  (ecase flag
-    (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let ((state+ (copy-problem-state state)))
-            ,@(mapcar (lambda (statement)
-                        ;; Bind read-mode to nil only for direct assert statements
-                        (let ((*proposition-read-mode* nil))
-                          (translate statement 'eff)))
-                      (cdr form))
-            (push (make-update :changes (problem-state.idb state+)
-                               :value ,(if *objective-value-p*
-                                         '$objective-value
-                                         0.0)
-                               :instantiations (list ,@*eff-param-vars*)
-                               :followups (nreverse followups))
-                  updated-dbs)))))
 
 
 (defun translate-do (form flag)

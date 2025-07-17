@@ -267,7 +267,92 @@
       finally (return db)))
 
 
+#+ignore (defun update (db literal)
+  "Single add or delete from db. Returns the original literal for change tracking."
+  (declare (type hash-table db))
+  (let ((original-entry nil))
+    (if (eql (car literal) 'not)
+        (progn
+          (setf original-entry (second literal))
+          (delete-proposition (second literal) db))
+        (progn
+          ;; Capture the original value before overwriting
+          (multiple-value-bind (vals present-p)
+              (gethash (butlast literal) db)
+            (when present-p
+              (setf original-entry (append (butlast literal) vals))))
+          (add-proposition literal db)))
+    ;; Return the original entry for proper restoration tracking
+    (or original-entry `(not ,literal))))
+
+
 (defun update (db literal)
+  "Single add or delete from db.
+Returns the restoring proposition for change tracking."
+  (declare (type hash-table db))
+  (when *print-updates*
+    (ut::prt literal))
+  (if (eql (car literal) 'not)
+      ;; Negative literal: delete from database
+      (let ((proposition (second literal)))
+        (if (get-prop-fluent-indices proposition)
+            ;; Negative fluent: capture current database value before deletion
+            (let* ((fluentless-prop (get-fluentless-prop proposition))
+                   (int-db (eql (hash-table-test db) 'eql))
+                   (key (if int-db (convert-to-integer fluentless-prop) fluentless-prop)))
+              (multiple-value-bind (vals present-p)
+                  (gethash key db)
+                (delete-proposition proposition db)
+                (when present-p
+                  ;; Reconstruct current database proposition for restoration
+                  (let ((restored-prop (copy-list fluentless-prop)))
+                    (loop for index in (get-prop-fluent-indices proposition)
+                          for val in vals
+                          do (ut::ninsert-list val index restored-prop))
+                    restored-prop))))
+            ;; Negative non-fluent: return positive form for restoration
+            (progn
+              (delete-proposition proposition db)
+              proposition)))
+      ;; Positive literal: add to database
+      (progn
+        (if (get-prop-fluent-indices literal)
+            ;; Positive fluent: capture current database value before overwriting
+            (let* ((fluentless-prop (get-fluentless-prop literal))
+                   (int-db (eql (hash-table-test db) 'eql))
+                   (key (if int-db (convert-to-integer fluentless-prop) fluentless-prop)))
+              (multiple-value-bind (vals present-p)
+                  (gethash key db)
+                (add-proposition literal db)
+                (if present-p
+                    ;; Reconstruct original proposition for restoration
+                    (let ((restored-prop (copy-list fluentless-prop)))
+                      (loop for index in (get-prop-fluent-indices literal)
+                            for val in vals
+                            do (ut::ninsert-list val index restored-prop))
+                      restored-prop)
+                    ;; No original value - return negation to delete during revert
+                    (let ((result `(not ,literal)))
+                      result))))
+            ;; Positive non-fluent: return negation for restoration
+            (progn
+              (add-proposition literal db)
+              (let ((result `(not ,literal)))
+                result))))))
+
+
+(defun revert-updates (db changes-list)
+  "Undoes a list of changes to restore database to previous state"
+  (declare (type hash-table db))
+  (dolist (change changes-list)
+    (when change  ; Skip nil values from non-existent database entries
+      (if (eql (car change) 'not)
+          (delete-proposition (second change) db)
+          (add-proposition change db))))
+  db)
+
+
+#+ignore (defun update (db literal)
   "Single add or delete from db. Returns the literal for change tracking."
   (declare (type hash-table db))
   (when *print-updates*
@@ -278,18 +363,7 @@
   literal)
 
 
-#+ignore (defun update (db literal)
-  "Single add or delete from db."
-  (declare (type hash-table db))
-  (when *print-updates*
-    (ut::prt literal))
-  (if (eql (car literal) 'not)
-    (delete-proposition (second literal) db)
-    (add-proposition literal db))
-  db)
-
-
-(defun revert-updates (db changes-list)
+#+ignore (defun revert-updates (db changes-list)
   "Undoes a list of changes to restore database to previous state"
   (declare (type hash-table db))
   (dolist (change changes-list)
