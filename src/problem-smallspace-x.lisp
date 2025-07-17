@@ -78,10 +78,6 @@
   (visible2 area divider divider area))
 
 
-;(define-complementary-relations  
-;  (holds me $cargo) -> (not (free me)))
-
-
 ;;;; QUERY FUNCTIONS ;;;;
 
 
@@ -209,7 +205,7 @@
       (not (color ?connector ?hue))))
 
 
-#+ignore (define-update activate-receiver! (?receiver)
+(define-update activate-receiver! (?receiver)
   (do (active ?receiver)
       (doall (?g gate)
         (if (and (controls ?receiver ?g)
@@ -224,7 +220,22 @@
           (active ?g)))))
 
 
-(define-update chain-activate! (?terminus ?hue)
+(define-update chain-activate! (?connector ?hue)
+  (do (activate-connector! ?connector ?hue)
+      (doall (?r receiver)
+        (if (and (connects ?connector ?r)
+                 (not (active ?r))
+                 (bind (color ?r $rhue))
+                 (eql $rhue ?hue))
+          (activate-receiver! ?r)))
+      (doall (?c connector)
+        (if (and (different ?c ?connector)
+                 (connects ?connector ?c)
+                 (not (active ?c)))
+          (chain-activate! ?c ?hue)))))
+
+
+#+ignore (define-update chain-activate! (?terminus ?hue)
   (do
     ;; Step 1: Activate the terminus based on its type
     (if (connector ?terminus)
@@ -265,44 +276,6 @@
                 (chain-activate! ?c $t-hue)))))))))
 
 
-#+ignore (define-update chain-activate! (?connector ?hue)
-  (do (activate-connector! ?connector ?hue)
-      (doall (?r receiver)
-        (if (and (connects ?connector ?r)
-                 (not (active ?r))
-                 (bind (color ?r $rhue))
-                 (eql $rhue ?hue))
-          (activate-receiver! ?r)))
-      (doall (?c connector)
-        (if (and (different ?c ?connector)
-                 (connects ?connector ?c)
-                 (not (active ?c)))
-          (chain-activate! ?c ?hue)))))
-
-
-#+ignore (define-update activate-receiver! (?receiver)
-  (do (active ?receiver)
-      ;; Step 1: Deactivate gates controlled by this receiver
-      (doall (?g gate)
-        (if (and (controls ?receiver ?g)
-                 (active ?g))
-          (not (active ?g))))
-      ;; Step 2: Connector revalidation for newly opened paths
-      (doall (?c connector)
-        (if (not (active ?c))
-          ;; Check for direct transmitter connections with line-of-sight
-          (doall (?t transmitter)
-            (if (and (connects ?c ?t)
-                     (bind (color ?t $t-hue))
-                     (bind (loc ?c $c-area))
-                     (los? $c-area ?t)
-                     (not (active ?c)))  ; Prevent multiple activation
-              (chain-activate! ?c $t-hue)))))))
-
-
-
-
-
 (define-update chain-deactivate! (?connector ?hue)
   (do 
     ;; Step 1: Deactivate this connector
@@ -325,47 +298,6 @@
         ;; Check if this connector still has valid line-of-sight to power sources
         (if (not (connector-has-valid-line-of-sight? ?c ?hue))
           (chain-deactivate! ?c ?hue))))))
-
-
-#+ignore (define-update chain-deactivate! (?connector ?hue)
-  (do 
-    ;; Step 1: Deactivate this connector
-    (deactivate-connector! ?connector ?hue)
-    ;; Step 2: Deactivate receivers that lost power
-    (doall (?r receiver)
-      (if (and (connects ?connector ?r)
-               (not (exists (?c connector)
-                      (and (different ?c ?connector)
-                           (connects ?c ?r)
-                           (active ?c)
-                           (bind (color ?c $c-hue))
-                           (eql $c-hue ?hue)))))
-        (deactivate-receiver! ?r)))
-    ;; Step 3: For each connected connector, check ALL possible power paths
-    ;; Including direct transmission paths and paths through other active connectors
-    (doall (?c connector)
-      (if (and (connects ?connector ?c)
-               (different ?c ?connector))  ;; Prevent direct self-reference
-        ;; Start a careful power source check
-        (if (not (or 
-                  ;; Check direct transmitter connection
-                  (exists (?t transmitter)
-                     (and (connects ?c ?t)
-                          (bind (color ?t $t-hue))
-                          (eql $t-hue ?hue)))
-                  ;; Check connection to another active connector (not the one being picked up)
-                  (exists (?other-connector connector)
-                     (and (different ?other-connector ?connector)
-                          (different ?other-connector ?c)
-                          (connects ?c ?other-connector)
-                          (active ?other-connector)
-                          (bind (color ?other-connector $other-hue))
-                          (eql $other-hue ?hue)))))
-            ;; No alternative power source found, recursively deactivate
-            (do
-              ;; Break the connection before recursion to avoid infinite recursion
-              (not (connects ?connector ?c))
-              (chain-deactivate! ?c ?hue)))))))
 
 
 ;;;; ACTIONS ;;;;
