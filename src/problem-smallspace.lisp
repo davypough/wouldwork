@@ -205,14 +205,6 @@
       (not (color ?connector ?hue))))
 
 
-(define-update activate-receiver! (?receiver)
-  (do (active ?receiver)
-      (doall (?g gate)
-        (if (and (controls ?receiver ?g)
-                 (active ?g))
-          (not (active ?g))))))
-
-
 (define-update deactivate-receiver! (?receiver)
   (do (not (active ?receiver))
       (doall (?g gate)
@@ -220,29 +212,13 @@
           (active ?g)))))
 
 
-(define-update chain-activate! (?connector ?hue)
-  (do (activate-connector! ?connector ?hue)
-      (doall (?r receiver)
-        (if (and (connects ?connector ?r)
-                 (not (active ?r))
-                 (bind (color ?r $rhue))
-                 (eql $rhue ?hue))
-          (activate-receiver! ?r)))
-      (doall (?c connector)
-        (if (and (different ?c ?connector)
-                 (connects ?connector ?c)
-                 (not (active ?c)))
-          (chain-activate! ?c ?hue)))))
-
-
-#+ignore (define-update chain-activate! (?terminus ?hue)
+(define-update chain-activate! (?terminus ?hue)
   (do
     ;; Step 1: Activate the terminus based on its type
     (if (connector ?terminus)
       (activate-connector! ?terminus ?hue)
       (if (receiver ?terminus)
         (do (active ?terminus)
-            ;; Deactivate gates controlled by this receiver
             (doall (?g gate)
               (if (and (controls ?terminus ?g)
                        (active ?g))
@@ -263,17 +239,18 @@
                    (connects ?terminus ?c)
                    (not (active ?c)))
             (chain-activate! ?c ?hue))))
+      ;; Handle receiver activation branch
       (if (receiver ?terminus)
-        ;; Receiver activation: check for newly accessible connectors
-        (doall (?c connector)
-          (if (not (active ?c))
-            (doall (?t transmitter)
-              (if (and (connects ?c ?t)
-                       (bind (color ?t $t-hue))
-                       (eql $t-hue ?hue)
-                       (bind (loc ?c $c-area))
-                       (los? $c-area ?t))
-                (chain-activate! ?c $t-hue)))))))))
+          ;; Receiver activation: check for newly accessible connectors
+          (doall (?c connector)
+            (if (not (active ?c))
+              (doall (?t transmitter)
+                (if (and (connects ?c ?t)
+                         (bind (color ?t $t-hue))
+                         (eql $t-hue ?hue)
+                         (bind (loc ?c $c-area))
+                         (los? $c-area ?t))
+                  (chain-activate! ?c $t-hue)))))))))
 
 
 (define-update chain-deactivate! (?connector ?hue)

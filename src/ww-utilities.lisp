@@ -32,6 +32,25 @@
           ,@(last `,forms)))
 
 
+(defmacro prt-if (&rest args)
+  "Conditional prt--eg, (ut::prt-if (?x 3) (?y 'abc) (ut::prt 'printing-x&y ?x ?y))"
+  (let ((conditions '())
+        (body-expr (car (last args))))
+    ;; Parse condition pairs from beginning
+    (loop for arg in (butlast args)
+          do (assert (and (listp arg) (= (length arg) 2)) ()
+                     "Each condition must be a 2-element list: ~A" arg)
+             (push arg conditions))
+    ;; Validate requirements
+    (assert (> (length conditions) 0) () "At least one condition required")
+    (assert body-expr () "Body expression required")
+    ;; Generate conditional execution
+    `(when (and ,@(mapcar (lambda (condition)
+                           `(eql ,(first condition) ,(second condition)))
+                         (reverse conditions)))
+       ,body-expr)))
+
+
 (defmacro mvb (vars values-form &rest body)
   "Abbreviation for multiple-value-bind."
   `(multiple-value-bind ,vars ,values-form ,@body))
