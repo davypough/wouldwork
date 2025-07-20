@@ -49,7 +49,7 @@
 
 (defun simple-break ()
   "Call to simplify debugger printout on a break."
-  (declare (optimize (debug 0)))
+  (declare (optimize (debug 1)))
   (break))
 
 
@@ -345,8 +345,10 @@
 
 (defun idb-to-sorted-alist (idb-hash-table)
   "Converts an IDB hash table to a sorted alist using Alexandria."
-  (sort (alexandria:hash-table-alist idb-hash-table)
-        #'< :key #'car))  ; Sort by fixnum keys
+  (ut::merge-sort-list (alexandria:hash-table-alist idb-hash-table)
+                       :pred #'< :key #'car))
+  ;(sort (alexandria:hash-table-alist idb-hash-table)
+  ;      #'< :key #'car))  ; Sort by fixnum keys
 
 
 (defun get-closed-values (idb)

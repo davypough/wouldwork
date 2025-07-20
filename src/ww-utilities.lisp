@@ -305,3 +305,23 @@
   (let* ((x.y-string (string x.y))
          (index (position #\. x.y-string :test #'char=)))
     (values (intern (subseq x.y-string 0 index)) (intern (subseq x.y-string (1+ index))))))
+
+
+(defun merge-sort-list (list &key (pred #'<) (key #'identity))
+  (labels ((ms (l)
+             (if (null (cdr l))
+                 l
+                 (let* ((len (length l))
+                        (half (floor len 2))
+                        (l1 (subseq l 0 half))
+                        (l2 (subseq l half)))
+                   (merge-list (ms l1) (ms l2)))))
+           (merge-list (a b)
+             (cond
+               ((null a) b)
+               ((null b) a)
+               ((funcall pred (funcall key (first a))
+                         (funcall key (first b)))
+                (cons (first a) (merge-list (rest a) b)))
+               (t (cons (first b) (merge-list a (rest b)))))))
+    (ms list)))
