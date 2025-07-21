@@ -11,11 +11,11 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* first)  ;min-length)
+(ww-set *solution-type* min-length)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 20)
 
 
 (define-types  ;types for smallspace
