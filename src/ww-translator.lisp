@@ -19,14 +19,6 @@
    When NIL, IF statements preserve natural value-returning semantics.")
 
 
-#+ignore (defun get-state-reference (flag)
-  "Centralized state reference determination"
-  (ecase flag
-    (pre 'state)  ;for precondition and effect statements outside of assert statements
-    (eff 'state+)  ;for effect statements inside assert statements
-    (context-aware 'state-or-state+)))  ;for query functions only
-
-
 (defun get-database-reference (form flag)
   "Determines appropriate database reference for proposition evaluation.
    Handles static relations, dynamic relations, and happening contexts consistently."
@@ -38,32 +30,6 @@
           `(problem-state.idb state))  ; Unified state reference
       ;; Static relation - always use static database
       '*static-db*))
-
-
-#+ignore (defun get-database-reference (form flag)
-  "Determines appropriate database reference for proposition evaluation.
-   Handles static relations, dynamic relations, and happening contexts consistently."
-  (if (gethash (car form) *relations*)
-      ;; Dynamic relation - check for happening context
-      (if *happening-names*
-          '(merge-idb-hidb state)
-          `(problem-state.idb state))  ;,(get-state-reference flag)))
-      ;; Static relation - always use static database
-      '*static-db*))
-
-
-#+ignore (defun get-function-state-parameter (function-name flag)
-  "Determines appropriate state parameter for function calls based on function type and context.
-   Query functions use context-aware selection, update functions use direct context mapping."
-  (cond
-    ;; Query functions: Always use context-aware runtime selection
-    ((member function-name *query-names*)
-     '(state-or-state+))
-    ;; Update functions
-    ((member function-name *update-names*)
-     '(state+))
-    ;; Unknown function type: Error condition
-    (t (error "Function ~A is neither a query nor update function" function-name))))
 
 
 (defun generate-fluent-bindings (prop-fluents)
@@ -160,7 +126,9 @@
   (declare (special changes-list))
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
-      `(push (update (problem-state.idb state) ,(translate-list form flag)) changes-list)
+      (case *algorithm*
+        (depth-first `(update (problem-state.idb state) ,(translate-list form flag)))
+        (backtracking `(push (update-bt (problem-state.idb state) ,(translate-list form flag)) changes-list)))
       ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
       (translate-proposition form flag)))
 
@@ -171,7 +139,10 @@
   (declare (special changes-list))
   (if (write-operation-p flag)
       ;; Write operation: Effect context and not in forced read-mode
-      `(push (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))) changes-list)
+      (case *algorithm*
+        (depth-first `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
+        (backtracking `(push (update-bt (problem-state.idb state)
+                                        (list 'not ,(translate-list (second form) flag))) changes-list)))
       ;; Read operation: All other cases
       `(not ,(translate-positive-relation (second form) flag))))
 
@@ -358,28 +329,6 @@
                       `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))))))
 
 
-#+ignore (defun translate-existential (form flag)
-  "Existential translation with translation-time quantifier context."
-  (check-form-body form)
-  (let ((parameters (second form))
-        (body (third form)))
-    (check-precondition-parameters parameters)
-    (unless (member (first parameters) *parameter-headers*)
-      (push 'standard parameters))
-    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
-            ;(state-ref (get-state-reference flag)))
-        ;; Translation-time binding affects the translate call below
-        (let ((*within-quantifier* t))
-          `(apply #'some (lambda (&rest args)
-                           (destructuring-bind ,pre-param-?vars args
-                             ,(translate body flag)))  ; Called with *within-quantifier* = t
-                  ,(if queries
-                     `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
-                     `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))))))
-
-
 (defun translate-universal (form flag)
   "Universal translation with translation-time quantifier context."
   (check-form-body form)
@@ -456,36 +405,6 @@
                              (cdr form))))))
 
 
-#+ignore (defun translate-connective (form flag)
-  "Translates logical connectives (and, or, etc.) by recursively translating all operands
-   with consistent context propagation. Preserves the original connective structure while
-   ensuring each operand is translated according to the current context flag.
-   Context Behaviors:
-   - pre: All operands become read operations against original state
-   - eff: All operands follow read/write determination based on syntactic context
-   - context-aware: All operands adapt to runtime state selection
-   Read-mode propagation: Connectives preserve current *proposition-read-mode* context,
-   allowing sub-forms to make appropriate read/write decisions.
-   Examples:
-   (and (connected ?a ?b) (color ?a blue))
-   → Precondition: Both operands query state
-   → Effect: Both operands update state+ (unless in read-mode)
-   → Condition: Both operands query appropriate state"
-  ;; Input validation
-  (check-type form cons "Connective form must be a list")
-  (unless (member (car form) '(and or not))
-    (warn "Translating non-standard connective: ~A" (car form)))
-  (when (< (length form) 2)
-    (error "Connective ~A requires at least one operand in form: ~A" (car form) form))
-  ;; Consistent flag validation with other translation functions
-  (ecase flag
-    ((pre eff context-aware)
-     ;; Preserve connective structure, translate all operands with same context
-     `(,(car form) ,@(mapcar (lambda (operand)
-                               (translate operand flag))
-                             (cdr form))))))
-
-
 (defun translate-conditional (form flag)
   "Conditional translation with proper read-mode isolation."
   ;; Input validation
@@ -523,7 +442,26 @@
 
 
 (defun translate-assert (form flag)
-  "Translates an assert statement with selective write-mode context."
+  "For depth-first, translates an assert statement with selective write-mode context."
+  (ecase flag
+    (eff (error "Nested ASSERT statements not allowed:~%~A" form))
+    (pre `(let ((state (copy-problem-state state)))
+            ,@(mapcar (lambda (statement)
+                        ;; Bind read-mode to nil only for direct assert statements
+                        (let ((*proposition-read-mode* nil))
+                          (translate statement 'eff)))
+                      (cdr form))
+            (push (make-update :changes (problem-state.idb state)
+                               :value ,(if *objective-value-p*
+                                         '$objective-value
+                                         0.0)
+                               :instantiations (list ,@*eff-param-vars*)
+                               :followups (nreverse followups))
+                  updated-dbs)))))
+
+
+(defun translate-assert-bt (form flag)
+  "For backtracking, translates an assert statement with selective write-mode context."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
     (pre `(let (changes-list)
@@ -533,9 +471,7 @@
                         (let ((*proposition-read-mode* nil))
                           (translate statement 'eff)))
                       (cdr form))
-            (push (make-update :changes (case *algorithm*
-                                          (depth-first (copy-idb (problem-state.idb state)))
-                                          (backtracking changes-list))
+            (push (make-update :changes changes-list
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0) 
@@ -543,7 +479,7 @@
                                :followups (reverse followups))
                   updated-dbs)
             ;; revert changes to restore original state
-            (revert-updates (problem-state.idb state) changes-list)
+            (revert-updates (problem-state.idb *backtrack-state*) changes-list)
             updated-dbs))))
 
 
@@ -602,6 +538,7 @@
 ;             (collect `(,(first clause) ,@(iter (for statement in (rest clause))
 ;                                            (collect (translate statement flag)))))))
 
+
 (defun translate-print (form flag)
   "Translates a print statement for debugging actions."
   `(print ,(let ((*proposition-read-mode* t))
@@ -634,7 +571,9 @@
   (cond ((atom form) form)  ;atom or (always-true) translates as itself
         ((null form) t)  ;if form=nil simply continue processing
         ((equal form '(always-true)) (translate-simple-atom form flag))
-        ((eql (car form) 'assert) (translate-assert form flag))
+        ((eql (car form) 'assert) (case *algorithm*
+                                    (depth-first (translate-assert form flag))
+                                    (backtracking (translate-assert-bt form flag))))
         ((member (car form) '(forsome exists exist)) (translate-existential form flag))  ;specialty first
         ((member (car form) '(forall forevery)) (translate-universal form flag)) ;removed every
         ((member (car form) '(finally next)) (translate-followup form flag))
