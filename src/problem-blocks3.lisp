@@ -16,6 +16,8 @@
 
 (ww-set *tree-or-graph* tree)  ;fast, don't bother to check for repeated states
 
+(ww-set *depth-cutoff* 5)
+
 
 (define-types
     block (A B C)
@@ -37,8 +39,8 @@
   (standard ?block block (?block-support ?target) support)  ;standard (optional) means ?block /= ?support /= ?target 
   (and (cleartop? ?block)          ;there is no other block on ?block
        (on ?block ?block-support)  ;?block is on some ?support
-       (and (block ?target)        ;?target is a block (not the table) and
-            (cleartop? ?target)))  ;there is no block on the ?target block
+       (or (and (block ?target) (cleartop? ?target))  ;there is no block on the ?target block
+           (table ?target)))                          ;or the ?target is the table
   (?block ?target)                 ;the action description will be (put ?block ?target)
   (assert (on ?block ?target)      ;new assertion added to state
           (not (on ?block ?block-support))))  ;previous assertion removed from state
