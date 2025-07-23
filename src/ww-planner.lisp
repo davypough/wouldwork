@@ -128,8 +128,8 @@
           ;        (funcall (symbol-function 'heuristic?) child-state))))
           ;  (alexandria:appendf children child-states)))))
           (let ((child-states (case *algorithm*
-                                (depth-first (get-new-states state action updated-dbs))
-                                (backtracking updated-dbs))))
+                                (depth-first (get-new-states state action updated-dbs))  ;return new states
+                                (backtracking updated-dbs))))  ;return update structures
             ;; Apply heuristics only for depth-first (complete states)
             (when (and (eql *algorithm* 'depth-first) (fboundp 'heuristic?))
               (dolist (child-state child-states)
