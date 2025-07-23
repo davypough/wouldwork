@@ -157,9 +157,9 @@
             #+:ww-debug (when (>= *debug* 4)
                           (if net-state
                             (when (and (boundp 'constraint-fn) (symbol-value 'constraint-fn))
-                              (format t "~&  ***NO CONSTRAINT VIOLATION"))
+                              (format t "~&  ***NO CONSTRAINT VIOLATION~%"))
                             (when (and (boundp 'constraint-fn) (symbol-value 'constraint-fn))
-                              (format t "~&  ***CONSTRAINT VIOLATED"))))
+                              (format t "~&  ***CONSTRAINT VIOLATED~%"))))
             (when new-state
               (list (setf new-state 
                           (process-followups act-state updated-db)))))))
