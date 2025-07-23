@@ -258,29 +258,6 @@
     (fix-if-ignore '(state) (symbol-value name))))
 
 
-#+ignore (defun install-query (name args body)
-  "Revised query function installation with consistent state parameter handling"
-  (format t "~&Installing ~A query-fn..." name)
-  (check-query/update-function name args body)
-  (push name *query-names*)
-  (let ((new-$vars (delete-duplicates 
-                     (set-difference (get-all-nonspecial-vars #'$varp body) args))))
-    (setf (symbol-value name)
-      `(lambda (state ,@args)
-         ,(format nil "~A query-fn" name)
-         (declare (ignorable state))
-         (block ,name
-           (let (,@new-$vars)
-             (declare (ignorable ,@new-$vars))
-             ;; Create dynamic binding for context-aware translation
-             ,(if (eql (car body) 'let)
-                `(let ,(second body)
-                   ,(third body)
-                   ,(translate (fourth body) 'context-aware))
-                (translate body 'context-aware))))))
-    (fix-if-ignore '(state) (symbol-value name))))
-
-
 (defmacro define-update (name args body)
   `(install-update ',name ',args ',body))
 
@@ -297,7 +274,7 @@
         (setf (symbol-value name)
           `(lambda (state ,@args)
              ,(format nil "~A update-fn" name)
-             (declare (special changes-list) (ignorable state))
+             (declare (special changes-list) (ignorable state))  ;changes-list only used if backtracking
              (let (updated-dbs ,@new-$vars)
                (declare (ignorable updated-dbs ,@new-$vars))
                ,(translate body 'eff)

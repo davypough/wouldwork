@@ -314,19 +314,14 @@
                         `(ut::transpose (eval-instantiated-spec ',type-inst state))
                         `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))
           (eff
-           ;; Assertion semantics - find first satisfying instantiation and assert it
-           `(apply #'some (lambda (&rest args)
-                            (destructuring-bind ,pre-param-?vars args
-                              ;; Check if condition is satisfied for this instantiation
-                              (when ,(let ((*within-quantifier* t))
-                                       (translate body 'pre))
-                                ;; If satisfied, perform the assertion
-                                ,(let ((*within-quantifier* nil))
-                                   (translate body 'eff))
-                                t)))  ; Signal success to terminate 'some
-                   ,(if queries
-                      `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                      `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))))))
+            ;; Assertion semantics - execute body for suitable instantiations
+            `(apply #'some (lambda (&rest args)
+                             (destructuring-bind ,pre-param-?vars args
+                                 ,(let ((*within-quantifier* t))
+                               (translate body 'eff))))
+                           ,(if queries
+                              `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                              `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))))))
 
 
 (defun translate-universal (form flag)
@@ -407,38 +402,55 @@
 
 (defun translate-conditional (form flag)
   "Conditional translation with proper read-mode isolation."
-  ;; Input validation
   (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
             (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
     (error "AND not allowed in <then> or <else> clause of IF statement; use DO: ~A" form))
   ;; Test translation with forced read-mode
   (let ((test-translation (let ((*proposition-read-mode* t))
                             (translate (second form) flag))))
-    (if *within-quantifier*
-        ;; Quantifier context with proper forall semantics
-        (if (fourth form)
-            ;; Explicit else clause exists - return actual values from both branches
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (third form) flag))
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (fourth form) flag)))
-            ;; No explicit else - implicit else should be t for forall semantics
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (third form) flag))
-               t))  ; Neutral element for universal quantification
-        ;; Value context remains unchanged
-        (if (fourth form)
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (third form) flag))
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (fourth form) flag)))
-            `(if ,test-translation
-               ,(let ((*proposition-read-mode* nil))
-                  (translate (third form) flag))
-               nil)))))
+    (cond
+      ;; Special case: Effect context within quantifiers - ensure T return for success
+      ((and (eq flag 'eff) *within-quantifier*)
+       (if (fourth form)
+           ;; Explicit else clause exists
+           `(if ,test-translation
+              (progn ,(let ((*proposition-read-mode* nil))
+                        (translate (third form) flag)) t)
+              (progn ,(let ((*proposition-read-mode* nil))
+                        (translate (fourth form) flag)) t))
+           ;; No explicit else - return t for success, nil for no-match
+           `(if ,test-translation
+              (progn ,(let ((*proposition-read-mode* nil))
+                        (translate (third form) flag)) t)
+              nil)))
+      
+      ;; Quantifier context with proper forall semantics (non-effect cases)
+      (*within-quantifier*
+       (if (fourth form)
+           ;; Explicit else clause exists - return actual values from both branches
+           `(if ,test-translation
+              ,(let ((*proposition-read-mode* nil))
+                 (translate (third form) flag))
+              ,(let ((*proposition-read-mode* nil))
+                 (translate (fourth form) flag)))
+           ;; No explicit else - implicit else should be t for forall semantics
+           `(if ,test-translation
+              ,(let ((*proposition-read-mode* nil))
+                 (translate (third form) flag))
+              t)))  ; Neutral element for universal quantification
+      
+      ;; Value context - standard conditional behavior
+      (t
+       (if (fourth form)
+           `(if ,test-translation
+              ,(let ((*proposition-read-mode* nil))
+                (translate (third form) flag))
+              ,(let ((*proposition-read-mode* nil))
+                (translate (fourth form) flag)))
+           `(if ,test-translation
+              ,(let ((*proposition-read-mode* nil))
+                (translate (third form) flag))
+              nil))))))
 
 
 (defun translate-assert (form flag)
