@@ -10,13 +10,18 @@
   `(progn
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
-       ((*depth-cutoff* *tree-or-graph* *solution-type* *algorithm*
-         *progress-reporting-interval* *randomize-search* *branch*)
+       ((*depth-cutoff* *solution-type* *progress-reporting-interval* *randomize-search* *branch*)
           (setf ,param ',val)
           (unless *ww-loading*
-            (save-globals))
-          ',val)
-       (*debug*
+            (save-globals)
+            (display-current-parameters)))
+       (*tree-or-graph*
+         (when (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
+           (error "When *algorithm* is backtracking, *tree-or-graph* must be set to tree."))
+         (setf ,param ',val)
+         (unless *ww-loading*
+           (display-current-parameters)))
+       (*debug*  ;need to recompile
          (when *ww-loading*
            (error "Please remove (ww-set *debug* ~S) from the current problem specification file.
                    Instead, enter it at the REPL after loading/staging)." ',val))
@@ -24,6 +29,12 @@
          (if (or (> *debug* 0) *probe*)
            (pushnew :ww-debug *features*)
            (setf *features* (remove :ww-debug *features*)))
+         (save-globals)
+         (with-silenced-compilation
+           (asdf:compile-system :wouldwork :force t)
+           (asdf:load-system :wouldwork)))
+       (*algorithm*  ;need to recompile for new translations
+         (setf ,param ',val)
          (save-globals)
          (with-silenced-compilation
            (asdf:compile-system :wouldwork :force t)
@@ -40,7 +51,8 @@
              (setf *counter* count)
              (unless *ww-loading*
                (save-globals))))
-         ',val)
+         (unless *ww-loading*
+           (display-current-parameters)))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

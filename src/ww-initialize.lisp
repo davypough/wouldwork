@@ -66,7 +66,12 @@
       (save-globals)))  ;save globals for new problem.lisp into vals.lisp
   (when (eq *problem-name* 'unspecified)
     (format t "~2%Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
+  (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))
+    (setf *tree-or-graph* 'tree)
+    (format t "~%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
   (display-current-parameters)
+  (when (and (eq *algorithm* 'backtracking) (<= *depth-cutoff* 0))
+             (format t "~%With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~2%"))
   (setf *ww-loading* nil))
 
 
@@ -83,24 +88,6 @@
       (setf instantiations nil)
       (setf name 'start)))
   (do-init-action-updates *start-state*))  ;updates start-state db & static-db, but not idb & hidb yet
-
-
-(defun display-current-parameters ()
-  (format t "~2%Current parameter settings:")
-  (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
-           *depth-cutoff* *progress-reporting-interval*
-           *threads* *randomize-search* *debug* *probe*)
-  (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
-  (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
-  (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
-  (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
-  (terpri) (terpri))
-
-
-(defun display-all ()  ;alias
-  (display-current-parameters))
-(defun params ()  ;alias
-  (display-current-parameters))
 
   
 (init)

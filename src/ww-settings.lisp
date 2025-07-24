@@ -41,6 +41,24 @@
       5 - display full nodes + break after each expansion cycle"))
 
 
+(defun display-current-parameters ()
+  (format t "~2%Current parameter settings:")
+  (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
+           *depth-cutoff* *progress-reporting-interval*
+           *threads* *randomize-search* *debug* *probe*)
+  (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
+  (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
+  (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
+  (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
+  (terpri) (terpri))
+
+
+(defun display-all ()  ;alias
+  (display-current-parameters))
+(defun params ()  ;alias
+  (display-current-parameters))
+
+
 ;(if (> *threads* 0)
 ;  (setf *debugger-hook* #'(lambda (condition original-hook)
 ;                            (declare (ignore original-hook))
