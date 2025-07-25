@@ -57,7 +57,7 @@
         (if (boundp var-name)
           `(setf ,var-name ,val-form)
           `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
-        `(defvar ,var-name ,val-form ,doc-string))))
+        `(defparameter ,var-name ,val-form ,doc-string))))
 
 
 (defmacro increment-global (var-name &optional (delta-form 1))

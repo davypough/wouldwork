@@ -39,13 +39,13 @@
 
 (define-action put
     1
-  (?block block (?block-support ?support) support)
+  (?block block (?block-support ?target) support)
   (and (cleartop? ?block)
        (on ?block ?block-support)
-       (cleartop? ?support)
-       (different ?block ?support))
-  (?block ?support)
-  (assert (on ?block ?support)
+       (or (and (block ?target) (cleartop? ?target))  ;there is no block on the ?target block
+           (table ?target)))                          ;or the ?target is the table
+  (?block ?target)
+  (assert (on ?block ?target)
           (not (on ?block ?block-support))))
 
 

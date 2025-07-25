@@ -14,7 +14,7 @@
 
 (ww-set *solution-type* every)  ;find every possible solution
 
-(ww-set *tree-or-graph* graph)  ;fast, don't bother to check for repeated states
+(ww-set *tree-or-graph* graph)  ;eliminate repeated states
 
 
 (define-types
@@ -37,15 +37,15 @@
   (standard ?block block ?target support)  ;standard (optional) means ?block /= ?target 
   (and (cleartop? ?block)                  ;?block must have a clear top
        (bind (on ?block $block-support))   ;get the $block-support under ?block
-       (and (block ?target)                ;if target is a block (not the table)
-            (cleartop? ?target)))          ;it must have a clear top, otherwise can move to table
+       (or (and (block ?target) (cleartop? ?target))  ;there is no block on the ?target block
+           (table ?target)))                          ;or the ?target is the table
   (?block ?target)                         ;the action description will be (put ?block ?target)
   (assert (on ?block ?target)))            ;fluent status of ?block updated
 
 
 (define-init
   (on A T)  ;note: all possible (on block $support) relations must be initially
-  (on B T)  ;instantiated for greatest efficiency
+  (on B T)  ;      instantiated for greatest efficiency
   (on C T))
 
 
