@@ -16,11 +16,12 @@
             (save-globals)
             (display-current-parameters)))
        (*tree-or-graph*
-         (when (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
-           (error "When *algorithm* is backtracking, *tree-or-graph* must be set to tree."))
-         (setf ,param ',val)
-         (unless *ww-loading*
-           (display-current-parameters)))
+         (if (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
+           (format t "~%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~%")
+           (progn (setf ,param ',val)
+                  (unless *ww-loading*
+                    (save-globals)
+                    (display-current-parameters)))))
        (*debug*  ;need to recompile
          (when *ww-loading*
            (error "Please remove (ww-set *debug* ~S) from the current problem specification file.
@@ -33,26 +34,27 @@
          (with-silenced-compilation
            (asdf:compile-system :wouldwork :force t)
            (asdf:load-system :wouldwork)))
-       (*algorithm*  ;need to recompile for new translations
+       (*algorithm*  ;need to recompile current problem for new translations
          (setf ,param ',val)
          (save-globals)
          (with-silenced-compilation
-           (asdf:compile-system :wouldwork :force t)
-           (asdf:load-system :wouldwork)))
+           (load-problem (string *problem-name*))))
        (*probe*
          (if (null ',val)
            (progn (setf ,param nil)
                   (unless *ww-loading*
-                    (save-globals)))
+                    (save-globals)
+                    (display-current-parameters)))
            (destructuring-bind (action instantiations depth &optional (count 1)) ',val
              (declare (ignore action instantiations depth))
              (setf ,param ',val)
              (setf *debug* 0)
              (setf *counter* count)
              (unless *ww-loading*
-               (save-globals))))
-         (unless *ww-loading*
-           (display-current-parameters)))
+               (save-globals)
+               (display-current-parameters)))))
+         ;(unless *ww-loading*
+         ;  (display-current-parameters)))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)
