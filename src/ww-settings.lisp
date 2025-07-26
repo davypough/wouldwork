@@ -140,7 +140,7 @@
 (define-global *start-time* 0
   "Stores time at beginning of the search.")
 
-(define-global *problem-name* 'unspecified  ;default name
+(defvar *problem-name* 'unspecified  ;default name
   "Name of the current problem, reassigned in problem.lisp by user.")
 
 (define-global *problem-type* 'planning

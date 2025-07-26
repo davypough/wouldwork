@@ -68,6 +68,50 @@
 
 
 (defun backtrack (state level)
+  "Recursive backtracking search with corrected goal detection timing"
+  
+  ;; Step 1: Enforce depth cutoff for infinite loop prevention
+  (when (and (> *depth-cutoff* 0) (> level *depth-cutoff*))
+    (return-from backtrack nil))
+  
+  ;; Step 2: Update search statistics and perform debugging hooks
+  (preprocess-state state level)
+  
+  ;; Step 3: Validate partial solution constraints
+  ;; NOTE: Removed goal check from here - this was the source of the timing error
+  (unless (is-valid-partial-solution state level)
+    (return-from backtrack nil))
+  
+  ;; Step 4: Generate and explore all valid choices
+  (let ((found-any-solution nil))
+    (dolist (action *actions*)
+      (let ((choices (generate-choices-for-action-bt action state level)))
+        (dolist (choice choices)
+          (unless (detect-path-cycle choice *choice-stack*)
+            (when (apply-choice-bt choice state level)
+              (if (is-complete-solution state level)
+                  ;; Solution found at current level - register and handle continuation
+                  (progn
+                    (register-solution-bt level)
+                    (when (and *choice-stack* (first *choice-stack*))
+                      (narrate-bt "Solution found ***" (first *choice-stack*) level))
+                    (finish-output)
+                    (setf found-any-solution t)
+                    (undo-choice-bt choice state level)
+                    ;; Check if we should stop after first solution
+                    (when (eq *solution-type* 'first)
+                      (return-from backtrack t)))
+                  ;; No solution yet - continue recursive exploration
+                  (let ((deeper-result (backtrack state (1+ level))))
+                    (undo-choice-bt choice state level)
+                    (when deeper-result
+                      (setf found-any-solution t)
+                      (when (eq *solution-type* 'first)
+                        (return-from backtrack t))))))))))
+    found-any-solution))
+
+
+#+ignore (defun backtrack (state level)
   "Recursive backtracking search with depth-cutoff integration"
   
   ;; Step 1: Enforce depth cutoff for infinite loop prevention
@@ -107,7 +151,7 @@
 
 
 (defun apply-choice-bt (choice state level)
-  "Apply choice with rigorous validation and state modification"
+  "Apply choice with rigorous validation and time state management"
   
   ;; Step 1: Strict structural validation
   (unless (and choice 
@@ -120,24 +164,25 @@
   (unless (choice-forward-update choice)
     (error "Choice must have valid forward-update." choice))
   
-  ;; Step 3: Beginning of choice application
-  (narrate-bt "Beginning choice application" choice level)
-  
-  ;; Step 4: Apply the forward update to modify current state
-  (let ((pre-application-idb-size (hash-table-count (problem-state.idb state))))
+  ;; Step 4: Look up action duration for time management
+  (let* ((action-name (first (choice-act choice)))
+         (action (find action-name *actions* :key #'action.name))
+         (action-duration (if action (action.duration action) 1.0))
+         (pre-application-idb-size (hash-table-count (problem-state.idb state))))
     
+    ;; Step 5: Apply the forward update to modify current state database
     (revise (problem-state.idb state) (choice-forward-update choice))
     
-    ;; Step 5: Post-application validation
+    ;; Step 6: Update time field to reflect action duration
+    (incf (problem-state.time state) action-duration)
+    
+    ;; Step 7: Post-application validation
     (let ((post-application-idb-size (hash-table-count (problem-state.idb state))))
       
       ;; Debug output
-      (narrate-bt (format nil "Applied choice: ~A -> ~A facts in database" 
-                          (choice-act choice)        
-                          post-application-idb-size) 
-                  choice level)
+      (narrate-bt "" choice (1+ level))
       
-      ;; Step 6: Global invariant validation
+      ;; Step 8: Global invariant validation
       (when *global-invariants*
         (unless (validate-global-invariants nil state)
           (error "Global invariant violation after applying choice ~A at state ~A" 
@@ -146,61 +191,62 @@
       (when *global-invariants*
         (narrate-bt "Global invariants validated after choice application" choice level))
       
-      ;; Step 7: Add choice to stack
+      ;; Step 9: Add choice to stack
       (push choice *choice-stack*)
-      (narrate-bt "Choice successfully applied and added to stack" choice level)
       
       t)))
 
 
 (defun undo-choice-bt (choice state level)
-  "Undo a choice from the current state with strict validation"
+  "Undo a choice from the current state with strict validation and time reversal"
   
   ;; Step 1: Strict validation of choice structure
   (unless choice
     (error "Cannot undo null choice. This indicates a serious bug in choice stack management."))
-  
-  ;; Step 2: Beginning of choice undo
-  (narrate-bt "Beginning choice undo" choice level)
   
   ;; Step 3: Verify choice is the most recent one on stack
   (unless (and *choice-stack* (eq choice (first *choice-stack*)))
     (error "Choice stack corruption detected. Attempted to undo ~A but top of stack is ~A. Stack: ~A"
            choice (first *choice-stack*) *choice-stack*))
   
-  ;; Step 4: Validate inverse update availability
-  (unless (choice-inverse-update choice)
-    (error "Cannot undo choice ~A: no inverse update available. This choice cannot be reversed."
-           choice))
-  
-  ;; Step 5: Apply inverse update with error handling
-  (handler-case 
-      (progn
-        (revise (problem-state.idb state) (choice-inverse-update choice))
+  ;; Step 4: Look up action duration for time reversal
+  (let* ((action-name (first (choice-act choice)))
+         (action (find action-name *actions* :key #'action.name))
+         (action-duration (if action (action.duration action) 1.0)))
+    
+    ;; Step 5: Validate inverse update availability
+    (unless (choice-inverse-update choice)
+      (error "Cannot undo choice ~A: no inverse update available. This choice cannot be reversed."
+             choice))
+    
+    ;; Step 6: Apply inverse update with error handling
+    (handler-case 
+        (progn
+          (revise (problem-state.idb state) (choice-inverse-update choice))
+          
+          ;; Step 7: Revert time field to previous state
+          (decf (problem-state.time state) action-duration)
+          
+          ;; Step 8: Validate inverse operation succeeded
+          (when *global-invariants*
+            (unless (validate-global-invariants nil state)
+              (error "Global invariant violation after undoing choice ~A. 
+                     This indicates a bug in the inverse update logic for action ~A"
+                     (choice-act choice) (first (choice-act choice))))))
         
-        ;; Step 6: Validate inverse operation succeeded
-        (when *global-invariants*
-          (unless (validate-global-invariants nil state)
-            (error "Global invariant violation after undoing choice ~A. 
-                   This indicates a bug in the inverse update logic for action ~A"
-                   (choice-act choice) (first (choice-act choice))))))
-      
-      (error (e)
-        (error "Failed to undo choice ~A due to error: ~A. 
-               This indicates corruption in inverse update logic." 
-               (choice-act choice) e)))
-  
-  ;; Step 7: Successful validation after undo
-  (when *global-invariants*
-    (narrate-bt "Global invariants validated after choice undo" choice level))
-  
-  ;; Step 8: Remove the choice from stack
-  (pop *choice-stack*)
-  
-  ;; Step 9: Completion confirmation
-  (narrate-bt "Choice successfully undone and removed from stack" choice level)
-  
-  t)
+        (error (e)
+          (error "Failed to undo choice ~A due to error: ~A. 
+                 This indicates corruption in inverse update logic." 
+                 (choice-act choice) e)))
+    
+    ;; Step 9: Successful validation after undo
+    (when *global-invariants*
+      (narrate-bt "Global invariants validated after choice undo" choice level))
+    
+    ;; Step 10: Remove the choice from stack
+    (pop *choice-stack*))
+    
+    t)
 
 
 (defun preprocess-state (state level)
@@ -358,6 +404,22 @@
 
 
 (defun reconstruct-solution-path (choice-stack)
+  "Reconstruct the solution path from the choice stack with correct cumulative time"
+  (let ((cumulative-time 0.0)
+        (path '()))
+    ;; Process choices in reverse order (oldest first) to build cumulative time
+    (dolist (choice (reverse choice-stack))
+      (let* ((action-name (first (choice-act choice)))
+             (action (find action-name *actions* :key #'action.name))
+             (action-duration (if action (action.duration action) 1.0)))
+        ;; Update cumulative time
+        (setf cumulative-time (+ cumulative-time action-duration))
+        ;; Build move record with correct time
+        (push (list cumulative-time (choice-act choice)) path)))
+    (nreverse path)))
+
+
+#+ignore (defun reconstruct-solution-path (choice-stack)
   "Reconstruct the solution path from the choice stack"
   (reverse 
     (mapcar (lambda (choice)
@@ -365,7 +427,7 @@
             choice-stack)))
 
 
-(defun record-move-from-choice (choice)
+#+ignore (defun record-move-from-choice (choice)
   "Create a move record from a choice (matching wouldwork's record-move format)"
   (list 1.0  ; Time step (simplified for now)
         (choice-act choice)))  ; Already in proper format: (action-name arg1 arg2 ...)
@@ -408,7 +470,7 @@
 
 (defun register-solution-bt (level)
   "Register a solution found via backtracking using the choice stack"
-  (let* ((solution-depth level)  ; Use actual search level as solution depth
+  (let* ((solution-depth (length *choice-stack*))
          (solution-path (reconstruct-solution-path *choice-stack*))
          (solution (make-solution
                      :depth solution-depth

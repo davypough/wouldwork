@@ -93,20 +93,31 @@
 (reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function? *actions*))
 
 
+(defun load-init-vals (vals-file)
+  "Load critical initialization parameters from vals.lisp if it exists.
+   Sets *problem-name*, *algorithm*, and *debug* for proper loading.
+   Returns the problem-name string for eval-when path construction, or nil if file absent."
+  (when (probe-file vals-file)
+    (with-open-file (stream vals-file :direction :input)
+      (let ((parameters (read stream)))
+        (setf *problem-name* (first parameters)     ; position 0
+              *algorithm* (third parameters)        ; position 2  
+              *debug* (tenth parameters))           ; position 9
+        ;; Handle debug feature flag based on loaded value
+        (if (> *debug* 0)
+            (pushnew :ww-debug *features*)
+            (setf *features* (remove :ww-debug *features*)))
+        ;; Return problem-name string for eval-when path logic
+        (string *problem-name*)))))
+
+
 (eval-when (:load-toplevel :execute)
   (let* ((root (asdf:system-source-directory :wouldwork))
          (src-dir (merge-pathnames "src/" root))
          (problem-file (merge-pathnames "problem.lisp" src-dir))
          (vals-file (merge-pathnames "vals.lisp" root))
          (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
-         (vals-problem-name (when (probe-file vals-file)
-                              (with-open-file (in-file vals-file :direction :input)
-                                (let* ((parameters (read in-file nil nil))
-                                       (problem-name (string (first parameters)))
-                                       (debug (tenth parameters)))
-                                  (when (> debug 0)
-                                    (pushnew :ww-debug *features*))
-                                  problem-name))))
+         (vals-problem-name (load-init-vals vals-file))
          (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
     (cond ((not (probe-file problem-file))  ;no problem.lisp file?
              (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp
@@ -117,5 +128,4 @@
                (delete-file vals-file)))  ;vals.lisp inconsistent with problem.lisp
           ((not (probe-file problem-file))
              (uiop:copy-file blocks3-file problem-file)))))
-
-           
+   
