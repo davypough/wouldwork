@@ -17,7 +17,7 @@
             (display-current-parameters)))
        (*tree-or-graph*
          (if (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
-           (format t "~%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~%")
+           (format t "~2%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~%")
            (progn (setf ,param ',val)
                   (unless *ww-loading*
                     (save-globals)

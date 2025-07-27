@@ -68,7 +68,7 @@
     (format t "~2%Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))
     (setf *tree-or-graph* 'tree)
-    (format t "~%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
+    (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
   (display-current-parameters)
   (when (and (eq *algorithm* 'backtracking) (<= *depth-cutoff* 0))
              (format t "~%With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~2%"))

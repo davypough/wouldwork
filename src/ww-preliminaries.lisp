@@ -19,6 +19,16 @@
 (defparameter *lock* (bt:make-lock))  ;for thread protection
 
 
+(defvar *debug* 0
+    "Set the debug level for subsequent runs.
+      0 - no debugging
+      1 - display full search tree
+      2 - display full search tree with states
+      3 - display basic nodes
+      4 - display full nodes
+      5 - display full nodes + break after each expansion cycle")
+
+
 (defmacro with-silenced-compilation (&body body)
   "Macro to suppress normal compilation output while preserving error reporting."
   `(let ((*compile-verbose* nil)
@@ -125,7 +135,7 @@
           ((probe-file vals-file)  ;does vals.lisp exist?
              (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
                (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
-               (delete-file vals-file)))  ;vals.lisp inconsistent with problem.lisp
-          ((not (probe-file problem-file))
-             (uiop:copy-file blocks3-file problem-file)))))
+               (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
+          ;((not (probe-file problem-file))
+          ;   (uiop:copy-file blocks3-file problem-file)))))
    

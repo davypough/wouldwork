@@ -6,6 +6,28 @@
 (in-package :wouldwork)
 
 
+(defparameter *default-parameters*
+  '(unspecified      ; *problem-name*
+    0                ; *depth-cutoff*  
+    depth-first      ; *algorithm*
+    graph            ; *tree-or-graph*
+    planning         ; *solution-type*
+    100000           ; *progress-reporting-interval*
+    nil              ; *randomize-search*
+    -1               ; *branch*
+    nil              ; *probe*
+    0)               ; *debug*
+  "Default parameter values in save/read order")
+
+
+(defparameter *globals-file* 
+  (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))
+  "In the vals.lisp file of this package the values of parameters
+     are stored as a list.
+   This should preserve when reloading the package for problems
+   the values of these global variables.")
+
+
 (defun help ()  ;;; text which appears if user enters (help)
   (format t "~%
 THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
@@ -102,7 +124,6 @@ any such settings appearing in the problem specification file.
          (result (rstrip without-prefix suffix-with-dot)))
     result))
 
-
 (defun lookup (key plist &key (test #'string-equal) (default))
   "Key value lookup in plist with #'string= or any other function as test.
    The plist-related getf can only handle eql."
@@ -114,16 +135,12 @@ any such settings appearing in the problem specification file.
 		     foundp t)
 	  finally (return (values (if res res default) foundp)))))
 
+
 ;; -------------------- pathname handling ---------------------------- ;;
-      
-(defun get-package-root (system-name)  
-  "Return the root directory of the ASDF system associated with the given package name."
-  (let ((system (asdf:find-system system-name)))
-    (when system
-      (asdf:system-source-directory system))))
+
   
 (Defun get-src-folder-path ()
-  (add-dir (get-package-root :wouldwork) "src"))
+  (add-dir (asdf:system-source-directory :wouldwork) "src"))
    
 (defun add-dir (root dir)
   "Add to absolute path an additional directory"
@@ -144,12 +161,9 @@ any such settings appearing in the problem specification file.
   "Shortcut to add filename to current package directory's src folder"   
   (add-file (get-src-folder-path) filename))
 
-(defun correct-wildcard (path)
-  "Eliminate unwanted wildcard escape in path strings."
-  (let ((chars (coerce (format nil "~a" path) 'list)))
-    (pathname (coerce (remove-if (lambda (x) (eql #\\ x)) chars) 'string))))
 
 ;; --------------------- file handling ------------------------------- ;;
+
 
 (defun copy-file-content (source-file target-file)
   "Replace the content of target-file by the content of source-file."
@@ -175,15 +189,6 @@ any such settings appearing in the problem specification file.
         default)))
 
 
-(defparameter *globals-file* 
-  (merge-pathnames "vals.lisp" (get-package-root :wouldwork))
-  "In the vals.lisp file of this package the values of parameters
-     are stored as a list.
-   This should preserve when reloading the package for problems
-   the values of these global variables. The user should not
-   have to worry about the changes of these values after reloading.")
-
-
 (defun display-globals ()
   (format t "~&*problem-name* ~A~% 
                *depth-cutoff* ~A~%
@@ -202,11 +207,21 @@ any such settings appearing in the problem specification file.
 
 (defun reset-parameters ()
    "Resets global parameters to defaults"
-  (setf *problem-name* 'unspecified *depth-cutoff* 0 *algorithm* 'depth-first *tree-or-graph* 'graph
-        *solution-type* 'planning *progress-reporting-interval* 100000
-        *randomize-search* nil *branch* -1 *probe* nil *debug* 0)
-  (setf *features* (remove :ww-debug *features*))
-  (display-current-parameters))
+  (destructuring-bind 
+       (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph default-solution-type
+        default-progress-reporting-interval default-randomize-search default-branch default-probe default-debug)
+      *default-parameters*
+    (setf *problem-name* default-problem-name
+          *depth-cutoff* default-depth-cutoff  
+          *algorithm* default-algorithm
+          *tree-or-graph* default-tree-or-graph
+          *solution-type* default-solution-type
+          *progress-reporting-interval* default-progress-reporting-interval
+          *randomize-search* default-randomize-search
+          *branch* default-branch
+          *probe* default-probe
+          *debug* default-debug))
+  (setf *features* (remove :ww-debug *features*)))
 
 
 (defun save-globals ()
@@ -216,49 +231,22 @@ any such settings appearing in the problem specification file.
                 *globals-file*)) ;; this stores global var values
 
 
-(defun set-globals (&key (problem-name *problem-name*)
-                         (depth-cutoff *depth-cutoff*)
-                         (algorithm *algorithm*)
-                         (tree-or-graph *tree-or-graph*)
-                         (solution-type *solution-type*)
-                         (progress-reporting-interval *progress-reporting-interval*)
-                         (randomize-search *randomize-search*)
-                         (branch *branch*)
-                         (probe *probe*)
-                         (debug *debug*))
-  "Set multiple globals at once in keywords argument format."
-  (setf *problem-name* problem-name
-        *depth-cutoff* depth-cutoff
-        *algorithm* algorithm
-        *tree-or-graph* tree-or-graph
-        *solution-type* solution-type
-        *progress-reporting-interval* progress-reporting-interval
-        *randomize-search* randomize-search
-        *branch* branch
-        *probe* probe
-        *debug* debug)
-  (save-globals))
-
-
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (let ((default-values (list 'unspecified 0 'depth-first 'graph 'planning 100000 nil -1 nil 0)))  ;10 elements, defaults
-    (destructuring-bind 
-         (tmp-problem-name tmp-depth-cutoff tmp-algorithm tmp-tree-or-graph tmp-solution-type
-          tmp-progress-reporting-interval tmp-randomize-search tmp-branch tmp-probe tmp-debug)
-        (let ((vals (or (ignore-errors (read-from-file *globals-file*))
-                        default-values)))
-          vals)
-        (setf *problem-name* tmp-problem-name
-              *depth-cutoff* tmp-depth-cutoff
-              *algorithm* tmp-algorithm
-              *tree-or-graph* tmp-tree-or-graph
-              *solution-type* tmp-solution-type
-              *progress-reporting-interval* tmp-progress-reporting-interval
-              *randomize-search* tmp-randomize-search
-              *branch* tmp-branch
-              *probe* tmp-probe
-              *debug* tmp-debug))))
+  (destructuring-bind 
+       (problem-name depth-cutoff algorithm tree-or-graph solution-type
+        progress-reporting-interval randomize-search branch probe debug)
+      (read-from-file *globals-file* *default-parameters*)
+      (setf *problem-name* problem-name
+            *depth-cutoff* depth-cutoff
+            *algorithm* algorithm
+            *tree-or-graph* tree-or-graph
+            *solution-type* solution-type
+            *progress-reporting-interval* progress-reporting-interval
+            *randomize-search* randomize-search
+            *branch* branch
+            *probe* probe
+            *debug* debug)))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;
@@ -332,9 +320,8 @@ any such settings appearing in the problem specification file.
 
 (defun load-problem (problem-name-str)
   "Given a problem-name, replace the content of the problem.lisp file by
-   the content of the correponsing problem file, and then reloads everything."
-  ;(unless (string-equal problem-name-str (string *problem-name*))
-    (exchange-problem-file problem-name-str)
+   the content of the correponsing problem file, and then reload everything."
+  (exchange-problem-file problem-name-str)
   (asdf:load-system :wouldwork :force t))
 
 
@@ -347,7 +334,7 @@ any such settings appearing in the problem specification file.
 
 
 (defun %run (problem-name-str)
-  "Stages and solves a user specified problem."
+  "Stages and solves a user specified problem with default parameters."
   (when (%stage problem-name-str)
     (ww-solve)))
 
@@ -367,13 +354,15 @@ any such settings appearing in the problem specification file.
     (format t "The problem ~A was not found." problem-name-str)
     (format t "~&Enter (list-all-problems) for a complete list of problems." )
     (return-from %stage))
-  (unless (string-equal problem-name-str (string *problem-name*))
-    (setf *debug* 0)
-    (setf *features* (remove :ww-debug *features*))
-    (setf *probe* nil)
-    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
+  ;(setf *problem-name* (intern problem-name-str))
+  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+  (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
+  (setf *problem-name* (intern problem-name-str)
+        *algorithm* 'depth-first
+        *debug* 0
+        *features* (remove :ww-debug *features*))
   (with-silenced-compilation
-    (load-problem problem-name-str)))
+    (asdf:load-system :wouldwork :force t)))
 
 
 (defun solve ()

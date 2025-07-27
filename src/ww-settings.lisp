@@ -30,17 +30,6 @@
 ;   (ww-set *probe* (JUMP (1 3 LD) 4))
 
 
-(unless (boundp '*debug*)
-  (defvar *debug* 0
-    "Set the debug level for subsequent runs.
-      0 - no debugging
-      1 - display full search tree
-      2 - display full search tree with states
-      3 - display basic nodes
-      4 - display full nodes
-      5 - display full nodes + break after each expansion cycle"))
-
-
 (defun display-current-parameters ()
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
