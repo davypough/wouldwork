@@ -83,12 +83,12 @@ Enter (list-all-problems) for a complete list of problems."
   (ww-set *progress-reporting-interval* 10)
   (ww-set *randomize-search* t)
   (ww-set *branch* 4)
-  (ww-set *probe* (put (C A) 3))  ;produces a compiler note, troubleshoot later
+  (ww-set *probe* (put (C A) 3))
   (ww-set *debug* 1)
   (format t "~&Testing that blocks3 runs successfully with new parameters...~2%")
   (assert (and (eq *problem-name* 'blocks3) (= *depth-cutoff* 2) (eq *tree-or-graph* 'graph)
                (eq *solution-type* 'first) (= *progress-reporting-interval* 10)
-               (eq *randomize-search* t) (= *branch* 4) (equal *probe* '(put (C A) 3))  ;compiler note
+               (eq *randomize-search* t) (= *branch* 4) (equal *probe* '(put (C A) 3))
                (eq *algorithm* 'depth-first) (= *debug* 1)))
   (assert (member :ww-debug *features*))
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
