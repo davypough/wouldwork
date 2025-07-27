@@ -175,69 +175,6 @@
                   (char= (char name-string (1- (length name-string))) #\!))))))
 
 
-#+ignore (defun translate-function-call (form flag)
-  "Simplified function call translation with unified state reference strategy"
-  (check-query/update-call form)
-  (let* ((state-arg 'state)  ; Unified state reference for all contexts
-         (fn-call (append (list (car form) state-arg)
-                          (mapcar (lambda (arg)
-                                    (if (and (symbolp arg) (not (varp arg)))
-                                       `(quote ,arg)
-                                       arg))
-                                  (cdr form)))))
-    ;; Validation: Update functions should only be called in effect contexts
-    (when (and (member (car form) *update-names*)
-               (not (eq flag 'eff)))
-      (error "Update function ~A cannot be called in ~A context" 
-             (car form) flag))
-    `,fn-call))
-
-
-#+ignore (defun translate-function-call (form flag)
-  "Revised function call translation using unified state reference strategy"
-  (check-query/update-call form)
-  (let* ((state-arg (cond
-                     ;; Query functions: pass appropriate state for context
-                     ((member (car form) *query-names*)
-                      'state)
-                     ;; Update functions: always pass state+ (only valid in effect contexts)
-                     ((member (car form) *update-names*)
-                      (if (eq flag 'eff)
-                          'state
-                          (error "Update function ~A cannot be called in ~A context" 
-                                 (car form) flag)))))
-         (fn-call (append (list (car form) state-arg)
-                          (mapcar (lambda (arg)
-                                    (if (and (symbolp arg) (not (varp arg)))
-                                       `(quote ,arg)
-                                       arg))
-                                  (cdr form)))))
-    `,fn-call))
-
-
-
-#+ignore (defun translate-function-call (form flag)
-  "Revised function call translation using unified state reference strategy"
-  (check-query/update-call form)
-  (let* ((state-arg (cond
-                     ;; Query functions: pass appropriate state for context
-                     ((member (car form) *query-names*)
-                      (get-state-reference flag))
-                     ;; Update functions: always pass state+ (only valid in effect contexts)
-                     ((member (car form) *update-names*)
-                      (if (eq flag 'eff)
-                          'state+
-                          (error "Update function ~A cannot be called in ~A context" 
-                                 (car form) flag)))))
-         (fn-call (append (list (car form) state-arg)
-                          (mapcar (lambda (arg)
-                                    (if (and (symbolp arg) (not (varp arg)))
-                                       `(quote ,arg)
-                                       arg))
-                                  (cdr form)))))
-    `,fn-call))
-
-
 (defun get-prop-fluents (proposition)
   "Returns the fluent values in an arbitrary proposition."
   (let ((indices (get-prop-fluent-indices proposition)))

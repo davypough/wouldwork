@@ -472,30 +472,6 @@
     t))
 
 
-#+ignore (defun update-search-tree (state/choice depth message)
-  "Universal search tree update function for both algorithms"
-  (declare (ignorable state/choice depth message))
-  (when (and (not (> *threads* 0)) (>= *debug* 1))
-    (let* ((is-depth-first (eql *algorithm* 'depth-first))
-           (state-info (if is-depth-first 
-                          state/choice
-                          *backtrack-state*))
-           (entry-info (if is-depth-first
-                          (list (problem-state.name state/choice)  ;ie, state
-                                (problem-state.instantiations state/choice))
-                          (when state/choice
-                            (list (choice-action state/choice)  ;ie, choice
-                                  (choice-instantiations state/choice))))))
-      (push `(,entry-info ,depth ,message
-              ,@(case *debug*
-                  (1 nil)
-                  (2 (list (when state-info
-                             (list-database (problem-state.idb state-info)))
-                           (when state-info
-                             (list-database (problem-state.hidb state-info)))))))
-            *search-tree*))))
-
-
 (defun update-search-tree (state depth message)
   (declare (type problem-state state) (type fixnum depth) (type string message))
   (when (and (not (> *threads* 0)) (>= *debug* 1))

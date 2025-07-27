@@ -53,27 +53,6 @@
         finally (return partial-prop)))
 
 
-#+ignore (defun list-database (idb)
-  "Used to printout idb in propositional form."
-  (let* ((propositions 
-           (iter (for (key val) in-hashtable idb)
-                 (if (listp val)
-                   ;Handle list values - expand each value to a separate proposition
-                   (appending 
-                     (iter (for v in val)
-                           (if (eql v t)
-                             ;For non-fluent propositions with t in the list
-                             (collecting (convert-to-proposition key))
-                             ;For fluent propositions with lists of values
-                             (collecting (convert-to-fluent-proposition key v)))))
-                   ;Handle any remaining non-list values (for backward compatibility)
-                   (if (eql val t)
-                     (collecting (convert-to-proposition key))
-                     (collecting (convert-to-fluent-proposition key val))))))
-         (sorted-props (sort (copy-list propositions) #'string< :key (lambda (prop) (format nil "~A" (car prop))))))
-    sorted-props))
-
-
 (defun list-database (idb)
   "Used to printout idb in propositional form."
   (let* ((propositions (iter (for (key val) in-hashtable idb)

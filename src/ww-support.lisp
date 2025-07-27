@@ -267,25 +267,6 @@
       finally (return db)))
 
 
-#+ignore (defun update (db literal)  ;is this for legacy backtracking?
-  "Single add or delete from db. Returns the original literal for change tracking."
-  (declare (type hash-table db))
-  (let ((original-entry nil))
-    (if (eql (car literal) 'not)
-        (progn
-          (setf original-entry (second literal))
-          (delete-proposition (second literal) db))
-        (progn
-          ;; Capture the original value before overwriting
-          (multiple-value-bind (vals present-p)
-              (gethash (butlast literal) db)
-            (when present-p
-              (setf original-entry (append (butlast literal) vals))))
-          (add-proposition literal db)))
-    ;; Return the original entry for proper restoration tracking
-    (or original-entry `(not ,literal))))
-
-
 (defun update (db literal)
   "For depth-first, single add or delete from db. Returns the literal for change tracking."
   (declare (type hash-table db))

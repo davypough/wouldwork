@@ -228,20 +228,6 @@
     (finally (return-from process-followups net-state))))
 
 
-#+ignore (defun process-followups (net-state updated-db)  ;followups for one update structure from effect
-  "Triggering forms are saved previously during effect apply."
-  (declare (ignorable updated-db))
-  (iter (with idb = (update.changes updated-db))  ;post effect idb
-        (for followup in (update.followups updated-db))
-        #+:ww-debug (when (>= *debug* 4)
-                      (ut::prt followup))
-        (for updated-idb = (apply (car followup) net-state idb (cdr followup)))  ;rtn followup updated idb
-        #+:ww-debug (when (>= *debug* 4)
-                      (ut::prt (list-database updated-idb)))
-        (setf (problem-state.idb net-state) updated-idb)
-    (finally (return-from process-followups net-state))))
-
-
 (defun expand (current-node)  ;called from df-bnb1
   "Returns the new states."
   (declare (type node current-node))   

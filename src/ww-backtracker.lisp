@@ -111,45 +111,6 @@
     found-any-solution))
 
 
-#+ignore (defun backtrack (state level)
-  "Recursive backtracking search with depth-cutoff integration"
-  
-  ;; Step 1: Enforce depth cutoff for infinite loop prevention
-  (when (and (> *depth-cutoff* 0) (> level *depth-cutoff*))
-    (return-from backtrack nil))
-  
-  ;; Step 2: Update search statistics and perform debugging hooks
-  (preprocess-state state level)
-  
-  ;; Step 3: Check for complete solution
-  (when (is-complete-solution state level)
-    (register-solution-bt level)
-    (when (and *choice-stack* (first *choice-stack*))
-      (narrate-bt "Solution found ***" (first *choice-stack*) level))
-    (finish-output)
-    (unless (should-continue-search state level)
-      (return-from backtrack t)))
-  
-  ;; Step 4: Validate partial solution constraints
-  (unless (is-valid-partial-solution state level)
-    (return-from backtrack nil))
-  
-  ;; Step 5: Generate and explore all valid choices
-  (let ((found-any-solution nil))
-    (dolist (action *actions*)
-      (let ((choices (generate-choices-for-action-bt action state level)))
-        (dolist (choice choices)
-          (unless (detect-path-cycle choice *choice-stack*)
-            (when (apply-choice-bt choice state level)
-              (let ((deeper-result (backtrack state (1+ level))))
-                (undo-choice-bt choice state level)
-                (when deeper-result
-                  (setf found-any-solution t)
-                  (when (eq *solution-type* 'first)
-                    (return-from backtrack t)))))))))
-    found-any-solution))
-
-
 (defun apply-choice-bt (choice state level)
   "Apply choice with rigorous validation and time state management"
   
@@ -417,20 +378,6 @@
         ;; Build move record with correct time
         (push (list cumulative-time (choice-act choice)) path)))
     (nreverse path)))
-
-
-#+ignore (defun reconstruct-solution-path (choice-stack)
-  "Reconstruct the solution path from the choice stack"
-  (reverse 
-    (mapcar (lambda (choice)
-              (record-move-from-choice choice))
-            choice-stack)))
-
-
-#+ignore (defun record-move-from-choice (choice)
-  "Create a move record from a choice (matching wouldwork's record-move format)"
-  (list 1.0  ; Time step (simplified for now)
-        (choice-act choice)))  ; Already in proper format: (action-name arg1 arg2 ...)
 
 
 (defun should-continue-search (state level)
