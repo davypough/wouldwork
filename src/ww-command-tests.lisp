@@ -77,6 +77,7 @@ Enter (list-all-problems) for a complete list of problems."
   (ww-set *problem-name* blocks3)
   (setf *ww-loading* nil)
   (ww-set *depth-cutoff* 2)
+  (ww-set *algorithm* depth-first)
   (ww-set *tree-or-graph* graph)
   (ww-set *solution-type* first)
   (ww-set *progress-reporting-interval* 10)
@@ -88,12 +89,12 @@ Enter (list-all-problems) for a complete list of problems."
   (assert (and (eq *problem-name* 'blocks3) (= *depth-cutoff* 2) (eq *tree-or-graph* 'graph)
                (eq *solution-type* 'first) (= *progress-reporting-interval* 10)
                (eq *randomize-search* t) (= *branch* 4) (equal *probe* '(put (C A) 3))  ;compiler note
-               (= *debug* 1)))
+               (eq *algorithm* 'depth-first) (= *debug* 1)))
   (assert (member :ww-debug *features*))
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
     (with-open-file (in-file vals-file :direction :input)
       (assert (equal (read in-file nil nil)
-                     '(blocks3 2 graph first 10 t 4 (put (C A) 3) 1))))
+                     '(blocks3 2 depth-first graph first 10 t 4 (put (C A) 3) 1))))
     (delete-file vals-file))
   (solve)  ;solve with new parameters
   (format t "~%Resetting all parameters to defaults...")

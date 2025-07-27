@@ -359,6 +359,7 @@ any such settings appearing in the problem specification file.
   (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
   (setf *problem-name* (intern problem-name-str)
         *algorithm* 'depth-first
+        *probe* nil
         *debug* 0
         *features* (remove :ww-debug *features*))
   (with-silenced-compilation

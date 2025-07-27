@@ -35,11 +35,13 @@
            (asdf:compile-system :wouldwork :force t)
            (asdf:load-system :wouldwork)))
        (*algorithm*  ;need to recompile current problem for new translations
-         (unless *ww-loading*
+         (unless *ww-loading*  ;ignore (ww-set *algorithm* ...) in problem specification
            (setf ,param ',val)
            (save-globals)
            (with-silenced-compilation
-             (load-problem (string *problem-name*)))))
+             ;(load-problem (string *problem-name*)))))
+             (asdf:load-system :wouldwork))
+           (display-current-parameters)))
        (*probe*
          (if (null ',val)
            (progn (setf ,param nil)
