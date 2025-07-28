@@ -311,7 +311,7 @@ any such settings appearing in the problem specification file.
 
 
 (defun exchange-problem-file (problem-name-str)
-  "Copies problem file to src/problem.lisp"
+  "Copies problem file to src/problem.lisp so it will be compiled by asdf."
   (let* ((plist (list-problem-files-plist))
 	     (problem-file (lookup problem-name-str plist)))
     (copy-file-content problem-file (in-src "problem.lisp"))
@@ -357,10 +357,16 @@ any such settings appearing in the problem specification file.
   ;(setf *problem-name* (intern problem-name-str))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
-  (setf *problem-name* (intern problem-name-str)
+  (setf *problem-name* (intern problem-name-str)  ;reset to defaults
+        *depth-cutoff* 0
         *algorithm* 'depth-first
         *probe* nil
+        *progress-reporting-interval* 100000
+        *solution-type* 'first
+        *tree-or-graph* 'graph
         *debug* 0
+        *branch* -1
+        *randomize-search* nil
         *features* (remove :ww-debug *features*))
   (with-silenced-compilation
     (asdf:load-system :wouldwork :force t)))

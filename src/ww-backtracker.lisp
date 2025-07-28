@@ -68,17 +68,16 @@
 
 
 (defun backtrack (state level)
-  "Recursive backtracking search with corrected goal detection timing"
+  "Recursive backtracking search with corrected depth cutoff"
   
-  ;; Step 1: Enforce depth cutoff for infinite loop prevention
-  (when (and (> *depth-cutoff* 0) (> level *depth-cutoff*))
+  ;; Step 1: Enforce depth cutoff - prevent processing AT the cutoff level
+  (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
     (return-from backtrack nil))
   
   ;; Step 2: Update search statistics and perform debugging hooks
   (preprocess-state state level)
   
   ;; Step 3: Validate partial solution constraints
-  ;; NOTE: Removed goal check from here - this was the source of the timing error
   (unless (is-valid-partial-solution state level)
     (return-from backtrack nil))
   
@@ -109,6 +108,18 @@
                       (when (eq *solution-type* 'first)
                         (return-from backtrack t))))))))))
     found-any-solution))
+
+
+(defun preprocess-state (state level)
+  "Hook: Preprocessing with statistics tracking and debugging"
+  (declare (ignore state))
+  (increment-global *program-cycles* 1)
+  (increment-global *total-states-processed* 1)
+  (when (> (1+ level) *max-depth-explored*)
+    (setf *max-depth-explored* (1+ level)))
+  (print-search-progress)
+  #+:ww-debug (when (>= *debug* 3)
+                (format t "~&Exploring state at level ~A~%" level)))
 
 
 (defun apply-choice-bt (choice state level)
@@ -208,18 +219,6 @@
     (pop *choice-stack*))
     
     t)
-
-
-(defun preprocess-state (state level)
-  "Hook: Preprocessing with statistics tracking and debugging"
-  (declare (ignore state))
-  (increment-global *program-cycles* 1)
-  (increment-global *total-states-processed* 1)
-  (when (> level *max-depth-explored*)
-    (setf *max-depth-explored* level))
-  (print-search-progress)
-  #+:ww-debug (when (>= *debug* 3)
-                (format t "~&Exploring state at level ~A~%" level)))
 
 
 (defun is-valid-partial-solution (state level)

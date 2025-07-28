@@ -39,9 +39,7 @@
            (setf ,param ',val)
            (save-globals)
            (with-silenced-compilation
-             ;(load-problem (string *problem-name*)))))
-             (asdf:load-system :wouldwork))
-           (display-current-parameters)))
+             (load-problem (string *problem-name*)))))
        (*probe*
          (if (null ',val)
            (progn (setf ,param nil)

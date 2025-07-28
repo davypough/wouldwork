@@ -14,6 +14,8 @@
 
 (ww-set *depth-cutoff* 10)
 
+(ww-set *progress-reporting-interval* 2000000)
+
 
 (define-types
   grave (grave1 grave2 grave3 grave4 grave5 grave6 grave7 grave8 grave9 grave10 grave11 grave12))
