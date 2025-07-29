@@ -32,8 +32,9 @@
            (setf *features* (remove :ww-debug *features*)))
          (save-globals)
          (with-silenced-compilation
-           (asdf:compile-system :wouldwork :force t)
-           (asdf:load-system :wouldwork)))
+           (load-problem (string *problem-name*))))
+           ;(asdf:compile-system :wouldwork :force t)
+           ;(asdf:load-system :wouldwork)))
        (*algorithm*  ;need to recompile current problem for new translations
          (unless *ww-loading*  ;ignore (ww-set *algorithm* ...) in problem specification
            (setf ,param ',val)

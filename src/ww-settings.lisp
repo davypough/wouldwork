@@ -132,31 +132,30 @@
 (defvar *problem-name* 'unspecified  ;default name
   "Name of the current problem, reassigned in problem.lisp by user.")
 
-(defvar *problem-type* 'planning
+(defvar *problem-type* 'planning ;
   "Spedify whether it's a planning problem or constraint satisfaction problem.")
-
 
 (defvar *algorithm* 'depth-first
   "Specify search algorithm: 'depth-first (default) or 'backtracking.
    depth-first: Traditional DFS with state copying (current behavior)
    backtracking: DFS with single state and undo operations (memory efficient)")
 
-(defvar *solution-type* 'first
+(defvar *solution-type* 'first    ;defvar issue
   "Specify whether to search for first, min-length, min-time, or every solution.")
 
-(defvar *tree-or-graph* 'graph
+(defvar *tree-or-graph* 'graph  ;
   "Whether there are repeated states (graph) or not (tree); try both.")
 
-(defvar *depth-cutoff* 0
+(defvar *depth-cutoff* 0  ;defvar issue on crossword13
   "Negative or 0 means no cutoff.")
 
-(defvar *progress-reporting-interval* 100000
+(defvar *progress-reporting-interval* 100000  ;
   "Print progress during search after each multiple n of states examined.")
 
-(defvar *randomize-search* nil
+(defvar *randomize-search* nil  ;
   "Set to t or nil.")
 
-(defvar *branch* -1
+(defvar *branch* -1  ;
   "If n>0, explore only the nth branch from the *start-state*.")
 
 (define-global *types* (make-hash-table :test #'eq)

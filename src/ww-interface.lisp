@@ -11,6 +11,21 @@
     0                ; *depth-cutoff*  
     depth-first      ; *algorithm*
     graph            ; *tree-or-graph*
+    planning         ; *problem-type*        ← ADDED
+    first            ; *solution-type*       ← CORRECTED
+    100000           ; *progress-reporting-interval*
+    nil              ; *randomize-search*
+    -1               ; *branch*
+    nil              ; *probe*
+    0)               ; *debug*
+  "Default parameter values in save/read order")
+
+
+#+ignore (defparameter *default-parameters*
+  '(unspecified      ; *problem-name*
+    0                ; *depth-cutoff*  
+    depth-first      ; *algorithm*
+    graph            ; *tree-or-graph*
     planning         ; *solution-type*
     100000           ; *progress-reporting-interval*
     nil              ; *randomize-search*
@@ -194,6 +209,23 @@ any such settings appearing in the problem specification file.
                *depth-cutoff* ~A~%
                *algorithm* ~A~%
                *tree-or-graph* ~A~%
+               *problem-type* ~A~%
+               *solution-type* ~A~%
+               *progress-reporting-interval* ~A~%
+               *randomize-search* ~A~%
+               *branch* ~A~%
+               *probe* ~A~%
+               *debug* ~A~2%"
+            *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
+            *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
+            *probe* *debug*))
+
+
+#+ignore (defun display-globals ()
+  (format t "~&*problem-name* ~A~% 
+               *depth-cutoff* ~A~%
+               *algorithm* ~A~%
+               *tree-or-graph* ~A~%
                *solution-type* ~A~%
                *progress-reporting-interval* ~A~%
                *randomize-search* ~A~%
@@ -206,6 +238,27 @@ any such settings appearing in the problem specification file.
 
 
 (defun reset-parameters ()
+   "Resets global parameters to defaults"
+  (destructuring-bind 
+       (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
+        default-problem-type default-solution-type default-progress-reporting-interval 
+        default-randomize-search default-branch default-probe default-debug)
+      *default-parameters*
+    (setf *problem-name* default-problem-name
+          *depth-cutoff* default-depth-cutoff  
+          *algorithm* default-algorithm
+          *tree-or-graph* default-tree-or-graph
+          *problem-type* default-problem-type           ; ← ADDED
+          *solution-type* default-solution-type         ; ← NOW GETS CORRECT VALUE
+          *progress-reporting-interval* default-progress-reporting-interval
+          *randomize-search* default-randomize-search
+          *branch* default-branch
+          *probe* default-probe
+          *debug* default-debug))
+  (setf *features* (remove :ww-debug *features*)))
+
+
+#+ignore (defun reset-parameters ()
    "Resets global parameters to defaults"
   (destructuring-bind 
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph default-solution-type
@@ -226,12 +279,39 @@ any such settings appearing in the problem specification file.
 
 (defun save-globals ()
   "Save the values of the globals in the vals.lisp file."
+  (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
+                      *solution-type* *progress-reporting-interval* *randomize-search* 
+                      *branch* *probe* *debug*)
+                *globals-file*))
+
+
+#+ignore (defun save-globals ()
+  "Save the values of the globals in the vals.lisp file."
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *solution-type*
                       *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*)
                 *globals-file*)) ;; this stores global var values
 
 
 (defun read-globals ()
+  "Read and setf values for global variables from vals.lisp file."
+  (destructuring-bind 
+       (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
+        progress-reporting-interval randomize-search branch probe debug)
+      (read-from-file *globals-file* *default-parameters*)
+      (setf *problem-name* problem-name
+            *depth-cutoff* depth-cutoff
+            *algorithm* algorithm
+            *tree-or-graph* tree-or-graph
+            *problem-type* problem-type
+            *solution-type* solution-type
+            *progress-reporting-interval* progress-reporting-interval
+            *randomize-search* randomize-search
+            *branch* branch
+            *probe* probe
+            *debug* debug)))
+
+
+#+ignore (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
   (destructuring-bind 
        (problem-name depth-cutoff algorithm tree-or-graph solution-type
@@ -369,7 +449,7 @@ any such settings appearing in the problem specification file.
         *randomize-search* nil
         *features* (remove :ww-debug *features*))
   (with-silenced-compilation
-    (asdf:load-system :wouldwork :force t)))
+    (load-problem problem-name-str)))
 
 
 (defun solve ()

@@ -110,9 +110,9 @@
   (when (probe-file vals-file)
     (with-open-file (stream vals-file :direction :input)
       (let ((parameters (read stream)))
-        (setf *problem-name* (first parameters)     ; position 0
-              *algorithm* (third parameters)        ; position 2  
-              *debug* (tenth parameters))           ; position 9
+        (setf *problem-name* (first parameters)      ; position 0
+              *algorithm* (third parameters)         ; position 2  
+              *debug* (nth 10 parameters))           ; position 10
         ;; Handle debug feature flag based on loaded value
         (if (> *debug* 0)
             (pushnew :ww-debug *features*)
