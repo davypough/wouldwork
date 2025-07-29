@@ -11,22 +11,8 @@
     0                ; *depth-cutoff*  
     depth-first      ; *algorithm*
     graph            ; *tree-or-graph*
-    planning         ; *problem-type*        ← ADDED
-    first            ; *solution-type*       ← CORRECTED
-    100000           ; *progress-reporting-interval*
-    nil              ; *randomize-search*
-    -1               ; *branch*
-    nil              ; *probe*
-    0)               ; *debug*
-  "Default parameter values in save/read order")
-
-
-#+ignore (defparameter *default-parameters*
-  '(unspecified      ; *problem-name*
-    0                ; *depth-cutoff*  
-    depth-first      ; *algorithm*
-    graph            ; *tree-or-graph*
-    planning         ; *solution-type*
+    planning         ; *problem-type*
+    first            ; *solution-type*
     100000           ; *progress-reporting-interval*
     nil              ; *randomize-search*
     -1               ; *branch*
@@ -77,9 +63,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (display-current-parameters) alias (params)
    -- displays all parameters associated with the currently staged problem
 
-(reset-parameters)
-  -- normally, parameters are automatically restored from the last session,
-     but this will restore all parameters to their default values
+(reset)
+  -- if Wouldwork throws an error, it can be reinitialized and maybe enable continuing
 
 
 (ww-set <problem-parameter> <new-value>)
@@ -101,7 +86,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
            -- probe enables debugging when a state is reached during search
               see ww-settings.lisp and User Manual for probe format examples
 
-Note that setting any problem parameters at the REPL with ww-set will override
+Note that setting problem parameters at the REPL with ww-set will override
 any such settings appearing in the problem specification file.
 "))
 
@@ -221,22 +206,6 @@ any such settings appearing in the problem specification file.
             *probe* *debug*))
 
 
-#+ignore (defun display-globals ()
-  (format t "~&*problem-name* ~A~% 
-               *depth-cutoff* ~A~%
-               *algorithm* ~A~%
-               *tree-or-graph* ~A~%
-               *solution-type* ~A~%
-               *progress-reporting-interval* ~A~%
-               *randomize-search* ~A~%
-               *branch* ~A~%
-               *probe* ~A~%
-               *debug* ~A~2%"
-            *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *solution-type*
-            *progress-reporting-interval* *randomize-search* *branch* *probe*
-            *debug*))
-
-
 (defun reset ()
   "Deletes vals.lisp & problem.lisp & parameters to start over fresh in case of inconsistency."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
@@ -256,26 +225,7 @@ any such settings appearing in the problem specification file.
           *depth-cutoff* default-depth-cutoff  
           *algorithm* default-algorithm
           *tree-or-graph* default-tree-or-graph
-          *problem-type* default-problem-type           ; ← ADDED
-          *solution-type* default-solution-type         ; ← NOW GETS CORRECT VALUE
-          *progress-reporting-interval* default-progress-reporting-interval
-          *randomize-search* default-randomize-search
-          *branch* default-branch
-          *probe* default-probe
-          *debug* default-debug))
-  (setf *features* (remove :ww-debug *features*)))
-
-
-#+ignore (defun reset-parameters ()
-   "Resets global parameters to defaults"
-  (destructuring-bind 
-       (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph default-solution-type
-        default-progress-reporting-interval default-randomize-search default-branch default-probe default-debug)
-      *default-parameters*
-    (setf *problem-name* default-problem-name
-          *depth-cutoff* default-depth-cutoff  
-          *algorithm* default-algorithm
-          *tree-or-graph* default-tree-or-graph
+          *problem-type* default-problem-type
           *solution-type* default-solution-type
           *progress-reporting-interval* default-progress-reporting-interval
           *randomize-search* default-randomize-search
@@ -293,13 +243,6 @@ any such settings appearing in the problem specification file.
                 *globals-file*))
 
 
-#+ignore (defun save-globals ()
-  "Save the values of the globals in the vals.lisp file."
-  (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *solution-type*
-                      *progress-reporting-interval* *randomize-search* *branch* *probe* *debug*)
-                *globals-file*)) ;; this stores global var values
-
-
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
   (destructuring-bind 
@@ -311,24 +254,6 @@ any such settings appearing in the problem specification file.
             *algorithm* algorithm
             *tree-or-graph* tree-or-graph
             *problem-type* problem-type
-            *solution-type* solution-type
-            *progress-reporting-interval* progress-reporting-interval
-            *randomize-search* randomize-search
-            *branch* branch
-            *probe* probe
-            *debug* debug)))
-
-
-#+ignore (defun read-globals ()
-  "Read and setf values for global variables from vals.lisp file."
-  (destructuring-bind 
-       (problem-name depth-cutoff algorithm tree-or-graph solution-type
-        progress-reporting-interval randomize-search branch probe debug)
-      (read-from-file *globals-file* *default-parameters*)
-      (setf *problem-name* problem-name
-            *depth-cutoff* depth-cutoff
-            *algorithm* algorithm
-            *tree-or-graph* tree-or-graph
             *solution-type* solution-type
             *progress-reporting-interval* progress-reporting-interval
             *randomize-search* randomize-search
@@ -450,6 +375,7 @@ any such settings appearing in the problem specification file.
         *algorithm* 'depth-first
         *probe* nil
         *progress-reporting-interval* 100000
+        *problem-type* 'planning
         *solution-type* 'first
         *tree-or-graph* 'graph
         *debug* 0

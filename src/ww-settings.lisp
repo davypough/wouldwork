@@ -140,16 +140,16 @@
    depth-first: Traditional DFS with state copying (current behavior)
    backtracking: DFS with single state and undo operations (memory efficient)")
 
-(defvar *solution-type* 'first    ;defvar issue
+(defvar *solution-type* 'first
   "Specify whether to search for first, min-length, min-time, or every solution.")
 
 (defvar *tree-or-graph* 'graph  ;
   "Whether there are repeated states (graph) or not (tree); try both.")
 
-(defvar *depth-cutoff* 0  ;defvar issue on crossword13
+(defvar *depth-cutoff* 0
   "Negative or 0 means no cutoff.")
 
-(defvar *progress-reporting-interval* 100000  ;
+(defvar *progress-reporting-interval* 100000
   "Print progress during search after each multiple n of states examined.")
 
 (defvar *randomize-search* nil  ;
