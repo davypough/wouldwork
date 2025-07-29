@@ -237,6 +237,14 @@ any such settings appearing in the problem specification file.
             *debug*))
 
 
+(defun reset ()
+  "Deletes vals.lisp & problem.lisp & parameters to start over fresh in case of inconsistency."
+  (uiop:delete-file-if-exists (in-src "problem.lisp"))
+  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+  (reset-parameters)
+  t)
+  
+
 (defun reset-parameters ()
    "Resets global parameters to defaults"
   (destructuring-bind 
