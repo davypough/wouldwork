@@ -6,6 +6,18 @@
 (in-package :ww)
 
 
+;Note: It is necessary to close & reopen the lisp environment after
+;      changing here from nonparallel to parallel, or parallel to nonparallel.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *threads* 0
+    "The number of parallel threads to use.
+      0 means no parallelism (ie, serial processing)
+      1 means use one parallel thread
+        (in addition to parallel management, effectively serial, useful for debugging)
+      2 means two or more parallel processing threads
+      N up to the number of available CPU threads"))
+
+
 (defmacro with-search-structures-lock (&body body)
   "Protects composite operations on *open* and *closed* search structures."
   `(bt:with-lock-held (*lock*)
