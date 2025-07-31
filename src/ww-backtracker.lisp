@@ -119,10 +119,61 @@
     (setf *max-depth-explored* (1+ level)))
   (print-search-progress)
   #+:ww-debug (when (>= *debug* 3)
-                (format t "~&Exploring state at level ~A~%" level)))
+                (format t "~2%Exploring state at level ~A~%" level)
+                (finish-output)))
 
 
 (defun apply-choice-bt (choice state level)
+  "Apply choice with rigorous validation, time state management, and comprehensive debug support"
+  
+  ;; Step 1: Strict structural validation
+  (unless (and choice 
+               (choice-forward-update choice)
+               (choice-inverse-update choice))
+    (error "Invalid choice structure: ~A. Must have forward and inverse updates."
+           choice))
+  
+  ;; Step 2: Validate choice structure integrity
+  (unless (choice-forward-update choice)
+    (error "Choice must have valid forward-update." choice))
+  
+  ;; Step 3: Capture pre-state for debug transition display
+  (let ((pre-state (copy-problem-state state)))
+    
+    ;; Step 4: Look up action duration for time management
+    (let* ((action-name (first (choice-act choice)))
+           (action (find action-name *actions* :key #'action.name))
+           (action-duration (if action (action.duration action) 1.0))
+           (pre-application-idb-size (hash-table-count (problem-state.idb state))))
+      
+      ;; Step 5: Apply the forward update to modify current state database
+      (revise (problem-state.idb state) (choice-forward-update choice))
+      
+      ;; Step 6: Update time field to reflect action duration
+      (incf (problem-state.time state) action-duration)
+      
+      ;; Step 7: Post-application validation
+      (let ((post-application-idb-size (hash-table-count (problem-state.idb state))))
+        
+        ;; Debug output with pre-state information
+        (narrate-bt "" choice (1+ level) pre-state)
+        
+        ;; Step 8: Global invariant validation
+        (when *global-invariants*
+          (unless (validate-global-invariants nil state)
+            (error "Global invariant violation after applying choice ~A at state ~A" 
+                   (choice-act choice) (list-database (problem-state.idb state)))))
+        
+        (when *global-invariants*
+          (narrate-bt "Global invariants validated after choice application" choice level pre-state))
+        
+        ;; Step 9: Add choice to stack
+        (push choice *choice-stack*)
+        
+        t))))
+
+
+#+ignore (defun apply-choice-bt (choice state level)
   "Apply choice with rigorous validation and time state management"
   
   ;; Step 1: Strict structural validation
@@ -258,23 +309,19 @@
 (defun generate-choices-for-action-bt (action state level)
   "Generate valid choices for action using algorithm-compatible effect processing"
   (declare (ignore level))
-  
   ;; Step 1: Validate action structure
   (unless (and action (action.pre-defun-name action) (action.eff-defun-name action))
     (return-from generate-choices-for-action-bt nil))
-  
   ;; Step 2: Execute precondition checking using WouldWork's mechanism
   (let ((precondition-fn (action.pre-defun-name action))
         (effect-fn (action.eff-defun-name action))
         (parameter-combinations (action.precondition-args action)))
-    
     ;; Step 3: Filter valid precondition instantiations
     (let ((pre-results 
            (remove-if #'null 
                       (mapcar (lambda (pinsts)
                                 (apply precondition-fn state pinsts))
                               parameter-combinations))))
-      
       (when pre-results
         ;; Step 4: Generate effect updates using our new algorithm-compatible lambda
         (let ((updated-dbs 
@@ -284,7 +331,6 @@
                              (apply effect-fn state pre-result)))
                        pre-results))
               (choices '()))
-          
           ;; Step 5: Convert update structures to choice objects
           (dolist (updated-db updated-dbs)
             (let* ((forward-literals (create-inverse-update (update.changes updated-db)))
@@ -296,7 +342,6 @@
                                         :inverse-update inverse-literals
                                         :level level)))
               (push choice choices)))
-          
           choices)))))
 
 
@@ -405,12 +450,50 @@
           *search-tree*)))
 
 
-(defun narrate-bt (string choice depth)
-  (declare (ignorable string choice depth))
-  #+:ww-debug (when (>= *debug* 3)
-                (format t "~%~A:~%~A~%" string choice))
+(defun narrate-bt (string choice depth &optional pre-state)
+  "Enhanced narration function with refined progressive debug level disclosure"
+  (declare (ignorable string choice depth pre-state))
   #+:ww-debug (when (>= *debug* 1)
                 (update-search-tree-bt choice depth string))
+  #+:ww-debug (when (>= *debug* 2)
+                (when (and string (not (string= string "")))
+                  (format t "~%~A:~%" string))
+                (when choice
+                  (format t "~%Action: ~A~%" (choice-act choice))
+                  (format t "Forward Update: ~A~%" (choice-forward-update choice))
+                  (format t "Inverse Update: ~A~%" (choice-inverse-update choice)))
+                (unless choice
+                  (format t "Choice: <nil>~%"))
+                (if pre-state
+                    (progn
+                      (format t "Pre-State IDB:  ~A~%" (list-database (problem-state.idb pre-state)))
+                      (format t "Post-State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
+                      (when (problem-state.hidb pre-state)
+                        (format t "Pre-State HIDB:  ~A~%" (list-database (problem-state.hidb pre-state))))
+                      (when (problem-state.hidb *backtrack-state*)
+                        (format t "Post-State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
+                      (format t "Time Change: ~A -> ~A~%" 
+                              (problem-state.time pre-state) 
+                              (problem-state.time *backtrack-state*))
+                      (format t "Value Change: ~A -> ~A~%" 
+                              (problem-state.value pre-state) 
+                              (problem-state.value *backtrack-state*)))
+                    ;; Fallback when pre-state not available
+                    (progn
+                      (format t "Current State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
+                      (when (problem-state.hidb *backtrack-state*)
+                        (format t "Current State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
+                      (format t "Current Time: ~A~%" (problem-state.time *backtrack-state*))
+                      (format t "Current Value: ~A~%" (problem-state.value *backtrack-state*)))))
+  #+:ww-debug (when (>= *debug* 3)
+                (format t "--- Choice Stack (Length ~A) ---~%" (length *choice-stack*))
+                (if *choice-stack*
+                    (loop for i from 0
+                          for stack-choice in *choice-stack*
+                          do (format t "  [~A] ~A~%" i (choice-act stack-choice)))
+                    (format t "  <empty>~%")))
+  #+:ww-debug (when (>= *debug* 5)
+                (simple-break))
   nil)
 
 
