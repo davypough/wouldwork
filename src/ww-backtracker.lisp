@@ -155,69 +155,27 @@
       ;; Step 7: Post-application validation
       (let ((post-application-idb-size (hash-table-count (problem-state.idb state))))
         
-        ;; Debug output with pre-state information
+        ;; Step 8: Add choice to stack BEFORE debug output
+        (push choice *choice-stack*)
+        
+        ;; Step 9: Debug output with pre-state information (now shows committed choice)
         (narrate-bt "" choice (1+ level) pre-state)
         
-        ;; Step 8: Global invariant validation
-        (when *global-invariants*
-          (unless (validate-global-invariants nil state)
-            (error "Global invariant violation after applying choice ~A at state ~A" 
-                   (choice-act choice) (list-database (problem-state.idb state)))))
+        ;; Step 10: Global invariant validation with error recovery
+        (handler-case
+            (when *global-invariants*
+              (unless (validate-global-invariants nil state)
+                (error "Global invariant violation after applying choice ~A at state ~A" 
+                       (choice-act choice) (list-database (problem-state.idb state)))))
+          (error (e)
+            ;; Recovery: remove choice from stack before re-raising error
+            (pop *choice-stack*)
+            (error e)))
         
         (when *global-invariants*
           (narrate-bt "Global invariants validated after choice application" choice level pre-state))
         
-        ;; Step 9: Add choice to stack
-        (push choice *choice-stack*)
-        
         t))))
-
-
-#+ignore (defun apply-choice-bt (choice state level)
-  "Apply choice with rigorous validation and time state management"
-  
-  ;; Step 1: Strict structural validation
-  (unless (and choice 
-               (choice-forward-update choice)
-               (choice-inverse-update choice))
-    (error "Invalid choice structure: ~A. Must have forward and inverse updates."
-           choice))
-  
-  ;; Step 2: Validate choice structure integrity
-  (unless (choice-forward-update choice)
-    (error "Choice must have valid forward-update." choice))
-  
-  ;; Step 4: Look up action duration for time management
-  (let* ((action-name (first (choice-act choice)))
-         (action (find action-name *actions* :key #'action.name))
-         (action-duration (if action (action.duration action) 1.0))
-         (pre-application-idb-size (hash-table-count (problem-state.idb state))))
-    
-    ;; Step 5: Apply the forward update to modify current state database
-    (revise (problem-state.idb state) (choice-forward-update choice))
-    
-    ;; Step 6: Update time field to reflect action duration
-    (incf (problem-state.time state) action-duration)
-    
-    ;; Step 7: Post-application validation
-    (let ((post-application-idb-size (hash-table-count (problem-state.idb state))))
-      
-      ;; Debug output
-      (narrate-bt "" choice (1+ level))
-      
-      ;; Step 8: Global invariant validation
-      (when *global-invariants*
-        (unless (validate-global-invariants nil state)
-          (error "Global invariant violation after applying choice ~A at state ~A" 
-                 (choice-act choice) (list-database (problem-state.idb state)))))
-      
-      (when *global-invariants*
-        (narrate-bt "Global invariants validated after choice application" choice level))
-      
-      ;; Step 9: Add choice to stack
-      (push choice *choice-stack*)
-      
-      t)))
 
 
 (defun undo-choice-bt (choice state level)
@@ -227,49 +185,55 @@
   (unless choice
     (error "Cannot undo null choice. This indicates a serious bug in choice stack management."))
   
-  ;; Step 3: Verify choice is the most recent one on stack
+  ;; Step 2: Verify choice is the most recent one on stack
   (unless (and *choice-stack* (eq choice (first *choice-stack*)))
     (error "Choice stack corruption detected. Attempted to undo ~A but top of stack is ~A. Stack: ~A"
            choice (first *choice-stack*) *choice-stack*))
   
-  ;; Step 4: Look up action duration for time reversal
+  ;; Step 3: Look up action duration for time reversal
   (let* ((action-name (first (choice-act choice)))
          (action (find action-name *actions* :key #'action.name))
          (action-duration (if action (action.duration action) 1.0)))
     
-    ;; Step 5: Validate inverse update availability
+    ;; Step 4: Validate inverse update availability
     (unless (choice-inverse-update choice)
       (error "Cannot undo choice ~A: no inverse update available. This choice cannot be reversed."
              choice))
     
-    ;; Step 6: Apply inverse update with error handling
-    (handler-case 
-        (progn
-          (revise (problem-state.idb state) (choice-inverse-update choice))
+    ;; Step 5: Capture pre-undo state for debug transition display
+    (let ((pre-undo-state (copy-problem-state state)))
+      
+      ;; Step 6: Apply inverse update with error handling
+      (handler-case 
+          (progn
+            (revise (problem-state.idb state) (choice-inverse-update choice))
+            
+            ;; Step 7: Revert time field to previous state
+            (decf (problem-state.time state) action-duration)
+            
+            ;; Step 8: Validate inverse operation succeeded
+            (when *global-invariants*
+              (unless (validate-global-invariants nil state)
+                (error "Global invariant violation after undoing choice ~A. 
+                       This indicates a bug in the inverse update logic for action ~A"
+                       (choice-act choice) (first (choice-act choice))))))
           
-          ;; Step 7: Revert time field to previous state
-          (decf (problem-state.time state) action-duration)
-          
-          ;; Step 8: Validate inverse operation succeeded
-          (when *global-invariants*
-            (unless (validate-global-invariants nil state)
-              (error "Global invariant violation after undoing choice ~A. 
-                     This indicates a bug in the inverse update logic for action ~A"
-                     (choice-act choice) (first (choice-act choice))))))
-        
-        (error (e)
-          (error "Failed to undo choice ~A due to error: ~A. 
-                 This indicates corruption in inverse update logic." 
-                 (choice-act choice) e)))
-    
-    ;; Step 9: Successful validation after undo
-    (when *global-invariants*
-      (narrate-bt "Global invariants validated after choice undo" choice level))
-    
-    ;; Step 10: Remove the choice from stack
-    (pop *choice-stack*))
-    
-    t)
+          (error (e)
+            (error "Failed to undo choice ~A due to error: ~A. 
+                   This indicates corruption in inverse update logic." 
+                   (choice-act choice) e)))
+      
+      ;; Step 9: Debug output BEFORE removing from stack (shows pre-removal state)
+      (narrate-bt "Undoing choice" choice level pre-undo-state)
+      
+      ;; Step 10: Global invariant validation confirmation
+      (when *global-invariants*
+        (narrate-bt "Global invariants validated after choice undo" choice level))
+      
+      ;; Step 11: Remove the choice from stack (symmetric with apply-choice-bt timing)
+      (pop *choice-stack*)
+      
+      t)))
 
 
 (defun is-valid-partial-solution (state level)
@@ -490,7 +454,13 @@
                 (if *choice-stack*
                     (loop for i from 0
                           for stack-choice in *choice-stack*
-                          do (format t "  [~A] ~A~%" i (choice-act stack-choice)))
+                          do (format t "  [~A] ~A~A~%" 
+                                     i 
+                                     (choice-act stack-choice)
+                                     ;; Highlight current choice being processed
+                                     (if (and choice (eq stack-choice choice))
+                                         " ← current"
+                                         "")))
                     (format t "  <empty>~%")))
   #+:ww-debug (when (>= *debug* 5)
                 (simple-break))
@@ -523,9 +493,10 @@
 
 
 (defun detect-immediate-reversal (new-choice choice-stack)
-  "Check if new-choice immediately undoes the last choice"
+  "Check if new-choice immediately undoes the last choice using set-based comparison"
   (when choice-stack
     (let ((last-choice (first choice-stack)))
-      ;; Check if new forward-update matches last inverse-update
-      (equal (choice-forward-update new-choice)
-             (choice-inverse-update last-choice)))))
+      ;; Check if new forward-update matches last inverse-update (set comparison)
+      (alexandria:set-equal (choice-forward-update new-choice)
+                            (choice-inverse-update last-choice)
+                            :test #'equal))))
