@@ -41,6 +41,16 @@
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)
+  #+:ww-debug (when (and (<= *debug* 2) (>= *debug* 1))
+                (setf *search-tree* nil)
+                ;; Add initial state at depth 0
+                (push `(start-state                     ; no action for initial state
+                       0                        ; depth 0
+                       ""                       ; no message
+                       ,@(case *debug*
+                           (1 nil)
+                           (2 (list (list-database (problem-state.idb *backtrack-state*))))))
+                      *search-tree*))
   ;; Rigorous initial state validation
   (when *global-invariants*
     (unless (validate-global-invariants nil *backtrack-state*)
@@ -92,8 +102,8 @@
                   ;; Solution found at current level - register and handle continuation
                   (progn
                     (register-solution-bt level)
-                    (when (and *choice-stack* (first *choice-stack*))
-                      (narrate-bt "Solution found ***" (first *choice-stack*) level))
+                    ;(when (and *choice-stack* (first *choice-stack*))
+                    ;  (narrate-bt "Solution found ***" (first *choice-stack*) level))
                     (finish-output)
                     (setf found-any-solution t)
                     (undo-choice-bt choice state level)
@@ -117,10 +127,10 @@
   (increment-global *total-states-processed* 1)
   (when (> (1+ level) *max-depth-explored*)
     (setf *max-depth-explored* (1+ level)))
-  (print-search-progress)
-  #+:ww-debug (when (>= *debug* 3)
-                (format t "~2%Exploring state at level ~A~%" level)
-                (finish-output)))
+  (print-search-progress))
+  ;#+:ww-debug (when (>= *debug* 3)
+  ;              (format t "~2%Exploring state at level ~A~%" level)
+  ;              (finish-output)))
 
 
 (defun apply-choice-bt (choice state level)
@@ -413,19 +423,6 @@
           *search-tree*)))
 
 
-#+ignore (defun update-search-tree-bt (choice depth message)
-  (declare (type choice choice) (type fixnum depth) (type string message))
-  (when (and (not (> *threads* 0)) (>= *debug* 1))
-    (push `(,(choice-act choice)    ; Already formatted as (action-name arg1 arg2 ...)
-           ,depth
-           ,message
-           ,@(case *debug*
-               (1 nil)
-               (2 (list (list-database (problem-state.idb *backtrack-state*))
-                        (list-database (problem-state.hidb *backtrack-state*))))))
-          *search-tree*)))
-
-
 (defun narrate-bt (string choice depth &optional pre-state)
   "Enhanced narration function with refined progressive debug level disclosure"
   (declare (ignorable string choice depth pre-state))
@@ -494,60 +491,6 @@
   #+:ww-debug (when (>= *debug* 5)
                 (simple-break))
   
-  nil)
-
-
-#+ignore (defun narrate-bt (string choice depth &optional pre-state)
-  "Enhanced narration function with refined progressive debug level disclosure"
-  (declare (ignorable string choice depth pre-state))
-  #+:ww-debug (when (= *debug* 1)
-                (update-search-tree-bt choice depth string))
-  #+:ww-debug (when (>= *debug* 2)
-                (when (and string (not (string= string "")))
-                  (format t "~%~A:~%" string))
-                (when choice
-                  (format t "~%Action: ~A~%" (choice-act choice))
-                  (format t "Depth: ~A~%" depth)
-                  (format t "Forward Update: ~A~%" (choice-forward-update choice))
-                  (format t "Inverse Update: ~A~%" (choice-inverse-update choice)))
-                (unless choice
-                  (format t "Choice: <nil>~%"))
-                (if pre-state
-                    (progn
-                      (format t "Pre-State IDB:  ~A~%" (list-database (problem-state.idb pre-state)))
-                      (format t "Post-State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
-                      (when (problem-state.hidb pre-state)
-                        (format t "Pre-State HIDB:  ~A~%" (list-database (problem-state.hidb pre-state))))
-                      (when (problem-state.hidb *backtrack-state*)
-                        (format t "Post-State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
-                      (format t "Time Change: ~A -> ~A~%" 
-                              (problem-state.time pre-state) 
-                              (problem-state.time *backtrack-state*))
-                      (format t "Value Change: ~A -> ~A~%" 
-                              (problem-state.value pre-state) 
-                              (problem-state.value *backtrack-state*)))
-                    ;; Fallback when pre-state not available
-                    (progn
-                      (format t "Current State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
-                      (when (problem-state.hidb *backtrack-state*)
-                        (format t "Current State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
-                      (format t "Current Time: ~A~%" (problem-state.time *backtrack-state*))
-                      (format t "Current Value: ~A~%" (problem-state.value *backtrack-state*)))))
-  #+:ww-debug (when (>= *debug* 3)
-                (format t "--- Choice Stack (Length ~A) ---~%" (length *choice-stack*))
-                (if *choice-stack*
-                    (loop for i from 0
-                          for stack-choice in *choice-stack*
-                          do (format t "  [~A] ~A~A~%" 
-                                     i 
-                                     (choice-act stack-choice)
-                                     ;; Highlight current choice being processed
-                                     (if (and choice (eq stack-choice choice))
-                                         " ← current"
-                                         "")))
-                    (format t "  <empty>~%")))
-  #+:ww-debug (when (>= *debug* 5)
-                (simple-break))
   nil)
 
 
