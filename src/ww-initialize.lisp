@@ -14,7 +14,6 @@
 
 (defun init ()
   (format t "~&Initializing...")
-  ;(setf *current-problem-name* *problem-name*)
   (setf *query-names* (nreverse *query-names*))
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
@@ -51,9 +50,6 @@
           (format t "~&Make sure the list or vector elements are always ordered canonically (eg, lexicographically),")
           (format t "~&so that Wouldwork can tell if two states are the same or not.~%")
          (return)))
-  ;(when (and (eql *tree-or-graph* 'graph) (not (fixedp *relations*)))
-  ;  (format t "~%NOTE: In graph search, you could significantly improve search efficiency by")
-  ;  (format t "~&changing each dynamic relation to include at least one fluent ($) variable.~%"))
   (when (and (> *threads* 0) (not (member :sbcl *features*)))
     (format t "~%Note that multi-threading is not available unless running SBCL. Please reset *threads*
                in ww-settings.lisp to 0 and restart wouldwork.~%"))
@@ -69,9 +65,11 @@
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))
     (setf *tree-or-graph* 'tree)
     (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
+  (when (and (eq *algorithm* 'backtracking) (eq *problem-type* 'planning))
+    (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))
   (display-current-parameters)
   (when (and (eq *algorithm* 'backtracking) (<= *depth-cutoff* 0))
-             (format t "~%With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~2%"))
+    (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~2%"))
   (setf *ww-loading* nil))
 
 

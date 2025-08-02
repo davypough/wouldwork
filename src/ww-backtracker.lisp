@@ -172,18 +172,13 @@
         (narrate-bt "" choice (1+ level) pre-state)
         
         ;; Step 10: Global invariant validation with error recovery
-        (handler-case
-            (when *global-invariants*
-              (unless (validate-global-invariants nil state)
-                (error "Global invariant violation after applying choice ~A at state ~A" 
-                       (choice-act choice) (list-database (problem-state.idb state)))))
-          (error (e)
-            ;; Recovery: remove choice from stack before re-raising error
-            (pop *choice-stack*)
-            (error e)))
-        
         (when *global-invariants*
-          (narrate-bt "Global invariants validated after choice application" choice level pre-state))
+          (unless (validate-global-invariants nil state)
+            (error "Global invariant violation after applying choice ~A at state ~A" 
+                   (choice-act choice) (list-database (problem-state.idb state)))))
+        
+        ;(when *global-invariants*
+        ;  (narrate-bt "Global invariants validated after choice application" choice level pre-state))
         
         t))))
 
@@ -203,7 +198,7 @@
   ;; Step 3: Look up action duration for time reversal
   (let* ((action-name (first (choice-act choice)))
          (action (find action-name *actions* :key #'action.name))
-         (action-duration (if action (action.duration action) 1.0)))
+         (action-duration (action.duration action)))
     
     ;; Step 4: Validate inverse update availability
     (unless (choice-inverse-update choice)
@@ -213,34 +208,21 @@
     ;; Step 5: Capture pre-undo state for debug transition display
     (let ((pre-undo-state (copy-problem-state state)))
       
-      ;; Step 6: Apply inverse update with error handling
-      (handler-case 
-          (progn
-            (revise (problem-state.idb state) (choice-inverse-update choice))
-            
-            ;; Step 7: Revert time field to previous state
-            (decf (problem-state.time state) action-duration)
-            
-            ;; Step 8: Validate inverse operation succeeded
-            (when *global-invariants*
-              (unless (validate-global-invariants nil state)
-                (error "Global invariant violation after undoing choice ~A. 
-                       This indicates a bug in the inverse update logic for action ~A"
-                       (choice-act choice) (first (choice-act choice))))))
-          
-          (error (e)
-            (error "Failed to undo choice ~A due to error: ~A. 
-                   This indicates corruption in inverse update logic." 
-                   (choice-act choice) e)))
+      ;; Step 6: Apply inverse update
+      (revise (problem-state.idb state) (choice-inverse-update choice))
+      (decf (problem-state.time state) action-duration)
+      (when *global-invariants*
+        (unless (validate-global-invariants nil state)
+          (error "Global invariant violation after undoing choice ~A." (choice-act choice))))
       
-      ;; Step 9: Debug output BEFORE removing from stack (shows pre-removal state)
+      ;; Step 7: Debug output BEFORE removing from stack (shows pre-removal state)
       (narrate-bt "Backtracking to" choice level pre-undo-state)
       
-      ;; Step 10: Global invariant validation confirmation
+      ;; Step 8: Global invariant validation confirmation
       (when *global-invariants*
         (narrate-bt "Global invariants validated after choice undo" choice level))
       
-      ;; Step 11: Remove the choice from stack (symmetric with apply-choice-bt timing)
+      ;; Step 9: Remove the choice from stack (symmetric with apply-choice-bt timing)
       (pop *choice-stack*)
       
       t)))
@@ -284,8 +266,8 @@
   "Generate valid choices for action using algorithm-compatible effect processing"
   (declare (ignore level))
   ;; Step 1: Validate action structure
-  (unless (and action (action.pre-defun-name action) (action.eff-defun-name action))
-    (return-from generate-choices-for-action-bt nil))
+  ;(unless (and action (action.pre-defun-name action) (action.eff-defun-name action))
+  ;  (return-from generate-choices-for-action-bt nil))
   ;; Step 2: Execute precondition checking using WouldWork's mechanism
   (let ((precondition-fn (action.pre-defun-name action))
         (effect-fn (action.eff-defun-name action))
@@ -390,7 +372,7 @@
     (dolist (choice (reverse choice-stack))
       (let* ((action-name (first (choice-act choice)))
              (action (find action-name *actions* :key #'action.name))
-             (action-duration (if action (action.duration action) 1.0)))
+             (action-duration (action.duration action)))
         ;; Update cumulative time
         (setf cumulative-time (+ cumulative-time action-duration))
         ;; Build move record with correct time
@@ -464,7 +446,7 @@
                             (format t "Value Change: ~A -> ~A~%" 
                                     (problem-state.value pre-state) 
                                     (problem-state.value *backtrack-state*)))
-                          ;; Fallback when pre-state not available
+                          ;; Fallback when pre-state is nil
                           (progn
                             (format t "Current State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
                             (when (problem-state.hidb *backtrack-state*)
