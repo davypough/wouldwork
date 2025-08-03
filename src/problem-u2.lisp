@@ -9,7 +9,7 @@
 
 (ww-set *problem-type* planning)
 
-;(ww-set *depth-cutoff* 7)
+(ww-set *depth-cutoff* 5)
 
 (ww-set *solution-type* min-length)
 

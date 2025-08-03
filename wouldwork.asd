@@ -6,6 +6,16 @@
 (in-package :asdf-user)
 
 
+(defclass always-compile-file (asdf:cl-source-file)
+  ()
+  (:documentation "A source file that is always compiled, regardless of timestamps."))
+
+
+(defmethod asdf:operation-done-p ((o asdf:compile-op) (c always-compile-file))
+  "Always return NIL to force recompilation."
+  nil)
+
+
 (defsystem "wouldwork"
   :author ("Program Development, Dave Brown <davypough@gmail.com>"
            "Quicklisp Integration & Test, Gwang-Jin Kim <gwang.jin.kim.phd@gmail.com>")

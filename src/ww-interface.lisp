@@ -63,6 +63,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (display-current-parameters) alias (params)
    -- displays all parameters associated with the currently staged problem
 
+(refresh)
+  -- refreshes (ie, reloads) the current problem specification file after editing it
+
 (reset)
   -- if Wouldwork throws an error, it can be reinitialized and maybe enable continuing
 
@@ -212,6 +215,13 @@ any such settings appearing in the problem specification file.
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (reset-parameters)
   t)
+
+
+(defun refresh ()
+  "Refreshes the current problem.lisp file--eg, after editing it."
+  (uiop:delete-file-if-exists (in-src "problem.lisp"))
+  (with-silenced-compilation
+    (load-problem (string *problem-name*))))
   
 
 (defun reset-parameters ()

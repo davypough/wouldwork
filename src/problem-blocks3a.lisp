@@ -37,6 +37,7 @@
   (standard ?block block ?target support)  ;standard (optional) means ?block /= ?target 
   (and (cleartop? ?block)                  ;?block must have a clear top
        (bind (on ?block $block-support))   ;get the $block-support under ?block
+       (different ?target $block-support)  ;prevents a no-change action
        (or (and (block ?target) (cleartop? ?target))  ;there is no block on the ?target block
            (table ?target)))                          ;or the ?target is the table
   (?block ?target)                         ;the action description will be (put ?block ?target)

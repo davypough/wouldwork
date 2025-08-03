@@ -250,14 +250,31 @@
     (funcall (symbol-function 'goal-fn) state)))
 
 
-(defun create-inverse-update (forward-literals)
-  "Create logical inverse of forward update with systematic negation handling"
+(defun create-inverse-update (forward-literals instantiations)
+  "Create forward literals by reconstructing fluent literals from action instantiations.
+   For fluent propositions, substitute instantiation values at fluent positions.
+   For non-fluent propositions, use logical negation."
   (mapcar (lambda (literal)
             (cond
              ;; Case 1: Negated literal -> remove negation
              ((and (listp literal) (eq (car literal) 'not))
               (second literal))
-             ;; Case 2: Positive literal -> add negation
+             ;; Case 2: Fluent proposition -> reconstruct using instantiations
+             ((get-prop-fluent-indices literal)
+              (let* ((fluent-indices (get-prop-fluent-indices literal))
+                     ;; Extract non-fluent values from current literal
+                     (non-fluent-values 
+                      (loop for i from 1 below (length literal)
+                            unless (member i fluent-indices)
+                            collect (nth i literal)))
+                     ;; Determine available instantiation values for fluent substitution
+                     (available-for-fluents 
+                      (remove-if (lambda (inst) 
+                                   (member inst non-fluent-values :test #'equal))
+                                 instantiations)))
+                ;; Efficient single-pass substitution using existing utility
+                (ut::subst-items-at-ascending-indexes available-for-fluents fluent-indices literal)))
+             ;; Case 3: Non-fluent positive literal -> add negation
              (t `(not ,literal))))
           forward-literals))
 
@@ -265,21 +282,18 @@
 (defun generate-choices-for-action-bt (action state level)
   "Generate valid choices for action using algorithm-compatible effect processing"
   (declare (ignore level))
-  ;; Step 1: Validate action structure
-  ;(unless (and action (action.pre-defun-name action) (action.eff-defun-name action))
-  ;  (return-from generate-choices-for-action-bt nil))
-  ;; Step 2: Execute precondition checking using WouldWork's mechanism
+  ;; Execute precondition checking
   (let ((precondition-fn (action.pre-defun-name action))
         (effect-fn (action.eff-defun-name action))
         (parameter-combinations (action.precondition-args action)))
-    ;; Step 3: Filter valid precondition instantiations
+    ;; Filter valid precondition instantiations
     (let ((pre-results 
            (remove-if #'null 
                       (mapcar (lambda (pinsts)
                                 (apply precondition-fn state pinsts))
                               parameter-combinations))))
       (when pre-results
-        ;; Step 4: Generate effect updates using our new algorithm-compatible lambda
+        ;; Generate effect updates
         (let ((updated-dbs 
                (mapcan (lambda (pre-result)
                          (if (eql pre-result t)
@@ -287,9 +301,13 @@
                              (apply effect-fn state pre-result)))
                        pre-results))
               (choices '()))
-          ;; Step 5: Convert update structures to choice objects
+          ;; Convert update structures to choice objects
           (dolist (updated-db updated-dbs)
-            (let* ((forward-literals (create-inverse-update (update.changes updated-db)))
+            ;; Counter-intuitively, create-inverse-update computes what needs to change
+            ;; to get from the current state to the successor state.
+            ;; Note update.changes is used differently in backtracking vs depth-first.
+            (let* ((forward-literals (create-inverse-update (update.changes updated-db)
+                                                            (update.instantiations updated-db)))
                    (inverse-literals (update.changes updated-db))
                    (combined-act (cons (action.name action)
                                        (update.instantiations updated-db)))
@@ -297,6 +315,11 @@
                                         :forward-update forward-literals
                                         :inverse-update inverse-literals
                                         :level level)))
+              ;(ut::prt (action.name action)
+              ;         (update.instantiations updated-db)
+              ;         (update.changes updated-db)
+              ;         forward-literals
+              ;         inverse-literals)
               (push choice choices)))
           choices)))))
 
