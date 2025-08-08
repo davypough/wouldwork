@@ -278,70 +278,51 @@
   literal)
 
 
-(defun update-bt (db literal)
+#+ignore (defun update-bt (db literal)
   "For backtracking, single add or delete from db.
-   Returns the restoring proposition for change tracking."
+   Returns the update proposition for change tracking."
   (declare (type hash-table db))
   (when *print-updates*
     (ut::prt literal))
   (if (eql (car literal) 'not)
-      ;; Negative literal: delete from database
-      (let ((proposition (second literal)))
-        (if (get-prop-fluent-indices proposition)
-            ;; Negative fluent: capture current database value before deletion
-            (let* ((fluentless-prop (get-fluentless-prop proposition))
-                   (int-db (eql (hash-table-test db) 'eql))
-                   (key (if int-db (convert-to-integer fluentless-prop) fluentless-prop)))
-              (multiple-value-bind (vals present-p)
-                  (gethash key db)
-                (delete-proposition proposition db)
-                (when present-p
-                  ;; Reconstruct current database proposition for restoration
-                  (let ((restored-prop (copy-list fluentless-prop)))
-                    (loop for index in (get-prop-fluent-indices proposition)
-                          for val in vals
-                          do (ut::ninsert-list val index restored-prop))
-                    restored-prop))))
-            ;; Negative non-fluent: return positive form for restoration
-            (progn
-              (delete-proposition proposition db)
-              proposition)))
-      ;; Positive literal: add to database
-      (progn
-        (if (get-prop-fluent-indices literal)
-            ;; Positive fluent: capture current database value before overwriting
-            (let* ((fluentless-prop (get-fluentless-prop literal))
-                   (int-db (eql (hash-table-test db) 'eql))
-                   (key (if int-db (convert-to-integer fluentless-prop) fluentless-prop)))
-              (multiple-value-bind (vals present-p)
-                  (gethash key db)
-                (add-proposition literal db)
-                (if present-p
-                    ;; Reconstruct original proposition for restoration
-                    (let ((restored-prop (copy-list fluentless-prop)))
-                      (loop for index in (get-prop-fluent-indices literal)
-                            for val in vals
-                            do (ut::ninsert-list val index restored-prop))
-                      restored-prop)
-                    ;; No original value - return negation to delete during revert
-                    (let ((result `(not ,literal)))
-                      result))))
-            ;; Positive non-fluent: return negation for restoration
-            (progn
-              (add-proposition literal db)
-              (let ((result `(not ,literal)))
-                result))))))
+    (delete-proposition (second literal) db)
+    (add-proposition literal db))
+  literal)
 
 
-(defun revert-updates (db changes-list)
-  "For backtracking, undoes a list of changes to restore database to previous state"
+(defun update-bt (db literal)
+  "For backtracking, single add or delete from db.
+   Returns the update proposition as first value.
+   For fluent updates, returns the previous literal as second value."
   (declare (type hash-table db))
-  (dolist (change changes-list)
-    (when change  ; Skip nil values from non-existent database entries
-      (if (eql (car change) 'not)
-          (delete-proposition (second change) db)
-          (add-proposition change db))))
-  db)
+  (when *print-updates*
+    (ut::prt literal))
+  (if (eql (car literal) 'not)
+      ;; Negative literal: deletion case
+      (progn
+        (delete-proposition (second literal) db)
+        (values literal (second literal)))   ;should return inverse = not literal
+      ;; Positive literal: addition/update case
+      (if (get-prop-fluent-indices literal)
+          ;; Fluent case: capture current value before overwriting
+          (let* ((fluentless-prop (get-fluentless-prop literal))
+                 (key (convert-to-integer fluentless-prop)))
+            (multiple-value-bind (vals present-p)
+                (gethash key db)
+              (add-proposition literal db)
+              (if present-p
+                  ;; Reconstruct previous literal
+                  (let ((previous-literal fluentless-prop))
+                    (loop for index in (get-prop-fluent-indices literal)
+                          for val in vals
+                          do (ut::ninsert-list val index previous-literal))
+                    (values literal previous-literal))
+                  ;; No previous value exists
+                  (values literal (list 'not literal)))))
+          ;; Non-fluent case: standard behavior
+          (progn
+            (add-proposition literal db)
+            (values literal (list 'not literal))))))
 
 
 (defun expand-into-plist (parameters)

@@ -128,7 +128,9 @@
       ;; Write operation: Effect context and not in forced read-mode
       (case *algorithm*
         (depth-first `(update (problem-state.idb state) ,(translate-list form flag)))
-        (backtracking `(push (update-bt (problem-state.idb state) ,(translate-list form flag)) changes-list)))
+        (backtracking `(multiple-value-bind (forward inverse) 
+                           (update-bt (problem-state.idb state) ,(translate-list form flag))
+                         (push (list forward inverse) changes-list))))
       ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
       (translate-proposition form flag)))
 
@@ -141,8 +143,9 @@
       ;; Write operation: Effect context and not in forced read-mode
       (case *algorithm*
         (depth-first `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
-        (backtracking `(push (update-bt (problem-state.idb state)
-                                        (list 'not ,(translate-list (second form) flag))) changes-list)))
+        (backtracking `(multiple-value-bind (forward inverse) 
+                           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+                         (push (list forward inverse) changes-list))))
       ;; Read operation: All other cases
       `(not ,(translate-positive-relation (second form) flag))))
 
@@ -410,13 +413,12 @@
 
 
 (defun translate-assert-bt (form flag)
-  "For backtracking, translates an assert statement with selective write-mode context."
+  "For backtracking, translates an assert statement with clean separation of concerns."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
     (pre `(let (changes-list)
-            (declare (special changes-list))  ;pass to any included update functions
+            (declare (special changes-list))
             ,@(mapcar (lambda (statement)
-                        ;; Bind read-mode to nil only for direct assert statements
                         (let ((*proposition-read-mode* nil))
                           (translate statement 'eff)))
                       (cdr form))
@@ -427,8 +429,6 @@
                                :instantiations (list ,@*eff-param-vars*) 
                                :followups (reverse followups))
                   updated-dbs)
-            ;; revert changes to restore original state
-            (revert-updates (problem-state.idb *backtrack-state*) changes-list)
             updated-dbs))))
 
 

@@ -16,6 +16,8 @@
 
 (ww-set *tree-or-graph* tree)  ;fast, don't bother to check for repeated states
 
+(ww-set *depth-cutoff* 3)
+
 
 (define-types
     block (A B C)
