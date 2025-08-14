@@ -107,7 +107,7 @@
                          ((bind let)  (alexandria:appendf valid-vars
                                         (remove-if-not #'varp (second item))))))))
     (ut::if-it (set-difference all-detected-vars valid-vars)
-      (error "Check spelling of unknown variables ~A in ~A" ut::it action-name))))
+      (error "Check spelling or use of unknown variables ~A in ~A" ut::it action-name))))
                  
                     
 (defun check-precondition-parameters (pre-parameter-list)

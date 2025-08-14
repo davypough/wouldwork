@@ -51,25 +51,31 @@
           (format t "~&so that Wouldwork can tell if two states are the same or not.~%")
          (return)))
   (when (and (> *threads* 0) (not (member :sbcl *features*)))
-    (format t "~%Note that multi-threading is not available unless running SBCL. Please reset *threads*
+    (format t "~%Note: Multi-threading is not available unless running SBCL. Please reset *threads*
                in ww-settings.lisp to 0 and restart wouldwork.~%"))
   (when (and (> *threads* 0) (> *debug* 1))
     (setf *debug* 1)
-    (format t "~%ADVISORY: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
+    (format t "~%Note: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
     (if (probe-file vals-file)
       (read-globals)    ;restore globals for old problem.lisp from vals.lisp
       (save-globals)))  ;save globals for new problem.lisp into vals.lisp
   (when (eq *problem-name* 'unspecified)
-    (format t "~2%Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
+    (format t "~%Note: Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
+  (when (and (eq *algorithm* 'backtracking) (> *threads* 0))
+    (error "~%Note: Backtracking is not compatible with parallel processing.~%"))
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))
     (setf *tree-or-graph* 'tree)
     (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
   (when (and (eq *algorithm* 'backtracking) (eq *problem-type* 'planning))
     (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))
+  (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))
+    (format t "~%Note: A CSP problem solution has no repeated states, so tree search is more efficient.~%"))
   (display-current-parameters)
   (when (and (eq *algorithm* 'backtracking) (<= *depth-cutoff* 0))
-    (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~2%"))
+    (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%"))
+  (when (and (eq *problem-type* 'csp) (/= *depth-cutoff* 0))
+    (format t  "~%Note: For a CSP, set *depth-cutoff* to 0, unless debugging.~%")) 
   (setf *ww-loading* nil))
 
 

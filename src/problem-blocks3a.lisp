@@ -16,6 +16,8 @@
 
 (ww-set *tree-or-graph* graph)  ;eliminate repeated states
 
+(ww-set *depth-cutoff* 3)  ;useful if *algorithm* = backtracking
+
 
 (define-types
   block (A B C)

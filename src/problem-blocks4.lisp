@@ -15,6 +15,8 @@
 
 (ww-set *tree-or-graph* graph)
 
+(ww-set *depth-cutoff* 4)
+
 
 (define-types
     block (A B C D)

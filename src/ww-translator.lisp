@@ -344,7 +344,7 @@
   "Conditional translation with proper read-mode isolation."
   (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
             (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
-    (error "AND not allowed in <then> or <else> clause of IF statement; use DO: ~A" form))
+    (error "AND not allowed in <then> or <else> clause of IF statement; use DO in effect: ~A" form))
   ;; Test translation with forced read-mode
   (let ((test-translation (let ((*proposition-read-mode* t))
                             (translate (second form) flag))))

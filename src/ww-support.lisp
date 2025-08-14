@@ -278,18 +278,6 @@
   literal)
 
 
-#+ignore (defun update-bt (db literal)
-  "For backtracking, single add or delete from db.
-   Returns the update proposition for change tracking."
-  (declare (type hash-table db))
-  (when *print-updates*
-    (ut::prt literal))
-  (if (eql (car literal) 'not)
-    (delete-proposition (second literal) db)
-    (add-proposition literal db))
-  literal)
-
-
 (defun update-bt (db literal)
   "For backtracking, single add or delete from db.
    Returns the update proposition as first value.
@@ -300,7 +288,7 @@
   (if (eql (car literal) 'not)
       ;; Negative literal: deletion case
       (progn
-        (delete-proposition (second literal) db)
+        ;(delete-proposition (second literal) db)
         (values literal (second literal)))   ;should return inverse = not literal
       ;; Positive literal: addition/update case
       (if (get-prop-fluent-indices literal)
@@ -309,10 +297,10 @@
                  (key (convert-to-integer fluentless-prop)))
             (multiple-value-bind (vals present-p)
                 (gethash key db)
-              (add-proposition literal db)
+              ;(add-proposition literal db)
               (if present-p
                   ;; Reconstruct previous literal
-                  (let ((previous-literal fluentless-prop))
+                  (let ((previous-literal (copy-list fluentless-prop)))
                     (loop for index in (get-prop-fluent-indices literal)
                           for val in vals
                           do (ut::ninsert-list val index previous-literal))
@@ -321,7 +309,7 @@
                   (values literal (list 'not literal)))))
           ;; Non-fluent case: standard behavior
           (progn
-            (add-proposition literal db)
+            ;(add-proposition literal db)
             (values literal (list 'not literal))))))
 
 

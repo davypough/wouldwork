@@ -41,6 +41,28 @@
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)
+
+  ;; initial state validation
+  (when *global-invariants*
+    (unless (validate-global-invariants nil *backtrack-state*)
+      (format t "~%Invariant validation failed on initial state.~%")
+      (return-from search-backtracking nil)))
+
+  ;; Check if start state satisfies goal condition
+  (when (is-complete-solution)
+    (register-solution-bt 0)
+    (narrate-bt "Solution found at start ***" nil 0)
+    (return-from search-backtracking t))
+  ;(when (and (fboundp 'goal-fn)
+  ;           (funcall (symbol-function 'goal-fn) *backtrack-state*))
+  ;  (let ((dummy-choice (make-choice :act '(initial-state)
+  ;                                   :forward-update nil
+  ;                                   :inverse-update nil
+  ;                                   :level 0)))
+  ;    (narrate-bt "Solution found at initial state ***" dummy-choice 0)
+  ;    (register-solution-bt 0)
+  ;    (return-from search-backtracking *solutions*)))
+
   #+:ww-debug (when (and (<= *debug* 2) (>= *debug* 1))
                 (setf *search-tree* nil)
                 ;; Add initial state at depth 0
@@ -51,34 +73,19 @@
                            (1 nil)
                            (2 (list (list-database (problem-state.idb *backtrack-state*))))))
                       *search-tree*))
-  ;; Rigorous initial state validation
-  (when *global-invariants*
-    (unless (validate-global-invariants nil *backtrack-state*)
-      (format t "~%Invariant validation failed on initial state.~%")
-      (return-from search-backtracking nil)))
-  ;; Check if start state satisfies goal condition
-  (when (and (fboundp 'goal-fn)
-             (funcall (symbol-function 'goal-fn) *backtrack-state*))
-    (let ((dummy-choice (make-choice :act '(initial-state)
-                                     :forward-update nil
-                                     :inverse-update nil
-                                     :level 0)))
-      (narrate-bt "Solution found at initial state ***" dummy-choice 0)
-      (register-solution-bt 0)
-      (return-from search-backtracking *solutions*)))
+
   ;; Initiate recursive backtracking search
-  (let ((search-result (backtrack 0)))
-    (declare (ignore search-result))
-    ;; Compute final statistics
-    (setf *average-branching-factor* 
-          (if (> *program-cycles* 0)
-              (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float)
-              0.0))
-    *solutions*))
+  (backtrack 0)
+  ;; Compute final statistics
+  (setf *average-branching-factor* (if (> *program-cycles* 0)
+                                     (coerce (/ (1- *total-states-processed*) *program-cycles*)
+                                             'single-float)
+                                     0.0))
+  t)
 
 
-(defun preprocess-state (level)
-  "Hook: Preprocessing with statistics tracking and debugging"
+(defun update-statistics (level)
+  "Update search statistics."
   (increment-global *program-cycles* 1)
   (increment-global *total-states-processed* 1)
   (when (> (1+ level) *max-depth-explored*)
@@ -87,102 +94,71 @@
 
 
 (defun backtrack (level)
-  "Recursive backtracking search with individual parameter combination processing.
-   Eliminates database corruption through systematic state isolation and restoration."
+  "Recursive backtracking search over new states from assert clauses."
   
-  ;; Step 1: Enforce depth cutoff - prevent processing AT the cutoff level
+  ;; Step 1: Enforce depth cutoff
   (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
     (return-from backtrack nil))
   
-  ;; Step 2: Update search statistics and perform debugging hooks
-  (preprocess-state level)
+  ;; Step 2: Update search statistics
+  (update-statistics level)
   
   ;; Step 3: Process each action with individual parameter combination handling
   (let ((found-a-solution nil))
     (dolist (action *actions*)
-      (let ((parameter-combinations (action.precondition-args action))
+      (let ((parameter-combinations (if (action.dynamic action)
+                                      ;; Dynamic case: compute combinations from current state
+                                      (eval-instantiated-spec (action.precondition-type-inst action) 
+                                                              *backtrack-state*)
+                                      ;; Static case: use pre-computed combinations
+                                      (action.precondition-args action)))
             (precondition-fn (action.pre-defun-name action)))
         
-        ;; Process each parameter combination individually against clean state
+        ;; Process each parameter combination individually against current state
         (dolist (param-combo parameter-combinations)
           (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))
             (when precondition-result  ; Only process if preconditions satisfied
               (let ((choices-from-combination 
-                     (generate-choices-for-single-combination-bt action param-combo precondition-result level)))
+                      (generate-choices-for-single-combination-bt action param-combo
+                                                                  precondition-result level)))
                 
                 ;; Process each choice generated from this parameter combination
-                ;; (Multiple choices possible due to conditional assert statements)
+                ;; (Multiple choices possible due to multiple assert statements in an action)
                 (dolist (choice choices-from-combination)
                   (unless (detect-path-cycle choice)
                     (when (register-choice-bt choice action level)
-                      (if (is-complete-solution)
+                      (unwind-protect
+                        (if (is-complete-solution)
                           ;; Solution found at current level - register and handle continuation
-                          (progn
-                            (register-solution-bt level)
-                            (narrate-bt "Solution found ***" (first *choice-stack*) level)
-                            (finish-output)
-                            (setf found-a-solution t)
-                            (undo-choice-bt choice action level)
-                            ;; Check if we should stop after first solution
-                            (when (eq *solution-type* 'first)
-                              (return-from backtrack t)))
+                          (progn (register-solution-bt (1+ level))
+                                 (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
+                                 (finish-output)
+                                 (setf found-a-solution t)
+                                 (when (eq *solution-type* 'first)
+                                   (return-from backtrack t)))
                           ;; No solution yet - continue recursive exploration
                           (let ((deeper-result (backtrack (1+ level))))
-                            (undo-choice-bt choice action level)
                             (when deeper-result
                               (setf found-a-solution t)
                               (when (eq *solution-type* 'first)
-                                (return-from backtrack t))))))))))))))
+                                (return-from backtrack t)))))
+                        (undo-choice-bt choice action level)))))))))))
     found-a-solution))
 
 
 (defun generate-choices-for-single-combination-bt (action param-combo precondition-result level)
   "Generate multiple choices from one parameter combination processing.
-   Each choice represents one conditional execution path (assert statement) from effect function.
-   Successor state is fully constructed (database + time + value) before validation."
+   Effect function computes updates but does NOT modify *backtrack-state*."
   
   (let ((effect-fn (action.eff-defun-name action))
-        (original-value (problem-state.value *backtrack-state*))
         (choices '()))
 
-    #+:ww-debug (when (>= *debug* 3)
-                  (format t "~%Current state: ~A~%" (list-database (problem-state.idb *backtrack-state*))))
-    
-    ;; Step 1: Execute effect function once - captures all conditional assert executions
+    ;; Step 1: Execute effect function to compute updates (no state modification)
     (let ((updated-dbs (if (eql precondition-result t)
                            (funcall effect-fn *backtrack-state*)
                            (apply effect-fn *backtrack-state* precondition-result))))
       
-      ;; Step 2: Complete successor state construction - time and value updates
-      (incf (problem-state.time *backtrack-state*) (action.duration action))
-      (when updated-dbs
-        (setf (problem-state.value *backtrack-state*) 
-              (update.value (first (last updated-dbs)))))
-      
-      ;; Step 3: Global invariant validation on complete successor state
-      (when *global-invariants*
-        (unless (validate-global-invariants nil *backtrack-state*)
-          ;; Critical: Restore complete original state before error signaling
-          (dolist (updated-db (reverse updated-dbs))
-            (revise (problem-state.idb *backtrack-state*) 
-                    (mapcar #'second (update.changes updated-db))))
-          (decf (problem-state.time *backtrack-state*) (action.duration action))
-          (setf (problem-state.value *backtrack-state*) original-value)
-          (error "Global invariant violation in successor state from action ~A with parameters ~A" 
-                 (action.name action) param-combo)))
-      
-      ;; Step 4: Constraint validation with complete state restoration on failure
-      (when (and (fboundp 'constraint-fn)
-                 (not (funcall (symbol-function 'constraint-fn) *backtrack-state*)))
-        ;; Restore complete original state and return empty choice list
-        (dolist (updated-db (reverse updated-dbs))
-          (revise (problem-state.idb *backtrack-state*) 
-                  (mapcar #'second (update.changes updated-db))))
-        (decf (problem-state.time *backtrack-state*) (action.duration action))
-        (setf (problem-state.value *backtrack-state*) original-value)
-        (return-from generate-choices-for-single-combination-bt nil))
-      
-      ;; Step 5: Process each updated-db into separate choice structure
+      ;; Step 2: Process each updated-db into separate choice structure
       (dolist (updated-db updated-dbs)
         (let ((change-pairs (update.changes updated-db)))
           (when change-pairs  ; Only create choice if changes exist
@@ -199,51 +175,62 @@
                                              :level level)))
                 (push new-choice choices))))))
       
-      ;; Step 6: Return choices in forward execution order
+      ;; Step 3: Return choices in forward execution order
       (nreverse choices))))
 
 
 (defun register-choice-bt (choice action level)
-  "Register a choice commitment after forward updates have been applied to *backtrack-state*"
-  
-  ;; Step 2: Add choice to stack for future backtracking
+  "Register a choice commitment, apply forward updates, and validate resulting state"
+    
+  #+:ww-debug
+  (when (>= *debug* 3)
+    (format t "~%Current state: ~A~%" (list-database (problem-state.idb *backtrack-state*))))
+
+  ;; Step 1: Apply forward update
+  (revise (problem-state.idb *backtrack-state*) (choice.forward-update choice))
+
+  ;; Step 2: Time update
+  (incf (problem-state.time *backtrack-state*) (action.duration action))
+
+  ;; Step 3: Global invariants
+  (when *global-invariants*
+    (unless (validate-global-invariants nil *backtrack-state*)
+      (revise (problem-state.idb *backtrack-state*) (choice.inverse-update choice))
+      (decf (problem-state.time *backtrack-state*) (action.duration action))
+      (error "Global invariant violation in successor state from action ~A" (choice.act choice))))
+
+  ;; Step 4: Constraint
+  (when (and (fboundp 'constraint-fn)
+             (not (funcall (symbol-function 'constraint-fn) *backtrack-state*)))
+    (revise (problem-state.idb *backtrack-state*) (choice.inverse-update choice))
+    (decf (problem-state.time *backtrack-state*) (action.duration action))
+    (return-from register-choice-bt nil))
+
+  ;; Step 5: Choice stack
   (push choice *choice-stack*)
-  
-  ;; Step 3: Debug output without pre-state information
+
+  ;; Step 6: Debug output
   (narrate-bt "" choice (1+ level))
-  
+
   t)
 
 
 (defun undo-choice-bt (choice action level)
   "Undo a choice from the current state with time reversal and stack management"
-  
-  ;; Step 1: Apply inverse update to restore previous state
+
+  ;; Inverse state update
   (revise (problem-state.idb *backtrack-state*) (choice.inverse-update choice))
-  
-  ;; Step 2: Reverse time increment made during choice registration
+
+  ;; Reverse time
   (decf (problem-state.time *backtrack-state*) (action.duration action))
-  
-  ;; Step 3: Debug output for backtracking operation
+
+  ;; Debug
   (narrate-bt "Backtracking to" choice level)
-  
-  ;; Step 4: Remove choice from stack (symmetric with register-choice-bt)
+
+  ;; Stack handling
   (pop *choice-stack*)
-  
+
   t)
-
-
-(defun is-valid-partial-solution ()
-  "Hook: Check if current partial solution is valid"
-  ;; Use wouldwork's existing constraint checking
-  (and (or (not (fboundp 'constraint-fn))
-           (not (symbol-value 'constraint-fn))
-           (funcall (symbol-function 'constraint-fn) *backtrack-state*))
-       ;; Check global invariants if they exist
-       (or (not *global-invariants*)
-           (every (lambda (invariant-fn)
-                    (funcall invariant-fn nil *backtrack-state*))
-                  *global-invariants*))))
 
 
 (defun is-complete-solution ()
@@ -281,9 +268,9 @@
           *search-tree*)))
 
 
-(defun narrate-bt (string choice depth &optional pre-state)
+(defun narrate-bt (string choice depth)
   "Enhanced narration function with refined progressive debug level disclosure"
-  (declare (ignorable string choice depth pre-state))
+  ;(declare (ignorable string choice depth))
   
   ;; Debug levels 1 & 2: Build search tree (but not for backtracking messages)
   #+:ww-debug (when (and (<= *debug* 2) (>= *debug* 1))
@@ -307,28 +294,11 @@
                         (format t "Inverse Update: ~A~%" (choice.inverse-update choice)))
                       (unless choice
                         (format t "Choice: <nil>~%"))
-                      (if pre-state
-                          ;; When pre-state is available, show complete transition
-                          (progn
-                            ;(format t "Pre-State IDB:  ~A~%" (list-database (problem-state.idb pre-state)))
-                            (format t "Post-State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
-                            ;(when (problem-state.hidb pre-state)
-                            ;  (format t "Pre-State HIDB:  ~A~%" (list-database (problem-state.hidb pre-state))))
-                            (when (problem-state.hidb *backtrack-state*)
-                              (format t "Post-State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
-                            (format t "Time Change: ~A -> ~A~%" 
-                                    (problem-state.time pre-state) 
-                                    (problem-state.time *backtrack-state*))
-                            (format t "Value Change: ~A -> ~A~%" 
-                                    (problem-state.value pre-state) 
-                                    (problem-state.value *backtrack-state*)))
-                          ;; Fallback when pre-state is nil
-                          (progn
-                            (format t "Successor State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
-                            (when (problem-state.hidb *backtrack-state*)
-                              (format t "Successor State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
-                            (format t "Successor Time: ~A~%" (problem-state.time *backtrack-state*))
-                            (format t "Successor Value: ~A~%" (problem-state.value *backtrack-state*)))))))
+                      (format t "Successor State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))
+                      (when (problem-state.hidb *backtrack-state*)
+                        (format t "Successor State HIDB: ~A~%" (list-database (problem-state.hidb *backtrack-state*))))
+                        (format t "Successor Time: ~A~%" (problem-state.time *backtrack-state*))
+                        (format t "Successor Value: ~A~%" (problem-state.value *backtrack-state*)))))
   
   ;; Debug level 4+: Add choice stack visualization  
   #+:ww-debug (when (>= *debug* 4)

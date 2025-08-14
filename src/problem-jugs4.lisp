@@ -12,6 +12,8 @@
 
 (ww-set *solution-type* min-length)
 
+(ww-set *depth-cutoff* 6)
+
 
 (define-types
     jug (jug1 jug2 jug3 jug4))
