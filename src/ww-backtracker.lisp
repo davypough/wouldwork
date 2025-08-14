@@ -103,6 +103,64 @@
   ;; Step 2: Update search statistics
   (update-statistics level)
   
+  ;; Step 3: CSP-aware action selection and processing
+  (let ((found-a-solution nil)
+        ;; CSP RESTRICTION: Select actions based on problem type and level
+        (actions (if (and (eql *problem-type* 'csp) (< level (length *actions*)))
+                     (list (nth level *actions*))  ; CSP: single action per level
+                     *actions*)))                   ; Planning: all actions
+    
+    (dolist (action actions)
+      (let ((parameter-combinations (if (action.dynamic action)
+                                      ;; Dynamic case: compute combinations from current state
+                                      (eval-instantiated-spec (action.precondition-type-inst action) 
+                                                              *backtrack-state*)
+                                      ;; Static case: use pre-computed combinations
+                                      (action.precondition-args action)))
+            (precondition-fn (action.pre-defun-name action)))
+        
+        ;; Process each parameter combination individually against current state
+        (dolist (param-combo parameter-combinations)
+          (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))
+            (when precondition-result  ; Only process if preconditions satisfied
+              (let ((choices-from-combination 
+                      (generate-choices-for-single-combination-bt action param-combo
+                                                                  precondition-result level)))
+                
+                ;; Process each choice generated from this parameter combination
+                ;; (Multiple choices possible due to multiple assert statements in an action)
+                (dolist (choice choices-from-combination)
+                  (unless (detect-path-cycle choice)
+                    (when (register-choice-bt choice action level)
+                      (unwind-protect
+                        (if (is-complete-solution)
+                          ;; Solution found at current level - register and handle continuation
+                          (progn (register-solution-bt (1+ level))
+                                 (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
+                                 (finish-output)
+                                 (setf found-a-solution t)
+                                 (when (eq *solution-type* 'first)
+                                   (return-from backtrack t)))
+                          ;; No solution yet - continue recursive exploration
+                          (let ((deeper-result (backtrack (1+ level))))
+                            (when deeper-result
+                              (setf found-a-solution t)
+                              (when (eq *solution-type* 'first)
+                                (return-from backtrack t)))))
+                        (undo-choice-bt choice action level)))))))))))
+    found-a-solution))
+
+
+#+ignore (defun backtrack (level)
+  "Recursive backtracking search over new states from assert clauses."
+  
+  ;; Step 1: Enforce depth cutoff
+  (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
+    (return-from backtrack nil))
+  
+  ;; Step 2: Update search statistics
+  (update-statistics level)
+  
   ;; Step 3: Process each action with individual parameter combination handling
   (let ((found-a-solution nil))
     (dolist (action *actions*)
@@ -189,7 +247,8 @@
   ;; Step 1: Apply forward update
   (revise (problem-state.idb *backtrack-state*) (choice.forward-update choice))
 
-  ;; Step 2: Time update
+  ;; Step 2: Name and time update
+  (setf (problem-state.name *backtrack-state*) (action.name action))
   (incf (problem-state.time *backtrack-state*) (action.duration action))
 
   ;; Step 3: Global invariants
@@ -221,7 +280,11 @@
   ;; Inverse state update
   (revise (problem-state.idb *backtrack-state*) (choice.inverse-update choice))
 
-  ;; Reverse time
+  ;; Reverse name & time
+  (setf (problem-state.name *backtrack-state*) 
+        (if (> (length *choice-stack*) 1)
+          (first (choice.act (second *choice-stack*)))  ; Previous action name
+          'start))
   (decf (problem-state.time *backtrack-state*) (action.duration action))
 
   ;; Debug

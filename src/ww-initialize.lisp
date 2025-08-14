@@ -71,11 +71,14 @@
     (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))
   (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))
     (format t "~%Note: A CSP problem solution has no repeated states, so tree search is more efficient.~%"))
-  (display-current-parameters)
   (when (and (eq *algorithm* 'backtracking) (<= *depth-cutoff* 0))
-    (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%"))
-  (when (and (eq *problem-type* 'csp) (/= *depth-cutoff* 0))
-    (format t  "~%Note: For a CSP, set *depth-cutoff* to 0, unless debugging.~%")) 
+    (if (eq *problem-type* 'csp)
+      (progn (setf *depth-cutoff* (length *actions*))
+             (format t "~%Note: Setting a *depth-cutoff* as a protection against infinite recursion.~%"))
+      (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%")))
+  ;(when (and (eq *problem-type* 'csp) (/= *depth-cutoff* 0))
+  ;  (format t  "~%Note: For a CSP, set *depth-cutoff* to 0, unless debugging.~%")) 
+  (display-current-parameters)
   (setf *ww-loading* nil))
 
 
