@@ -12,7 +12,7 @@
 (defvar *test-problem-files*
   '("problem-blocks3.lisp" "problem-blocks3a.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp" "problem-queens8.lisp"
-    "problem-captjohn-csp.lisp" "problem-quern.lisp" "problem-graveyard.lisp" "problem-sentry.lisp"
+    "problem-captjohn.lisp" "problem-quern.lisp" "problem-graveyard.lisp" "problem-sentry.lisp"
     ;"problem-crossword5-11.lisp"  ;runs out of default memory
     ;"problem-crossword15-18.lisp"  ;runs out of default memory
     "problem-crossword13.lisp" "problem-array-path.lisp"
