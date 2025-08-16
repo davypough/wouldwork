@@ -458,6 +458,20 @@
       (push `(declare (ignorable ,@ignores)) (cddr lambda-expr)))))
 
 
+#+ignore (defmacro define-init (&body args)  ;allows list of inits, but use define-init-action instead
+  (labels ((maybe-unquote (x)
+             (if (and (consp x) (eq (car x) 'quote))
+               (cadr x) x))
+           (list-of-lists-p (x)
+             (and (listp x) (or (null x) (listp (first x))))))
+    (let* ((single (and args (null (cdr args))))
+           (arg1   (and single (maybe-unquote (car args))))
+           (literals (if (and single (list-of-lists-p arg1))
+                       arg1
+                       args)))
+      `(install-init ',literals))))
+
+
 (defmacro define-init (&rest literals)
   `(install-init ',literals))
 

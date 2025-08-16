@@ -197,7 +197,8 @@
                (eq (first form) 'bind)
                (consp (second form)))
     (error "Invalid bind form structure: ~A" form))
-  (check-proposition (second form)))
+  (check-proposition (second form))
+  (check-bind-fluent-consistency (second form)))
 
 
 (defun translate-bind (form flag)

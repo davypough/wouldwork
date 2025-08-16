@@ -48,6 +48,7 @@
   (when (eql (first proposition) 'not)
     (setf proposition (second proposition)))
   (check-predicate proposition)
+  (check-fluent-consistency proposition)
   (iter (for arg in (cdr proposition))
         (for type-def in (or (gethash (first proposition) *relations*)  ;the type that goes with arg
                              (gethash (first proposition) *static-relations*)))
@@ -68,7 +69,35 @@
                      (and (symbolp arg) (special-operator-p (car arg)))))
             (error "The argument ~A is not of specified type ~A in proposition ~A"
                            arg type-def proposition))))
-                           
+
+
+(defun check-fluent-consistency (proposition)
+  "Validates that fluent variables ($var) are only used in positions 
+   declared as fluents in the relation definition."
+  (let ((relation-name (car proposition))
+        (fluent-positions (get-prop-fluent-indices proposition)))
+    (iter (for arg in (cdr proposition))
+          (for position from 1)
+          (when ($varp arg)
+            (unless (and fluent-positions 
+                         (member position fluent-positions))
+              (error "~%Proposition ~A is inconsistent with its defining relation ~A~%"
+                     proposition (cons relation-name (gethash relation-name *relations*))))))))
+
+
+(defun check-bind-fluent-consistency (proposition)
+  "Validates that fluent positions in bind statements use fluent variables."
+  (let ((relation-name (car proposition))
+        (fluent-positions (get-prop-fluent-indices proposition)))
+    (when fluent-positions
+      (iter (for arg in (cdr proposition))
+            (for position from 0)
+            (when (member position fluent-positions)
+              (unless ($varp arg)
+                (error "~%Bind statement ~A is inconsistent with relation ~A"
+                       `(list (bind ,proposition))
+                       `(list ,relation-name ,(gethash relation-name *relations*)))))))))
+                         
 
 (defun check-query/update-call (fn-call)
   "Checks the validity of a call to a query or update function
