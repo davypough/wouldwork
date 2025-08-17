@@ -6,14 +6,16 @@
 
 (in-package :ww)  ;required
 
+
+(defparameter *N* 4)
+
+
 (ww-set *problem-name* queensN)
 (ww-set *problem-type* csp)
 (ww-set *algorithm* backtracking)
 (ww-set *solution-type* every)
 (ww-set *tree-or-graph* tree)
-
-
-(defparameter *N* 4)
+(ww-set *depth-cutoff* 4)
 
 
 (define-types
@@ -50,13 +52,13 @@
               (remaining ?r (remove ?col $initial-cols)))))))
 
 
-(define-action assign-queen
+(define-action assign-queen-to-col
   1
   (?col column)
   (and (bind (next-row $current-row))
        (<= $current-row *N*)
        (setq $remaining-columns (get-remaining-columns? $current-row))
-       (member ?col $remaining-columns)  ;(get-remaining-columns? $current-row))
+       (member ?col $remaining-columns)
        (not (conflict-with? $current-row ?col)))
   (?col)
   (assert (make-queen-assignment! $current-row ?col)

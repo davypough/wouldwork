@@ -48,7 +48,7 @@
   (when (eql (first proposition) 'not)
     (setf proposition (second proposition)))
   (check-predicate proposition)
-  (check-fluent-consistency proposition)
+  ;(check-fluent-consistency proposition)
   (iter (for arg in (cdr proposition))
         (for type-def in (or (gethash (first proposition) *relations*)  ;the type that goes with arg
                              (gethash (first proposition) *static-relations*)))
@@ -71,7 +71,7 @@
                            arg type-def proposition))))
 
 
-(defun check-fluent-consistency (proposition)
+#+ignore (defun check-fluent-consistency (proposition)
   "Validates that fluent variables ($var) are only used in positions 
    declared as fluents in the relation definition."
   (let ((relation-name (car proposition))

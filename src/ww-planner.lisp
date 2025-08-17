@@ -36,6 +36,55 @@
       (format t "~&~A...~%" name)
       (let ((pre-fn (compile nil precondition-lambda))
             (eff-fn (compile nil effect-lambda))
+            pre-results updated-dbs)
+        (setf pre-results
+             (remove-if #'null (mapcar (lambda (pinsts)
+                                         (apply pre-fn state pinsts))
+                                       precondition-args)))
+        (when (null pre-results)
+          (next-iteration))
+        (setf updated-dbs  ;returns list of update structures
+              (mapcan (lambda (pre-result)
+                        (if (eql pre-result t)
+                          (funcall eff-fn state)
+                          (apply eff-fn state pre-result)))
+                pre-results))
+        (dolist (updated-db updated-dbs)  ;merge updates into *db* and *static-db*
+          (let ((changes (update.changes updated-db)))
+            (etypecase changes
+              (hash-table
+               ;; Depth-first algorithm: changes contains integer keys → values
+               (maphash (lambda (key val)
+                          (let ((proposition (convert-to-proposition key)))
+                            (if (gethash (car proposition) *relations*)
+                              (setf (gethash proposition *db*) val)
+                              (setf (gethash proposition *static-db*) val))))
+                        changes))
+              (list
+               ;; Backtracking algorithm: changes contains (forward inverse) pairs
+               ;; where forward and inverse are already propositions
+               (dolist (change-pair changes)
+                 (let ((forward-op (first change-pair)))
+                   (when forward-op
+                     ;; forward-op is already a proposition - no conversion needed
+                     (if (gethash (car forward-op) *relations*)
+                       (setf (gethash forward-op *db*) t)
+                       (setf (gethash forward-op *static-db*) t)))))))))))))
+
+
+#+ignore (defun do-init-action-updates (state)  ;add init actions to start-state
+  "Checks precondition of each init-action,
+   and if true, then updates db and static-db according to each init-action effect."
+  (declare (type problem-state state))
+  (when *init-actions*
+    (format t "~&Adding init-action propositions to initial database...~%"))
+  (iter (for init-action in *init-actions*)
+    (with-slots (name precondition-params precondition-args
+                 precondition-lambda effect-lambda)
+        init-action
+      (format t "~&~A...~%" name)
+      (let ((pre-fn (compile nil precondition-lambda))
+            (eff-fn (compile nil effect-lambda))
             ;(eff-fn (symbol-function (eval effect-lambda)))
             pre-results updated-dbs)
         (setf pre-results
