@@ -6,14 +6,6 @@
 (in-package :ww)
 
 
-;(defun record-move (parent state)
-;  "Returns some user-friendly representation of the move from the parent state
-;   to the current state."
-;  (declare (type problem-state state) (ignore parent))
-;  (with-slots (name instantiations time) state
-;    (list time (cons name instantiations))))
-
-
 (defun record-move (state)
   "Returns some user-friendly representation of the move from the parent state
    to the current state."
@@ -70,42 +62,6 @@
                      (if (gethash (car forward-op) *relations*)
                        (setf (gethash forward-op *db*) t)
                        (setf (gethash forward-op *static-db*) t)))))))))))))
-
-
-#+ignore (defun do-init-action-updates (state)  ;add init actions to start-state
-  "Checks precondition of each init-action,
-   and if true, then updates db and static-db according to each init-action effect."
-  (declare (type problem-state state))
-  (when *init-actions*
-    (format t "~&Adding init-action propositions to initial database...~%"))
-  (iter (for init-action in *init-actions*)
-    (with-slots (name precondition-params precondition-args
-                 precondition-lambda effect-lambda)
-        init-action
-      (format t "~&~A...~%" name)
-      (let ((pre-fn (compile nil precondition-lambda))
-            (eff-fn (compile nil effect-lambda))
-            ;(eff-fn (symbol-function (eval effect-lambda)))
-            pre-results updated-dbs)
-        (setf pre-results
-             (remove-if #'null (mapcar (lambda (pinsts)
-                                         (apply pre-fn state pinsts))
-                                       precondition-args)))
-        (when (null pre-results)
-          (next-iteration))
-        (setf updated-dbs  ;returns list of update structures
-              (mapcan (lambda (pre-result)
-                        (if (eql pre-result t)
-                          (funcall eff-fn state)
-                          (apply eff-fn state pre-result)))
-                pre-results))
-        (dolist (updated-db updated-dbs)  ;merge updates into *db* and *static-db*
-          (maphash (lambda (key val)
-                     (let ((proposition (convert-to-proposition key)))
-                       (if (gethash (car proposition) *relations*)
-                         (setf (gethash proposition *db*) val)
-                         (setf (gethash proposition *static-db*) val))))
-                   (update.changes updated-db)))))))
 
 
 ;(defun order-propositions (updated-db)
@@ -170,12 +126,6 @@
                           (terpri)))
           (when *troubleshoot-current-node*  ;signaled in process-ieffect below
              (return-from generate-children))
-          ;(let ((child-states (get-new-states state action updated-dbs)))  ;keep idb & hidb separate
-          ;  (when (fboundp 'heuristic?)
-          ;    (dolist (child-state child-states)
-          ;      (setf (problem-state.heuristic child-state)
-          ;        (funcall (symbol-function 'heuristic?) child-state))))
-          ;  (alexandria:appendf children child-states)))))
           (let ((child-states (case *algorithm*
                                 (depth-first (get-new-states state action updated-dbs))  ;return new states
                                 (backtracking updated-dbs))))  ;return update structures

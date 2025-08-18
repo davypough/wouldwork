@@ -377,9 +377,20 @@ any such settings appearing in the problem specification file.
     (format t "The problem ~A was not found." problem-name-str)
     (format t "~&Enter (list-all-problems) for a complete list of problems." )
     (return-from %stage))
-  ;(setf *problem-name* (intern problem-name-str))
   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
   (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
+  (setf *problem-name* (intern problem-name-str)  ;reset to defaults
+        *depth-cutoff* 0
+        *algorithm* 'depth-first
+        *probe* nil
+        *progress-reporting-interval* 100000
+        *problem-type* 'planning
+        *solution-type* 'first
+        *tree-or-graph* 'graph
+        *debug* 0
+        *branch* -1
+        *randomize-search* nil
+        *features* (remove :ww-debug *features*))
   (with-silenced-compilation
     (load-problem problem-name-str)))
 

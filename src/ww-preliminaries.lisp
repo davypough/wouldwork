@@ -148,6 +148,4 @@
              (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
                (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
                (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
-          ;((not (probe-file problem-file))
-          ;   (uiop:copy-file blocks3-file problem-file)))))
    

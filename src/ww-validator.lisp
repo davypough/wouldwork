@@ -34,12 +34,6 @@
   (iter (for arg in args)
         (check-type arg symbol)))
 
-        ;(or (?varp arg)
-        ;    ($varp arg)
-        ;    (eql arg '&rest)
-        ;    (error "The argument ~A is not valid in the query or update function named ~A."
-        ;            arg fn-name))))
-
 
 (defun check-proposition (proposition)
   "Detects an error in a proposition--eg, (height block1 3)
