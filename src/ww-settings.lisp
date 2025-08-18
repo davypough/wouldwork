@@ -248,3 +248,7 @@
 
 (define-global *global-invariants* nil
   "List of invariant query functions to check on every state.")
+
+(defparameter *processing-init-action* nil
+  "Dynamic variable indicating when we're processing initialization actions.
+   When T, assert statements should use depth-first translation regardless of *algorithm*.")

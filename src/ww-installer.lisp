@@ -323,8 +323,10 @@
 (defun install-init-action (name duration pre-params precondition eff-params effect)
   (declare (ignore duration))
   (format t "~&Installing ~A init action..." name)
+  (setf *processing-init-action* t)  ;affects translation of the action
   (push (create-action name 0 pre-params precondition eff-params effect t)
-    *init-actions*))
+    *init-actions*)
+  (setf *processing-init-action* nil))
 
 
 (defun create-action (name duration pre-params precondition eff-params effect init-action)

@@ -125,14 +125,16 @@
    based on syntactic context rather than just translation flag."
   (declare (special changes-list))
   (if (write-operation-p flag)
-      ;; Write operation: Effect context and not in forced read-mode
-      (case *algorithm*
-        (depth-first `(update (problem-state.idb state) ,(translate-list form flag)))
-        (backtracking `(multiple-value-bind (forward inverse) 
-                           (update-bt (problem-state.idb state) ,(translate-list form flag))
-                         (push (list forward inverse) changes-list))))
-      ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
-      (translate-proposition form flag)))
+    ;; Write operation: Effect context and not in forced read-mode
+    (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
+      ;; Use backtracking update only for normal actions when algorithm is backtracking
+      `(multiple-value-bind (forward inverse) 
+           (update-bt (problem-state.idb state) ,(translate-list form flag))
+         (push (list forward inverse) changes-list))
+      ;; Use depth-first update for init actions OR when algorithm is depth-first
+      `(update (problem-state.idb state) ,(translate-list form flag)))
+    ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
+    (translate-proposition form flag)))
 
 
 (defun translate-negative-relation (form flag)
@@ -140,14 +142,16 @@
    Preserves negation semantics across both query and update operations."
   (declare (special changes-list))
   (if (write-operation-p flag)
-      ;; Write operation: Effect context and not in forced read-mode
-      (case *algorithm*
-        (depth-first `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
-        (backtracking `(multiple-value-bind (forward inverse) 
-                           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-                         (push (list forward inverse) changes-list))))
-      ;; Read operation: All other cases
-      `(not ,(translate-positive-relation (second form) flag))))
+    ;; Write operation: Effect context and not in forced read-mode
+    (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
+      ;; Use backtracking update only for normal actions when algorithm is backtracking
+      `(multiple-value-bind (forward inverse) 
+           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+         (push (list forward inverse) changes-list))
+      ;; Use depth-first update for init actions OR when algorithm is depth-first
+      `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
+    ;; Read operation: All other cases
+    `(not ,(translate-positive-relation (second form) flag))))
 
 
 (defun translate-function-call (form flag)
@@ -521,9 +525,9 @@
   (cond ((atom form) form)  ;atom or (always-true) translates as itself
         ((null form) t)  ;if form=nil simply continue processing
         ((equal form '(always-true)) (translate-simple-atom form flag))
-        ((eql (car form) 'assert) (case *algorithm*
-                                    (depth-first (translate-assert form flag))
-                                    (backtracking (translate-assert-bt form flag))))
+        ((eql (car form) 'assert) (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
+                                    (translate-assert-bt form flag)
+                                    (translate-assert form flag)))
         ((member (car form) '(forsome exists exist)) (translate-existential form flag))  ;specialty first
         ((member (car form) '(forall forevery)) (translate-universal form flag)) ;removed every
         ((member (car form) '(finally next)) (translate-followup form flag))
