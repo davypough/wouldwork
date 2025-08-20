@@ -14,9 +14,7 @@
 
 (ww-set *solution-type* every)  ;find every possible solution
 
-(ww-set *tree-or-graph* tree)  ;fast, don't bother to check for repeated states
-
-(ww-set *depth-cutoff* 3)
+(ww-set *tree-or-graph* tree)
 
 
 (define-types

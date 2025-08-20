@@ -7,7 +7,7 @@
 (in-package :ww)  ;required
 
 
-(defparameter *N* 4)
+(defparameter *N* 10)
 
 
 (ww-set *problem-name* queensN)
@@ -15,7 +15,7 @@
 (ww-set *algorithm* backtracking)  ;note: ignored here, set at repl
 (ww-set *solution-type* every)
 (ww-set *tree-or-graph* tree)
-(ww-set *depth-cutoff* 4)
+(ww-set *depth-cutoff* 10)
 
 
 (define-types
@@ -30,7 +30,7 @@
 
 
 (define-query get-remaining-columns? (?row)
-  (do (ut::prt ?row state) (bind (remaining ?row $cols))  (ut::prt $cols)
+  (do (bind (remaining ?row $cols))
       $cols))
 
 

@@ -41,7 +41,8 @@
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)
-
+  ;(clrhash *proposition-cache*)
+  ;(setf *last-object-index* 0)
   ;; initial state validation
   (when *global-invariants*
     (unless (validate-global-invariants nil *backtrack-state*)

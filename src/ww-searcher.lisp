@@ -186,6 +186,8 @@
   (setf *search-tree* nil)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
+  ;(clrhash *proposition-cache*)
+  ;(setf *last-object-index* 0)
   (if (> *threads* 0)
     ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
     (if (eql *algorithm* 'backtracking)

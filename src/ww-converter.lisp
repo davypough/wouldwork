@@ -9,6 +9,7 @@
 (defun do-integer-conversion ()
   "Convert all objects to integers & put in idatabases."
   (format t "~&Optimizing lambda expressions and compiling...")
+  #+ignore (clrhash *proposition-cache*)
   (associate-objects-with-integers)
   (iter (for (type constants) in-hashtable *types*)
     (iter (for constant in constants)
@@ -134,7 +135,19 @@
     (process-item code-tree)))
 
 
+#+ignore (defun convert-to-integer (proposition)
+  "Memoized wrapper for proposition-to-integer conversion."
+  ;(declare (optimize (speed 3) (safety 1)))
+  (multiple-value-bind (cached-result found-p)
+      (gethash proposition *proposition-cache*)
+    (if found-p
+        cached-result
+        (setf (gethash proposition *proposition-cache*)
+              (convert-to-integer-uncached proposition)))))
+
+
 (defun convert-to-integer (proposition)
+  "Original version"
   (iter (for item in proposition)
         (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
         (ut::if-it (gethash item *constant-integers*)
@@ -145,6 +158,28 @@
                  (setf (gethash item *constant-integers*) *last-object-index*)
                  (setf (gethash *last-object-index* *integer-constants*) item)
                  (summing (* *last-object-index* multiplier))))))
+
+
+#+ignore (defun convert-to-integer-uncached (proposition)
+  "Original conversion algorithm without memoization, preserving 5-element limit."
+  ;(declare (optimize (speed 3) (safety 1)))
+  (let ((result 0)
+        (multiplier 1))
+    ;; Process at most 5 elements, matching original iter behavior
+    (loop for item in proposition
+          for count from 1 to 5
+          do (let ((item-value (gethash item *constant-integers*)))
+               (if item-value
+                   (incf result (* item-value multiplier))
+                   (progn
+                     (incf *last-object-index*)
+                     (when (>= *last-object-index* 1000)
+                       (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
+                     (setf (gethash item *constant-integers*) *last-object-index*)
+                     (setf (gethash *last-object-index* *integer-constants*) item)
+                     (incf result (* *last-object-index* multiplier))))
+               (setf multiplier (* multiplier 1000))))
+    result))
 
 
 (defun convert-prop-list (prop-list)

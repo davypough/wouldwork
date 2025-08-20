@@ -218,6 +218,7 @@
 
 (define-global *last-object-index* 0
   "Last index of object constants seen so far in propositions.")
+(declaim (type (integer 0 999) *last-object-index*))
 
 (define-global *objective-value-p* nil
   "Does the variable $objective-value appear in an action rule.")
@@ -252,3 +253,6 @@
 (defparameter *processing-init-action* nil
   "Dynamic variable indicating when we're processing initialization actions.
    When T, assert statements should use depth-first translation regardless of *algorithm*.")
+
+#+ignore (defparameter *proposition-cache* (make-hash-table :test #'equal)
+  "Cache for complete proposition-to-integer conversions")
