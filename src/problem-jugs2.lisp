@@ -15,8 +15,6 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 6)
-
 
 (define-types
     jug (jug1 jug2))
