@@ -9,25 +9,25 @@
 (defun do-integer-conversion ()
   "Convert all objects to integers & put in idatabases."
   (format t "~&Optimizing lambda expressions and compiling...")
-  #+ignore (clrhash *proposition-cache*)
+  (clrhash *prop-key-cache*)
   (associate-objects-with-integers)
   (iter (for (type constants) in-hashtable *types*)
     (iter (for constant in constants)
       (when (or (symbolp constant) (realp constant) (characterp constant))
-        (setf (gethash (convert-to-integer (list type constant)) *static-idb*) t))))
-  (iter (for (proposition value) in-hashtable *db*)
-        (for iproposition = (convert-to-integer proposition))
+        (setf (gethash (convert-to-integer-memoized (list type constant)) *static-idb*) t))))
+  (iter (for (prop-key value) in-hashtable *db*)
+        (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *idb*) value)
         (setf (gethash iproposition (problem-state.idb *start-state*)) value))
-  (iter (for (proposition value) in-hashtable *hdb*)
-        (for iproposition = (convert-to-integer proposition))
+  (iter (for (prop-key value) in-hashtable *hdb*)
+        (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *hidb*) value)
         (setf (gethash iproposition (problem-state.hidb *start-state*)) value))
-  (iter (for (proposition value) in-hashtable *static-db*)
-        (for iproposition = (convert-to-integer proposition))
+  (iter (for (prop-key value) in-hashtable *static-db*)
+        (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *static-idb*) value))
-  (iter (for (proposition value) in-hashtable *hap-db*)
-        (for iproposition = (convert-to-integer proposition))
+  (iter (for (prop-key value) in-hashtable *hap-db*)
+        (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *hap-idb*) value)
         (setf (gethash iproposition (problem-state.hidb *start-state*)) value))
   (iter (for action in *actions*)
@@ -135,20 +135,35 @@
     (process-item code-tree)))
 
 
-#+ignore (defun convert-to-integer (proposition)
-  "Memoized wrapper for proposition-to-integer conversion."
-  ;(declare (optimize (speed 3) (safety 1)))
-  (multiple-value-bind (cached-result found-p)
-      (gethash proposition *proposition-cache*)
-    (if found-p
-        cached-result
-        (setf (gethash proposition *proposition-cache*)
-              (convert-to-integer-uncached proposition)))))
+(defun convert-to-integer-memoized (prop-key)
+  "Memoized version for straightforward lookup"
+  (or (gethash prop-key *prop-key-cache*)
+      (setf (gethash prop-key *prop-key-cache*)
+            (convert-to-integer prop-key))))
 
 
-(defun convert-to-integer (proposition)
+(defun convert-to-integer (prop-key)
+  "Thread-safe original version"
+  (iter (for item in prop-key)
+        (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
+        (ut::if-it (gethash item *constant-integers*)
+          (summing (* ut::it multiplier))
+          ;; Critical section: check-increment-assign must be atomic
+          (bt:with-lock-held (*lock*)
+            ;; Double-check pattern: item might have been added by another thread
+            (ut::if-it (gethash item *constant-integers*)
+              (summing (* ut::it multiplier))
+              (progn (when (>= *last-object-index* 999)
+                       (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
+                     (incf *last-object-index*)
+                     (setf (gethash item *constant-integers*) *last-object-index*)
+                     (setf (gethash *last-object-index* *integer-constants*) item)
+                     (summing (* *last-object-index* multiplier))))))))
+
+
+#+ignore (defun convert-to-integer (prop-key)
   "Original version"
-  (iter (for item in proposition)
+  (iter (for item in prop-key)
         (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
         (ut::if-it (gethash item *constant-integers*)
           (summing (* ut::it multiplier))
@@ -158,28 +173,6 @@
                  (setf (gethash item *constant-integers*) *last-object-index*)
                  (setf (gethash *last-object-index* *integer-constants*) item)
                  (summing (* *last-object-index* multiplier))))))
-
-
-#+ignore (defun convert-to-integer-uncached (proposition)
-  "Original conversion algorithm without memoization, preserving 5-element limit."
-  ;(declare (optimize (speed 3) (safety 1)))
-  (let ((result 0)
-        (multiplier 1))
-    ;; Process at most 5 elements, matching original iter behavior
-    (loop for item in proposition
-          for count from 1 to 5
-          do (let ((item-value (gethash item *constant-integers*)))
-               (if item-value
-                   (incf result (* item-value multiplier))
-                   (progn
-                     (incf *last-object-index*)
-                     (when (>= *last-object-index* 1000)
-                       (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
-                     (setf (gethash item *constant-integers*) *last-object-index*)
-                     (setf (gethash *last-object-index* *integer-constants*) item)
-                     (incf result (* *last-object-index* multiplier))))
-               (setf multiplier (* multiplier 1000))))
-    result))
 
 
 (defun convert-prop-list (prop-list)
