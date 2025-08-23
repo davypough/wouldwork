@@ -48,22 +48,11 @@
     (unless (validate-global-invariants nil *backtrack-state*)
       (format t "~%Invariant validation failed on initial state.~%")
       (return-from search-backtracking nil)))
-
   ;; Check if start state satisfies goal condition
   (when (is-complete-solution)
     (register-solution-bt 0)
     (narrate-bt "Solution found at start ***" nil 0)
     (return-from search-backtracking t))
-  ;(when (and (fboundp 'goal-fn)
-  ;           (funcall (symbol-function 'goal-fn) *backtrack-state*))
-  ;  (let ((dummy-choice (make-choice :act '(initial-state)
-  ;                                   :forward-update nil
-  ;                                   :inverse-update nil
-  ;                                   :level 0)))
-  ;    (narrate-bt "Solution found at initial state ***" dummy-choice 0)
-  ;    (register-solution-bt 0)
-  ;    (return-from search-backtracking *solutions*)))
-
   #+:ww-debug (when (and (<= *debug* 2) (>= *debug* 1))
                 (setf *search-tree* nil)
                 ;; Add initial state at depth 0
@@ -74,7 +63,6 @@
                            (1 nil)
                            (2 (list (list-database (problem-state.idb *backtrack-state*))))))
                       *search-tree*))
-
   ;; Initiate recursive backtracking search
   (backtrack 0)
   ;; Compute final statistics
@@ -112,59 +100,6 @@
                      *actions*)))                   ; Planning: all actions
     
     (dolist (action actions)
-      (let ((parameter-combinations (if (action.dynamic action)
-                                      ;; Dynamic case: compute combinations from current state
-                                      (eval-instantiated-spec (action.precondition-type-inst action) 
-                                                              *backtrack-state*)
-                                      ;; Static case: use pre-computed combinations
-                                      (action.precondition-args action)))
-            (precondition-fn (action.pre-defun-name action)))
-        
-        ;; Process each parameter combination individually against current state
-        (dolist (param-combo parameter-combinations)
-          (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))
-            (when precondition-result  ; Only process if preconditions satisfied
-              (let ((choices-from-combination 
-                      (generate-choices-for-single-combination-bt action param-combo
-                                                                  precondition-result level)))
-                
-                ;; Process each choice generated from this parameter combination
-                ;; (Multiple choices possible due to multiple assert statements in an action)
-                (dolist (choice choices-from-combination)
-                  (unless (detect-path-cycle choice)
-                    (when (register-choice-bt choice action level)
-                      (unwind-protect
-                        (if (is-complete-solution)
-                          ;; Solution found at current level - register and handle continuation
-                          (progn (register-solution-bt (1+ level))
-                                 (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
-                                 (finish-output)
-                                 (setf found-a-solution t)
-                                 (when (eq *solution-type* 'first)
-                                   (return-from backtrack t)))
-                          ;; No solution yet - continue recursive exploration
-                          (let ((deeper-result (backtrack (1+ level))))
-                            (when deeper-result
-                              (setf found-a-solution t)
-                              (when (eq *solution-type* 'first)
-                                (return-from backtrack t)))))
-                        (undo-choice-bt choice action level)))))))))))
-    found-a-solution))
-
-
-#+ignore (defun backtrack (level)
-  "Recursive backtracking search over new states from assert clauses."
-  
-  ;; Step 1: Enforce depth cutoff
-  (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
-    (return-from backtrack nil))
-  
-  ;; Step 2: Update search statistics
-  (update-statistics level)
-  
-  ;; Step 3: Process each action with individual parameter combination handling
-  (let ((found-a-solution nil))
-    (dolist (action *actions*)
       (let ((parameter-combinations (if (action.dynamic action)
                                       ;; Dynamic case: compute combinations from current state
                                       (eval-instantiated-spec (action.precondition-type-inst action) 

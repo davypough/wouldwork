@@ -161,20 +161,6 @@
                      (summing (* *last-object-index* multiplier))))))))
 
 
-#+ignore (defun convert-to-integer (prop-key)
-  "Original version"
-  (iter (for item in prop-key)
-        (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
-        (ut::if-it (gethash item *constant-integers*)
-          (summing (* ut::it multiplier))
-          (progn (incf *last-object-index*)
-                 (when (>= *last-object-index* 1000)
-                   (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
-                 (setf (gethash item *constant-integers*) *last-object-index*)
-                 (setf (gethash *last-object-index* *integer-constants*) item)
-                 (summing (* *last-object-index* multiplier))))))
-
-
 (defun convert-prop-list (prop-list)
   "Converts a statement form in an action--eg, (list 'loc ?jammer ?area)
    with no $vars to an integer key form for efficient db access."

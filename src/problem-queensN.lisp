@@ -7,7 +7,7 @@
 (in-package :ww)  ;required
 
 
-(defparameter *N* 10)
+(defparameter *N* 12)
 
 
 (ww-set *problem-name* queensN)
@@ -15,7 +15,7 @@
 (ww-set *algorithm* backtracking)  ;note: ignored here, set at repl
 (ww-set *solution-type* every)
 (ww-set *tree-or-graph* tree)
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 12)
 
 
 (define-types
