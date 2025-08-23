@@ -94,7 +94,8 @@ After correcting any compile errors or warnings during staging, and changing any
 enter (solve) to direct Wouldwork to solve the currently staged problem.
 If there are run-time errors, fix the `problem-<new-problem-name>.lisp` file,
 or include diagnostic checkpoints such as `(ut::prt <S-expression>)` in the file,
-or enter `(ww-set *debug* 5)` to step through the search one expansion node at a time.
+and then do (refresh) to tell Wouldwork to recompile the changes.
+You can also enter `(ww-set *debug* 5)` at the REPL to step through the search one expansion node at a time.
 
 5. TROUBLESHOOTING
 
