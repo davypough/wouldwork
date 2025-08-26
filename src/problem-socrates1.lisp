@@ -31,7 +31,7 @@
    1
    (?disk disk)
    (always-true)
-   (?disk disk)
+   (?disk)
    (assert (if (and (eql ?disk 'disk1)
                     (bind (at $p1 A)) (bind (at $p2 B)) (bind (at $p3 C)) (bind (at $p4 D)))
              (do (at $p1 B) (at $p2 C) (at $p3 D) (at $p4 A)))

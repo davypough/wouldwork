@@ -215,18 +215,18 @@
 
 (define-update activate-receiver! (?receiver)
   (if (not (active ?receiver))
-    (do (assert (active ?receiver))
+    (do (active ?receiver)
         (doall (?g gate)  
           (if (and (controls ?receiver ?g) (active ?g))
-            (assert (not (active ?g))))))))
+            (not (active ?g)))))))
 
 
 (define-update deactivate-receiver! (?receiver)
   (if (active ?receiver)
-    (do (assert (not (active ?receiver)))
+    (do (not (active ?receiver))
         (doall (?g gate)
           (if (controls ?receiver ?g)
-            (assert (active ?g)))))))
+            (active ?g))))))
 
 
 (define-update disconnect-connector! (?connector)
@@ -236,11 +236,11 @@
 
 
 (define-update disengage-jammer! (?jammer ?target)
-  (assert (not (jamming ?jammer ?target))
-          (if (not (exists (?j jammer)
-                     (and (different ?j ?jammer)
-                          (jamming ?j ?target))))
-            (assert (active ?target)))))
+  (do (not (jamming ?jammer ?target))
+      (if (not (exists (?j jammer)
+                 (and (different ?j ?jammer)
+                      (jamming ?j ?target))))
+        (active ?target))))
 
 
 
@@ -314,7 +314,7 @@
        (connector $cargo)
        (bind (loc me $area))
        (connectable? $area ?terminus))
-  ($cargo fluent ?terminus terminus ($area $hue) fluent)
+  ($cargo ?terminus $area $hue)
   (do (assert (not (holding me $cargo))
               (loc $cargo $area)
               (connecting $cargo ?terminus))
@@ -346,8 +346,7 @@
        (bind (loc me $area))
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2))
-  ($cargo fluent (?terminus1 ?terminus2) terminus
-   $area fluent)
+  ($cargo ?terminus1 ?terminus2 $area)
   (do (assert (not (holding me $cargo))
               (loc $cargo $area)
               (connecting $cargo ?terminus1)
@@ -365,9 +364,7 @@
        (connectable? $area ?terminus1)
        (connectable? $area ?terminus2)
        (connectable? $area ?terminus3))
-  ($cargo fluent
-   (?terminus1 ?terminus2 ?terminus3) terminus
-   $area fluent)
+  ($cargo ?terminus1 ?terminus2 ?terminus3 $area)
   (do (assert (not (holding me $cargo))
               (loc $cargo $area)
               (connecting $cargo ?terminus1)
@@ -392,7 +389,7 @@
        (jammer $cargo)
        (bind (loc me $area))
        (los? $area ?target))
-  (?target target $cargo fluent $area fluent)
+  (?target $cargo $area)
   (assert (not (holding me $cargo))
           (loc $cargo $area)
           (jamming $cargo ?target)
@@ -405,7 +402,7 @@
   (and (free me)
        (bind (loc me $area))
        (loc ?jammer $area))
-  (?jammer jammer ($area $target) fluent)
+  (?jammer $area $target)
   (do (assert (holding me ?jammer)
               (not (loc ?jammer $area)))
       (if (bind (jamming ?jammer $target))
@@ -418,7 +415,7 @@
   (and (free me)
        (bind (loc me $area))
        (loc ?connector $area))
-  (?connector connector $area fluent)
+  (?connector $area)
   (do (assert (holding me ?connector)
               (not (loc ?connector $area)))
       (next (deactivate-connector! ?connector))
@@ -437,7 +434,7 @@
   ()
   (and (bind (loc me $area))
        (bind (holding me $cargo)))
-  ($cargo fluent $area fluent)
+  ($cargo $area)
   (assert (not (holding me $cargo))
           (loc $cargo $area)))
 
@@ -448,7 +445,7 @@
   (and (bind (loc me $area1))
        (different $area1 ?area2)
        (passable? $area1 ?area2))
-  ($area1 fluent ?area2 area)
+  ($area1 ?area2)
   (assert (loc me ?area2)))
 
 
@@ -460,7 +457,7 @@
        (different $area1 ?area3)
        (passable? $area1 ?area2)
        (passable? ?area2 ?area3))
-  ($area1 fluent (?area2 ?area3) area)
+  ($area1 ?area2 ?area3)
   (assert (loc me ?area3)))
 
 

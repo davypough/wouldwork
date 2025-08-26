@@ -81,6 +81,9 @@
   (los0 vantage (either gate fixture))
   (los1 vantage divider (either gate fixture))
   (los2 vantage divider divider (either gate fixture))
+  (visible0 area area)
+  (visible1 area divider area)
+  (visible2 area divider divider area)
 )
 
 ;(define-complementary-relations  
