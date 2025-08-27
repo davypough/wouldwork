@@ -36,12 +36,18 @@
            ;(asdf:compile-system :wouldwork :force t)
            ;(asdf:load-system :wouldwork)))
        (*algorithm*  ;need to recompile current problem for new translations
+         (when *ww-loading*
+           (error "Please remove (ww-set *algorithm* ~S) from the current problem specification file.
+                   Instead, enter it at the REPL after loading/staging)." ',val))
          (unless *ww-loading*  ;ignore (ww-set *algorithm* ...) in problem specification
            (setf ,param ',val)
            (save-globals)
            (with-silenced-compilation
              (load-problem (string *problem-name*)))))
        (*probe*
+         (when *ww-loading*
+           (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
+                   Instead, enter it at the REPL after loading/staging)." ',val))
          (if (null ',val)
            (progn (setf ,param nil)
                   (unless *ww-loading*
@@ -55,8 +61,6 @@
              (unless *ww-loading*
                (save-globals)
                (display-current-parameters)))))
-         ;(unless *ww-loading*
-         ;  (display-current-parameters)))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

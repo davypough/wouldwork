@@ -115,7 +115,7 @@
 (reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function? *actions*))
 
 
-(defun load-init-vals (vals-file)
+(defun read-init-vals (vals-file)
   "Load critical initialization parameters from vals.lisp if it exists.
    Sets *problem-name*, *algorithm*, and *debug* for proper loading.
    Returns the problem-name string for eval-when path construction, or nil if file absent."
@@ -139,7 +139,7 @@
          (problem-file (merge-pathnames "problem.lisp" src-dir))
          (vals-file (merge-pathnames "vals.lisp" root))
          (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
-         (vals-problem-name (load-init-vals vals-file))
+         (vals-problem-name (read-init-vals vals-file))
          (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
     (cond ((not (probe-file problem-file))  ;no problem.lisp file?
              (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp
