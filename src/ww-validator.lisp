@@ -15,6 +15,7 @@
         (or (nth-value 1 (gethash arg *types*))  ;a user type
             (and ($varp arg)  ;a $var incorporating a user or lisp defined type
                  (user-or-lisp-type-p (trim-1st-char arg)))
+            (lisp-type-p arg)  ;a Common Lisp type as non-fluent argument
             (and (consp arg)
                  (eql (car arg) 'either)
                  (consp (cdr arg))
@@ -54,6 +55,8 @@
                      (member arg (gethash (trim-1st-char type-def) *types*))))
             (and ($varp type-def)  ;arg is a value of a lisp type
                  (typep arg (trim-1st-char type-def)))
+            (and (lisp-type-p type-def)  ;arg is a value of a Common Lisp type
+                 (typep arg type-def))
             (and (listp type-def)  ;arg is a value of a type combo
                  (eql (first type-def) 'either)
                  (member arg (iter (for type in (cdr type-def))
@@ -239,7 +242,13 @@
 (defun user-or-lisp-type-p (type)
   "Determines if a symbol is either a user-defined type or a lisp type."
   (or (nth-value 1 (gethash type *types*))
-      (member type '(array atom bignum bit bit-vector boolean character compiled-function
+      (lisp-type-p type)))
+
+
+(defun lisp-type-p (type)
+  "Determines if a symbol is a valid Common Lisp type."
+  (and (symbolp type)
+       (member type '(array atom bignum bit bit-vector boolean character compiled-function
                      complex cons double-float extended-char fixnum float function
                      hash-table integer keyword list long-float nil null number package
                      pathname random-state ratio rational real readtable sequence

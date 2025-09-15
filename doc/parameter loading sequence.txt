@@ -1,0 +1,63 @@
+WOULDWORK PARAMETER LOADING SEQUENCE
+
+START: System Loading
+(quickload :wouldwork) or (asdf:load-system :wouldwork)
+    ↓
+STEP 1: ww-preliminaries.lisp loads
+eval-when (:load-toplevel :execute) begins
+    ↓
+Call read-init-vals(vals-file)
+    ↓
+Decision Point: Does vals.lisp exist?
+    ├─ NO → Return nil
+    └─ YES → Read vals.lisp parameter list
+             Set *problem-name* (position 0)
+             Set *algorithm* (position 2) 
+             Set *debug* (position 10)
+             Set :ww-debug feature flag if (*debug* > 0)
+             Return problem-name string
+    ↓
+File Management Logic:
+    ↓
+Decision Point: Does problem.lisp exist?
+    ├─ NO → Copy problem-blocks3.lisp to problem.lisp
+    │       Delete vals.lisp (will be rebuilt in step 5)
+    │       END file management
+    └─ YES → Decision Point: Does vals.lisp exist?
+             ├─ NO → END file management  
+             └─ YES → Decision Point: Does problem-<vals-problem-name>.lisp exist?
+                      ├─ NO → Delete inconsistent vals.lisp
+                      │       END file management
+                      └─ YES → Copy problem-<vals-problem-name>.lisp to problem.lisp
+                               END file management
+STEP 2: ww-settings.lisp loads
+For each parameter with define-global:
+    ↓
+Decision Point: Is parameter already bound?
+    ├─ YES → Keep current value (from step 1 or previous)
+    └─ NO → Set to default value
+STEP 3: problem.lisp loads
+For each (ww-set parameter value) statement:
+    ↓
+Decision Point: Is parameter compilation-critical?
+    ├─ *debug* → ERROR: "Remove from problem file, set at REPL"
+    ├─ *algorithm* → ERROR: "Remove from problem file, set at REPL" 
+    ├─ *probe* → ERROR: "Remove from problem file, set at REPL"
+    └─ Other parameters → Set parameter = value
+                         Override any previous value
+STEP 4: ww-initialize.lisp loads
+    ↓
+(init)
+    ↓
+System initialization tasks performed...
+    ↓
+Decision Point: Does vals.lisp exist?
+    ├─ YES → Call read-globals()
+    │        Read all 11 parameters from vals.lisp
+    │        **OVERRIDE ALL current parameter values** ← KEY POINT
+    └─ NO → Call save-globals()
+            Save current parameter values to new vals.lisp
+    ↓
+Call display-current-parameters()
+    ↓
+END: loading complete, all parameters finalized
