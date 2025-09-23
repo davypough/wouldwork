@@ -48,19 +48,14 @@
          (when *ww-loading*
            (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
                    Instead, enter it at the REPL after loading/staging)." ',val))
-         (if (null ',val)
-           (progn (setf ,param nil)
-                  (unless *ww-loading*
-                    (save-globals)
-                    (display-current-parameters)))
-           (destructuring-bind (action instantiations depth &optional (count 1)) ',val
-             (declare (ignore action instantiations depth))
-             (setf ,param ',val)
-             (setf *debug* 0)
-             (setf *counter* count)
-             (unless *ww-loading*
-               (save-globals)
-               (display-current-parameters)))))
+         (setf ,param ',val)
+         (if (or (> *debug* 0) *probe*)
+           (pushnew :ww-debug *features*)
+           (setf *features* (remove :ww-debug *features*)))
+         (setf *debug* 0)
+         (save-globals)
+         (with-silenced-compilation
+           (load-problem (string *problem-name*))))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)
