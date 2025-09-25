@@ -18,9 +18,11 @@
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
   (setf *init-actions* (nreverse *init-actions*))
-  (init-start-state)  ;finish start-state init later in converter.lisp
   (setq *happening-names* (sort (copy-list *happening-names*) #'< :key (lambda (object)
                                                    (first (aref (get object :events) 0)))))
+  (init-start-state)  ;finish start-state init later in converter.lisp
+  (do-integer-conversion)
+  (do-init-action-updates *start-state*)
   (do-integer-conversion)  ;allows integer hashtable db lookups, adds start-state idb
   (if *actions*
     (setf *min-action-duration* (reduce #'min *actions* :key #'action.duration))
@@ -90,8 +92,7 @@
       (setf value 0.0)
       (setf heuristic 0.0)
       (setf instantiations nil)
-      (setf name 'start)))
-  (do-init-action-updates *start-state*))  ;updates start-state db & static-db, but not idb & hidb yet
+      (setf name 'start))))  ;updates start-state db & static-db, but not idb & hidb yet
 
   
 (init)

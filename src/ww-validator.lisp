@@ -78,8 +78,12 @@
             (when (member position fluent-positions)
               (unless ($varp arg)
                 (error "~%Bind statement ~A is inconsistent with relation ~A"
-                       `(list (bind ,proposition))
-                       `(list ,relation-name ,(gethash relation-name *relations*)))))))))
+                       (list 'bind proposition)
+                       (cons relation-name (gethash relation-name *relations*)))))))))
+
+                       ;`(bind ,proposition))
+                       ;(cons `,relation-name `,(gethash relation-name *relations*)))))))))
+                       ;`(list ,relation-name ,(gethash relation-name *relations*)))))))))
                          
 
 (defun check-query/update-call (fn-call)
