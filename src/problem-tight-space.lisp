@@ -15,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 9)
+(ww-set *depth-cutoff* 7)
 
 
 (define-types
@@ -140,14 +140,6 @@
                    (los? $other-area ?t)))))))
 
 
-(define-query connectable? (?area ?terminus)
-  (or (los? ?area ?terminus)  ;from connector in area to terminus
-      (and (connector ?terminus)
-           (exists (?a area)
-             (and (loc ?terminus ?a)
-                  (visible? ?area ?a))))))
-
-
 (define-query resolve-consensus-hue? ($hue-list)
   ;; Returns consensus hue from list of available hues, nil if no consensus
   (do (setq $unique-hues (remove-duplicates (remove nil $hue-list)))
@@ -264,6 +256,39 @@
                   (setq $result-y $int-y))))))
     ;; Return closest intersection coordinates
     (values $result-x $result-y)))
+
+
+(define-query connectable? (?area ?terminus)
+  (or 
+    ;; Case 1: Fixtures (transmitters/receivers) - check both architectural and geometric LOS
+    (and (fixture ?terminus)
+         ;; Static gate-based line-of-sight check
+         (los? ?area ?terminus)
+         ;; Dynamic occlusion/interference check
+         (mvsetq ($source-x $source-y) (get-coordinates? ?area))
+         (mvsetq ($target-x $target-y) (get-coordinates? ?terminus))
+         (mvsetq ($end-x $end-y)
+           (find-first-intersection? $source-x $source-y $target-x $target-y))
+         ;; Verify beam reaches fixture
+         (= $end-x $target-x)
+         (= $end-y $target-y))
+    ;; Case 2: Connectors require geometric beam path validation
+    ;; Must verify actual beam reaches target through dynamic obstacles
+    (and (connector ?terminus)
+         (exists (?target-area area)
+           (and (loc ?terminus ?target-area)
+                ;; Verify areas are gate-visible
+                (visible? ?area ?target-area)
+                ;; Get source coordinates
+                (mvsetq ($source-x $source-y) (get-coordinates? ?area))
+                ;; Get target connector coordinates
+                (mvsetq ($target-x $target-y) (get-coordinates? ?terminus))
+                ;; Calculate where beam actually terminates
+                (mvsetq ($end-x $end-y) 
+                  (find-first-intersection? $source-x $source-y $target-x $target-y))
+                ;; Verify beam reaches target
+                (= $end-x $target-x)
+                (= $end-y $target-y))))))
 
 
 (define-query passable? (?area1 ?area2)
@@ -551,17 +576,18 @@
                   (do (not (beam-segment ?b ?connector $target $end-x $end-y))
                       (bind (current-beams $beams1))
                       (current-beams (remove ?b $beams1)))
-                  (if (eql $target ?connector))
+                  (if (eql $target ?connector)
                     ;; Connector is target - remove this beam segment  
                     (do (not (beam-segment ?b $source ?connector $end-x $end-y))
                         (bind (current-beams $beams2))
-                        (current-beams (remove ?b $beams2))))))
-          ;; Step 4: Standard cleanup - remove pairings and deactivate
+                        (current-beams (remove ?b $beams2)))))))
+          ;; Step 4: Deactivate connector
+          (if (bind (color ?connector $hue))
+            (chain-deactivate! ?connector $hue))
+          ;; Step 5: Remove pairings (must be AFTER chain-deactivate!)
           (doall (?t terminus)
             (if (paired ?connector ?t)
-              (not (paired ?connector ?t))))
-          (if (bind (color ?connector $hue))
-            (chain-deactivate! ?connector $hue))))
+              (not (paired ?connector ?t))))))
 
 
 (define-action drop
@@ -572,7 +598,8 @@
        (vacant? $area))
   ($cargo $area)
   (assert (not (holds me $cargo))
-          (loc $cargo $area)))
+          (loc $cargo $area)
+          (update-beams-if-occluded! $area)))
 
 
 (define-action move
@@ -583,7 +610,7 @@
        (passable? $area1 ?area2))
   ($area1 ?area2)
   (assert (loc me ?area2)
-          (update-beams-if-occluded! ?area2)))
+          (recalculate-all-beams!)))
 
 
 ;;;; INITIALIZATION ;;;;

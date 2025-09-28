@@ -120,7 +120,7 @@
                           (iter (for updated-db in updated-dbs)
                                 (for pre-result in pre-results)
                                 (format t "~A~%~A,~A~2%"
-                                        pre-result
+                                        (format-action-with-effect-order action pre-result updated-db)
                                         (or (list-database (update.changes updated-db)) nil)
                                         (update.value updated-db)))
                           (terpri)))
@@ -136,6 +136,31 @@
                 (funcall (symbol-function 'heuristic?) child-state))))
             (alexandria:appendf children child-states)))))
     (nreverse children)))  ;put first action child states first
+
+
+(defun format-action-with-effect-order (action pre-result updated-db)
+  "Returns action name consed with instantiation values in effect-variables order."
+  (let* ((action-name (action.name action))
+         (effect-vars (action.effect-variables action))
+         (precond-vars (action.precondition-variables action))
+         ;; Create mapping from variable names to values
+         (var-value-alist (pairlis precond-vars pre-result))
+         ;; Extract effect values in effect-variables order
+         (effect-values 
+           (mapcar (lambda (var)
+                     (cond 
+                       ;; For precondition variables (starting with ?)
+                       ((char= (char (symbol-name var) 0) #\?)
+                        (cdr (assoc var var-value-alist)))
+                       ;; For effect-computed variables (starting with $)
+                       ((char= (char (symbol-name var) 0) #\$)
+                        (if (update.instantiations updated-db)
+                            (nth (position var effect-vars) 
+                                 (update.instantiations updated-db))
+                            var))
+                       (t var)))
+                   effect-vars)))
+    (cons action-name effect-values)))
 
 
 (defun get-new-states (state action updated-dbs)

@@ -210,6 +210,7 @@
   (iter
     (when (hs::empty-hstack *open*)
       (leave))  ;terminate *open*
+    (for current-node = (hs::peek-hstack *open*))
     (for succ-nodes = (df-bnb1 *open*))
     (when (equal succ-nodes '(first))
       (return-from search-serial 'first))
@@ -231,7 +232,11 @@
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
     (print-search-progress)  ;#nodes expanded so far
-    (after-each #+:ww-debug (when (>= *debug* 5) (simple-break)))))  ;simplifies debugger printout
+    (after-each #+:ww-debug (when (>= *debug* 5)
+                              (format t "~%---~%Restating current node for easy reference: ~A~%---~%" current-node)
+                              (simple-break)  ;simplifies debugger printout
+                              (when (= *debug* 6)
+                                (setf *debug* 0))))))  ;allows continuing search for next *probe*
 
 
 (defun df-bnb1 (open)
@@ -271,7 +276,7 @@
                     (update-search-tree (node.state current-node) (node.depth current-node) ""))
       (update-max-depth-explored (1+ (node.depth current-node)))
       (increment-global *total-states-processed* (length succ-states))
-      #+:ww-debug (when (= *debug* 6) (simple-break))  ;probe found
+;      #+:ww-debug (when (= *debug* 6) (simple-break))  ;probe found
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
