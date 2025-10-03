@@ -98,6 +98,52 @@
           (setf (gethash obj *constant-integers*) i)
           (setf (gethash i *integer-constants*) obj)
           (finally (setf *last-object-index* i)))))
+
+
+(defun register-dynamic-object (object type-name)
+  "Registers a dynamically-created object in the integer constants system
+   and adds the type proposition to the static database.
+   This function MUST be called immediately after creating any dynamic object
+   (via intern, gensym, etc.) and BEFORE using it in any propositions.
+   Purpose:
+   - Assigns an integer code enabling database lookups for the new object
+   - Creates type proposition (type-name object) in *static-idb*
+   - Makes the object discoverable via type queries (e.g., (beam ?b))
+   - Ensures thread-safe registration in parallel search environments
+   Parameters:
+   - object: The dynamically-created symbol (e.g., BEAM3)
+   - type-name: The type it belongs to (e.g., BEAM)
+   Returns: The registered object (for convenient chaining)
+   Example Usage:
+   (setq $new-beam (intern (format nil \"BEAM~D\" $index)))
+   (register-dynamic-object $new-beam 'beam)
+   ;; Now $new-beam can be safely used in propositions like:
+   ;; (beam-segment $new-beam ?source ?target $x $y)"
+  (declare (type symbol object type-name))
+  ;; Input validation
+  (check-type object symbol "a symbol")
+  (check-type type-name symbol "a symbol")
+  ;; Register object in integer constants system
+  ;; This enables convert-to-integer to process propositions containing this object
+  (unless (gethash object *constant-integers*)
+    (bt:with-lock-held (*lock*)
+      ;; Double-check pattern: object might have been added by another thread
+      (unless (gethash object *constant-integers*)
+        (when (>= *last-object-index* 999)
+          (error "Design Limit Error: Total number of planning objects exceeds 999"))
+        (incf *last-object-index*)
+        (setf (gethash object *constant-integers*) *last-object-index*)
+        (setf (gethash *last-object-index* *integer-constants*) object))))
+  ;; Create type proposition (type-name object) and convert to integer
+  ;; This makes the object discoverable via type-based iteration and queries
+  (let* ((type-prop (list type-name object))
+         (type-prop-int (convert-to-integer-memoized type-prop)))
+    (bt:with-lock-held (*lock*)
+      ;; Add to static database if not already present
+      (unless (gethash type-prop-int *static-idb*)
+        (setf (gethash type-prop-int *static-idb*) t))))
+  ;; Return the registered object for convenient chaining
+  object)
   
 
 (defun subst-int-code (code-tree)

@@ -274,6 +274,30 @@
         (setf (symbol-value name)
           `(lambda (state ,@args)
              ,(format nil "~A update-fn" name)
+             (declare (special changes-list) (ignorable state))
+             (let (updated-dbs ,@new-$vars)
+               (declare (ignorable updated-dbs ,@new-$vars))
+               ,(translate body 'eff))))
+        (setf (symbol-value name)
+          `(lambda (state ,@args)
+             ,(format nil "~A update-fn" name)
+             (declare (special changes-list) (ignorable state))
+             ,(translate body 'eff))))
+    (fix-if-ignore '(state) (symbol-value name))))
+
+
+#+ignore (defun install-update (name args body)
+  "Revised update function installation with explicit effect context"
+  (format t "~&Installing ~A update-fn..." name)
+  (check-query/update-function name args body)
+  (push name *update-names*)
+  (let ((new-$vars (delete-duplicates
+                     (set-difference
+                       (get-all-nonspecial-vars #'$varp body) args))))
+    (if new-$vars
+        (setf (symbol-value name)
+          `(lambda (state ,@args)
+             ,(format nil "~A update-fn" name)
              (declare (special changes-list) (ignorable state))  ;changes-list only used if backtracking
              (let (updated-dbs ,@new-$vars)
                (declare (ignorable updated-dbs ,@new-$vars))
