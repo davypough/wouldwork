@@ -169,7 +169,7 @@
             ;; Step 5: Validate intersection lies within both segments
             ;; Exclude continuation points at beam start (t=0)
             (if (and (> $t 1e-10) (< $t 1.0)       ; New beam: exclude both endpoints
-                     (> $s 0.0) (< $s 1.0))         ; Existing beam: exclude both endpoints
+                     (> $s 1e-10) (< $s 1.0))      ; Existing beam: exclude both endpoints
               ;; Step 6: Calculate and return intersection coordinates
               (do (setq $int-x (+ ?source-x (* $t $dx1)))
                   (setq $int-y (+ ?source-y (* $t $dy1)))
@@ -207,7 +207,7 @@
                   (setq $distance (sqrt (+ (* $dist-x $dist-x) 
                                           (* $dist-y $dist-y))))
                   ;; Step 7: Check if point is within intersection tolerance
-                  (if (< $distance 1.0)  ; Tolerance for blocking the beam
+                  (if (< $distance (+ 0.5d0 1d-6))  ; Tolerance for blocking the beam with epsilon
                     (values $t $closest-x $closest-y)  ; Point blocks beam
                     (values nil nil nil)))             ; Point too far from beam
               ;; Projection falls outside segment bounds
