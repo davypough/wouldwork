@@ -54,7 +54,7 @@
                              (:file "ww-problem-tests")
 		                     (:file "ww-set")
                              (:file "ww-command-tests")
-		                     (:file "problem" 
+		                     (always-compile-file "problem"
                                       :around-compile (lambda (thunk) 
                                                         ;asdf sometimes doesn't recompile ww-preliminaries
                                                         (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t) 

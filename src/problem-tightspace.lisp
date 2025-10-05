@@ -11,15 +11,15 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* min-length)
+(ww-set *solution-type* first)  ;min-length)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 7)
+(ww-set *depth-cutoff* 10)
 
 
 (define-types
-  agent       (me)  ;the name of the agent performing actions
+  agent       (agent1)  ;the name of the agent performing actions
   gate        (gate1)
   wall        (wall1)
   connector   (connector1 connector2 connector3)
@@ -30,7 +30,7 @@
   area        (area1 area2 area3 area4 area5 area6)  ;vantage points
   gate-state  (open closed)
   receiver-state (active inactive)
-  cargo       (either connector)  ;what an agent (me) can pickup & carry
+  cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   source      (either transmitter connector)  ;beam source
   target      (either connector receiver)  ;beam target
@@ -38,7 +38,7 @@
 )
 
 
-(define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds me $any-cargo))
+(define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds agent1 $any-cargo))
   (holds agent $cargo)  ;fluent because we need to sometimes lookup what is currently being held
   (loc (either agent cargo) $area)  ;a location in an area
   (paired terminus terminus)  ;potential beam between two terminus
@@ -273,12 +273,14 @@
                   (beam-segment-interference $src1-x $src1-y $tgt1-x $tgt1-y 
                                               $src2-x $src2-y $tgt2-x $tgt2-y))
                 (if $t1
-                  ;; Get t2 parameter by checking beam2 vs beam1
-                  (mvsetq ($t2 $int-x2 $int-y2) 
-                    (beam-segment-interference $src2-x $src2-y $tgt2-x $tgt2-y 
-                                                $src1-x $src1-y $tgt1-x $tgt1-y))
-                  (if $t2
-                    (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections)))))))
+                  (do
+                    ;; Get t2 parameter by checking beam2 vs beam1
+                    (mvsetq ($t2 $int-x2 $int-y2) 
+                      (beam-segment-interference $src2-x $src2-y $tgt2-x $tgt2-y 
+                                                  $src1-x $src1-y $tgt1-x $tgt1-y))
+                    ;; Only push if both intersections valid
+                    (if $t2
+                      (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections))))))))
       $intersections))
 
 
@@ -403,6 +405,16 @@
     (beam-segment $new-beam ?source ?target $end-x $end-y)
     (current-beams (cons $new-beam $current-beams))
     $new-beam))
+
+
+(define-update remove-beam-segment-p! (?beam)
+  ;; bind and remove beam-segment; if it doesn't exist, return nil
+  (if (bind (beam-segment ?beam $source $target $end-x $end-y))
+    (do (not (beam-segment ?beam $source $target $end-x $end-y))
+        (bind (current-beams $beams))
+        (current-beams (remove ?beam $beams))
+        t)
+    nil))
 
 
 (define-update recalculate-all-beams! ()
@@ -551,15 +563,19 @@
     ;; Process each existing beam directly
     (doall (?b beam)
       (do (bind (beam-segment ?b $source $target $end-x $end-y))
-          ;; Get beam start coordinates (source coordinates are stable)
-          (mvsetq ($start-x $start-y) (get-coordinates $source))
-          ;; Check if object at ?area would occlude this beam segment
-          (mvsetq ($int-t $int-x $int-y)
-                  (beam-segment-occlusion $start-x $start-y $end-x $end-y $area-x $area-y))
-          ;; Update beam endpoint if occluded
-          (if $int-t
-            (do (not (beam-segment ?b $source $target $end-x $end-y))
-                (beam-segment ?b $source $target $area-x $area-y)))))))  
+          ;; CHANGED: Check if target's coordinates match ?area - if so, this is relay not occlusion
+          (mvsetq ($target-x $target-y) (get-coordinates $target))
+          (if (or (/= $target-x $area-x) (/= $target-y $area-y))
+            ;; Target is elsewhere - check for occlusion
+            (do (mvsetq ($start-x $start-y) (get-coordinates $source))
+                (mvsetq ($int-t $int-x $int-y)
+                        (beam-segment-occlusion $start-x $start-y $end-x $end-y $area-x $area-y))
+                ;; Update beam endpoint if occluded
+                (if $int-t
+                  (do (not (beam-segment ?b $source $target $end-x $end-y))
+                      (beam-segment ?b $source $target $area-x $area-y)))))
+            ;; else: Target is at ?area coordinates - this is a relay, skip occlusion check
+            ))))
 
 
 ;;;; ACTIONS ;;;;
@@ -568,13 +584,13 @@
 (define-action connect-to-1-terminus
     2
   (?terminus terminus)
-  (and (bind (holds me $cargo))
+  (and (bind (holds agent1 $cargo))
        (connector $cargo)
-       (bind (loc me $area))
+       (bind (loc agent1 $area))
        (vacant $area)
        (connectable $area ?terminus))
   ($cargo ?terminus $area $hue1)
-  (assert (not (holds me $cargo))
+  (assert (not (holds agent1 $cargo))
         (loc $cargo $area)
         (paired ?terminus $cargo)
         (setq $hue1 (get-hue-if-source ?terminus))
@@ -594,14 +610,14 @@
 (define-action connect-to-2-terminus
     3
   (combination (?terminus1 ?terminus2) terminus)
-  (and (bind (holds me $cargo))
+  (and (bind (holds agent1 $cargo))
        (connector $cargo)
-       (bind (loc me $area))
+       (bind (loc agent1 $area))
        (vacant $area)
        (connectable $area ?terminus1)
        (connectable $area ?terminus2))
   ($cargo ?terminus1 ?terminus2 $area $hue)
-  (assert (not (holds me $cargo))
+  (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
           (paired $cargo ?terminus1)
           (paired $cargo ?terminus2)
@@ -634,15 +650,15 @@
 (define-action connect-to-3-terminus
     4
   (combination (?terminus1 ?terminus2 ?terminus3) terminus)
-  (and (bind (holds me $cargo))
+  (and (bind (holds agent1 $cargo))
        (connector $cargo)
-       (bind (loc me $area))
+       (bind (loc agent1 $area))
        (vacant $area)
        (connectable $area ?terminus1)
        (connectable $area ?terminus2)
        (connectable $area ?terminus3))
   ($cargo ?terminus1 ?terminus2 ?terminus3 $area $hue)
-  (assert (not (holds me $cargo))
+  (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
           (paired $cargo ?terminus1)
           (paired $cargo ?terminus2)
@@ -684,11 +700,11 @@
 (define-action pickup-connector
     1
   (?connector connector)
-  (and (not (bind (holds me $cargo)))
-       (bind (loc me $area))
+  (and (not (bind (holds agent1 $cargo)))
+       (bind (loc agent1 $area))
        (loc ?connector $area))
   (?connector $area)
-  (assert (holds me ?connector)
+  (assert (holds agent1 ?connector)
           ;; Step 1: Extract connector coordinates from area
           (mvsetq ($conn-x $conn-y) (get-coordinates $area))
           ;; Step 2: Process beams where connector is occluder (not participant)
@@ -709,16 +725,8 @@
           ;; Step 3: Remove beam segments where connector is participant (source or target)
           (doall (?b (get-current-beams))
             (do (bind (beam-segment ?b $source $target $end-x $end-y))
-                (if (eql $source ?connector)
-                  ;; Connector is source - remove this beam segment
-                  (do (not (beam-segment ?b ?connector $target $end-x $end-y))
-                      (bind (current-beams $beams1))
-                      (current-beams (remove ?b $beams1)))
-                  (if (eql $target ?connector)
-                    ;; Connector is target - remove this beam segment  
-                    (do (not (beam-segment ?b $source ?connector $end-x $end-y))
-                        (bind (current-beams $beams2))
-                        (current-beams (remove ?b $beams2)))))))
+                (if (or (eql $source ?connector) (eql $target ?connector))
+                  (remove-beam-segment-p! ?b))))
           (update-beams-if-interference!)  ;before chain-deactivate!
           (not (loc ?connector $area))
           ;; Step 4: Deactivate connector
@@ -733,11 +741,11 @@
 (define-action drop
     1
   ()
-  (and (bind (holds me $cargo))  ;if not holding anything, then bind statement returns nil
-       (bind (loc me $area))  ;me is always located somewhere
+  (and (bind (holds agent1 $cargo))  ;if not holding anything, then bind statement returns nil
+       (bind (loc agent1 $area))  ;agent1 is always located somewhere
        (vacant $area))
   ($cargo $area)
-  (assert (not (holds me $cargo))
+  (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
           (update-beams-if-occluded! $area)))
 
@@ -745,11 +753,11 @@
 (define-action move
     1
   (?area2 area)
-  (and (bind (loc me $area1))
+  (and (bind (loc agent1 $area1))
        (different $area1 ?area2)
        (passable $area1 ?area2))
   ($area1 ?area2)
-  (assert (loc me ?area2)
+  (assert (loc agent1 ?area2)
           (recalculate-all-beams!)))  ;handle both extension and shortening
 
 
@@ -758,7 +766,7 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc me area1)
+  (loc agent1 area1)
   (loc connector1 area4)
   (loc connector2 area5)
   (loc connector3 area2)
