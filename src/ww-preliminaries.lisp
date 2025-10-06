@@ -73,6 +73,16 @@
 
 
 (defmacro define-global (var-name val-form &optional doc-string)
+  `(progn
+     ,(if (> *threads* 0)
+          ;; Ensure the global exists, then ALWAYS reset it at load-time.
+          `(progn
+             (sb-ext:defglobal ,var-name (ignore-errors ,var-name) ,doc-string)
+             (setf ,var-name ,val-form))
+          `(defparameter ,var-name ,val-form ,doc-string))))
+
+
+#+ignore (defmacro define-global (var-name val-form &optional doc-string)
   "Convenience for defining globals in ww-setting.lisp for single- or multi-threading operation."
   `(progn
      ,(if (> *threads* 0)

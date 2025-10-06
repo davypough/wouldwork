@@ -108,7 +108,7 @@
   (declare (type hash-table idb))
   (alexandria:copy-hash-table idb
     :key (lambda (val)
-           (if (listp val)
+           (if (consp val)
              (copy-list val)
              val))))
 

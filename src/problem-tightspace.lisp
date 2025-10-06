@@ -148,34 +148,40 @@
         nil)))               ; Multiple different hues or no hues (no consensus)
 
 
-(define-query beam-segment-interference (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
+(define-query beam-segment-interference
+    (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
   ;; Determines if a cross segment (beam, gate, wall, etc) interferes with the main beam-segment
   ;; Returns the interference endpoint, or nil
   ;; Step 1: Calculate direction vectors and displacement
   (do (setq $dx1 (- ?end-x ?source-x))    ; Beam direction x
       (setq $dy1 (- ?end-y ?source-y))    ; Beam direction y
-      (setq $dx2 (- ?cross-x2 ?cross-x1))  ; Obstacle direction x  
-      (setq $dy2 (- ?cross-y2 ?cross-y1))  ; Obstacle direction y
-      (setq $dx3 (- ?cross-x1 ?source-x))   ; Displacement x
-      (setq $dy3 (- ?cross-y1 ?source-y))   ; Displacement y
+      (setq $dx2 (- ?cross-x2 ?cross-x1)) ; Obstacle direction x
+      (setq $dy2 (- ?cross-y2 ?cross-y1)) ; Obstacle direction y
+      (setq $dx3 (- ?cross-x1 ?source-x)) ; Displacement x
+      (setq $dy3 (- ?cross-y1 ?source-y)) ; Displacement y
+
       ;; Step 2: Calculate determinant for parallel line detection
       (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
+
       ;; Step 3: Handle parallel lines case
-      (if (< (abs $det) 1e-10)  ; Numerical tolerance for parallel detection
-        (values nil nil nil)     ; No intersection for parallel lines
+      (if (< (abs $det) 1e-10)
+        (values nil nil nil)
         ;; Step 4: Solve for intersection parameters using Cramer's rule
         (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
             (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
-            ;; Step 5: Validate intersection lies within both segments
-            ;; Exclude continuation points at beam start (t=0)
-            (if (and (> $t 1e-10) (< $t 1.0)       ; New beam: exclude both endpoints
-                     (> $s 1e-10) (< $s 1.0))      ; Existing beam: exclude both endpoints
+            ;; Treat hits within 2% of either endpoint as "at the endpoint" => no interference
+            (setq $eps 2e-2)  ; parameter-space epsilon (2%)
+
+            ;; Step 5: Validate intersection lies well inside both segments
+            (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; main beam interior only
+                     (> $s $eps) (< $s (- 1.0 $eps)))     ; cross segment interior only
               ;; Step 6: Calculate and return intersection coordinates
               (do (setq $int-x (+ ?source-x (* $t $dx1)))
                   (setq $int-y (+ ?source-y (* $t $dy1)))
-                  (values $t $int-x $int-y))      ; Return parameter and coordinates
-              ;; No valid intersection within segments
+                  (values $t $int-x $int-y))
+              ;; No valid intersection within (epsilon-trimmed) interiors
               (values nil nil nil))))))
+
 
 
 (define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
@@ -255,29 +261,37 @@
 
 
 (define-query collect-all-beam-intersections ()
+  ;; Use current endpoints (actual segments), not intended targets
   ;; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y t1 t2) ...)
-  ;; Uses intended target paths to detect all beam-beam intersections
   (do (doall (?b1 (get-current-beams))
         (doall (?b2 (get-current-beams))
           (if (and (different ?b1 ?b2)
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
             (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
                 (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
-                ;; Use intended target coordinates, not current endpoints
+
+                ;; Start points come from the fixtures; end points come from the *current* segments
                 (mvsetq ($src1-x $src1-y) (get-coordinates $src1))
-                (mvsetq ($tgt1-x $tgt1-y) (get-coordinates $tgt1))
+                (setq $tgt1-x $end1-x)
+                (setq $tgt1-y $end1-y)
+
                 (mvsetq ($src2-x $src2-y) (get-coordinates $src2))
-                (mvsetq ($tgt2-x $tgt2-y) (get-coordinates $tgt2))
-                ;; Check intersection between intended paths
-                (mvsetq ($t1 $int-x $int-y) 
-                  (beam-segment-interference $src1-x $src1-y $tgt1-x $tgt1-y 
-                                              $src2-x $src2-y $tgt2-x $tgt2-y))
+                (setq $tgt2-x $end2-x)
+                (setq $tgt2-y $end2-y)
+
+                ;; Check intersection between current segments (not intended paths)
+                (mvsetq ($t1 $int-x $int-y)
+                  (beam-segment-interference
+                    $src1-x $src1-y $tgt1-x $tgt1-y
+                    $src2-x $src2-y $tgt2-x $tgt2-y))
+
                 (if $t1
                   (do
                     ;; Get t2 parameter by checking beam2 vs beam1
-                    (mvsetq ($t2 $int-x2 $int-y2) 
-                      (beam-segment-interference $src2-x $src2-y $tgt2-x $tgt2-y 
-                                                  $src1-x $src1-y $tgt1-x $tgt1-y))
+                    (mvsetq ($t2 $int-x2 $int-y2)
+                      (beam-segment-interference
+                        $src2-x $src2-y $tgt2-x $tgt2-y
+                        $src1-x $src1-y $tgt1-x $tgt1-y))
                     ;; Only push if both intersections valid
                     (if $t2
                       (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections))))))))
@@ -864,7 +878,9 @@
   ()
   (assert
     ;; Phase 1: Create initial beams and resolve initial interference
+    (paired transmitter1 receiver3)
     (create-beam-segment-p! transmitter1 receiver3)
+    (paired transmitter2 receiver1)
     (create-beam-segment-p! transmitter2 receiver1)
     (update-beams-if-interference!)
     
