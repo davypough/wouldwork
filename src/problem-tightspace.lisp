@@ -27,7 +27,7 @@
   receiver    (receiver1 receiver2 receiver3)
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
   beam        (beam1 beam2)
-  area        (area1 area2 area3 area4 area5 area6)  ;vantage points
+  area        (area1 area2 area3 area4 area5 area6    area7)  ;vantage points
   gate-state  (open closed)
   receiver-state (active inactive)
   cargo       (either connector)  ;what an agent can pickup & carry
@@ -358,13 +358,6 @@
            (eql $source-hue $required-hue)))))
 
 
-(define-query receiver-activation-pending ()
-  ;; Returns t if any inactive receiver has a matching beam reaching it
-  (exists (?r receiver)
-    (and (receiver-status ?r inactive)
-         (receiver-beam-reaches ?r))))
-
-
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
@@ -381,28 +374,6 @@
       (doall (?g gate)
         (if (controls ?receiver ?g)
           (gate-status ?g closed)))))
-
-
-(define-update activate-powered-receivers! ()
-  ;; Activates all inactive receivers receiving matching-color beams
-  ;; Returns t if any changes made
-  (do
-    (setq $changed nil)
-    (doall (?r receiver)
-      (if (and (receiver-status ?r inactive)
-               (receiver-beam-reaches ?r))
-        (do (receiver-status ?r active)
-            (setq $changed t))))
-    $changed))
-
-
-(define-update open-controlled-gates! ()
-  ;; Opens all gates controlled by currently active receivers
-  (doall (?r receiver)
-    (if (receiver-status ?r active)
-      (doall (?g gate)
-        (if (controls ?r ?g)
-          (gate-status ?g open))))))
 
 
 (define-update create-beam-segment-p! (?source ?target)
@@ -498,19 +469,69 @@
             (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y))))))
 
 
+(define-update converge-receiver-states! ()
+  ;; Iteratively processes receiver activations and deactivations until stable
+  ;; Returns t if any changes were made during convergence
+  (do
+    (setq $iteration 0)
+    (setq $max-iterations 10)
+    (setq $any-changes nil)
+    (setq $continue t)
+    
+    (ww-loop while (and $continue (< $iteration $max-iterations)) do
+      (setq $iteration-had-changes nil)
+      
+      ;; Step 1: Deactivate receivers that lost power
+      (doall (?r receiver)
+        (if (and (receiver-status ?r active)
+                 (not (receiver-beam-reaches ?r)))
+          (do (deactivate-receiver! ?r)              ;; closes controlled gates
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      
+      ;; Step 2: If gates closed, recalculate beams and check interference
+      (if $iteration-had-changes
+        (do (recalculate-all-beams!)
+            (update-beams-if-interference!)))
+      
+      ;; Step 3: Activate receivers that gained power
+      (doall (?r receiver)
+        (if (and (receiver-status ?r inactive)
+                 (receiver-beam-reaches ?r))
+          (do (receiver-status ?r active)            ;; receiver becomes active
+              (doall (?g gate)
+                (if (controls ?r ?g)
+                  (gate-status ?g open)))            ;; opens controlled gates
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      
+      ;; Step 4: If gates opened, recalculate beams and check interference
+      (if $iteration-had-changes
+        (do (recalculate-all-beams!)
+            (update-beams-if-interference!)))
+      
+      ;; Step 5: Check if system stabilized
+      (if (not $iteration-had-changes)
+        (setq $continue nil))
+      
+      (incf $iteration))
+    
+    ;; Diagnostic warning if convergence incomplete
+    (if (and (= $iteration $max-iterations) $continue)
+      (format t "~&Warning: Receiver state convergence incomplete after ~A iterations~%" 
+              $max-iterations))
+    
+    $any-changes))
+
+
 (define-update chain-activate! (?terminus ?hue)
   (do
     ;; Activate the terminus based on its type
     (if (connector ?terminus)
       (activate-connector! ?terminus ?hue)
       (if (receiver ?terminus)
-        (do (receiver-status ?terminus active)
-            (setq $gates-opened nil)
-            (doall (?g gate)
-              (if (controls ?terminus ?g)
-                (do (gate-status ?g open)
-                    (setq $gates-opened t))))
-            (if $gates-opened (recalculate-all-beams!)))))
+        (do (receiver-status ?terminus active)       ;; Set receiver active
+            (converge-receiver-states!))))
     ;; Handle cascading effects based on terminus type
     (if (connector ?terminus)
       (do
@@ -628,7 +649,8 @@
           (do (bind (beam-segment $new-beam1 $src $tgt $occluder $end-x1 $end-y1))
               (mvsetq ($cargo-x $cargo-y) (get-coordinates $cargo))
               (if (and (= $end-x1 $cargo-x) (= $end-y1 $cargo-y))
-                (activate-connector! $cargo $hue1))))))
+                (activate-connector! $cargo $hue1))))
+        (converge-receiver-states!)))  ;handle all cascading activations/deactivations
 
 
 (define-action connect-to-2-terminus
@@ -668,7 +690,8 @@
                              (bind (beam-segment $new-beam2 $src2 $tgt2 $occluder2 $end-x2 $end-y2))
                              (= $end-x2 $cargo-x)
                              (= $end-y2 $cargo-y)))
-                  (chain-activate! $cargo $hue))))))
+                  (chain-activate! $cargo $hue))))
+          (converge-receiver-states!)))
 
 
 (define-action connect-to-3-terminus
@@ -718,7 +741,8 @@
                              (bind (beam-segment $new-beam3 $src3 $tgt3 $occluder3 $end-x3 $end-y3))
                              (= $end-x3 $cargo-x)
                              (= $end-y3 $cargo-y)))
-                  (chain-activate! $cargo $hue))))))
+                  (chain-activate! $cargo $hue))))
+          (converge-receiver-states!)))
 
 
 (define-action pickup-connector
@@ -736,7 +760,9 @@
           ;; These beams terminate at connector coordinates but connector is neither source nor target
           (doall (?b (get-current-beams))
             (do (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
-                (if (eql $occluder ?connector)
+                (if (and (= $end-x $conn-x) (= $end-y $conn-y)
+                         (different $source ?connector)
+                         (different $target ?connector))
                   ;; Connector was occluding this beam - recalculate beam endpoint
                   (do (mvsetq ($source-x $source-y) (get-coordinates $source))
                       (mvsetq ($target-x $target-y) (get-coordinates $target))
@@ -756,7 +782,9 @@
           ;; Step 5: Remove pairings (must be AFTER chain-deactivate!)
           (doall (?t terminus)
             (if (paired ?connector ?t)
-              (not (paired ?connector ?t))))))
+              (not (paired ?connector ?t))))
+          ;; Step 6: Converge receiver states after all modifications
+          (converge-receiver-states!)))
 
 
 (define-action drop
@@ -768,7 +796,8 @@
   ($cargo $area)
   (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
-          (update-beams-if-occluded! $area)))
+          (update-beams-if-occluded! $area)
+          (converge-receiver-states!)))  ;Handle receiver deactivations after occlusion
 
 
 (define-action move
@@ -779,7 +808,8 @@
        (passable $area1 ?area2))
   ($area1 ?area2)
   (assert (loc agent1 ?area2)
-          (recalculate-all-beams!)))  ;handle both extension and shortening
+          (recalculate-all-beams!)  ;handle both extension and shortening
+          (converge-receiver-states!)))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -787,10 +817,10 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area1)
+  (loc agent1 area6)  ;area1)
   (loc connector1 area4)
-  (loc connector2 area5)
-  (loc connector3 area2)
+  (loc connector2 area6)  ;area5)
+  (loc connector3 area7)  ;area2)
   (current-beams ())  ; Empty - populated by init-action
   (receiver-status receiver1 inactive)  ;default
   (receiver-status receiver2 inactive)
@@ -804,6 +834,7 @@
   (vantage area4 19 15)
   (vantage area5 25 14)
   (vantage area6 34 13)
+     (vantage area7 10 20)
   (adjacent area1 area2)
   (adjacent area1 area3)
   (adjacent area1 area4)
@@ -884,32 +915,12 @@
   (always-true)
   ()
   (assert
-    ;; Phase 1: Create initial beams and resolve initial interference
     (paired transmitter1 receiver3)
     (create-beam-segment-p! transmitter1 receiver3)
     (paired transmitter2 receiver1)
     (create-beam-segment-p! transmitter2 receiver1)
     (update-beams-if-interference!)
-    
-    ;; Phase 2: Initial activation pass (capture result)
-    (activate-powered-receivers!)
-
-    ;; Phase 3: Iterate until convergence
-    (setq $iteration 0)
-    (setq $max-iterations 5)
-    
-    (ww-loop while (and (< $iteration $max-iterations) 
-                        (receiver-activation-pending)) do
-      (incf $iteration)
-      (open-controlled-gates!)
-      (recalculate-all-beams!)
-      (update-beams-if-interference!)
-      (setq $changed (activate-powered-receivers!)))
-    
-    ;; Validation
-    (if (and (= $iteration $max-iterations) $changed)
-      (format t "~&Warning: Initialization did not converge within ~A iterations~%" 
-              $max-iterations))))
+    (converge-receiver-states!)))
 
 
 ;;;; GOAL ;;;;
