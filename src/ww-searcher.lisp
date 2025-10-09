@@ -313,6 +313,51 @@
           (let* ((succ-idb (problem-state.idb succ-state))
                  (closed-values (get-closed-values (idb-to-sorted-alist succ-idb))))
             (when closed-values
+              (increment-global *repeated-states*)
+              (if (better-than-closed closed-values succ-state succ-depth)
+                (progn             ; succ has better value
+                  (narrate "Returning this previously closed state to open" succ-state succ-depth)
+                  (remhash (idb-to-sorted-alist succ-idb) *closed*))
+                (progn 
+                  (narrate "Dropping this previously closed state" succ-state succ-depth)
+                  (finalize-path-depth succ-depth) 
+                  (next-iteration))))))  ;drop this succ
+        (collecting (generate-new-node current-node succ-state))))  ;live successors
+
+
+#+ignore (defun process-successors (succ-states current-node open)  ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
+  (iter (with succ-depth = (1+ (node.depth current-node)))
+        (for succ-state in succ-states)
+        (when *global-invariants*
+          (validate-global-invariants current-node succ-state))
+        (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+          (unless (f-value-better succ-state succ-depth)
+            (next-iteration)))  ;throw out state if can't better best solution so far
+        (when (goal succ-state)
+          (register-solution current-node succ-state)
+          (finalize-path-depth succ-depth)
+          (if (eql *solution-type* 'first)
+            (return-from process-successors '(first))  ; Return immediately after first solution found
+            (next-iteration)))
+        (unless (boundp 'goal-fn)  ;looking for best results rather than goals
+          (process-min-max-value succ-state))  ;only if not associated with a goal
+        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))  ;not for csp problems
+          (when (on-current-path succ-state current-node)  ;stop infinite loop
+            (increment-global *repeated-states*)
+            (finalize-path-depth succ-depth)
+            (next-iteration)))
+        (when (eql *tree-or-graph* 'graph)   ;(ut::print-ht (problem-state.idb succ-state))
+          (let ((open-node (idb-in-open (problem-state.idb succ-state) open)))
+            (when open-node
+              (narrate "State already on open" succ-state succ-depth)
+              (increment-global *repeated-states*)
+             (if (update-open-if-succ-better open-node succ-state)
+               (setf (node.parent open-node) current-node)  ;succ is better
+               (finalize-path-depth succ-depth))  ;succ is not better
+             (next-iteration)))  ;drop this succ
+          (let* ((succ-idb (problem-state.idb succ-state))
+                 (closed-values (get-closed-values (idb-to-sorted-alist succ-idb))))
+            (when closed-values
               (narrate "State previously closed" succ-state succ-depth)
               (increment-global *repeated-states*)
               (if (better-than-closed closed-values succ-state succ-depth)  ;succ has better value
