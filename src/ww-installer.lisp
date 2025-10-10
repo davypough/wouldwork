@@ -114,6 +114,7 @@
                             (declare (ignore val))
                             (setf (gethash key *static-relations*) '(something)))
                           *types*)
+                 (setf (gethash 'inconsistent-state *relations*) t)
                  (add-proposition '(always-true) *static-db*)
                  (setf (gethash 'always-true *static-relations*) '(always-true))))
   ;; Install symmetric relations

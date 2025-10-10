@@ -124,6 +124,15 @@
                                         (or (list-database (update.changes updated-db)) nil)
                                         (update.value updated-db)))
                           (terpri)))
+          ;; Filter out inconsistent updates before creating states
+          (let ((original-count (length updated-dbs)))
+            (setf updated-dbs (remove-if #'update-is-inconsistent updated-dbs))
+            (when (< (length updated-dbs) original-count)
+              (increment-global *inconsistent-states-dropped* (- original-count (length updated-dbs)))))
+          ;; If all updates were inconsistent, skip to next action
+          (when (null updated-dbs)
+            #+:ww-debug (when (>= *debug* 4)
+                          (next-iteration)))
           (when *troubleshoot-current-node*  ;signaled in process-ieffect below
              (return-from generate-children))
           (let ((child-states (case *algorithm*
@@ -136,6 +145,28 @@
                 (funcall (symbol-function 'heuristic?) child-state))))
             (alexandria:appendf children child-states)))))
     (nreverse children)))  ;put first action child states first
+
+
+(defun update-is-inconsistent (updated-db)
+  "Returns T if update contains the inconsistent-state marker.
+   Handles both depth-first (hash-table) and backtracking (list) representations."
+  (declare (type update updated-db))
+  (let ((changes (update.changes updated-db)))
+    (etypecase changes
+      (hash-table
+       ;; Depth-first algorithm: changes contains integer keys → values
+       ;; Convert the marker proposition to integer and check for presence
+       (gethash (convert-to-integer-memoized '(inconsistent-state)) changes))
+      (list
+       ;; Backtracking algorithm: changes contains (forward inverse) pairs
+       ;; Check symbolically for the inconsistent-state proposition
+       (some (lambda (change-pair)
+               (let ((forward-op (first change-pair)))
+                 (and forward-op
+                      (listp forward-op)
+                      (eql (car forward-op) 'inconsistent-state)
+                      (null (cdr forward-op)))))
+             changes)))))
 
 
 (defun format-action-with-effect-order (action pre-result updated-db)

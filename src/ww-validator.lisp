@@ -44,28 +44,30 @@
     (setf proposition (second proposition)))
   (check-predicate proposition)
   ;(check-fluent-consistency proposition)
-  (iter (for arg in (cdr proposition))
-        (for type-def in (or (gethash (first proposition) *relations*)  ;the type that goes with arg
-                             (gethash (first proposition) *static-relations*)))
-        (or (?varp arg)  ;arg is a ?var
-            ($varp arg)  ;arg is a $var
-            (member arg (gethash type-def *types*))  ;arg is a value of a user defined type
-            (and ($varp type-def)  ;arg is a value of a user defined $type
-                 (or (null arg)
-                     (member arg (gethash (trim-1st-char type-def) *types*))))
-            (and ($varp type-def)  ;arg is a value of a lisp type
-                 (typep arg (trim-1st-char type-def)))
-            (and (lisp-type-p type-def)  ;arg is a value of a Common Lisp type
-                 (typep arg type-def))
-            (and (listp type-def)  ;arg is a value of a type combo
-                 (eql (first type-def) 'either)
-                 (member arg (iter (for type in (cdr type-def))
-                                   (unioning (gethash type *types*)))))
-            (and (listp arg)  ;arg is a lisp function or special lisp op
-                 (or (fboundp (car arg))
-                     (and (symbolp arg) (special-operator-p (car arg)))))
-            (error "The argument ~A is not of specified type ~A in proposition ~A"
-                           arg type-def proposition))))
+  (let ((relation-def (or (gethash (first proposition) *relations*)
+                          (gethash (first proposition) *static-relations*))))
+    (when (listp relation-def)
+      (iter (for arg in (cdr proposition))
+            (for type-def in relation-def)
+            (or (?varp arg)  ;arg is a ?var
+                ($varp arg)  ;arg is a $var
+                (member arg (gethash type-def *types*))  ;arg is a value of a user defined type
+                (and ($varp type-def)  ;arg is a value of a user defined $type
+                     (or (null arg)
+                         (member arg (gethash (trim-1st-char type-def) *types*))))
+                (and ($varp type-def)  ;arg is a value of a lisp type
+                     (typep arg (trim-1st-char type-def)))
+                (and (lisp-type-p type-def)  ;arg is a value of a Common Lisp type
+                     (typep arg type-def))
+                (and (listp type-def)  ;arg is a value of a type combo
+                     (eql (first type-def) 'either)
+                     (member arg (iter (for type in (cdr type-def))
+                                       (unioning (gethash type *types*)))))
+                (and (listp arg)  ;arg is a lisp function or special lisp op
+                     (or (fboundp (car arg))
+                         (and (symbolp arg) (special-operator-p (car arg)))))
+                (error "The argument ~A is not of specified type ~A in proposition ~A"
+                       arg type-def proposition))))))
 
 
 (defun check-bind-fluent-consistency (proposition)

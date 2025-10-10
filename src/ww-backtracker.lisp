@@ -38,6 +38,7 @@
   (setf *prior-total-states-processed* 0)
   (setf *prior-time* 0)
   (setf *average-branching-factor* 0.0)
+  (setf *inconsistent-states-dropped* 0)
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)

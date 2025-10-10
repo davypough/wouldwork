@@ -94,14 +94,15 @@
   (let (lisp-$types)  ;eg, $list, $hash-table, $fixnum, $real
     (maphash (lambda (rel args)
                (declare (ignore rel))
-               (iter (for arg in args)
-                     (when ($varp arg)
-                       (let ((lisp-$type (trim-1st-char arg)))
-                         (unless (gethash lisp-$type *types*)  ;user defined type
-                           (pushnew lisp-$type lisp-$types))))))  ;should be a lisp type
+               (when (listp args)
+                 (iter (for arg in args)
+                       (when ($varp arg)
+                         (let ((lisp-$type (trim-1st-char arg)))
+                           (unless (gethash lisp-$type *types*)  ;user defined type
+                             (pushnew lisp-$type lisp-$types)))))))
              relations)
-    (cond ((intersection '(hash-table vector array) lisp-$types) #'equalp)  ;for complex containers
-          (t #'equal))))  ;remember ht-values are always lists of items, not atoms
+    (cond ((intersection '(hash-table vector array) lisp-$types) #'equalp)
+          (t #'equal))))
 
 
 (defparameter *fixed-ht-values-fn* (choose-ht-value-test *relations*)
@@ -135,7 +136,8 @@
   "Determines if all relations have $var args, and thus have fixed keys idb."
   (maphash (lambda (rel args)
              (declare (ignore rel))
-             (unless (member-if #'$varp args)
+             (unless (and (listp args)
+                          (member-if #'$varp args))
                (return-from fixedp nil)))
            relations)
   t)
@@ -186,6 +188,7 @@
   (setf *search-tree* nil)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
+  (setf *inconsistent-states-dropped* 0)
   ;(clrhash *proposition-cache*)
   ;(setf *last-object-index* 0)
   (if (> *threads* 0)
@@ -323,47 +326,6 @@
                   (finalize-path-depth succ-depth) 
                   (next-iteration))))))  ;drop this succ
         (collecting (generate-new-node current-node succ-state))))  ;live successors
-
-
-#+ignore (defun process-successors (succ-states current-node open)  ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
-  (iter (with succ-depth = (1+ (node.depth current-node)))
-        (for succ-state in succ-states)
-        (when *global-invariants*
-          (validate-global-invariants current-node succ-state))
-        (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
-          (unless (f-value-better succ-state succ-depth)
-            (next-iteration)))  ;throw out state if can't better best solution so far
-        (when (goal succ-state)
-          (register-solution current-node succ-state)
-          (finalize-path-depth succ-depth)
-          (if (eql *solution-type* 'first)
-            (return-from process-successors '(first))  ; Return immediately after first solution found
-            (next-iteration)))
-        (unless (boundp 'goal-fn)  ;looking for best results rather than goals
-          (process-min-max-value succ-state))  ;only if not associated with a goal
-        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))  ;not for csp problems
-          (when (on-current-path succ-state current-node)  ;stop infinite loop
-            (increment-global *repeated-states*)
-            (finalize-path-depth succ-depth)
-            (next-iteration)))
-        (when (eql *tree-or-graph* 'graph)   ;(ut::print-ht (problem-state.idb succ-state))
-          (let ((open-node (idb-in-open (problem-state.idb succ-state) open)))
-            (when open-node
-              (narrate "State already on open" succ-state succ-depth)
-              (increment-global *repeated-states*)
-             (if (update-open-if-succ-better open-node succ-state)
-               (setf (node.parent open-node) current-node)  ;succ is better
-               (finalize-path-depth succ-depth))  ;succ is not better
-             (next-iteration)))  ;drop this succ
-          (let* ((succ-idb (problem-state.idb succ-state))
-                 (closed-values (get-closed-values (idb-to-sorted-alist succ-idb))))
-            (when closed-values
-              (narrate "State previously closed" succ-state succ-depth)
-              (increment-global *repeated-states*)
-              (if (better-than-closed closed-values succ-state succ-depth)  ;succ has better value
-                (remhash (idb-to-sorted-alist succ-idb) *closed*)
-                (progn (finalize-path-depth succ-depth) (next-iteration))))))  ;drop this succ
-        (collecting (generate-new-node current-node succ-state))))  ;live successor
 
 
 (defun validate-global-invariants (current-node succ-state)
@@ -614,6 +576,9 @@
     (format t "~2%Repeated states = ~:D, ie, ~,1F percent"
               *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
   ;(format t "~2%Unique states encountered = ~:D" (unique-states-encountered-graph))
+  (when (> *inconsistent-states-dropped* 0)
+    (format t "~%~%Dropped ~D inconsistent successor state~:P due to convergence failure."
+            *inconsistent-states-dropped*))
   (format t "~2%Average branching factor = ~,1F" *average-branching-factor*)
   (format t "~2%Start state:~%~A" (list-database (problem-state.idb *start-state*)))
   (format t "~2%Goal:~%~A~2%" (when (boundp 'goal-fn)

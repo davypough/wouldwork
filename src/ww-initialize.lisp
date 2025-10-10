@@ -21,9 +21,10 @@
   (setq *happening-names* (sort (copy-list *happening-names*) #'< :key (lambda (object)
                                                    (first (aref (get object :events) 0)))))
   (init-start-state)  ;finish start-state init later in converter.lisp
-  (do-integer-conversion)
-  (do-init-action-updates *start-state*)
-  (do-integer-conversion)  ;allows integer hashtable db lookups, adds start-state idb
+  (do-integer-conversion)                      ; Full conversion and compilation of baseline
+  (do-init-action-updates *start-state*)       ; Add init action propositions
+  (convert-databases-to-integers)              ; Only convert new propositions, no recompilation
+  (validate-start-state-consistency)
   (if *actions*
     (setf *min-action-duration* (reduce #'min *actions* :key #'action.duration))
     (format t "~%NOTE: There are no defined actions.~%"))
@@ -93,6 +94,18 @@
       (setf heuristic 0.0)
       (setf instantiations nil)
       (setf name 'start))))  ;updates start-state db & static-db, but not idb & hidb yet
+
+
+(defun validate-start-state-consistency ()
+  "Checks if start state contains inconsistent-state marker.
+   Errors out if initial state failed to converge."
+  (when (gethash (convert-to-integer-memoized '(inconsistent-state))
+                 (problem-state.idb *start-state*))
+    (error "FATAL: Initial state is inconsistent.~%~
+            Receiver state convergence failed during initialization.~%~
+            The system could not stabilize in ~A iterations.~%~
+            Cannot begin planning from an oscillating state."
+           10)))  ;; Or reference the max-iterations value
 
   
 (init)

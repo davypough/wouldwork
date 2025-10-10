@@ -27,7 +27,7 @@
   receiver    (receiver1 receiver2 receiver3)
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
   beam        (beam1 beam2)
-  area        (area1 area2 area3 area4 area5 area6    area7)  ;vantage points
+  area        (area1 area2 area3 area4 area5 area6)  ;vantage points
   gate-state  (open closed)
   receiver-state (active inactive)
   cargo       (either connector)  ;what an agent can pickup & carry
@@ -470,8 +470,6 @@
 
 
 (define-update converge-receiver-states! ()
-  ;; Iteratively processes receiver activations and deactivations until stable
-  ;; Returns t if any changes were made during convergence
   (do
     (setq $iteration 0)
     (setq $max-iterations 10)
@@ -485,7 +483,7 @@
       (doall (?r receiver)
         (if (and (receiver-status ?r active)
                  (not (receiver-beam-reaches ?r)))
-          (do (deactivate-receiver! ?r)              ;; closes controlled gates
+          (do (deactivate-receiver! ?r)
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
       
@@ -498,10 +496,10 @@
       (doall (?r receiver)
         (if (and (receiver-status ?r inactive)
                  (receiver-beam-reaches ?r))
-          (do (receiver-status ?r active)            ;; receiver becomes active
+          (do (receiver-status ?r active)
               (doall (?g gate)
                 (if (controls ?r ?g)
-                  (gate-status ?g open)))            ;; opens controlled gates
+                  (gate-status ?g open)))
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
       
@@ -516,10 +514,11 @@
       
       (incf $iteration))
     
-    ;; Diagnostic warning if convergence incomplete
+    ;; Mark state as inconsistent if convergence failed
     (if (and (= $iteration $max-iterations) $continue)
-      (format t "~&Warning: Receiver state convergence incomplete after ~A iterations~%" 
-              $max-iterations))
+      (do (format t "~&Warning: Receiver state convergence incomplete after ~A iterations~%" 
+                  $max-iterations)
+          (inconsistent-state)))
     
     $any-changes))
 
@@ -817,10 +816,10 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area6)  ;area1)
+  (loc agent1 area1)  ;area6
   (loc connector1 area4)
-  (loc connector2 area6)  ;area5)
-  (loc connector3 area7)  ;area2)
+  (loc connector2 area5)  ;area6
+  (loc connector3 area2)  ;area7
   (current-beams ())  ; Empty - populated by init-action
   (receiver-status receiver1 inactive)  ;default
   (receiver-status receiver2 inactive)
@@ -834,7 +833,6 @@
   (vantage area4 19 15)
   (vantage area5 25 14)
   (vantage area6 34 13)
-     (vantage area7 10 20)
   (adjacent area1 area2)
   (adjacent area1 area3)
   (adjacent area1 area4)

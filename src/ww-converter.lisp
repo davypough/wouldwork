@@ -6,58 +6,77 @@
 (in-package :ww)
 
 
-(defun do-integer-conversion ()
-  "Convert all objects to integers & put in idatabases."
-  (format t "~&Optimizing lambda expressions and compiling...")
-  (clrhash *prop-key-cache*)
-  (associate-objects-with-integers)
+(defun convert-databases-to-integers ()
+  "Convert propositions in databases to integer keys and store in integer databases.
+   This can be called multiple times to convert newly-added propositions."
+  ;; Convert type propositions
   (iter (for (type constants) in-hashtable *types*)
     (iter (for constant in constants)
       (when (or (symbolp constant) (realp constant) (characterp constant))
         (setf (gethash (convert-to-integer-memoized (list type constant)) *static-idb*) t))))
+  ;; Convert dynamic database propositions
   (iter (for (prop-key value) in-hashtable *db*)
         (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *idb*) value)
         (setf (gethash iproposition (problem-state.idb *start-state*)) value))
+  ;; Convert hash dynamic database propositions
   (iter (for (prop-key value) in-hashtable *hdb*)
         (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *hidb*) value)
         (setf (gethash iproposition (problem-state.hidb *start-state*)) value))
+  ;; Convert static database propositions
   (iter (for (prop-key value) in-hashtable *static-db*)
         (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *static-idb*) value))
+  ;; Convert happenings database propositions
   (iter (for (prop-key value) in-hashtable *hap-db*)
         (for iproposition = (convert-to-integer-memoized prop-key))
         (setf (gethash iproposition *hap-idb*) value)
-        (setf (gethash iproposition (problem-state.hidb *start-state*)) value))
+        (setf (gethash iproposition (problem-state.hidb *start-state*)) value)))
+
+
+(defun compile-all-functions ()
+  "Compile all action preconditions/effects, queries, updates, goal, and constraint functions.
+   Should only be called once during initialization."
+  (format t "~&Optimizing lambda expressions and compiling...")
+  ;; Compile action preconditions and effects
   (iter (for action in *actions*)
         (format t "~&  ~A...~%" (action.name action))
         (finish-output)
         (with-slots (pre-defun-name eff-defun-name precondition-lambda effect-lambda) action
           (compile pre-defun-name (subst-int-code precondition-lambda))
           (compile eff-defun-name (subst-int-code effect-lambda))))
-        ;(setf (action.iprecondition-lambda action)
-        ;  (subst-int-code (copy-tree (action.precondition-lambda action)))))
-        ;(setf (action.ieffect-lambda action)
-        ;  (subst-int-code (copy-tree (action.effect-lambda action)))))
+  ;; Compile query and update functions
   (iter (for fname in (append *query-names* *update-names*))
         (format t "~&  ~A...~%" fname)
         (finish-output)
         (compile fname (subst-int-code (symbol-value fname))))
+  ;; Compile happening interrupt functions
   (iter (for obj in *happening-names*)
         (format t "~&  ~A...~%" obj)
         (finish-output)
-        (when (get obj :interrupt)  ;ie, there is an :interrupt function
+        (when (get obj :interrupt)
           (setf (get obj :interrupt)
                 (compile nil (subst-int-code (symbol-value obj))))))
+  ;; Compile goal function
   (when (boundp 'goal-fn)
     (format t "~&  ~A...~%" 'goal-fn)
     (finish-output)
     (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+  ;; Compile constraint function
   (when (boundp 'constraint-fn)
     (format t "~&  ~A...~%" 'constraint-fn)
     (finish-output)
     (compile 'constraint-fn (subst-int-code (symbol-value 'constraint-fn)))))
+
+
+(defun do-integer-conversion ()
+  "Convert all objects to integers, populate integer databases, and compile all functions.
+   This is the main initialization function called during problem loading."
+  (clrhash *prop-key-cache*)
+  (associate-objects-with-integers)
+  (convert-databases-to-integers)
+  (compile-all-functions))
 
 
 (defun associate-objects-with-integers ()
