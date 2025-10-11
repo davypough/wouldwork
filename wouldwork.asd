@@ -16,6 +16,20 @@
   nil)
 
 
+;; Use *load-pathname* instead of asdf:system-source-directory to avoid circular dependency
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (let* ((root (make-pathname :name nil :type nil :defaults *load-pathname*))
+         (src-dir (merge-pathnames "src/" root))
+         (problem-file (merge-pathnames "problem.lisp" src-dir))
+         (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
+         (vals-file (merge-pathnames "vals.lisp" root)))
+    (unless (probe-file problem-file)
+      ;; No problem.lisp exists, copy default
+      (uiop:copy-file blocks3-file problem-file)
+      ;; Delete vals.lisp to force rebuild
+      (uiop:delete-file-if-exists vals-file))))
+
+
 (defsystem "wouldwork"
   :author ("Program Development, Dave Brown <davypough@gmail.com>"
            "Quicklisp Integration & Test, Gwang-Jin Kim <gwang.jin.kim.phd@gmail.com>")
@@ -64,6 +78,6 @@
                              (:file "ww-backtracker")
 		                     (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
-  :build-operation "program-op"  ;build a binary: binary name: adapt.
+  :build-operation "program-op"
   :build-pathname "wouldwork"
-  :entry-point "wouldwork:main")  ;entry point: here "main" is an exported symbol. Otherwise, use a double ::
+  :entry-point "wouldwork:main")

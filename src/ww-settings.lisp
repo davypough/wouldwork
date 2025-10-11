@@ -260,3 +260,26 @@
 
 (defparameter *prop-key-cache* (make-hash-table :test #'equal)
   "Cache for prop-key-to-integer conversions")
+
+
+;; *** ADDED: Reset parameters to defaults when vals.lisp doesn't exist ***
+;; This ensures clean initialization for new problems without carrying over
+;; settings from previous problem.lisp files
+(eval-when (:load-toplevel :execute)
+  (let ((vals-file (merge-pathnames "vals.lisp" 
+                                    (asdf:system-source-directory :wouldwork))))
+    (unless (probe-file vals-file)
+      ;; No vals.lisp exists, reset to defaults before problem.lisp loads
+      (setf *problem-name* 'unspecified
+            *depth-cutoff* 0
+            *algorithm* 'depth-first
+            *tree-or-graph* 'graph
+            *problem-type* 'planning
+            *solution-type* 'first
+            *progress-reporting-interval* 100000
+            *randomize-search* nil
+            *branch* -1
+            *probe* nil
+            *debug* 0)
+      ;; Ensure debug feature flag is cleared
+      (setf *features* (remove :ww-debug *features*)))))

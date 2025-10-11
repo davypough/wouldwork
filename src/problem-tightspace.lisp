@@ -214,7 +214,7 @@
                   (setq $distance (sqrt (+ (* $dist-x $dist-x) 
                                           (* $dist-y $dist-y))))
                   ;; Step 7: Check if point is within intersection tolerance
-                  (if (< $distance (+ 0.5d0 1d-6))  ; Tolerance for blocking the beam with epsilon
+                  (if (< $distance (+ 0.25d0 1d-6))  ; Tolerance for blocking the beam with epsilon
                     (values $t $closest-x $closest-y)  ; Point blocks beam
                     (values nil nil nil)))             ; Point too far from beam
               ;; Projection falls outside segment bounds
@@ -354,7 +354,9 @@
       (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
            (= $end-x $r-x)
            (= $end-y $r-y)
-           (bind (chroma $source $source-hue))
+           ;; Get hue from source
+           (or (bind (chroma $source $source-hue))
+               (bind (color $source $source-hue)))
            (eql $source-hue $required-hue)))))
 
 
@@ -479,6 +481,11 @@
     (ww-loop while (and $continue (< $iteration $max-iterations)) do
       (setq $iteration-had-changes nil)
       
+      ;; Recalculate beams once at iteration start
+      ;; All decisions this iteration use this consistent beam state
+      (recalculate-all-beams!)
+      (update-beams-if-interference!)
+      
       ;; Step 1: Deactivate receivers that lost power
       (doall (?r receiver)
         (if (and (receiver-status ?r active)
@@ -487,28 +494,19 @@
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
       
-      ;; Step 2: If gates closed, recalculate beams and check interference
-      (if $iteration-had-changes
-        (do (recalculate-all-beams!)
-            (update-beams-if-interference!)))
-      
-      ;; Step 3: Activate receivers that gained power
+      ;; Step 2: Activate receivers that gained power
       (doall (?r receiver)
         (if (and (receiver-status ?r inactive)
                  (receiver-beam-reaches ?r))
-          (do (receiver-status ?r active)
+          (do (not (receiver-status ?r inactive))
+              (receiver-status ?r active)
               (doall (?g gate)
                 (if (controls ?r ?g)
                   (gate-status ?g open)))
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
       
-      ;; Step 4: If gates opened, recalculate beams and check interference
-      (if $iteration-had-changes
-        (do (recalculate-all-beams!)
-            (update-beams-if-interference!)))
-      
-      ;; Step 5: Check if system stabilized
+      ;; Step 3: Check if system stabilized
       (if (not $iteration-had-changes)
         (setq $continue nil))
       
@@ -516,9 +514,7 @@
     
     ;; Mark state as inconsistent if convergence failed
     (if (and (= $iteration $max-iterations) $continue)
-      (do (format t "~&Warning: Receiver state convergence incomplete after ~A iterations~%" 
-                  $max-iterations)
-          (inconsistent-state)))
+      (inconsistent-state))
     
     $any-changes))
 
@@ -816,15 +812,18 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area1)  ;area6
-  (loc connector1 area4)
-  (loc connector2 area5)  ;area6
-  (loc connector3 area2)  ;area7
+  (loc agent1 area4)
+  (loc connector1 area3)
+  (loc connector2 area6)
+  (loc connector3 area1)
+  (color connector1 red)
+  (color connector2 red)
+  (color connector3 red)
   (current-beams ())  ; Empty - populated by init-action
-  (receiver-status receiver1 inactive)  ;default
-  (receiver-status receiver2 inactive)
+  (receiver-status receiver1 active)
+  (receiver-status receiver2 active)
   (receiver-status receiver3 inactive)
-  (gate-status gate1 closed)
+  (gate-status gate1 open)
   
   ;; Static spatial configuration
   (vantage area1 25 18)
@@ -914,9 +913,19 @@
   ()
   (assert
     (paired transmitter1 receiver3)
-    (create-beam-segment-p! transmitter1 receiver3)
     (paired transmitter2 receiver1)
+    (paired transmitter2 connector1)
+    (paired connector1 connector2)
+    (paired connector1 receiver2)
+    (paired connector2 connector3)
+    (paired connector3 receiver1)
+    (create-beam-segment-p! transmitter1 receiver3)
     (create-beam-segment-p! transmitter2 receiver1)
+    (create-beam-segment-p! transmitter2 connector1)
+    (create-beam-segment-p! connector1 connector2)
+    (create-beam-segment-p! connector1 receiver2)
+    (create-beam-segment-p! connector2 connector3)
+    (create-beam-segment-p! connector3 receiver1)
     (update-beams-if-interference!)
     (converge-receiver-states!)))
 

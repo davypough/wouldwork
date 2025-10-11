@@ -101,7 +101,7 @@
    Errors out if initial state failed to converge."
   (when (gethash (convert-to-integer-memoized '(inconsistent-state))
                  (problem-state.idb *start-state*))
-    (error "FATAL: Initial state is inconsistent.~%~
+    (error "~%FATAL ERROR: Initial state is inconsistent.~%~
             Receiver state convergence failed during initialization.~%~
             The system could not stabilize in ~A iterations.~%~
             Cannot begin planning from an oscillating state."
