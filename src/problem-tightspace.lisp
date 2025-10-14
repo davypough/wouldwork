@@ -15,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 2)
 
 
 (define-types
@@ -25,16 +25,14 @@
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3)
-  hue         (blue red)  ;the color of a transmitter, receiver, or active connector
+  hue         (blue red none)  ;the color of a transmitter, receiver, or active connector
   beam        (beam1 beam2)
   area        (area1 area2 area3 area4 area5 area6)  ;vantage points
-  gate-state  (open closed)
-  receiver-state (active inactive)
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   source      (either transmitter connector)  ;beam source
   target      (either connector receiver)  ;beam target
-  occluder    (either cargo agent gate wall)  ;what can occlude a beam
+  occluder    (either cargo agent gate wall)  ;objects that can occlude a beam
   fixture     (either transmitter receiver)
 )
 
@@ -43,8 +41,8 @@
   (holds agent $cargo)  ;fluent because we need to sometimes lookup what is currently being held
   (loc (either agent cargo) $area)  ;a location in an area
   (paired terminus terminus)  ;potential beam between two terminus
-  (gate-status gate $gate-state)
-  (receiver-status receiver $receiver-state)
+  (open gate)  ;a gate can be open or not open, default is not open
+  (active receiver)
   (color connector $hue)
   (beam-segment beam $source $target $occluder $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
@@ -98,7 +96,7 @@
 (define-query los-thru-1-gate (?area ?fixture)
   (exists (?g gate)
     (and (los1 ?area ?g ?fixture)
-         (gate-status ?g open))))
+         (open ?g))))
 
 
 (define-query los (?area ?fixture)
@@ -109,7 +107,7 @@
 (define-query visible-thru-1-gate (?area1 ?area2)
   (exists (?g gate)
     (and (visible1 ?area1 ?g ?area2)
-         (gate-status ?g open))))
+         (open ?g))))
 
 
 (define-query visible (?area1 ?area2)
@@ -234,7 +232,7 @@
     (doall (?obj occluder)
       (if (and ;; Type-specific coordinate binding and conditions
                (or (and (gate ?obj) 
-                        (not (gate-status ?obj open))  ; Block UNLESS explicitly open
+                        (not (open ?obj))  ; Block UNLESS explicitly open
                         (bind (gate-segment ?obj $x1 $y1 $x2 $y2)))
                    (and (wall ?obj) 
                         (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
@@ -337,7 +335,7 @@
   (or (adjacent ?area1 ?area2)
       (exists (?g gate)
         (and (gate-separates ?g ?area1 ?area2)
-             (gate-status ?g open)))))
+             (open ?g)))))
 
 
 (define-query vacant (?area)
@@ -372,10 +370,10 @@
 
 
 (define-update deactivate-receiver! (?receiver)
-  (do (receiver-status ?receiver inactive)
+  (do (not (active ?receiver))
       (doall (?g gate)
         (if (controls ?receiver ?g)
-          (gate-status ?g closed)))))
+          (not (open ?g))))))
 
 
 (define-update create-beam-segment-p! (?source ?target)
@@ -488,7 +486,7 @@
       
       ;; Step 1: Deactivate receivers that lost power
       (doall (?r receiver)
-        (if (and (receiver-status ?r active)
+        (if (and (active ?r)
                  (not (receiver-beam-reaches ?r)))
           (do (deactivate-receiver! ?r)
               (setq $iteration-had-changes t)
@@ -496,13 +494,12 @@
       
       ;; Step 2: Activate receivers that gained power
       (doall (?r receiver)
-        (if (and (receiver-status ?r inactive)
+        (if (and (not (active ?r))
                  (receiver-beam-reaches ?r))
-          (do (not (receiver-status ?r inactive))
-              (receiver-status ?r active)
+          (do (active ?r)
               (doall (?g gate)
                 (if (controls ?r ?g)
-                  (gate-status ?g open)))
+                  (open ?g)))
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
       
@@ -525,7 +522,7 @@
     (if (connector ?terminus)
       (activate-connector! ?terminus ?hue)
       (if (receiver ?terminus)
-        (do (receiver-status ?terminus active)       ;; Set receiver active
+        (do (active ?terminus)      ;; Set receiver active
             (converge-receiver-states!))))
     ;; Handle cascading effects based on terminus type
     (if (connector ?terminus)
@@ -533,7 +530,7 @@
         ;; Connector activation: activate connected receivers of matching color
         (doall (?r receiver)
           (if (and (paired ?terminus ?r)
-                   (receiver-status ?r inactive)
+                   (not (active ?r))
                    (bind (chroma ?r $rhue))
                    (eql $rhue ?hue)
                    (or
@@ -820,10 +817,16 @@
   (color connector2 red)
   (color connector3 red)
   (current-beams ())  ; Empty - populated by init-action
-  (receiver-status receiver1 active)
-  (receiver-status receiver2 active)
-  (receiver-status receiver3 inactive)
-  (gate-status gate1 open)
+  (active receiver1)
+  (active receiver2)
+  (open gate1)
+  (paired transmitter1 receiver3)
+  (paired transmitter2 receiver1)
+  (paired transmitter2 connector1)
+  (paired connector1 connector2)
+  (paired connector1 receiver2)
+  (paired connector2 connector3)
+  (paired connector3 receiver1)
   
   ;; Static spatial configuration
   (vantage area1 25 18)
@@ -912,13 +915,6 @@
   (always-true)
   ()
   (assert
-    (paired transmitter1 receiver3)
-    (paired transmitter2 receiver1)
-    (paired transmitter2 connector1)
-    (paired connector1 connector2)
-    (paired connector1 receiver2)
-    (paired connector2 connector3)
-    (paired connector3 receiver1)
     (create-beam-segment-p! transmitter1 receiver3)
     (create-beam-segment-p! transmitter2 receiver1)
     (create-beam-segment-p! transmitter2 connector1)
@@ -933,5 +929,5 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (and (receiver-status receiver2 active)
-       (receiver-status receiver3 active)))
+  (and (active receiver2)
+       (active receiver3)))
