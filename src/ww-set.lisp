@@ -17,7 +17,7 @@
             (display-current-parameters)))
        (*tree-or-graph*
          (if (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
-           (format t "~2%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~%")
+           (format t "~2%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~2%")
            (progn (setf ,param ',val)
                   (unless *ww-loading*
                     (save-globals)
@@ -32,9 +32,8 @@
            (setf *features* (remove :ww-debug *features*)))
          (save-globals)
          (with-silenced-compilation
-           (load-problem (string *problem-name*))))
-           ;(asdf:compile-system :wouldwork :force t)
-           ;(asdf:load-system :wouldwork)))
+           (asdf:load-system :wouldwork :force t)))
+           ;(load-problem (string *problem-name*))))
        (*algorithm*  ;need to recompile current problem for new translations
          (when *ww-loading*
            (error "Please remove (ww-set *algorithm* ~S) from the current problem specification file.
@@ -43,7 +42,8 @@
            (setf ,param ',val)
            (save-globals)
            (with-silenced-compilation
-             (load-problem (string *problem-name*)))))
+             (asdf:load-system :wouldwork :force t))))
+             ;(load-problem (string *problem-name*)))))  ;deletes vals.lisp
        (*probe*
          (when *ww-loading*
            (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
@@ -55,7 +55,8 @@
          (setf *debug* 0)
          (save-globals)
          (with-silenced-compilation
-           (load-problem (string *problem-name*))))
+           (asdf:load-system :wouldwork :force t)))
+           ;(load-problem (string *problem-name*))))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

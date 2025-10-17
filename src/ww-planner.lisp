@@ -15,7 +15,122 @@
               (problem-state.instantiations state))))
 
 
-(defun do-init-action-updates (state)  ;add init actions to start-state
+(defun do-init-action-updates (state)
+  "Checks precondition of each init-action,
+   and if true, then updates db and static-db according to each init-action effect.
+   CRITICAL: Init actions always use depth-first semantics regardless of *algorithm*."
+  (declare (type problem-state state))
+  (when *init-actions*
+    (format t "~&Adding init-action propositions to initial database...~%"))
+  (iter (for init-action in *init-actions*)
+    (with-slots (name precondition-params precondition-args
+                 precondition-lambda effect-lambda)
+        init-action
+      (format t "~&~A...~%" name)
+      (let ((pre-fn (compile nil precondition-lambda))
+            (eff-fn (compile nil effect-lambda))
+            pre-results)
+        (setf pre-results
+             (remove-if #'null (mapcar (lambda (pinsts)
+                                         (apply pre-fn state pinsts))
+                                       precondition-args)))
+        (when (null pre-results)
+          (next-iteration))
+        
+        ;; Process each precondition result with depth-first semantics only
+        (dolist (pre-result pre-results)
+          (let ((updated-dbs
+                  ;; Always use depth-first semantics for init actions
+                  (if (eql pre-result t)
+                    (funcall eff-fn state)
+                    (apply eff-fn state pre-result))))
+            
+            (dolist (updated-db updated-dbs)
+              (let ((changes (update.changes updated-db)))
+                ;; Changes will always be a hash-table from depth-first translation
+                (maphash (lambda (key val)
+                           (let ((proposition (convert-to-proposition key)))
+                             ;; Update both global databases AND state
+                             (if (gethash (car proposition) *relations*)
+                               (progn
+                                 (setf (gethash proposition *db*) val)
+                                 (setf (gethash key (problem-state.idb state)) val))
+                               (progn
+                                 (setf (gethash proposition *static-db*) val)
+                                 (setf (gethash key (problem-state.idb state)) val)))))
+                         changes)))))))))
+
+
+#+ignore (defun do-init-action-updates (state)
+  "Checks precondition of each init-action,
+   and if true, then updates db and static-db according to each init-action effect."
+  (declare (type problem-state state))
+  (when *init-actions*
+    (format t "~&Adding init-action propositions to initial database...~%"))
+  (iter (for init-action in *init-actions*)
+    (with-slots (name precondition-params precondition-args
+                 precondition-lambda effect-lambda)
+        init-action
+      (format t "~&~A...~%" name)
+      (let ((pre-fn (compile nil precondition-lambda))
+            (eff-fn (compile nil effect-lambda))
+            pre-results)
+        (setf pre-results
+             (remove-if #'null (mapcar (lambda (pinsts)
+                                         (apply pre-fn state pinsts))
+                                       precondition-args)))
+        (when (null pre-results)
+          (next-iteration))
+        
+        ;; Process each precondition result separately with IMMEDIATE state updates
+        (dolist (pre-result pre-results)
+          (let ((updated-dbs
+                  (if (eq *algorithm* 'backtracking)
+                    ;; Backtracking mode: bind changes-list for effect function
+                    (let (changes-list)
+                      (declare (special changes-list))
+                      (if (eql pre-result t)
+                        (funcall eff-fn state)
+                        (apply eff-fn state pre-result)))
+                    ;; Depth-first mode: call directly
+                    (if (eql pre-result t)
+                      (funcall eff-fn state)
+                      (apply eff-fn state pre-result)))))
+            
+            (dolist (updated-db updated-dbs)
+              (let ((changes (update.changes updated-db)))
+                (etypecase changes
+                  (hash-table
+                   ;; Depth-first: changes contains integer keys → values
+                   (maphash (lambda (key val)
+                              (let ((proposition (convert-to-proposition key)))
+                                ;; Update both global databases AND state
+                                (if (gethash (car proposition) *relations*)
+                                  (progn
+                                    (setf (gethash proposition *db*) val)
+                                    (setf (gethash key (problem-state.idb state)) val))
+                                  (progn
+                                    (setf (gethash proposition *static-db*) val)
+                                    (setf (gethash key (problem-state.idb state)) val)))))
+                            changes))
+                  (list
+                   ;; Backtracking: changes contains (forward inverse) pairs
+                   (dolist (change-pair changes)
+                     (let ((forward-op (first change-pair)))
+                       (when forward-op
+                         ;; Convert proposition to integer for state.idb
+                         (let ((int-key (convert-to-integer-memoized forward-op)))
+                           ;; Update both global databases AND state
+                           (if (gethash (car forward-op) *relations*)
+                             (progn
+                               (setf (gethash forward-op *db*) t)
+                               (setf (gethash int-key (problem-state.idb state)) '(t)))
+                             (progn
+                               (setf (gethash forward-op *static-db*) t)
+                               (setf (gethash int-key (problem-state.idb state)) '(t))))))))))))))))))
+
+
+#+ignore (defun do-init-action-updates (state)  ;add init actions to start-state
   "Checks precondition of each init-action,
    and if true, then updates db and static-db according to each init-action effect."
   (declare (type problem-state state))

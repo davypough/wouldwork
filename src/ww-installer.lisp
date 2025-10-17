@@ -264,56 +264,39 @@
 
 
 (defun install-update (name args body)
-  "Revised update function installation with explicit effect context"
+  "Revised update function installation with explicit effect context.
+   CRITICAL: Update functions always use depth-first semantics internally
+   to ensure immediate state modification for sequential calls."
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
   (push name *update-names*)
   (let ((new-$vars (delete-duplicates
                      (set-difference
-                       (get-all-nonspecial-vars #'$varp body) args))))
-    (if new-$vars
-        (setf (symbol-value name)
-          `(lambda (state ,@args)
-             ,(format nil "~A update-fn" name)
-             (declare (special changes-list) (ignorable state))
-             (let (updated-dbs ,@new-$vars)
-               (declare (ignorable updated-dbs ,@new-$vars))
-               ,(translate body 'eff))))
-        (setf (symbol-value name)
-          `(lambda (state ,@args)
-             ,(format nil "~A update-fn" name)
-             (declare (special changes-list) (ignorable state))
-             ,(translate body 'eff))))
+                       (get-all-nonspecial-vars #'$varp body) args)))
+        ;; Save and temporarily override algorithm setting
+        (saved-algorithm *algorithm*))
+    ;; Force depth-first translation for update function body
+    ;; This ensures all internal propositions use `update` not `update-bt`
+    (setf *algorithm* 'depth-first)
+    (unwind-protect
+        (if new-$vars
+            (setf (symbol-value name)
+              `(lambda (state ,@args)
+                 ,(format nil "~A update-fn" name)
+                 (declare (ignorable state))
+                 (let (updated-dbs ,@new-$vars)
+                   (declare (ignorable updated-dbs ,@new-$vars))
+                   ,(translate body 'eff))))
+            (setf (symbol-value name)
+              `(lambda (state ,@args)
+                 ,(format nil "~A update-fn" name)
+                 (declare (ignorable state))
+                 ,(translate body 'eff))))
+      ;; Always restore original algorithm setting
+      (setf *algorithm* saved-algorithm))
     (fix-if-ignore '(state) (symbol-value name))))
 
 
-#+ignore (defun install-update (name args body)
-  "Revised update function installation with explicit effect context"
-  (format t "~&Installing ~A update-fn..." name)
-  (check-query/update-function name args body)
-  (push name *update-names*)
-  (let ((new-$vars (delete-duplicates
-                     (set-difference
-                       (get-all-nonspecial-vars #'$varp body) args))))
-    (if new-$vars
-        (setf (symbol-value name)
-          `(lambda (state ,@args)
-             ,(format nil "~A update-fn" name)
-             (declare (special changes-list) (ignorable state))  ;changes-list only used if backtracking
-             (let (updated-dbs ,@new-$vars)
-               (declare (ignorable updated-dbs ,@new-$vars))
-               ,(translate body 'eff)
-               (problem-state.idb state))))
-        (setf (symbol-value name)
-          `(lambda (state ,@args)
-             ,(format nil "~A update-fn" name)
-             (declare (special changes-list) (ignorable state))
-             (progn
-               ,(translate body 'eff)
-               (problem-state.idb state)))))
-    (fix-if-ignore '(state) (symbol-value name))))
-
-  
 (defmacro define-constraint (form)
   `(install-constraint ',form))
 
@@ -483,20 +466,6 @@
                                                      (cddr lambda-expr)))))
     (when ignores
       (push `(declare (ignorable ,@ignores)) (cddr lambda-expr)))))
-
-
-#+ignore (defmacro define-init (&body args)  ;allows list of inits, but use define-init-action instead
-  (labels ((maybe-unquote (x)
-             (if (and (consp x) (eq (car x) 'quote))
-               (cadr x) x))
-           (list-of-lists-p (x)
-             (and (listp x) (or (null x) (listp (first x))))))
-    (let* ((single (and args (null (cdr args))))
-           (arg1   (and single (maybe-unquote (car args))))
-           (literals (if (and single (list-of-lists-p arg1))
-                       arg1
-                       args)))
-      `(install-init ',literals))))
 
 
 (defmacro define-init (&rest literals)
