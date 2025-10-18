@@ -48,6 +48,18 @@
      ,@body))
 
 
+(defun reset ()
+  "Delete problem.lisp and vals.lisp, then reload wouldwork with default problem."
+  (format t "~%Loading wouldwork defaults...~2%")
+  (let* ((root (asdf:system-source-directory :wouldwork))
+         (problem-file (merge-pathnames "src/problem.lisp" root)))
+    (when (probe-file problem-file) (delete-file problem-file))
+    (asdf:clear-system :wouldwork)
+    (with-silenced-compilation
+      (asdf:load-system :wouldwork :force t))))
+
+
+
 (defun cleanup-resources ()
   "Attempt to shutdown dangling threads safely in SBCL."
   (format t "~&Cleaning up resources and shutting down threads...~%")

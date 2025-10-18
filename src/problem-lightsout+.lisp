@@ -12,7 +12,7 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* first)  ;min-length)
+(ww-set *solution-type* min-length)
 
 (ww-set *tree-or-graph* graph)
 
@@ -57,9 +57,9 @@
   (controls (either receiver plate) gate)
   (chroma (either transmitter receiver) $hue)
   ;potential los from an area to a transmitter or receiver
-  (los0 area (either transmitter receiver))
-  (los1 area $gate (either transmitter receiver))
-  (los2 area $gate $gate (either transmitter receiver))
+  (los0 area station)  ;(either transmitter receiver))
+  (los1 area $gate station)  ;(either transmitter receiver))
+  (los2 area $gate $gate station)  ;(either transmitter receiver))
   (visible0 area area)  ;visibility between areas is for connecting connectors
   (visible1 area $gate area)
   (visible2 area $gate $gate area)

@@ -241,6 +241,9 @@
 (defvar *state-codes* (make-hash-table)
   "Holding place for integer state codes in bi-directional search.")
 
+(defvar *choice-stack* nil
+  "Stack of choices for backtracking search. Defined here to avoid forward reference warnings.")
+
 (define-global *parameter-headers* '(standard product combination dot-product)
   "The different ways values can be combined in a pre-parameter list.")
 

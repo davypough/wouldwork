@@ -209,14 +209,6 @@ any such settings appearing in the problem specification file.
             *probe* *debug*))
 
 
-(defun ww-reset ()
-  "Deletes vals.lisp & problem.lisp & parameters to start over fresh in case of inconsistency."
-  (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
-  (reset-parameters)
-  t)
-
-
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
