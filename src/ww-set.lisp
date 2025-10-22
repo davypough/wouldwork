@@ -40,6 +40,9 @@
                    Instead, enter it at the REPL after loading/staging)." ',val))
          (unless *ww-loading*  ;ignore (ww-set *algorithm* ...) in problem specification
            (setf ,param ',val)
+           (when (and (eq ',val 'backtracking) (eq *tree-or-graph* 'graph))
+             (setf *tree-or-graph* 'tree))
+             ;(format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
            (save-globals)
            (with-silenced-compilation
              (asdf:load-system :wouldwork :force t))))

@@ -108,7 +108,7 @@
                                       ;; Static case: use pre-computed combinations
                                       (action.precondition-args action)))
             (precondition-fn (action.pre-defun-name action)))
-        
+
         ;; Process each parameter combination individually against current state
         (dolist (param-combo parameter-combinations)
           (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))
@@ -116,7 +116,6 @@
               (let ((choices-from-combination 
                       (generate-choices-for-single-combination-bt action param-combo
                                                                   precondition-result level)))
-                
                 ;; Process each choice generated from this parameter combination
                 ;; (Multiple choices possible due to multiple assert statements in an action)
                 (dolist (choice choices-from-combination)
@@ -142,46 +141,47 @@
 
 
 (defun generate-choices-for-single-combination-bt (action param-combo precondition-result level)
-  "Generate multiple choices from one parameter combination processing.
-   Effect function computes updates but does NOT modify *backtrack-state*."
+  "Generate choices by executing effect with incremental updates to *backtrack-state*.
+   Effect modifies state, then changes are undone. Returns choices with forward/inverse ops."
   
   (let ((effect-fn (action.eff-defun-name action))
         (choices '()))
 
-    ;; Step 1: Execute effect function to compute updates (no state modification)
-    (let ((updated-dbs (if (eql precondition-result t)
-                           (funcall effect-fn *backtrack-state*)
-                           (apply effect-fn *backtrack-state* precondition-result))))
+    ;; Execute effect function - MODIFIES *backtrack-state* incrementally
+    (let ((updated-dbs 
+            (if (eql precondition-result t)
+                (funcall effect-fn *backtrack-state*)
+                (apply effect-fn *backtrack-state* precondition-result))))
       
-      ;; Step 2: Process each updated-db into separate choice structure
+      ;; Process each updated-db into separate choice structure
       (dolist (updated-db updated-dbs)
-        (let ((change-pairs (update.changes updated-db)))
-          (when change-pairs  ; Only create choice if changes exist
-            (multiple-value-bind (forward-literals inverse-literals)
-                (loop for (forward inverse) in change-pairs
-                      collect forward into forwards
-                      collect inverse into inverses
-                      finally (return (values forwards inverses)))
+        (let ((change-lists (update.changes updated-db)))
+          (when change-lists
+            (destructuring-bind (forward-ops inverse-ops) change-lists
               (let* ((combined-act (cons (action.name action)
                                         (update.instantiations updated-db)))
                      (new-choice (make-choice :act combined-act
-                                             :forward-update forward-literals
-                                             :inverse-update inverse-literals
+                                             :forward-update forward-ops
+                                             :inverse-update inverse-ops
                                              :level level)))
-                (push new-choice choices))))))
+                (push new-choice choices)
+                
+                ;; CRITICAL: Undo changes immediately after capturing
+                ;;           So next action sees correct state
+                (revise (problem-state.idb *backtrack-state*) inverse-ops))))))
       
-      ;; Step 3: Return choices in forward execution order
+      ;; Return choices in forward execution order
       (nreverse choices))))
 
 
 (defun register-choice-bt (choice action level)
-  "Register a choice commitment, apply forward updates, and validate resulting state"
+  "Register a choice by applying its forward operations to *backtrack-state*."
     
   #+:ww-debug
   (when (>= *debug* 3)
     (format t "~%Current state: ~A~%" (list-database (problem-state.idb *backtrack-state*))))
 
-  ;; Step 1: Apply forward update
+  ;; Step 1: Apply forward operations
   (revise (problem-state.idb *backtrack-state*) (choice.forward-update choice))
 
   ;; Step 2: Name and time update

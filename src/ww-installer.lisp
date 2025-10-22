@@ -264,36 +264,35 @@
 
 
 (defun install-update (name args body)
-  "Revised update function installation with explicit effect context.
-   CRITICAL: Update functions always use depth-first semantics internally
-   to ensure immediate state modification for sequential calls."
+  "Installs a user-defined update function.
+   Update functions translate according to current *algorithm* setting.
+   Init-action processing (do-init-action-updates) handles both formats:
+   - Depth-first: changes as hash-table with integer keys
+   - Backtracking: changes as list of (forward inverse) pairs"
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
   (push name *update-names*)
   (let ((new-$vars (delete-duplicates
                      (set-difference
-                       (get-all-nonspecial-vars #'$varp body) args)))
-        ;; Save and temporarily override algorithm setting
-        (saved-algorithm *algorithm*))
-    ;; Force depth-first translation for update function body
-    ;; This ensures all internal propositions use `update` not `update-bt`
-    (setf *algorithm* 'depth-first)
-    (unwind-protect
-        (if new-$vars
-            (setf (symbol-value name)
-              `(lambda (state ,@args)
-                 ,(format nil "~A update-fn" name)
-                 (declare (ignorable state))
-                 (let (updated-dbs ,@new-$vars)
-                   (declare (ignorable updated-dbs ,@new-$vars))
-                   ,(translate body 'eff))))
-            (setf (symbol-value name)
-              `(lambda (state ,@args)
-                 ,(format nil "~A update-fn" name)
-                 (declare (ignorable state))
-                 ,(translate body 'eff))))
-      ;; Always restore original algorithm setting
-      (setf *algorithm* saved-algorithm))
+                       (get-all-nonspecial-vars #'$varp body) args))))
+    ;; Translation uses current *algorithm* value
+    (if new-$vars
+      (setf (symbol-value name)
+        `(lambda (state ,@args)
+           ,(format nil "~A update-fn" name)
+           (declare (ignorable state)
+                    ,@(when (eq *algorithm* 'backtracking)
+                        '((special forward-list inverse-list))))
+           (let (updated-dbs ,@new-$vars)
+             (declare (ignorable updated-dbs ,@new-$vars))
+             ,(translate body 'eff))))
+      (setf (symbol-value name)
+        `(lambda (state ,@args)
+           ,(format nil "~A update-fn" name)
+           (declare (ignorable state)
+                    ,@(when (eq *algorithm* 'backtracking)
+                        '((special forward-list inverse-list))))
+          ,(translate body 'eff))))
     (fix-if-ignore '(state) (symbol-value name))))
 
 
@@ -331,10 +330,8 @@
 (defun install-init-action (name duration pre-params precondition eff-params effect)
   (declare (ignore duration))
   (format t "~&Installing ~A init action..." name)
-  (setf *processing-init-action* t)  ;affects translation of the action
   (push (create-action name 0 pre-params precondition eff-params effect t)
-    *init-actions*)
-  (setf *processing-init-action* nil))
+    *init-actions*))
 
 
 (defun create-action (name duration pre-params precondition eff-params effect init-action)
@@ -413,10 +410,24 @@
                        :effect-lambda `(lambda (state ,@eff-args ,@eff-extra-?vars)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
-                                         (let (updated-dbs followups ,@(set-difference (set-difference eff-extra-$vars      eff-args) eff-extra-?vars))
-                                           (declare (ignorable ,@eff-extra-$vars))
+                                         ;; CHANGED: Add forward-list and inverse-list to let-binding for backtracking
+                                         (let (updated-dbs 
+                                               followups 
+                                               ,@(set-difference (set-difference eff-extra-$vars eff-args) eff-extra-?vars)
+                                               ,@(when (eq *algorithm* 'backtracking)
+                                                   '(forward-list inverse-list)))
+                                           (declare (ignorable ,@eff-extra-$vars)
+                                                    ;; CHANGED: Declare as special for backtracking
+                                                    ,@(when (eq *algorithm* 'backtracking)
+                                                        '((special forward-list inverse-list))))
                                            ,(translate effect 'pre)  ;start as pre, shift to eff in assert
-                                           updated-dbs))
+                                           ;; CHANGED: Package results for backtracking
+                                           ,(if (eq *algorithm* 'backtracking)
+                                              '(progn (dolist (upd updated-dbs)
+                                                        (setf (update.changes upd) 
+                                                          (list (nreverse forward-list) (nreverse inverse-list))))
+                                                      updated-dbs)
+                                              'updated-dbs)))
                        :effect-adds nil))
         (fix-if-ignore '(state) (action.precondition-lambda action))
         (fix-if-ignore `(state ,@eff-missing-vars) (action.effect-lambda action))

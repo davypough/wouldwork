@@ -121,34 +121,89 @@
 
 (defun translate-positive-relation (form flag)
   "Unified positive relation translation with context-aware read/write determination.
+   For backtracking: applies changes incrementally while tracking forward and inverse."
+  (declare (special forward-list inverse-list))
+  (if (write-operation-p flag)
+    (if (eq *algorithm* 'backtracking)
+      ;; Backtracking with incremental updates
+      `(multiple-value-bind (forward inverse) 
+           (update-bt (problem-state.idb state) ,(translate-list form flag))
+         ;; Apply forward operation immediately to state
+         (update (problem-state.idb state) forward)
+         ;; Track both for later use
+         (push forward forward-list)
+         (push inverse inverse-list))
+      ;; Depth-first algorithm
+      `(update (problem-state.idb state) ,(translate-list form flag)))
+    ;; Read operation
+    (translate-proposition form flag)))
+
+
+(defun translate-negative-relation (form flag)
+  "Unified negative relation translation with incremental updates for backtracking."
+  (declare (special forward-list inverse-list))
+  (if (write-operation-p flag)
+    (if (eq *algorithm* 'backtracking)
+      ;; Backtracking with incremental updates
+      `(multiple-value-bind (forward inverse) 
+           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+         ;; Apply forward operation immediately to state
+         (update (problem-state.idb state) forward)
+         ;; Track both for later use
+         (push forward forward-list)
+         (push inverse inverse-list))
+      ;; Depth-first algorithm
+      `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
+    ;; Read operation
+    `(not ,(translate-positive-relation (second form) flag))))
+
+
+#+ignore (defun translate-positive-relation (form flag)
+  "Unified positive relation translation with context-aware read/write determination.
    Automatically detects whether to perform read operations (queries) or write operations (updates)
-   based on syntactic context rather than just translation flag."
+   based on syntactic context rather than just translation flag.
+   For backtracking algorithm, generates runtime branching to handle both init-action
+   and normal action contexts with the same compiled code."
   (declare (special changes-list))
   (if (write-operation-p flag)
     ;; Write operation: Effect context and not in forced read-mode
-    (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
-      ;; Use backtracking update only for normal actions when algorithm is backtracking
-      `(multiple-value-bind (forward inverse) 
-           (update-bt (problem-state.idb state) ,(translate-list form flag))
-         (push (list forward inverse) changes-list))
-      ;; Use depth-first update for init actions OR when algorithm is depth-first
+    (if (eq *algorithm* 'backtracking)
+      ;; Backtracking: generate runtime check for init-action context
+      `(if *processing-init-action*
+           ;; Init-action context: use depth-first update for immediate state modification
+           ;; This allows sequential update function calls to see each other's changes
+           (update (problem-state.idb state) ,(translate-list form flag))
+           ;; Normal action context: use backtracking update with change tracking
+           ;; Changes accumulate in changes-list without modifying state
+           (multiple-value-bind (forward inverse) 
+               (update-bt (problem-state.idb state) ,(translate-list form flag))
+             (push (list forward inverse) changes-list)))
+      ;; Depth-first algorithm: always use direct update regardless of context
       `(update (problem-state.idb state) ,(translate-list form flag)))
     ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
     (translate-proposition form flag)))
 
 
-(defun translate-negative-relation (form flag)
+#+ignore (defun translate-negative-relation (form flag)
   "Unified negative relation translation maintaining read/write context consistency.
-   Preserves negation semantics across both query and update operations."
+   Preserves negation semantics across both query and update operations.
+   For backtracking algorithm, generates runtime branching to handle both init-action
+   and normal action contexts with the same compiled code."
   (declare (special changes-list))
   (if (write-operation-p flag)
     ;; Write operation: Effect context and not in forced read-mode
-    (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
-      ;; Use backtracking update only for normal actions when algorithm is backtracking
-      `(multiple-value-bind (forward inverse) 
-           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-         (push (list forward inverse) changes-list))
-      ;; Use depth-first update for init actions OR when algorithm is depth-first
+    (if (eq *algorithm* 'backtracking)
+      ;; Backtracking: generate runtime check for init-action context
+      `(if *processing-init-action*
+           ;; Init-action context: use depth-first update for immediate state modification
+           ;; This allows sequential update function calls to see each other's changes
+           (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+           ;; Normal action context: use backtracking update with change tracking
+           ;; Changes accumulate in changes-list without modifying state
+           (multiple-value-bind (forward inverse) 
+               (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+             (push (list forward inverse) changes-list)))
+      ;; Depth-first algorithm: always use direct update regardless of context
       `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
     ;; Read operation: All other cases
     `(not ,(translate-positive-relation (second form) flag))))
@@ -418,6 +473,31 @@
 
 
 (defun translate-assert-bt (form flag)
+  "For backtracking with incremental updates, translates an assert statement.
+   Applies updates directly to state (incremental) while tracking both forward 
+   and inverse operations."
+  (ecase flag
+    (eff (error "Nested ASSERT statements not allowed:~%~A" form))
+    (pre `(let (forward-list inverse-list)
+            (declare (special forward-list inverse-list))
+            ;; Execute each statement, applying updates incrementally to state
+            ,@(mapcar (lambda (statement)
+                        (let ((*proposition-read-mode* nil))
+                          (translate statement 'eff)))
+                      (cdr form))
+            ;; Create update structure with BOTH forward and inverse operations
+            (push (make-update :changes (list (nreverse forward-list)    ; Forward ops
+                                             (nreverse inverse-list))   ; Inverse ops
+                               :value ,(if *objective-value-p*
+                                         '$objective-value
+                                         0.0) 
+                               :instantiations (list ,@*eff-param-vars*) 
+                               :followups (reverse followups))
+                  updated-dbs)
+            updated-dbs))))
+
+
+#+ignore (defun translate-assert-bt (form flag)
   "For backtracking, translates an assert statement with clean separation of concerns."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
@@ -525,7 +605,7 @@
   (cond ((atom form) form)  ;atom or (always-true) translates as itself
         ((null form) t)  ;if form=nil simply continue processing
         ((equal form '(always-true)) (translate-simple-atom form flag))
-        ((eql (car form) 'assert) (if (and (eq *algorithm* 'backtracking) (not *processing-init-action*))
+        ((eql (car form) 'assert) (if (eq *algorithm* 'backtracking)
                                     (translate-assert-bt form flag)
                                     (translate-assert form flag)))
         ((member (car form) '(forsome exists exist)) (translate-existential form flag))  ;specialty first

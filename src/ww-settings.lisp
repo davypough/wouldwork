@@ -257,10 +257,6 @@
 (define-global *inconsistent-states-dropped* 0
   "Count of successor states dropped due to convergence failure.")
 
-(defparameter *processing-init-action* nil
-  "Dynamic variable indicating when we're processing initialization actions.
-   When T, assert statements should use depth-first translation regardless of *algorithm*.")
-
 (defparameter *prop-key-cache* (make-hash-table :test #'equal)
   "Cache for prop-key-to-integer conversions")
 

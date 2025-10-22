@@ -212,6 +212,7 @@ any such settings appearing in the problem specification file.
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
+  (save-globals)
   (with-silenced-compilation
     (load-problem (string *problem-name*))))
   
@@ -329,8 +330,7 @@ any such settings appearing in the problem specification file.
   "Copies problem file to src/problem.lisp so it will be compiled by asdf."
   (let* ((plist (list-problem-files-plist))
 	     (problem-file (lookup problem-name-str plist)))
-    (copy-file-content problem-file (in-src "problem.lisp"))
-    (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))))
+    (copy-file-content problem-file (in-src "problem.lisp"))))
 
 
 (defun load-problem (problem-name-str)
