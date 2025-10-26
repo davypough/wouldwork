@@ -407,27 +407,15 @@
                                                             `(list ,@eff-args)
                                                             `t))))))
                        :effect-variables eff-param-vars  ;user listed parameter variables
-                       :effect-lambda `(lambda (state ,@eff-args ,@eff-extra-?vars)
+                       :effect-lambda `(lambda (state ,@eff-args)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
-                                         ;; CHANGED: Add forward-list and inverse-list to let-binding for backtracking
                                          (let (updated-dbs 
                                                followups 
-                                               ,@(set-difference (set-difference eff-extra-$vars eff-args) eff-extra-?vars)
-                                               ,@(when (eq *algorithm* 'backtracking)
-                                                   '(forward-list inverse-list)))
-                                           (declare (ignorable ,@eff-extra-$vars)
-                                                    ;; CHANGED: Declare as special for backtracking
-                                                    ,@(when (eq *algorithm* 'backtracking)
-                                                        '((special forward-list inverse-list))))
+                                               ,@(set-difference (set-difference eff-extra-$vars eff-args) eff-extra-?vars))
+                                           (declare (ignorable ,@eff-extra-$vars))
                                            ,(translate effect 'pre)  ;start as pre, shift to eff in assert
-                                           ;; CHANGED: Package results for backtracking
-                                           ,(if (eq *algorithm* 'backtracking)
-                                              '(progn (dolist (upd updated-dbs)
-                                                        (setf (update.changes upd) 
-                                                          (list (nreverse forward-list) (nreverse inverse-list))))
-                                                      updated-dbs)
-                                              'updated-dbs)))
+                                           updated-dbs))
                        :effect-adds nil))
         (fix-if-ignore '(state) (action.precondition-lambda action))
         (fix-if-ignore `(state ,@eff-missing-vars) (action.effect-lambda action))
