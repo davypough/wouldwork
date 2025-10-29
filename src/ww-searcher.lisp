@@ -86,7 +86,15 @@
 
 (defun node.state.idb-alist (node)
   "Gets the canonical alist representation of a node's idb for efficient hstack lookup."
-  (idb-to-sorted-alist (problem-state.idb (node.state node))))
+  (problem-state-canonical-alist (node.state node)))
+
+
+(defun problem-state-canonical-alist (state)
+  "Returns the canonical sorted alist for state comparison.
+   Uses cached idb-alist if available, otherwise computes and caches it."
+  (or (problem-state.idb-alist state)
+      (setf (problem-state.idb-alist state)
+            (idb-to-sorted-alist (problem-state.idb state)))))
 
 
 (defun choose-ht-value-test (relations)
@@ -261,7 +269,7 @@
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
-      (setf (gethash (idb-to-sorted-alist (problem-state.idb (node.state current-node))) *closed*)
+      (setf (gethash (problem-state-canonical-alist (node.state current-node)) *closed*)
         (list (node.depth current-node)
               (problem-state.time (node.state current-node))
               (problem-state.value (node.state current-node)))))
@@ -305,7 +313,7 @@
             (finalize-path-depth succ-depth)
             (next-iteration)))
         (when (eql *tree-or-graph* 'graph)   ;(ut::print-ht (problem-state.idb succ-state))
-          (let ((open-node (idb-in-open (problem-state.idb succ-state) open)))
+          (let ((open-node (idb-in-open succ-state open)))
             (when open-node
               (narrate "State already on open" succ-state succ-depth)
               (increment-global *repeated-states*)
@@ -313,14 +321,13 @@
                (setf (node.parent open-node) current-node)  ;succ is better
                (finalize-path-depth succ-depth))  ;succ is not better
              (next-iteration)))  ;drop this succ
-          (let* ((succ-idb (problem-state.idb succ-state))
-                 (closed-values (get-closed-values (idb-to-sorted-alist succ-idb))))
+          (let ((closed-values (get-closed-values (problem-state-canonical-alist succ-state))))
             (when closed-values
               (increment-global *repeated-states*)
               (if (better-than-closed closed-values succ-state succ-depth)
                 (progn             ; succ has better value
                   (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                  (remhash (idb-to-sorted-alist succ-idb) *closed*))
+                  (remhash (problem-state-canonical-alist succ-state) *closed*))
                 (progn 
                   (narrate "Dropping this previously closed state" succ-state succ-depth)
                   (finalize-path-depth succ-depth) 
@@ -347,11 +354,11 @@
   t)
 
 
-(defun idb-in-open (succ-idb open)
-  "Determines if an idb hash table's contents match the contents of a key in open's table.
+(defun idb-in-open (succ-state open)
+  "Determines if a state's idb matches the contents of a key in open's table.
    Returns the node in open or nil."
-   (declare (type hash-table succ-idb))
-  (let ((canonical-key (idb-to-sorted-alist succ-idb))
+  (declare (type problem-state succ-state))
+  (let ((canonical-key (problem-state-canonical-alist succ-state))
         (ht (hs::hstack.table open)))
     (let ((nodes (gethash canonical-key ht)))
       (when nodes (car nodes)))))
@@ -753,7 +760,7 @@
               (backtracking (length *choice-stack*))))
     (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
     (iter (while (and *rem-init-successors*
-                      (not (idb-in-open (problem-state.idb (node.state (first *rem-init-successors*))) 
+                      (not (idb-in-open (node.state (first *rem-init-successors*))
                                         *open*))))
           (pop-global *rem-init-successors*))
     (when (< *threads* 2)

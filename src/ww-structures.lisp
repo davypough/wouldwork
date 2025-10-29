@@ -15,7 +15,8 @@
   (value 0.0 :type real)
   (heuristic 0.0 :type real)
   (idb (make-hash-table) :type hash-table)  ;integer hash table of propositions
-  (hidb (make-hash-table) :type hash-table))  ;integer table for happening events
+  (hidb (make-hash-table) :type hash-table)  ;integer table for happening events
+  (idb-alist nil :type list))  ;cached sorted alist for efficient state comparisons
 ;Note: hidb is separate from idb because otherwise each exogenous event will change
 ;the state, leading to endless revisiting of the same similar state
 ;Note: happenings contains an entry for each object's next event, updated as events occur
@@ -92,15 +93,15 @@
 
 
 (defun copy-problem-state (state)
-  (make-problem-state
-    :name (problem-state.name state)
-    :instantiations (copy-list (problem-state.instantiations state))
-    :happenings (copy-tree (problem-state.happenings state))
-    :time (problem-state.time state)
-    :value (problem-state.value state)
-    :heuristic (problem-state.heuristic state)
-    :idb (copy-idb (problem-state.idb state))
-    :hidb (copy-idb (problem-state.hidb state))))
+    (make-problem-state
+      :name (problem-state.name state)
+      :instantiations (copy-list (problem-state.instantiations state))
+      :happenings (copy-tree (problem-state.happenings state))
+      :time (problem-state.time state)
+      :value (problem-state.value state)
+      :heuristic (problem-state.heuristic state)
+      :idb (copy-idb (problem-state.idb state))
+      :hidb (copy-idb (problem-state.hidb state))))
 
 
 (defun copy-idb (idb)

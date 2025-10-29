@@ -298,7 +298,9 @@
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt (list-database updated-idb)))
         (setf (problem-state.idb net-state) updated-idb)
-    (finally (return-from process-followups net-state))))
+    (finally (setf (problem-state.idb-alist net-state)
+               (idb-to-sorted-alist (problem-state.idb net-state)))
+             (return-from process-followups net-state))))
 
 
 (defun expand (current-node)  ;called from df-bnb1
