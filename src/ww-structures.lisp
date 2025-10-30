@@ -104,6 +104,20 @@
       :hidb (copy-idb (problem-state.hidb state))))
 
 
+(defun copy-problem-state-without-idb (state)
+  "Copies a problem-state but omits the idb field (leaves it as new empty hash table).
+   Used when the idb will be immediately replaced with a different one."
+  (make-problem-state
+    :name (problem-state.name state)
+    :instantiations (copy-list (problem-state.instantiations state))
+    :happenings (copy-tree (problem-state.happenings state))
+    :time (problem-state.time state)
+    :value (problem-state.value state)
+    :heuristic (problem-state.heuristic state)
+    :idb (make-hash-table)                              ; ← NEW: empty table instead of copy
+    :hidb (copy-idb (problem-state.hidb state))))
+
+
 (defun copy-idb (idb)
   "Copies a Wouldwork database."
   (declare (type hash-table idb))
