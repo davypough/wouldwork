@@ -274,9 +274,10 @@
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
       (let ((current-state (node.state current-node)))
-        (problem-state-canonical-alist current-state)  ;ensure hash cached
-        (setf (gethash (problem-state.idb-hash current-state) *closed*)  ;use hash
-          (list (node.depth current-node)
+        (problem-state-canonical-alist current-state)
+        (setf (gethash (problem-state.idb-hash current-state) *closed*)
+          (list (problem-state.idb current-state)      ; store idb for collision detection
+                (node.depth current-node)
                 (problem-state.time current-state)
                 (problem-state.value current-state)))))
     (let ((succ-states (expand current-node)))  ;from generate-children
@@ -392,10 +393,16 @@
 
 (defun get-closed-values (state)
   "Returns the closed values (depth time value) for the given state, or nil if not found.
-   Uses idb-hash for O(1) lookup."
+   Uses idb-hash for O(1) lookup with idb verification for collision safety."
   (declare (type problem-state state))
   (problem-state-canonical-alist state)  ; ensure hash is cached
-  (gethash (problem-state.idb-hash state) *closed*))
+  (let ((entry (gethash (problem-state.idb-hash state) *closed*)))
+    (when entry
+      (let ((stored-idb (first entry))
+            (stored-values (rest entry)))
+        ;; Verify idb matches - handles hash collisions correctly
+        (when (equalp (problem-state.idb state) stored-idb)
+          stored-values)))))  ; return (depth time value)
 
 
 (defun goal (state)
