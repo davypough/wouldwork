@@ -513,10 +513,17 @@
 
 
 (defun on-current-path (succ-state current-node)
-  "Determines if a successor is already on the current path from the start state."
+  "Determines if a successor is already on the current path from the start state.
+   Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."  ; CHANGED: Updated docstring
+  (problem-state-canonical-alist succ-state)  ; NEW: ensure hash is cached
   (when (iter (for node initially current-node then (node.parent node))
-              (while node)  
-              (thereis (equalp (problem-state.idb succ-state) (problem-state.idb (node.state node)))))
+              (while node)
+              (for node-state = (node.state node))  ; NEW: bind node-state for clarity
+              (problem-state-canonical-alist node-state)  ; NEW: ensure hash is cached
+              (thereis (and (= (problem-state.idb-hash succ-state)  ; CHANGED: hash comparison first
+                              (problem-state.idb-hash node-state))
+                           (equalp (problem-state.idb succ-state)  ; CHANGED: equalp only on collision
+                                  (problem-state.idb node-state)))))
     (narrate "State already on current path" succ-state (1+ (node.depth current-node)))
     t))
 
