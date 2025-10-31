@@ -20,7 +20,7 @@
 (define-types
   agent       (agent1 agent1-)  ;the name of the agent performing actions, and the agent's ghost
   recorder    (recorder1)
-  gate        (gate1 gate2)
+  gate        (gate1)
   connector   (connector1 connector1-)
   transmitter (transmitter1)
   receiver    (receiver1)
@@ -28,7 +28,7 @@
   plate       (plate1)
   fan         (fan1)
   hue         (blue none)  ;the color of a transmitter, receiver, or active connector
-  area        (area1 area2 area3)  ;vantage points
+  area        (area1 area2 area3 area4)  ;position points
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector repeater)  ;what a connector can connect to
   source      (either transmitter connector repeater)  ;beam source
@@ -38,7 +38,7 @@
 
 
 (define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds agent1 $any-cargo))
-  (holds agent $cargo)  ;fluent because we need to sometimes lookup what is currently being held
+  (holds agent $cargo)  ;fluent because we may need to lookup what is currently being held
   (loc (either agent cargo) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either receiver fan))
@@ -50,14 +50,14 @@
 
 
 (define-static-relations
-  (vantage area $fixnum $fixnum)  ;the (x,y) position of an area
+  (coords (either area fixture) $fixnum $fixnum)  ;the (x,y) position
+  ;(position area $fixnum $fixnum)  ;the (x,y) position of an area
+  ;(fixpoint fixture $fixnum $fixnum)  ;coordinates of a fixture
   (adjacent area area)  ;agent can always move to adjacent area unimpeded  
-  (locale fixture area)  ;locale is a fixed location, loc is dynamic
-  (controls receiver gate)
   (toggles plate (either gate fan))
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
-  (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
+  ;(wall-segment wall $fixnum $fixnum $fixnum $fixnum)
   ;clear los from an area to a fixture
   (los0 area (either transmitter receiver repeater))  
   (los1 area gate (either transmitter receiver repeater))
@@ -85,14 +85,12 @@
 
 
 (define-query get-coordinates (?object)
-  (if (and (bind (loc ?object $area))
-           (bind (vantage $area $x $y)))
+  (if (and (bind (loc ?object $area))  ;object is movable--eg, a connector
+           (bind (coords $area $x $y)))
     (values $x $y)
-    (if (bind (fixpoint ?object $x $y))
+    (if (bind (coords ?object $x $y))  ;object is an area or fixture
       (values $x $y)
-      (if (bind (vantage ?object $x $y))
-        (values $x $y)
-        (values nil nil)))))
+      (values nil nil))))
 
 
 (define-query los-thru-1-gate (?area ?fixture)
@@ -240,7 +238,7 @@
                         (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
                    (and (or (cargo ?obj) (agent ?obj))
                         (bind (loc ?obj $area))
-                        (bind (vantage $area $x1 $y1))
+                        (bind (coords $area $x1 $y1))
                         (setq $x2 $x1) (setq $y2 $y1)))
                ;; Endpoint exclusion logic for all obstacle types
                (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
@@ -811,107 +809,54 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area4)
-  (loc connector1 area3)
-  (loc connector2 area6)
-  (loc connector3 area1)
-  (color connector1 red)
-  (color connector2 red)
-  (color connector3 red)
-  (current-beams ())  ; Empty - populated by init-action
-  (active receiver1)
-  (active receiver2)
-  (open gate1)
-  (paired transmitter1 receiver3)
-  (paired transmitter2 receiver1)
-  (paired transmitter2 connector1)
-  (paired connector1 connector2)
-  (paired connector1 receiver2)
-  (paired connector2 connector3)
-  (paired connector3 receiver1)
+  (loc agent1 area5)
+  (loc agent1- area5)
+  (loc connector1 area1)
+  (loc connector1- area1)
+  (color connector1 none)
+  (color connector1- none)
+  (color repeater1 none)
+  ;(not (open gate1))
+  ;(not (active fan1))
+  ;(not (active receiver1))
+  (current-beams ())  ; Empty - can be populated by init-action, if exist initially
   
   ;; Static spatial configuration
-  (vantage area1 25 18)
-  (vantage area2 27 14)
-  (vantage area3 25 10)
-  (vantage area4 19 15)
-  (vantage area5 25 14)
-  (vantage area6 34 13)
+  (coords area1  4 20)
+  (coords area2 10 14)
+  (coords area3 21  8)
+  (coords area4 22  3)
   (adjacent area1 area2)
-  (adjacent area1 area3)
-  (adjacent area1 area4)
-  (adjacent area1 area5)
-  (adjacent area2 area3)
-  (adjacent area2 area4)
-  (adjacent area2 area5)
   (adjacent area3 area4)
-  (adjacent area3 area5)
-  (adjacent area4 area5)
   
   ;; Static object configuration
-  (fixpoint transmitter1 32 13)
-  (fixpoint transmitter2 25  0)
-  (fixpoint receiver1 25 26)
-  (fixpoint receiver2  0  7)
-  (fixpoint receiver3  0 18)
-  (gate-segment gate1 31 15 31 11)
-  (wall-segment wall1 33 13 33 13)
+  (coord recorder1 4 21)
+  (coord transmitter1 19 19)
+  (coord plate1 11 14)
+  (coord relay1 3 8)
+  (coord fan1 23 8)
+  (coord receiver1 21 0)
+  (gate-segment gate1 12 21 12 17)
   
   ;; Static color assignments
   (chroma transmitter1 blue)
-  (chroma transmitter2 red)
-  (chroma receiver1 red)
-  (chroma receiver2 red)
-  (chroma receiver3 blue)
+  (chroma receiver1 blue)
   
   ;; Control relationships
   (controls receiver1 gate1)
   
-  ;; Line-of-sight relationships
+  ;; Line-of-sight relationships (connector to fixture)
   (los1 area1 gate1 transmitter1)
-  (los0 area1 transmitter2)
-  (los0 area1 receiver1)
-  (los0 area1 receiver2)
-  (los0 area1 receiver3)
-  (los1 area2 gate1 transmitter1)
-  (los0 area2 transmitter2)
-  (los0 area2 receiver1)
-  (los0 area2 receiver2)
-  (los0 area2 receiver3)
-  (los1 area3 gate1 transmitter1)
-  (los0 area3 transmitter2)
+  (los0 area1 relay1)
+  (los0 area3 relay1)
   (los0 area3 receiver1)
-  (los0 area3 receiver2)
-  (los0 area3 receiver3)
-  (los1 area4 gate1 transmitter1)
-  (los0 area4 transmitter2)
-  (los0 area4 receiver1)
-  (los0 area4 receiver2)
-  (los0 area4 receiver3)
-  (los1 area5 gate1 transmitter1)
-  (los0 area5 transmitter2)
-  (los0 area5 receiver1)
-  (los0 area5 receiver2)
-  (los0 area5 receiver3)
-  (los1 area6 gate1 receiver2)
   
-  ;; Visibility relationships
-  (visible0 area1 area2)
-  (visible0 area1 area3)
-  (visible0 area1 area4)
-  (visible0 area1 area5)
-  (visible1 area1 gate1 area6)
-  (visible0 area2 area3)
-  (visible0 area2 area4)
-  (visible0 area2 area5)
-  (visible0 area3 area4)
-  (visible0 area3 area5)
-  (visible1 area3 gate1 area6)
-  (visible0 area4 area5)
+  ;; Visibility relationships (connector to area)
 )
 
 
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (loc agent1 area5))
+  (and (loc agent1 area4)
+       (active receiver1)))

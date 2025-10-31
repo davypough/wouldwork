@@ -91,10 +91,14 @@
 
 (defun problem-state-canonical-alist (state)
   "Returns the canonical sorted alist for state comparison.
-   Uses cached idb-alist if available, otherwise computes and caches it."
-  (or (problem-state.idb-alist state)
-      (setf (problem-state.idb-alist state)
-            (idb-to-sorted-alist (problem-state.idb state)))))
+   Uses cached idb-alist if available, otherwise computes and caches it.
+   Also computes and caches the idb-hash for *closed* lookups."
+  (unless (problem-state.idb-alist state)
+    (setf (problem-state.idb-alist state)
+          (idb-to-sorted-alist (problem-state.idb state)))
+    (setf (problem-state.idb-hash state)
+          (compute-idb-hash (problem-state.idb state))))
+  (problem-state.idb-alist state))
 
 
 (defun choose-ht-value-test (relations)
@@ -171,7 +175,7 @@
                                                :synchronized parallelp)
                        :keyfn #'node.state.idb-alist))
     (when (eql *tree-or-graph* 'graph)
-      (setf *closed* (make-hash-table :test 'equal  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+      (setf *closed* (make-hash-table :test 'eql  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                       :size 200003
                                       :rehash-size 2.7
                                       :rehash-threshold 0.8
@@ -269,10 +273,12 @@
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
-      (setf (gethash (problem-state-canonical-alist (node.state current-node)) *closed*)
-        (list (node.depth current-node)
-              (problem-state.time (node.state current-node))
-              (problem-state.value (node.state current-node)))))
+      (let ((current-state (node.state current-node)))
+        (problem-state-canonical-alist current-state)  ;ensure hash cached
+        (setf (gethash (problem-state.idb-hash current-state) *closed*)  ;use hash
+          (list (node.depth current-node)
+                (problem-state.time current-state)
+                (problem-state.value current-state)))))
     (let ((succ-states (expand current-node)))  ;from generate-children
       (when *troubleshoot-current-node*
         (setf *debug* 5)
@@ -321,13 +327,13 @@
                (setf (node.parent open-node) current-node)  ;succ is better
                (finalize-path-depth succ-depth))  ;succ is not better
              (next-iteration)))  ;drop this succ
-          (let ((closed-values (get-closed-values (problem-state-canonical-alist succ-state))))
+          (let ((closed-values (get-closed-values succ-state)))
             (when closed-values
               (increment-global *repeated-states*)
               (if (better-than-closed closed-values succ-state succ-depth)
                 (progn             ; succ has better value
                   (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                  (remhash (problem-state-canonical-alist succ-state) *closed*))
+                  (remhash (problem-state.idb-hash succ-state) *closed*))
                 (progn 
                   (narrate "Dropping this previously closed state" succ-state succ-depth)
                   (finalize-path-depth succ-depth) 
@@ -372,9 +378,24 @@
   ;      #'< :key #'car))  ; Sort by fixnum keys
 
 
-(defun get-closed-values (idb)
-  "Returns the closed values (depth time value) for the given idb, or nil if not found."
-  (gethash idb *closed*))
+(defun compute-idb-hash (idb-hash-table)
+  "Computes a fixnum hash from an idb hash table.
+   Uses XOR of sxhash values for deterministic hashing."
+  (declare (type hash-table idb-hash-table))
+  (let ((hash 0))
+    (declare (type fixnum hash))
+    (maphash (lambda (k v)
+               (setf hash (logxor hash (sxhash (cons k v)))))  ; hash the pair as a unit
+             idb-hash-table)
+    hash))
+
+
+(defun get-closed-values (state)
+  "Returns the closed values (depth time value) for the given state, or nil if not found.
+   Uses idb-hash for O(1) lookup."
+  (declare (type problem-state state))
+  (problem-state-canonical-alist state)  ; ensure hash is cached
+  (gethash (problem-state.idb-hash state) *closed*))
 
 
 (defun goal (state)

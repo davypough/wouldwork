@@ -300,6 +300,8 @@
         (setf (problem-state.idb net-state) updated-idb)
     (finally (setf (problem-state.idb-alist net-state)
                (idb-to-sorted-alist (problem-state.idb net-state)))
+             (setf (problem-state.idb-hash net-state)
+               (compute-idb-hash (problem-state.idb net-state)))
              (return-from process-followups net-state))))
 
 
