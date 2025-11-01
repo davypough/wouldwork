@@ -16,8 +16,7 @@
   (heuristic 0.0 :type real)
   (idb (make-hash-table) :type hash-table)  ;integer hash table of propositions
   (hidb (make-hash-table) :type hash-table)  ;integer table for happening events
-  (idb-alist nil :type list)  ;cached sorted alist for efficient state comparisons
-  (idb-hash 0 :type fixnum))  ;hash fixnum representing an idb
+  (idb-hash nil :type (or null fixnum)))  ;hash fixnum representing an idb
 ;Note: hidb is separate from idb because otherwise each exogenous event will change
 ;the state, leading to endless revisiting of the same similar state
 ;Note: happenings contains an entry for each object's next event, updated as events occur
@@ -118,7 +117,7 @@
     :heuristic (problem-state.heuristic state)
     :idb (make-hash-table)        ; empty table instead of copy
     :hidb (copy-idb (problem-state.hidb state))
-    :idb-hash 0))  ; will be recomputed when alist is created
+    :idb-hash nil))  ; will be recomputed when alist is created
 
 
 (defun copy-idb (idb)

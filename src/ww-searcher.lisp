@@ -84,21 +84,18 @@
   (problem-state.idb (node.state node)))
 
 
-(defun node.state.idb-alist (node)
-  "Gets the canonical alist representation of a node's idb for efficient hstack lookup."
-  (problem-state-canonical-alist (node.state node)))
+(defun node.state.idb-hash (node)
+  "Gets the cached idb-hash of a node's state."
+  (problem-state.idb-hash (node.state node)))
 
 
-(defun problem-state-canonical-alist (state)
-  "Returns the canonical sorted alist for state comparison.
-   Uses cached idb-alist if available, otherwise computes and caches it.
-   Also computes and caches the idb-hash for *closed* lookups."
-  (unless (problem-state.idb-alist state)
-    (setf (problem-state.idb-alist state)
-          (idb-to-sorted-alist (problem-state.idb state)))
+(defun ensure-idb-hash (state)
+  "Ensures the idb-hash is computed and cached for the given state.
+   Returns the state's idb-hash."
+  (unless (problem-state.idb-hash state)
     (setf (problem-state.idb-hash state)
           (compute-idb-hash (problem-state.idb state))))
-  (problem-state.idb-alist state))
+  (problem-state.idb-hash state))
 
 
 (defun choose-ht-value-test (relations)
@@ -171,9 +168,9 @@
         (parallelp (> *threads* 0)))
     (declare (ignorable parallelp))
     (setf *open* 
-      (hs::make-hstack :table (make-hash-table :test 'equal
+      (hs::make-hstack :table (make-hash-table :test 'eql
                                                :synchronized parallelp)
-                       :keyfn #'node.state.idb-alist))
+                       :keyfn #'node.state.idb-hash))
     (when (eql *tree-or-graph* 'graph)
       (setf *closed* (make-hash-table :test 'eql  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
                                       :size 200003
@@ -274,7 +271,7 @@
       (return-from df-bnb1 nil))
     (when (eql *tree-or-graph* 'graph)
       (let ((current-state (node.state current-node)))
-        (problem-state-canonical-alist current-state)
+        (ensure-idb-hash current-state)
         (setf (gethash (problem-state.idb-hash current-state) *closed*)
           (list (problem-state.idb current-state)      ; store idb for collision detection
                 (node.depth current-node)
@@ -363,20 +360,19 @@
 
 (defun idb-in-open (succ-state open)
   "Determines if a state's idb matches the contents of a key in open's table.
+   Uses idb-hash for O(1) lookup with idb verification for collision safety.
    Returns the node in open or nil."
   (declare (type problem-state succ-state))
-  (let ((canonical-key (problem-state-canonical-alist succ-state))
+  (ensure-idb-hash succ-state)  ; ensure hash is cached
+  (let ((hash-key (problem-state.idb-hash succ-state))
         (ht (hs::hstack.table open)))
-    (let ((nodes (gethash canonical-key ht)))
-      (when nodes (car nodes)))))
-
-
-(defun idb-to-sorted-alist (idb-hash-table)
-  "Converts an IDB hash table to a sorted alist using Alexandria."
-  (ut::merge-sort-list (alexandria:hash-table-alist idb-hash-table)
-                       :pred #'< :key #'car))
-  ;(sort (alexandria:hash-table-alist idb-hash-table)
-  ;      #'< :key #'car))  ; Sort by fixnum keys
+    (let ((nodes (gethash hash-key ht)))  ; lookup by hash
+      (when nodes
+        ;; verify idb matches to handle hash collisions
+        (find-if (lambda (node)
+                   (equalp (problem-state.idb succ-state)
+                           (problem-state.idb (node.state node))))
+                 nodes)))))
 
 
 (defun compute-idb-hash (idb-hash-table)
@@ -395,7 +391,7 @@
   "Returns the closed values (depth time value) for the given state, or nil if not found.
    Uses idb-hash for O(1) lookup with idb verification for collision safety."
   (declare (type problem-state state))
-  (problem-state-canonical-alist state)  ; ensure hash is cached
+  (ensure-idb-hash state)  ; ensure hash is cached
   (let ((entry (gethash (problem-state.idb-hash state) *closed*)))
     (when entry
       (let ((stored-idb (first entry))
@@ -515,14 +511,14 @@
 (defun on-current-path (succ-state current-node)
   "Determines if a successor is already on the current path from the start state.
    Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."  ; CHANGED: Updated docstring
-  (problem-state-canonical-alist succ-state)  ; NEW: ensure hash is cached
+  (ensure-idb-hash succ-state)  ; ensure hash is cached
   (when (iter (for node initially current-node then (node.parent node))
               (while node)
-              (for node-state = (node.state node))  ; NEW: bind node-state for clarity
-              (problem-state-canonical-alist node-state)  ; NEW: ensure hash is cached
-              (thereis (and (= (problem-state.idb-hash succ-state)  ; CHANGED: hash comparison first
+              (for node-state = (node.state node))  ; bind node-state for clarity
+              (ensure-idb-hash node-state)  ; ensure hash is cached
+              (thereis (and (= (problem-state.idb-hash succ-state)  ; hash comparison first
                               (problem-state.idb-hash node-state))
-                           (equalp (problem-state.idb succ-state)  ; CHANGED: equalp only on collision
+                           (equalp (problem-state.idb succ-state)  ; equalp only on collision
                                   (problem-state.idb node-state)))))
     (narrate "State already on current path" succ-state (1+ (node.depth current-node)))
     t))

@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 2)  ;for testing
+(ww-set *depth-cutoff* 2)  ;for initial testing
 
 
 (define-types
@@ -42,10 +42,8 @@
   (loc (either agent cargo) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either receiver fan))
-  (paired connector terminus)  ;potential beam from connector to terminus
+  (connected terminus terminus)
   (color (either connector repeater) $hue)  ;$hue is either blue or none
-  (beam-segment beam $source $target $occluder $rational $rational)  ;endpoint-x endpoint-y
-  (current-beams $list)
 )
 
 
@@ -53,7 +51,8 @@
   (coords (either area fixture) $fixnum $fixnum)  ;the (x,y) position
   ;(position area $fixnum $fixnum)  ;the (x,y) position of an area
   ;(fixpoint fixture $fixnum $fixnum)  ;coordinates of a fixture
-  (adjacent area area)  ;agent can always move to adjacent area unimpeded  
+  (adjacent area area)  ;agent can always move to adjacent area unimpeded 
+  (separates> fan area area)
   (toggles plate (either gate fan))
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
@@ -63,14 +62,13 @@
   (los1 area gate (either transmitter receiver repeater))
   ;could see a mobile object in an area from a given area
   (visible0 area area)  
-  (visible1 area gate area)
 )
 
 
 ;;;; QUERY FUNCTIONS ;;;;
 
 
-(define-query get-current-beams ()
+#+ignore (define-query get-current-beams ()
   (do (bind (current-beams $beams))
       $beams))
 
@@ -84,11 +82,11 @@
       $hue))
 
 
-(define-query get-coordinates (?object)
-  (if (and (bind (loc ?object $area))  ;object is movable--eg, a connector
+(define-query get-coordinates (?cargo/area/fixture)
+  (if (and (bind (loc ?cargo/area/fixture $area))  ;object is movable--eg, a connector
            (bind (coords $area $x $y)))
     (values $x $y)
-    (if (bind (coords ?object $x $y))  ;object is an area or fixture
+    (if (bind (coords ?cargo/area/fixture $x $y))  ;object is an area or fixture
       (values $x $y)
       (values nil nil))))
 
@@ -104,18 +102,18 @@
       (los-thru-1-gate ?area ?fixture)))
 
 
-(define-query visible-thru-1-gate (?area1 ?area2)
+#+ignore (define-query visible-thru-1-gate (?area1 ?area2)
   (exists (?g gate)
     (and (visible1 ?area1 ?g ?area2)
          (open ?g))))
 
 
-(define-query visible (?area1 ?area2)
+#+ignore (define-query visible (?area1 ?area2)
   (or (visible0 ?area1 ?area2)
       (visible-thru-1-gate ?area1 ?area2)))
 
 
-(define-query connector-has-valid-line-of-sight (?connector ?hue)
+#+ignore (define-query connector-has-valid-line-of-sight (?connector ?hue)
   (or 
     ;; Check direct transmitter connection with current line-of-sight
     (exists (?t transmitter)
@@ -139,7 +137,7 @@
                    (los $other-area ?t)))))))
 
 
-(define-query resolve-consensus-hue (?hue-list)
+#+ignore (define-query resolve-consensus-hue (?hue-list)
   ;; Returns consensus hue from list of available hues, nil if no consensus
   (do (setq $unique-hues (remove-duplicates (remove nil ?hue-list)))
       (if (= (length $unique-hues) 1)
@@ -147,7 +145,7 @@
         nil)))               ; Multiple different hues or no hues (no consensus)
 
 
-(define-query beam-segment-interference
+#+ignore (define-query beam-segment-interference
     (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
   ;; Determines if a cross segment (beam, gate, wall, etc) interferes with the main beam-segment
   ;; Returns the interference endpoint, or nil
@@ -183,7 +181,7 @@
 
 
 
-(define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
+#+ignore (define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
   ;; Determines if an object in an area at (?px,?py) occludes a beam-segment with tolerance < 1.0
   ;; Step 1: Calculate beam direction and length
   (do (setq $dx (- ?end-x ?source-x))
@@ -219,7 +217,7 @@
               (values nil nil nil))))))
 
 
-(define-query find-first-obstacle-intersection (?source-x ?source-y ?target-x ?target-y)
+#+ignore (define-query find-first-obstacle-intersection (?source-x ?source-y ?target-x ?target-y)
   ;; Establishes each beam's intended full path by finding intersections with static obstacles only
   ;; Returns the endpoint coordinates where the beam terminates and what blocks it
   (do
@@ -261,7 +259,7 @@
     (values $result-x $result-y $occluder)))
 
 
-(define-query collect-all-beam-intersections ()
+#+ignore (define-query collect-all-beam-intersections ()
   ;; Use current endpoints (actual segments), not intended targets
   ;; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y t1 t2) ...)
   (do (doall (?b1 (get-current-beams))
@@ -299,7 +297,7 @@
       $intersections))
 
 
-(define-query connectable (?area ?terminus)
+#+ignore (define-query connectable (?area ?terminus)
   (or
     ;; Case 1: Transmitters and receivers (fixtures) use static line-of-sight
     (and (fixture ?terminus)
@@ -333,17 +331,17 @@
 
 (define-query passable (?area1 ?area2)
   (or (adjacent ?area1 ?area2)
-      (exists (?g gate)
-        (and (gate-separates ?g ?area1 ?area2)
-             (open ?g)))))
+      (exists (?f fan)
+        (and (separates> ?f ?area1 ?area2)
+             (not (on ?f))))))
 
 
 (define-query vacant (?area)
-  (not (exists (?cargo cargo)
-         (loc ?cargo ?area))))
+  (not (exists (?c cargo)
+         (loc ?c ?area))))
 
 
-(define-query receiver-beam-reaches (?receiver)
+#+ignore (define-query receiver-beam-reaches (?receiver)
   ;; Returns t if a color-matching beam reaches the receiver
   (do
     (mvsetq ($r-x $r-y) (get-coordinates ?receiver))
@@ -361,12 +359,12 @@
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
-(define-update activate-connector! (?connector ?hue)
-  (color ?connector ?hue))
+(define-update activate-connector/relay! (?connector/relay ?hue)
+  (color ?connector/relay ?hue))
 
 
-(define-update deactivate-connector! (?connector ?hue)
-  (not (color ?connector ?hue)))
+(define-update deactivate-connector/relay! (?connector/relay)
+  (color ?connector/relay none))
 
 
 (define-update deactivate-receiver! (?receiver)
@@ -376,7 +374,7 @@
           (not (open ?g))))))
 
 
-(define-update create-beam-segment-p! (?source ?target)
+#+ignore (define-update create-beam-segment-p! (?source ?target)
   ; Create a beam segment from source, and return the new beam's name.
   (do
     ;; Generate new beam entity with next available index
@@ -394,7 +392,7 @@
     $new-beam))
 
 
-(define-update remove-beam-segment-p! (?beam)
+#+ignore (define-update remove-beam-segment-p! (?beam)
   ;; bind and remove beam-segment; if it doesn't exist, return nil
   (if (bind (beam-segment ?beam $source $target $occluder $end-x $end-y))
     (do (not (beam-segment ?beam $source $target $occluder $end-x $end-y))
@@ -404,7 +402,7 @@
     nil))
 
 
-(define-update recalculate-all-beams! ()
+#+ignore (define-update recalculate-all-beams! ()
   (doall (?b (get-current-beams))
     (do (bind (beam-segment ?b $source $target $old-occluder $old-end-x $old-end-y))
         ;; Get source coordinates
@@ -420,7 +418,7 @@
           (beam-segment ?b $source $target $new-occluder $new-end-x $new-end-y)))))
 
 
-(define-update update-beams-if-interference! ()
+#+ignore (define-update update-beams-if-interference! ()
   ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
   ;; at their intersection points, eliminating sequential processing dependencies
   (do
@@ -469,7 +467,7 @@
             (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y))))))
 
 
-(define-update converge-receiver-states! ()
+#+ignore (define-update converge-receiver-states! ()
   (do
     (setq $iteration 0)
     (setq $max-iterations 10)
@@ -590,7 +588,7 @@
           (chain-deactivate! ?c ?hue))))))
 
 
-(define-update update-beams-if-occluded! (?area)
+#+ignore (define-update update-beams-if-occluded! (?area)
   ;; Check if placing an object at ?area would occlude existing beam segments
   (do 
     ;; Get coordinates of area where object would be placed
@@ -613,6 +611,17 @@
                     (beam-segment ?b $source $target $occluder $area-x $area-y)))
               ;; else: Target is at ?area coordinates - this is a relay, skip occlusion check
               ))))))
+
+
+(define-update toggle! (?gate/fan)
+  (cond ((gate ?gate/fan)
+           (if (open ?gate/fan)
+             (not (open ?gate/fan))
+             (open ?gate/fan)))
+        ((fan ?gate/fan)
+           (if (on ?gate/fan)
+             (not (on ?gate/fan))
+             (on ?gate/fan)))))
 
 
 ;;;; ACTIONS ;;;;
@@ -779,7 +788,7 @@
           (converge-receiver-states!)))
 
 
-(define-action drop
+#+ignore (define-action drop
     1
   ()
   (and (bind (holds agent1 $cargo))  ;if not holding anything, then bind statement returns nil
@@ -792,7 +801,21 @@
           (converge-receiver-states!)))  ;Handle receiver deactivations after occlusion
 
 
-(define-action move
+(define-action step-on-plate
+  1
+  (?agent agent ?plate plate)
+  (and (bind (loc ?agent $area))
+       (bind (coords $area $agent-x $agent-y))
+       (bind (coords ?plate $plate-x $plate-y))
+       (= $agent-x $plate-x)
+       (= $agent-y $plate-y))
+  (?agent ?plate)
+  (assert (doall (?gf (either gate fan))
+            (if (toggles ?plate ?gf)
+              (toggle! ?gf))) 
+
+
+(define-action move-agent
     1
   (?area2 area)
   (and (bind (loc agent1 $area1))
@@ -804,13 +827,24 @@
           (converge-receiver-states!)))
 
 
+(define-action move-ghost
+    1
+  (?area2 area)
+  (and (bind (loc agent1- $area1))
+       (different $area1 ?area2))
+  ($area1 ?area2)
+  (assert (loc agent1- ?area2)
+          (recalculate-all-beams!)  ;handle both extension and shortening
+          (converge-receiver-states!)))
+
+
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area5)
-  (loc agent1- area5)
+  (loc agent1 area1)
+  (loc agent1- area1)
   (loc connector1 area1)
   (loc connector1- area1)
   (color connector1 none)
@@ -823,35 +857,37 @@
   
   ;; Static spatial configuration
   (coords area1  4 20)
-  (coords area2 10 14)
+  (coords area2 11 14)
   (coords area3 21  8)
   (coords area4 22  3)
   (adjacent area1 area2)
   (adjacent area3 area4)
   
   ;; Static object configuration
-  (coord recorder1 4 21)
+  (coord recorder1 4 20)
   (coord transmitter1 19 19)
   (coord plate1 11 14)
   (coord relay1 3 8)
   (coord fan1 23 8)
   (coord receiver1 21 0)
   (gate-segment gate1 12 21 12 17)
+  (separates> fan1 area1 area3)
   
   ;; Static color assignments
   (chroma transmitter1 blue)
   (chroma receiver1 blue)
   
   ;; Control relationships
-  (controls receiver1 gate1)
+  (toggles plate1 gate1)
+  (toggles plate1 fan1)
   
-  ;; Line-of-sight relationships (connector to fixture)
+  ;; Line-of-sight relationships (connector area to fixture)
   (los1 area1 gate1 transmitter1)
   (los0 area1 relay1)
   (los0 area3 relay1)
   (los0 area3 receiver1)
   
-  ;; Visibility relationships (connector to area)
+  ;; Visibility relationships (connector area to area)
 )
 
 

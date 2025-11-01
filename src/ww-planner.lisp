@@ -286,7 +286,7 @@
     (minimizing time)))
 
 
-(defun process-followups (net-state updated-db)  ;followups for one update structure from effect
+(defun process-followups (net-state updated-db)
   "Triggering forms are saved previously during effect apply."
   (declare (ignorable updated-db))
   (iter (with state+ = (copy-problem-state-without-idb net-state))  ;create state+ from net-state
@@ -298,9 +298,7 @@
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt (list-database updated-idb)))
         (setf (problem-state.idb net-state) updated-idb)
-    (finally (setf (problem-state.idb-alist net-state)
-               (idb-to-sorted-alist (problem-state.idb net-state)))
-             (setf (problem-state.idb-hash net-state)
+    (finally (setf (problem-state.idb-hash net-state)
                (compute-idb-hash (problem-state.idb net-state)))
              (return-from process-followups net-state))))
 
