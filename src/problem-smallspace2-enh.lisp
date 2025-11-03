@@ -16,7 +16,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 30)
+(ww-set *depth-cutoff* 25)
 
 
 (define-types
@@ -57,7 +57,7 @@
   ;could move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
-  ;(accessible2 area gate gate area)  ;double moves not needed for this problem
+  ;(accessible2 area gate gate area)  ;double gate moves not needed for this problem
 )
 
 ;;;; QUERY FUNCTIONS ;;;;

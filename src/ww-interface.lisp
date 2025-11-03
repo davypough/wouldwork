@@ -212,7 +212,7 @@ any such settings appearing in the problem specification file.
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (save-globals)
+  (uiop:delete-file-if-exists *globals-file*)
   (with-silenced-compilation
     (load-problem (string *problem-name*))))
   
@@ -369,7 +369,7 @@ any such settings appearing in the problem specification file.
     (format t "The problem ~A was not found." problem-name-str)
     (format t "~&Enter (list-all-problems) for a complete list of problems." )
     (return-from %stage))
-  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+  (uiop:delete-file-if-exists *globals-file*)
   (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
   (setf *problem-name* (intern problem-name-str)  ;reset to defaults
         *depth-cutoff* 0
