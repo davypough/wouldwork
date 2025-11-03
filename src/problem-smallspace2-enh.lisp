@@ -1,14 +1,14 @@
-;;; Filename: problem-smallspace-enh.lisp
+;;; Filename: problem-smallspace2-enh.lisp
 
 
 ;;; Enhanced topological representation for connectivity.
 ;;; Connectivity potential to areas (with visibility and accessibility) and fixtures (with los).
-;;; First leg to area3.
+;;; Extra leg to area4.
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* smallspace-enh)
+(ww-set *problem-name* smallspace2-enh)
 
 (ww-set *problem-type* planning)
 
@@ -16,17 +16,17 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 30)
 
 
 (define-types
   agent       (agent1)
-  gate        (gate1 gate2)
-  connector   (connector1 connector2)
+  gate        (gate1 gate2 gate3)
+  connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
-  receiver    (receiver1 receiver2)
+  receiver    (receiver1 receiver2 receiver3)
   hue         (blue red nil)  ;the color of a transmitter, receiver, or connector
-  area        (area1 area2 area3)
+  area        (area1 area2 area3 area4)
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver)
@@ -48,8 +48,8 @@
   (chroma terminus $hue)
   ;clear los from an area to a fixture
   (los0 area fixture)  
-  (los1 area gate fixture)
-  (los2 area gate gate fixture)
+  (los1 area $gate fixture)
+  (los2 area $gate $gate fixture)
   ;could see from an area to another area
   (visible0 area area)  
   (visible1 area gate area)
@@ -57,7 +57,7 @@
   ;could move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
-  (accessible2 area gate gate area)
+  ;(accessible2 area gate gate area)  ;double moves not needed for this problem
 )
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -75,6 +75,16 @@
 
 
 (define-query los (?area ?fixture)
+  (or (los0 ?area ?fixture)
+      (and (bind (los1 ?area $gate ?fixture))
+           (open $gate))
+      (and (bind (los2 ?area $gate1 $gate2 ?fixture))
+           (open $gate1)
+           (open $gate2)))
+)
+
+
+#+ignore (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
       (exists (?g gate)
         (and (los1 ?area ?g ?fixture)
@@ -102,11 +112,7 @@
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
-             (open ?g)))
-      (exists ((?g1 ?g2) gate)
-        (and (accessible2 ?area1 ?g1 ?g2 ?area2)
-             (open ?g1)
-             (open ?g2))))
+             (open ?g))))
 )
 
 
@@ -314,150 +320,44 @@
   (loc agent1 area1)
   (loc connector1 area1)
   (loc connector2 area2)
+   (loc connector3 area3)
   (color connector1 nil)
   (color connector2 nil)
+   (color connector3 nil)
   ;static
   (accessible1 area1 gate1 area2)
-  ;(accessible2 area1 gate1 gate2 area3)  ;not needed since A1 -> A2 -> A3 for this problem
-  (accessible1 area2 gate2 area3) 
+  (accessible1 area2 gate2 area3)
+   (accessible1 area3 gate3 area4)
   (chroma transmitter1 blue)
   (chroma transmitter2 red)
   (chroma receiver1 blue)
   (chroma receiver2 red)
+   (chroma receiver3 blue)
   (controls receiver1 gate1)
   (controls receiver2 gate2)
+   (controls receiver3 gate3)
   ;los is from an area to a fixture
   (los0 area1 transmitter1)
   (los0 area1 receiver1)
   (los0 area1 receiver2)
+   (los0 area1 receiver3)
   (los0 area2 transmitter2)
   (los0 area2 transmitter1)
   (los1 area2 gate2 receiver2)
   (los0 area3 receiver2)
-  (los0 area3 transmitter1)
   (los1 area3 gate2 transmitter2)
+   (los1 area3 gate3 receiver3)
   ;visibility is from an area to an area 
   (visible0 area1 area2)
   (visible0 area1 area3)
+   (visible0 area1 area4)
   (visible1 area2 gate2 area3)
+   (visible1 area3 gate3 area4)
 )
 
 
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (loc agent1 area3)
+  (loc agent1 area4)
 )
-
-
-;;;;;;;; Invariant Checks for Debugging ;;;;;;;;;;;;;;;
-
-#+ignore (define-invariant holds-cargo-location ()
-  ;Cargo cannot be both held and have a location simultaneously
-  (not (and (bind (holds agent1 $cargo))
-            (bind (loc $cargo $area))))
-)
-
-
-#+ignore (define-invariant receiver-activation ()
-  ;A receiver is active if and only if there exists at least one
-  ;connected, active connector of the same color.
-  (doall (?r receiver)
-    (if (bind (color ?r $rhue))
-      (equivalent (active ?r)
-                  (exists (?c connector)
-                    (and (connected ?c ?r)
-                         (active ?c)
-                         (bind (color ?c $chue))
-                         (eql $chue $rhue))))))
-)
-
-
-#+ignore (define-invariant receiver-gate-control ()
-  ;A receiver is active if and only if all gates it controls are inactive
-  (doall (?r receiver)
-    (if (exists (?g gate)
-          (controls ?r ?g))
-      (equivalent (active ?r)
-                  (forall (?g gate)
-                    (if (controls ?r ?g)
-                      (not (active ?g)))))))
-)
-
-
-#+ignore (define-invariant colored-connector-connection ()
-  ;Any colored connector must have a valid source with matching color,
-  ;either a transmitter or another connector
-  (doall (?c connector)
-    (if (bind (color ?c $hue))
-        (or (exists (?t transmitter)
-              (and (connected ?c ?t)
-                   (bind (color ?t $t-hue))
-                   (eql $t-hue $hue)))
-            (exists (?other connector)
-              (and (different ?other ?c)
-                   (connected ?c ?other)    ; Connected to it
-                   (bind (color ?other $other-hue))
-                   (eql $other-hue $hue))))))
-)
-
-
-#+ignore (define-invariant connector-self-connection ()
-  ;No connector is connected to itself
-  (doall (?c connector)
-    (not (connected ?c ?c)))
-)
-
-
-#+ignore (define-invariant agent1-has-location ()
-  ;agent1 is always located in some area
-  (bind (loc agent1 $area))
-)
-
-
-#+ignore (define-invariant connector-transmitter-source ()
-  ;Every active connector ultimately traces to transmitter sources without cycles
-  (let (($valid-source t)) ; Assume valid until proven otherwise
-    ;; For each active connector, verify it has a valid transmitter source
-    (doall (?c connector)
-      (if (active ?c)
-        (do (setq $visited nil)           ; Track visited connectors
-            (setq $source-found nil)      ; Flag if transmitter found
-            (setq $stack nil)             ; DFS stack
-            (setq $current ?c)            ; Current connector being examined
-            (setq $color nil)             ; Color we're tracing
-            ;; Get the color of this connector
-            (bind (color ?c $col))
-            (setq $color $col)
-            ;; Initialize stack with current connector
-            (push $current $stack)
-            ;; Perform depth-first search to find transmitter or detect cycle
-            (ww-loop while $stack do
-              ;; Pop current connector from stack
-              (setq $current (pop $stack))
-              ;; Only process this connector if we haven't seen it before
-              (unless (member $current $visited)
-                ;; Mark as visited
-                (push $current $visited)
-                ;; Check if current is directly connected to a transmitter of same color
-                (if (exists (?t transmitter)
-                      (and (connected $current ?t)
-                           (bind (color ?t $t-color))
-                           (eql $t-color $color)))
-                  (setq $source-found t)
-                  ;; Otherwise, add connected connectors of same color to stack
-                  (doall (?other connector)
-                    (if (and (different ?other $current)
-                             (connected $current ?other)
-                             (active ?other)
-                             (bind (color ?other $other-color))
-                             (eql $other-color $color))
-                      (push ?other $stack))))))
-            ;; If we've explored all paths and never found a transmitter source,
-            ;; this connector has no valid source (either disconnected or in a cycle)
-            (if (not $source-found)
-              (setq $valid-source nil)))))
-    ;; Return result
-    $valid-source)
-)
-

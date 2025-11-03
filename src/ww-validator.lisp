@@ -76,7 +76,7 @@
         (fluent-positions (get-prop-fluent-indices proposition)))
     (when fluent-positions
       (iter (for arg in (cdr proposition))
-            (for position from 0)
+            (for position from 1)
             (when (member position fluent-positions)
               (unless ($varp arg)
                 (error "~%Bind statement ~A is inconsistent with relation ~A"
