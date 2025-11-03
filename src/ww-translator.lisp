@@ -627,7 +627,6 @@
         ((and (eql (car form) 'not)
               (consp (cadr form))
               (symbolp (caadr form))
-              (not (cl-symbol-p (caadr form)))
               (gethash (caadr form) *relations*)) (translate-negative-relation form flag))
         ((member (car form) *connectives*) (translate-connective form flag))
         ((or (gethash (car form) *relations*) (gethash (car form) *static-relations*))
