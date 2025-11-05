@@ -63,6 +63,32 @@
               (cons 'either (sort (copy-list (cdr item)) #'string<
                                   :key #'symbol-name))))
           relation))
+
+
+(defun fluent-spec-p (spec)
+  "Returns T if spec is or contains fluent variables."
+  (cond
+    ((symbolp spec) ($varp spec))
+    ((and (listp spec) (eql (car spec) 'either))
+     (some #'$varp (cdr spec)))
+    (t nil)))
+
+
+(defun normalize-fluent-spec (spec)
+  "Strips $ prefix from fluent specifications."
+  (cond
+    ((symbolp spec)
+     (if ($varp spec)
+         (trim-1st-char spec)
+         spec))
+    ((and (listp spec) (eql (car spec) 'either))
+     (cons 'either
+           (mapcar (lambda (type)
+                     (if ($varp type)
+                         (trim-1st-char type)
+                         type))
+                   (cdr spec))))
+    (t spec)))
             
             
 (defmacro define-dynamic-relations (&rest relations)
@@ -100,6 +126,39 @@
   (format t "~&Installing dynamic relations...")
   (iter (for relation in relations)
         (check-relation relation)
+        ;; CHANGED: Normalize fluent specs before storing
+        (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
+          (setf (gethash (car relation) *relations*)
+                (ut::if-it normalized-args
+                  (sort-either-types ut::it)
+                  t)))
+        ;; CHANGED: Detect fluent positions using fluent-spec-p
+        (ut::if-it (iter (for arg in (cdr relation))
+                         (for i from 1)
+                         (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
+                           (collect i)))
+          (setf (gethash (car relation) *fluent-relation-indices*)
+                ut::it))
+        (finally (maphash (lambda (key val)  ;install implied unary relations
+                            (declare (ignore val))
+                            (setf (gethash key *static-relations*) '(something)))
+                          *types*)
+                 (setf (gethash 'inconsistent-state *relations*) t)
+                 (add-proposition '(always-true) *static-db*)
+                 (setf (gethash 'always-true *static-relations*) '(always-true))))
+  ;; Install symmetric relations
+  (iter (for (key val) in-hashtable *relations*)
+    (when (and (not (eql val t))
+               (not (alexandria:setp val))  ;multiple types
+               (not (final-charp #\> key)))   ;not explicitly directed
+      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
+  t)
+
+
+#+ignore (defun install-dynamic-relations (relations)
+  (format t "~&Installing dynamic relations...")
+  (iter (for relation in relations)
+        (check-relation relation)
         (setf (gethash (car relation) *relations*)
               (ut::if-it (cdr relation)
                 (sort-either-types ut::it)
@@ -131,6 +190,36 @@
 
 
 (defun install-static-relations (relations)
+  (format t "~&Installing static relations...")
+  (iter (for relation in relations)
+        (check-relation relation)
+        ;; CHANGED: Normalize fluent specs before storing
+        (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
+          (setf (gethash (car relation) *static-relations*)
+                (ut::if-it normalized-args
+                  (sort-either-types ut::it)
+                  nil)))
+        ;; CHANGED: Detect fluent positions using fluent-spec-p
+        (ut::if-it (iter (for arg in (cdr relation))
+                         (for i from 1)
+                         (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
+                           (collect i)))
+          (setf (gethash (car relation) *fluent-relation-indices*) ut::it))
+        (finally (maphash #'(lambda (key val)  ;install implied unary relations
+                              (declare (ignore val))
+                              (setf (gethash key *static-relations*) '(everything)))
+                          *types*)))
+  (iter (for (key val) in-hashtable *static-relations*)  ;install symmetric relations
+    (when (and (not (eql val t))
+               (not (alexandria:setp val))  ;multiple types
+               (not (final-charp #\> key)))   ;not explicitly directed
+      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
+  (setf (gethash 'always-true *static-relations*) t)
+  (setf (gethash 'waiting *static-relations*) t)
+  t)
+
+
+#+ignore (defun install-static-relations (relations)
   (format t "~&Installing static relations...")
   (iter (for relation in relations)
         (check-relation relation)

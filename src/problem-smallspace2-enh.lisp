@@ -49,12 +49,10 @@
   (chroma terminus $hue)
   ;potential clear los from an area to a fixture
   (los0 area fixture)  
-  (los1 area $gate fixture)  ; (los1 area $(either gate area) fixture) or (los1 area (either $gate $area) fixture)
-  (los2 area $gate $gate fixture)
+  (los1 area (either $gate $area) fixture)  ;los can be blocked either by a closed $gate or object in $area
   ;potential visibility from an area to another area
   (visible0 area area)  
   (visible1 area $gate area)
-  (visible2 area $gate $gate area)
   ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
@@ -80,20 +78,14 @@
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
       (and (bind (los1 ?area $gate ?fixture))
-           (open $gate))
-      (and (bind (los2 ?area $gate1 $gate2 ?fixture))
-           (open $gate1)
-           (open $gate2)))
+           (open $gate)))
 )
 
 
 (define-query visible (?area ?fixture)
   (or (visible0 ?area ?fixture)
       (and (bind (visible1 ?area $gate ?fixture))
-           (open $gate))
-      (and (bind (visible2 ?area $gate1 $gate2 ?fixture))
-           (open $gate1)
-           (open $gate2)))
+           (open $gate)))
 )
 
 
@@ -332,7 +324,7 @@
   (los0 area1 transmitter1)
   (los0 area1 receiver1)
   (los0 area1 receiver2)
-  (los1 area1 area4 receiver3)  ;???
+  (los1 area1 area4 receiver3)
   (los0 area2 transmitter2)
   (los0 area2 transmitter1)
   (los1 area2 gate2 receiver2)
@@ -341,7 +333,6 @@
   (los0 area4 receiver3)
   (los0 area4 receiver1)
   (los0 area4 receiver4)
-  (los1 area4 area1 transmitter1)  ;???
   ;visibility is from an area to an area 
   (visible0 area1 area2)
   (visible0 area1 area4)

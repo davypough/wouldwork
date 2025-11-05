@@ -19,6 +19,40 @@
             (and (consp arg)
                  (eql (car arg) 'either)
                  (consp (cdr arg))
+                 ;; Validate either clause for fluent/non-fluent types
+                 (let* ((either-types (cdr arg))
+                        (fluent-count (count-if #'$varp either-types))
+                        (all-fluent (= fluent-count (length either-types)))
+                        (all-non-fluent (zerop fluent-count)))
+                   ;; Check for mixed fluent/non-fluent
+                   (unless (or all-fluent all-non-fluent)
+                     (error "Mixed fluent and non-fluent types in either clause: ~A~%~
+                             All types in an either clause must be consistently fluent or non-fluent."
+                            arg))
+                   ;; Validate all types (stripping $ if present)
+                   (every (lambda (type)
+                            (let ((base-type (if ($varp type)
+                                               (trim-1st-char type)
+                                               type)))
+                              (gethash base-type *types*)))
+                          either-types)))
+            (error "The argument ~A is not valid in the user-defined relation ~A."
+                   arg relation))))
+
+
+#+ignore (defun check-relation (relation)
+  "Checks for errors in a user-defined relation--eg, (height ?obj $fixnum)."
+  (check-type relation cons)
+  (check-type (car relation) symbol)
+  (iter (for arg in (cdr relation))
+        (check-type arg (or symbol cons))
+        (or (nth-value 1 (gethash arg *types*))  ;a user type
+            (and ($varp arg)  ;a $var incorporating a user or lisp defined type
+                 (user-or-lisp-type-p (trim-1st-char arg)))
+            (lisp-type-p arg)  ;a Common Lisp type as non-fluent argument
+            (and (consp arg)
+                 (eql (car arg) 'either)
+                 (consp (cdr arg))
                  (every (lambda (type)
                           (gethash type *types*))
                         (cdr arg)))
