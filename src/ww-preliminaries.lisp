@@ -48,15 +48,16 @@
      ,@body))
 
 
-(defun reset ()
+(defun ww-reset ()
   "Delete problem.lisp, then reload wouldwork with default problem."
   (format t "~%Loading wouldwork defaults...~2%")
   (let* ((root (asdf:system-source-directory :wouldwork))
          (problem-file (merge-pathnames "src/problem.lisp" root)))
-    (when (probe-file problem-file) (delete-file problem-file))
-    (asdf:clear-system :wouldwork)
-    (with-silenced-compilation
-      (asdf:load-system :wouldwork :force t))))
+    (when (probe-file problem-file) (delete-file problem-file)))
+  (asdf:clear-system :wouldwork)
+  (with-silenced-compilation
+    (asdf:load-system :wouldwork :force t))
+  (setf *package* (find-package :ww)))
 
 
 

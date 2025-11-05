@@ -3,6 +3,7 @@
 
 ;;; Enhanced topological representation for connectivity.
 ;;; Connectivity potential to areas (with visibility and accessibility) and fixtures (with los).
+;;; No beam occlusion or interference.
 ;;; Extra leg to area4.
 
 
@@ -12,21 +13,21 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* min-length)
+(ww-set *solution-type* every)  ;min-length)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 25)
+(ww-set *depth-cutoff* 30)
 
 
 (define-types
   agent       (agent1)
-  gate        (gate1 gate2 gate3)
+  gate        (gate1 gate2 gate3 gate4)
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
-  receiver    (receiver1 receiver2 receiver3)
+  receiver    (receiver1 receiver2 receiver3 receiver4)
   hue         (blue red nil)  ;the color of a transmitter, receiver, or connector
-  area        (area1 area2 area3 area4)
+  area        (area1 area2 area3 area4 area5)
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver)
@@ -46,18 +47,20 @@
 (define-static-relations
   (controls receiver gate)
   (chroma terminus $hue)
-  ;clear los from an area to a fixture
+  ;potential clear los from an area to a fixture
   (los0 area fixture)  
-  (los1 area $gate fixture)
+  (los1 area $gate fixture)  ; (los1 area $(either gate area) fixture) or (los1 area (either $gate $area) fixture)
   (los2 area $gate $gate fixture)
-  ;could see from an area to another area
+  ;potential visibility from an area to another area
   (visible0 area area)  
-  (visible1 area gate area)
-  (visible2 area gate gate area)
-  ;could move from an area to another area
+  (visible1 area $gate area)
+  (visible2 area $gate $gate area)
+  ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
   ;(accessible2 area gate gate area)  ;double gate moves not needed for this problem
+  ;potential occlusion between an area to a fixture or other area
+  ;(occludable area $area (either fixture area))
 )
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -84,33 +87,19 @@
 )
 
 
-#+ignore (define-query los (?area ?fixture)
-  (or (los0 ?area ?fixture)
-      (exists (?g gate)
-        (and (los1 ?area ?g ?fixture)
-             (open ?g)))
-      (exists ((?g1 ?g2) gate)
-        (and (los2 ?area ?g1 ?g2 ?fixture)
-             (open ?g1)
-             (open ?g2))))
+(define-query visible (?area ?fixture)
+  (or (visible0 ?area ?fixture)
+      (and (bind (visible1 ?area $gate ?fixture))
+           (open $gate))
+      (and (bind (visible2 ?area $gate1 $gate2 ?fixture))
+           (open $gate1)
+           (open $gate2)))
 )
 
-
-(define-query visible (?area1 ?area2)
-  (or (visible0 ?area1 ?area2)
-      (exists (?g gate)
-        (and (visible1 ?area1 ?g ?area2)
-             (open ?g)))
-      (exists ((?g1 ?g2) gate)
-        (and (visible2 ?area1 ?g1 ?g2 ?area2)
-             (open ?g1)
-             (open ?g2))))
-)
-      
 
 (define-query accessible (?area1 ?area2)
   (or (accessible0 ?area1 ?area2)
-      (exists (?g gate)
+      (exists (?g gate)  ;note that an area may be accessible through more than one gate
         (and (accessible1 ?area1 ?g ?area2)
              (open ?g))))
 )
@@ -320,39 +309,44 @@
   (loc agent1 area1)
   (loc connector1 area1)
   (loc connector2 area2)
-   (loc connector3 area3)
+  (loc connector3 area3)
   (color connector1 nil)
   (color connector2 nil)
-   (color connector3 nil)
+  (color connector3 nil)
   ;static
   (accessible1 area1 gate1 area2)
   (accessible1 area2 gate2 area3)
-   (accessible1 area3 gate3 area4)
+  (accessible1 area3 gate3 area4)
+  (accessible1 area4 gate4 area5)
   (chroma transmitter1 blue)
   (chroma transmitter2 red)
   (chroma receiver1 blue)
   (chroma receiver2 red)
-   (chroma receiver3 blue)
+  (chroma receiver3 blue)
+  (chroma receiver4 blue)
   (controls receiver1 gate1)
   (controls receiver2 gate2)
-   (controls receiver3 gate3)
+  (controls receiver3 gate3)
+  (controls receiver4 gate4)
   ;los is from an area to a fixture
   (los0 area1 transmitter1)
   (los0 area1 receiver1)
   (los0 area1 receiver2)
-   (los0 area1 receiver3)
+  (los1 area1 area4 receiver3)  ;???
   (los0 area2 transmitter2)
   (los0 area2 transmitter1)
   (los1 area2 gate2 receiver2)
   (los0 area3 receiver2)
   (los1 area3 gate2 transmitter2)
-   (los1 area3 gate3 receiver3)
+  (los0 area4 receiver3)
+  (los0 area4 receiver1)
+  (los0 area4 receiver4)
+  (los1 area4 area1 transmitter1)  ;???
   ;visibility is from an area to an area 
   (visible0 area1 area2)
-  (visible0 area1 area3)
-   (visible0 area1 area4)
+  (visible0 area1 area4)
   (visible1 area2 gate2 area3)
-   (visible1 area3 gate3 area4)
+  (visible0 area3 area4)
 )
 
 

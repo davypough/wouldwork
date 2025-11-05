@@ -66,7 +66,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (refresh)
   -- refreshes (ie, reloads) the current problem specification file after editing it
 
-(reset)
+(ww-reset)
   -- if Wouldwork throws an error, it can be reinitialized and maybe enable continuing
 
 
