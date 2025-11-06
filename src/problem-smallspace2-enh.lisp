@@ -56,7 +56,6 @@
   ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
-  ;(accessible2 area gate gate area)  ;double gate moves not needed for this problem
   ;potential occlusion between an area to a fixture or other area
   ;(occludable area $area (either fixture area))
 )
