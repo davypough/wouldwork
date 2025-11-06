@@ -34,22 +34,6 @@
 )
 
 
-#+ignore (define-types  ;types for lightsout+
-  me          (me1)
-  gate        (gate1 gate2 gate3)
-  connector   (connector1 connector2 connector3)
-  plate       (plate1)
-  transmitter (transmitter1 transmitter2)
-  receiver    (receiver1 receiver2 receiver3)
-  hue         (blue red)  ;the color of a transmitter, receiver, or active connector
-  area        (area1 area2 area3)
-  cargo       (either connector)  ;what an agent (me) can pickup & carry
-  terminus    (either transmitter receiver connector)  ;what a connector can connect to
-  fixture     (either transmitter receiver plate)  ;has a permanent locale in an area
-  station     (either transmitter receiver gate)  ;useful for los determinations
-)
-
-
 (define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds me1 $any-cargo))
   (holds me $cargo)  ;fluent because we need to sometimes lookup what is currently being held
   (loc (either me cargo) $area)

@@ -155,36 +155,6 @@
   t)
 
 
-#+ignore (defun install-dynamic-relations (relations)
-  (format t "~&Installing dynamic relations...")
-  (iter (for relation in relations)
-        (check-relation relation)
-        (setf (gethash (car relation) *relations*)
-              (ut::if-it (cdr relation)
-                (sort-either-types ut::it)
-                t))
-        (ut::if-it (iter (for arg in (cdr relation))
-                         (for i from 1)
-                         (when ($varp arg)
-                           (collect i)))
-          (setf (gethash (car relation) *fluent-relation-indices*)
-                ut::it))
-        (finally (maphash (lambda (key val)  ;install implied unary relations
-                            (declare (ignore val))
-                            (setf (gethash key *static-relations*) '(something)))
-                          *types*)
-                 (setf (gethash 'inconsistent-state *relations*) t)
-                 (add-proposition '(always-true) *static-db*)
-                 (setf (gethash 'always-true *static-relations*) '(always-true))))
-  ;; Install symmetric relations
-  (iter (for (key val) in-hashtable *relations*)
-    (when (and (not (eql val t))
-               (not (alexandria:setp val))  ;multiple types
-               (not (final-charp #\> key)))   ;not explicitly directed
-      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
-  t)
-
-
 (defmacro define-static-relations (&rest relations)
   `(install-static-relations ',relations))
 
@@ -203,33 +173,6 @@
         (ut::if-it (iter (for arg in (cdr relation))
                          (for i from 1)
                          (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
-                           (collect i)))
-          (setf (gethash (car relation) *fluent-relation-indices*) ut::it))
-        (finally (maphash #'(lambda (key val)  ;install implied unary relations
-                              (declare (ignore val))
-                              (setf (gethash key *static-relations*) '(everything)))
-                          *types*)))
-  (iter (for (key val) in-hashtable *static-relations*)  ;install symmetric relations
-    (when (and (not (eql val t))
-               (not (alexandria:setp val))  ;multiple types
-               (not (final-charp #\> key)))   ;not explicitly directed
-      (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
-  (setf (gethash 'always-true *static-relations*) t)
-  (setf (gethash 'waiting *static-relations*) t)
-  t)
-
-
-#+ignore (defun install-static-relations (relations)
-  (format t "~&Installing static relations...")
-  (iter (for relation in relations)
-        (check-relation relation)
-        (setf (gethash (car relation) *static-relations*)
-              (ut::if-it (cdr relation) 
-                (sort-either-types ut::it)
-                nil))
-        (ut::if-it (iter (for arg in (cdr relation))
-                         (for i from 1)
-                         (when ($varp arg)
                            (collect i)))
           (setf (gethash (car relation) *fluent-relation-indices*) ut::it))
         (finally (maphash #'(lambda (key val)  ;install implied unary relations

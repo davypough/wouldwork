@@ -158,57 +158,6 @@
     `(not ,(translate-positive-relation (second form) flag))))
 
 
-#+ignore (defun translate-positive-relation (form flag)
-  "Unified positive relation translation with context-aware read/write determination.
-   Automatically detects whether to perform read operations (queries) or write operations (updates)
-   based on syntactic context rather than just translation flag.
-   For backtracking algorithm, generates runtime branching to handle both init-action
-   and normal action contexts with the same compiled code."
-  (declare (special changes-list))
-  (if (write-operation-p flag)
-    ;; Write operation: Effect context and not in forced read-mode
-    (if (eq *algorithm* 'backtracking)
-      ;; Backtracking: generate runtime check for init-action context
-      `(if *processing-init-action*
-           ;; Init-action context: use depth-first update for immediate state modification
-           ;; This allows sequential update function calls to see each other's changes
-           (update (problem-state.idb state) ,(translate-list form flag))
-           ;; Normal action context: use backtracking update with change tracking
-           ;; Changes accumulate in changes-list without modifying state
-           (multiple-value-bind (forward inverse) 
-               (update-bt (problem-state.idb state) ,(translate-list form flag))
-             (push (list forward inverse) changes-list)))
-      ;; Depth-first algorithm: always use direct update regardless of context
-      `(update (problem-state.idb state) ,(translate-list form flag)))
-    ;; Read operation: All other cases (preconditions, conditions, context-aware queries)
-    (translate-proposition form flag)))
-
-
-#+ignore (defun translate-negative-relation (form flag)
-  "Unified negative relation translation maintaining read/write context consistency.
-   Preserves negation semantics across both query and update operations.
-   For backtracking algorithm, generates runtime branching to handle both init-action
-   and normal action contexts with the same compiled code."
-  (declare (special changes-list))
-  (if (write-operation-p flag)
-    ;; Write operation: Effect context and not in forced read-mode
-    (if (eq *algorithm* 'backtracking)
-      ;; Backtracking: generate runtime check for init-action context
-      `(if *processing-init-action*
-           ;; Init-action context: use depth-first update for immediate state modification
-           ;; This allows sequential update function calls to see each other's changes
-           (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-           ;; Normal action context: use backtracking update with change tracking
-           ;; Changes accumulate in changes-list without modifying state
-           (multiple-value-bind (forward inverse) 
-               (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-             (push (list forward inverse) changes-list)))
-      ;; Depth-first algorithm: always use direct update regardless of context
-      `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
-    ;; Read operation: All other cases
-    `(not ,(translate-positive-relation (second form) flag))))
-
-
 (defun translate-function-call (form flag)
   "Corrected function call translation with robust update function detection"
   (check-query/update-call form)
@@ -488,26 +437,6 @@
             ;; Create update structure with BOTH forward and inverse operations
             (push (make-update :changes (list (nreverse forward-list)    ; Forward ops
                                              (nreverse inverse-list))   ; Inverse ops
-                               :value ,(if *objective-value-p*
-                                         '$objective-value
-                                         0.0) 
-                               :instantiations (list ,@*eff-param-vars*) 
-                               :followups (reverse followups))
-                  updated-dbs)
-            updated-dbs))))
-
-
-#+ignore (defun translate-assert-bt (form flag)
-  "For backtracking, translates an assert statement with clean separation of concerns."
-  (ecase flag
-    (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let (changes-list)
-            (declare (special changes-list))
-            ,@(mapcar (lambda (statement)
-                        (let ((*proposition-read-mode* nil))
-                          (translate statement 'eff)))
-                      (cdr form))
-            (push (make-update :changes changes-list
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0) 

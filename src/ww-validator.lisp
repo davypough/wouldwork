@@ -40,26 +40,6 @@
                    arg relation))))
 
 
-#+ignore (defun check-relation (relation)
-  "Checks for errors in a user-defined relation--eg, (height ?obj $fixnum)."
-  (check-type relation cons)
-  (check-type (car relation) symbol)
-  (iter (for arg in (cdr relation))
-        (check-type arg (or symbol cons))
-        (or (nth-value 1 (gethash arg *types*))  ;a user type
-            (and ($varp arg)  ;a $var incorporating a user or lisp defined type
-                 (user-or-lisp-type-p (trim-1st-char arg)))
-            (lisp-type-p arg)  ;a Common Lisp type as non-fluent argument
-            (and (consp arg)
-                 (eql (car arg) 'either)
-                 (consp (cdr arg))
-                 (every (lambda (type)
-                          (gethash type *types*))
-                        (cdr arg)))
-            (error "The argument ~A is not valid in the user-defined relation ~A."
-                   arg relation))))
-
-
 (defun check-query/update-function (fn-name args body)
   "Detects an error in the supplied arguments to a user-defined
    query or update function--eg, (?queen $row $col)."

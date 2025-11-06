@@ -95,16 +95,6 @@
           `(defparameter ,var-name ,val-form ,doc-string))))
 
 
-#+ignore (defmacro define-global (var-name val-form &optional doc-string)
-  "Convenience for defining globals in ww-setting.lisp for single- or multi-threading operation."
-  `(progn
-     ,(if (> *threads* 0)
-        (if (boundp var-name)
-          `(setf ,var-name ,val-form)
-          `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
-        `(defparameter ,var-name ,val-form ,doc-string))))
-
-
 (defmacro increment-global (var-name &optional (delta-form 1))
   `(progn
      (declaim (type fixnum ,var-name))
