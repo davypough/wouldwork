@@ -1,19 +1,19 @@
-;;; Filename: problem-smallspace2-enh.lisp
+;;; Filename: problem-smallspace2.lisp
 
 
 ;;; Enhanced topological representation for connectivity.
 ;;; Connectivity potential to areas (with visibility and accessibility) and fixtures (with los).
-;;; No beam occlusion or interference.
+;;; No beam occlusion (or interference), but runs ok with blocking zone.
 ;;; Extra leg to area4.
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* smallspace2-enh)
+(ww-set *problem-name* smallspace2)
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* every)  ;min-length)
+(ww-set *solution-type* min-length)
 
 (ww-set *tree-or-graph* graph)
 
@@ -52,7 +52,7 @@
   (los1 area (either $gate $area) fixture)  ;los can be blocked either by a closed $gate or object in $area
   ;potential visibility from an area to another area
   (visible0 area area)  
-  (visible1 area $gate area)
+  (visible1 area (either $gate $area) area)
   ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
@@ -76,15 +76,23 @@
 
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
-      (and (bind (los1 ?area $gate ?fixture))
-           (open $gate)))
+      (and (bind (los1 ?area $zone ?fixture))
+           (or (and (gate $zone)
+                    (open $zone))
+               (and (area $zone)
+                    (not (exists (?obj (either agent cargo))
+                           (loc ?obj $zone)))))))
 )
 
 
-(define-query visible (?area ?fixture)
-  (or (visible0 ?area ?fixture)
-      (and (bind (visible1 ?area $gate ?fixture))
-           (open $gate)))
+(define-query visible (?area1 ?area2)
+  (or (visible0 ?area1 ?area2)
+      (and (bind (visible1 ?area1 $zone ?area2))
+           (or (and (gate $zone)
+                    (open $zone))
+               (and (area $zone)
+                    (not (exists (?obj (either agent cargo))
+                           (loc ?obj $zone)))))))
 )
 
 
@@ -314,7 +322,7 @@
   (chroma receiver1 blue)
   (chroma receiver2 red)
   (chroma receiver3 blue)
-  (chroma receiver4 blue)
+  (chroma receiver4 red)
   (controls receiver1 gate1)
   (controls receiver2 gate2)
   (controls receiver3 gate3)
@@ -343,5 +351,5 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (loc agent1 area4)
+  (loc agent1 area5)
 )

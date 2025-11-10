@@ -1,52 +1,47 @@
-;;; Filename: problem-tightspace-enh.lisp
+;;; Filename: problem-smallspace3-coords.lisp
 
 
-;;; Enhanced problem specification in the Talos Principle game
-;;; for the tight space problem in The Lost Prisoner.
-;;; Deals with beams that can be occluded or intersecting.
-;;; Requires explicit object coordinates and obstructions like walls.
-;;; Agent1 initially blocking blue beam, moves anywhere off beam los to unblock.
+;;; Enhanced coordinate representation for beam connectivity.
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tightspace-enh)
+(ww-set *problem-name* smallspace3-coords)
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* first)  ;min-length)
+(ww-set *solution-type* min-length)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 2)
+(ww-set *depth-cutoff* 30)
 
 
 (define-types
-  agent       (agent1)  ;the name of the agent performing actions
-  gate        (gate1)
-  wall        (wall1)
+  agent       (agent1)
+  gate        (gate1 gate2 gate3 gate4)
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
-  receiver    (receiver1 receiver2 receiver3)
-  hue         (blue red nil)  ;the color of a transmitter, receiver, or active connector
-  beam        (beam1 beam2)  ;the initial beams
-  area        (area1 area2 area3 area4 area5 area6)
+  receiver    (receiver1 receiver2 receiver3 receiver4)
+  hue         (blue red nil)  ;the color of a transmitter, receiver, or connector
+  area        (area1 area2 area3 area4 area5)
   cargo       (either connector)  ;what an agent can pickup & carry
-  terminus    (either transmitter receiver connector)  ;what a connector can connect to
+  beam        ()  ;the list of initial beams
   source      (either transmitter connector)  ;beam source
   target      (either connector receiver)  ;beam target
-  occluder    (either cargo agent gate wall)  ;objects that can occlude a beam
+  occluder    (either cargo agent gate)  ;objects that can occlude a beam
+  terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver)
 )
 
 
 (define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds agent1 $any-cargo))
   (holds agent $cargo)  ;fluent because we need to sometimes lookup what is currently being held
-  (loc (either agent cargo) $area)  ;a location in an area
+  (loc (either agent cargo) $area)
   (paired terminus terminus)  ;potential beam between two terminus
-  (open gate)  ;a gate can be open or not open, default is not open
   (active receiver)
-  (color connector $hue)  ;dynamic connector color
+  (open gate)
+  (color connector $hue)
   (beam-segment beam $source $target $occluder $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
 )
@@ -55,17 +50,18 @@
 (define-static-relations
   (coords (either area fixture) $fixnum $fixnum)
   (controls receiver gate)
-  (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
-  (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
   (chroma fixture $hue)
-  (los0 area fixture)  ;direct line of sight to a fixture
-  (los1 area $gate fixture)  ;line of sight thru a gate to a fixture
-  (visible0 area area)  ;visibility between areas to a connector
-  (visible1 area $gate area)  ;visibility thru a gate
+  (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
+  ;potential clear los from an area to a fixture
+  (los0 area fixture)  
+  (los1 area (either $gate $area) fixture)  ;los can be blocked either by a closed $gate or object in $area
+  ;potential visibility from an area to another area
+  (visible0 area area)  
+  (visible1 area (either $gate $area) area)
+  ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
 )
-
 
 ;;;; QUERY FUNCTIONS ;;;;
 
@@ -104,14 +100,23 @@
 
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
-      (and (bind (los1 ?area $gate ?fixture))
-           (open $gate))))
+      (and (bind (los1 ?area $zone ?fixture))  ;$zone is a gate or area with possible object
+           (or (and (gate $zone)
+                    (open $zone))
+               (and (area $zone)
+                    (not (exists (?obj (either agent cargo))
+                           (loc ?obj $zone)))))))
+)
 
 
-(define-query visible (?area ?fixture)
-  (or (visible0 ?area ?fixture)
-      (and (bind (visible1 ?area $gate ?fixture))
-           (open $gate)))
+(define-query visible (?area1 ?area2)
+  (or (visible0 ?area1 ?area2)
+      (and (bind (visible1 ?area1 $zone ?area2))
+           (or (and (gate $zone)
+                    (open $zone))
+               (and (area $zone)
+                    (not (exists (?obj (either agent cargo))
+                           (loc ?obj $zone)))))))
 )
 
 
@@ -120,6 +125,12 @@
       (exists (?g gate)  ;note that an area may be accessible through more than one gate
         (and (accessible1 ?area1 ?g ?area2)
              (open ?g))))
+)
+
+
+(define-query vacant (?area)
+  (not (exists (?cargo cargo)
+         (loc ?cargo ?area)))
 )
 
 
@@ -144,7 +155,8 @@
                    (bind (chroma ?t $t2-hue))
                    (eql $t2-hue ?hue)
                    (bind (loc ?other-connector $other-area))
-                   (los $other-area ?t)))))))
+                   (los $other-area ?t))))))
+)
 
 
 (define-query resolve-consensus-hue (?hue-list)
@@ -152,12 +164,13 @@
   (do (setq $unique-hues (remove-duplicates (remove nil ?hue-list)))
       (if (= (length $unique-hues) 1)
         (first $unique-hues)  ; Single unique hue (consensus achieved)
-        nil)))               ; Multiple different hues or no hues (no consensus)
+        nil))               ; Multiple different hues or no hues (no consensus)
+)
 
 
 (define-query beam-segment-interference
     (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
-  ;; Determines if a cross segment (beam, gate, wall, etc) interferes with the main beam-segment
+  ;; Determines if a cross segment (beam, gate, etc) interferes with the main beam-segment
   ;; Returns the interference endpoint, or nil
   ;; Step 1: Calculate direction vectors and displacement
   (do (setq $dx1 (- ?end-x ?source-x))    ; Beam direction x
@@ -187,7 +200,8 @@
                   (setq $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
               ;; No valid intersection within (epsilon-trimmed) interiors
-              (values nil nil nil))))))
+              (values nil nil nil)))))
+)
 
 
 
@@ -224,7 +238,8 @@
                     (values $t $closest-x $closest-y)  ; Point blocks beam
                     (values nil nil nil)))             ; Point too far from beam
               ;; Projection falls outside segment bounds
-              (values nil nil nil))))))
+              (values nil nil nil)))))
+)
 
 
 (define-query find-first-obstacle-intersection (?source-x ?source-y ?target-x ?target-y)
@@ -242,8 +257,6 @@
                (or (and (gate ?obj) 
                         (not (open ?obj))  ; Block UNLESS explicitly open
                         (bind (gate-segment ?obj $x1 $y1 $x2 $y2)))
-                   (and (wall ?obj) 
-                        (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
                    (and (or (cargo ?obj) (agent ?obj))
                         (bind (loc ?obj $area))
                         (bind (coords $area $x1 $y1))
@@ -258,7 +271,7 @@
               (if (and (= $x1 $x2) (= $y1 $y2))
                 ;; Point occlusion (cargo)
                 (beam-segment-occlusion ?source-x ?source-y ?target-x ?target-y $x1 $y1)
-                ;; Line segment interference (gates, walls)
+                ;; Line segment interference (gates)
                 (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2)))
             (if (and $int-t (< $int-t $closest-t))
               (do (setq $closest-t $int-t)
@@ -266,7 +279,8 @@
                   (setq $result-y $int-y)
                   (setq $occluder ?obj))))))
     ;; Return closest intersection coordinates and occluder
-    (values $result-x $result-y $occluder)))
+    (values $result-x $result-y $occluder))
+)
 
 
 (define-query collect-all-beam-intersections ()
@@ -304,7 +318,8 @@
                     ;; Only push if both intersections valid
                     (if $t2
                       (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections))))))))
-      $intersections))
+      $intersections)
+)
 
 
 (define-query connectable (?area ?terminus)
@@ -336,12 +351,8 @@
                   (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
                 ;; Verify beam reaches target
                 (= $end-x $target-x)
-                (= $end-y $target-y))))))
-
-
-(define-query vacant (?area)
-  (not (exists (?cargo cargo)
-         (loc ?cargo ?area))))
+                (= $end-y $target-y)))))
+)
 
 
 (define-query receiver-beam-reaches (?receiver)
@@ -363,150 +374,21 @@
 
 
 (define-update activate-connector! (?connector ?hue)
-  (color ?connector ?hue))
+  (color ?connector ?hue)
+)
 
 
 (define-update deactivate-connector! (?connector ?hue)
-  (not (color ?connector ?hue)))
+  (not (color ?connector ?hue))
+)
 
 
 (define-update deactivate-receiver! (?receiver)
   (do (not (active ?receiver))
       (doall (?g gate)
         (if (controls ?receiver ?g)
-          (not (open ?g))))))
-
-
-(define-update create-beam-segment-p! (?source ?target)
-  ; Create a beam segment from source, and return the new beam's name.
-  (do
-    ;; Generate new beam entity with next available index
-    (bind (current-beams $current-beams))
-    (setq $next-index (1+ (length $current-beams)))
-    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
-    (register-dynamic-object $new-beam 'beam)
-    ;; Calculate beam path and intersection
-    (mvsetq ($source-x $source-y) (get-coordinates ?source))
-    (mvsetq ($target-x $target-y) (get-coordinates ?target))
-    (mvsetq ($end-x $end-y $occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-    ;; Create beam relations
-    (beam-segment $new-beam ?source ?target $occluder $end-x $end-y)
-    (current-beams (cons $new-beam $current-beams))
-    $new-beam))
-
-
-(define-update remove-beam-segment-p! (?beam)
-  ;; bind and remove beam-segment; if it doesn't exist, return nil
-  (if (bind (beam-segment ?beam $source $target $occluder $end-x $end-y))
-    (do (not (beam-segment ?beam $source $target $occluder $end-x $end-y))
-        (bind (current-beams $beams))
-        (current-beams (remove ?beam $beams))
-        t)
-    nil))
-
-
-(define-update recalculate-all-beams! ()
-  (doall (?b (get-current-beams))
-    (do (bind (beam-segment ?b $source $target $old-occluder $old-end-x $old-end-y))
-        ;; Get source coordinates
-        (mvsetq ($source-x $source-y) (get-coordinates $source))
-        ;; Get target coordinates  
-        (mvsetq ($target-x $target-y) (get-coordinates $target))
-        ;; Recalculate endpoint using current gate/wall/beam states
-        (mvsetq ($new-end-x $new-end-y $new-occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-        ;; Update beam segment if endpoint changed
-        (if (or (/= $new-end-x $old-end-x)
-                (/= $new-end-y $old-end-y)
-                (different $new-occluder $old-occluder))
-          (beam-segment ?b $source $target $new-occluder $new-end-x $new-end-y)))))
-
-
-(define-update update-beams-if-interference! ()
-  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
-  ;; at their intersection points, eliminating sequential processing dependencies
-  (do
-    ;; Phase 1: For each beam, determine its closest intersection point
-    (doall (?b (get-current-beams))
-      (do (bind (beam-segment ?b $src $tgt $occluder $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
-          ;; Calculate t-parameter for current endpoint position
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $closest-t (/ $dot $length-sq))
-          (setq $new-end-x $old-end-x)
-          (setq $new-end-y $old-end-y)
-          (setq $new-occluder $occluder)
-          ;; Check all intersections involving this beam
-          (ww-loop for $intersection in (collect-all-beam-intersections) do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $int-x (third $intersection))
-                (setq $int-y (fourth $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
-                ;; Determine which t-parameter applies to this beam and identify blocking beam
-                (if (eql ?b $beam1)
-                  (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2))
-                  (if (eql ?b $beam2)
-                    (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1))
-                    (setq $t-param nil)))
-                ;; Update closest intersection if this one is closer
-                (if (and $t-param (< $t-param $closest-t))
-                  (do (setq $closest-t $t-param)
-                      (setq $new-end-x $int-x)
-                      (setq $new-end-y $int-y)
-                      (setq $new-occluder $blocking-beam))))
-          ;; Phase 2: Atomically update beam segment if endpoint or occluder changed
-          (if (or (/= $new-end-x $old-end-x) 
-                  (/= $new-end-y $old-end-y)
-                  (not (eql $new-occluder $occluder)))
-            (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y))))))
-
-
-(define-update converge-receiver-states! ()
-  (do
-    (setq $iteration 0)
-    (setq $max-iterations 10)
-    (setq $any-changes nil)
-    (setq $continue t)
-    (ww-loop while (and $continue (< $iteration $max-iterations)) do
-      (setq $iteration-had-changes nil)
-      ;; Recalculate beams once at iteration start
-      ;; All decisions this iteration use this consistent beam state
-      (recalculate-all-beams!)
-      (update-beams-if-interference!)
-      ;; Step 1: Deactivate receivers that lost power
-      (doall (?r receiver)
-        (if (and (active ?r)
-                 (not (receiver-beam-reaches ?r)))
-          (do (deactivate-receiver! ?r)
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 2: Activate receivers that gained power
-      (doall (?r receiver)
-        (if (and (not (active ?r))
-                 (receiver-beam-reaches ?r))
-          (do (active ?r)
-              (doall (?g gate)
-                (if (controls ?r ?g)
-                  (open ?g)))
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 3: Check if system stabilized
-      (if (not $iteration-had-changes)
-        (setq $continue nil))
-      (incf $iteration))
-    ;; Mark state as inconsistent if convergence failed
-    (if (and (= $iteration $max-iterations) $continue)
-      (inconsistent-state))
-    $any-changes))
+          (not (open ?g)))))
+)
 
 
 (define-update chain-activate! (?terminus ?hue)
@@ -558,7 +440,8 @@
                          (bind (chroma ?t $t-hue))
                          (eql $t-hue ?hue)
                          (create-beam-segment-p! ?t ?c))
-                  (chain-activate! ?c $t-hue)))))))))
+                  (chain-activate! ?c $t-hue))))))))
+)
 
 
 (define-update chain-deactivate! (?connector ?hue)
@@ -580,7 +463,105 @@
                (eql $c-hue ?hue))
         ;; Check if this connector still has valid line-of-sight to power sources
         (if (not (connector-has-valid-line-of-sight ?c ?hue))
-          (chain-deactivate! ?c ?hue))))))
+          (chain-deactivate! ?c ?hue)))))
+)
+
+
+(define-update create-beam-segment-p! (?source ?target)
+  ; Create a beam segment from source, and return the new beam's name.
+  (do
+    ;; Generate new beam entity with next available index
+    (bind (current-beams $current-beams))
+    (setq $next-index (1+ (length $current-beams)))
+    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
+    (register-dynamic-object $new-beam 'beam)
+    ;; Calculate beam path and intersection
+    (mvsetq ($source-x $source-y) (get-coordinates ?source))
+    (mvsetq ($target-x $target-y) (get-coordinates ?target))
+    (mvsetq ($end-x $end-y $occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+    ;; Create beam relations
+    (beam-segment $new-beam ?source ?target $occluder $end-x $end-y)
+    (current-beams (cons $new-beam $current-beams))
+    $new-beam)
+)
+
+
+(define-update remove-beam-segment-p! (?beam)
+  ;; bind and remove beam-segment; if it doesn't exist, return nil
+  (if (bind (beam-segment ?beam $source $target $occluder $end-x $end-y))
+    (do (not (beam-segment ?beam $source $target $occluder $end-x $end-y))
+        (bind (current-beams $beams))
+        (current-beams (remove ?beam $beams))
+        t)
+    nil)
+)
+
+
+(define-update recalculate-all-beams! ()
+  (doall (?b (get-current-beams))
+    (do (bind (beam-segment ?b $source $target $old-occluder $old-end-x $old-end-y))
+        ;; Get source coordinates
+        (mvsetq ($source-x $source-y) (get-coordinates $source))
+        ;; Get target coordinates  
+        (mvsetq ($target-x $target-y) (get-coordinates $target))
+        ;; Recalculate endpoint using current gate/beam states
+        (mvsetq ($new-end-x $new-end-y $new-occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+        ;; Update beam segment if endpoint changed
+        (if (or (/= $new-end-x $old-end-x)
+                (/= $new-end-y $old-end-y)
+                (different $new-occluder $old-occluder))
+          (beam-segment ?b $source $target $new-occluder $new-end-x $new-end-y))))
+)
+
+
+(define-update update-beams-if-interference! ()
+  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
+  ;; at their intersection points, eliminating sequential processing dependencies
+  (do
+    ;; Phase 1: For each beam, determine its closest intersection point
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $occluder $old-end-x $old-end-y))
+          (mvsetq ($src-x $src-y) (get-coordinates $src))
+          (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
+          ;; Calculate t-parameter for current endpoint position
+          (setq $dx (- $tgt-x $src-x))
+          (setq $dy (- $tgt-y $src-y))
+          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (setq $curr-dx (- $old-end-x $src-x))
+          (setq $curr-dy (- $old-end-y $src-y))
+          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+          (setq $closest-t (/ $dot $length-sq))
+          (setq $new-end-x $old-end-x)
+          (setq $new-end-y $old-end-y)
+          (setq $new-occluder $occluder)
+          ;; Check all intersections involving this beam
+          (ww-loop for $intersection in (collect-all-beam-intersections) do
+                (setq $beam1 (first $intersection))
+                (setq $beam2 (second $intersection))
+                (setq $int-x (third $intersection))
+                (setq $int-y (fourth $intersection))
+                (setq $t1 (fifth $intersection))
+                (setq $t2 (sixth $intersection))
+                ;; Determine which t-parameter applies to this beam and identify blocking beam
+                (if (eql ?b $beam1)
+                  (do (setq $t-param $t1)
+                      (setq $blocking-beam $beam2))
+                  (if (eql ?b $beam2)
+                    (do (setq $t-param $t2)
+                        (setq $blocking-beam $beam1))
+                    (setq $t-param nil)))
+                ;; Update closest intersection if this one is closer
+                (if (and $t-param (< $t-param $closest-t))
+                  (do (setq $closest-t $t-param)
+                      (setq $new-end-x $int-x)
+                      (setq $new-end-y $int-y)
+                      (setq $new-occluder $blocking-beam))))
+          ;; Phase 2: Atomically update beam segment if endpoint or occluder changed
+          (if (or (/= $new-end-x $old-end-x) 
+                  (/= $new-end-y $old-end-y)
+                  (not (eql $new-occluder $occluder)))
+            (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y)))))
+)
 
 
 (define-update update-beams-if-occluded! (?area)
@@ -605,7 +586,48 @@
                   (if $int-t
                     (beam-segment ?b $source $target $occluder $area-x $area-y)))
               ;; else: Target is at ?area coordinates - this is a relay, skip occlusion check
-              ))))))
+              )))))
+)
+
+
+(define-update converge-receiver-states! ()
+  (do
+    (setq $iteration 0)
+    (setq $max-iterations 10)
+    (setq $any-changes nil)
+    (setq $continue t)
+    (ww-loop while (and $continue (< $iteration $max-iterations)) do
+      (setq $iteration-had-changes nil)
+      ;; Recalculate beams once at iteration start
+      ;; All decisions this iteration use this consistent beam state
+      (recalculate-all-beams!)
+      (update-beams-if-interference!)
+      ;; Step 1: Deactivate receivers that lost power
+      (doall (?r receiver)
+        (if (and (active ?r)
+                 (not (receiver-beam-reaches ?r)))
+          (do (deactivate-receiver! ?r)
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      ;; Step 2: Activate receivers that gained power
+      (doall (?r receiver)
+        (if (and (not (active ?r))
+                 (receiver-beam-reaches ?r))
+          (do (active ?r)
+              (doall (?g gate)
+                (if (controls ?r ?g)
+                  (open ?g)))
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      ;; Step 3: Check if system stabilized
+      (if (not $iteration-had-changes)
+        (setq $continue nil))
+      (incf $iteration))
+    ;; Mark state as inconsistent if convergence failed
+    (if (and (= $iteration $max-iterations) $continue)
+      (inconsistent-state))
+    $any-changes)
+)
 
 
 ;;;; ACTIONS ;;;;
@@ -635,7 +657,8 @@
               (mvsetq ($cargo-x $cargo-y) (get-coordinates $cargo))
               (if (and (= $end-x1 $cargo-x) (= $end-y1 $cargo-y))
                 (activate-connector! $cargo $hue1))))
-        (converge-receiver-states!)))  ;handle all cascading activations/deactivations
+        (converge-receiver-states!))  ;handle all cascading activations/deactivations
+)
 
 
 (define-action connect-to-2-terminus
@@ -676,7 +699,8 @@
                              (= $end-x2 $cargo-x)
                              (= $end-y2 $cargo-y)))
                   (chain-activate! $cargo $hue))))
-          (converge-receiver-states!)))
+          (converge-receiver-states!))
+)
 
 
 (define-action connect-to-3-terminus
@@ -727,7 +751,8 @@
                              (= $end-x3 $cargo-x)
                              (= $end-y3 $cargo-y)))
                   (chain-activate! $cargo $hue))))
-          (converge-receiver-states!)))
+          (converge-receiver-states!))
+)
 
 
 (define-action pickup-connector
@@ -769,7 +794,8 @@
             (if (paired ?connector ?t)
               (not (paired ?connector ?t))))
           ;; Step 6: Converge receiver states after all modifications
-          (converge-receiver-states!)))
+          (converge-receiver-states!))
+)
 
 
 (define-action drop
@@ -782,7 +808,8 @@
   (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
           (update-beams-if-occluded! $area)
-          (converge-receiver-states!)))  ;Handle receiver deactivations after occlusion
+          (converge-receiver-states!))  ;Handle receiver deactivations after occlusion
+)
 
 
 (define-action move
@@ -794,133 +821,78 @@
   ($area1 ?area2)
   (assert (loc agent1 ?area2)
           (recalculate-all-beams!)  ;handle both extension and shortening
-          (converge-receiver-states!)))
+          (converge-receiver-states!))
+)
 
 
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
-  ;; Dynamic state (agent-manipulable or derived)
-  (loc agent1 area4)
-  (loc connector1 area3)
-  (loc connector2 area6)
-  (loc connector3 area1)
-  (color connector1 red)
-  (color connector2 red)
-  (color connector3 red)
-  (current-beams ())  ; Empty - populated by init-action
-  (active receiver1)
-  (active receiver2)
-  (open gate1)
-  (paired transmitter1 receiver3)
-  (paired transmitter2 receiver1)
-  (paired transmitter2 connector1)
-  (paired connector1 connector2)
-  (paired connector1 receiver2)
-  (paired connector2 connector3)
-  (paired connector3 receiver1)
-  
-  ;; Static spatial configuration
-  (coords area1 25 18)
-  (coords area2 27 14)
-  (coords area3 25 10)
-  (coords area4 19 15)
-  (coords area5 25 14)
-  (coords area6 34 13)
-  (accessible0 area1 area2)
-  (accessible0 area1 area3)
-  (accessible0 area1 area4)
-  (accessible0 area1 area5)
-  (accessible0 area2 area3)
-  (accessible0 area2 area4)
-  (accessible0 area2 area5)
-  (accessible0 area3 area4)
-  (accessible0 area3 area5)
-  (accessible0 area4 area5)
-  
-  ;; Static object configuration
-  (coords transmitter1 32 13)
-  (coords transmitter2 25  0)
-  (coords receiver1 25 26)
-  (coords receiver2  0  7)
-  (coords receiver3  0 18)
-  (gate-segment gate1 31 15 31 11)
-  (wall-segment wall1 33 13 33 13)
-  
-  ;; Static color assignments
+  ;dynamic
+  (loc agent1 area1)
+  (loc connector1 area1)
+  (loc connector2 area2)
+  (loc connector3 area3)
+  (color connector1 nil)
+  (color connector2 nil)
+  (color connector3 nil)
+  (current-beams ())
+  ;static
+  (coords area1 18 10)
+  (coords area2 1 16)
+  (coords area3 17 18)
+  (coords area4 27 11)
+  (coords area5 9 5)
+  (accessible1 area1 gate1 area2)
+  (accessible1 area2 gate2 area3)
+  (accessible1 area3 gate3 area4)
+  (accessible1 area4 gate4 area5)
   (chroma transmitter1 blue)
   (chroma transmitter2 red)
-  (chroma receiver1 red)
+  (chroma receiver1 blue)
   (chroma receiver2 red)
   (chroma receiver3 blue)
-  
-  ;; Control relationships
+  (chroma receiver4 red)
+  (gate-segment gate1 8 15 12 15)
+  (gate-segment gate2 15 17 15 22)
+  (gate-segment gate3 30 15 35 15)
+  (gate-segment gate4 30 7 35 7)
   (controls receiver1 gate1)
-  
-  ;; Line-of-sight relationships
-  (los1 area1 gate1 transmitter1)
-  (los0 area1 transmitter2)
+  (controls receiver2 gate2)
+  (controls receiver3 gate3)
+  (controls receiver4 gate4)
+  (coords transmitter1 13 7)
+  (coords transmitter2 7 15)
+  (coords receiver1 13 15)
+  (coords receiver2 20 24)
+  (coords receiver3 36 12)
+  (coords receiver4 11 0)
+  ;los is from an area to a fixture
+  (los0 area1 transmitter1)
   (los0 area1 receiver1)
   (los0 area1 receiver2)
-  (los0 area1 receiver3)
-  (los1 area2 gate1 transmitter1)
+  (los1 area1 area4 receiver3)
   (los0 area2 transmitter2)
-  (los0 area2 receiver1)
-  (los0 area2 receiver2)
-  (los0 area2 receiver3)
-  (los1 area3 gate1 transmitter1)
-  (los0 area3 transmitter2)
-  (los0 area3 receiver1)
+  (los0 area2 transmitter1)
+  (los1 area2 gate2 receiver2)
   (los0 area3 receiver2)
-  (los0 area3 receiver3)
-  (los1 area4 gate1 transmitter1)
-  (los0 area4 transmitter2)
-  (los0 area4 receiver1)
-  (los0 area4 receiver2)
+  (los1 area3 gate2 transmitter2)
   (los0 area4 receiver3)
-  (los1 area5 gate1 transmitter1)
-  (los0 area5 transmitter2)
-  (los0 area5 receiver1)
-  (los0 area5 receiver2)
-  (los0 area5 receiver3)
-  (los1 area6 gate1 receiver2)
-  
-  ;; Visibility relationships
+  (los0 area4 receiver1)
+  (los0 area4 transmitter1)
+  (los0 area4 receiver4)
+  ;visibility is from an area to an area 
   (visible0 area1 area2)
   (visible0 area1 area3)
   (visible0 area1 area4)
-  (visible0 area1 area5)
-  (visible1 area1 gate1 area6)
-  (visible0 area2 area3)
-  (visible0 area2 area4)
-  (visible0 area2 area5)
+  (visible1 area2 gate2 area3)
   (visible0 area3 area4)
-  (visible0 area3 area5)
-  (visible1 area3 gate1 area6)
-  (visible0 area4 area5)
 )
-
-
-(define-init-action initialize-derived-state
-  0
-  ()
-  (always-true)
-  ()
-  (assert
-    (create-beam-segment-p! transmitter1 receiver3)
-    (create-beam-segment-p! transmitter2 receiver1)
-    (create-beam-segment-p! transmitter2 connector1)
-    (create-beam-segment-p! connector1 connector2)
-    (create-beam-segment-p! connector1 receiver2)
-    (create-beam-segment-p! connector2 connector3)
-    (create-beam-segment-p! connector3 receiver1)
-    (update-beams-if-interference!)
-    (converge-receiver-states!)))
 
 
 ;;;; GOAL ;;;;
 
-(define-goal  ;always put this last
-  (and (active receiver2)
-       (active receiver3)))
+(define-goal
+  (loc agent1 area5)
+)

@@ -256,6 +256,46 @@
           (pre
            ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
            (let ((*within-quantifier* t))
+             `(let ((collection ,(if queries
+                                    `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                    `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
+                (if (and collection (caar collection))
+                    (apply #'some (lambda (&rest args)
+                                   (destructuring-bind ,pre-param-?vars args
+                                     ,(translate body flag)))
+                           collection)
+                    nil))))
+          (eff
+            ;; Assertion semantics - execute body for suitable instantiations
+            `(let ((collection ,(if queries
+                                   `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                   `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
+               (if (and collection (caar collection))
+                   (apply #'some (lambda (&rest args)
+                                  (destructuring-bind ,pre-param-?vars args
+                                      ,(let ((*within-quantifier* t))
+                                    (translate body 'eff))))
+                          collection)
+                   nil))))))))
+
+
+#+ignore (defun translate-existential (form flag)
+  "Existential translation with context-dependent semantics.
+   Pre: Query semantics returning T/NIL based on satisfaction
+   Eff: Assertion semantics - assert first satisfying instantiation"
+  (check-form-body form)
+  (let ((parameters (second form))
+        (body (third form)))
+    (check-precondition-parameters parameters)
+    (unless (member (first parameters) *parameter-headers*)
+      (push 'standard parameters))
+    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
+      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+            (type-inst (instantiate-type-spec pre-param-types)))
+        (ecase flag
+          (pre
+           ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
+           (let ((*within-quantifier* t))
              `(apply #'some (lambda (&rest args)
                               (destructuring-bind ,pre-param-?vars args
                                 ,(translate body flag)))
@@ -286,6 +326,32 @@
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
             (type-inst (instantiate-type-spec pre-param-types)))
+        ;; Translation-time binding affects the translate call below
+        (let ((*within-quantifier* t))
+          `(let ((collection ,(if queries
+                                 `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                 `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
+             (if (and collection (caar collection))
+                 (apply #'every (lambda (&rest args)
+                                 (destructuring-bind ,pre-param-?vars args
+                                   ,(translate body flag)))
+                        collection)
+                 t)))))))
+
+
+#+ignore (defun translate-universal (form flag)
+  "Universal translation with translation-time quantifier context."
+  (check-form-body form)
+  (let ((parameters (second form))
+        (body (third form)))
+    (check-precondition-parameters parameters)
+    (unless (member (first parameters) *parameter-headers*)
+      (push 'standard parameters))
+    (when (eql flag 'eff)
+      (warn "Found FORALL statement in effect; DOALL is often intended: ~A" form))
+    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
+      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+            (type-inst (instantiate-type-spec pre-param-types)))
             ;(state-ref (get-state-reference flag)))
         ;; Translation-time binding affects the translate call below
         (let ((*within-quantifier* t))
@@ -298,6 +364,31 @@
 
 
 (defun translate-doall (form flag)
+  "DOALL translation with translation-time quantifier context."
+  (check-form-body form)
+  (let ((parameters (second form))
+        (body (third form)))
+    (check-precondition-parameters parameters)
+    (unless (member (first parameters) *parameter-headers*)
+      (push 'standard parameters))
+    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
+      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+            (type-inst (instantiate-type-spec pre-param-types)))
+        ;; Translation-time binding affects the translate call below
+        (let ((*within-quantifier* t))
+          `(progn
+             (let ((collection ,(if queries
+                                   `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                   `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
+               (when (and collection (caar collection))
+                 (apply #'mapc (lambda (&rest args)
+                                (destructuring-bind ,pre-param-?vars args
+                                  ,(translate body flag)))
+                        collection)))
+             t))))))
+
+
+#+ignore (defun translate-doall (form flag)
   "DOALL translation with translation-time quantifier context."
   (check-form-body form)
   (let ((parameters (second form))

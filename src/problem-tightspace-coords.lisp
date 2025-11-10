@@ -1,13 +1,16 @@
-;;; Filename: problem-tightspace.lisp
+;;; Filename: problem-tightspace-coords.lisp
 
 
-;;; Problem specification in the Talos Principle game
+;;; Enhanced problem specification in the Talos Principle game
 ;;; for the tight space problem in The Lost Prisoner.
+;;; Deals with beams that can be occluded or intersecting.
+;;; Requires explicit object coordinates and obstructions like walls.
+;;; Agent1 initially blocking blue beam, moves anywhere off beam los to unblock.
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tightspace)
+(ww-set *problem-name* tightspace-coords)
 
 (ww-set *problem-type* planning)
 
@@ -25,9 +28,9 @@
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3)
-  hue         (blue red none)  ;the color of a transmitter, receiver, or active connector
-  beam        (beam1 beam2)
-  area        (area1 area2 area3 area4 area5 area6)  ;vantage points
+  hue         (blue red nil)  ;the color of a transmitter, receiver, or active connector
+  beam        (beam1 beam2)  ;the initial beams
+  area        (area1 area2 area3 area4 area5 area6)
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   source      (either transmitter connector)  ;beam source
@@ -43,25 +46,24 @@
   (paired terminus terminus)  ;potential beam between two terminus
   (open gate)  ;a gate can be open or not open, default is not open
   (active receiver)
-  (color connector $hue)
+  (color connector $hue)  ;dynamic connector color
   (beam-segment beam $source $target $occluder $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
 )
 
 
 (define-static-relations
-  (vantage area $fixnum $fixnum)  ;the (x,y) position of an area
-  (adjacent area area)   ;agent can always move to adjacent area unimpeded
+  (coords (either area fixture) $fixnum $fixnum)
   (controls receiver gate)
-  (gate-separates gate area area)
-  (fixpoint fixture $fixnum $fixnum)  ;coordinates of a transmitter or receiver
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
   (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
   (chroma fixture $hue)
   (los0 area fixture)  ;direct line of sight to a fixture
-  (los1 area gate fixture)  ;line of sight thru a gate to a fixture
+  (los1 area $gate fixture)  ;line of sight thru a gate to a fixture
   (visible0 area area)  ;visibility between areas to a connector
-  (visible1 area gate area)  ;visibility thru a gate
+  (visible1 area $gate area)  ;visibility thru a gate
+  (accessible0 area area)
+  (accessible1 area gate area)
 )
 
 
@@ -70,49 +72,55 @@
 
 (define-query get-current-beams ()
   (do (bind (current-beams $beams))
-      $beams))
+      $beams)
+)
 
 
 (define-query get-hue-if-source (?terminus)
-  ;Returns color or chroma if source, otherwise nil
-  (do (or (and (transmitter ?terminus)
-               (bind (chroma ?terminus $hue)))
-          (and (connector ?terminus)
-               (bind (color ?terminus $hue))))
-      $hue))
+  ;gets the hue of ?terminus if it is a source, else nil
+  (or (and (transmitter ?terminus)
+           (bind (chroma ?terminus $hue))
+           $hue)
+      (and (connector ?terminus)
+           (bind (color ?terminus $hue))
+           $hue))
+)
 
 
 (define-query get-coordinates (?object)
-  (if (and (bind (loc ?object $area))
-           (bind (vantage $area $x $y)))
+  ;; Check 1: Areas and fixtures have direct coordinates
+  (if (and (or (area ?object) (fixture ?object))
+           (bind (coords ?object $x $y)))
     (values $x $y)
-    (if (bind (fixpoint ?object $x $y))
+    ;; Check 2: Agents and cargo require location lookup first
+    (if (and (or (agent ?object) (cargo ?object))
+             (bind (loc ?object $area))  ;fails if ?object is held
+             (bind (coords $area $x $y)))
       (values $x $y)
-      (if (bind (vantage ?object $x $y))
-        (values $x $y)
-        (values nil nil)))))
-
-
-(define-query los-thru-1-gate (?area ?fixture)
-  (exists (?g gate)
-    (and (los1 ?area ?g ?fixture)
-         (open ?g))))
+      ;; Default: No coordinates found
+      (values nil nil)))
+)
 
 
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
-      (los-thru-1-gate ?area ?fixture)))
+      (and (bind (los1 ?area $gate ?fixture))
+           (open $gate))))
 
 
-(define-query visible-thru-1-gate (?area1 ?area2)
-  (exists (?g gate)
-    (and (visible1 ?area1 ?g ?area2)
-         (open ?g))))
+(define-query visible (?area ?fixture)
+  (or (visible0 ?area ?fixture)
+      (and (bind (visible1 ?area $gate ?fixture))
+           (open $gate)))
+)
 
 
-(define-query visible (?area1 ?area2)
-  (or (visible0 ?area1 ?area2)
-      (visible-thru-1-gate ?area1 ?area2)))
+(define-query accessible (?area1 ?area2)
+  (or (accessible0 ?area1 ?area2)
+      (exists (?g gate)  ;note that an area may be accessible through more than one gate
+        (and (accessible1 ?area1 ?g ?area2)
+             (open ?g))))
+)
 
 
 (define-query connector-has-valid-line-of-sight (?connector ?hue)
@@ -238,7 +246,7 @@
                         (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
                    (and (or (cargo ?obj) (agent ?obj))
                         (bind (loc ?obj $area))
-                        (bind (vantage $area $x1 $y1))
+                        (bind (coords $area $x1 $y1))
                         (setq $x2 $x1) (setq $y2 $y1)))
                ;; Endpoint exclusion logic for all obstacle types
                (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
@@ -329,13 +337,6 @@
                 ;; Verify beam reaches target
                 (= $end-x $target-x)
                 (= $end-y $target-y))))))
-
-
-(define-query passable (?area1 ?area2)
-  (or (adjacent ?area1 ?area2)
-      (exists (?g gate)
-        (and (gate-separates ?g ?area1 ?area2)
-             (open ?g)))))
 
 
 (define-query vacant (?area)
@@ -475,15 +476,12 @@
     (setq $max-iterations 10)
     (setq $any-changes nil)
     (setq $continue t)
-    
     (ww-loop while (and $continue (< $iteration $max-iterations)) do
       (setq $iteration-had-changes nil)
-      
       ;; Recalculate beams once at iteration start
       ;; All decisions this iteration use this consistent beam state
       (recalculate-all-beams!)
       (update-beams-if-interference!)
-      
       ;; Step 1: Deactivate receivers that lost power
       (doall (?r receiver)
         (if (and (active ?r)
@@ -491,7 +489,6 @@
           (do (deactivate-receiver! ?r)
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
-      
       ;; Step 2: Activate receivers that gained power
       (doall (?r receiver)
         (if (and (not (active ?r))
@@ -502,17 +499,13 @@
                   (open ?g)))
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
-      
       ;; Step 3: Check if system stabilized
       (if (not $iteration-had-changes)
         (setq $continue nil))
-      
       (incf $iteration))
-    
     ;; Mark state as inconsistent if convergence failed
     (if (and (= $iteration $max-iterations) $continue)
       (inconsistent-state))
-    
     $any-changes))
 
 
@@ -797,7 +790,7 @@
   (?area2 area)
   (and (bind (loc agent1 $area1))
        (different $area1 ?area2)
-       (passable $area1 ?area2))
+       (accessible $area1 ?area2))
   ($area1 ?area2)
   (assert (loc agent1 ?area2)
           (recalculate-all-beams!)  ;handle both extension and shortening
@@ -829,29 +822,29 @@
   (paired connector3 receiver1)
   
   ;; Static spatial configuration
-  (vantage area1 25 18)
-  (vantage area2 27 14)
-  (vantage area3 25 10)
-  (vantage area4 19 15)
-  (vantage area5 25 14)
-  (vantage area6 34 13)
-  (adjacent area1 area2)
-  (adjacent area1 area3)
-  (adjacent area1 area4)
-  (adjacent area1 area5)
-  (adjacent area2 area3)
-  (adjacent area2 area4)
-  (adjacent area2 area5)
-  (adjacent area3 area4)
-  (adjacent area3 area5)
-  (adjacent area4 area5)
+  (coords area1 25 18)
+  (coords area2 27 14)
+  (coords area3 25 10)
+  (coords area4 19 15)
+  (coords area5 25 14)
+  (coords area6 34 13)
+  (accessible0 area1 area2)
+  (accessible0 area1 area3)
+  (accessible0 area1 area4)
+  (accessible0 area1 area5)
+  (accessible0 area2 area3)
+  (accessible0 area2 area4)
+  (accessible0 area2 area5)
+  (accessible0 area3 area4)
+  (accessible0 area3 area5)
+  (accessible0 area4 area5)
   
   ;; Static object configuration
-  (fixpoint transmitter1 32 13)
-  (fixpoint transmitter2 25  0)
-  (fixpoint receiver1 25 26)
-  (fixpoint receiver2  0  7)
-  (fixpoint receiver3  0 18)
+  (coords transmitter1 32 13)
+  (coords transmitter2 25  0)
+  (coords receiver1 25 26)
+  (coords receiver2  0  7)
+  (coords receiver3  0 18)
   (gate-segment gate1 31 15 31 11)
   (wall-segment wall1 33 13 33 13)
   
