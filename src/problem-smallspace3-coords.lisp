@@ -391,6 +391,132 @@
 )
 
 
+(define-update recalculate-all-beams! ()
+  (doall (?b (get-current-beams))
+    (do (bind (beam-segment ?b $source $target $old-occluder $old-end-x $old-end-y))
+        ;; Get source coordinates
+        (mvsetq ($source-x $source-y) (get-coordinates $source))
+        ;; Get target coordinates  
+        (mvsetq ($target-x $target-y) (get-coordinates $target))
+        ;; Recalculate endpoint using current gate/beam states
+        (mvsetq ($new-end-x $new-end-y $new-occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+        ;; Update beam segment if endpoint changed
+        (if (or (/= $new-end-x $old-end-x)
+                (/= $new-end-y $old-end-y)
+                (different $new-occluder $old-occluder))
+          (beam-segment ?b $source $target $new-occluder $new-end-x $new-end-y))))
+)
+
+
+(define-update update-beams-if-interference! ()
+  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
+  ;; at their intersection points, eliminating sequential processing dependencies
+  (do
+    ;; Phase 1: For each beam, determine its closest intersection point
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $occluder $old-end-x $old-end-y))
+          (mvsetq ($src-x $src-y) (get-coordinates $src))
+          (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
+          ;; Calculate t-parameter for current endpoint position
+          (setq $dx (- $tgt-x $src-x))
+          (setq $dy (- $tgt-y $src-y))
+          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (setq $curr-dx (- $old-end-x $src-x))
+          (setq $curr-dy (- $old-end-y $src-y))
+          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+          (setq $closest-t (/ $dot $length-sq))
+          (setq $new-end-x $old-end-x)
+          (setq $new-end-y $old-end-y)
+          (setq $new-occluder $occluder)
+          ;; Check all intersections involving this beam
+          (ww-loop for $intersection in (collect-all-beam-intersections) do
+                (setq $beam1 (first $intersection))
+                (setq $beam2 (second $intersection))
+                (setq $int-x (third $intersection))
+                (setq $int-y (fourth $intersection))
+                (setq $t1 (fifth $intersection))
+                (setq $t2 (sixth $intersection))
+                ;; Determine which t-parameter applies to this beam and identify blocking beam
+                (if (eql ?b $beam1)
+                  (do (setq $t-param $t1)
+                      (setq $blocking-beam $beam2))
+                  (if (eql ?b $beam2)
+                    (do (setq $t-param $t2)
+                        (setq $blocking-beam $beam1))
+                    (setq $t-param nil)))
+                ;; Update closest intersection if this one is closer
+                (if (and $t-param (< $t-param $closest-t))
+                  (do (setq $closest-t $t-param)
+                      (setq $new-end-x $int-x)
+                      (setq $new-end-y $int-y)
+                      (setq $new-occluder $blocking-beam))))
+          ;; Phase 2: Atomically update beam segment if endpoint or occluder changed
+          (if (or (/= $new-end-x $old-end-x) 
+                  (/= $new-end-y $old-end-y)
+                  (not (eql $new-occluder $occluder)))
+            (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y)))))
+)
+
+
+(define-update converge-receiver-states! ()
+  (do
+    (setq $iteration 0)
+    (setq $max-iterations 10)
+    (setq $any-changes nil)
+    (setq $continue t)
+    (ww-loop while (and $continue (< $iteration $max-iterations)) do
+      (setq $iteration-had-changes nil)
+      ;; Recalculate beams once at iteration start
+      ;; All decisions this iteration use this consistent beam state
+      (recalculate-all-beams!)
+      (update-beams-if-interference!)
+      ;; Step 1: Deactivate receivers that lost power
+      (doall (?r receiver)
+        (if (and (active ?r)
+                 (not (receiver-beam-reaches ?r)))
+          (do (deactivate-receiver! ?r)
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      ;; Step 2: Activate receivers that gained power
+      (doall (?r receiver)
+        (if (and (not (active ?r))
+                 (receiver-beam-reaches ?r))
+          (do (active ?r)
+              (doall (?g gate)
+                (if (controls ?r ?g)
+                  (open ?g)))
+              (setq $iteration-had-changes t)
+              (setq $any-changes t))))
+      ;; Step 3: Check if system stabilized
+      (if (not $iteration-had-changes)
+        (setq $continue nil))
+      (incf $iteration))
+    ;; Mark state as inconsistent if convergence failed
+    (if (and (= $iteration $max-iterations) $continue)
+      (inconsistent-state))
+    $any-changes)
+)
+
+
+(define-update create-beam-segment-p! (?source ?target)
+  ; Create a beam segment from source, and return the new beam's name.
+  (do
+    ;; Generate new beam entity with next available index
+    (bind (current-beams $current-beams))
+    (setq $next-index (1+ (length $current-beams)))
+    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
+    (register-dynamic-object $new-beam 'beam)
+    ;; Calculate beam path and intersection
+    (mvsetq ($source-x $source-y) (get-coordinates ?source))
+    (mvsetq ($target-x $target-y) (get-coordinates ?target))
+    (mvsetq ($end-x $end-y $occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+    ;; Create beam relations
+    (beam-segment $new-beam ?source ?target $occluder $end-x $end-y)
+    (current-beams (cons $new-beam $current-beams))
+    $new-beam)
+)
+
+
 (define-update chain-activate! (?terminus ?hue)
   (do
     ;; Activate the terminus based on its type
@@ -467,25 +593,6 @@
 )
 
 
-(define-update create-beam-segment-p! (?source ?target)
-  ; Create a beam segment from source, and return the new beam's name.
-  (do
-    ;; Generate new beam entity with next available index
-    (bind (current-beams $current-beams))
-    (setq $next-index (1+ (length $current-beams)))
-    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
-    (register-dynamic-object $new-beam 'beam)
-    ;; Calculate beam path and intersection
-    (mvsetq ($source-x $source-y) (get-coordinates ?source))
-    (mvsetq ($target-x $target-y) (get-coordinates ?target))
-    (mvsetq ($end-x $end-y $occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-    ;; Create beam relations
-    (beam-segment $new-beam ?source ?target $occluder $end-x $end-y)
-    (current-beams (cons $new-beam $current-beams))
-    $new-beam)
-)
-
-
 (define-update remove-beam-segment-p! (?beam)
   ;; bind and remove beam-segment; if it doesn't exist, return nil
   (if (bind (beam-segment ?beam $source $target $occluder $end-x $end-y))
@@ -494,73 +601,6 @@
         (current-beams (remove ?beam $beams))
         t)
     nil)
-)
-
-
-(define-update recalculate-all-beams! ()
-  (doall (?b (get-current-beams))
-    (do (bind (beam-segment ?b $source $target $old-occluder $old-end-x $old-end-y))
-        ;; Get source coordinates
-        (mvsetq ($source-x $source-y) (get-coordinates $source))
-        ;; Get target coordinates  
-        (mvsetq ($target-x $target-y) (get-coordinates $target))
-        ;; Recalculate endpoint using current gate/beam states
-        (mvsetq ($new-end-x $new-end-y $new-occluder) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-        ;; Update beam segment if endpoint changed
-        (if (or (/= $new-end-x $old-end-x)
-                (/= $new-end-y $old-end-y)
-                (different $new-occluder $old-occluder))
-          (beam-segment ?b $source $target $new-occluder $new-end-x $new-end-y))))
-)
-
-
-(define-update update-beams-if-interference! ()
-  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
-  ;; at their intersection points, eliminating sequential processing dependencies
-  (do
-    ;; Phase 1: For each beam, determine its closest intersection point
-    (doall (?b (get-current-beams))
-      (do (bind (beam-segment ?b $src $tgt $occluder $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
-          ;; Calculate t-parameter for current endpoint position
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $closest-t (/ $dot $length-sq))
-          (setq $new-end-x $old-end-x)
-          (setq $new-end-y $old-end-y)
-          (setq $new-occluder $occluder)
-          ;; Check all intersections involving this beam
-          (ww-loop for $intersection in (collect-all-beam-intersections) do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $int-x (third $intersection))
-                (setq $int-y (fourth $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
-                ;; Determine which t-parameter applies to this beam and identify blocking beam
-                (if (eql ?b $beam1)
-                  (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2))
-                  (if (eql ?b $beam2)
-                    (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1))
-                    (setq $t-param nil)))
-                ;; Update closest intersection if this one is closer
-                (if (and $t-param (< $t-param $closest-t))
-                  (do (setq $closest-t $t-param)
-                      (setq $new-end-x $int-x)
-                      (setq $new-end-y $int-y)
-                      (setq $new-occluder $blocking-beam))))
-          ;; Phase 2: Atomically update beam segment if endpoint or occluder changed
-          (if (or (/= $new-end-x $old-end-x) 
-                  (/= $new-end-y $old-end-y)
-                  (not (eql $new-occluder $occluder)))
-            (beam-segment ?b $src $tgt $new-occluder $new-end-x $new-end-y)))))
 )
 
 
@@ -587,46 +627,6 @@
                     (beam-segment ?b $source $target $occluder $area-x $area-y)))
               ;; else: Target is at ?area coordinates - this is a relay, skip occlusion check
               )))))
-)
-
-
-(define-update converge-receiver-states! ()
-  (do
-    (setq $iteration 0)
-    (setq $max-iterations 10)
-    (setq $any-changes nil)
-    (setq $continue t)
-    (ww-loop while (and $continue (< $iteration $max-iterations)) do
-      (setq $iteration-had-changes nil)
-      ;; Recalculate beams once at iteration start
-      ;; All decisions this iteration use this consistent beam state
-      (recalculate-all-beams!)
-      (update-beams-if-interference!)
-      ;; Step 1: Deactivate receivers that lost power
-      (doall (?r receiver)
-        (if (and (active ?r)
-                 (not (receiver-beam-reaches ?r)))
-          (do (deactivate-receiver! ?r)
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 2: Activate receivers that gained power
-      (doall (?r receiver)
-        (if (and (not (active ?r))
-                 (receiver-beam-reaches ?r))
-          (do (active ?r)
-              (doall (?g gate)
-                (if (controls ?r ?g)
-                  (open ?g)))
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 3: Check if system stabilized
-      (if (not $iteration-had-changes)
-        (setq $continue nil))
-      (incf $iteration))
-    ;; Mark state as inconsistent if convergence failed
-    (if (and (= $iteration $max-iterations) $continue)
-      (inconsistent-state))
-    $any-changes)
 )
 
 

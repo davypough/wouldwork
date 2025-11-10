@@ -652,5 +652,15 @@
         ((or (gethash (car form) *relations*) (gethash (car form) *static-relations*))
            (translate-positive-relation form flag))
         ((member (car form) (append *query-names* *update-names*)) (translate-function-call form flag))
-        ;((or (fboundp (car form)) (special-operator-p (car form)) form)   ;any lisp function
+        ((and (listp form)
+              (symbolp (car form))
+              (not ($varp (car form)))
+              (not (?varp (car form)))
+              (not (cl-symbol-p (car form)))
+              (not (fboundp (car form)))
+              (not (macro-function (car form)))
+              (not (special-operator-p (car form))))
+         (format t "~%Note: The use of ~A as a local variable in ~A is acceptable.~%~
+                 But if this is a query or update function, ensure it's defined before it's used."
+                (car form) form))
         (t form)))

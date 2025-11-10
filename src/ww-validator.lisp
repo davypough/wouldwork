@@ -279,6 +279,13 @@
                      unsigned-byte vector))))
 
 
+(defun cl-symbol-p (item)
+  "Returns true if item is a symbol from the common-lisp package."
+  (and (symbolp item)
+       (eq (symbol-package item) 
+           (find-package :common-lisp))))
+
+
 (defun $varp (item)
   (and (symbolp item)
        (char= (char (symbol-name item) 0) #\$)))
