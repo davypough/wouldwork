@@ -120,12 +120,22 @@
 
 
 (defun reset-user-syms (symbols)
+  "Unintern symbols and unbind any functions stored in function name lists."
   (dolist (symbol symbols)
+    (when (boundp symbol)
+      ;; If this symbol holds a list of function names, unbind each function
+      (let ((value (symbol-value symbol)))
+        (when (and (listp value)
+                   (every #'symbolp value))
+          (dolist (fn-name value)
+            (when (fboundp fn-name)
+              (fmakunbound fn-name))))))
     (unintern symbol)))
 
 
 ;Reset certain user defined symbols, when defined on previous load.
-(reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function? *actions*))
+(reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function?
+                   *actions* *query-names* *update-names*))
 
 
 (defun read-init-vals (vals-file)
