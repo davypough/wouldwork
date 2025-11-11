@@ -23,7 +23,7 @@
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3 receiver4)
-  hue         (blue red nil)  ;the color of a transmitter, receiver, or connector
+  hue         (blue red)  ;the color of a transmitter, receiver, or connector
   area        (area1 area2 area3 area4 area5)
   cargo       (either connector)  ;what an agent can pickup & carry
   beam        ()  ;the list of initial beams
@@ -84,18 +84,18 @@
 
 
 (define-query get-coordinates (?object)
-  ;; Check 1: Areas and fixtures have direct coordinates
-  (if (and (or (area ?object) (fixture ?object))
-           (bind (coords ?object $x $y)))
-    (values $x $y)
+  (cond 
+    ;; Check 1: Areas and fixtures have direct coordinates
+    ((and (or (area ?object) (fixture ?object))
+          (bind (coords ?object $x $y)))
+     (values $x $y))
     ;; Check 2: Agents and cargo require location lookup first
-    (if (and (or (agent ?object) (cargo ?object))
-             (bind (loc ?object $area))  ;fails if ?object is held
-             (bind (coords $area $x $y)))
-      (values $x $y)
-      ;; Default: No coordinates found
-      (values nil nil)))
-)
+    ((and (or (agent ?object) (cargo ?object))
+          (bind (loc ?object $area))
+          (bind (coords $area $x $y)))
+     (values $x $y))
+    ;; Default: No coordinates found
+    (t (values nil nil))))
 
 
 (define-query los (?area ?fixture)
@@ -531,31 +531,44 @@
         ;; Connector activation: activate connected receivers of matching color
         (doall (?r receiver)
           (if (and (paired ?terminus ?r)
-                   (not (active ?r))
-                   (bind (chroma ?r $rhue))
-                   (eql $rhue ?hue)
-                   (or
-                     ;; Check if existing beam reaches target
-                     (exists (?b (get-current-beams))
-                       (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
-                            (eql $source ?terminus)
-                            (eql $target ?r)
-                            (mvsetq ($target-x $target-y) (get-coordinates ?r))
-                            (= $end-x $target-x)
-                            (= $end-y $target-y)))
-                     ;; No existing beam, but can create one that reaches target
-                     (and (not (exists (?b (get-current-beams))
+                   (not (active ?r)))
+            ;; First ensure beam exists (create if needed)
+            (do (if (not (exists (?b (get-current-beams))
                           (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
                                (eql $source ?terminus)
                                (eql $target ?r))))
-                          (create-beam-segment-p! ?terminus ?r))))
-            (chain-activate! ?r ?hue)))
+                  (create-beam-segment-p! ?terminus ?r))
+                ;; Now check if should activate: color match AND beam reaches
+                (if (and (bind (chroma ?r $rhue))
+                         (eql $rhue ?hue)
+                         (exists (?b (get-current-beams))
+                           (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+                                (eql $source ?terminus)
+                                (eql $target ?r)
+                                (mvsetq ($target-x $target-y) (get-coordinates ?r))
+                                (= $end-x $target-x)
+                                (= $end-y $target-y))))
+                  (chain-activate! ?r ?hue)))))
         ;; Connector activation: activate connected connectors
         (doall (?c connector)
           (if (and (different ?c ?terminus)
                    (paired ?terminus ?c)
                    (not (bind (color ?c $hue))))
-            (chain-activate! ?c ?hue))))
+            ;; Only process unpowered connectors
+            (do (if (not (exists (?b (get-current-beams))
+                          (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+                               (eql $source ?terminus)
+                               (eql $target ?c))))
+                  (create-beam-segment-p! ?terminus ?c))
+                ;; Check if beam reaches before activating
+                (if (exists (?b (get-current-beams))
+                      (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+                           (eql $source ?terminus)
+                           (eql $target ?c)
+                           (mvsetq ($target-x $target-y) (get-coordinates ?c))
+                           (= $end-x $target-x)
+                           (= $end-y $target-y)))
+                  (chain-activate! ?c $hue)))))
       ;; Handle receiver activation branch
       (if (receiver ?terminus)
           ;; Receiver activation: check for newly accessible connectors
@@ -566,7 +579,7 @@
                          (bind (chroma ?t $t-hue))
                          (eql $t-hue ?hue)
                          (create-beam-segment-p! ?t ?c))
-                  (chain-activate! ?c $t-hue))))))))
+                  (chain-activate! ?c $t-hue)))))))))
 )
 
 
@@ -574,6 +587,11 @@
   (do 
     ;; Deactivate this connector
     (deactivate-connector! ?connector ?hue)
+    ;; Remove beams emitted by this connector
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+          (if (eql $source ?connector)
+            (remove-beam-segment-p! ?b))))
     ;; Deactivate receivers that lost power
     (doall (?r receiver)
       (if (and (paired ?connector ?r)
@@ -678,11 +696,9 @@
           (setq $hue1 (get-hue-if-source ?terminus1))
           (setq $hue2 (get-hue-if-source ?terminus2))
           (if $hue1 
-            (setq $new-beam1 (create-beam-segment-p! ?terminus1 $cargo))
-            (setq $new-beam1 (create-beam-segment-p! $cargo ?terminus1)))
+            (setq $new-beam1 (create-beam-segment-p! ?terminus1 $cargo)))
           (if $hue2 
-            (setq $new-beam2 (create-beam-segment-p! ?terminus2 $cargo))
-            (setq $new-beam2 (create-beam-segment-p! $cargo ?terminus2)))
+            (setq $new-beam2 (create-beam-segment-p! ?terminus2 $cargo)))
           ; Handle all interference & occlusion before activation decision
           (update-beams-if-interference!)
           (update-beams-if-occluded! $area)
@@ -723,14 +739,11 @@
           (setq $hue2 (get-hue-if-source ?terminus2))
           (setq $hue3 (get-hue-if-source ?terminus3))
           (if $hue1 
-            (setq $new-beam1 (create-beam-segment-p! ?terminus1 $cargo))
-            (setq $new-beam1 (create-beam-segment-p! $cargo ?terminus1)))
+            (setq $new-beam1 (create-beam-segment-p! ?terminus1 $cargo)))
           (if $hue2 
-            (setq $new-beam2 (create-beam-segment-p! ?terminus2 $cargo))
-            (setq $new-beam2 (create-beam-segment-p! $cargo ?terminus2)))
+            (setq $new-beam2 (create-beam-segment-p! ?terminus2 $cargo)))
           (if $hue3 
-            (setq $new-beam3 (create-beam-segment-p! ?terminus3 $cargo))
-            (setq $new-beam3 (create-beam-segment-p! $cargo ?terminus3)))
+            (setq $new-beam3 (create-beam-segment-p! ?terminus3 $cargo)))
           ; Handle all interference & occlusion before activation decision
           (update-beams-if-interference!)
           (update-beams-if-occluded! $area)
@@ -834,9 +847,6 @@
   (loc connector1 area1)
   (loc connector2 area2)
   (loc connector3 area3)
-  (color connector1 nil)
-  (color connector2 nil)
-  (color connector3 nil)
   (current-beams ())
   ;static
   (coords area1 18 10)

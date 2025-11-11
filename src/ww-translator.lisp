@@ -279,40 +279,6 @@
                    nil))))))))
 
 
-#+ignore (defun translate-existential (form flag)
-  "Existential translation with context-dependent semantics.
-   Pre: Query semantics returning T/NIL based on satisfaction
-   Eff: Assertion semantics - assert first satisfying instantiation"
-  (check-form-body form)
-  (let ((parameters (second form))
-        (body (third form)))
-    (check-precondition-parameters parameters)
-    (unless (member (first parameters) *parameter-headers*)
-      (push 'standard parameters))
-    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
-        (ecase flag
-          (pre
-           ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
-           (let ((*within-quantifier* t))
-             `(apply #'some (lambda (&rest args)
-                              (destructuring-bind ,pre-param-?vars args
-                                ,(translate body flag)))
-                     ,(if queries
-                        `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                        `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))
-          (eff
-            ;; Assertion semantics - execute body for suitable instantiations
-            `(apply #'some (lambda (&rest args)
-                             (destructuring-bind ,pre-param-?vars args
-                                 ,(let ((*within-quantifier* t))
-                               (translate body 'eff))))
-                           ,(if queries
-                              `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                              `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))))))))
-
-
 (defun translate-universal (form flag)
   "Universal translation with translation-time quantifier context."
   (check-form-body form)
@@ -339,30 +305,6 @@
                  t)))))))
 
 
-#+ignore (defun translate-universal (form flag)
-  "Universal translation with translation-time quantifier context."
-  (check-form-body form)
-  (let ((parameters (second form))
-        (body (third form)))
-    (check-precondition-parameters parameters)
-    (unless (member (first parameters) *parameter-headers*)
-      (push 'standard parameters))
-    (when (eql flag 'eff)
-      (warn "Found FORALL statement in effect; DOALL is often intended: ~A" form))
-    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
-            ;(state-ref (get-state-reference flag)))
-        ;; Translation-time binding affects the translate call below
-        (let ((*within-quantifier* t))
-          `(apply #'every (lambda (&rest args)
-                           (destructuring-bind ,pre-param-?vars args
-                             ,(translate body flag)))  ; Called with *within-quantifier* = t
-                  ,(if queries
-                     `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
-                     `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))))))
-
-
 (defun translate-doall (form flag)
   "DOALL translation with translation-time quantifier context."
   (check-form-body form)
@@ -385,30 +327,6 @@
                                 (destructuring-bind ,pre-param-?vars args
                                   ,(translate body flag)))
                         collection)))
-             t))))))
-
-
-#+ignore (defun translate-doall (form flag)
-  "DOALL translation with translation-time quantifier context."
-  (check-form-body form)
-  (let ((parameters (second form))
-        (body (third form)))
-    (check-precondition-parameters parameters)
-    (unless (member (first parameters) *parameter-headers*)
-      (push 'standard parameters))
-    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
-            ;(state-ref (get-state-reference flag)))
-        ;; Translation-time binding affects the translate call below
-        (let ((*within-quantifier* t))
-          `(progn
-             (apply #'mapc (lambda (&rest args)
-                            (destructuring-bind ,pre-param-?vars args
-                              ,(translate body flag)))  ; Called with *within-quantifier* = t
-                    ,(if queries
-                       `(ut::transpose (eval-instantiated-spec ',type-inst state))  ;,state-ref))
-                       `(ut::transpose (quote ,(eval-instantiated-spec type-inst)))))
              t))))))
 
 
@@ -586,11 +504,48 @@
                                             (collect (translate statement flag))))))))
 
 
-;(defun translate-cond (form flag)
-;  "Translates a cond statement."
-;  `(cond ,@(iter (for clause in cddr form))
-;             (collect `(,(first clause) ,@(iter (for statement in (rest clause))
-;                                            (collect (translate statement flag)))))))
+(defun translate-cond (form flag)
+  "Translates a cond statement by converting to nested if statements.
+   Each cond clause (test result1 result2 ...) becomes an if branch.
+   Leverages translate-conditional for all semantic complexity.
+   Structure: (cond (test1 result1...) (test2 result2...) ...)
+   Translation strategy:
+   - Recursively converts clauses to nested if statements from back to front
+   - Multiple result forms wrapped in do (translates to progn)
+   - Bare test clauses return test value if true (standard CL semantics)
+   - Final else defaults to nil
+   - Delegates all context handling to translate-conditional"
+  ;; Validate structure
+  (unless (and (consp form) (eq (car form) 'cond))
+    (error "Invalid cond form: ~A" form))
+  (unless (cdr form)
+    (error "COND requires at least one clause: ~A" form))
+  ;; Convert to nested ifs recursively
+  (labels ((convert-clauses (clauses)
+             (if (null clauses)
+                 nil  ; No more clauses - return nil as default else
+                 (let* ((clause (car clauses))
+                        (test (car clause))
+                        (results (cdr clause)))
+                   ;; Validate clause structure
+                   (unless (consp clause)
+                     (error "Invalid cond clause (must be list): ~A" clause))
+                   ;; Build then-form based on number of result forms
+                   (let ((then-form (cond
+                                      ;; No result forms - use test value (CL semantics)
+                                      ((null results) test)
+                                      ;; Single result form - use as-is
+                                      ((null (cdr results)) (car results))
+                                      ;; Multiple result forms - wrap in do
+                                      (t `(do ,@results))))
+                         (else-form (convert-clauses (cdr clauses))))
+                     ;; Build if statement with or without else clause
+                     (if else-form
+                         `(if ,test ,then-form ,else-form)
+                         `(if ,test ,then-form)))))))
+    ;; Generate nested if structure and translate
+    (let ((if-form (convert-clauses (cdr form))))
+      (translate-conditional if-form flag))))
 
 
 (defun translate-print (form flag)
@@ -640,6 +595,7 @@
         ((eql (car form) 'setq) (translate-setq form flag))
         ((eql (car form) 'let) (translate-let form flag))
         ((eql (car form) 'case) (translate-case form flag))
+        ((eql (car form) 'cond) (translate-cond form flag))
         ((member (car form) '(mvsetq multiple-value-setq)) (translate-mvsetq form flag))
         ((eql (car form) 'declare) form)
         ((eql (car form) 'print) (translate-print form flag))
@@ -660,7 +616,7 @@
               (not (fboundp (car form)))
               (not (macro-function (car form)))
               (not (special-operator-p (car form))))
-         (format t "~%Note: The use of ~A as a local variable in ~A is acceptable.~%~
-                 But if this is a query or update function, ensure it's defined before it's used."
+         (format t "~2%Note: If ~A is a query or update function, it must be defined before it's used.~%~
+                   (However, it's acceptable as is, if it's a local variable.)~2%"
                 (car form) form))
         (t form)))

@@ -212,7 +212,6 @@ any such settings appearing in the problem specification file.
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (uiop:delete-file-if-exists *globals-file*)
   (with-silenced-compilation
     (load-problem (string *problem-name*))))
   
