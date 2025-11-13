@@ -69,10 +69,26 @@
 		                     (:file "ww-set")
                              (:file "ww-command-tests")
 		                     (always-compile-file "problem"
-                                      :around-compile (lambda (thunk) 
-                                                        ;asdf sometimes doesn't recompile ww-preliminaries
-                                                        (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t) 
-                                                        (funcall thunk)))
+                               :around-compile (lambda (thunk)
+                                                 (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t)
+                                                 ;; Pre-scan problem.lisp before compilation
+                                                 (let ((query-names (find-symbol "*QUERY-NAMES*" "WOULDWORK"))
+                                                       (update-names (find-symbol "*UPDATE-NAMES*" "WOULDWORK"))
+                                                       (problem-path (asdf:system-relative-pathname :wouldwork "src/problem.lisp"))
+                                                       (*package* (find-package "WOULDWORK")))
+                                                   (with-open-file (stream problem-path :direction :input)
+                                                     (loop for form = (read stream nil nil)
+                                                           while form
+                                                           do (when (and (consp form)
+                                                                         (symbolp (car form))
+                                                                         (member (symbol-name (car form)) 
+                                                                                 '("DEFINE-QUERY" "DEFINE-UPDATE")
+                                                                                 :test #'string=))
+                                                                (let ((fn-name (second form))
+                                                                      (is-query (string= (symbol-name (car form)) "DEFINE-QUERY")))
+                                                                  (push fn-name
+                                                                        (symbol-value (if is-query query-names update-names))))))))
+                                                 (funcall thunk)))
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
                              (:file "ww-backtracker")

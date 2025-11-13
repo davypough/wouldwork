@@ -616,7 +616,7 @@
               (not (fboundp (car form)))
               (not (macro-function (car form)))
               (not (special-operator-p (car form))))
-         (format t "~2%Note: If ~A is a query or update function, it must be defined before it's used.~%~
-                   (However, it's acceptable as is, if it's a local variable.)~2%"
+         (format t "~2%Note: If ~A references a query or update function, it is undefined (typo?).~%~
+                   (However, if it's a local variable, it's acceptable as is.)~2%"
                 (car form) form))
         (t form)))
