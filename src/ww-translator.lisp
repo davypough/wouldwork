@@ -611,12 +611,11 @@
         ((and (listp form)
               (symbolp (car form))
               (not ($varp (car form)))
-              (not (?varp (car form)))
               (not (cl-symbol-p (car form)))
               (not (fboundp (car form)))
               (not (macro-function (car form)))
               (not (special-operator-p (car form))))
-         (format t "~2%Note: If ~A references a query or update function, it is undefined (typo?).~%~
-                   (However, if it's a local variable, it's acceptable as is.)~2%"
+         (error "~2%If ~A is a query or update function, it is unrecognized as such (typo?).~%~
+                 If it is a local variable, prefix it with $.)~2%"
                 (car form) form))
         (t form)))

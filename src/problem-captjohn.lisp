@@ -70,29 +70,6 @@
           (remaining ?obj (remove ?assigned-coord $initial-coords :test #'equal))))))
 
 
-#+ignore (define-update update-new-assignments (&rest ?objects&?coords)
-  ;; Single comprehensive update: all changes computed from initial state
-  (doall (?obj object)
-    (do (bind (remaining ?obj $initial-coords))
-        ;; Determine what this object's new remaining coordinates should be
-        (let ((?assigned-coord nil)
-              (?all-assigned-coords '()))
-          ;; Collect all coordinates being assigned in this action
-          (ww-loop for (?assigned-obj ?coord) on ?objects&?coords by #'cddr
-                   do (push ?coord ?all-assigned-coords)
-                      (if (eql ?obj ?assigned-obj)
-                        (setf ?assigned-coord ?coord)))
-          ;; Apply appropriate update based on whether this object is being assigned
-          (if ?assigned-coord
-            ;; Object is being assigned: set to single coordinate (only if not already singleton)
-            (if (not (alexandria:length= 1 $initial-coords))
-              (remaining ?obj (list ?assigned-coord)))
-            ;; Object not being assigned: remove all assigned coordinates from its current list
-            (remaining ?obj (remove-if (lambda (?coord)
-                                        (member ?coord ?all-assigned-coords :test #'equal))
-                                      $initial-coords)))))))
-
-
 ; Make one rule for each object assignment with constraints
 ; Later actions can depend on prior assignments
 
@@ -163,12 +140,12 @@
      ?guard2-coord (get-remaining guard2) ?grass2-coord (get-remaining grass2))
   (and (or (vert-next-to ?guard1-coord ?grass1-coord)
            (vert-next-to ?guard1-coord ?grass2-coord)
-           (ww-loop for ?possible-grass3-coord in (get-remaining grass3)
-                    thereis (vert-next-to ?guard1-coord ?possible-grass3-coord)))
+           (ww-loop for $possible-grass3-coord in (get-remaining grass3)
+                    thereis (vert-next-to ?guard1-coord $possible-grass3-coord)))
        (or (vert-next-to ?guard2-coord ?grass1-coord)
            (vert-next-to ?guard2-coord ?grass2-coord)
-           (ww-loop for ?possible-grass3-coord in (get-remaining grass3)
-                    thereis (vert-next-to ?guard2-coord ?possible-grass3-coord))))
+           (ww-loop for $possible-grass3-coord in (get-remaining grass3)
+                    thereis (vert-next-to ?guard2-coord $possible-grass3-coord))))
   (?grass1-coord)
   (assert (make-assignment grass1 ?grass1-coord)))
 
@@ -194,15 +171,15 @@
   1
   (?crew1-coord (get-remaining crew1) ?grass1-coord (get-remaining grass1)
      ?grass2-coord (get-remaining grass2) ?grass3-coord (get-remaining grass3))
-  (and (or (ww-loop for ?possible-crew2-coord in (get-remaining crew2)
+  (and (or (ww-loop for $possible-crew2-coord in (get-remaining crew2)
                     thereis (and (diag-next-to ?grass1-coord ?crew1-coord)
-                                 (diag-next-to ?grass1-coord ?possible-crew2-coord)))
-           (ww-loop for ?possible-crew2-coord in (get-remaining crew2)
+                                 (diag-next-to ?grass1-coord $possible-crew2-coord)))
+           (ww-loop for $possible-crew2-coord in (get-remaining crew2)
                     thereis (and (diag-next-to ?grass2-coord ?crew1-coord)
-                                 (diag-next-to ?grass2-coord ?possible-crew2-coord)))
-           (ww-loop for ?possible-crew2-coord in (get-remaining crew2)
+                                 (diag-next-to ?grass2-coord $possible-crew2-coord)))
+           (ww-loop for $possible-crew2-coord in (get-remaining crew2)
                     thereis (and (diag-next-to ?grass3-coord ?crew1-coord)
-                                 (diag-next-to ?grass3-coord ?possible-crew2-coord)))))
+                                 (diag-next-to ?grass3-coord $possible-crew2-coord)))))
   (?crew1-coord)
   (assert (make-assignment crew1 ?crew1-coord)))
 

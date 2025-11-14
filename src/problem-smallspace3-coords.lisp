@@ -93,6 +93,17 @@
     (t (values nil nil))))
 
 
+(define-query beam-reaches-target (?source ?target)
+  ;; Returns t if a beam from ?source to ?target reaches ?target's coordinates
+  (do (mvsetq ($target-x $target-y) (get-coordinates ?target))
+      (exists (?b (get-current-beams))
+        (and (bind (beam-segment ?b $src $tgt $occluder $end-x $end-y))
+             (eql $src ?source)
+             (eql $tgt ?target)
+             (= $end-x $target-x)
+             (= $end-y $target-y)))))
+
+
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
       (and (bind (los1 ?area $zone ?fixture))  ;$zone is a gate or area with possible object
@@ -123,30 +134,6 @@
 (define-query vacant (?area)
   (not (exists (?cargo cargo)
          (loc ?cargo ?area))))
-
-
-(define-query connector-has-valid-line-of-sight (?connector ?hue)
-  (or 
-    ;; Check direct transmitter connection with current line-of-sight
-    (exists (?t transmitter)
-       (and (paired ?connector ?t)
-            (bind (chroma ?t $t-hue))
-            (eql $t-hue ?hue)
-            (bind (loc ?connector $c-area))
-            (los $c-area ?t)))
-    ;; Check if connected to another active connector that has line-of-sight to transmitter
-    (exists (?other-connector connector)
-       (and (different ?other-connector ?connector)
-            (paired ?connector ?other-connector)
-            (bind (color ?other-connector $other-hue))
-            (eql $other-hue ?hue)
-            ;; Verify the other connector has direct transmitter access
-            (exists (?t transmitter)
-              (and (paired ?other-connector ?t)
-                   (bind (chroma ?t $t2-hue))
-                   (eql $t2-hue ?hue)
-                   (bind (loc ?other-connector $other-area))
-                   (los $other-area ?t)))))))
 
 
 (define-query resolve-consensus-hue (?hue-list)
@@ -187,7 +174,6 @@
                   (values $t $int-x $int-y))
               ;; No valid intersection within (epsilon-trimmed) interiors
               (values nil nil nil))))))
-
 
 
 (define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
@@ -347,6 +333,21 @@
            (eql $source-hue $required-hue)))))
 
 
+(define-query connector-has-beam-power (?connector ?hue)
+  ;; Returns t if a beam with matching hue reaches the connector at its current coordinates
+  (do
+    (mvsetq ($c-x $c-y) (get-coordinates ?connector))
+    (exists (?b (get-current-beams))
+      (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+           (eql $target ?connector)  ; Beam must target this connector
+           (= $end-x $c-x)            ; Beam must reach connector coordinates
+           (= $end-y $c-y)
+           ;; Verify source has matching hue
+           (or (bind (chroma $source $source-hue))
+               (bind (color $source $source-hue)))
+           (eql $source-hue ?hue)))))
+
+
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
@@ -355,6 +356,58 @@
       (doall (?g gate)
         (if (controls ?receiver ?g)
           (not (open ?g))))))
+
+
+(define-update activate-reachable-connectors! ()
+  ;; Returns t if any connector was activated, nil otherwise
+  (do
+    (setq $activated-any nil)
+    (doall (?c connector)
+      (if (not (bind (color ?c $existing-hue)))
+        (do
+          ;; Path 1: Check transmitter connections
+          (doall (?t transmitter)
+            (if (and (paired ?c ?t)
+                     (bind (chroma ?t $t-hue)))
+              (do
+                ;; Ensure beam exists with current state
+                (create-beam-segment-p! ?t ?c)
+                ;; Verify beam reaches connector coordinates
+                (if (beam-reaches-target ?t ?c)
+                  (do (chain-activate! ?c $t-hue)
+                      (setq $activated-any t))))))
+          ;; Path 2: Check active connector connections
+          (doall (?other-c connector)
+            (if (and (different ?other-c ?c)
+                     (paired ?c ?other-c)
+                     (bind (color ?other-c $other-hue)))
+              (do
+                ;; Beam should already exist from other-c's chain-activate!
+                ;; Verify beam reaches connector coordinates
+                (if (beam-reaches-target ?other-c ?c)
+                  (do (chain-activate! ?c $other-hue)
+                      (setq $activated-any t)))))))))
+    $activated-any))
+
+
+(define-update deactivate-unreachable-connectors! ()
+  ;; Returns t if any connector was deactivated, nil otherwise
+  (do
+    (setq $deactivated-any nil)
+    (doall (?c connector)
+      (if (bind (color ?c $c-hue))
+        ;; Connector is currently active - verify it still has power
+        (if (not (connector-has-beam-power ?c $c-hue))
+          ;; Lost power - deactivate and remove emitted beams
+          (do
+            (not (color ?c $c-hue))
+            ;; Remove all beams emitted by this connector
+            (doall (?b (get-current-beams))
+              (do (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
+                  (if (eql $source ?c)
+                    (remove-beam-segment-p! ?b))))
+            (setq $deactivated-any t)))))
+    $deactivated-any))
 
 
 (define-update recalculate-all-beams! ()
@@ -434,14 +487,20 @@
       ;; All decisions this iteration use this consistent beam state
       (recalculate-all-beams!)
       (update-beams-if-interference!)
-      ;; Step 1: Deactivate receivers that lost power
+      ;; DEACTIVATION PHASE
+      ;; Step 1a: Deactivate receivers that lost power
       (doall (?r receiver)
         (if (and (active ?r)
                  (not (receiver-beam-reaches ?r)))
           (do (deactivate-receiver! ?r)
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
-      ;; Step 2: Activate receivers that gained power
+      ;; Step 1b: Deactivate connectors that lost power
+      (if (deactivate-unreachable-connectors!)
+        (do (setq $iteration-had-changes t)
+            (setq $any-changes t)))
+      ;; ACTIVATION PHASE
+      ;; Step 2a: Activate receivers that gained power
       (doall (?r receiver)
         (if (and (not (active ?r))
                  (receiver-beam-reaches ?r))
@@ -451,6 +510,10 @@
                   (open ?g)))
               (setq $iteration-had-changes t)
               (setq $any-changes t))))
+      ;; Step 2b: Activate connectors that gained access
+      (if (activate-reachable-connectors!)
+        (do (setq $iteration-had-changes t)
+            (setq $any-changes t)))
       ;; Step 3: Check if system stabilized
       (if (not $iteration-had-changes)
         (setq $continue nil))
@@ -483,25 +546,36 @@
   (do
     ;; Step 1: Activate the connector itself
     (color ?connector ?hue)
-    ;; Step 2: Check paired receivers - delegates all receiver processing
+    ;; Step 2: Activate any paired receivers
     (check-receiver-activation! ?connector ?hue)
     ;; Step 3: Propagate to paired connectors
     (doall (?c connector)
       (if (and (different ?c ?connector)
                (paired ?connector ?c))
-        ;; Always create beam to paired connector (physical light path)
-        (do (create-beam-segment-p! ?connector ?c)
-            ;; Only chain activate if not already powered
-            (if (not (bind (color ?c $hue)))
-              ;; Check if beam reaches before activating
-              (if (exists (?b (get-current-beams))
-                    (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
-                         (eql $source ?connector)
-                         (eql $target ?c)
-                         (mvsetq ($target-x $target-y) (get-coordinates ?c))
-                         (= $end-x $target-x)
-                         (= $end-y $target-y)))
+        ;; Create new beam if target connector is inactive
+        (if (not (bind (color ?c $hue)))
+          ;; Create beam to inactive paired connector
+          (do (create-beam-segment-p! ?connector ?c)
+              ;; Check if beam reaches ?c before activating
+              (if (beam-reaches-target ?connector ?c)
                 (chain-activate! ?c ?hue))))))))
+
+
+(define-update propagate-gate-effects! (?receiver ?hue)
+  (do
+    ;; Step 1: Open gates controlled by this receiver
+    (doall (?g gate)
+      (if (controls ?receiver ?g)
+        (open ?g)))
+    ;; Step 2: Check for connectors that gained transmitter access
+    (doall (?c connector)
+      (if (not (bind (color ?c $existing-hue)))
+        (doall (?t transmitter)
+          (if (and (paired ?c ?t)
+                   (bind (chroma ?t $t-hue))
+                   (eql $t-hue ?hue)
+                   (create-beam-segment-p! ?t ?c))
+            (chain-activate! ?c ?hue)))))))
 
 
 (define-update check-receiver-activation! (?connector ?hue)
@@ -514,26 +588,11 @@
         (if (not (active ?r))
           (if (and (bind (chroma ?r $rhue))
                    (eql $rhue ?hue)
-                   (exists (?b (get-current-beams))
-                     (and (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
-                          (eql $source ?connector)
-                          (eql $target ?r)
-                          (mvsetq ($target-x $target-y) (get-coordinates ?r))
-                          (= $end-x $target-x)
-                          (= $end-y $target-y))))
-            ;; Activate this receiver and handle gate-opening consequences
+                   (beam-reaches-target ?connector ?r))
+            ;; Activate receiver then handle cascading effects ***
             (do
               (active ?r)
-              (converge-receiver-states!)
-              ;; Check for newly accessible connectors due to gate opening
-              (doall (?c connector)
-                (if (not (bind (color ?c $hue)))
-                  (doall (?t transmitter)
-                    (if (and (paired ?c ?t)
-                             (bind (chroma ?t $t-hue))
-                             (eql $t-hue ?hue)
-                             (create-beam-segment-p! ?t ?c))
-                      (chain-activate! ?c ?hue))))))))))))
+              (propagate-gate-effects! ?r ?hue))))))))
 
 
 (define-update remove-beam-segment-p! (?beam)
@@ -554,23 +613,7 @@
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $source $target $occluder $end-x $end-y))
           (if (eql $source ?connector)
-            (remove-beam-segment-p! ?b))))
-    ;; Deactivate receivers that lost power
-    (doall (?r receiver)
-      (if (and (paired ?connector ?r)
-               (not (exists (?c connector)
-                      (and (different ?c ?connector)
-                           (paired ?c ?r)
-                           (bind (color ?c $c-hue))
-                           (eql $c-hue ?hue)))))
-        (deactivate-receiver! ?r)))
-    ;; Connector revalidation
-    (doall (?c connector)
-      (if (and (bind (color ?c $c-hue))
-               (eql $c-hue ?hue))
-        ;; Check if this connector still has valid line-of-sight to power sources
-        (if (not (connector-has-valid-line-of-sight ?c ?hue))
-          (chain-deactivate! ?c ?hue))))))
+            (remove-beam-segment-p! ?b))))))
 
 
 (define-update update-beams-if-occluded! (?area)

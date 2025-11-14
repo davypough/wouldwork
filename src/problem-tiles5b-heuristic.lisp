@@ -711,9 +711,9 @@
   ()
   (setq $ht (make-hash-table :test #'equal))
   ()
-  (assert (ww-loop for row from 2 to 5 do  ;board coordinates
-            (ww-loop for col from 2 to 4 do
-              (setf (gethash (cons row col) $ht) t)))
+  (assert (ww-loop for $row from 2 to 5 do  ;board coordinates
+            (ww-loop for $col from 2 to 4 do
+              (setf (gethash (cons $row $col) $ht) t)))
           (emptys $ht)))
 
 
