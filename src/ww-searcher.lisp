@@ -244,11 +244,15 @@
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
     (print-search-progress)  ;#nodes expanded so far
-    (after-each #+:ww-debug (when (>= *debug* 5)
+    (after-each ;; Probe facility - always available regardless of debug compilation
+                (when (= *debug* 6)
+                  (setf *debug* 0)
+                  (format t "~2%Probing current node: ~A~2%" current-node)
+                  (simple-break))  ; Reset for next probe
+                ;; Full debug output - only when :ww-debug compiled in
+                #+:ww-debug (when (= *debug* 5)
                               (format t "~%---~%Restating current node for easy reference: ~A~%---~%" current-node)
-                              (simple-break)  ;simplifies debugger printout
-                              (when (= *debug* 6)
-                                (setf *debug* 0))))))  ;allows continuing search for next *probe*
+                              (simple-break)))))  ;allows continuing search for next *probe*
 
 
 (defun df-bnb1 (open)
