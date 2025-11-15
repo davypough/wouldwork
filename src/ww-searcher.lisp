@@ -248,6 +248,10 @@
                 (when (= *debug* 6)
                   (setf *debug* 0)
                   (format t "~2%Probing current node: ~A~2%" current-node)
+                  (format t "~%Successor nodes (~D):~%" (length succ-nodes))
+                  (when succ-nodes
+                    (dolist (succ-node succ-nodes)
+                      (format t "~%  ~A~%" succ-node)))
                   (simple-break))  ; Reset for next probe
                 ;; Full debug output - only when :ww-debug compiled in
                 #+:ww-debug (when (= *debug* 5)

@@ -60,12 +60,13 @@
   (accessible0 area area)
   (accessible1 area gate area))
 
+
 ;;;; QUERY FUNCTIONS ;;;;
 
 
 (define-query get-current-beams ()
   (do (bind (current-beams $beams))
-      $beams))
+      (remove nil $beams)))  ; Filter out placeholders
 
 
 (define-query get-hue-if-source (?terminus)
@@ -596,11 +597,10 @@
 
 
 (define-update remove-beam-segment-p! (?beam)
-  ;; bind and remove beam-segment; if it doesn't exist, return nil
   (if (bind (beam-segment ?beam $source $target $occluder $end-x $end-y))
     (do (not (beam-segment ?beam $source $target $occluder $end-x $end-y))
         (bind (current-beams $beams))
-        (current-beams (remove ?beam $beams))
+        (current-beams (substitute nil ?beam $beams))
         t)
     nil))
 
