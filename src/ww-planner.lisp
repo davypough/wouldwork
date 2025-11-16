@@ -122,6 +122,8 @@
             #+:ww-debug (when (>= *debug* 5)
                           (terpri))
             (next-iteration))
+          #+:ww-debug (when (and *trace-action-name* (eq name *trace-action-name*))
+                        (handle-trace-interception state action pre-results precondition-variables))
           (setf updated-dbs
             (mapcan (lambda (pre-result)
                       (if (eql pre-result t)
