@@ -178,6 +178,14 @@
                                       :rehash-threshold 0.8
                                       :synchronized parallelp))))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
+  ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
+  (when (eql *tree-or-graph* 'graph)
+    (ensure-idb-hash *start-state*)
+    (setf (gethash (problem-state.idb-hash *start-state*) *closed*)
+      (list (problem-state.idb *start-state*)
+            0
+            (problem-state.time *start-state*)
+            (problem-state.value *start-state*))))
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
   (setf *total-states-processed* 1)  ;start state is first
@@ -198,8 +206,7 @@
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
   (setf *inconsistent-states-dropped* 0)
-  ;(clrhash *proposition-cache*)
-  ;(setf *last-object-index* 0)
+  (clrhash *prop-key-cache*)
   (if (> *threads* 0)
     ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
     (if (eql *algorithm* 'backtracking)
@@ -277,14 +284,7 @@
       (return-from df-bnb1 nil))
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
-    (when (eql *tree-or-graph* 'graph)
-      (let ((current-state (node.state current-node)))
-        (ensure-idb-hash current-state)
-        (setf (gethash (problem-state.idb-hash current-state) *closed*)
-          (list (problem-state.idb current-state)      ; store idb for collision detection
-                (node.depth current-node)
-                (problem-state.time current-state)
-                (problem-state.value current-state)))))
+    ;; States are now reserved in *closed* when added to open in process-successors
     (let ((succ-states (expand current-node)))  ;from generate-children
       (when *troubleshoot-current-node*
         (setf *debug* 5)
@@ -329,21 +329,29 @@
             (when open-node
               (narrate "State already on open" succ-state succ-depth)
               (increment-global *repeated-states*)
-             (if (update-open-if-succ-better open-node succ-state)
-               (setf (node.parent open-node) current-node)  ;succ is better
-               (finalize-path-depth succ-depth))  ;succ is not better
-             (next-iteration)))  ;drop this succ
-          (let ((closed-values (get-closed-values succ-state)))
-            (when closed-values
-              (increment-global *repeated-states*)
-              (if (better-than-closed closed-values succ-state succ-depth)
-                (progn             ; succ has better value
-                  (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                  (remhash (problem-state.idb-hash succ-state) *closed*))
-                (progn 
-                  (narrate "Dropping this previously closed state" succ-state succ-depth)
-                  (finalize-path-depth succ-depth) 
-                  (next-iteration))))))  ;drop this succ
+              (if (update-open-if-succ-better open-node succ-state)
+                (setf (node.parent open-node) current-node)  ;succ is better
+                (finalize-path-depth succ-depth))  ;succ is not better
+                (next-iteration)))  ;drop this succ
+          (with-search-structures-lock                               ; Begin atomic section
+            (let ((closed-values (get-closed-values succ-state)))
+              (when closed-values
+                (increment-global *repeated-states*)
+                (if (better-than-closed closed-values succ-state succ-depth)
+                  (progn             ; succ has better value
+                    (narrate "Returning this previously closed state to open" succ-state succ-depth)
+                    (remhash (problem-state.idb-hash succ-state) *closed*))
+                  (progn 
+                    (narrate "Dropping this previously closed state" succ-state succ-depth)
+                    (finalize-path-depth succ-depth) 
+                    (next-iteration)))))  ;drop this succ
+            ;; State is new or reopened - reserve it immediately (atomic with check above)
+            (ensure-idb-hash succ-state)
+            (setf (gethash (problem-state.idb-hash succ-state) *closed*)
+                  (list (problem-state.idb succ-state)
+                        succ-depth
+                        (problem-state.time succ-state)
+                        (problem-state.value succ-state)))))
         (collecting (generate-new-node current-node succ-state))))  ;live successors
 
 

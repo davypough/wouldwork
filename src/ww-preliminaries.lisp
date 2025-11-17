@@ -88,10 +88,7 @@
 (defmacro define-global (var-name val-form &optional doc-string)
   `(progn
      ,(if (> *threads* 0)
-          ;; Ensure the global exists, then ALWAYS reset it at load-time.
-          `(progn
-             (sb-ext:defglobal ,var-name (ignore-errors ,var-name) ,doc-string)
-             (setf ,var-name ,val-form))
+          `(sb-ext:defglobal ,var-name ,val-form ,doc-string)
           `(defparameter ,var-name ,val-form ,doc-string))))
 
 
@@ -134,8 +131,78 @@
 
 
 ;Reset certain user defined symbols, when defined on previous load.
-(reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function?
-                   *actions* *query-names* *update-names*))
+(eval-when (:load-toplevel :execute)
+  (reset-user-syms '(goal-fn constraint-fn heuristic? prune? bounding-function?)))
+
+
+(defun reset-global-hash-tables ()
+  "Clear all global hash tables and reset global lists between problem loads.
+   Critical for parallel mode where sb-ext:defglobal prevents reinitialization.
+   In parallel mode (*threads* > 0), define-global uses sb-ext:defglobal which
+   only evaluates initialization forms ONCE. On subsequent ASDF reloads, the
+   variables remain bound to their previous values, causing state contamination
+   between sequential problem loads.
+   This function must execute at top-level in ww-preliminaries.lisp so it runs
+   on every system reload, before problem files populate the hash tables with
+   new data."
+  (when (> *threads* 0)  ; Only needed when using sb-ext:defglobal
+    ;; Hash tables for type system and object mappings
+    (when (boundp '*types*)
+      (clrhash *types*))
+    (when (boundp '*constant-integers*)
+      (clrhash *constant-integers*))
+    (when (boundp '*integer-constants*)
+      (clrhash *integer-constants*))
+    ;; Hash tables for relations
+    (when (boundp '*relations*)
+      (clrhash *relations*))
+    (when (boundp '*static-relations*)
+      (clrhash *static-relations*))
+    (when (boundp '*symmetrics*)
+      (clrhash *symmetrics*))
+    (when (boundp '*complements*)
+      (clrhash *complements*))
+    (when (boundp '*fluent-relation-indices*)
+      (clrhash *fluent-relation-indices*))
+    ;; Hash tables for databases
+    (when (boundp '*db*)
+      (clrhash *db*))
+    (when (boundp '*hdb*)
+      (clrhash *hdb*))
+    (when (boundp '*idb*)
+      (clrhash *idb*))
+    (when (boundp '*hidb*)
+      (clrhash *hidb*))
+    (when (boundp '*static-db*)
+      (clrhash *static-db*))
+    (when (boundp '*static-idb*)
+      (clrhash *static-idb*))
+    (when (boundp '*hap-db*)
+      (clrhash *hap-db*))
+    (when (boundp '*hap-idb*)
+      (clrhash *hap-idb*))
+    ;; Cache for proposition key conversions
+    (when (boundp '*prop-key-cache*)
+      (clrhash *prop-key-cache*))
+    ;; Reset lists that accumulate problem definitions
+    (when (boundp '*query-names*)
+      (setf *query-names* nil))
+    (when (boundp '*update-names*)
+      (setf *update-names* nil))
+    (when (boundp '*actions*)
+      (setf *actions* nil))
+    (when (boundp '*init-actions*)
+      (setf *init-actions* nil))
+    (when (boundp '*happening-names*)
+      (setf *happening-names* nil))
+    ;; Reset object index counter
+    (when (boundp '*last-object-index*)
+      (setf *last-object-index* 0))))
+
+
+;; Call at top-level so it executes on every ASDF reload
+(eval-when (:load-toplevel :execute)
+  (reset-global-hash-tables))
 
 
 (defun read-init-vals (vals-file)

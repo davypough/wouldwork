@@ -166,11 +166,29 @@
 
 
 (defun ninsert-list (new-element position lst)
-  "Destructively inserts new element in a list at given position <= length lst"
-  (if (zerop position)
-    (push new-element lst)
-    (push new-element (cdr (nthcdr (1- position) lst))))
-  lst)
+  "Destructively inserts new element in a list at given position.
+   For position 0, returns new list with element prepended.
+   For position > length, extends list with NILs then inserts."
+  (cond
+    ;; Position 0: Can't destructively modify head, return new list
+    ((zerop position)
+     (cons new-element lst))
+    ;; Normal case: Insert at position > 0
+    (t
+     ;; Extend list if too short
+     (let ((current-length (length lst)))
+       (when (< current-length position)
+         ;; Find last cons cell
+         (let ((tail (last lst)))
+           ;; Extend with NIL elements up to position
+           (loop for i from current-length below position
+                 do (setf (cdr tail) (list nil))
+                    (setf tail (cdr tail))))))
+     ;; Now perform the insertion
+     (let ((target-cell (nthcdr (1- position) lst)))
+       (when target-cell  ; Safety check
+         (push new-element (cdr target-cell))))
+     lst)))
 
 
 (defun intersperse (element lst)

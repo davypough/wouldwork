@@ -50,7 +50,7 @@
   (loop with partial-prop = (convert-to-proposition key)
         for index in (get-prop-fluent-indices partial-prop)
         for val in vals
-          do (ut::ninsert-list val index partial-prop)
+          do (setf partial-prop (ut::ninsert-list val index partial-prop))
         finally (return partial-prop)))
 
 

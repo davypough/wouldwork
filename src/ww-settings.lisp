@@ -63,13 +63,13 @@
 (define-global *solution-count* 0
   "Holds the total number of solutions found following search.")
 
-(declaim (type fixnum *num-idle-threads*))
 (define-global *num-idle-threads* 0
   "Holds the number of currently idle threads (shared).")
+(declaim (type fixnum *num-idle-threads*))
 
-(declaim (type fixnum *total-states-processed*))
 (define-global *total-states-processed* 0
   "Count of states either newly generated, updated, or regenerated while searching (shared).")
+(declaim (type fixnum *total-states-processed*))
 
 (define-global *prior-total-states-processed* 0
   "Count of states produced since last progress printing (shared).")
@@ -80,25 +80,25 @@
 (define-global *best-states* nil
   "Holds the best states encountered during a graph search.")
 
-(declaim (type fixnum *repeated-states*))
 (define-global *repeated-states* 0
   "Count of the repeated states during a graph search.")
+(declaim (type fixnum *repeated-states*))
 
-(declaim (type fixnum *program-cycles*))
 (define-global *program-cycles* 0
  "Count of complete cycles of searching (shared).")
+(declaim (type fixnum *program-cycles*))
 
-(declaim (type fixnum *max-depth-explored*))
 (define-global *max-depth-explored* 0
   "Keeps track of the maximum depth reached so far during the search (shared).")
+(declaim (type fixnum *max-depth-explored*))
 
-(declaim (type fixnum *accumulated-depths*))
 (define-global *accumulated-depths* 0
   "Sums the final depths of all terminated paths so far.")
+(declaim (type fixnum *accumulated-depths*))
 
-(declaim (type fixnum *num-paths*))
 (define-global *num-paths* 0
   "Tracks the total number of paths explored so far.")
+(declaim (type fixnum *num-paths*))
 
 (define-global *num-init-successors* 0
   "The number of branches completed so far from the start state.")
@@ -253,11 +253,13 @@
 (define-global *global-invariants* nil
   "List of invariant query functions to check on every state.")
 
-(declaim (type fixnum *inconsistent-states-dropped*))
 (define-global *inconsistent-states-dropped* 0
   "Count of successor states dropped due to convergence failure.")
+(declaim (type fixnum *inconsistent-states-dropped*))
 
-(defparameter *prop-key-cache* (make-hash-table :test #'equal)
+(define-global *prop-key-cache* 
+  (make-hash-table :test #'equal 
+                   :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
 
 

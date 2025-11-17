@@ -303,7 +303,7 @@
                   (let ((previous-literal (copy-list fluentless-prop)))
                     (loop for index in (get-prop-fluent-indices literal)
                           for val in vals
-                          do (ut::ninsert-list val index previous-literal))
+                          do (setf previous-literal (ut::ninsert-list val index previous-literal)))
                     (values literal previous-literal))
                   ;; No previous value exists
                   (values literal (list 'not literal)))))

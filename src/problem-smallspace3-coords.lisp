@@ -26,7 +26,7 @@
   hue         (blue red)  ;the color of a transmitter, receiver, or connector
   area        (area1 area2 area3 area4 area5)
   cargo       (either connector)  ;what an agent can pickup & carry
-  beam        ()  ;the list of initial beams
+  beam        (beam1 beam2 beam3 beam4 beam5)  ;the list of initial beams
   source      (either transmitter connector)  ;beam source
   target      (either connector receiver)  ;beam target
   occluder    (either cargo agent gate)  ;objects that can occlude a beam
@@ -830,11 +830,22 @@
 
 (define-init
   ;dynamic
-  (loc agent1 area1)
+#|  (loc agent1 area1)
   (loc connector1 area1)
   (loc connector2 area2)
   (loc connector3 area3)
-  (current-beams ())
+  (current-beams ()) |#
+
+  (loc agent1 area3) (holds agent1 connector2)
+  (loc connector1 area1)
+  (beam-segment beam1 transmitter1 connector1 nil 18 10) (color connector1 blue)
+  (beam-segment beam2 connector1 receiver1 nil 13 15) (active receiver1) (open gate1)
+  (beam-segment beam3 connector1 receiver3 nil 36 12) (active receiver3) (open gate3)
+  (loc connector3 area3)
+  (beam-segment beam4 transmitter2 connector3 nil 17 18) (color connector3 red)
+  (beam-segment beam5 connector3 receiver2 nil 20 24) (active receiver2) (open gate2)
+  (current-beams (beam1 beam2 beam3 beam4 beam5))
+
   ;static
   (coords area1 18 10)
   (coords area2 1 16)
