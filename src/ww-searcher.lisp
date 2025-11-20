@@ -16,17 +16,6 @@
 (in-package :ww)
 
 
-#|
-(defun protect (fn &rest args)
-  "If multi-threading, protect a function with a lock."
-  (if (> *threads* 0)
-    (bt:with-lock-held (*lock*)
-      (apply fn args)
-      (finish-output))
-    (apply fn args)))
-|#
-
-
 (defmacro lprt (&rest vars)
   "Print some variable values in a thread for debugging."
   `(bt:with-lock-held (*lock*)  ;grab lock for uninterrupted printing
@@ -36,15 +25,6 @@
        (ut::prt thread-index)
        (ut::prt ,@vars)
        (finish-output))))  ;make sure printout is complete before continuing
-
-
-(defmacro with-search-structures-lock (&body body)
-  "Protects composite operations on *open* and *closed* search structures.
-   Threading mode determined at compile time for optimal performance."
-  (if (> *threads* 0)
-       `(bt:with-lock-held (*lock*)
-          ,@body)
-       `(progn ,@body)))
 
 
 (defun simple-break ()
@@ -75,7 +55,7 @@
 (declaim (hs::hstack *open*))
 
 
-(define-global *closed* (make-hash-table)  ;initialized in dfs
+(define-global *closed* (make-hash-table :synchronized (> *threads* 0))  ;initialized in dfs
   "Contains the set of closed state idbs for graph search, idb -> (depth time value).")
 
 
@@ -177,6 +157,8 @@
                                       :rehash-size 2.7
                                       :rehash-threshold 0.8
                                       :synchronized parallelp))))
+  (when (> *threads* 0)  ;; Ensure start state has synchronized IDB tables for parallel mode
+    (ensure-start-state-synchronized))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
   (when (eql *tree-or-graph* 'graph)
@@ -769,10 +751,11 @@
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solutions*)
-    (when (not (member (problem-state.idb (solution.goal solution)) *unique-solutions* 
-                       :key (lambda (soln) (problem-state.idb (solution.goal soln)))
-                       :test #'equalp))
-      (push-global solution *unique-solutions*))))
+    (with-search-structures-lock
+      (when (not (member (problem-state.idb (solution.goal solution)) *unique-solutions* 
+                         :key (lambda (soln) (problem-state.idb (solution.goal soln)))
+                         :test #'equalp))
+        (push-global solution *unique-solutions*)))))
 
 
 (defun printout-solution (soln)

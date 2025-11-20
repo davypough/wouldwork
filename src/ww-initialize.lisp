@@ -107,5 +107,26 @@
             Cannot begin planning from an oscillating state."
            10)))  ;; Or reference the max-iterations value
 
+
+(defun ensure-start-state-synchronized ()
+  "Converts start state's hash tables to synchronized versions for parallel mode.
+   Must be called after init-start-state and before search begins."
+  (when (> *threads* 0)
+    ;; Create new synchronized tables
+    (let ((new-idb (make-hash-table :test 'eql :synchronized t))
+          (new-hidb (make-hash-table :test 'eql :synchronized t)))
+      ;; Copy all entries with value deep-copying
+      (maphash (lambda (k v)
+                 (setf (gethash k new-idb)
+                       (if (consp v) (copy-list v) v)))
+               (problem-state.idb *start-state*))
+      (maphash (lambda (k v)
+                 (setf (gethash k new-hidb)
+                       (if (consp v) (copy-list v) v)))
+               (problem-state.hidb *start-state*))
+      ;; Replace with synchronized versions
+      (setf (problem-state.idb *start-state*) new-idb)
+      (setf (problem-state.hidb *start-state*) new-hidb))))
+
   
 (init)

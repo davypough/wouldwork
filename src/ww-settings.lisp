@@ -147,43 +147,43 @@
 (defvar *branch* -1  ;
   "If n>0, explore only the nth branch from the *start-state*.")
 
-(define-global *types* (make-hash-table :test #'eq)
+(define-global *types* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Table of all types.")
 
-(define-global *relations* (make-hash-table :test #'eq)
+(define-global *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
 
-(define-global *static-relations* (make-hash-table :test #'eq)
+(define-global *static-relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Static relations.")
 
 (define-global *connectives* '(and or not)
   "Logical connectives.")
 
-(define-global *symmetrics* (make-hash-table :test #'eq)
+(define-global *symmetrics* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Symmetric relations.")
 
-(define-global *complements* (make-hash-table :test #'eq)
+(define-global *complements* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Table of complement relations.")
 
 (define-global *fluent-relation-indices* (make-hash-table :test #'eq)
   "List of fluent argument indices for a relation.")
 
-(define-global *db* (make-hash-table :test #'equal)
+(define-global *db* (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Initial database of dynamic db relations.")
 
-(define-global *hdb* (make-hash-table :test #'equal)
+(define-global *hdb* (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Initial database of dynamic hdb relations.")
 
-(define-global *idb* (make-hash-table)
+(define-global *idb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of dynamic idb propositions.")
 
-(define-global *hidb* (make-hash-table)
+(define-global *hidb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of dynamic hidb propositions.")
 
-(define-global *constant-integers* (make-hash-table)
+(define-global *constant-integers* (make-hash-table :synchronized (> *threads* 0))
   "Integer codes for the problem's object constants.")
 
-(define-global *integer-constants* (make-hash-table)
+(define-global *integer-constants* (make-hash-table :synchronized (> *threads* 0))
   "Translating codes back to constants for printout.")
 
 (define-global *min-action-duration* 0.0
@@ -207,7 +207,7 @@
 (define-global *static-db* (make-hash-table :test #'equal)
   "Initial database of static propositions.")
 
-(define-global *static-idb* (make-hash-table)
+(define-global *static-idb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of static propositions.")
 
 (define-global *hap-db* (make-hash-table :test #'equal)
@@ -258,8 +258,7 @@
 (declaim (type fixnum *inconsistent-states-dropped*))
 
 (define-global *prop-key-cache* 
-  (make-hash-table :test #'equal 
-                   :synchronized (> *threads* 0))
+  (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
 
 

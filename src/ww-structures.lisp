@@ -115,19 +115,23 @@
     :time (problem-state.time state)
     :value (problem-state.value state)
     :heuristic (problem-state.heuristic state)
-    :idb (make-hash-table)        ; empty table instead of copy
+    :idb (make-hash-table :test 'eql :synchronized nil)
     :hidb (copy-idb (problem-state.hidb state))
     :idb-hash nil))  ; will be recomputed when alist is created
 
 
 (defun copy-idb (idb)
-  "Copies a Wouldwork database."
+  "Copies a Wouldwork database with thread-safe hash table in parallel mode."
   (declare (type hash-table idb))
-  (alexandria:copy-hash-table idb
-    :key (lambda (val)
-           (if (consp val)
-             (copy-list val)
-             val))))
+  (let ((new-idb (make-hash-table :test (hash-table-test idb)
+                                  :synchronized nil)))  ;not shared (> *threads* 0))))
+    (maphash (lambda (k v)
+               (setf (gethash k new-idb)
+                     (if (consp v)
+                         (copy-list v)
+                         v)))
+             idb)
+    new-idb))
 
 
 (defparameter *start-state* (make-problem-state)

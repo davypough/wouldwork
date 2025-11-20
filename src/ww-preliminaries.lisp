@@ -20,6 +20,14 @@
 
 (defmacro with-search-structures-lock (&body body)
   "Protects composite operations on *open* and *closed* search structures."
+  (if (> *threads* 0)
+      `(bt:with-lock-held (*search-lock*)
+         ,@body)
+      `(progn ,@body)))
+
+
+#+ignore (defmacro with-search-structures-lock (&body body)
+  "Protects composite operations on *open* and *closed* search structures."
   `(bt:with-lock-held (*lock*)
      ,@body))
 
@@ -28,7 +36,9 @@
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
 
 
-(defparameter *lock* (bt:make-lock))  ;for thread protection
+(defparameter *lock* (bt:make-lock))  ;for general thread protection
+(defparameter *search-lock*  (bt:make-lock "ww-search-lock"))
+(defparameter *integer-lock* (bt:make-lock "ww-integer-lock"))
 
 
 (defvar *debug* 0

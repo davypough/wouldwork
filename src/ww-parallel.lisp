@@ -6,6 +6,9 @@
 (in-package :ww)
 
 
+(defparameter *min-split-size* 7)
+
+
 (define-condition thread-error (error)  ;condition for signaling errors across threads
   ((original-error :initarg :original-error :reader original-error)))
 
@@ -74,7 +77,7 @@
                           (lprt 'interrupted))
             (increment-global *num-idle-threads*)
             (leave))
-          (when (and (> (hs::length-hstack open) 1)
+          (when (and (> (hs::length-hstack open) *min-split-size*)  ;1)
                      (> *num-idle-threads* 0))
             (let ((subopen (split-off open)))
               (when subopen
@@ -129,7 +132,8 @@
                                                    :synchronized (> *threads* 0))
                                   :keyfn (hs::hstack.keyfn open)))
         (bottom-node (hs::deletef-nth-hstack 0 open)))
-    (hs::push-hstack bottom-node subopen :new-only (eq *tree-or-graph* 'graph))))
+    (hs::push-hstack bottom-node subopen :new-only (eq *tree-or-graph* 'graph))
+    subopen))
 
 
 (defun ww-shutdown ()

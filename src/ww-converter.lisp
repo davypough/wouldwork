@@ -110,7 +110,7 @@
     (setf objects (delete-duplicates objects))
     (iter (for obj in objects)
           (when (or (listp obj) (vectorp obj))
-            (setf *constant-integers* (make-hash-table :test #'equal))  ;redefine if necessary
+            (setf *constant-integers* (make-hash-table :test #'equal :synchronized (> *threads* 0)))
             (leave)))
     (iter (for obj in objects)
           (for i from 100)
@@ -145,7 +145,7 @@
   ;; Register object in integer constants system
   ;; This enables convert-to-integer to process propositions containing this object
   (unless (gethash object *constant-integers*)
-    (bt:with-lock-held (*lock*)
+    (bt:with-lock-held (*integer-lock*)
       ;; Double-check pattern: object might have been added by another thread
       (unless (gethash object *constant-integers*)
         (when (>= *last-object-index* 999)
@@ -157,10 +157,9 @@
   ;; This makes the object discoverable via type-based iteration and queries
   (let* ((type-prop (list type-name object))
          (type-prop-int (convert-to-integer-memoized type-prop)))
-    (bt:with-lock-held (*lock*)
-      ;; Add to static database if not already present
-      (unless (gethash type-prop-int *static-idb*)
-        (setf (gethash type-prop-int *static-idb*) t))))
+    ;; Add to static database if not already present
+    (unless (gethash type-prop-int *static-idb*)
+      (setf (gethash type-prop-int *static-idb*) t)))
   ;; Return the registered object for convenient chaining
   object)
   
@@ -208,6 +207,29 @@
 
 
 (defun convert-to-integer (prop-key)
+  "Thread-safe original version with narrower locking.
+   Only the create-new-code path runs under the lock; summing happens outside."
+  (iter (for item in prop-key)
+        (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
+        ;; First try without any lock
+        (for code = (or (gethash item *constant-integers*)
+                        ;; Only lock if we didn't find a code
+                        (bt:with-lock-held (*integer-lock*)
+                          ;; Double-check pattern: item might have been added by another thread
+                          (or (gethash item *constant-integers*)
+                              (progn
+                                (when (>= *last-object-index* 999)
+                                  (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
+                                (incf *last-object-index*)
+                                (setf (gethash item *constant-integers*) *last-object-index*)
+                                (setf (gethash *last-object-index* *integer-constants*) item)
+                                *last-object-index*)))))
+        ;; Use the code outside the lock
+        (summing (* code multiplier))))
+
+
+
+#+ignore (defun convert-to-integer (prop-key)
   "Thread-safe original version"
   (iter (for item in prop-key)
         (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
