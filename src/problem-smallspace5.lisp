@@ -827,5 +827,5 @@
 ;;;; GOAL ;;;;
 
 (define-goal
-  (loc agent1 area3)
+  (and (loc agent1 area3) (holds agent1 connector2))
 )

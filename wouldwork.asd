@@ -90,6 +90,7 @@
                                                                         (symbol-value (if is-query query-names update-names))))))))
                                                  (funcall thunk)))
                              (:file "ww-action-trace")
+                             (:file "ww-goal-chaining")
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
                              (:file "ww-backtracker")

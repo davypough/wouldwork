@@ -21,14 +21,19 @@
 
 ;;;; Main Entry Point ;;;;
 
-(defun trace-action (action-name)
+(defmacro trace-action (action-name)
+  `(trace-action% ',action-name))
+
+
+(defun trace-action% (action-name)
   "Runs search until ACTION-NAME's precondition succeeds, then traces a unique instantiation.
    User can interrupt search at any time with Ctrl-C."
   (unless (find action-name *actions* :key #'action.name)
     (format t "~%ERROR: Action ~A not found in problem specification.~%" action-name)
-    (return-from trace-action nil))
-  (unless (> *debug* 0)
-    (format t "~%Please enable debugging with (ww-set *debug* 1) before analyzing actions.~%"))
+    (return-from trace-action% nil))
+  (unless (= *debug* 0.5)
+    (format t "~%Please enable debugging with (ww-set *debug* .5) before analyzing actions.~%")
+    (return-from trace-action% nil))
   
   ;; Initialize tracing state
   (setf *trace-action-name* action-name

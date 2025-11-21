@@ -212,7 +212,7 @@
     (*branch* (unless (typep val 'fixnum)
                 (error "Can't set *branch* to ~S. Must be an integer
                         where n < 1 means search all branches." val)))
-    (*debug* (unless (and (typep val 'fixnum) (>= val 0) (<= val 5))
+    (*debug* (unless (or (and (typep val 'fixnum) (>= val 0) (<= val 5)) (= val 0.5))
                 (error "Can't set *debug* to ~S. Must be an integer between 0 and 5." val)))
     (*probe* (unless (or (null val)
                          (and (listp val) (>= (length val) 3) (<= (length val) 4) (symbolp (first val))
