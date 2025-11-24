@@ -17,7 +17,8 @@
     nil              ; *randomize-search*
     -1               ; *branch*
     nil              ; *probe*
-    0)               ; *debug*
+    0                ; *debug*
+    nil)             ; *goal* 
   "Default parameter values in save/read order")
 
 
@@ -221,7 +222,7 @@ any such settings appearing in the problem specification file.
   (destructuring-bind 
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
         default-problem-type default-solution-type default-progress-reporting-interval 
-        default-randomize-search default-branch default-probe default-debug)
+        default-randomize-search default-branch default-probe default-debug default-goal)
       *default-parameters*
     (setf *problem-name* default-problem-name
           *depth-cutoff* default-depth-cutoff  
@@ -233,7 +234,8 @@ any such settings appearing in the problem specification file.
           *randomize-search* default-randomize-search
           *branch* default-branch
           *probe* default-probe
-          *debug* default-debug))
+          *debug* default-debug
+          *goal* default-goal))
   (setf *features* (remove :ww-debug *features*)))
 
 
@@ -241,7 +243,7 @@ any such settings appearing in the problem specification file.
   "Save the values of the globals in the vals.lisp file."
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
                       *solution-type* *progress-reporting-interval* *randomize-search* 
-                      *branch* *probe* *debug*)
+                      *branch* *probe* *debug* *goal*)
                 *globals-file*))
 
 
@@ -249,7 +251,7 @@ any such settings appearing in the problem specification file.
   "Read and setf values for global variables from vals.lisp file."
   (destructuring-bind 
        (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
-        progress-reporting-interval randomize-search branch probe debug)
+        progress-reporting-interval randomize-search branch probe debug goal)
       (read-from-file *globals-file* *default-parameters*)
       (setf *problem-name* problem-name
             *depth-cutoff* depth-cutoff
@@ -261,7 +263,8 @@ any such settings appearing in the problem specification file.
             *randomize-search* randomize-search
             *branch* branch
             *probe* probe
-            *debug* debug)))
+            *debug* debug
+            *goal* goal)))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;

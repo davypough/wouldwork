@@ -531,6 +531,7 @@
              (not (eql *solution-type* 'min-value))
              (not (eql *solution-type* 'max-value)))
     (error "Goal is required unless searching for a *solution-type* of min-value or max-value."))
+  (setf *goal* form)
   (let (($vars (get-all-nonspecial-vars #'$varp form)))
     (setf (symbol-value 'goal-fn)
       `(lambda (state)  ;save uncoded goal translation

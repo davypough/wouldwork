@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 26)
+(ww-set *depth-cutoff* 18)
 
 
 (define-types
@@ -68,7 +68,6 @@
   ;; Estimates distance to goal based on agent's area and gate status
   ;; Lower values indicate states closer to goal or with more open gates
   (do (bind (loc agent1 $area))
-      
       ;; Base distance: how many areas away from area5
       (setq $base-distance
         (cond ((eql $area 'area5) 0)    ; At goal
@@ -77,31 +76,25 @@
               ((eql $area 'area2) 3)    ; Three areas away
               ((eql $area 'area1) 4)    ; Four areas away
               (t 10)))                   ; Should not occur
-      
       ;; Penalty for closed gates on the path forward
       (setq $penalty 0)
-      
       ;; From area1, all gates ahead matter
       (if (or (eql $area 'area1) (eql $area 'area2) 
               (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate1))
           (setq $penalty (+ $penalty 0.5))))
-      
       ;; From area2 forward, gate2-4 matter
       (if (or (eql $area 'area2) (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate2))
           (setq $penalty (+ $penalty 0.5))))
-      
       ;; From area3 forward, gate3-4 matter
       (if (or (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate3))
           (setq $penalty (+ $penalty 0.5))))
-      
       ;; From area4, only gate4 matters
       (if (eql $area 'area4)
         (if (not (open gate4))
           (setq $penalty (+ $penalty 0.5))))
-      
       ;; Return total heuristic value
       (+ $base-distance $penalty)))
 
@@ -138,7 +131,6 @@
 (define-query get-coordinates (?object)
   ;; Finds coordinates for any arbitrary object
   (cond 
-    ;; Check 1: Areas and fixtures have direct coordinates
     ((or (area ?object) (fixture ?object))
      (bind (coords ?object $x $y))
      (values $x $y))
@@ -302,7 +294,6 @@
               (do (setq $closest-t $int-t)
                   (setq $result-x $int-x)
                   (setq $result-y $int-y))))))
-
     ;; Return closest intersection coordinates
     (values $result-x $result-y)))
 
@@ -311,7 +302,7 @@
   ; Use current endpoints (actual segments), not intended targets
   ; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y t1 t2) ...)
   (do 
-      ;; >>>>>> NEW: Phase 0 - Build coordinate cache for all beam sources
+      ;; Build coordinate cache for all beam sources
       (setq $coord-cache (make-hash-table :test 'eq))
       (doall (?b (get-current-beams))
         (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
@@ -319,27 +310,21 @@
             (if (not (gethash $src $coord-cache))
               (do (mvsetq ($x $y) (get-coordinates $src))
                   (setf (gethash $src $coord-cache) (list $x $y))))))
-      ;; <<<<<< END NEW
-      
-      ;; >>>>>> MODIFIED: Phase 1 - Detect intersections using cached coordinates
+      ;; Detect intersections using cached coordinates
       (doall (?b1 (get-current-beams))
         (doall (?b2 (get-current-beams))
           (if (and (different ?b1 ?b2)
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
             (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
                 (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
-                ;; >>>>>> CHANGED: Retrieve from cache instead of calling get-coordinates
                 (setq $src1-coords (gethash $src1 $coord-cache))
                 (setq $src1-x (first $src1-coords))
                 (setq $src1-y (second $src1-coords))
-                ;; <<<<<< END CHANGED (was: mvsetq ($src1-x $src1-y) (get-coordinates $src1))
                 (setq $tgt1-x $end1-x)
                 (setq $tgt1-y $end1-y)
-                ;; >>>>>> CHANGED: Retrieve from cache instead of calling get-coordinates
                 (setq $src2-coords (gethash $src2 $coord-cache))
                 (setq $src2-x (first $src2-coords))
                 (setq $src2-y (second $src2-coords))
-                ;; <<<<<< END CHANGED (was: mvsetq ($src2-x $src2-y) (get-coordinates $src2))
                 (setq $tgt2-x $end2-x)
                 (setq $tgt2-y $end2-y)
                 ;; Check intersection between current segments (not intended paths)
@@ -357,7 +342,6 @@
                     ;; Only push if both intersections valid
                     (if $t2
                       (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections))))))))
-      ;; <<<<<< END MODIFIED
       $intersections))
 
 
@@ -423,6 +407,26 @@
            (eql $source-hue ?hue)))))
 
 
+(define-query connector-is-powered-by (?connector ?potential-source)
+  ;; Returns t if ?connector is currently receiving power from ?potential-source
+  ;; This prevents creating reciprocal beams back to the power source
+  (and (connector ?connector)
+       (bind (color ?connector $conn-hue))  ; Connector must be active
+       ;; Check if a beam exists from ?potential-source to ?connector
+       (exists (?b (get-current-beams))
+         (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
+              (eql $src ?potential-source)
+              (eql $tgt ?connector)
+              ;; Verify beam actually reaches connector's coordinates
+              (mvsetq ($conn-x $conn-y) (get-coordinates ?connector))
+              (= $end-x $conn-x)
+              (= $end-y $conn-y)
+              ;; Verify source has matching hue (confirming power flow)
+              (or (bind (chroma $src $src-hue))     ; Transmitter
+                  (bind (color $src $src-hue)))     ; Active connector
+              (eql $src-hue $conn-hue)))))
+
+
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
@@ -479,19 +483,20 @@
 
 
 (define-update recalculate-all-beams! ()
-  (doall (?b (get-current-beams))
-    (do (bind (beam-segment ?b $source $target $old-end-x $old-end-y))
-        ;; Get source coordinates
-        (mvsetq ($source-x $source-y) (get-coordinates $source))
-        ;; Get target coordinates  
-        (mvsetq ($target-x $target-y) (get-coordinates $target))
-        ;; Recalculate endpoint using current gate/beam states
-        (mvsetq ($new-end-x $new-end-y)
-                (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-        ;; Update beam segment if endpoint changed
-        (if (or (/= $new-end-x $old-end-x)
-                (/= $new-end-y $old-end-y))
-          (beam-segment ?b $source $target $new-end-x $new-end-y)))))
+  (do (doall (?b (get-current-beams))
+        (do (bind (beam-segment ?b $source $target $old-end-x $old-end-y))
+            ;; Get source coordinates
+            (mvsetq ($source-x $source-y) (get-coordinates $source))
+            ;; Get target coordinates  
+            (mvsetq ($target-x $target-y) (get-coordinates $target))
+            ;; Recalculate endpoint using current gate/beam states
+            (mvsetq ($new-end-x $new-end-y)
+                    (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+            ;; Update beam segment if endpoint changed
+            (if (or (/= $new-end-x $old-end-x)
+                    (/= $new-end-y $old-end-y))
+              (beam-segment ?b $source $target $new-end-x $new-end-y))))
+      nil))  ;must return nil
 
 
 (define-update update-beams-if-interference! ()
@@ -537,91 +542,98 @@
           ;; Phase 2: Atomically update beam segment if endpoint changed
           (if (or (/= $new-end-x $old-end-x) 
                   (/= $new-end-y $old-end-y))
-            (beam-segment ?b $src $tgt $new-end-x $new-end-y))))))
+            (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
+    nil))  ;must return nil
+
+
+(define-update create-missing-beams! ()
+  ;; Creates beams for active sources paired with targets where no beam exists yet
+  ;; Returns t if any beams were created, nil otherwise
+  (do
+    (setq $created-any nil)
+    (doall (?src terminus)
+      (doall (?tgt terminus)
+        (if (and (different ?src ?tgt)
+                 (or (paired ?src ?tgt) (paired ?tgt ?src)))  ; Pairing exists (bidirectional)
+          ;; Have a pairing - check if source can emit and beam should exist
+          (do (setq $source-hue (get-hue-if-source ?src))
+              (if (and $source-hue                              ; Source is active
+                       (target ?tgt)
+                       (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
+                       (not (connector-is-powered-by ?src ?tgt))) ; ?tgt is not powering ?src
+                ;; Create beam: source is transmitter (always active) or powered connector
+                (do (create-beam-segment-p! ?src ?tgt)
+                    (setq $created-any t)))))))
+    $created-any))
+
+
+(define-update remove-orphaned-beams! ()
+  ;; Removes beams whose pairing no longer exists or whose source lost power
+  ;; Returns t if any beams were removed, nil otherwise
+  (do
+    (setq $removed-any nil)
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+          ;; Determine if beam should be removed
+          (setq $should-remove nil)
+          ;; Reason 1: Pairing no longer exists (check bidirectional)
+          (if (not (or (paired $src $tgt) (paired $tgt $src)))
+            (setq $should-remove t))
+          ;; Reason 2: Source is connector that lost power (no color binding)
+          (if (and (connector $src)
+                   (not (bind (color $src $hue))))
+            (setq $should-remove t))
+          ;; Execute removal if needed
+          (if $should-remove
+            (do (remove-beam-segment-p! ?b)
+                (setq $removed-any t)))))
+    $removed-any))
+
+
+(define-update deactivate-receivers-that-lost-power! ()
+  ;; Returns t if any receiver was deactivated, nil otherwise
+  (do
+    (doall (?r receiver)
+      (if (and (active ?r)
+               (not (receiver-beam-reaches ?r)))
+        (do (deactivate-receiver! ?r)
+            (setq $any-deactivated t))))
+    $any-deactivated))
+
+
+(define-update activate-receivers-that-gained-power! ()
+  ;; Returns t if any receiver was activated, nil otherwise
+  (do
+    (doall (?r receiver)
+      (if (and (not (active ?r))
+               (receiver-beam-reaches ?r))
+        (do (active ?r)
+            (doall (?g gate)
+              (if (controls ?r ?g)
+                (open ?g)))
+            (setq $any-activated t))))
+    $any-activated))
+
+
+(define-update propagate-consequences! ()
+  ;; All functions must execute in order; returns t if any change occurred
+  (some #'identity
+        (mapcar (lambda (fn) (funcall fn state))
+                (list #'create-missing-beams!
+                      #'remove-orphaned-beams!
+                      #'recalculate-all-beams!          ;always returns nil
+                      #'update-beams-if-interference!   ;always returns nil
+                      #'deactivate-receivers-that-lost-power!
+                      #'deactivate-unreachable-connectors!
+                      #'activate-receivers-that-gained-power!
+                      #'activate-reachable-connectors!))))
 
 
 (define-update propagate-changes! ()
-  (do
-    (setq $iteration 0)
-    (setq $max-iterations 10)
-    (setq $any-changes nil)
-    (setq $continue t)
-    (ww-loop while (and $continue (< $iteration $max-iterations)) do
-      (setq $iteration-had-changes nil)
-      ;; ========== PHASE 0: BEAM SYNCHRONIZATION (NEW) ==========
-      ;; Synchronize beam list with current pairing and activation state
-      ;; This runs EVERY iteration to handle cascading pairing/activation changes
-      ;; Part A: Create missing beams for active sources with pairings
-      (doall (?src terminus)
-        (doall (?tgt terminus)
-          (if (and (different ?src ?tgt)
-                   (or (paired ?src ?tgt) (paired ?tgt ?src)))  ; Pairing exists (bidirectional)
-            ;; Have a pairing - check if source can emit and beam should exist
-            (do (setq $source-hue (get-hue-if-source ?src))
-                (if (and $source-hue                              ; Source is active
-                         (target ?tgt)
-                         (not (beam-exists-p ?src ?tgt)))         ; Beam doesn't exist yet
-                  ;; Create beam: source is transmitter (always active) or powered connector
-                  (do (create-beam-segment-p! ?src ?tgt)
-                      (setq $iteration-had-changes t)
-                      (setq $any-changes t)))))))
-      ;; Part B: Remove orphaned beams (no pairing or source lost power)
-      (doall (?b (get-current-beams))
-        (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
-            ;; Determine if beam should be removed
-            (setq $should-remove nil)
-            ;; Reason 1: Pairing no longer exists (check bidirectional)
-            (if (not (or (paired $src $tgt) (paired $tgt $src)))
-              (setq $should-remove t))
-            ;; Reason 2: Source is connector that lost power (no color binding)
-            (if (and (connector $src)
-                     (not (bind (color $src $hue))))
-              (setq $should-remove t))
-            ;; Execute removal if needed
-            (if $should-remove
-              (do (remove-beam-segment-p! ?b)
-                  (setq $iteration-had-changes t)
-                  (setq $any-changes t)))))
-      ;; ========== EXISTING PHASES (UNCHANGED) ==========
-      ;; Recalculate beams once at iteration start
-      ;; All decisions this iteration use this consistent beam state
-      (recalculate-all-beams!)
-      (update-beams-if-interference!)
-      ;; DEACTIVATION PHASE
-      ;; Step 1a: Deactivate receivers that lost power
-      (doall (?r receiver)
-        (if (and (active ?r)
-                 (not (receiver-beam-reaches ?r)))
-          (do (deactivate-receiver! ?r)
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 1b: Deactivate connectors that lost power
-      (if (deactivate-unreachable-connectors!)
-        (do (setq $iteration-had-changes t)
-            (setq $any-changes t)))
-      ;; ACTIVATION PHASE
-      ;; Step 2a: Activate receivers that gained power
-      (doall (?r receiver)
-        (if (and (not (active ?r))
-                 (receiver-beam-reaches ?r))
-          (do (active ?r)
-              (doall (?g gate)
-                (if (controls ?r ?g)
-                  (open ?g)))
-              (setq $iteration-had-changes t)
-              (setq $any-changes t))))
-      ;; Step 2b: Activate connectors that gained access
-      (if (activate-reachable-connectors!)
-        (do (setq $iteration-had-changes t)
-            (setq $any-changes t)))
-      ;; Step 3: Check if system stabilized
-      (if (not $iteration-had-changes)
-        (setq $continue nil))
-      (incf $iteration))
-    ;; Mark state as inconsistent if convergence failed
-    (if (and (= $iteration $max-iterations) $continue)
-      (inconsistent-state))
-    $any-changes))
+  (ww-loop for $iteration from 1 to 10
+           do (if (not (propagate-consequences!))
+                (return))  ;convergence achieved
+           finally (inconsistent-state)))  ;no convergence, mark state inconsistent
 
 
 (define-update create-beam-segment-p! (?source ?target)
@@ -757,21 +769,6 @@
   (loc connector2 area2)
   (loc connector3 area3)
   (current-beams ())
-#|
-  ;dynamic for (move area3 area4) testing
-  (loc agent1 area3) (holds agent1 connector2)
-  (loc connector1 area1)
-  (paired connector1 transmitter1) (paired connector1 receiver1) (paired connector1 receiver3)
-  (beam-segment beam1 transmitter1 connector1 nil 18 10) (color connector1 blue)
-  (beam-segment beam2 connector1 receiver1 nil 13 15) (active receiver1) (open gate1)
-  (beam-segment beam3 connector1 receiver3 nil 36 12) (active receiver3) (open gate3)
-  (loc connector3 area3)
-  (paired connector3 transmitter2) (paired connector3 receiver2)
-  (beam-segment beam4 transmitter2 connector3 nil 17 18) (color connector3 red)
-  (beam-segment beam5 connector3 receiver2 nil 20 24) (active receiver2) (open gate2)
-  (current-beams (beam1 beam2 beam3 beam4 beam5))
-  ;end dynamic for (move area3 area4) testing 
-|#
   ;static
   (coords area1 18 10)
   (coords area2 1 16)

@@ -23,7 +23,7 @@
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* *progress-reporting-interval*
-           *threads* *randomize-search* *debug* *probe*)
+           *threads* *randomize-search* *debug* *probe* *goal*)
   (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
@@ -137,6 +137,9 @@
 
 (defvar *depth-cutoff* 0
   "Negative or 0 means no cutoff.")
+
+(defvar *goal* nil
+  "Holds the current user goal specification.")
 
 (defvar *progress-reporting-interval* 100000
   "Print progress during search after each multiple n of states examined.")
@@ -262,7 +265,7 @@
   "Cache for prop-key-to-integer conversions")
 
 
-;; *** ADDED: Reset parameters to defaults when vals.lisp doesn't exist ***
+;; Reset parameters to defaults when vals.lisp doesn't exist
 ;; This ensures clean initialization for new problems without carrying over
 ;; settings from previous problem.lisp files
 (eval-when (:load-toplevel :execute)
@@ -280,6 +283,7 @@
             *randomize-search* nil
             *branch* -1
             *probe* nil
-            *debug* 0)
+            *debug* 0
+            *goal* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

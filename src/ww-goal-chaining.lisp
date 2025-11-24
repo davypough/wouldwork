@@ -5,13 +5,27 @@
 (in-package :ww)
 
 
+(defstruct undo-checkpoint
+  "Saved state for goal-chaining undo."
+  start-state          ; Deep copy of *start-state*
+  goal-fn              ; Saved goal function
+  goal-form)           ; Original goal form for display
+
+
+(defvar *undo-checkpoint* nil
+  "Saved state from most recent ww-continue, or nil if none.")
+
+
+;; ============================================================
+
+
 (defmacro ww-continue (goal-form)
   "Continue search from the final state of the previous solution.
    Installs GOAL-FORM as the new goal and updates *start-state*.
    
    Usage:
      (solve)                          ; Solve initial goal
-     (ww-continue (at agent target))  ; Set up continuation
+     (ww-continue (at agent target))  ; Set up continuation with new goal
      (solve)                          ; Solve for new goal
    
    Updates only the starting conditions:
@@ -27,28 +41,24 @@
 (defun continue-from-solution (goal-form)
   "Internal implementation of ww-continue.
    Updates *start-state* and goal, then lets normal (solve) flow handle the rest."
-  
   ;; Validate preconditions
   (validate-continuation-preconditions)
-  
+  ;; Save undo checkpoint before any modifications
+  (save-undo-checkpoint goal-form)
   ;; Extract goal state from most recent solution
   (let ((goal-state (extract-goal-state-from-solution)))
-    
     ;; Update *start-state* with goal state data
     (update-start-state-from-goal goal-state)
-    
     ;; Install and compile new goal (uses existing infrastructure)
     (install-goal goal-form)
     (when (boundp 'goal-fn)
       (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
-    
     ;; Re-apply heuristic to new start state if defined
     (when (fboundp 'heuristic?)
       (setf (problem-state.heuristic *start-state*)
             (funcall (symbol-function 'heuristic?) *start-state*))
       (format t "~&Heuristic applied to continuation state: ~A~%" 
               (problem-state.heuristic *start-state*)))
-    
     ;; Display continuation status
     (format t "~2%Continuation initialized from solution state.")
     (format t "~%  Continuation time: ~A" (problem-state.time *start-state*))
@@ -64,11 +74,9 @@
   (when (> *threads* 0)
     (error "Goal chaining requires single-threaded mode. ~
             Set (ww-set *threads* 0) before using ww-continue."))
-  
   (unless (and (boundp '*solutions*) *solutions*)
     (error "No solution exists to continue from. ~
             First run (solve) successfully, then use (ww-continue <new-goal>)."))
-  
   (unless (boundp 'goal-fn)
     (error "No goal function currently defined.")))
 
@@ -104,10 +112,8 @@
                     (t 
                      ;; Default: first solution in list
                      (first *solutions*)))))
-    
     (unless solution
       (error "Could not extract solution from *solutions*."))
-    
     (let ((goal-state (solution.goal solution)))
       ;; Validate state consistency before using
       (when (gethash 'inconsistent-state (problem-state.idb goal-state))
@@ -119,11 +125,9 @@
   "Update *start-state* with all components from goal-state.
    Preserves temporal continuity: time, happenings, databases."
   (declare (type problem-state goal-state))
-  
   ;; Update basic state components
   (setf (problem-state.name *start-state*) 'continuation)
   (setf (problem-state.instantiations *start-state*) nil)
-  
   ;; Preserve temporal state
   (setf (problem-state.time *start-state*) 
         (problem-state.time goal-state))
@@ -131,12 +135,10 @@
         (problem-state.value goal-state))
   (setf (problem-state.heuristic *start-state*) 
         (problem-state.heuristic goal-state))
-  
   ;; Preserve happenings - deep copy to avoid aliasing
   ;; This maintains temporal continuity with exogenous events
   (setf (problem-state.happenings *start-state*) 
         (copy-tree (problem-state.happenings goal-state)))
-  
   ;; Copy databases - both proposition state and happening events
   (setf (problem-state.idb *start-state*) 
         (copy-idb (problem-state.idb goal-state)))
@@ -144,3 +146,43 @@
         (copy-idb (problem-state.hidb goal-state)))
   (setf (problem-state.idb-hash *start-state*) 
         (problem-state.idb-hash goal-state)))
+
+
+(defun save-undo-checkpoint (goal-form)
+  "Save current state before ww-continue modifies it.
+   Captures *start-state*, goal-fn, and user's original goal expression."
+  (setf *undo-checkpoint*
+        (make-undo-checkpoint
+         :start-state (copy-problem-state *start-state*)
+         :goal-fn (when (fboundp 'goal-fn)
+                    (symbol-function 'goal-fn))
+         :goal-form goal-form)))
+
+
+(defun ww-undo ()
+  "Restore state from most recent ww-continue.
+   Allows user to adjust parameters and retry from the same point.
+   Can be called multiple times to retry different approaches."
+  (unless *undo-checkpoint*
+    (format t "No ww-continue to undo. ~
+               Use ww-undo only after ww-continue has been called."))
+  ;; Restore start-state (full deep copy to avoid aliasing)
+  (setf *start-state* 
+        (copy-problem-state (undo-checkpoint-start-state *undo-checkpoint*)))
+  ;; Restore goal function
+  (when (undo-checkpoint-goal-fn *undo-checkpoint*)
+    (setf (symbol-function 'goal-fn) 
+          (undo-checkpoint-goal-fn *undo-checkpoint*)))
+  (when (undo-checkpoint-goal-form *undo-checkpoint*)
+    (setf (symbol-value 'goal-fn)
+          (undo-checkpoint-goal-form *undo-checkpoint*)))
+  ;; Display restoration status
+  (format t "~2%Undone ww-continue.")
+  (format t "~%  Restored to state before goal: ~A"
+          (undo-checkpoint-goal-form *undo-checkpoint*))
+  (format t "~%  State time: ~A" (problem-state.time *start-state*))
+  (format t "~%  State value: ~A" (problem-state.value *start-state*))
+  (format t "~%  State propositions: ~A"
+          (hash-table-count (problem-state.idb *start-state*)))
+  (format t "~%~%Ready to adjust parameters and (solve) again.~2%")
+  t)
