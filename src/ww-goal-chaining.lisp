@@ -8,8 +8,7 @@
 (defstruct undo-checkpoint
   "Saved state for goal-chaining undo."
   start-state          ; Deep copy of *start-state*
-  goal-fn              ; Saved goal function
-  goal-form)           ; Original goal form for display
+  goal)                ; User's *goal* specification
 
 
 (defvar *undo-checkpoint* nil
@@ -25,7 +24,7 @@
    
    Usage:
      (solve)                          ; Solve initial goal
-     (ww-continue (at agent target))  ; Set up continuation with new goal
+     (ww-continue (loc agent area))   ; Set up continuation with new goal
      (solve)                          ; Solve for new goal
    
    Updates only the starting conditions:
@@ -43,16 +42,17 @@
    Updates *start-state* and goal, then lets normal (solve) flow handle the rest."
   ;; Validate preconditions
   (validate-continuation-preconditions)
-  ;; Save undo checkpoint before any modifications
-  (save-undo-checkpoint goal-form)
   ;; Extract goal state from most recent solution
   (let ((goal-state (extract-goal-state-from-solution)))
     ;; Update *start-state* with goal state data
     (update-start-state-from-goal goal-state)
     ;; Install and compile new goal (uses existing infrastructure)
+    (terpri)
     (install-goal goal-form)
     (when (boundp 'goal-fn)
       (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+    ;; Save undo checkpoint AFTER modifications complete
+    (save-undo-checkpoint)
     ;; Re-apply heuristic to new start state if defined
     (when (fboundp 'heuristic?)
       (setf (problem-state.heuristic *start-state*)
@@ -60,12 +60,9 @@
       (format t "~&Heuristic applied to continuation state: ~A~%" 
               (problem-state.heuristic *start-state*)))
     ;; Display continuation status
-    (format t "~2%Continuation initialized from solution state.")
-    (format t "~%  Continuation time: ~A" (problem-state.time *start-state*))
-    (format t "~%  Continuation value: ~A" (problem-state.value *start-state*))
-    (format t "~%  State propositions: ~A" 
-            (hash-table-count (problem-state.idb *start-state*)))
-    (format t "~%~%Ready to (solve) for new goal.~2%")
+    (format t "~&Continuation time: ~A" (problem-state.time *start-state*))
+    (format t "~&Continuation value: ~A" (problem-state.value *start-state*))
+    (format t "~%~%Ready to (solve) for new goal from continuation state.~2%")
     t))
 
 
@@ -148,15 +145,13 @@
         (problem-state.idb-hash goal-state)))
 
 
-(defun save-undo-checkpoint (goal-form)
-  "Save current state before ww-continue modifies it.
-   Captures *start-state*, goal-fn, and user's original goal expression."
+(defun save-undo-checkpoint ()
+  "Save current state after ww-continue completes modifications.
+   Captures continuation *start-state* and *goal* for potential undo."
   (setf *undo-checkpoint*
         (make-undo-checkpoint
          :start-state (copy-problem-state *start-state*)
-         :goal-fn (when (fboundp 'goal-fn)
-                    (symbol-function 'goal-fn))
-         :goal-form goal-form)))
+         :goal *goal*)))
 
 
 (defun ww-undo ()
@@ -165,24 +160,20 @@
    Can be called multiple times to retry different approaches."
   (unless *undo-checkpoint*
     (format t "No ww-continue to undo. ~
-               Use ww-undo only after ww-continue has been called."))
+               Use ww-undo only after ww-continue has been called.")
+    (return-from ww-undo nil))
   ;; Restore start-state (full deep copy to avoid aliasing)
   (setf *start-state* 
         (copy-problem-state (undo-checkpoint-start-state *undo-checkpoint*)))
-  ;; Restore goal function
-  (when (undo-checkpoint-goal-fn *undo-checkpoint*)
-    (setf (symbol-function 'goal-fn) 
-          (undo-checkpoint-goal-fn *undo-checkpoint*)))
-  (when (undo-checkpoint-goal-form *undo-checkpoint*)
-    (setf (symbol-value 'goal-fn)
-          (undo-checkpoint-goal-form *undo-checkpoint*)))
+  ;; Restore goal and regenerate goal-fn
+  (setf *goal* (undo-checkpoint-goal *undo-checkpoint*))
+  (install-goal *goal*)
+  (when (boundp 'goal-fn)
+    (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
   ;; Display restoration status
   (format t "~2%Undone ww-continue.")
-  (format t "~%  Restored to state before goal: ~A"
-          (undo-checkpoint-goal-form *undo-checkpoint*))
+  (format t "~%  Restored goal: ~A" *goal*)
   (format t "~%  State time: ~A" (problem-state.time *start-state*))
   (format t "~%  State value: ~A" (problem-state.value *start-state*))
-  (format t "~%  State propositions: ~A"
-          (hash-table-count (problem-state.idb *start-state*)))
   (format t "~%~%Ready to adjust parameters and (solve) again.~2%")
   t)

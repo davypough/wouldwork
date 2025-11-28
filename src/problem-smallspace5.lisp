@@ -28,7 +28,7 @@
   cargo       (either connector)  ;what an agent can pickup & carry
   beam        ()  ;the list of initial beams
   source      (either transmitter connector)  ;beam source
-  target      (either connector receiver)  ;beam target
+  target      (either connector receiver repeater)  ;beam target
   occluder    (either cargo agent gate)  ;objects that can occlude a beam
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver))
