@@ -904,5 +904,10 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (loc agent1 area5))
-  ;(and (loc agent1 area1) (loc agent1* area1) (paired connector1 transmitter1) (paired connector1 repeater1) (active plate1)))
+  ;(loc agent1 area5))
+(and (loc agent1 area1)
+(loc agent1* area2)
+(loc connector1 area1)
+(paired connector1 transmitter1)
+(paired connector1 repeater1)
+(loc connector1* area1)))

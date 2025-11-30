@@ -30,7 +30,7 @@
    the values of these global variables.")
 
 
-(defparameter *refreshing* nil
+(defvar *refreshing* nil
   "Flag to skip read-globals during refresh, preserving REPL-set parameters.")
 
 
@@ -218,9 +218,16 @@ any such settings appearing in the problem specification file.
   "Refreshes the current problem.lisp file--eg, after editing it.
    Preserves REPL-set parameters not overridden in the problem file."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (let ((*refreshing* t))
-    (with-silenced-compilation
-      (load-problem (string *problem-name*)))))
+  (setf *goal* nil)
+  (when *undo-checkpoint*
+    (format t "~%Note: Refresh invalidates the current goal-chaining session.~%~
+               Use (ww-continue <new-goal>) to restart goal chaining after refresh completes.~%")
+    (setf *undo-checkpoint* nil))
+  (setf *refreshing* t)
+  (unwind-protect
+      (with-silenced-compilation
+        (load-problem (string *problem-name*)))
+    (setf *refreshing* nil)))                            ; cleanup
   
 
 (defun reset-parameters ()
