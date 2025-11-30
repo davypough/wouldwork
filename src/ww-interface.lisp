@@ -30,6 +30,10 @@
    the values of these global variables.")
 
 
+(defparameter *refreshing* nil
+  "Flag to skip read-globals during refresh, preserving REPL-set parameters.")
+
+
 (defun help ()  ;;; text which appears if user enters (help)
   (format t "~%
 THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
@@ -211,10 +215,12 @@ any such settings appearing in the problem specification file.
 
 
 (defun refresh ()
-  "Refreshes the current problem.lisp file--eg, after editing it."
+  "Refreshes the current problem.lisp file--eg, after editing it.
+   Preserves REPL-set parameters not overridden in the problem file."
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (with-silenced-compilation
-    (load-problem (string *problem-name*))))
+  (let ((*refreshing* t))
+    (with-silenced-compilation
+      (load-problem (string *problem-name*)))))
   
 
 (defun reset-parameters ()

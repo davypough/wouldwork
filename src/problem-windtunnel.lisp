@@ -14,41 +14,46 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 2)  ;for initial testing
+(ww-set *depth-cutoff* 16)
+
+(ww-set *progress-reporting-interval* 1000000)
 
 
 (define-types
-  player      (player1)  ;the name of the main agent performing actions
-  ghost       (ghost1)
-  recorder    (recorder1)
-  gate        (gate1 gate2)
-  connector   (connector1)
-  ghost-connector  (ghost-connector1)
-  transmitter (transmitter1)
-  receiver    (receiver1)
-  beam        ()  ;initial beams
-  repeater    (repeater1)
-  plate       (plate1)
-  fan         (fan1)
-  hue         (blue)  ;the color of a transmitter, receiver, repeater, or active connector
-  area        (area1 area2 area3 area4 area5)  ;position points
-  agent       (either player ghost)
-  cargo       (either connector ghost-connector)  ;what an agent can pickup & carry
-  terminus    (either transmitter receiver connector ghost-connector repeater)  ;what a connector can connect to
-  source      (either transmitter connector ghost-connector repeater)  ;beam source
-  occluder    (either cargo agent gate)  ;objects that can occlude a beam
-  target      (either connector ghost-connector receiver repeater)  ;beam target
-  focus       (either transmitter receiver repeater)  ;los object of interest
-  fixture     (either transmitter receiver recorder repeater plate fan)
+  real-agent      (agent1)  ;the name of the main agent performing actions
+  ghost-agent     (agent1*)  ;ghost objects are starred
+  agent           (either real-agent ghost-agent)
+  recorder        (recorder1)
+  gate            (gate1 gate2)
+  wall            (wall1 wall2 wall3 wall4 wall5 wall6 wall7 wall8 wall9 wall10)
+  real-connector  (connector1)
+  ghost-connector (connector1*)
+  connector       (either real-connector ghost-connector)
+  transmitter     (transmitter1)
+  receiver        (receiver1)
+  beam            ()  ;initial beams
+  repeater        (repeater1)
+  plate           (plate1)
+  blower          (blower1)
+  hue             (blue)  ;the color of a transmitter, receiver, repeater, or active connector
+  area            (area1 area2 area3 area4 area5)  ;position points
+  real-cargo      (either real-connector)
+  ghost-cargo     (either ghost-connector)
+  cargo           (either connector)  ;what the player can pickup & carry
+  terminus        (either transmitter receiver connector repeater)  ;what a connector can connect to
+  source          (either transmitter connector repeater)  ;beam source
+  occluder        (either cargo agent gate wall)  ;objects that can occlude a beam
+  target          (either connector receiver repeater)  ;beam target
+  focus           (either transmitter receiver repeater)  ;los object of interest
+  fixture         (either transmitter receiver recorder repeater plate blower)
 )
 
 
-(define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds player1 $any-cargo))
+(define-dynamic-relations  ;relations with fluents can be bound in rules--eg (bind (holds agent1 $any-cargo))
   (holds agent $cargo)  ;fluent because we may need to lookup what is currently being held
   (loc (either agent cargo) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
-  (active receiver)
-  (on (either plate fan))  ;plate or fan can be on/off
+  (active (either plate blower receiver))
   (paired terminus terminus)  ;potential beam between two terminus
   (color (either connector repeater) $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
@@ -58,11 +63,11 @@
 
 (define-static-relations
   (coords (either area fixture) $fixnum $fixnum)  ;the (x,y) position
-  (controls (either receiver plate) (either gate fan))
+  (controls (either receiver plate) (either gate blower))
   (chroma (either transmitter receiver) $hue)
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
-  (separates> fan area area)
-  (toggles plate (either gate fan))
+  (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
+  (toggles plate (either gate blower))
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
   ;potential clear los from an area to a focus
@@ -73,7 +78,7 @@
   (visible1 area (either $gate $area) area)
   ;potential accesibility to move from an area to another area
   (accessible0 area area)
-  (accessible1 area (either $gate $fan) area)
+  (accessible1 area (either $gate $blower) area)
 )
 
 
@@ -81,21 +86,21 @@
 
 
 (define-query heuristic? ()
-  ;; Estimates minimum actions to reach goal (player1 in area5)
-  (do (bind (loc player1 $area))
+  ;; Estimates minimum actions to reach goal (agent1 in area5)
+  (do (bind (loc agent1 $area))
       ;; Base distance considering topology
       (setq $base-distance
         (cond ((eql $area 'area5) 0)    ; At goal
               ((eql $area 'area4) 1)    ; One move (through gate2)
               ((eql $area 'area3) 2)    ; area3 → area4 → area5
-              ;; From area1/area2: can reach area4 directly if fan off
+              ;; From area1/area2: can reach area4 directly if blower off
               ((or (eql $area 'area1) (eql $area 'area2)) 2)
               (t 10)))                   ; Should not occur
       ;; Penalties for obstacles on path to goal
       (setq $penalty 0)
-      ;; Fan blocks area1/area2 → area3/area4 passage
+      ;; blower blocks area1/area2 → area3/area4 passage
       (if (and (or (eql $area 'area1) (eql $area 'area2))
-               (on fan1))
+               (active blower1))
         (setq $penalty (+ $penalty 1)))  ; Need to toggle plate1
       ;; Gate2 blocks area4 → area5 passage
       (if (and (not (eql $area 'area5))
@@ -132,7 +137,7 @@
     ((or (area ?object) (fixture ?object))
      (bind (coords ?object $x $y))
      (values $x $y))
-    ((or (agent ?object) (and (cargo ?object) (not (holds player1 ?object))))
+    ((or (agent ?object) (and (cargo ?object) (not (holds agent1 ?object))))
      (bind (loc ?object $area))
      (bind (coords $area $x $y))
      (values $x $y))
@@ -163,7 +168,7 @@
   ;; For ghost: ignores environmental states (recorded when different)
   (or (los0 ?area ?fixture)
       (and (bind (los1 ?area $zone ?fixture))
-           (or (ghost ?agent)
+           (or (ghost-agent ?agent)
                (and (gate $zone)
                     (open $zone))
                (and (area $zone)
@@ -173,11 +178,11 @@
 
 
 (define-query visible (?agent ?area1 ?area2)
-  ;; For player: respects gate open states and area occupancy
+  ;; For player: respects gate open states and area occupancy to connect connectors
   ;; For ghost: ignores environmental states (recorded when different)
   (or (visible0 ?area1 ?area2)
       (and (bind (visible1 ?area1 $zone ?area2))
-           (or (ghost ?agent)
+           (or (ghost-agent ?agent)
                (and (gate $zone)
                     (open $zone))
                (and (area $zone)
@@ -185,25 +190,51 @@
                            (loc ?obj $zone))))))))
 
 
+(define-query observable (?area ?terminus)
+  ;; Static observability check - ignores gate state and area occupancy
+  ;; Returns t if terminus could potentially be seen from ?area
+  (or
+    ;; Case 1: Fixture terminus - check los relationships exist
+    (and (fixture ?terminus)
+         (or (los0 ?area ?terminus)
+             (bind (los1 ?area $zone ?terminus))))
+    ;; Case 2: Connector terminus - check visible relationships to connector's area
+    (and (connector ?terminus)
+         (bind (loc ?terminus $target-area))
+         (or (visible0 ?area $target-area)
+             (bind (visible1 ?area $zone $target-area))))))
+
+
+(define-query selectable (?agent ?area ?terminus)
+  ;; Agent can select terminus if observable from ?area or accessible adjacent area
+  (or (observable ?area ?terminus)
+      (exists (?adj-area area)
+        (and (accessible ?agent ?area ?adj-area)
+             (observable ?adj-area ?terminus)))))
+
 
 (define-query accessible (?agent ?area1 ?area2)
-  ;; For player: respects gate and fan environmental states
-  ;; For ghost: ignores gate and fan states (recorded when different)
+  ;; For player: respects gate and blower environmental states
+  ;; For ghost: ignores gate and blower states (recorded when different)
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
-             (or (ghost ?agent)
+             (or (ghost-agent ?agent)
                  (open ?g))))
-      (exists (?f fan)
+      (exists (?f blower)
         (and (accessible1 ?area1 ?f ?area2)
-             (or (ghost ?agent)
-                 (not (on ?f)))))))
+             (or (ghost-agent ?agent)
+                 (not (active ?f)))))))
 
 
-
-(define-query vacant (?area)
-  (not (exists (?cargo cargo)
-         (loc ?cargo ?area))))
+(define-query placeable (?cargo ?area)
+  ;Cargo cannot colocate with another cargo of the same type
+  (not (or (and (real-cargo ?cargo)
+                (exists (?rc real-cargo)
+                  (loc ?rc ?area)))
+           (and (ghost-cargo ?cargo)
+                (exists (?gc ghost-cargo)
+                  (loc ?gc ?area))))))
 
 
 (define-query resolve-consensus-hue (?hue-list)
@@ -296,6 +327,8 @@
                (or (and (gate ?obj) 
                         (not (open ?obj))  ; Block UNLESS explicitly open
                         (bind (gate-segment ?obj $x1 $y1 $x2 $y2)))
+                   (and (wall ?obj)
+                        (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
                    (and (or (cargo ?obj) (agent ?obj))
                         (bind (loc ?obj $area))
                         (bind (coords $area $x1 $y1))
@@ -367,7 +400,7 @@
       $intersections))
 
 
-(define-query connectable (?agent ?area ?terminus)
+#+ignore (define-query connectable (?agent ?area ?terminus)
   ;; For player: respects environmental constraints via los/visible
   ;; For ghost: relaxed constraints via los/visible ghost dispatch
   (or
@@ -393,7 +426,6 @@
                   (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
                 (= $end-x $target-x)
                 (= $end-y $target-y))))))
-
 
 
 (define-query receiver-beam-reaches (?receiver)
@@ -689,58 +721,67 @@
     1
   (?agent agent ?terminus terminus)
   (and (bind (holds ?agent $cargo))
+       (or (and (real-agent ?agent) (real-cargo $cargo))
+           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (different $cargo ?terminus)
        (bind (loc ?agent $area))
-       (vacant $area)
-       (connectable ?agent $area ?terminus))
+       (placeable $cargo $area)
+       (selectable ?agent $area ?terminus))
   (?agent $cargo ?terminus $area)
   (assert (not (holds ?agent $cargo))
           (loc $cargo $area)
-          (paired ?terminus $cargo)
+          (paired $cargo ?terminus)
           (propagate-changes!)))
 
 
 (define-action connect-to-2-terminus
     1
-  (?agent agent (combination (?terminus1 ?terminus2) terminus))
+  (?agent agent (combination (?t1 ?t2) terminus))
   (and (bind (holds ?agent $cargo))
+       (or (and (real-agent ?agent) (real-cargo $cargo))
+           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (different $cargo ?t1)
+       (different $cargo ?t2)
        (bind (loc ?agent $area))
-       (vacant $area)
-       (connectable ?agent $area ?terminus1)
-       (connectable ?agent $area ?terminus2))
-  (?agent $cargo ?terminus1 ?terminus2 $area)
+       (placeable $cargo $area)
+       (selectable ?agent $area ?t1)
+       (selectable ?agent $area ?t2))
+  (?agent $cargo ?t1 ?t2 $area)
   (assert (not (holds ?agent $cargo))
           (loc $cargo $area)
-          (paired $cargo ?terminus1)
-          (paired $cargo ?terminus2)
+          (paired $cargo ?t1)
+          (paired $cargo ?t2)
           (propagate-changes!)))
 
 
 (define-action connect-to-3-terminus
     1
-  (?agent agent (combination (?terminus1 ?terminus2 ?terminus3) terminus))
+  (?agent agent (combination (?t1 ?t2 ?t3) terminus))
   (and (bind (holds ?agent $cargo))
+       (or (and (real-agent ?agent) (real-cargo $cargo))
+           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (different $cargo ?t1)
+       (different $cargo ?t2)
+       (different $cargo ?t3)
        (bind (loc ?agent $area))
-       (vacant $area)
-       (connectable ?agent $area ?terminus1)
-       (connectable ?agent $area ?terminus2)
-       (connectable ?agent $area ?terminus3))
-  (?agent $cargo ?terminus1 ?terminus2 ?terminus3 $area)
+       (placeable $cargo $area)
+       (selectable ?agent $area ?t1)
+       (selectable ?agent $area ?t2)
+       (selectable ?agent $area ?t3))
+  (?agent $cargo ?t1 ?t2 ?t3 $area)
   (assert (not (holds ?agent $cargo))
           (loc $cargo $area)
-          (paired $cargo ?terminus1)
-          (paired $cargo ?terminus2)
-          (paired $cargo ?terminus3)
-          (propagate-changes!))) 
-
-
-
+          (paired $cargo ?t1)
+          (paired $cargo ?t2)
+          (paired $cargo ?t3)
+          (propagate-changes!)))
 
 
 (define-action pickup-connector
     1
   (?agent agent ?cargo cargo)
-  (and (or (and (player ?agent) (connector ?cargo))
-           (and (ghost ?agent) (ghost-connector ?cargo)))
+  (and (or (and (real-agent ?agent) (real-cargo ?cargo))
+           (and (ghost-agent ?agent) (ghost-cargo ?cargo)))
        (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
        (loc ?cargo $area))
@@ -763,7 +804,7 @@
   (?agent agent)
   (and (bind (holds ?agent $cargo))
        (bind (loc ?agent $area))
-       (vacant $area))
+       (placeable $cargo $area))
   (?agent $cargo $area)
   (assert (not (holds ?agent $cargo))
           (loc $cargo $area)
@@ -780,9 +821,9 @@
        (= $agent-x $plate-x)
        (= $agent-y $plate-y))
   (?agent ?plate)
-  (assert (if (on ?plate)
-            (not (on ?plate))
-            (on ?plate))
+  (assert (if (active ?plate)
+            (not (active ?plate))
+            (active ?plate))
           (propagate-changes!)))
 
 
@@ -797,26 +838,15 @@
           (propagate-changes!)))
 
 
-#+ignore (define-action move-ghost
-    1
-  (?area2 area)
-  (and (bind (loc ghost1 $area1))
-       (different $area1 ?area2)
-       (accessible-ghost $area1 ?area2))
-  ($area1 ?area2)
-  (assert (loc ghost1 ?area2)
-          (propagate-changes!)))
-
-
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (loc player1 area1)
-  (loc ghost1 area1)
+  (loc agent1 area1)
+  (loc agent1* area1)
   (loc connector1 area1)
-  (loc ghost-connector1 area1)
+  (loc connector1* area1)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
   
   ;; Static spatial configuration
@@ -828,21 +858,31 @@
   (accessible0 area1 area2)
   (accessible0 area3 area4)
   (accessible1 area4 gate2 area5)
-  (accessible1 area1 fan1 area3)
-  (accessible1 area2 fan1 area3)
-  (accessible1 area2 fan1 area4)
+  (accessible1 area1 blower1 area3)
+  (accessible1 area2 blower1 area3)
+  (accessible1 area2 blower1 area4)
   ;; Static fixture configuration
   (coords recorder1 4 20)
   (coords transmitter1 19 19)
   (coords plate1 11 14)
   (coords repeater1 3 8)
-  (coords fan1 23 8)
+  (coords blower1 23 8)
   (coords receiver1 21 0)
-  (gate-segment gate1 12 21 12 17)
-  (gate-segment gate2 17 5 17 1)
   (controls plate1 gate1)
-  (controls plate1 fan1)
+  (controls plate1 blower1)
   (controls receiver1 gate2)
+  (gate-segment gate1 12 21 12 17)
+  (gate-segment gate2 17 6 17 0)
+  (wall-segment wall1 19 21 19 17)
+  (wall-segment wall2 19 17 12 17)
+  (wall-segment wall3 12 17 12 10)
+  (wall-segment wall4 12 10 23 10)
+  (wall-segment wall5 23 10 23 0)
+  (wall-segment wall6 23 0 0 0)
+  (wall-segment wall7 0 0 0 21)
+  (wall-segment wall8 0 21 19 21)
+  (wall-segment wall9 12 0 12 6)
+  (wall-segment wall10 12 6 19 6)
   
   ;; Static color assignments
   (chroma transmitter1 blue)
@@ -864,4 +904,5 @@
 ;;;; GOAL ;;;;
 
 (define-goal  ;always put this last
-  (loc player1 area5))
+  (loc agent1 area5))
+  ;(and (loc agent1 area1) (loc agent1* area1) (paired connector1 transmitter1) (paired connector1 repeater1) (active plate1)))

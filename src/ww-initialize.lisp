@@ -60,9 +60,12 @@
     (setf *debug* 1)
     (format t "~%Note: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
-    (if (probe-file vals-file)
-      (read-globals)    ;restore globals for old problem.lisp from vals.lisp
-      (save-globals)))  ;save globals for new problem.lisp into vals.lisp
+    (cond (*refreshing*     ; skip read-globals on refresh
+           (save-globals))  ; just save current in-memory state
+          ((probe-file vals-file)
+           (read-globals))       ; restore globals from vals.lisp
+          (t
+           (save-globals))))     ; save globals for new problem
   (when (eq *problem-name* 'unspecified)
     (format t "~%Note: Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
   (when (and (eq *algorithm* 'backtracking) (> *threads* 0))
