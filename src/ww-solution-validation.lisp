@@ -129,7 +129,7 @@
               (let ((effect-args (extract-effect-args action pre-args pre-result)))
                 (when verbose
                   (format t "  Pre-args ~S passed, effect-args: ~S~%" pre-args effect-args))
-                (when (equal effect-args provided-args)
+                (when (args-match-with-combinations action effect-args provided-args)
                   (setf matching-pre-result pre-result)
                   (return))))))
         
@@ -229,7 +229,7 @@
           (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
             (when pre-result
               (let ((effect-args (extract-effect-args action pre-args pre-result)))
-                (when (equal effect-args args)
+                (when (args-match-with-combinations action effect-args args)
                   (return-from next-action-valid-p t))))))))))
 
 
@@ -281,6 +281,65 @@
   (setf (problem-state.name state) (action.name action))
   (incf (problem-state.time state) (action.duration action))
   (setf (problem-state.value state) (update.value update)))
+
+
+(defun find-combination-var-groups (precondition-params)
+  "Extract variable groups from combination parameters in precondition-params.
+   Returns a list of variable groups, e.g., ((?T1 ?T2)) for a 2-way combination.
+   Handles nested parameter structures recursively."
+  (let ((groups nil))
+    (dolist (item precondition-params)
+      (when (listp item)
+        (cond
+          ;; Found a combination spec: (combination (?v1 ?v2 ...) type)
+          ((eq (first item) 'combination)
+           (let ((vars (second item)))
+             (when (and (listp vars) (every #'?varp vars))
+               (push vars groups))))
+          ;; Nested parameter list with header - recurse
+          ((member (first item) *parameter-headers*)
+           (setf groups (nconc (find-combination-var-groups item) groups))))))
+    (nreverse groups)))
+
+
+(defun args-match-with-combinations (action effect-args provided-args)
+  "Compare effect-args with provided-args, treating combination-derived
+   positions as order-independent (set equality).
+   Returns T if arguments match, NIL otherwise."
+  (let ((combo-groups (find-combination-var-groups (action.precondition-params action))))
+    ;; No combination parameters - use simple equality
+    (when (null combo-groups)
+      (return-from args-match-with-combinations (equal effect-args provided-args)))
+    
+    (let* ((effect-vars (action.effect-variables action))
+           ;; Build list of all positions involved in combinations
+           (combo-positions
+             (loop for group in combo-groups
+                   nconc (loop for var in group
+                               for pos = (position var effect-vars)
+                               when pos collect pos)))
+           ;; Check non-combination positions match exactly
+           (non-combo-match
+             (loop for i from 0 below (length effect-vars)
+                   always (or (member i combo-positions)
+                              (equal (nth i effect-args)
+                                     (nth i provided-args))))))
+      
+      (unless non-combo-match
+        (return-from args-match-with-combinations nil))
+      
+      ;; Check each combination group has matching values (as sets)
+      (dolist (group combo-groups t)
+        (let* ((positions (loop for var in group
+                                for pos = (position var effect-vars)
+                                when pos collect pos))
+               (effect-vals (mapcar (lambda (p) (nth p effect-args)) positions))
+               (provided-vals (mapcar (lambda (p) (nth p provided-args)) positions))
+               ;; Sort canonically for comparison
+               (sorted-effect (sort (copy-list effect-vals) #'string< :key #'symbol-name))
+               (sorted-provided (sort (copy-list provided-vals) #'string< :key #'symbol-name)))
+          (unless (equal sorted-effect sorted-provided)
+            (return-from args-match-with-combinations nil)))))))
 
 
 ;;; ==================== Output Functions ====================
