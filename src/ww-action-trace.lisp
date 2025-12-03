@@ -79,7 +79,7 @@
           (action.name action)
           instantiation)
   ;; Show current state
-  (format t "~%CURRENT STATE:~%")
+  (format t "~%PRIOR STATE:~%")
   (print-state-propositions state)
   ;; Execute effect to get final state
   (let ((updated-dbs (if (eql pre-result t)
@@ -87,7 +87,7 @@
                          (apply (action.eff-defun-name action) state pre-result))))
     ;; Show final state delta for each update
     (dolist (updated-db updated-dbs)
-      (format t "~%FINAL STATE DELTA:~%")
+      (format t "~%UPDATED STATE DELTA:~%")
       (print-state-delta state updated-db)))
   (simple-break)
   (terpri))

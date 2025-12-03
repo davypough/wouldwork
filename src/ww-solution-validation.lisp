@@ -53,6 +53,9 @@
         (action-count (length action-list)))
     
     (format t "~%Validating ~D action~:P...~2%" action-count)
+    (when verbose
+      (format t "Start state:~%")
+      (display-validation-state current-state))
     
     ;; Process each action in sequence
     (loop for action-form in action-list
@@ -66,7 +69,9 @@
                    ;; Action succeeded - update current state
                    (progn
                      (when verbose
-                       (format t "Action ~D succeeded.~%" index))
+                       (format t "Action ~D succeeded.~%" index)
+                       (format t "Resulting state:~%")
+                       (display-validation-state new-state))
                      (setf current-state new-state))
                    ;; Action failed - report and return
                    (progn
@@ -104,15 +109,16 @@
     
     (when verbose
       (format t "  Effect variables: ~S~%" (action.effect-variables action))
-      (format t "  Precondition variables: ~S~%" (action.precondition-variables action))
-      (format t "  Provided args: ~S~%" provided-args))
+      (format t "  Provided values : ~S~%" provided-args)
+      (format t "  Precondition variables: ~S~%"
+                (remove-if-not #'?varp (action.precondition-variables action))))
     
     ;; Get precondition argument combinations (handle dynamic vs static)
     (let ((precondition-args (get-precondition-args action state)))
       
-      (when verbose
-        (format t "  Number of precondition-args combinations: ~D~%" (length precondition-args))
-        (format t "  First few combinations: ~S~%" (subseq precondition-args 0 (min 5 (length precondition-args)))))
+      ;(when verbose
+      ;  (format t "  Total number of precondition-arg combinations: ~D~%" (length precondition-args))
+      ;  (format t "  First few combinations: ~S~%" (subseq precondition-args 0 (min 5 (length precondition-args)))))
       
       ;; Find matching precondition instantiation
       (let ((matching-pre-result nil)
@@ -128,13 +134,13 @@
               ;; Check if this instantiation matches provided arguments
               (let ((effect-args (extract-effect-args action pre-args pre-result)))
                 (when verbose
-                  (format t "  Pre-args ~S passed, effect-args: ~S~%" pre-args effect-args))
+                  (format t "  Precondition satisfied for: ~S~%" pre-args))
                 (when (args-match-with-combinations action effect-args provided-args)
                   (setf matching-pre-result pre-result)
                   (return))))))
         
-        (when verbose
-          (format t "  Checked ~D combinations, ~D passed precondition~%" checked-count passed-count))
+        ;(when verbose
+        ;  (format t "  Checked ~D combinations, ~D passed precondition~%" checked-count passed-count))
         
         ;; If no matching instantiation found, precondition failed
         (unless matching-pre-result
@@ -382,8 +388,7 @@
        (format t "~%All ~D action~:P executed successfully.~%" action-count)
        (format t "Goal NOT satisfied.~%")
        (format t "~%Intermediate state:~%")
-       (display-validation-state final-state)
-       final-state))))
+       (display-validation-state final-state)))))
 
 
 (defun display-validation-state (state)

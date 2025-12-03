@@ -92,17 +92,17 @@
       (setq $base-distance
         (cond ((eql $area 'area5) 0)    ; At goal
               ((eql $area 'area4) 1)    ; One move (through gate2)
-              ((eql $area 'area3) 2)    ; area3 → area4 → area5
+              ((eql $area 'area3) 2)    ; area3 â†’ area4 â†’ area5
               ;; From area1/area2: can reach area4 directly if blower off
               ((or (eql $area 'area1) (eql $area 'area2)) 2)
               (t 10)))                   ; Should not occur
       ;; Penalties for obstacles on path to goal
       (setq $penalty 0)
-      ;; blower blocks area1/area2 → area3/area4 passage
+      ;; blower blocks area1/area2 â†’ area3/area4 passage
       (if (and (or (eql $area 'area1) (eql $area 'area2))
                (active blower1))
         (setq $penalty (+ $penalty 1)))  ; Need to toggle plate1
-      ;; Gate2 blocks area4 → area5 passage
+      ;; Gate2 blocks area4 â†’ area5 passage
       (if (and (not (eql $area 'area5))
                (not (open gate2)))
         (setq $penalty (+ $penalty 1)))  ; Need to activate receiver1
@@ -121,6 +121,9 @@
            (bind (chroma ?terminus $hue))
            $hue)
       (and (connector ?terminus)
+           (bind (color ?terminus $hue))
+           $hue)
+      (and (repeater ?terminus)
            (bind (color ?terminus $hue))
            $hue)))
 
@@ -458,11 +461,11 @@
            (eql $source-hue ?hue)))))
 
 
-(define-query connector-is-powered-by (?connector ?potential-source)
+(define-query terminus-is-powered-by (?connector ?potential-source)
   ;; Returns t if ?connector is currently receiving power from ?potential-source
   ;; This prevents creating reciprocal beams back to the power source
-  (and (connector ?connector)
-       (bind (color ?connector $conn-hue))  ; Connector must be active
+  (and (or (connector ?connector) (repeater ?connector))
+       (bind (color ?connector $conn-hue))  ; Connector/repeater must be active
        ;; Check if a beam exists from ?potential-source to ?connector
        (exists (?b (get-current-beams))
          (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
@@ -474,7 +477,7 @@
               (= $end-y $conn-y)
               ;; Verify source has matching hue (confirming power flow)
               (or (bind (chroma $src $src-hue))     ; Transmitter
-                  (bind (color $src $src-hue)))     ; Active connector
+                  (bind (color $src $src-hue)))     ; Active connector/repeater
               (eql $src-hue $conn-hue)))))
 
 
@@ -492,14 +495,42 @@
   ;; All functions must execute in order; returns t if any change occurred
   (some #'identity
         (mapcar (lambda (fn) (funcall fn state))
-                (list #'create-missing-beams!
+                (list #'update-plate-controlled-devices!
+                      #'create-missing-beams!
                       #'remove-orphaned-beams!
                       #'recalculate-all-beams!          ;always returns nil
                       #'update-beams-if-interference!   ;always returns nil
                       #'deactivate-receivers-that-lost-power!
-                      #'deactivate-unreachable-connectors!
+                      #'deactivate-unpowered-relays!
                       #'activate-receivers-that-gained-power!
                       #'activate-reachable-connectors!))))
+
+
+(define-update update-plate-controlled-devices! ()
+  ;; Propagates plate activation state to controlled gates and blowers
+  ;; Returns t if any change occurred, nil otherwise
+  (do
+    (doall (?p plate)
+      (if (active ?p)
+        ;; Plate is active: open controlled gates, activate controlled blowers
+        (do (doall (?g gate)
+              (if (and (controls ?p ?g) (not (open ?g)))
+                (do (open ?g)
+                    (setq $changed t))))
+            (doall (?b blower)
+              (if (and (controls ?p ?b) (not (active ?b)))
+                (do (active ?b)
+                    (setq $changed t)))))
+        ;; Plate is inactive: close controlled gates, deactivate controlled blowers
+        (do (doall (?g gate)
+              (if (and (controls ?p ?g) (open ?g))
+                (do (not (open ?g))
+                    (setq $changed t))))
+            (doall (?b blower)
+              (if (and (controls ?p ?b) (active ?b))
+                (do (not (active ?b))
+                    (setq $changed t)))))))
+    $changed))
 
 
 (define-update create-missing-beams! ()
@@ -516,7 +547,7 @@
               (if (and $source-hue                              ; Source is active
                        (target ?tgt)
                        (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
-                       (not (connector-is-powered-by ?src ?tgt))) ; ?tgt is not powering ?src
+                       (not (terminus-is-powered-by ?src ?tgt))) ; ?tgt is not powering ?src
                 ;; Create beam: source is transmitter (always active) or powered connector
                 (do (create-beam-segment-p! ?src ?tgt)
                     (setq $created-any t)))))))
@@ -536,7 +567,7 @@
           (if (not (or (paired $src $tgt) (paired $tgt $src)))
             (setq $should-remove t))
           ;; Reason 2: Source is connector that lost power (no color binding)
-          (if (and (or (connector $src) (ghost-connector $src))
+          (if (and (or (connector $src) (repeater $src))
                    (not (bind (color $src $hue))))
             (setq $should-remove t))
           ;; Execute removal if needed
@@ -621,12 +652,12 @@
     $any-deactivated))
 
 
-(define-update deactivate-unreachable-connectors! ()
+(define-update deactivate-unpowered-relays! ()
   ;; Returns t if any connector was deactivated, nil otherwise
   ;; Beam removal now handled by Phase 0 Part B in next iteration
   (do
     (setq $deactivated-any nil)
-    (doall (?c (either connector ghost-connector))
+    (doall (?c (either connector repeater))
       (if (bind (color ?c $c-hue))
         ;; Connector is currently active - verify it still has power
         (if (not (connector-has-beam-power ?c $c-hue))
@@ -656,7 +687,7 @@
   ;; Now uses consensus logic: connector only activates if ALL reaching beams have same hue
   (do
     (setq $activated-any nil)
-    (doall (?c (either connector ghost-connector))
+    (doall (?c (either connector repeater))  ; <-- CHANGED: added repeater
       (if (not (bind (color ?c $existing-hue)))
         (do
           ;; Collect all hues from beams that reach this connector
