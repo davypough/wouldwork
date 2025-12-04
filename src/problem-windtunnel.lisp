@@ -54,6 +54,7 @@
   (loc (either agent cargo) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either plate blower receiver))
+  (ghost-activated blower)  ;blower was activated by ghost agent
   (paired terminus terminus)  ;potential beam between two terminus
   (color (either connector repeater) $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
@@ -92,17 +93,17 @@
       (setq $base-distance
         (cond ((eql $area 'area5) 0)    ; At goal
               ((eql $area 'area4) 1)    ; One move (through gate2)
-              ((eql $area 'area3) 2)    ; area3 â†’ area4 â†’ area5
+              ((eql $area 'area3) 2)    ; area3 -> area4 -> area5
               ;; From area1/area2: can reach area4 directly if blower off
               ((or (eql $area 'area1) (eql $area 'area2)) 2)
               (t 10)))                   ; Should not occur
       ;; Penalties for obstacles on path to goal
       (setq $penalty 0)
-      ;; blower blocks area1/area2 â†’ area3/area4 passage
+      ;; blower blocks area1/area2 -> area3/area4 passage
       (if (and (or (eql $area 'area1) (eql $area 'area2))
                (active blower1))
         (setq $penalty (+ $penalty 1)))  ; Need to toggle plate1
-      ;; Gate2 blocks area4 â†’ area5 passage
+      ;; Gate2 blocks area4 -> area5 passage
       (if (and (not (eql $area 'area5))
                (not (open gate2)))
         (setq $penalty (+ $penalty 1)))  ; Need to activate receiver1
@@ -179,7 +180,6 @@
                            (loc ?obj $zone))))))))
 
 
-
 (define-query visible (?agent ?area1 ?area2)
   ;; For player: respects gate open states and area occupancy to connect connectors
   ;; For ghost: ignores environmental states (recorded when different)
@@ -218,16 +218,17 @@
 
 (define-query accessible (?agent ?area1 ?area2)
   ;; For player: respects gate and blower environmental states
-  ;; For ghost: ignores gate and blower states (recorded when different)
+  ;; For ghost: ignores states recorded when different, respects own activations
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
              (or (ghost-agent ?agent)
                  (open ?g))))
-      (exists (?f blower)
-        (and (accessible1 ?area1 ?f ?area2)
-             (or (ghost-agent ?agent)
-                 (not (active ?f)))))))
+      (exists (?b blower)
+        (and (accessible1 ?area1 ?b ?area2)
+             (or (and (ghost-agent ?agent)
+                      (not (ghost-activated ?b)))
+                 (not (active ?b)))))))
 
 
 (define-query placeable (?cargo ?area)
@@ -403,34 +404,6 @@
       $intersections))
 
 
-#+ignore (define-query connectable (?agent ?area ?terminus)
-  ;; For player: respects environmental constraints via los/visible
-  ;; For ghost: relaxed constraints via los/visible ghost dispatch
-  (or
-    ;; Case 1: Transmitters and receivers (fixtures) use static line-of-sight
-    (and (fixture ?terminus)
-         (los ?agent ?area ?terminus)
-         ;; Additional validation: verify geometric beam path is clear
-         (mvsetq ($source-x $source-y) (get-fixed-coordinates ?area))
-         (mvsetq ($target-x $target-y) (get-coordinates ?terminus))
-         (mvsetq ($end-x $end-y)
-           (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-         ;; Verify beam reaches fixture
-         (= $end-x $target-x)
-         (= $end-y $target-y))
-    ;; Case 2: Connectors require geometric beam path validation
-    (and (connector ?terminus)
-         (exists (?target-area area)
-           (and (loc ?terminus ?target-area)
-                (visible ?agent ?area ?target-area)
-                (mvsetq ($source-x $source-y) (get-fixed-coordinates ?area))
-                (mvsetq ($target-x $target-y) (get-coordinates ?terminus))
-                (mvsetq ($end-x $end-y)
-                  (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
-                (= $end-x $target-x)
-                (= $end-y $target-y))))))
-
-
 (define-query receiver-beam-reaches (?receiver)
   ; Returns t if a color-matching beam reaches the receiver
   (do
@@ -481,6 +454,39 @@
               (eql $src-hue $conn-hue)))))
 
 
+(define-query collect-transmitter-powered-relays ()
+  ;; BFS from all transmitters, returning list of relays reachable via beam chains
+  (do
+    ;; Initialize frontier with all transmitters
+    (setq $frontier nil)
+    (doall (?t transmitter)
+      (push ?t $frontier))
+    ;; Initialize result set
+    (setq $powered-relays nil)
+    ;; BFS loop - continue while frontier has sources to process
+    (ww-loop while $frontier do
+      (setq $next-frontier nil)
+      ;; Process each source in current frontier
+      (ww-loop for $source in $frontier do
+        ;; Check all beams originating from this source
+        (doall (?b (get-current-beams))
+          (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+              (if (eql $src $source)
+                ;; Beam originates from current source - check if target is a relay
+                (if (or (connector $tgt) (repeater $tgt))
+                  ;; Verify beam actually reaches target coordinates
+                  (do (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
+                      (if (and (= $end-x $tgt-x)
+                               (= $end-y $tgt-y)
+                               (not (member $tgt $powered-relays)))
+                        ;; Target is newly discovered powered relay
+                        (do (push $tgt $powered-relays)
+                            (push $tgt $next-frontier)))))))))
+      ;; Advance to next frontier
+      (setq $frontier $next-frontier))
+    $powered-relays))
+
+
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
@@ -496,6 +502,7 @@
   (some #'identity
         (mapcar (lambda (fn) (funcall fn state))
                 (list #'update-plate-controlled-devices!
+                      #'blow-area3-objects-if-active!
                       #'create-missing-beams!
                       #'remove-orphaned-beams!
                       #'recalculate-all-beams!          ;always returns nil
@@ -529,8 +536,41 @@
             (doall (?b blower)
               (if (and (controls ?p ?b) (active ?b))
                 (do (not (active ?b))
+                    (if (ghost-activated ?b)              ; <-- ADDED
+                      (not (ghost-activated ?b)))         ; <-- ADDED
                     (setq $changed t)))))))
     $changed))
+
+
+(define-update blow-area3-objects-if-active! ()
+  ;; Blows objects from area3 to area1 when blower1 is active.
+  ;; Uses ghost-activated status to determine which objects to blow:
+  ;;   ghost-activated: blow all objects (recording phase)
+  ;;   not ghost-activated: blow only real objects (playback phase)
+  ;; Returns t if any object was moved, nil otherwise.
+  (do
+    (setq $moved-any nil)
+    (if (active blower1)
+      (if (ghost-activated blower1)
+        ;; Ghost activated: blow all objects
+        (do (doall (?a agent)
+              (if (loc ?a area3)
+                (do (loc ?a area1)
+                    (setq $moved-any t))))
+            (doall (?c cargo)
+              (if (loc ?c area3)
+                (do (loc ?c area1)
+                    (setq $moved-any t)))))
+        ;; Real agent activated: blow only real objects
+        (do (doall (?ra real-agent)
+              (if (loc ?ra area3)
+                (do (loc ?ra area1)
+                    (setq $moved-any t))))
+            (doall (?rc real-cargo)
+              (if (loc ?rc area3)
+                (do (loc ?rc area1)
+                    (setq $moved-any t)))))))
+    $moved-any))
 
 
 (define-update create-missing-beams! ()
@@ -653,15 +693,17 @@
 
 
 (define-update deactivate-unpowered-relays! ()
-  ;; Returns t if any connector was deactivated, nil otherwise
-  ;; Beam removal now handled by Phase 0 Part B in next iteration
+  ;; Returns t if any connector/repeater was deactivated, nil otherwise
+  ;; Uses forward reachability from transmitters to detect true power
   (do
     (setq $deactivated-any nil)
+    ;; Get set of relays with valid transmitter power
+    (setq $powered-relays (collect-transmitter-powered-relays))
     (doall (?c (either connector repeater))
       (if (bind (color ?c $c-hue))
-        ;; Connector is currently active - verify it still has power
-        (if (not (connector-has-beam-power ?c $c-hue))
-          ;; Lost power - deactivate (beams removed by Phase 0 next iteration)
+        ;; Relay is currently active - verify it has transmitter power
+        (if (not (member ?c $powered-relays))
+          ;; No path to transmitter - deactivate
           (do
             (not (color ?c $c-hue))
             (setq $deactivated-any t)))))
@@ -743,6 +785,28 @@
         (current-beams (substitute nil ?beam $beams))
         t)
     nil))
+
+
+(define-update blow-objects-from-area3! (?agent)
+  ;; Blows objects from area3 to area1 when a blower activates.
+  ;; ?agent is who caused the activation (determines which objects get blown).
+  ;; Real agent toggles: blow only real objects (playback phase)
+  ;; Ghost agent toggles: blow all objects (recording phase)
+  (if (real-agent ?agent)
+    ;; Real agent toggles: blow only real objects
+    (do (doall (?ra real-agent)
+          (if (loc ?ra area3)
+            (loc ?ra area1)))
+        (doall (?rc real-cargo)
+          (if (loc ?rc area3)
+            (loc ?rc area1))))
+    ;; Ghost agent toggles: blow all objects
+    (do (doall (?a agent)
+          (if (loc ?a area3)
+            (loc ?a area1)))
+        (doall (?c cargo)
+          (if (loc ?c area3)
+            (loc ?c area1))))))
 
 
 ;;;; ACTIONS ;;;;
@@ -855,6 +919,12 @@
   (assert (if (active ?plate)
             (not (active ?plate))
             (active ?plate))
+          ;; Track ghost-activated when ghost agent activates blower
+          (if (and (active ?plate)
+                   (ghost-agent ?agent))
+            (doall (?b blower)
+              (if (controls ?plate ?b)
+                (ghost-activated ?b))))
           (propagate-changes!)))
 
 

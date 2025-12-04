@@ -1,0 +1,47 @@
+Full Integrated Sequence Table for Recorder Problem (windtunnel)
+
+1. Solve with wouldwork
+2. Edit solution inserting (pause) & (resume) to create Playback Phase
+3. Create Recording Phase by extracting only agent1* (ghost) actions
+
+
+A minimum length solution path from start state to goal state:
+(1.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 AREA1))
+(2.0 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* AREA1))
+(3.0 (CONNECT-TO-2-TERMINUS AGENT1* CONNECTOR1* REPEATER1 TRANSMITTER1 AREA1))
+(4.0 (MOVE AGENT1 AREA1 AREA3))
+(5.0 (CONNECT-TO-2-TERMINUS AGENT1 CONNECTOR1 REPEATER1 RECEIVER1 AREA3))
+(6.0 (MOVE AGENT1 AREA3 AREA4))
+(7.0 (MOVE AGENT1* AREA1 AREA2))
+(8.0 (TOGGLE-PLATE AGENT1* PLATE1))
+(9.0 (MOVE AGENT1 AREA4 AREA5))
+
+
+Recording Phase:
+     (start-recorder)   ;always begin recording
+     (pause)
+(2.0 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* AREA1))
+(3.0 (CONNECT-TO-2-TERMINUS AGENT1* CONNECTOR1* REPEATER1 TRANSMITTER1 AREA1))
+     (pause)
+(7.0 (MOVE AGENT1* AREA1 AREA2))
+(8.0 (TOGGLE-PLATE AGENT1* PLATE1))
+     (pause)
+     (stop-recorder)    ;always end recording
+
+
+Playback Phase:
+A minimum length solution path from start state to goal state:  
+     (pause)                ;insert pause before any agent1 action
+(1.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 AREA1))
+     (resume)               ;insert resume before any agent1* action
+(2.0 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* AREA1))
+(3.0 (CONNECT-TO-2-TERMINUS AGENT1* CONNECTOR1* REPEATER1 TRANSMITTER1 AREA1))
+     (pause)
+(4.0 (MOVE AGENT1 AREA1 AREA3))
+(5.0 (CONNECT-TO-2-TERMINUS AGENT1 CONNECTOR1 REPEATER1 RECEIVER1 AREA3))
+(6.0 (MOVE AGENT1 AREA3 AREA4))
+     (resume)
+(7.0 (MOVE AGENT1* AREA1 AREA2))
+(8.0 (TOGGLE-PLATE AGENT1* PLATE1))
+     (pause)
+(9.0 (MOVE AGENT1 AREA4 AREA5))  ;goal

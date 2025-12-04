@@ -410,6 +410,7 @@
                        :pre-defun-name (ut::intern-symbol name '-PRE-FN)
                        :eff-defun-name (ut::intern-symbol name '-EFF-FN)
                        :duration duration
+                       :precondition-form precondition  ;user's specified precondition
                        :precondition-params pre-params
                        :precondition-variables (append flat-pre-param-?vars pre-$vars)
                        :precondition-types pre-param-types

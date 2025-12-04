@@ -353,11 +353,15 @@
 
 (defun report-validation-failure (index action-form reason state)
   "Report a validation failure with diagnostics."
+  (declare (ignore state))
   (format t "~%VALIDATION FAILED at action ~D~%" index)
   (format t "~%Action: ~S~%" action-form)
   (format t "~%Reason: ~A~%" reason)
-  (format t "~%State before failure:~%")
-  (display-validation-state state))
+  ;; When precondition failed, show the precondition for diagnosis
+  (when (string= reason "Precondition not satisfied for given arguments")
+    (let ((action (find (first action-form) *actions* :key #'action.name)))
+      (when action
+        (format t "~%Precondition: ~S~%" (action.precondition-form action))))))
 
 
 (defun check-validation-result (final-state action-count)

@@ -150,6 +150,7 @@
   (precondition-type-inst nil :type list)
   (dynamic nil :type list)  ;a dynamic rule requires recomputation of params on each execution
   (precondition-args nil :type (or list symbol))
+  (precondition-form nil :type list)  ;the user's specified precondition
   (init nil :type (member nil t))  ;signals if an init-action or a normal rule action
   (precondition-lambda nil :type list)
   (iprecondition-lambda nil :type list)
