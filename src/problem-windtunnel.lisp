@@ -54,7 +54,6 @@
   (loc (either agent cargo) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either plate blower receiver))
-  (ghost-activated blower)  ;blower was activated by ghost agent
   (paired terminus terminus)  ;potential beam between two terminus
   (color (either connector repeater) $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
@@ -218,7 +217,7 @@
 
 (define-query accessible (?agent ?area1 ?area2)
   ;; For player: respects gate and blower environmental states
-  ;; For ghost: ignores states recorded when different, respects own activations
+  ;; For ghost: ignores environmental states (replaying recorded script)
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
@@ -226,8 +225,7 @@
                  (open ?g))))
       (exists (?b blower)
         (and (accessible1 ?area1 ?b ?area2)
-             (or (and (ghost-agent ?agent)
-                      (not (ghost-activated ?b)))
+             (or (ghost-agent ?agent)
                  (not (active ?b)))))))
 
 
@@ -536,40 +534,28 @@
             (doall (?b blower)
               (if (and (controls ?p ?b) (active ?b))
                 (do (not (active ?b))
-                    (if (ghost-activated ?b)              ; <-- ADDED
-                      (not (ghost-activated ?b)))         ; <-- ADDED
                     (setq $changed t)))))))
     $changed))
 
 
 (define-update blow-area3-objects-if-active! ()
   ;; Blows objects from area3 to area1 when blower1 is active.
-  ;; Uses ghost-activated status to determine which objects to blow:
-  ;;   ghost-activated: blow all objects (recording phase)
-  ;;   not ghost-activated: blow only real objects (playback phase)
+  ;; Ghost agents/cargo are NEVER blown - they follow their recorded script
+  ;; and are immune to environmental physics.
+  ;; Only real agents and real cargo are affected by blower physics.
   ;; Returns t if any object was moved, nil otherwise.
   (do
     (setq $moved-any nil)
     (if (active blower1)
-      (if (ghost-activated blower1)
-        ;; Ghost activated: blow all objects
-        (do (doall (?a agent)
-              (if (loc ?a area3)
-                (do (loc ?a area1)
-                    (setq $moved-any t))))
-            (doall (?c cargo)
-              (if (loc ?c area3)
-                (do (loc ?c area1)
-                    (setq $moved-any t)))))
-        ;; Real agent activated: blow only real objects
-        (do (doall (?ra real-agent)
-              (if (loc ?ra area3)
-                (do (loc ?ra area1)
-                    (setq $moved-any t))))
-            (doall (?rc real-cargo)
-              (if (loc ?rc area3)
-                (do (loc ?rc area1)
-                    (setq $moved-any t)))))))
+      ;; Blow only real objects - ghost objects are immune
+      (do (doall (?ra real-agent)
+            (if (loc ?ra area3)
+              (do (loc ?ra area1)
+                  (setq $moved-any t))))
+          (doall (?rc real-cargo)
+            (if (loc ?rc area3)
+              (do (loc ?rc area1)
+                  (setq $moved-any t))))))
     $moved-any))
 
 
@@ -919,12 +905,6 @@
   (assert (if (active ?plate)
             (not (active ?plate))
             (active ?plate))
-          ;; Track ghost-activated when ghost agent activates blower
-          (if (and (active ?plate)
-                   (ghost-agent ?agent))
-            (doall (?b blower)
-              (if (controls ?plate ?b)
-                (ghost-activated ?b))))
           (propagate-changes!)))
 
 

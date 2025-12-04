@@ -116,14 +116,11 @@
     ;; Get precondition argument combinations (handle dynamic vs static)
     (let ((precondition-args (get-precondition-args action state)))
       
-      ;(when verbose
-      ;  (format t "  Total number of precondition-arg combinations: ~D~%" (length precondition-args))
-      ;  (format t "  First few combinations: ~S~%" (subseq precondition-args 0 (min 5 (length precondition-args)))))
-      
       ;; Find matching precondition instantiation
       (let ((matching-pre-result nil)
             (checked-count 0)
-            (passed-count 0))
+            (passed-count 0)
+            (first-passing-effect-args nil))                                    ; NEW
         
         ;; Search through precondition argument combinations
         (dolist (pre-args precondition-args)
@@ -135,17 +132,21 @@
               (let ((effect-args (extract-effect-args action pre-args pre-result)))
                 (when verbose
                   (format t "  Precondition satisfied for: ~S~%" pre-args))
+                ;; Save first passing effect-args for mismatch reporting             ; NEW
+                (unless first-passing-effect-args                                    ; NEW
+                  (setf first-passing-effect-args effect-args))                      ; NEW
                 (when (args-match-with-combinations action effect-args provided-args)
                   (setf matching-pre-result pre-result)
                   (return))))))
         
-        ;(when verbose
-        ;  (format t "  Checked ~D combinations, ~D passed precondition~%" checked-count passed-count))
-        
-        ;; If no matching instantiation found, precondition failed
-        (unless matching-pre-result
-          (return-from apply-action-to-state
-            (values nil nil "Precondition not satisfied for given arguments")))
+        ;; If no matching instantiation found, determine failure type               ; CHANGED
+        (unless matching-pre-result                                                 ; CHANGED
+          (return-from apply-action-to-state                                        ; CHANGED
+            (if (> passed-count 0)                                                  ; NEW
+                ;; Precondition passed but bindings don't match provided args       ; NEW
+                (values nil nil (cons :state-mismatch first-passing-effect-args))   ; NEW
+                ;; True precondition failure                                        ; NEW
+                (values nil nil :precondition-failure))))                           ; NEW
         
         ;; Apply effect to produce updated-dbs
         (let ((updated-dbs (if (eql matching-pre-result t)
@@ -353,15 +354,26 @@
 
 (defun report-validation-failure (index action-form reason state)
   "Report a validation failure with diagnostics."
-  (declare (ignore state))
   (format t "~%VALIDATION FAILED at action ~D~%" index)
   (format t "~%Action: ~S~%" action-form)
-  (format t "~%Reason: ~A~%" reason)
-  ;; When precondition failed, show the precondition for diagnosis
-  (when (string= reason "Precondition not satisfied for given arguments")
-    (let ((action (find (first action-form) *actions* :key #'action.name)))
-      (when action
-        (format t "~%Precondition: ~S~%" (action.precondition-form action))))))
+  (let ((action (find (first action-form) *actions* :key #'action.name)))
+    (cond
+      ;; True precondition failure
+      ((eq reason :precondition-failure)
+       (format t "~%Reason: Precondition not satisfied~%")
+       (when action
+         (format t "~%Precondition: ~S~%" (action.precondition-form action))
+         (diagnose-precondition-failure action (rest action-form) state)))
+      
+      ;; State mismatch - precondition passed but bindings differ
+      ((and (consp reason) (eq (car reason) :state-mismatch))
+       (format t "~%Reason: State mismatch - Loss of synchronization with expected trajectory~%")
+       (when action
+         (report-state-mismatch action (rest action-form) (cdr reason))))
+      
+      ;; Other failure reasons (strings)
+      (t
+       (format t "~%Reason: ~A~%" reason)))))
 
 
 (defun check-validation-result (final-state action-count)
@@ -404,3 +416,157 @@
     (dolist (prop props)
       (format t "    ~S~%" prop))
     (terpri)))
+
+
+;;; ==================== Precondition Diagnosis ====================
+
+
+(defun diagnose-precondition-failure (action provided-args state)
+  "Diagnose which clause in a precondition fails by evaluating each clause
+   in sequence. Reports the first failing clause with bindings substituted.
+   
+   ACTION is the action structure.
+   PROVIDED-ARGS is the list of argument values from the action form.
+   STATE is the current problem-state."
+  (let* ((precond-form (action.precondition-form action))
+         (precond-vars (action.precondition-variables action))
+         (effect-vars (action.effect-variables action))
+         ;; Build effect-var -> value mapping from provided args
+         (effect-var-map (pairlis effect-vars provided-args))
+         ;; Split precondition-variables into ?vars (from parameters) and $vars (fluents)
+         (?vars (remove-if-not #'?varp precond-vars))
+         ($vars (remove-if-not #'$varp precond-vars))
+         ;; Get ?var values from the effect-var mapping (they must appear in effect-vars)
+         ;; $vars are initialized to nil (bound during clause evaluation)
+         (?var-values (mapcar (lambda (v)
+                                (let ((binding (assoc v effect-var-map)))
+                                  (if binding (cdr binding) nil)))
+                              ?vars))
+         ($var-values (make-list (length $vars) :initial-element nil))
+         ;; Extract clauses and any let-bindings
+         (clauses nil)
+         (let-bindings nil))
+    
+    ;; Handle (let bindings decl body) wrapper
+    (when (and (consp precond-form) (eq (car precond-form) 'let))
+      (setf let-bindings (second precond-form))
+      (setf precond-form (if (and (third precond-form)
+                                   (consp (third precond-form))
+                                   (eq (car (third precond-form)) 'declare))
+                              (fourth precond-form)
+                              (third precond-form))))
+    
+    ;; Extract clauses from AND, or treat as single clause
+    (setf clauses (if (and (consp precond-form) (eq (car precond-form) 'and))
+                      (cdr precond-form)
+                      (list precond-form)))
+    
+    ;; Evaluate each clause in sequence
+    (dolist (clause clauses)
+      (multiple-value-bind (result new-$var-values)
+          (evaluate-precondition-clause clause state 
+                                        ?vars ?var-values 
+                                        $vars $var-values
+                                        let-bindings)
+        (if result
+            ;; Clause passed - update $var bindings for next clause
+            (setf $var-values new-$var-values)
+            ;; Clause failed - report and return
+            (let ((substituted (substitute-bindings clause 
+                                                    ?vars ?var-values 
+                                                    $vars $var-values)))
+              (format t "~%Failed: ~S~%" substituted)
+              (return-from diagnose-precondition-failure nil)))))))
+
+
+(defun report-binding-mismatches ($vars $var-values effect-vars provided-args)
+  "Report mismatches between $var values bound from database evaluation
+   vs. values provided in the action form.
+   
+   $VARS is the list of fluent variable names from precondition.
+   $VAR-VALUES is the list of values bound during clause evaluation.
+   EFFECT-VARS is the list of effect variable names.
+   PROVIDED-ARGS is the list of values from the action form."
+  (let ((mismatches nil))
+    ;; For each $var, find its position in effect-vars and compare values
+    (loop for $var in $vars
+          for bound-value in $var-values
+          for pos = (position $var effect-vars)
+          when pos
+          do (let ((provided-value (nth pos provided-args)))
+               (unless (equal bound-value provided-value)
+                 (push (list $var bound-value provided-value) mismatches))))
+    
+    (if mismatches
+        (progn
+          (format t "~%Binding mismatch - Loss of state synchronization:~%")
+          (dolist (mismatch (nreverse mismatches))
+            (destructuring-bind ($var bound-value provided-value) mismatch
+              (format t "  ~A: actual ~S, provided ~S~%" $var bound-value provided-value))))
+        ;; No mismatches found - truly unexpected
+        (format t "~%All clauses passed, no binding mismatches found (unexpected)~%"))))
+
+
+(defun evaluate-precondition-clause (clause state ?vars ?var-values $vars $var-values let-bindings)
+  "Evaluate a single precondition clause against state.
+   Returns (values result new-$var-values) where result is T/NIL
+   and new-$var-values contains updated fluent bindings."
+  (let* (;; Build the lambda body with translated clause
+         (translated (translate clause 'pre))
+         (int-code (subst-int-code translated))
+         ;; Lambda that evaluates clause and returns updated $var values
+         (lambda-form
+           `(lambda (state ,@?vars ,@$vars)
+              (declare (ignorable state ,@?vars ,@$vars))
+              ,(if let-bindings
+                   `(let ,let-bindings
+                      (let ((result ,int-code))
+                        (values result (list ,@$vars))))
+                   `(let ((result ,int-code))
+                      (values result (list ,@$vars))))))
+         (fn (compile nil lambda-form)))
+    ;; Call with state, ?var values, then $var values
+    (apply fn state (append ?var-values $var-values))))
+
+
+(defun substitute-bindings (form ?vars ?var-values $vars $var-values)
+  "Substitute variable bindings into a form for display.
+   Replaces ?vars and $vars with their corresponding values."
+  (let ((bindings (append (pairlis ?vars ?var-values)
+                          (pairlis $vars $var-values))))
+    (subst-bindings-recursive form bindings)))
+
+
+(defun subst-bindings-recursive (form bindings)
+  "Recursively substitute bindings in form."
+  (cond
+    ((null form) nil)
+    ((atom form)
+     (let ((binding (assoc form bindings)))
+       (if binding
+           (cdr binding)
+           form)))
+    (t (cons (subst-bindings-recursive (car form) bindings)
+             (subst-bindings-recursive (cdr form) bindings)))))
+
+
+(defun report-state-mismatch (action provided-args actual-effect-args)
+  "Report mismatches between provided argument values and actual bound values.
+   
+   ACTION is the action structure.
+   PROVIDED-ARGS is the list of values from the action form.
+   ACTUAL-EFFECT-ARGS is the effect-args extracted from a passing precondition."
+  (let ((effect-vars (action.effect-variables action))
+        (mismatches nil))
+    ;; Compare each position
+    (loop for var in effect-vars
+          for provided in provided-args
+          for actual in actual-effect-args
+          unless (equal provided actual)
+          do (push (list var actual provided) mismatches))
+    
+    (when mismatches
+      (format t "~%Mismatched bindings:~%")
+      (dolist (mismatch (nreverse mismatches))
+        (destructuring-bind (var actual provided) mismatch
+          (format t "  ~A: actual ~S, provided ~S~%" var actual provided))))))
