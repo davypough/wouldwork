@@ -751,11 +751,33 @@
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solutions*)
+    ;; CHANGED: Replace existing unique solution if new one is better
     (with-search-structures-lock
-      (when (not (member (problem-state.idb (solution.goal solution)) *unique-solutions* 
-                         :key (lambda (soln) (problem-state.idb (solution.goal soln)))
-                         :test #'equalp))
-        (push-global solution *unique-solutions*)))))
+      (let* ((new-idb (problem-state.idb (solution.goal solution)))
+             (existing (find new-idb *unique-solutions*
+                             :key (lambda (soln)
+                                    (problem-state.idb (solution.goal soln)))
+                             :test #'equalp)))
+        (cond (existing
+               ;; Replace if new solution is better
+               (when (solution-better-p solution existing)
+                 (setf *unique-solutions*
+                       (substitute solution existing *unique-solutions*))))
+              (t
+               (push-global solution *unique-solutions*)))))))
+
+
+(defun solution-better-p (new-soln old-soln)
+  "Returns T if NEW-SOLN is better than OLD-SOLN based on *solution-type*."
+  (ecase *solution-type*
+    ((min-length first every)
+     (< (solution.depth new-soln) (solution.depth old-soln)))
+    (min-time
+     (< (solution.time new-soln) (solution.time old-soln)))
+    (min-value
+     (< (solution.value new-soln) (solution.value old-soln)))
+    (max-value
+     (> (solution.value new-soln) (solution.value old-soln)))))
 
 
 (defun printout-solution (soln)

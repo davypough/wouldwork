@@ -58,6 +58,8 @@
   (color (either connector repeater) $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
+  (ghost-toggle-count plate $fixnum)
+  (real-blower-moves $list)
 )
 
 
@@ -485,6 +487,31 @@
     $powered-relays))
 
 
+(define-query find-blower-on-path? (?area1 ?area2)
+  ;; Returns the blower controlling path from ?area1 to ?area2, or nil if none.
+  (ww-loop for ?b in (gethash 'blower *types*)
+           do (if (accessible1 ?area1 ?b ?area2)
+                (return ?b))))
+
+
+(define-query playback-blower-active? (?blower)
+  ;; Returns t if blower will be active when playback begins.
+  ;; This occurs when any controlling plate has odd ghost toggle count.
+  (exists (?p plate)
+    (and (controls ?p ?blower)
+         (bind (ghost-toggle-count ?p $count))
+         (oddp $count))))
+
+
+(define-query recording-playback-valid? ()
+  ;; Validates that all real agent moves through blower-controlled paths
+  ;; were legal given the recording-final blower states.
+  ;; Returns t if valid, nil if any move was illegal.
+  (do (bind (real-blower-moves $moves))
+      (not (ww-loop for $move in $moves
+                    thereis (playback-blower-active? (third $move))))))
+
+
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
@@ -905,6 +932,10 @@
   (assert (if (active ?plate)
             (not (active ?plate))
             (active ?plate))
+          ;; Track ghost toggle count for playback validation        ; <-- ADDED
+          (if (ghost-agent ?agent)                                   ; <-- ADDED
+            (do (bind (ghost-toggle-count ?plate $count))            ; <-- ADDED
+                (ghost-toggle-count ?plate (1+ $count))))            ; <-- ADDED
           (propagate-changes!)))
 
 
@@ -913,9 +944,19 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       (accessible ?agent $area1 ?area2))
-  (?agent $area1 ?area2)
+       (accessible ?agent $area1 ?area2)
+       ;; Capture blower if real agent uses blower-controlled path          ; <-- ADDED
+       (setq $blower-used                                                   ; <-- ADDED
+             (if (real-agent ?agent)                                        ; <-- ADDED
+               (find-blower-on-path? $area1 ?area2)                         ; <-- ADDED
+               nil)))                                                       ; <-- ADDED
+  (?agent $area1 ?area2 $blower-used)                                       ; <-- CHANGED: added $blower-used
   (assert (loc ?agent ?area2)
+          ;; Record real agent blower-path moves for validation             ; <-- ADDED
+          (if $blower-used                                                  ; <-- ADDED
+            (do (bind (real-blower-moves $moves))                           ; <-- ADDED
+                (real-blower-moves (cons (list $area1 ?area2 $blower-used)  ; <-- ADDED
+                                         $moves))))                         ; <-- ADDED
           (propagate-changes!)))
 
 
@@ -929,7 +970,8 @@
   (loc connector1 area1)
   (loc connector1* area1)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
-  
+  (ghost-toggle-count plate1 0)  ;plate1 starts with zero ghost toggles (inactive)
+  (real-blower-moves ())  ;empty list of recorded blower-path moves
   ;; Static spatial configuration
   (coords area1  4 20)
   (coords area2 11 14)
@@ -984,5 +1026,9 @@
 
 ;;;; GOAL ;;;;
 
-(define-goal  ;always put this last
-  (loc agent1 area5))
+
+(define-goal
+  (and (loc agent1 area5)
+       (if (recording-playback-valid?)
+         (ut::prt 'valid state t)
+         (ut::prt 'not-valid state nil))))  ;return nil, continue searching
