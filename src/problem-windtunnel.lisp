@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 16)
+(ww-set *depth-cutoff* 15)
 
 (ww-set *progress-reporting-interval* 10000000)
 
@@ -58,7 +58,7 @@
   (color (either connector repeater) $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
-  (ghost-toggle-count plate $fixnum)
+  (ghost-toggled-active plate)  ;used to track ghost plate activations during playback to catch illegal moves
   (real-blower-moves $list)
 )
 
@@ -497,11 +497,10 @@
 
 (define-query playback-blower-active? (?blower)
   ;; Returns t if blower will be active when playback begins.
-  ;; This occurs when any controlling plate has odd ghost toggle count.
+  ;; This occurs when any controlling plate has been ghost-toggled to active.
   (exists (?p plate)
     (and (controls ?p ?blower)
-         (bind (ghost-toggle-count ?p $count))
-         (oddp $count))))
+         (ghost-toggled-active ?p))))
 
 
 (define-query recording-playback-valid? ()
@@ -909,10 +908,11 @@
   (assert (if (active ?plate)
             (not (active ?plate))
             (active ?plate))
-          ;; Track ghost toggle count for playback validation
+          ;; Track ghost toggle parity for playback validation
           (if (ghost-agent ?agent)
-            (do (bind (ghost-toggle-count ?plate $count))
-                (ghost-toggle-count ?plate (1+ $count))))
+            (if (ghost-toggled-active ?plate)
+              (not (ghost-toggled-active ?plate))
+              (ghost-toggled-active ?plate)))
           (propagate-changes!)))
 
 
@@ -947,7 +947,6 @@
   (loc connector1 area1)
   (loc connector1* area1)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
-  (ghost-toggle-count plate1 0)  ;plate1 starts with zero ghost toggles (inactive)
   (real-blower-moves ())  ;empty list of recorded blower-path moves
 
   ;; Static spatial configuration
