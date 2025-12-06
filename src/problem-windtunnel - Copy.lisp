@@ -66,7 +66,6 @@
 (define-static-relations
   (coords (either area fixture) $fixnum $fixnum)  ;the (x,y) position
   (controls (either receiver plate) (either gate blower))
-  (blows> blower $area $area)
   (chroma (either transmitter receiver) $hue)
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
   (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
@@ -527,7 +526,7 @@
   ;; All functions must execute in order; returns t if any change occurred
   (do
     (setq $r1 (update-plate-controlled-devices!))
-    (setq $r2 (blow-real-objects-if-active!))
+    (setq $r2 (blow-area3-objects-if-active!))
     (setq $r3 (create-missing-beams!))
     (setq $r4 (remove-orphaned-beams!))
     (recalculate-all-beams!)  ;always returns nil
@@ -566,24 +565,23 @@
     $changed))
 
 
-(define-update blow-real-objects-if-active! ()
-  ;; Blows real objects according to blows> relation when blower is active.
+(define-update blow-area3-objects-if-active! ()
+  ;; Blows objects from area3 to area1 when blower1 is active.
   ;; Ghost agents are ALWAYS immune to blower physics during playback -
   ;; they follow predetermined scripts that were valid when recorded.
   ;; Only real agent and real cargo are ever affected.
   ;; Returns t if any object was moved, nil otherwise.
   (do
     (setq $moved-any nil)
-    (doall (?b blower)
-      (if (and (active ?b)
-               (bind (blows> ?b $from $to)))
-        (do (if (loc agent1 $from)
-              (do (loc agent1 $to)
-                  (setq $moved-any t)))
-            (doall (?rc real-cargo)
-              (if (loc ?rc $from)
-                (do (loc ?rc $to)
-                    (setq $moved-any t)))))))
+    (if (active blower1)
+      ;; Blow only real objects - ghost entities are immune
+      (do (if (loc agent1 area3)
+            (do (loc agent1 area1)
+                (setq $moved-any t)))
+          (doall (?rc real-cargo)
+            (if (loc ?rc area3)
+              (do (loc ?rc area1)
+                  (setq $moved-any t))))))
     $moved-any))
 
 
@@ -973,7 +971,6 @@
   (controls plate1 gate1)
   (controls plate1 blower1)
   (controls receiver1 gate2)
-  (blows> blower1 area3 area1)
   (gate-segment gate1 12 21 12 17)
   (gate-segment gate2 17 6 17 0)
   (wall-segment wall1 19 21 19 17)
