@@ -59,7 +59,7 @@
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
   (ghost-toggled-active plate)  ;used to track ghost plate activations during playback to catch illegal moves
-  (real-blower-moves $list)
+  (moves-pending-validation $list)
 )
 
 
@@ -488,7 +488,7 @@
     $powered-relays))
 
 
-(define-query find-blower-on-path? (?area1 ?area2)
+(define-query find-blower-on-path (?area1 ?area2)
   ;; Returns the blower controlling path from ?area1 to ?area2, or nil if none.
   (ww-loop for ?b in (gethash 'blower *types*)
            do (if (accessible1 ?area1 ?b ?area2)
@@ -507,7 +507,7 @@
   ;; Validates that all real agent moves through blower-controlled paths
   ;; were legal given the recording-final blower states.
   ;; Returns t if valid, nil if any move was illegal.
-  (do (bind (real-blower-moves $moves))
+  (do (bind (moves-pending-validation $moves))
       (not (ww-loop for $move in $moves
                     thereis (playback-blower-active? (third $move))))))
 
@@ -800,6 +800,16 @@
     nil))
 
 
+(define-update record-move-for-playback-validation! (?agent ?area1 ?area2)
+  ;; Records blower-path moves by real agents for playback validation.
+  ;; Only records if agent is real and path is blower-controlled.
+  (if (real-agent ?agent)
+    (do (setq $blower (find-blower-on-path ?area1 ?area2))
+        (if $blower
+          (do (bind (moves-pending-validation $moves))
+              (moves-pending-validation (cons (list ?area1 ?area2 $blower) $moves)))))))
+
+
 ;;;; ACTIONS ;;;;
 
 
@@ -921,19 +931,10 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       (accessible ?agent $area1 ?area2)
-       ;; Capture blower if real agent uses blower-controlled path
-       (setq $blower-used
-             (if (real-agent ?agent)
-               (find-blower-on-path? $area1 ?area2)
-               nil)))
+       (accessible ?agent $area1 ?area2))
   (?agent $area1 ?area2)
   (assert (loc ?agent ?area2)
-          ;; Record real agent blower-path moves for validation
-          (if $blower-used
-            (do (bind (real-blower-moves $moves))
-                (real-blower-moves (cons (list $area1 ?area2 $blower-used)
-                                         $moves))))
+          (record-move-for-playback-validation! ?agent $area1 ?area2)
           (propagate-changes!)))
 
 
@@ -947,7 +948,7 @@
   (loc connector1 area1)
   (loc connector1* area1)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
-  (real-blower-moves ())  ;empty list of recorded blower-path moves
+  (moves-pending-validation ())  ;empty list of recorded blower-path moves
 
   ;; Static spatial configuration
   (coords area1  4 20)
@@ -1008,6 +1009,4 @@
 
 (define-goal
   (and (loc agent1 area5)
-       (if (recording-playback-valid?)
-         (ut::prt '----valid-state state t)
-         nil)))  ;invalid state, return nil, continue searching
+       (recording-playback-valid?)))  ;if invalid state, return nil, continue searching
