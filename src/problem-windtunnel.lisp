@@ -524,18 +524,18 @@
 
 (define-update propagate-consequences! ()
   ;; All functions must execute in order; returns t if any change occurred
-  (do
-    (setq $r1 (update-plate-controlled-devices!))
-    (setq $r2 (blow-real-objects-if-active!))
-    (setq $r3 (create-missing-beams!))
-    (setq $r4 (remove-orphaned-beams!))
-    (recalculate-all-beams!)  ;always returns nil
-    (update-beams-if-interference!)  ;always returns nil
-    (setq $r5 (deactivate-receivers-that-lost-power!))
-    (setq $r6 (deactivate-unpowered-relays!))
-    (setq $r7 (activate-receivers-that-gained-power!))
-    (setq $r8 (activate-reachable-connectors!))
-    (or $r1 $r2 $r3 $r4 $r5 $r6 $r7 $r8)))
+  (some #'identity
+        (mapcar (lambda (fn) (funcall fn state))
+                (list #'update-plate-controlled-devices!
+                      #'blow-real-objects-if-active!
+                      #'create-missing-beams!
+                      #'remove-orphaned-beams!
+                      #'recalculate-all-beams!          ;always returns nil
+                      #'update-beams-if-interference!   ;always returns nil
+                      #'deactivate-receivers-that-lost-power!
+                      #'deactivate-unpowered-relays!
+                      #'activate-receivers-that-gained-power!
+                      #'activate-reachable-connectors!))))
 
 
 (define-update update-plate-controlled-devices! ()
