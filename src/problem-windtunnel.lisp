@@ -242,6 +242,13 @@
                   (loc ?gc ?area))))))
 
 
+(define-query same-type (?agent ?cargo)
+  ; Agent type and cargo type must be the same.
+  (if (real-agent ?agent)
+    (real-cargo ?cargo)
+    (ghost-cargo ?cargo)))
+
+
 (define-query resolve-consensus-hue (?hue-list)
   ; Returns consensus hue from list of available hues, nil if no consensus
   (do (setq $unique-hues (remove-duplicates (remove nil ?hue-list)))
@@ -617,7 +624,7 @@
           ;; Reason 1: Pairing no longer exists (check bidirectional)
           (if (not (or (paired $src $tgt) (paired $tgt $src)))
             (setq $should-remove t))
-          ;; Reason 2: Source is connector that lost power (no color binding)
+          ;; Reason 2: Source is a relay that lost power (no color binding)
           (if (and (or (connector $src) (repeater $src))
                    (not (bind (color $src $hue))))
             (setq $should-remove t))
@@ -771,6 +778,15 @@
           (not (open ?g))))))
 
 
+(define-update disconnect-connector! (?cargo)
+  ;; Clears all pairings and deactivates connector when picked up
+  (do (doall (?t terminus)
+        (if (paired ?cargo ?t)
+          (not (paired ?cargo ?t))))
+      (if (bind (color ?cargo $hue))
+        (not (color ?cargo $hue)))))
+
+
 (define-update create-beam-segment-p! (?source ?target)
   ; Create a beam segment from source, and return the new beam's name.
   (do
@@ -808,6 +824,15 @@
               (moves-pending-validation (cons (list ?area1 ?area2 $blower) $moves)))))))
 
 
+(define-update log-if-ghost-toggle! (?agent ?plate)
+  ;; Track ghost toggle parity for playback validation.
+  ;; Only affects state when agent is a ghost-agent.
+  (if (ghost-agent ?agent)
+    (if (ghost-toggled-active ?plate)
+      (not (ghost-toggled-active ?plate))
+      (ghost-toggled-active ?plate))))
+
+
 ;;;; ACTIONS ;;;;
 
 
@@ -815,8 +840,7 @@
     1
   (?agent agent ?terminus terminus)
   (and (bind (holds ?agent $cargo))
-       (or (and (real-agent ?agent) (real-cargo $cargo))
-           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (same-type ?agent $cargo)
        (different $cargo ?terminus)
        (bind (loc ?agent $area))
        (placeable $cargo $area)
@@ -832,8 +856,7 @@
     1
   (?agent agent (combination (?t1 ?t2) terminus))
   (and (bind (holds ?agent $cargo))
-       (or (and (real-agent ?agent) (real-cargo $cargo))
-           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (bind (loc ?agent $area))
@@ -852,8 +875,7 @@
     1
   (?agent agent (combination (?t1 ?t2 ?t3) terminus))
   (and (bind (holds ?agent $cargo))
-       (or (and (real-agent ?agent) (real-cargo $cargo))
-           (and (ghost-agent ?agent) (ghost-cargo $cargo)))
+       (same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (different $cargo ?t3)
@@ -874,21 +896,14 @@
 (define-action pickup-connector
     1
   (?agent agent ?cargo cargo)
-  (and (or (and (real-agent ?agent) (real-cargo ?cargo))
-           (and (ghost-agent ?agent) (ghost-cargo ?cargo)))
+  (and (same-type ?agent ?cargo)
        (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
        (loc ?cargo $area))
   (?agent ?cargo $area)
   (assert (holds ?agent ?cargo)
           (not (loc ?cargo $area))
-          ;; Remove pairings before convergence (Phase 0 needs this)
-          (doall (?t terminus)
-            (if (paired ?cargo ?t)
-              (not (paired ?cargo ?t))))
-          ;; Deactivate connector if active
-          (if (bind (color ?cargo $hue))
-            (not (color ?cargo $hue)))
+          (disconnect-connector! ?cargo)
           (propagate-changes!)))
 
 
@@ -916,6 +931,7 @@
   (assert (if (active ?plate)
             (not (active ?plate))
             (active ?plate))
+          (log-if-ghost-toggle! ?agent ?plate)  ;tracks ghost toggling for playback validation
           ;; Track ghost toggle parity for playback validation
           (if (ghost-agent ?agent)
             (if (ghost-toggled-active ?plate)
