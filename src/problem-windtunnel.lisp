@@ -527,7 +527,7 @@
   (some #'identity
         (mapcar (lambda (fn) (funcall fn state))
                 (list #'update-plate-controlled-devices!
-                      #'blow-real-objects-if-active!
+                      #'blow-objects-if-active!
                       #'create-missing-beams!
                       #'remove-orphaned-beams!
                       #'recalculate-all-beams!          ;always returns nil
@@ -565,23 +565,23 @@
     $changed))
 
 
-(define-update blow-real-objects-if-active! ()
-  ;; Blows real objects according to blows> relation when blower is active.
-  ;; Ghost agents are ALWAYS immune to blower physics during playback -
-  ;; they follow predetermined scripts that were valid when recorded.
-  ;; Only real agent and real cargo are ever affected.
+(define-update blow-objects-if-active! ()
+  ;; Blows all objects according to blows> relation when blower is active.
+  ;; Both real and ghost agents/cargo are affected by blower physics.
+  ;; Ghost agents can move through blower paths (via accessible query),
+  ;; but are subject to passive physics when standing in blow zones.
   ;; Returns t if any object was moved, nil otherwise.
   (do
-    (setq $moved-any nil)
     (doall (?b blower)
       (if (and (active ?b)
                (bind (blows> ?b $from $to)))
-        (do (if (loc agent1 $from)
-              (do (loc agent1 $to)
-                  (setq $moved-any t)))
-            (doall (?rc real-cargo)
-              (if (loc ?rc $from)
-                (do (loc ?rc $to)
+        (do (doall (?a agent)
+              (if (loc ?a $from)
+                (do (loc ?a $to)
+                    (setq $moved-any t))))
+            (doall (?c cargo)
+              (if (loc ?c $from)
+                (do (loc ?c $to)
                     (setq $moved-any t)))))))
     $moved-any))
 
@@ -590,7 +590,6 @@
   ;; Creates beams for active sources paired with targets where no beam exists yet
   ;; Returns t if any beams were created, nil otherwise
   (do
-    (setq $created-any nil)
     (doall (?src terminus)
       (doall (?tgt terminus)
         (if (and (different ?src ?tgt)
@@ -611,7 +610,6 @@
   ;; Removes beams whose pairing no longer exists or whose source lost power
   ;; Returns t if any beams were removed, nil otherwise
   (do
-    (setq $removed-any nil)
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
           ;; Determine if beam should be removed
@@ -957,11 +955,12 @@
   (coords area4 22 3)
   (coords area5 14 3)
   (accessible0 area1 area2)
-  (accessible0 area3 area4)
-  (accessible1 area4 gate2 area5)
-  (accessible1 area1 blower1 area3)
+  ;(accessible1 area1 blower1 area3)
+  ;(accessible1 area1 blower1 area4)
   (accessible1 area2 blower1 area3)
   (accessible1 area2 blower1 area4)
+  (accessible0 area3 area4)
+  (accessible1 area4 gate2 area5)
 
   ;; Static fixture configuration
   (coords recorder1 4 20)
