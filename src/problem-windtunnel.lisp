@@ -29,13 +29,14 @@
   real-connector  (connector1)
   ghost-connector (connector1*)
   connector       (either real-connector ghost-connector)
+  repeater        (repeater1)
+  relay           (either connector repeater)
   transmitter     (transmitter1)
   receiver        (receiver1)
   beam            ()  ;initial beams
-  repeater        (repeater1)
   plate           (plate1)
   blower          (blower1)
-  hue             (blue)  ;the color of a transmitter, receiver, repeater, or active connector
+  hue             (blue)  ;the hue of a transmitter, receiver, repeater, or active connector
   area            (area1 area2 area3 area4 area5)  ;position points
   real-cargo      (either real-connector)
   ghost-cargo     (either ghost-connector)
@@ -55,7 +56,7 @@
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either plate blower receiver))
   (paired terminus terminus)  ;potential beam between two terminus
-  (color (either connector repeater) $hue)  ;having a color means it is active
+  (color relay $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
   (ghost-toggled-active plate)  ;used to track ghost plate activations during playback to catch illegal moves
@@ -233,17 +234,13 @@
 
 
 (define-query placeable (?cargo ?area)
-  ;Cargo cannot colocate with another cargo of the same type
-  (not (or (and (real-cargo ?cargo)
-                (exists (?rc real-cargo)
-                  (loc ?rc ?area)))
-           (and (ghost-cargo ?cargo)
-                (exists (?gc ghost-cargo)
-                  (loc ?gc ?area))))))
+  ;; Area can hold multiple cargos; coordinate reference used for calculations;
+  ;; can be extended if future domains require area capacity constraints.
+  (and (cargo ?cargo) (area ?area)))
 
 
 (define-query same-type (?agent ?cargo)
-  ; Agent type and cargo type must be the same.
+  ; Agent type and cargo type are the same (real or ghost).
   (if (real-agent ?agent)
     (real-cargo ?cargo)
     (ghost-cargo ?cargo)))
@@ -412,7 +409,7 @@
       $intersections))
 
 
-(define-query receiver-beam-reaches (?receiver)
+(define-query beam-reaches-receiver (?receiver)
   ; Returns t if a color-matching beam reaches the receiver
   (do
     (mvsetq ($r-x $r-y) (get-fixed-coordinates ?receiver))
@@ -442,23 +439,22 @@
            (eql $source-hue ?hue)))))
 
 
-(define-query terminus-is-powered-by (?connector ?potential-source)
-  ;; Returns t if ?connector is currently receiving power from ?potential-source
+(define-query relay-is-powered-by (?relay ?potential-source)
+  ;; Returns t if ?relay is currently receiving power from ?potential-source
   ;; This prevents creating reciprocal beams back to the power source
-  (and (or (connector ?connector) (repeater ?connector))
-       (bind (color ?connector $conn-hue))  ; Connector/repeater must be active
-       ;; Check if a beam exists from ?potential-source to ?connector
+  (and (bind (color ?relay $conn-hue))  ; Relay must be active
+       ;; Check if a beam exists from ?potential-source to ?relay
        (exists (?b (get-current-beams))
          (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
               (eql $src ?potential-source)
-              (eql $tgt ?connector)
-              ;; Verify beam actually reaches connector's coordinates
-              (mvsetq ($conn-x $conn-y) (get-coordinates ?connector))
+              (eql $tgt ?relay)
+              ;; Verify beam actually reaches relay's coordinates
+              (mvsetq ($conn-x $conn-y) (get-coordinates ?relay))
               (= $end-x $conn-x)
               (= $end-y $conn-y)
               ;; Verify source has matching hue (confirming power flow)
               (or (bind (chroma $src $src-hue))     ; Transmitter
-                  (bind (color $src $src-hue)))     ; Active connector/repeater
+                  (bind (color $src $src-hue)))     ; Active relay
               (eql $src-hue $conn-hue)))))
 
 
@@ -481,7 +477,7 @@
           (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
               (if (eql $src $source)
                 ;; Beam originates from current source - check if target is a relay
-                (if (or (connector $tgt) (repeater $tgt))
+                (if (relay $tgt)
                   ;; Verify beam actually reaches target coordinates
                   (do (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
                       (if (and (= $end-x $tgt-x)
@@ -526,7 +522,7 @@
   (ww-loop for $iteration from 1 to 10
            do (if (not (propagate-consequences!))
                 (return))  ;convergence achieved
-           finally (inconsistent-state)))  ;no convergence, mark state inconsistent
+           finally (inconsistent-state)))  ;no convergence, mark state inconsistent for pruning
 
 
 (define-update propagate-consequences! ()
@@ -542,7 +538,7 @@
                       #'deactivate-receivers-that-lost-power!
                       #'deactivate-unpowered-relays!
                       #'activate-receivers-that-gained-power!
-                      #'activate-reachable-connectors!))))
+                      #'activate-reachable-relays!))))
 
 
 (define-update update-plate-controlled-devices! ()
@@ -606,7 +602,7 @@
               (if (and $source-hue                              ; Source is active
                        (target ?tgt)
                        (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
-                       (not (terminus-is-powered-by ?src ?tgt))) ; ?tgt is not powering ?src
+                       (not (relay-is-powered-by ?src ?tgt)))  ; ?tgt is not powering ?src
                 ;; Create beam: source is transmitter (always active) or powered connector
                 (do (create-beam-segment-p! ?src ?tgt)
                     (setq $created-any t)))))))
@@ -625,7 +621,7 @@
           (if (not (or (paired $src $tgt) (paired $tgt $src)))
             (setq $should-remove t))
           ;; Reason 2: Source is a relay that lost power (no color binding)
-          (if (and (or (connector $src) (repeater $src))
+          (if (and (relay $src)
                    (not (bind (color $src $hue))))
             (setq $should-remove t))
           ;; Execute removal if needed
@@ -704,26 +700,25 @@
   (do
     (doall (?r receiver)
       (if (and (active ?r)
-               (not (receiver-beam-reaches ?r)))
+               (not (beam-reaches-receiver ?r)))
         (do (deactivate-receiver! ?r)
             (setq $any-deactivated t))))
     $any-deactivated))
 
 
 (define-update deactivate-unpowered-relays! ()
-  ;; Returns t if any connector/repeater was deactivated, nil otherwise
+  ;; Returns t if any relay was deactivated, nil otherwise
   ;; Uses forward reachability from transmitters to detect true power
   (do
-    (setq $deactivated-any nil)
     ;; Get set of relays with valid transmitter power
     (setq $powered-relays (collect-transmitter-powered-relays))
-    (doall (?c (either connector repeater))
-      (if (bind (color ?c $c-hue))
+    (doall (?r relay)
+      (if (bind (color ?r $c-hue))
         ;; Relay is currently active - verify it has transmitter power
-        (if (not (member ?c $powered-relays))
+        (if (not (member ?r $powered-relays))
           ;; No path to transmitter - deactivate
           (do
-            (not (color ?c $c-hue))
+            (not (color ?r $c-hue))
             (setq $deactivated-any t)))))
     $deactivated-any))
 
@@ -733,7 +728,7 @@
   (do
     (doall (?r receiver)
       (if (and (not (active ?r))
-               (receiver-beam-reaches ?r))
+               (beam-reaches-receiver ?r))
         (do (active ?r)
             (doall (?g gate)
               (if (controls ?r ?g)
@@ -742,31 +737,30 @@
     $any-activated))
 
 
-(define-update activate-reachable-connectors! ()
+(define-update activate-reachable-relays! ()
   ;; Returns t if any connector was activated, nil otherwise
   ;; Now uses consensus logic: connector only activates if ALL reaching beams have same hue
   (do
-    (setq $activated-any nil)
-    (doall (?c (either connector repeater))
-      (if (not (bind (color ?c $existing-hue)))
+    (doall (?r relay)
+      (if (not (bind (color ?r $existing-hue)))
         (do
           ;; Collect all hues from beams that reach this connector
           (setq $reaching-hues nil)
           ;; Check all paired termini that could be sources
           (doall (?src terminus)
-            (if (or (paired ?c ?src) (paired ?src ?c))  ; Pairing exists (bidirectional)
+            (if (or (paired ?r ?src) (paired ?src ?r))  ; Pairing exists (bidirectional)
               (do
                 ;; Get source hue if it's an active source (transmitter or powered connector)
                 (setq $src-hue (get-hue-if-source ?src))
                 ;; If source has hue AND beam reaches connector, collect hue
                 (if (and $src-hue
-                         (beam-reaches-target ?src ?c))
+                         (beam-reaches-target ?src ?r))
                   (push $src-hue $reaching-hues)))))
           ;; Check for consensus among all reaching hues
           (setq $consensus-hue (resolve-consensus-hue $reaching-hues))
           ;; Only activate if consensus achieved (all hues identical)
           (if $consensus-hue
-            (do (color ?c $consensus-hue)
+            (do (color ?r $consensus-hue)
                 (setq $activated-any t))))))
     $activated-any))
 
@@ -932,11 +926,6 @@
             (not (active ?plate))
             (active ?plate))
           (log-if-ghost-toggle! ?agent ?plate)  ;tracks ghost toggling for playback validation
-          ;; Track ghost toggle parity for playback validation
-          (if (ghost-agent ?agent)
-            (if (ghost-toggled-active ?plate)
-              (not (ghost-toggled-active ?plate))
-              (ghost-toggled-active ?plate)))
           (propagate-changes!)))
 
 
@@ -970,11 +959,8 @@
   (coords area3 21 8)
   (coords area4 22 3)
   (coords area5 14 3)
-  (accessible0 area1 area2)
-  ;(accessible1 area1 blower1 area3)
-  ;(accessible1 area1 blower1 area4)
+  (accessible0 area1 area2)  ;chain moves between areas to lower search branching
   (accessible1 area2 blower1 area3)
-  (accessible1 area2 blower1 area4)
   (accessible0 area3 area4)
   (accessible1 area4 gate2 area5)
 
@@ -1001,13 +987,11 @@
   (wall-segment wall8 0 21 19 21)
   (wall-segment wall9 12 0 12 6)
   (wall-segment wall10 12 6 19 6)
-  
-  ;; Static color assignments
   (chroma transmitter1 blue)
   (chroma receiver1 blue)
   
   ;; Line-of-sight relationships (connector area to fixture)
-  (los1 area1 gate1 transmitter1)
+  (los1 area1 gate1 transmitter1)  ;include only necessary los relations
   (los0 area1 repeater1)
   (los0 area3 repeater1)
   (los0 area3 receiver1)
