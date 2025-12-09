@@ -421,7 +421,7 @@
               (t (error "Unexpected item ~A in dynamic-spec ~A" item instantiated-pre-type-spec)))
         (finally (return (get-pre-lambda-arg-lists instantiated-spec)))))
 
-        
+
 (defun get-pre-lambda-arg-lists (instantiated-spec)
   "Returns list of instantiations as arg list for a rule precondition."
   (when (or (equal instantiated-spec '(standard))  ;no precondition parameters
@@ -429,17 +429,27 @@
     (return-from get-pre-lambda-arg-lists '((nil))))
   (let ((header (first instantiated-spec))
         (value-lists (cdr instantiated-spec)))
-    ;(when (some #'null value-lists)
-    ;  (return-from get-pre-lambda-arg-lists '())) ; Return empty - no valid instantiations
+    ;; Fast path for single-parameter case (no filtering needed)
+    (when (null (cdr value-lists))
+      (return-from get-pre-lambda-arg-lists (mapcar #'list (first value-lists))))
     (if (eql header 'dot-product)
       (apply #'mapcar #'list value-lists)
-      (let ((product-values (apply #'alexandria:map-product 'list value-lists)))
+      ;; Pre-check if all elements are atoms (symbols, numbers, characters)
+      ;; to enable faster eql comparisons vs equalp for list instances
+      (let* ((all-atoms-p (every (lambda (lst) (every #'atom lst)) value-lists))
+             (element-test (if all-atoms-p #'eql #'equalp))
+             (product-values (apply #'alexandria:map-product #'list value-lists)))
         (if (eql header 'product)
           product-values
-          (let ((set-values (remove-if-not (lambda (x) (alexandria:setp x :test #'equalp))
+          (let ((set-values (remove-if-not (lambda (x) 
+                                             (alexandria:setp x :test element-test))
                                            product-values)))
             (if (eql header 'combination)
-              (or (delete-duplicates set-values :test #'alexandria:set-equal)
+              (or (delete-duplicates set-values 
+                                     :test (if all-atoms-p
+                                             #'alexandria:set-equal
+                                             (lambda (a b) 
+                                               (alexandria:set-equal a b :test #'equalp))))
                   (make-list (length value-lists) :initial-element nil))
               (if (eql header 'standard)
                 (or set-values

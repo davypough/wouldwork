@@ -220,8 +220,9 @@
 
 
 (define-query accessible (?agent ?area1 ?area2)
-  ;; For player: respects gate and blower environmental states
-  ;; For ghost: ignores environmental states (replaying recorded script)
+  ;; For real agent: respects gate and blower environmental states
+  ;; For ghost: respects states it caused (recording phase),
+  ;;            ignores states caused by real agent (playback phase)
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
@@ -229,8 +230,9 @@
                  (open ?g))))
       (exists (?b blower)
         (and (accessible1 ?area1 ?b ?area2)
-             (or (ghost-agent ?agent)
-                 (not (active ?b)))))))
+             (or (not (active ?b))                                 ;; blower off: anyone can pass
+                 (and (ghost-agent ?agent)                         ;; blower on + ghost:
+                      (not (blower-activated-by-ghost ?b))))))))  ;;   only if ghost didn't cause it
 
 
 (define-query placeable (?cargo ?area)
@@ -498,12 +500,21 @@
                 (return ?b))))
 
 
-(define-query playback-blower-active? (?blower)
+(define-query playback-blower-active (?blower)
   ;; Returns t if blower will be active when playback begins.
   ;; This occurs when any controlling plate has been ghost-toggled to active.
   (exists (?p plate)
     (and (controls ?p ?blower)
          (ghost-toggled-active ?p))))
+
+
+(define-query blower-activated-by-ghost (?blower)
+  ;; Returns t if blower is currently active due to ghost plate toggle.
+  ;; Used to enforce recording-phase physics on ghost agent.
+  (and (active ?blower)
+       (exists (?p plate)
+         (and (controls ?p ?blower)
+              (ghost-toggled-active ?p)))))
 
 
 (define-query recording-playback-valid? ()
@@ -512,7 +523,7 @@
   ;; Returns t if valid, nil if any move was illegal.
   (do (bind (moves-pending-validation $moves))
       (not (ww-loop for $move in $moves
-                    thereis (playback-blower-active? (third $move))))))
+                    thereis (playback-blower-active (third $move))))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -569,23 +580,35 @@
 
 
 (define-update blow-objects-if-active! ()
-  ;; Blows all objects according to blows> relation when blower is active.
-  ;; Both real and ghost agents/cargo are affected by blower physics.
-  ;; Ghost agents can move through blower paths (via accessible query),
-  ;; but are subject to passive physics when standing in blow zones.
+  ;; Blows objects according to blows> relation when blower is active.
+  ;; Real agents/cargo: always subject to active blowers.
+  ;; Ghost agents/cargo: only subject if ghost activated the blower
+  ;;   (recording-phase physics); immune if real agent activated it
+  ;;   (playback-phase, ghost follows pre-recorded trajectory).
   ;; Returns t if any object was moved, nil otherwise.
   (do
     (doall (?b blower)
       (if (and (active ?b)
                (bind (blows> ?b $from $to)))
-        (do (doall (?a agent)
+        (do ;; Real objects always affected
+            (doall (?a real-agent)
               (if (loc ?a $from)
                 (do (loc ?a $to)
                     (setq $moved-any t))))
-            (doall (?c cargo)
+            (doall (?c real-cargo)
               (if (loc ?c $from)
                 (do (loc ?c $to)
-                    (setq $moved-any t)))))))
+                    (setq $moved-any t))))
+            ;; Ghost objects only affected if ghost activated blower
+            (if (blower-activated-by-ghost ?b)
+              (do (doall (?a ghost-agent)
+                    (if (loc ?a $from)
+                      (do (loc ?a $to)
+                          (setq $moved-any t))))
+                  (doall (?c ghost-cargo)
+                    (if (loc ?c $from)
+                      (do (loc ?c $to)
+                          (setq $moved-any t)))))))))
     $moved-any))
 
 
