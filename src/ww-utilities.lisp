@@ -343,3 +343,75 @@
                 (cons (first a) (merge-list (rest a) b)))
                (t (cons (first b) (merge-list a (rest b)))))))
     (ms list)))
+
+
+;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun agent-starred-p (agent)
+  "Returns T if AGENT symbol name ends with asterisk."
+  (declare (type symbol agent))
+  (let ((name (symbol-name agent)))
+    (char= (char name (1- (length name))) #\*)))
+
+
+(defun get-path-action-agent (path-element)
+  "Extracts the agent from a path element of form (time (action agent ...))."
+  (second (second path-element)))
+
+
+(defun count-agent-switches (path)
+  "Counts transitions between starred and unstarred agents in PATH."
+  (loop with prev-starred = nil
+        with first-p = t
+        for element in path
+        for agent = (get-path-action-agent element)
+        for starred = (agent-starred-p agent)
+        count (and (not first-p) (not (eql starred prev-starred)))
+        do (setf prev-starred starred)
+           (setf first-p nil)))
+
+
+(defun print-optimal-solutions (&optional (solutions ww::*solutions*))
+  "Prints optimal solutions from SOLUTIONS list.
+   Optimal solutions: (1) begin with unstarred agent, (2) minimize agent switches.
+   Requires all solutions to have the same depth."
+  ;; Check for empty input
+  (when (null solutions)
+    (format t "~&No solutions to analyze.~%")
+    (return-from print-optimal-solutions nil))
+  ;; Verify uniform depth
+  (let ((depths (mapcar #'ww::solution.depth solutions)))
+    (unless (apply #'= depths)
+      (error "Solutions have varying depths: ~A" (remove-duplicates depths))))
+  ;; Filter: first action must be by unstarred agent
+  (let ((filtered (remove-if 
+                    (lambda (sol)
+                      (agent-starred-p 
+                        (get-path-action-agent 
+                          (first (ww::solution.path sol)))))
+                    solutions)))
+    (when (null filtered)
+      (format t "~&No solutions begin with unstarred agent.~%")
+      (return-from print-optimal-solutions nil))
+    ;; Score and find minimum switches
+    (let* ((scored (mapcar (lambda (sol)
+                             (cons (count-agent-switches (ww::solution.path sol))
+                                   sol))
+                           filtered))
+           (min-switches (reduce #'min scored :key #'car))
+           (optimal (remove-if-not (lambda (pair) (= (car pair) min-switches))
+                                   scored)))
+      ;; Print results
+      (format t "~&~%=== OPTIMAL SOLUTIONS ===~%")
+      (format t "Found ~D optimal solution~:P with ~D agent switch~[es~;~:;es~].~%"
+              (length optimal) min-switches min-switches)
+      (format t "Solution depth: ~D~%~%" (ww::solution.depth (cdar optimal)))
+      (loop for (_switches . sol) in optimal                        ; <-- CHANGED
+            for i from 1
+            do (format t "~&--- Solution ~D ---~%" i)
+               (loop for (time action) in (ww::solution.path sol)
+                     do (format t "  ~A ~A~%" time action))
+               (terpri))
+      ;; Return count and switch value
+      (values (length optimal) min-switches))))

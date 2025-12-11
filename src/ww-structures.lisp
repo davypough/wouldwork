@@ -186,6 +186,56 @@
                    (node.state node) (node.depth node)))))
   (state (make-problem-state) :type problem-state)    ;problem state
   (depth 0 :type fixnum)           ;depth in the search tree
-  (parent nil :type (or null node)))  ;this node's parent
+  (parent nil :type (or null node list)))  ;this node's parent
 
 
+(defun node-parents-list (node)
+  "Returns the parent node(s) of NODE as a list.
+   Normalizes access for both standard mode (single parent) and hybrid mode (parent-move pairs).
+   In hybrid mode, extracts just the parent nodes from (parent-node . move) pairs."
+  (declare (type node node))
+  (let ((parent (node.parent node)))
+    (cond ((null parent) nil)
+          (*hybrid-mode*
+           ;; Hybrid mode: parent is list of (parent-node . move) pairs
+           (mapcar #'car parent))
+          ((listp parent) parent)
+          (t (list parent)))))
+
+
+(defun node-parent-entries (node)
+  "Returns the parent entries of NODE for hybrid mode path enumeration.
+   Returns list of (parent-node . move) pairs.
+   Only valid in hybrid mode; returns nil otherwise."
+  (declare (type node node))
+  (when *hybrid-mode*
+    (node.parent node)))
+
+
+(defun add-parent-to-node (node new-parent &optional move)
+  "Adds NEW-PARENT to NODE's parent slot for hybrid mode.
+   In hybrid mode, stores (parent-node . move) pairs; checks for duplicate parents.
+   In non-hybrid mode, stores just the parent node.
+   Thread-safe: uses locking when *threads* > 0."
+  (declare (type node node new-parent))
+  (flet ((do-add ()
+           (let ((current (node.parent node)))
+             (cond (*hybrid-mode*
+                    ;; Hybrid mode: store (parent-node . move) pairs
+                    (let ((new-entry (cons new-parent move)))
+                      (cond ((null current)
+                             (setf (node.parent node) (list new-entry)))
+                            ;; Check for duplicate parent (ignore move in comparison)
+                            ((not (member new-parent current :key #'car :test #'eq))
+                             (setf (node.parent node) (cons new-entry current))))))
+                   ;; Non-hybrid mode: original behavior
+                   ((null current)
+                    (setf (node.parent node) (list new-parent)))
+                   ((listp current)
+                    (setf (node.parent node) (cons new-parent current)))
+                   (t
+                    (setf (node.parent node) (list new-parent current)))))))
+    (if (> *threads* 0)
+        (bt:with-lock-held (*lock*)
+          (do-add))
+        (do-add))))

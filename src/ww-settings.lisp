@@ -115,6 +115,13 @@
 (define-global *search-tree* nil
   "DFS search tree for debugging (serial processing only).")
 
+(define-global *hybrid-mode* nil
+  "When T, hybrid graph search is active for enumerating all solutions at *depth-cutoff*.")
+
+(define-global *hybrid-goals* nil
+  "In hybrid mode, stores (current-node . goal-state) pairs for deferred enumeration.")
+(declaim (type list *hybrid-goals*))
+
 (define-global *start-time* 0
   "Stores time at beginning of the search.")
 

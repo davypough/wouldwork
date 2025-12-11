@@ -78,6 +78,18 @@
   (problem-state.idb-hash state))
 
 
+(defun closed-key (state depth)
+  "Generates the appropriate key for *closed* hash table lookup/storage.
+   Standard mode: idb-hash (state identity only)
+   Hybrid mode: (cons idb-hash depth) for (state, depth) pair identity."
+  (declare (type problem-state state) (type fixnum depth))
+  (ensure-idb-hash state)
+  (let ((hash (problem-state.idb-hash state)))
+    (if *hybrid-mode*
+        (cons hash depth)
+        hash)))
+
+
 (defun choose-ht-value-test (relations)
   "Chooses either #'equal or #'equalp as a test for *closed* ht (idb) keys."
   (let (lisp-$types)  ;eg, $list, $hash-table, $fixnum, $real
@@ -132,6 +144,31 @@
   t)
 
 
+(defun initialize-hybrid-mode ()
+  "Checks constraints for hybrid graph search mode.
+   Returns T if hybrid mode should activate, NIL otherwise.
+   Prints diagnostic messages when *solution-type* is EVERY but constraints prevent hybrid mode."
+  ;; Only consider hybrid mode when seeking all solutions
+  (unless (eql *solution-type* 'every)
+    (return-from initialize-hybrid-mode nil))
+  ;; Check remaining constraints with diagnostics
+  (let ((constraints-met t))
+    (unless (eql *algorithm* 'depth-first)
+      (format t "~&Note: *solution-type* EVERY with *algorithm* ~A not supported for hybrid mode; using standard search.~%"
+              *algorithm*)
+      (setf constraints-met nil))
+    (unless (eql *tree-or-graph* 'graph)
+      (format t "~&Note: *solution-type* EVERY with *tree-or-graph* ~A uses standard search; hybrid mode requires GRAPH.~%"
+              *tree-or-graph*)
+      (setf constraints-met nil))
+    (unless (> *depth-cutoff* 0)
+      (format t "~&Note: *solution-type* EVERY requires *depth-cutoff* > 0 for hybrid mode; using standard search.~%")
+      (setf constraints-met nil))
+    (when constraints-met
+      (format t "~&Hybrid graph search mode active: enumerating all solutions at depth ~D.~%" *depth-cutoff*))
+    constraints-met))
+
+
 ;;; Search Functions
 
 
@@ -144,6 +181,7 @@
   (when (fboundp 'bounding-function?)
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
+  (setf *hybrid-mode* (initialize-hybrid-mode))
   (let ((fixed-idb nil)  ;(fixedp *relations*))
         (parallelp (> *threads* 0)))
     (declare (ignorable parallelp))
@@ -152,7 +190,7 @@
                                                :synchronized parallelp)
                        :keyfn #'node.state.idb-hash))
     (when (eql *tree-or-graph* 'graph)
-      (setf *closed* (make-hash-table :test 'eql  ;(if fixed-idb 'fixed-keys-ht-equal 'equalp)
+      (setf *closed* (make-hash-table :test (if *hybrid-mode* 'equal 'eql)
                                       :size 200003
                                       :rehash-size 2.7
                                       :rehash-threshold 0.8
@@ -163,7 +201,7 @@
   ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
   (when (eql *tree-or-graph* 'graph)
     (ensure-idb-hash *start-state*)
-    (setf (gethash (problem-state.idb-hash *start-state*) *closed*)
+    (setf (gethash (closed-key *start-state* 0) *closed*)
       (list (problem-state.idb *start-state*)
             0
             (problem-state.time *start-state*)
@@ -180,6 +218,7 @@
   (setf *repeated-states* 0)
   (setf *num-paths* 0)
   (setf *solutions* nil)
+  (setf *hybrid-goals* nil)
   (setf *unique-solutions* nil)
   (setf *best-states* (list *start-state*))
   (setf *solution-count* 0)
@@ -199,6 +238,8 @@
     (ecase *algorithm*
       (depth-first (search-serial))
       (backtracking (search-backtracking))))
+  (when *hybrid-mode*
+    (finalize-hybrid-solutions))
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
       (summarize-search-results (if (eql *solution-type* 'first)
@@ -285,7 +326,9 @@
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
-(defun process-successors (succ-states current-node open)  ;(ut::print-ght-keys (hs::hstack.table open)) (print 'successors)
+(defun process-successors (succ-states current-node open)
+  "Processes successor states: checks goals, handles duplicates, generates nodes.
+   In hybrid mode, accumulates parent pointers for multi-path enumeration."
   (iter (with succ-depth = (1+ (node.depth current-node)))
         (for succ-state in succ-states)
         (when *global-invariants*
@@ -294,47 +337,70 @@
           (unless (f-value-better succ-state succ-depth)
             (next-iteration)))  ;throw out state if can't better best solution so far
         (when (goal succ-state)
-          (register-solution current-node succ-state)
+          (if *hybrid-mode*
+              (defer-hybrid-goal current-node succ-state)
+              (register-solution current-node succ-state))
           (finalize-path-depth succ-depth)
           (if (eql *solution-type* 'first)
-            (return-from process-successors '(first))  ; Return immediately after first solution found
+            (return-from process-successors '(first))
             (next-iteration)))
-        (unless (boundp 'goal-fn)  ;looking for best results rather than goals
-          (process-min-max-value succ-state))  ;only if not associated with a goal
-        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))  ;not for csp problems
-          (when (on-current-path succ-state current-node)  ;stop infinite loop
+        (unless (boundp 'goal-fn)
+          (process-min-max-value succ-state))
+        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
+          (when (on-current-path succ-state current-node)
             (increment-global *repeated-states*)
             (finalize-path-depth succ-depth)
             (next-iteration)))
-        (when (eql *tree-or-graph* 'graph)   ;(ut::print-ht (problem-state.idb succ-state))
-          (let ((open-node (idb-in-open succ-state open)))
+        (when (eql *tree-or-graph* 'graph)
+          ;; Check if state already on open
+          (let ((open-node (idb-in-open succ-state open succ-depth)))
             (when open-node
               (narrate "State already on open" succ-state succ-depth)
               (increment-global *repeated-states*)
-              (if (update-open-if-succ-better open-node succ-state)
-                (setf (node.parent open-node) current-node)  ;succ is better
-                (finalize-path-depth succ-depth))  ;succ is not better
-                (next-iteration)))  ;drop this succ
-          (with-search-structures-lock                               ; Begin atomic section
-            (let ((closed-values (get-closed-values succ-state)))
+              (cond (*hybrid-mode*
+                     (add-parent-to-node open-node current-node (record-move succ-state))
+                     (finalize-path-depth succ-depth))
+                    (t
+                     (if (update-open-if-succ-better open-node succ-state)
+                       (setf (node.parent open-node) current-node)
+                       (finalize-path-depth succ-depth))))
+              (next-iteration)))
+          ;; Check if state in closed
+          (with-search-structures-lock
+            (let ((closed-values (get-closed-values succ-state succ-depth)))
               (when closed-values
                 (increment-global *repeated-states*)
-                (if (better-than-closed closed-values succ-state succ-depth)
-                  (progn             ; succ has better value
-                    (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                    (remhash (problem-state.idb-hash succ-state) *closed*))
-                  (progn 
-                    (narrate "Dropping this previously closed state" succ-state succ-depth)
-                    (finalize-path-depth succ-depth) 
-                    (next-iteration)))))  ;drop this succ
-            ;; State is new or reopened - reserve it immediately (atomic with check above)
-            (ensure-idb-hash succ-state)
-            (setf (gethash (problem-state.idb-hash succ-state) *closed*)
-                  (list (problem-state.idb succ-state)
-                        succ-depth
-                        (problem-state.time succ-state)
-                        (problem-state.value succ-state)))))
-        (collecting (generate-new-node current-node succ-state))))  ;live successors
+                (cond (*hybrid-mode*
+                       (let ((closed-node (get-closed-node succ-state succ-depth)))
+                         (when closed-node
+                           (add-parent-to-node closed-node current-node (record-move succ-state))))
+                       (narrate "Accumulating parent for closed state" succ-state succ-depth)
+                       (finalize-path-depth succ-depth)
+                       (next-iteration))
+                      ((better-than-closed closed-values succ-state succ-depth)
+                       (narrate "Returning this previously closed state to open" succ-state succ-depth)
+                       (remhash (closed-key succ-state succ-depth) *closed*))
+                      (t
+                       (narrate "Dropping this previously closed state" succ-state succ-depth)
+                       (finalize-path-depth succ-depth)
+                       (next-iteration)))))
+            ;; State is new or reopened - reserve immediately
+            (let ((succ-node (generate-new-node current-node succ-state)))
+              (setf (gethash (closed-key succ-state succ-depth) *closed*)
+                    (if *hybrid-mode*
+                        (list (problem-state.idb succ-state)
+                              succ-depth
+                              (problem-state.time succ-state)
+                              (problem-state.value succ-state)
+                              succ-node)
+                        (list (problem-state.idb succ-state)
+                              succ-depth
+                              (problem-state.time succ-state)
+                              (problem-state.value succ-state))))
+              (collecting succ-node))))
+        ;; Tree search path - generate node without closed tracking
+        (when (eql *tree-or-graph* 'tree)
+          (collecting (generate-new-node current-node succ-state)))))
 
 
 (defun validate-global-invariants (current-node succ-state)
@@ -356,9 +422,10 @@
   t)
 
 
-(defun idb-in-open (succ-state open)
+(defun idb-in-open (succ-state open &optional succ-depth)
   "Determines if a state's idb matches the contents of a key in open's table.
    Uses idb-hash for O(1) lookup with idb verification for collision safety.
+   In hybrid mode, also requires depth match (succ-depth must be provided).
    Returns the node in open or nil."
   (declare (type problem-state succ-state))
   (ensure-idb-hash succ-state)  ; ensure hash is cached
@@ -367,9 +434,12 @@
     (let ((nodes (gethash hash-key ht)))  ; lookup by hash
       (when nodes
         ;; verify idb matches to handle hash collisions
+        ;; in hybrid mode, also verify depth matches
         (find-if (lambda (node)
-                   (equalp (problem-state.idb succ-state)
-                           (problem-state.idb (node.state node))))
+                   (and (equalp (problem-state.idb succ-state)
+                                (problem-state.idb (node.state node)))
+                        (or (not *hybrid-mode*)
+                            (= succ-depth (node.depth node)))))
                  nodes)))))
 
 
@@ -385,18 +455,30 @@
     hash))
 
 
-(defun get-closed-values (state)
+(defun get-closed-values (state depth)
   "Returns the closed values (depth time value) for the given state, or nil if not found.
-   Uses idb-hash for O(1) lookup with idb verification for collision safety."
-  (declare (type problem-state state))
-  (ensure-idb-hash state)  ; ensure hash is cached
-  (let ((entry (gethash (problem-state.idb-hash state) *closed*)))
+   Uses idb-hash for O(1) lookup with idb verification for collision safety.
+   In hybrid mode, looks up by (state, depth) pair."
+  (declare (type problem-state state) (type fixnum depth))
+  (let ((entry (gethash (closed-key state depth) *closed*)))
     (when entry
       (let ((stored-idb (first entry))
             (stored-values (rest entry)))
         ;; Verify idb matches - handles hash collisions correctly
         (when (equalp (problem-state.idb state) stored-idb)
           stored-values)))))  ; return (depth time value)
+
+
+(defun get-closed-node (state depth)
+  "Returns the node stored in *closed* for the given (state, depth) pair.
+   Only valid in hybrid mode where nodes are stored in closed entries.
+   Returns nil if not found or if idb doesn't match (collision)."
+  (declare (type problem-state state) (type fixnum depth))
+  (let ((entry (gethash (closed-key state depth) *closed*)))
+    (when entry
+      (let ((stored-idb (first entry)))
+        (when (equalp (problem-state.idb state) stored-idb)
+          (fifth entry))))))  ; node is 5th element: (idb depth time value node)
 
 
 (defun goal (state)
@@ -546,12 +628,17 @@
 
 
 (defun generate-new-node (current-node succ-state)
-  "Produces a new node for a given successor."
+  "Produces a new node for a given successor.
+   In hybrid mode, stores parent as (parent-node . move) pair."
   (declare (type node current-node) (type problem-state succ-state))
   (let* ((depth (1+ (node.depth current-node)))
+         (move (record-move succ-state))
+         (parent-entry (if *hybrid-mode*
+                           (list (cons current-node move))
+                           current-node))
          (succ-node (make-node :state succ-state
                                :depth depth
-                               :parent current-node)))
+                               :parent parent-entry)))
     #+:ww-debug (when (>= *debug* 3)
                   (format t "~%Installing new or updated successor:~%~S~%" succ-node))
     succ-node))
@@ -589,11 +676,82 @@
                          (node.state n))
             path))))
 
+
+(defun enumerate-paths-to-node (node)
+  "Enumerates all paths from the start node to NODE.
+   Returns a list of paths, where each path is a list of (action instantiations) moves.
+   Paths are in forward order (start to node).
+   In hybrid mode, uses moves stored in (parent-node . move) pairs.
+   In standard mode with single parents, returns a single-element list."
+  (declare (type node node))
+  (let ((parent-entries (node.parent node)))
+    (if (null parent-entries)
+        ;; At start node - return one path with no moves
+        (list nil)
+        ;; Branch based on mode
+        (if *hybrid-mode*
+            ;; Hybrid mode: parent-entries is list of (parent-node . move) pairs
+            (mapcan (lambda (entry)
+                      (let ((parent (car entry))
+                            (move (cdr entry)))
+                        (mapcar (lambda (path-to-parent)
+                                  (append path-to-parent (list move)))
+                                (enumerate-paths-to-node parent))))
+                    parent-entries)
+            ;; Standard mode: parent-entries is single node or list of nodes
+            (let ((parents (if (listp parent-entries)
+                               parent-entries
+                               (list parent-entries)))
+                  (current-move (record-move (node.state node))))
+              (mapcan (lambda (parent)
+                        (mapcar (lambda (path-to-parent)
+                                  (append path-to-parent (list current-move)))
+                                (enumerate-paths-to-node parent)))
+                      parents))))))
+
+
+(defun defer-hybrid-goal (current-node goal-state)
+  "Stores a goal-reaching pair for deferred enumeration after search completes.
+   Called in hybrid mode when a goal is reached."
+  (declare (type node current-node) (type problem-state goal-state))
+  (push-global (cons current-node goal-state) *hybrid-goals*))
+
+
+(defun finalize-hybrid-solutions ()
+  "Enumerates all solutions from stored goal-reaching pairs after search completes.
+   Called once when all parent DAGs are fully constructed."
+  (dolist (pair *hybrid-goals*)
+    (let* ((current-node (car pair))
+           (goal-state (cdr pair))
+           (state-depth (1+ (node.depth current-node)))
+           (goal-move (record-move goal-state))
+           (paths-to-current (enumerate-paths-to-node current-node))
+           (num-paths (length paths-to-current))
+           (goal-idb (problem-state.idb goal-state)))
+      (format t "~%Enumerating ~D path~:P to goal at depth ~D~%" num-paths state-depth)
+      (dolist (path paths-to-current)
+        (let* ((full-path (append path (list goal-move)))
+               (solution (make-solution
+                           :depth state-depth
+                           :time (problem-state.time goal-state)
+                           :value (problem-state.value goal-state)
+                           :path full-path
+                           :goal goal-state)))
+          (push-global solution *solutions*)
+          (with-search-structures-lock
+            (unless (find goal-idb *unique-solutions*
+                          :key (lambda (soln)
+                                 (problem-state.idb (solution.goal soln)))
+                          :test #'equalp)
+              (push-global solution *unique-solutions*))))))))
+
   
 (defun summarize-search-results (condition)
   (declare (type symbol condition))
-  (format t "~2%In problem ~A, performed ~A search for ~A solution."
-            *problem-name* *tree-or-graph* *solution-type*)
+  (format t "~2%In problem ~A, performed ~A~A search for ~A solution."
+            *problem-name* 
+            (if *hybrid-mode* "hybrid " "")
+            *tree-or-graph* *solution-type*)
   (ecase condition
     (first
       (when *solutions*
@@ -601,9 +759,13 @@
     (exhausted
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
-        (if (eql *tree-or-graph* 'tree)
-          (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any).")
-          (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches).")))))
+        (cond (*hybrid-mode*
+               (format t "~2%Hybrid mode enumerated all paths to goal states at depth ≤ ~D."
+                       *depth-cutoff*))
+              ((eql *tree-or-graph* 'tree)
+               (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
+              (t
+               (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches)."))))))
   (format t "~2%Depth cutoff = ~:D" *depth-cutoff*)
   (format t "~2%Maximum depth explored = ~:D" *max-depth-explored*)
   (format t "~2%Program cycles = ~:D" *program-cycles*)
@@ -751,7 +913,7 @@
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solutions*)
-    ;; CHANGED: Replace existing unique solution if new one is better
+    ;; Replace existing unique solution if new one is better
     (with-search-structures-lock
       (let* ((new-idb (problem-state.idb (solution.goal solution)))
              (existing (find new-idb *unique-solutions*
