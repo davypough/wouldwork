@@ -27,6 +27,17 @@
        (finish-output))))  ;make sure printout is complete before continuing
 
 
+(defmacro with-closed-shard-lock ((state) &body body)
+  "Execute BODY while holding the shard lock for STATE.
+   In serial mode, executes BODY directly without locking."
+  (if (> *threads* 0)
+      (let ((shard-idx (gensym "SHARD-IDX")))
+        `(let ((,shard-idx (shard-index-for-state ,state)))
+           (bt:with-lock-held ((svref *closed-locks* ,shard-idx))
+             ,@body)))
+      `(progn ,@body)))
+
+
 (defun simple-break ()
   "Call to simplify debugger printout on a break."
   (declare (optimize (debug 1)))
@@ -182,30 +193,33 @@
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
   (setf *hybrid-mode* (initialize-hybrid-mode))
-  (let ((fixed-idb nil)  ;(fixedp *relations*))
-        (parallelp (> *threads* 0)))
-    (declare (ignorable parallelp))
-    (setf *open* 
+  (setf *open* 
       (hs::make-hstack :table (make-hash-table :test 'eql
-                                               :synchronized parallelp)
+                                               :synchronized nil)
                        :keyfn #'node.state.idb-hash))
-    (when (eql *tree-or-graph* 'graph)
-      (setf *closed* (make-hash-table :test (if *hybrid-mode* 'equal 'eql)
+  (when (eql *tree-or-graph* 'graph)
+    (let ((hash-test (if *hybrid-mode* 'equal 'eql))) 
+      (setf *closed* (make-hash-table :test hash-test
                                       :size 200003
                                       :rehash-size 2.7
                                       :rehash-threshold 0.8
-                                      :synchronized parallelp))))
+                                      :synchronized nil))
+      (when (> *threads* 0)
+        (initialize-closed-infrastructure hash-test))))
   (when (> *threads* 0)  ;; Ensure start state has synchronized IDB tables for parallel mode
     (ensure-start-state-synchronized))
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
   (when (eql *tree-or-graph* 'graph)
     (ensure-idb-hash *start-state*)
-    (setf (gethash (closed-key *start-state* 0) *closed*)
-      (list (problem-state.idb *start-state*)
-            0
-            (problem-state.time *start-state*)
-            (problem-state.value *start-state*))))
+    (let ((closed-table (if (> *threads* 0)
+                            (closed-shard *start-state*)
+                            *closed*)))
+      (setf (gethash (closed-key *start-state* 0) closed-table)
+        (list (problem-state.idb *start-state*)
+              0
+              (problem-state.time *start-state*)
+              (problem-state.value *start-state*)))))
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
   (setf *total-states-processed* 1)  ;start state is first
@@ -233,7 +247,7 @@
     (if (eql *algorithm* 'backtracking)
       (error "Parallel processing not supported with backtracking algorithm")
       (progn
-        (process-threads)
+        (process-threads-chase-lev)
         (finalize-parallel-search-results)))
     (ecase *algorithm*
       (depth-first (search-serial))
@@ -456,29 +470,23 @@
 
 
 (defun get-closed-values (state depth)
-  "Returns the closed values (depth time value) for the given state, or nil if not found.
-   Uses idb-hash for O(1) lookup with idb verification for collision safety.
-   In hybrid mode, looks up by (state, depth) pair."
-  (declare (type problem-state state) (type fixnum depth))
-  (let ((entry (gethash (closed-key state depth) *closed*)))
-    (when entry
-      (let ((stored-idb (first entry))
-            (stored-values (rest entry)))
-        ;; Verify idb matches - handles hash collisions correctly
-        (when (equalp (problem-state.idb state) stored-idb)
-          stored-values)))))  ; return (depth time value)
+  "Retrieve the closed values for a state.
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (gethash (closed-key state depth)
+           (if (> *threads* 0) 
+               (closed-shard state)
+               *closed*)))
 
 
 (defun get-closed-node (state depth)
-  "Returns the node stored in *closed* for the given (state, depth) pair.
-   Only valid in hybrid mode where nodes are stored in closed entries.
-   Returns nil if not found or if idb doesn't match (collision)."
-  (declare (type problem-state state) (type fixnum depth))
-  (let ((entry (gethash (closed-key state depth) *closed*)))
-    (when entry
-      (let ((stored-idb (first entry)))
-        (when (equalp (problem-state.idb state) stored-idb)
-          (fifth entry))))))  ; node is 5th element: (idb depth time value node)
+  "Retrieve the node stored in *closed* for hybrid mode.
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (let ((values (gethash (closed-key state depth)
+                         (if (> *threads* 0)
+                             (closed-shard state)
+                             *closed*))))
+    (when values
+      (fifth values))))  ; Node is 5th element in hybrid mode
 
 
 (defun goal (state)
@@ -539,16 +547,22 @@
 
 
 (defun better-than-closed (closed-values succ-state succ-depth)
-  "Determines if f-value of successor is better than closed state."
-  (ecase *solution-type*
-    ((min-length first every)
-       (< succ-depth (first closed-values)))
-    (min-time
-       (< (problem-state.time succ-state) (second closed-values)))
-    (min-value
-       (< (problem-state.value succ-state) (third closed-values)))
-    (max-value
-       (> (problem-state.value succ-state) (third closed-values)))))
+  "Check if succ-state is better than the closed version.
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (declare (ignorable succ-depth))
+  (let ((closed-depth (second closed-values))
+        (closed-time (third closed-values))
+        (closed-value (fourth closed-values)))
+    (case *solution-type*
+      ((first every min-length)
+       (< succ-depth closed-depth))
+      (min-time
+       (< (problem-state.time succ-state) closed-time))
+      (min-value
+       (< (problem-state.value succ-state) closed-value))
+      (max-value
+       (> (problem-state.value succ-state) closed-value))
+      (otherwise nil))))
 
 
 (defun bounding-function (current-node)
@@ -760,7 +774,7 @@
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
         (cond (*hybrid-mode*
-               (format t "~2%Hybrid mode enumerated all paths to goal states at depth ≤ ~D."
+               (format t "~2%Hybrid mode enumerated all paths to goal states at depth â‰¤ ~D."
                        *depth-cutoff*))
               ((eql *tree-or-graph* 'tree)
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
@@ -965,19 +979,28 @@
     (format t "~2%program cycles = ~:D" *program-cycles*)
     (format t "~%total states processed so far = ~:D" *total-states-processed*)
     (when (eql *tree-or-graph* 'graph)
-      (format t "~%ht count: ~:D    ht size: ~:D"
-              (hash-table-count *closed*)
-              (hash-table-size *closed*)))
-    (format t "~%frontier nodes: ~:D" 
-            (ecase *algorithm*
-              (depth-first (hs::length-hstack *open*))
-              (backtracking (length *choice-stack*))))
+      (if (> *threads* 0)
+          ;; Parallel mode: sum counts across all shards
+          (format t "~%ht count: ~:D    ht size: ~:D (across ~D shards)"
+                  (loop for shard across *closed-shards* sum (hash-table-count shard))
+                  (loop for shard across *closed-shards* sum (hash-table-size shard))
+                  *num-closed-shards*)
+          ;; Serial mode: single hash table
+          (format t "~%ht count: ~:D    ht size: ~:D"
+                  (hash-table-count *closed*)
+                  (hash-table-size *closed*))))
+    (format t "~%frontier nodes: ~:D"
+            (if (> *threads* 0)
+                (total-parallel-frontier)
+                (ecase *algorithm*
+                  (depth-first (hs::length-hstack *open*))
+                  (backtracking (length *choice-stack*)))))
     (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
-    (iter (while (and *rem-init-successors*
-                      (not (idb-in-open (node.state (first *rem-init-successors*))
-                                        *open*))))
-          (pop-global *rem-init-successors*))
-    (when (< *threads* 2)
+    (when (zerop *threads*)
+      (iter (while (and *rem-init-successors*
+                        (not (idb-in-open (node.state (first *rem-init-successors*))
+                                          *open*))))
+            (pop-global *rem-init-successors*))
       (format t "~%current progress: in #~:D of ~:D initial branches"
               (the fixnum (- *num-init-successors*
                              (length *rem-init-successors*)))

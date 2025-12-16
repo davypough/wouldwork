@@ -26,11 +26,6 @@
       `(progn ,@body)))
 
 
-#+ignore (defmacro with-search-structures-lock (&body body)
-  "Protects composite operations on *open* and *closed* search structures."
-  `(bt:with-lock-held (*lock*)
-     ,@body))
-
 
 (defparameter *ww-loading* t
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
@@ -157,56 +152,56 @@
    new data."
   (when (> *threads* 0)  ; Only needed when using sb-ext:defglobal
     ;; Hash tables for type system and object mappings
-    (when (boundp '*types*)
+    (when (and (boundp '*types*) (hash-table-p *types*))
       (clrhash *types*))
-    (when (boundp '*constant-integers*)
+    (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
       (clrhash *constant-integers*))
-    (when (boundp '*integer-constants*)
+    (when (and (boundp '*integer-constants*) (hash-table-p *integer-constants*))
       (clrhash *integer-constants*))
     ;; Hash tables for relations
-    (when (boundp '*relations*)
+    (when (and (boundp '*relations*) (hash-table-p *relations*))
       (clrhash *relations*))
-    (when (boundp '*static-relations*)
+    (when (and (boundp '*static-relations*) (hash-table-p *static-relations*))
       (clrhash *static-relations*))
-    (when (boundp '*symmetrics*)
+    (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
       (clrhash *symmetrics*))
-    (when (boundp '*complements*)
+    (when (and (boundp '*complements*) (hash-table-p *complements*))
       (clrhash *complements*))
-    (when (boundp '*fluent-relation-indices*)
+    (when (and (boundp '*fluent-relation-indices*) (hash-table-p *fluent-relation-indices*))
       (clrhash *fluent-relation-indices*))
     ;; Hash tables for databases
-    (when (boundp '*db*)
+    (when (and (boundp '*db*) (hash-table-p *db*))
       (clrhash *db*))
-    (when (boundp '*hdb*)
+    (when (and (boundp '*hdb*) (hash-table-p *hdb*))
       (clrhash *hdb*))
-    (when (boundp '*idb*)
+    (when (and (boundp '*idb*) (hash-table-p *idb*))
       (clrhash *idb*))
-    (when (boundp '*hidb*)
+    (when (and (boundp '*hidb*) (hash-table-p *hidb*))
       (clrhash *hidb*))
-    (when (boundp '*static-db*)
+    (when (and (boundp '*static-db*) (hash-table-p *static-db*))
       (clrhash *static-db*))
-    (when (boundp '*static-idb*)
+    (when (and (boundp '*static-idb*) (hash-table-p *static-idb*))
       (clrhash *static-idb*))
-    (when (boundp '*hap-db*)
+    (when (and (boundp '*hap-db*) (hash-table-p *hap-db*))
       (clrhash *hap-db*))
-    (when (boundp '*hap-idb*)
+    (when (and (boundp '*hap-idb*) (hash-table-p *hap-idb*))
       (clrhash *hap-idb*))
     ;; Cache for proposition key conversions
-    (when (boundp '*prop-key-cache*)
+    (when (and (boundp '*prop-key-cache*) (hash-table-p *prop-key-cache*))
       (clrhash *prop-key-cache*))
     ;; Reset lists that accumulate problem definitions
-    (when (boundp '*query-names*)
+    (when (and (boundp '*query-names*) (listp *query-names*))
       (setf *query-names* nil))
-    (when (boundp '*update-names*)
+    (when (and (boundp '*update-names*) (listp *update-names*))
       (setf *update-names* nil))
-    (when (boundp '*actions*)
+    (when (and (boundp '*actions*) (listp *actions*))
       (setf *actions* nil))
-    (when (boundp '*init-actions*)
+    (when (and (boundp '*init-actions*) (listp *init-actions*))
       (setf *init-actions* nil))
-    (when (boundp '*happening-names*)
+    (when (and (boundp '*happening-names*) (listp *happening-names*))
       (setf *happening-names* nil))
     ;; Reset object index counter
-    (when (boundp '*last-object-index*)
+    (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
       (setf *last-object-index* 0))))
 
 
