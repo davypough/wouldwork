@@ -95,6 +95,7 @@
 		                     (:file "ww-planner")
 		                     (:file "ww-searcher")
                              (:file "ww-backtracker")
+                             (:file "ww-parallel-infrastructure")
 		                     (:file "ww-parallel")
 		                     (:file "ww-initialize"))))
   :build-operation "program-op"

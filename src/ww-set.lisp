@@ -33,7 +33,6 @@
          (save-globals)
          (with-silenced-compilation
            (asdf:load-system :wouldwork :force t)))
-           ;(load-problem (string *problem-name*))))
        (*algorithm*  ;need to recompile current problem for new translations
          (when *ww-loading*
            (error "Please remove (ww-set *algorithm* ~S) from the current problem specification file.
@@ -46,7 +45,6 @@
            (save-globals)
            (with-silenced-compilation
              (asdf:load-system :wouldwork :force t))))
-             ;(load-problem (string *problem-name*)))))  ;deletes vals.lisp
        (*probe*
          (when *ww-loading*
            (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
@@ -59,7 +57,6 @@
          (save-globals)
          (with-silenced-compilation
            (asdf:load-system :wouldwork :force t)))
-           ;(load-problem (string *problem-name*))))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

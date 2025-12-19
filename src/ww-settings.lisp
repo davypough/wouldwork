@@ -28,6 +28,8 @@
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
+  (when (> *threads* 0)
+    (format t "~&~%  For parallel settings: (display-parallel-parameters)"))
   (terpri) (terpri))
 
 

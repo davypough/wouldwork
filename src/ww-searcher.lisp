@@ -27,17 +27,6 @@
        (finish-output))))  ;make sure printout is complete before continuing
 
 
-(defmacro with-closed-shard-lock ((state) &body body)
-  "Execute BODY while holding the shard lock for STATE.
-   In serial mode, executes BODY directly without locking."
-  (if (> *threads* 0)
-      (let ((shard-idx (gensym "SHARD-IDX")))
-        `(let ((,shard-idx (shard-index-for-state ,state)))
-           (bt:with-lock-held ((svref *closed-locks* ,shard-idx))
-             ,@body)))
-      `(progn ,@body)))
-
-
 (defun simple-break ()
   "Call to simplify debugger printout on a break."
   (declare (optimize (debug 1)))
@@ -243,11 +232,10 @@
   (setf *inconsistent-states-dropped* 0)
   (clrhash *prop-key-cache*)
   (if (> *threads* 0)
-    ;(with-open-stream (*standard-output* (make-broadcast-stream))) ;ignore *standard-output*
     (if (eql *algorithm* 'backtracking)
       (error "Parallel processing not supported with backtracking algorithm")
       (progn
-        (process-threads-chase-lev)
+        (process-partitioned-parallel)
         (finalize-parallel-search-results)))
     (ecase *algorithm*
       (depth-first (search-serial))
@@ -774,7 +762,7 @@
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
         (cond (*hybrid-mode*
-               (format t "~2%Hybrid mode enumerated all paths to goal states at depth â‰¤ ~D."
+               (format t "~2%Hybrid mode enumerated all paths to goal states at depth Ã¢â€°Â¤ ~D."
                        *depth-cutoff*))
               ((eql *tree-or-graph* 'tree)
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
