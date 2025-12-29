@@ -224,11 +224,13 @@
           (when act-state  ;no new act-state if wait action was cancelled
             (if *happening-names*  ;note that act-state = state+
               (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
-              (if (and (boundp 'constraint-fn)
-                       (symbol-value 'constraint-fn) 
-                       (not (funcall (symbol-function 'constraint-fn) act-state))) ;violated
-                (setf new-state nil)
-                (setf new-state act-state)))
+              (progn
+                (setf net-state act-state)
+                (if (and (boundp 'constraint-fn)
+                         (symbol-value 'constraint-fn) 
+                         (not (funcall (symbol-function 'constraint-fn) act-state))) ;violated
+                  (setf new-state nil)
+                  (setf new-state act-state))))
             #+:ww-debug (when (>= *debug* 4)
                           (if net-state
                             (when (and (boundp 'constraint-fn) (symbol-value 'constraint-fn))
@@ -237,7 +239,7 @@
                               (format t "~&  ***CONSTRAINT VIOLATED~%"))))
             (when new-state
               (list (setf new-state 
-                          (process-followups act-state updated-db)))))))
+                          (process-followups net-state updated-db)))))))
       updated-dbs))
 
 

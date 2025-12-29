@@ -229,6 +229,7 @@
     ;; Generate database lookup and conditional binding
     `(multiple-value-bind (vals present-p)
          (gethash ,(translate-list fluentless-atom flag) ,database-ref)
+       (declare (ignorable vals))
        (when present-p
          ,(cond
             ;; Case 1: Fluent variables present - perform binding

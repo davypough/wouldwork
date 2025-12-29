@@ -33,9 +33,18 @@
           ;; Apply happening updates to BOTH hidb and hap-state
           (when (/= (first (second following-happening)) index)  ;happening is not interrupted
             (revise (problem-state.hidb act-state) hap-updates)
+            (revise (problem-state.idb act-state) hap-updates)
             (revise (problem-state.idb hap-state) hap-updates)  ;hap-state = state + updates
+            (revise (problem-state.hidb hap-state) hap-updates)
             #+:ww-debug (when (>= *debug* 4)
-                                 (ut::prt hap-updates)))
+                                 (ut::prt hap-updates))
+            ;; Check for rebound after updates applied (reactive model)
+            (when (rebound-condition object hap-state)
+              (setf following-happening (apply-rebound following-happening))))
+          ;; Check for kill condition after updates applied (prunes state)
+          ;; Use act-state which has agent's current location post-action
+          (when (kill-condition object act-state)
+            (return-from amend-happenings (values nil nil)))
           (push following-happening next-happenings)) ;keep looking until past action-completion-time
     (let ((net-state (copy-problem-state act-state))) ;add happenings to hap-state & net-state
       (maphash (lambda (key value)  ;merge hidb into idb
@@ -51,7 +60,6 @@
                (constraint-violated-in-act-hap-net act-state hap-state net-state))
         (values nil nil)
         (values net-state act-state)))))  ;act-state is final state
-
 
 (defun get-following-happening (act-state object index time direction ref-time)  ;not state
   "Derive the following happening update for an object."
@@ -70,11 +78,13 @@
       `(,object (,following-index ,following-time ,direction)))))
 
 
-(defun interrupt-condition (object act-state)  ;not state
+(defun interrupt-condition (object act-state)
   "Determines if the interrupt function for object is satisfied in this state;
    eg, if the object is currently being jammed, and therefore disabled."
-  (declare (type symbol object) (type problem-state act-state))  ;not state
-  (funcall (get object :interrupt) act-state))  ;not state
+  (declare (type symbol object) (type problem-state act-state))
+  (ut::if-it (get object :interrupt)
+             (funcall ut::it act-state)
+             nil))
 
 
 (defun rebound-condition (object new-state)
@@ -82,6 +92,32 @@
   (declare (type symbol object) (type problem-state new-state))
   (ut::if-it (get object :rebound)
              (funcall ut::it new-state)))
+
+
+(defun kill-condition (object state)
+  "Determines if the kill condition for object is satisfied in this state;
+   eg, if a mine has moved into the agent's location, killing them."
+  (declare (type symbol object) (type problem-state state))
+  (ut::if-it (get object :kill)
+             (funcall ut::it state)
+             nil))
+
+
+(defun apply-rebound (following-happening)
+  "Compute mirror index for rebound. For :reverse mode patrollers,
+   reverses direction by jumping to the mirror event in the events array.
+   Mirror formula: for events array of length N, mirror of index I is (N - I)."
+  (let* ((object (first following-happening))
+         (params (second following-happening))
+         (following-index (first params))
+         (following-time (second params))
+         (direction (third params))
+         (events (get object :events))
+         (n-events (length events))
+         (mirror-index (- n-events following-index 1)))
+    (if (eq (get object :patroller-mode) :reverse)
+        `(,object (,mirror-index ,following-time ,(- direction)))
+        following-happening)))
  
 
 (defun constraint-violated-in-act-hap-net (act-state hap-state net-state)

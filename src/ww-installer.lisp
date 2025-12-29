@@ -126,13 +126,13 @@
   (format t "~&Installing dynamic relations...")
   (iter (for relation in relations)
         (check-relation relation)
-        ;; CHANGED: Normalize fluent specs before storing
+        ;; Normalize fluent specs before storing
         (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
           (setf (gethash (car relation) *relations*)
                 (ut::if-it normalized-args
                   (sort-either-types ut::it)
                   t)))
-        ;; CHANGED: Detect fluent positions using fluent-spec-p
+        ;; Detect fluent positions using fluent-spec-p
         (ut::if-it (iter (for arg in (cdr relation))
                          (for i from 1)
                          (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
@@ -163,16 +163,16 @@
   (format t "~&Installing static relations...")
   (iter (for relation in relations)
         (check-relation relation)
-        ;; CHANGED: Normalize fluent specs before storing
+        ;; Normalize fluent specs before storing
         (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
           (setf (gethash (car relation) *static-relations*)
                 (ut::if-it normalized-args
                   (sort-either-types ut::it)
                   nil)))
-        ;; CHANGED: Detect fluent positions using fluent-spec-p
+        ;; Detect fluent positions using fluent-spec-p
         (ut::if-it (iter (for arg in (cdr relation))
                          (for i from 1)
-                         (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
+                         (when (fluent-spec-p arg)
                            (collect i)))
           (setf (gethash (car relation) *fluent-relation-indices*) ut::it))
         (finally (maphash #'(lambda (key val)  ;install implied unary relations
@@ -224,17 +224,13 @@
     (setf (get object :interrupt) (getf plist :interrupt)))
   (ut::if-it (getf plist :interrupt)
     (let (($vars (get-all-nonspecial-vars #'$varp ut::it)))
-      (setf (symbol-value object)  ;(get object :interrupt) 
+      (setf (get object :interrupt-lambda)
         `(lambda (state)
            (let ,$vars
              ,(when $vars
-                `(declare (ignorable @,$vars)))
-                ,(translate (getf plist :interrupt) 'pre))))))
-  (fix-if-ignore '(state) (symbol-value object))  ; (get object :interrupt))
-  ;(when (get object :rebound) 
-  ;  (setf (get object :rebound) `(lambda (state+)
-  ;                                 ,(translate (get object :rebound) 'pre)))
-  ;  (setf (the function (get object :rebound-fn)) (compile nil (get object :rebound))))
+                `(declare (ignorable ,@$vars)))
+              ,(translate (getf plist :interrupt) 'pre))))))
+  (fix-if-ignore '(state) (get object :interrupt-lambda))
   (dolist (literal (get object :inits))
     (when (eql (char (format nil "~S" literal) 0) #\`)
       (setq literal (eval literal)))

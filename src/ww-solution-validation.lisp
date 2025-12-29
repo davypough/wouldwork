@@ -43,10 +43,20 @@
 (defun %validate-solution (action-list &optional verbose)
   "Internal implementation of validate-solution.
    Executes ACTION-LIST sequentially from *start-state*.
+   ACTION-LIST may be either:
+     - Plain actions: ((ACTION arg1 arg2) (ACTION2 arg1) ...)
+     - Timestamped actions: ((1.0 (ACTION arg1 arg2)) (2.0 (ACTION2 arg1)) ...)
    If VERBOSE is true, shows diagnostic output for each action."
   (when (null action-list)
     (format t "~%No actions provided to validate.~%")
     (return-from %validate-solution nil))
+  
+  ;; Normalize timestamped action lists to plain action lists
+  (let ((first-entry (first action-list)))
+    (when (and (consp first-entry)
+               (numberp (first first-entry))
+               (consp (second first-entry)))
+      (setf action-list (mapcar #'second action-list))))
   
   ;; Initialize working state from *start-state*
   (let ((current-state (copy-problem-state *start-state*))
@@ -92,12 +102,19 @@
    VERBOSE if true shows diagnostic output."
   (let* ((action-name (first action-form))
          (provided-args (rest action-form))
-         (action (find action-name *actions* :key #'action.name)))
+         (action (find action-name *actions* :key #'action.name))
+         (wait-duration nil))
     
     ;; Check if action exists
     (unless action
       (return-from apply-action-to-state
         (values nil nil (format nil "Action ~A not found in problem specification" action-name))))
+    
+    ;; WAIT action special handling: duration in solution output is informational,
+    ;; not an effect variable. Save it for time update, then strip for validation.
+    (when (eql action-name 'wait)
+      (setf wait-duration (first provided-args))
+      (setf provided-args nil))
     
     ;; Check argument count matches effect variables
     (let ((expected-count (length (action.effect-variables action)))
@@ -120,7 +137,7 @@
       (let ((matching-pre-result nil)
             (checked-count 0)
             (passed-count 0)
-            (first-passing-effect-args nil))                                    ; NEW
+            (first-passing-effect-args nil))
         
         ;; Search through precondition argument combinations
         (dolist (pre-args precondition-args)
@@ -132,21 +149,21 @@
               (let ((effect-args (extract-effect-args action pre-args pre-result)))
                 (when verbose
                   (format t "  Precondition satisfied for: ~S~%" pre-args))
-                ;; Save first passing effect-args for mismatch reporting             ; NEW
-                (unless first-passing-effect-args                                    ; NEW
-                  (setf first-passing-effect-args effect-args))                      ; NEW
+                ;; Save first passing effect-args for mismatch reporting
+                (unless first-passing-effect-args
+                  (setf first-passing-effect-args effect-args))
                 (when (args-match-with-combinations action effect-args provided-args)
                   (setf matching-pre-result pre-result)
                   (return))))))
         
-        ;; If no matching instantiation found, determine failure type               ; CHANGED
-        (unless matching-pre-result                                                 ; CHANGED
-          (return-from apply-action-to-state                                        ; CHANGED
-            (if (> passed-count 0)                                                  ; NEW
-                ;; Precondition passed but bindings don't match provided args       ; NEW
-                (values nil nil (cons :state-mismatch first-passing-effect-args))   ; NEW
-                ;; True precondition failure                                        ; NEW
-                (values nil nil :precondition-failure))))                           ; NEW
+        ;; If no matching instantiation found, determine failure type
+        (unless matching-pre-result
+          (return-from apply-action-to-state
+            (if (> passed-count 0)
+                ;; Precondition passed but bindings don't match provided args
+                (values nil nil (cons :state-mismatch first-passing-effect-args))
+                ;; True precondition failure
+                (values nil nil :precondition-failure))))
         
         ;; Apply effect to produce updated-dbs
         (let ((updated-dbs (if (eql matching-pre-result t)
@@ -168,9 +185,30 @@
             (let ((new-state (copy-problem-state state)))
               ;; Apply the update changes to new state
               (apply-update-to-state new-state update action)
+              
+              ;; Remove (WAITING) when transitioning from a WAIT action
+              ;; (mirrors logic in ww-planner.lisp create-action-state)
+              (when (eql (problem-state.name state) 'wait)
+                (remhash (gethash 'waiting *constant-integers*)
+                         (problem-state.idb new-state)))
+              
+              ;; For WAIT, override time with actual duration from solution
+              (when wait-duration
+                (setf (problem-state.time new-state)
+                      (+ (problem-state.time state) wait-duration)))
+              
               ;; Apply followups if any
               (when (update.followups update)
                 (apply-followups new-state update))
+              
+              ;; Process happenings if present
+              (when *happening-names*
+                (let ((net-state (amend-happenings state new-state)))
+                  (unless net-state
+                    (return-from apply-action-to-state
+                      (values nil nil "Happening violation (kill condition)")))
+                  (setf new-state net-state)))
+              
               (values new-state t nil))))))))
 
 

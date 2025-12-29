@@ -57,7 +57,21 @@
         (finish-output)
         (when (get obj :interrupt)
           (setf (get obj :interrupt)
-                (compile nil (subst-int-code (symbol-value obj))))))
+                (compile nil (subst-int-code (get obj :interrupt-lambda))))))
+  ;; Compile happening rebound functions
+  (iter (for obj in *happening-names*)
+        (when (get obj :rebound-lambda)
+          (format t "~&  ~A rebound...~%" obj)
+          (finish-output)
+          (setf (get obj :rebound)
+                (compile nil (subst-int-code (get obj :rebound-lambda))))))
+  ;; Compile happening kill functions
+  (iter (for obj in *happening-names*)
+        (when (get obj :kill-lambda)
+          (format t "~&  ~A kill...~%" obj)
+          (finish-output)
+          (setf (get obj :kill)
+                (compile nil (subst-int-code (get obj :kill-lambda))))))
   ;; Compile goal function
   (when (boundp 'goal-fn)
     (format t "~&  ~A...~%" 'goal-fn)
@@ -226,26 +240,6 @@
                                 *last-object-index*)))))
         ;; Use the code outside the lock
         (summing (* code multiplier))))
-
-
-
-#+ignore (defun convert-to-integer (prop-key)
-  "Thread-safe original version"
-  (iter (for item in prop-key)
-        (for multiplier in '(1 1000 1000000 1000000000 1000000000000))
-        (ut::if-it (gethash item *constant-integers*)
-          (summing (* ut::it multiplier))
-          ;; Critical section: check-increment-assign must be atomic
-          (bt:with-lock-held (*lock*)
-            ;; Double-check pattern: item might have been added by another thread
-            (ut::if-it (gethash item *constant-integers*)
-              (summing (* ut::it multiplier))
-              (progn (when (>= *last-object-index* 999)
-                       (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
-                     (incf *last-object-index*)
-                     (setf (gethash item *constant-integers*) *last-object-index*)
-                     (setf (gethash *last-object-index* *integer-constants*) item)
-                     (summing (* *last-object-index* multiplier))))))))
 
 
 (defun convert-prop-list (prop-list)

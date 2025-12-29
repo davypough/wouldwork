@@ -87,7 +87,8 @@
 
 
 (defun check-bind-fluent-consistency (proposition)
-  "Validates that fluent positions in bind statements use fluent variables."
+  "Validates that fluent positions in bind statements use $var arguments.
+   Fluent positions (per relation definition) must use $var to receive bound values."
   (let ((relation-name (car proposition))
         (fluent-positions (get-prop-fluent-indices proposition)))
     (when fluent-positions
@@ -95,13 +96,11 @@
             (for position from 1)
             (when (member position fluent-positions)
               (unless ($varp arg)
-                (error "~%Bind statement ~A is inconsistent with relation ~A"
+                (error "~%Bind statement ~A is inconsistent with relation ~A~%~
+                        Position ~D is declared fluent but argument ~A is not a $variable"
                        (list 'bind proposition)
-                       (cons relation-name (gethash relation-name *relations*)))))))))
-
-                       ;`(bind ,proposition))
-                       ;(cons `,relation-name `,(gethash relation-name *relations*)))))))))
-                       ;`(list ,relation-name ,(gethash relation-name *relations*)))))))))
+                       (cons relation-name (gethash relation-name *relations*))
+                       position arg)))))))
                          
 
 (defun check-query/update-call (fn-call)

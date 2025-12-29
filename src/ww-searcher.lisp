@@ -158,8 +158,9 @@
               *algorithm*)
       (setf constraints-met nil))
     (unless (eql *tree-or-graph* 'graph)
-      (format t "~&Note: *solution-type* EVERY with *tree-or-graph* ~A uses standard search; hybrid mode requires GRAPH.~%"
-              *tree-or-graph*)
+      (unless *happening-names*  ; Suppress message when tree is required for happenings
+        (format t "~&Note: *solution-type* EVERY with *tree-or-graph* TREE uses standard search to find every solution.~%~
+                   Using *tree-or-graph* GRAPH may be more efficient (hybrid mode), but may find fewer solutions.~%"))
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (format t "~&Note: *solution-type* EVERY requires *depth-cutoff* > 0 for hybrid mode; using standard search.~%")
