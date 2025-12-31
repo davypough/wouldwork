@@ -2,7 +2,7 @@
 
 
 ;;; Problem specification for getting by an automated 
-;;; sentry mine by jamming it.
+;;; sentry mine by jamming it.  Similar to problem-sentry.lisp
 
 
 (in-package :ww)  ;required
