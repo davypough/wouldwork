@@ -269,7 +269,7 @@
     (when (= *program-cycles* 0)  ;ie, expanding the start state
       (when (>= *branch* 0)  ;choose an initial branch to explore, drop others
         (format t "~&Exploring only branch ~D of ~D~%" *branch* (length succ-nodes))
-        (setf succ-nodes (subseq succ-nodes *branch* (1+ *branch*))))
+        (setf succ-nodes (subseq succ-nodes (1- *branch*) *branch*)))
       (setf *num-init-successors* (length succ-nodes))
       (setf *rem-init-successors* (reverse succ-nodes)))
     (iter (for succ-node in succ-nodes)
@@ -616,8 +616,7 @@
            ,message
            ,@(case *debug*
                (1 nil)
-               (2 (list (list-database (problem-state.idb state))
-                        (list-database (problem-state.hidb state))))))
+               (2 (list (list-database (problem-state.idb state))))))
           *search-tree*)))
 
 

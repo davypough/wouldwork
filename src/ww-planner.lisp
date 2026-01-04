@@ -291,17 +291,19 @@
 
 
 (defun process-followups (net-state updated-db)
-  "Triggering forms are saved previously during effect apply."
+  "Triggering forms are saved previously during effect apply.
+   Followups execute on post-happening state, seeing cumulative changes."
   (declare (ignorable updated-db))
-  (iter (with state+ = (copy-problem-state-without-idb net-state))  ;create state+ from net-state
-        (setf (problem-state.idb state+) (update.changes updated-db))  ;set updated idb
+  (iter (with state+ = (copy-problem-state-without-idb net-state))
+        (initially (setf (problem-state.idb state+) (problem-state.idb net-state)))
         (for followup in (update.followups updated-db))
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt followup))
-        (for updated-idb = (apply (car followup) state+ (cdr followup)))  ;pass state+ only
+        (for updated-idb = (apply (car followup) state+ (cdr followup)))
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt (list-database updated-idb)))
         (setf (problem-state.idb net-state) updated-idb)
+        (setf (problem-state.idb state+) updated-idb)
     (finally (setf (problem-state.idb-hash net-state)
                (compute-idb-hash (problem-state.idb net-state)))
              (return-from process-followups net-state))))

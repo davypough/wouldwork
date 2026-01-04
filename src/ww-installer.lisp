@@ -89,6 +89,52 @@
                          type))
                    (cdr spec))))
     (t spec)))
+
+
+(defun bijective-relation-p (relation)
+  "Detects if a relation specification contains the :bijective annotation.
+   Returns two values:
+   1. The relation with :bijective removed (or unchanged if not present)
+   2. T if :bijective was present, NIL otherwise."
+  (let ((last-element (car (last relation))))
+    (if (eql last-element :bijective)
+        (values (butlast relation) t)
+        (values relation nil))))
+
+
+(defun create-bijective-indices (relation)
+  "Creates dual internal indices for a validated bijective relation.
+   For (on $block $support), creates:
+   - ON1: keyed by position 1 (block), fluent at position 2
+   - ON2: keyed by position 2 (support), fluent at position 1
+   Registers all necessary data structures."
+  (let* ((relation-name (car relation))
+         (args (cdr relation))
+         (normalized-args (mapcar #'normalize-fluent-spec args))
+         (sorted-args (sort-either-types normalized-args))
+         (index1-name (intern (format nil "~A1" relation-name)))
+         (index2-name (intern (format nil "~A2" relation-name))))
+    
+    ;; Register canonical relation in *relations* for validation
+    (setf (gethash relation-name *relations*) sorted-args)
+    ;; Canonical relation has all positions as fluent
+    (setf (gethash relation-name *fluent-relation-indices*) '(1 2))
+    
+    ;; Register ON1: keyed by position 1, fluent at position 2
+    (setf (gethash index1-name *relations*) sorted-args)
+    (setf (gethash index1-name *fluent-relation-indices*) '(2))
+    
+    ;; Register ON2: keyed by position 2, fluent at position 1
+    (setf (gethash index2-name *relations*) sorted-args)
+    (setf (gethash index2-name *fluent-relation-indices*) '(1))
+    
+    ;; Register bijective mappings
+    (setf (gethash relation-name *bijective-relations*) 
+          (list index1-name index2-name))
+    (setf (gethash index1-name *bijective-canonical*) 
+          (cons relation-name 1))
+    (setf (gethash index2-name *bijective-canonical*) 
+          (cons relation-name 2))))
             
             
 (defmacro define-dynamic-relations (&rest relations)
@@ -124,21 +170,30 @@
 
 (defun install-dynamic-relations (relations)
   (format t "~&Installing dynamic relations...")
-  (iter (for relation in relations)
-        (check-relation relation)
-        ;; Normalize fluent specs before storing
-        (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
-          (setf (gethash (car relation) *relations*)
-                (ut::if-it normalized-args
-                  (sort-either-types ut::it)
-                  t)))
-        ;; Detect fluent positions using fluent-spec-p
-        (ut::if-it (iter (for arg in (cdr relation))
-                         (for i from 1)
-                         (when (fluent-spec-p arg)  ; CHANGED: was ($varp arg)
-                           (collect i)))
-          (setf (gethash (car relation) *fluent-relation-indices*)
-                ut::it))
+  (iter (for raw-relation in relations)
+        (multiple-value-bind (relation bijectivep)
+            (bijective-relation-p raw-relation)
+          (check-relation relation)
+          (if bijectivep
+              ;; Handle bijective relation
+              (progn
+                (check-bijective-relation relation)
+                (create-bijective-indices relation))
+              ;; Handle normal relation (existing logic)
+              (progn
+                ;; Normalize fluent specs before storing
+                (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
+                  (setf (gethash (car relation) *relations*)
+                        (ut::if-it normalized-args
+                          (sort-either-types ut::it)
+                          t)))
+                ;; Detect fluent positions using fluent-spec-p
+                (ut::if-it (iter (for arg in (cdr relation))
+                                 (for i from 1)
+                                 (when (fluent-spec-p arg)
+                                   (collect i)))
+                  (setf (gethash (car relation) *fluent-relation-indices*)
+                        ut::it)))))
         (finally (maphash (lambda (key val)  ;install implied unary relations
                             (declare (ignore val))
                             (setf (gethash key *static-relations*) '(something)))
@@ -146,11 +201,13 @@
                  (setf (gethash 'inconsistent-state *relations*) t)
                  (add-proposition '(always-true) *static-db*)
                  (setf (gethash 'always-true *static-relations*) '(always-true))))
-  ;; Install symmetric relations
+  ;; Install symmetric relations (exclude bijective relations and their indices)
   (iter (for (key val) in-hashtable *relations*)
     (when (and (not (eql val t))
                (not (alexandria:setp val))  ;multiple types
-               (not (final-charp #\> key)))   ;not explicitly directed
+               (not (final-charp #\> key))  ;not explicitly directed
+               (not (gethash key *bijective-relations*))
+               (not (gethash key *bijective-canonical*)))
       (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
   t)
 

@@ -26,14 +26,15 @@
 
 (ww-set *tree-or-graph* tree)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 15)
 
-(ww-set *progress-reporting-interval* 10000)
+(ww-set *progress-reporting-interval* 100000)
 
 
 (define-types
   agent           (agent1)
   buzzer          (buzzer1)
+  mine            ()
   box             (box1 box2)
   transmitter     (transmitter1 transmitter2)
   area            (area1 area2 area3 area4 area5)
@@ -44,11 +45,10 @@
 
 
 (define-dynamic-relations
-  (loc (either agent buzzer cargo) $area)      ;always ground area
-  (on1 (either $agent $cargo) box)              ;stacking on a box
-  (on2 (either agent cargo) $box)
-  (supports $buzzer box)                       ;inverse of on, box placed on buzzer (force field distinction)
-  (height (either agent cargo) $fixnum)        ;0 = ground, 1 = on support, 2 = stacked
+  (loc (either agent buzzer mine cargo) $area)  ;always ground area
+  (on (either $agent $cargo) $box :bijective)  ;stacking on a box, bijective allows binding either argument
+  (supports (either $buzzer $mine) $box :bijective)  ;inverse of on, only box object can placed on buzzer
+  (height (either agent cargo) $fixnum)  ;0 = on ground, 1 = on support, 2+ = stacked
   (holds agent $cargo)
 )
 
@@ -65,16 +65,19 @@
   rebound (exists (?c cargo)
             (and (bind (loc buzzer1 $area))
                  (loc ?c $area)))
+  kill (and (bind (loc buzzer1 $area))  ;prune (disallow) state if true
+            (loc agent1 $area))
 )
 
 
 ;;;; HELPER QUERIES ;;;;
 
 
-(define-query cleartop (?box)
-  ;; True if nothing is on top of this box
-  (not (exists (?x (either agent cargo))
-         (on ?x ?box))))
+(define-query cleartop (?bearer)
+  ;; True if nothing is on top of a box, buzzer, or mine.
+  (cond ((box ?bearer) (not (bind (on $anything ?bearer))))  ;anything = agent or cargo
+        ((buzzer ?bearer) (not (bind (supports ?bearer $any-box))))
+        ((mine ?bearer) (not (bind (supports ?bearer $any-box))))))
 
 
 (define-query accessible (?agent ?area1 ?area2)
@@ -83,18 +86,9 @@
       (accessible0 ?area1 ?area2)))
 
 
-(define-query get-object-on-box (?box)
-  ;; Returns the agent or cargo resting on this box, or nil if none
-  (exists (?object (either agent cargo))
-    (and (on ?object ?box)
-         ?object)))
-
-
-(define-query get-box-below (?box)
-  ;; Returns the box that ?box is resting on, or nil if none
-  (exists (?lower-box box)
-    (and (on ?box ?lower-box)
-         ?lower-box)))
+(define-query safe (?area)
+  (not (exists (?threat (either buzzer mine))
+         (loc ?threat ?area))))
 
 
 ;;;; PROPAGATION ;;;;
@@ -109,45 +103,24 @@
 
 
 (define-update propagate-consequences! ()
-  ;; Returns t if any change occurred
-  (or (update-buzzer-cargo!)
-      (drop-unsupported!)))
+  ;; All functions should execute in order and return t if any change occurred.
+  (some #'identity
+        (mapcar (lambda (fn) (funcall fn state))
+                (list #'relocate-objects-above-rovers!))))
 
 
-(define-update update-buzzer-cargo! ()
-  ;; When buzzer moves, update loc of boxes on it and anything on those boxes
-  ;; Returns t if any change occurred
-  (ww-loop with $changed = nil
-           for ?box in (box)
-           do (when (and (bind (supports buzzer1 ?box))
-                         (bind (loc buzzer1 $bz-area))
-                         (bind (loc ?box $box-area))
-                         (different $bz-area $box-area))
-                ;; Box on buzzer has stale loc - update it
-                (dodb (loc ?box $bz-area))
-                (setq $changed t)
-                ;; Also update anything on this box
-                (ww-loop for ?x in (either agent cargo)
-                         do (when (and (bind (on ?x ?box))
-                                       (bind (loc ?x $x-area))
-                                       (different $x-area $bz-area))
-                              (dodb (loc ?x $bz-area))
-                              (setq $changed t))))
-           finally (return $changed)))
+(define-update relocate-stacked-object! (?object ?area)
+  (do (loc ?object ?area)
+      (if (bind (on $higher-object ?object))
+        (relocate-stacked-object! $higher-object ?area))))
+  
 
-
-(define-update drop-unsupported! ()
-  ;; Drop cargo/agent to ground if their supporting box was picked up
-  ;; Returns t if any change occurred
-  (ww-loop with $changed = nil
-           for ?x in (either agent cargo)
-           do (when (and (bind (on ?x $box))
-                         (not (bind (loc $box $any))))  ;box is held, has no loc
-                ;; Support removed - drop to ground
-                (dodb (not (on ?x $box))
-                      (height ?x 0))
-                (setq $changed t))
-           finally (return $changed)))
+(define-update relocate-objects-above-rovers! ()
+  ;; When a buzzer or mine moves, we need to relocate any objects stacked on it.
+  (doall (?rover (either buzzer mine))
+    (if (bind (supports ?rover $box))
+      (do (bind (loc ?rover $buzzer-area))
+          (relocate-stacked-object! $box $buzzer-area)))))
 
 
 (define-update collapse-cargo-above-box! (?box)
@@ -159,139 +132,141 @@
           (collapse-cargo-above-box! $cargo)))))
 
 
-;;;; ACTIONS - GROUND MOVEMENT ;;;;
+;;;; ACTIONS ;;;;
+
+
+(define-action put-cargo-on-place
+  ;; Agent can place a cargo object on a box, buzzer, mine or the ground.
+  1
+  (?agent agent)
+  (and (bind (holds ?agent $cargo))
+       (bind (loc ?agent $area)))
+  (?agent $cargo $place $area)
+  (do  ;; Can put cargo on a box
+      (doall (?box box)
+        (if (and (loc ?box $area)
+                 (cleartop ?box)
+                 (bind (height ?box $h-box))
+                 (bind (height ?agent $h-agent))
+                 (setq $h-delta (- $h-box $h-agent))
+                 (< $h-delta 1))  ;within reach +1 up or any level down
+          (assert (not (holds ?agent $cargo))
+                  (loc $cargo $area)
+                  (on $cargo ?box)
+                  (height $cargo (1+ $h-box))
+                  (setq $place ?box))))
+      ;; an put cargo = box on a buzzer or mine
+      (doall (?rover (either buzzer mine))
+        (if (and (box $cargo)
+                 (loc ?rover $area)
+                 (cleartop ?rover)
+                 (bind (height ?agent $h-agent))
+                 (>= $h-agent 1))  ;must be above buzzer
+          (assert (not (holds ?agent $cargo))
+                  (loc $cargo $area)
+                  (supports ?rover $cargo)
+                  (height $cargo 1))  ;box on buzzer = height 1
+                  (setq $place ?rover)))
+      ;; Can put cargo on the ground
+      (assert (not (holds ?agent $cargo))
+              (loc $cargo $area)
+              (height $cargo 0)
+              (setq $place 'ground))
+      (finally (propagate-changes!))))
+
+
+(define-action pickup-cargo
+  ;; Agent picks up cargo 
+    1
+  (?agent agent)
+  (and (not (bind (holds ?agent $any-cargo)))
+       (bind (loc ?agent $area))
+       (bind (height ?agent $h-agent)))
+  (?agent $cargo $area)
+  (do ;; if cargo is a box, anything on box falls one level
+      (doall (?box box)
+        (if (and (not (on ?agent ?box))
+                 (loc ?box $area)
+                 (bind (height ?box $h-box))
+                 (<= (abs (- $h-box $h-agent)) 1))  ;within reach (+1,0,-1)
+          (assert (setq $cargo ?box)
+                  (holds ?agent ?box)
+                  (not (loc ?box $area))
+                  ;; First update heights while on relationships still exist
+                  (collapse-cargo-above-box! ?box)
+                  ;; Now handle removal of relationships and establishing new ones
+                  (cond ((bind (supports $rover ?box))
+                           ;; Box was on buzzer or mine - remove supports, transfer cargo to buzzer
+                           (not (supports $rover ?box))
+                           (if (bind (on $cargo ?box))
+                             (do (not (on $cargo ?box))
+                                 (if (box $cargo)
+                                   (supports $rover $cargo)
+                                   (height $cargo 0)))))  ;any cargo not a box falls to ground
+                        ((bind (on ?box $under-box))
+                           ;; Box was on another box - remove on, transfer cargo to under-box
+                           (not (on ?box $under-box))
+                           (if (bind (on $cargo ?box))
+                             (do (not (on $cargo ?box))
+                                 (on $cargo $under-box))))
+                        (t
+                           ;; Box was on ground - just remove on relationship for cargo
+                           (if (bind (on $cargo ?box))
+                             (not (on $cargo ?box))))))))
+      (finally (propagate-changes!))))
+
+
+(define-action jump-to-place
+  ;; Agent can jump up or down to any reachable box or the ground.
+  1
+  (?agent agent)
+  (and (bind (loc ?agent $area))
+       (bind (height ?agent $h-agent)))
+  (?agent $place $area)
+  (do ;; Can jump to a reachable box
+      (doall (?box box)
+        (if (and (cleartop ?box)
+                 (loc ?box $area)  ;agent and box must be in same area
+                 (bind (height ?agent $h-agent))
+                 (bind (height ?box $h-box))
+                 (setq $h-delta (- $h-box $h-agent))
+                 (< $h-delta 1))  ;agent can only reach box at same level or below;
+          (assert (if (bind (on ?agent $old-box))
+                    (not (on ?agent $old-box)))
+                  (on ?agent ?box)
+                  (height ?agent (1+ $h-box))  ;standing on a box sets agent height to box_height + 1
+                  (setq $place ?box))))
+      ;; Can jump to the ground
+      (if (> $h-agent 0)
+        (assert (height ?agent 0)
+                (if (bind (on ?agent $box))
+                  (not (on ?agent $box)))
+                (setq $place 'ground)))
+      (finally (propagate-changes!))))
+
 
 
 (define-action move
     1
-  (?agent agent ?area2 area)
-  (and (bind (height ?agent $h))
-       (= $h 0)  ;must be on ground
-       (bind (loc ?agent $area1))
-       (different $area1 ?area2)
-       (accessible ?agent $area1 ?area2))
-  (?agent $area1 ?area2)
-  (assert (loc ?agent ?area2)
-          (propagate-changes!)))
-
-
-;;;; ACTIONS - JUMPING ;;;;
-
-
-(define-action jump-onto-box
-  ;; Agent can jump up or down to any reachable box
-  1
-  (?agent agent ?box box)
-  (and (cleartop ?box)
-       (bind (loc ?agent $area))
-       (loc ?box $area)  ;agent and box must be in same area
-       (bind (height ?agent $h-agent))
-       (bind (height ?box $h-box))
-       (setq $h-delta (- $h-box $h-agent))
-       (< $h-delta 1))  ;agent can only jump up 1 level max
-                        ;but can jump across or down to any lower level box
-  (?agent ?box $h-box $area)
-  (assert (if (bind (on ?agent $old-box))
-            (not (on ?agent $old-box)))
-          (on ?agent ?box)
-          (height ?agent (1+ $h-box))
-          (propagate-changes!)))
-
-
-(define-action jump-to-ground
-  ;; Agent can jump from any height > 0 to the ground
-  1
   (?agent agent)
   (and (bind (height ?agent $h-agent))
-       (> $h-agent 0)
-       (bind (loc ?agent $area)))
-  (?agent $area)
-  (assert (height ?agent 0)
-          (if (bind (on ?agent $box))
-            (not (on ?agent $box)))
-          (propagate-changes!)))
+       (= $h-agent 0))  ;must be on ground
+  (?agent $area1 ?area2)
+  (do (doall (?area2 area)
+        (if (and (bind (loc ?agent $area1))
+                 (different ?area2 $area1)
+                 (accessible ?agent $area1 ?area2)
+                 (safe ?area2))
+          (assert (loc ?agent ?area2))))
+      (finally (propagate-changes!))))
 
 
-;;;; ACTIONS - BOX PICKUP/DROP ;;;;
-
-
-(define-action pickup-box
-  ;; Agent picks up a box; anything on box falls one level
-    1
-  (?agent agent ?box box)
-  (and (not (bind (holds ?agent $any-cargo)))
-       (not (on ?agent ?box))
-       (bind (loc ?agent $area))
-       (loc ?box $area)
-       (bind (height ?agent $h-agent))
-       (bind (height ?box $h-box))
-       (<= (abs (- $h-box $h-agent)) 1))  ;within reach (+1,0,-1)
-  (?agent ?box $area)
-  (assert (holds ?agent ?box)
-          (not (loc ?box $area))
-          (cond ((bind (supports $buzzer ?box))
-                   (not (supports $buzzer ?box))
-                   (bind (on $cargo ?box))  ;can't do this binding
-                   (if (box $cargo)  ;if cargo is not a box, then just drops to ground
-                     (supports $buzzer $cargo))
-                ((bind (on ?box $lower-box))
-                   (not (on ?box $lower-box))))
-          (collapse-cargo-above-box! ?box)  ;stack above box shifts down one level after box removed
-          (propagate-changes!)))
-
-
-(define-action drop-cargo-on-ground
-  ;; Agent drops held cargo at current location to the ground
-    1
-  (?agent agent)
-  (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area)))
-  (?agent $cargo $area)
-  (assert (not (holds ?agent $cargo))
-          (loc $cargo $area)
-          (height $cargo 0)
-          (propagate-changes!)))
-
-
-;;;; ACTIONS - PLACING CARGO ON SUPPORTS ;;;;
-
-
-(define-action put-cargo-on-box
-  ;; Agent can place a cargo object onto a reachable box
-    1
-  (?agent agent ?box box)
-  ;; Agent places held cargo onto a box
-  (and (cleartop ?box)
-       (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area))
-       (loc ?box $area)
-       (bind (height ?agent $h-agent))
-       (bind (height ?box $h-box))
-       (setq $h-delta (- $h-box $h-agent))
-       (< (- $h-box $h-agent) 1))  ;within reach +1 up or any level down
-  (?agent $cargo ?box $area)
-  (assert (not (holds ?agent $cargo))
-          (loc $cargo $area)
-          (on $cargo ?box)
-          (height $cargo (1+ $h-box))
-          (propagate-changes!)))
-
-
-(define-action put-box-on-buzzer
-  ;; Agent places held box onto buzzer (requires height >= 1, force field)
-    1
-  (?agent agent ?buzzer buzzer)
-  (and (bind (holds ?agent $box))
-       (bind (height ?agent $h-agent))
-       (>= $h-agent 1)  ;must be elevated
-       (bind (loc ?agent $area))
-       (loc ?buzzer $area))  ;buzzer is always at ground level
-  (?agent $box ?buzzer $area)
-  (assert (not (holds ?agent $box))
-          (loc $box $area)
-          (supports ?buzzer $box)
-          (height $box 1)  ;on buzzer = height 1
-          (propagate-changes!)))
+(define-action wait
+    0  ;always 0, wait for next exogenous event
+  (?agent agent ?area area)
+  (loc ?agent ?area)
+  ()
+  (assert (waiting)))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -335,3 +310,10 @@
 (define-goal
   (loc buzzer1 area5)
 )
+
+#|
+Notes:
+ 
+
+
+|#

@@ -114,7 +114,7 @@
          (direction (third params))
          (events (get object :events))
          (n-events (length events))
-         (mirror-index (- n-events following-index 1)))
+         (mirror-index (mod (- n-events following-index) n-events)))
     (if (eq (get object :patroller-mode) :reverse)
         `(,object (,mirror-index ,following-time ,(- direction)))
         following-happening)))

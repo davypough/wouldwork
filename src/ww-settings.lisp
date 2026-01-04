@@ -273,6 +273,12 @@
   (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
 
+(define-global *bijective-relations* (make-hash-table :test #'eq)
+  "Maps canonical relation name to (index1-name index2-name).")
+
+(define-global *bijective-canonical* (make-hash-table :test #'eq)
+  "Maps internal index name to (canonical-name . key-position).")
+
 
 ;; Reset parameters to defaults when vals.lisp doesn't exist
 ;; This ensures clean initialization for new problems without carrying over

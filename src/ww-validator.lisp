@@ -34,10 +34,30 @@
                             (let ((base-type (if ($varp type)
                                                (trim-1st-char type)
                                                type)))
-                              (gethash base-type *types*)))
+                              (nth-value 1 (gethash base-type *types*))))
                           either-types)))
             (error "The argument ~A is not valid in the user-defined relation ~A."
                    arg relation))))
+
+
+(defun check-bijective-relation (relation)
+  "Validates that a bijective relation meets required constraints:
+   1. Exactly 2 arguments (excluding relation name)
+   2. All arguments must be fluent.
+   Signals an error if constraints are violated."
+  (let ((relation-name (car relation))
+        (args (cdr relation)))
+    ;; Check exactly 2 arguments
+    (unless (= (length args) 2)
+      (error "Bijective relation ~A must have exactly 2 arguments, found ~D: ~A"
+             relation-name (length args) args))
+    ;; Check all arguments are fluent
+    (iter (for arg in args)
+          (for position from 1)
+          (unless (fluent-spec-p arg)
+            (error "Bijective relation ~A requires all arguments to be fluent.~%~
+                    Argument ~D (~A) is not fluent."
+                   relation-name position arg)))))
 
 
 (defun check-query/update-function (fn-name args body)
@@ -86,21 +106,47 @@
                        arg type-def proposition))))))
 
 
+(defun add-fluent-marker (type-spec)
+  "Add $ prefix to type specification to indicate fluent position."
+  (if (and (listp type-spec) (eq (car type-spec) 'either))
+    (cons 'either 
+          (mapcar (lambda (typ) (intern (format nil "$~A" typ) :ww))
+                  (cdr type-spec)))
+    (intern (format nil "$~A" type-spec) :ww)))
+
+
+(defun format-relation-with-fluents (relation-name)
+  "Returns a displayable relation spec with $ prefixes indicating fluent positions."
+  (let ((types (gethash relation-name *relations*))
+        (fluent-positions (gethash relation-name *fluent-relation-indices*)))
+    (when types
+      (cons relation-name
+            (iter (for type in types)
+                  (for position from 1)
+                  (collect (if (member position fluent-positions)
+                             (add-fluent-marker type)
+                             type)))))))
+
+
 (defun check-bind-fluent-consistency (proposition)
-  "Validates that fluent positions in bind statements use $var arguments.
-   Fluent positions (per relation definition) must use $var to receive bound values."
+  "Validates that bind statements contain at least one $variable in a fluent position.
+   Fluent positions can contain:
+   - $variable: receives the bound value from the database
+   - ?variable: serves as a lookup key (already-bound pattern variable)
+   - literal value: serves as a lookup key (validated by check-proposition)"
   (let ((relation-name (car proposition))
         (fluent-positions (get-prop-fluent-indices proposition)))
     (when fluent-positions
-      (iter (for arg in (cdr proposition))
-            (for position from 1)
-            (when (member position fluent-positions)
-              (unless ($varp arg)
-                (error "~%Bind statement ~A is inconsistent with relation ~A~%~
-                        Position ~D is declared fluent but argument ~A is not a $variable"
-                       (list 'bind proposition)
-                       (cons relation-name (gethash relation-name *relations*))
-                       position arg)))))))
+      (unless (iter (for arg in (cdr proposition))
+                    (for position from 1)
+                    (thereis (and (member position fluent-positions)
+                                  ($varp arg))))
+        (error "~%Bind statement is inconsistent with relation definition.~%~
+                  Statement: ~S~%~
+                  Relation:  ~S~%~
+                  Error: At least one fluent position must contain a $variable"
+               (list 'bind proposition)
+               (format-relation-with-fluents relation-name))))))
                          
 
 (defun check-query/update-call (fn-call)

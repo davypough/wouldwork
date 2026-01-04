@@ -415,3 +415,86 @@
                (terpri))
       ;; Return count and switch value
       (values (length optimal) min-switches))))
+
+
+;;;;;;;;;; Check-parens utility ;;;;;;;;;;;;;;;;;
+
+
+(defun check-parens-file (filepath)
+  "Scans file for parenthesis balance, reports line of first mismatch.
+   Properly handles comments, strings, and character literals."
+  (with-open-file (stream filepath :direction :input)
+    (loop with depth = 0
+          with line-num = 1
+          with open-positions = nil  ; stack of line numbers where '(' occurred
+          with in-string = nil
+          with in-line-comment = nil
+          with in-block-comment = 0  ; depth counter for nested #|...|#
+          with prev-char = nil
+          for char = (read-char stream nil nil)
+          while char
+          do (cond
+               ;; Track newlines and exit line comments
+               ((char= char #\Newline)
+                (incf line-num)
+                (setf in-line-comment nil))
+               
+               ;; Inside line comment - skip everything
+               (in-line-comment
+                nil)
+               
+               ;; Check for block comment start: #|
+               ((and (char= char #\|) (eql prev-char #\#) (not in-string))
+                (incf in-block-comment))
+               
+               ;; Check for block comment end: |#
+               ((and (char= char #\#) (eql prev-char #\|) (plusp in-block-comment))
+                (decf in-block-comment))
+               
+               ;; Inside block comment - skip everything else
+               ((plusp in-block-comment)
+                nil)
+               
+               ;; Check for line comment start
+               ((and (char= char #\;) (not in-string))
+                (setf in-line-comment t))
+               
+               ;; Handle string delimiters (not escaped)
+               ((and (char= char #\") (not (eql prev-char #\\)))
+                (setf in-string (not in-string)))
+               
+               ;; Inside string - skip parens
+               (in-string
+                nil)
+               
+               ;; Character literal #\( or #\) - skip
+               ((and (eql prev-char #\\)
+                     (or (char= char #\() (char= char #\))))
+                nil)
+               
+               ;; Open paren
+               ((char= char #\()
+                (push line-num open-positions)
+                (incf depth))
+               
+               ;; Close paren
+               ((char= char #\))
+                (if (zerop depth)
+                    (return (format nil "Extra ')' at line ~D" line-num))
+                    (progn (decf depth) (pop open-positions)))))
+             
+             (setf prev-char char)
+          
+          finally (return (if (zerop depth)
+                              "Parentheses balanced."
+                              (format nil "Unclosed '(' at line ~D (depth ~D remaining)"
+                                      (car open-positions) depth))))))
+
+
+(defmacro check-parens (problem-name)
+  "Check parenthesis balance in a problem file.
+   Usage: (check-parens buzzer1) checks problem-buzzer1.lisp"
+  (let ((filename (format nil "problem-~A.lisp" (string-downcase (symbol-name problem-name)))))
+    `(check-parens-file 
+      (merge-pathnames ,filename
+                       (asdf:system-relative-pathname :wouldwork "src/")))))

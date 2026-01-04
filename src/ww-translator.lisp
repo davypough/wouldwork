@@ -209,11 +209,32 @@
   (check-bind-fluent-consistency (second form)))
 
 
+(defun select-bijective-index-proposition (proposition)
+  "For a bijective relation in a bind form, returns index selection info.
+   Input: proposition like (on $block $support)
+   Returns: (index1-name index2-name $var1 $var2) if bijective, NIL otherwise.
+   - index1-name: internal index keyed by position 1
+   - index2-name: internal index keyed by position 2
+   - $var1, $var2: the fluent variables at positions 1 and 2"
+  (let* ((relation-name (car proposition))
+         (args (cdr proposition))
+         (index-names (gethash relation-name *bijective-relations*)))
+    (when index-names
+      (list (first index-names)    ; index1-name (e.g., ON1)
+            (second index-names)   ; index2-name (e.g., ON2)
+            (first args)           ; $var1 (e.g., $BLOCK)
+            (second args)))))      ; $var2 (e.g., $SUPPORT)
+
+
 (defun translate-bind (form flag)
   "Revised binding translation with unified state reference strategy.
    Translates binding operations like (bind (loc ?obj $area)) where fluent variables
    get bound to values retrieved from the database. Always performs read-only queries
    regardless of syntactic context.
+   For bijective relations, performs compile-time analysis to determine which index
+   to use based on variable types. Only $-variables may be unbound; ?-variables and
+   constants are always bound. Only generates runtime selection when both variables
+   are $-variables (binding state unknown at compile time).
    Returns:
    - t if proposition found and variables successfully bound
    - nil if proposition not found in database
@@ -222,22 +243,68 @@
   ;; Input validation and structure extraction
   (validate-bind-form form)
   (let* ((proposition (second form))
-         (fluent-indices (get-prop-fluent-indices proposition))
-         (fluentless-atom (ut::remove-at-indexes fluent-indices proposition))
-         (prop-fluents (get-prop-fluents proposition))
+         (bijective-info (select-bijective-index-proposition proposition))
          (database-ref (get-database-reference proposition flag)))
-    ;; Generate database lookup and conditional binding
-    `(multiple-value-bind (vals present-p)
-         (gethash ,(translate-list fluentless-atom flag) ,database-ref)
-       (declare (ignorable vals))
-       (when present-p
-         ,(cond
-            ;; Case 1: Fluent variables present - perform binding
-            (prop-fluents
-             `(progn (setf ,@(generate-fluent-bindings prop-fluents))
-                     t))
-            ;; Case 2: No fluent variables - simple existence check
-            (t 't))))))
+    (if bijective-info
+        ;; Handle bijective relation with compile-time index selection when possible
+        (destructuring-bind (index1-name index2-name var1 var2) bijective-info
+          (let ((var1-unbound ($varp var1))    ; CHANGED: $var might be unbound
+                (var2-unbound ($varp var2)))   ; CHANGED: $var might be unbound
+            (cond
+              ;; Both are non-$: neither can receive a value - error  ; CHANGED
+              ((and (not var1-unbound) (not var2-unbound))            ; CHANGED
+               (error "Bijective bind ~A: both arguments are bound (~A, ~A), ~
+                       neither can receive a value" proposition var1 var2))  ; CHANGED
+              ;; var1 is bound (not $var) - use index1 to look up var2  ; CHANGED
+              ((not var1-unbound)                                      ; CHANGED
+               `(multiple-value-bind (vals present-p)
+                    (gethash (list ',index1-name ,var1) ,database-ref)
+                  (when present-p
+                    (setf ,var2 (first vals))
+                    t)))
+              ;; var2 is bound (not $var) - use index2 to look up var1  ; CHANGED
+              ((not var2-unbound)                                      ; CHANGED
+               `(multiple-value-bind (vals present-p)
+                    (gethash (list ',index2-name ,var2) ,database-ref)
+                  (when present-p
+                    (setf ,var1 (first vals))
+                    t)))
+              ;; Both are $-variables: binding state unknown, need runtime check
+              (t
+               `(cond
+                  ;; var1 bound, var2 unbound → use index1 (keyed by position 1)
+                  ((and ,var1 (null ,var2))
+                   (multiple-value-bind (vals present-p)
+                       (gethash (list ',index1-name ,var1) ,database-ref)
+                     (when present-p
+                       (setf ,var2 (first vals))
+                       t)))
+                  ;; var2 bound, var1 unbound → use index2 (keyed by position 2)
+                  ((and ,var2 (null ,var1))
+                   (multiple-value-bind (vals present-p)
+                       (gethash (list ',index2-name ,var2) ,database-ref)
+                     (when present-p
+                       (setf ,var1 (first vals))
+                       t)))
+                  (t (error "Bijective bind ~A requires exactly one variable bound, ~
+                             got ~A=~A, ~A=~A"
+                            ',proposition ',var1 ,var1 ',var2 ,var2)))))))
+        ;; Handle normal relation (existing logic)
+        (let* ((fluent-indices (get-prop-fluent-indices proposition))
+               (fluentless-atom (ut::remove-at-indexes fluent-indices proposition))
+               (prop-fluents (get-prop-fluents proposition)))
+          ;; Generate database lookup and conditional binding
+          `(multiple-value-bind (vals present-p)
+               (gethash ,(translate-list fluentless-atom flag) ,database-ref)
+             (declare (ignorable vals))
+             (when present-p
+               ,(cond
+                  ;; Case 1: Fluent variables present - perform binding
+                  (prop-fluents
+                   `(progn (setf ,@(generate-fluent-bindings prop-fluents))
+                           t))
+                  ;; Case 2: No fluent variables - simple existence check
+                  (t 't))))))))
 
 
 (defun translate-existential (form flag)

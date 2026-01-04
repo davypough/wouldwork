@@ -15,42 +15,41 @@
 (ww-set *solution-type* max-value)
 
 
-(defvar item nil)  ;prevent compiler warnings
-(defvar create-item-structures nil)
+;;; First initialize & populate any auxiliary problem data structures.
+;;; Use the reader macro #. to initialize structures at read time.
+
+#.(unless (fboundp 'make-item)  ;don't keep redefining the defstruct
+    (defstruct item  ;an item template
+      (name nil :type symbol)
+      (id -1 :type fixnum)
+      (value -1 :type fixnum)
+      (weight -1 :type fixnum)
+      (value/weight -1 :type double-float)))
+
+#.(defparameter *item-structures* nil)
+#.(defparameter *num-items* -1)
+#.(defparameter *max-weight* -1)
+
+#.(unless (fboundp 'create-item-structures)
+    (defun create-item-structures (data-file)
+      (with-open-file (infile data-file :direction :input :if-does-not-exist nil)
+        (when (not (streamp infile)) (error "File does not exist!"))
+        (setf *num-items* (read infile))
+        (setf *max-weight* (read infile))
+        (loop for i from 1 upto *num-items* do
+          (let ((value (read infile))
+                (weight (read infile)))
+            (push (make-item :name (intern (format nil "ITEM~D" i) :ww)
+                             :value value
+                             :weight weight
+                             :value/weight (coerce (/ value weight)
+                                                   'double-float))
+                  *item-structures*))))))
+
+#.(create-item-structures (in-src "data-knap19.lisp"))
 
 
-#.(defstruct item  ;an item template
-  (name nil :type symbol)  ;item name--eg, item3
-  (id -1 :type fixnum)  ;item# in sorted list
-  (value -1 :type fixnum)  ;value of that item
-  (weight -1 :type fixnum)  ;weight of that item
-  (value/weight -1 :type double-float))  ;the ratio of the item's value/weight
-
-
-#.(defparameter *item-structures* nil)  ;the list of data item structures
-#.(defparameter *num-items* -1)  ;total number of items, update from data-knap19.lisp
-#.(defparameter *max-weight* -1)  ;max weight allowed, update from data-knap19.lisp
-
-
-#.(defun create-item-structures (data-file)
-  ;Read in data from a file.
-  (with-open-file (infile data-file :direction :input :if-does-not-exist nil)
-    (when (not (streamp infile)) (error "File does not exist!"))
-    (setf *num-items* (read infile))
-    (setf *max-weight* (read infile))
-    (loop for i from 1 upto *num-items* do
-      (let ((value (read infile))
-            (weight (read infile)))
-        (push (make-item :name (intern (format nil "ITEM~D" i) :ww)
-                           :value value
-                           :weight weight
-                           :value/weight (coerce (/ value weight)
-                                                 'double-float))
-               *item-structures*)))))
-
-
-#.(create-item-structures (in-src "data-knap19.lisp"))  ;path to the data file in the src directory
-
+;;; Then describe the problem for Wouldwork
 
 (defparameter *sorted-item-structures*
   (loop with sorted-item-structures = (sort (copy-list *item-structures*) #'>
@@ -158,7 +157,7 @@
 
 
 (define-init
-  (capacity #.*max-weight*)
+  (capacity #.*max-weight*)  ;read-time eval required for macro processing
   (contents nil)
   (load 0)
   (worth 0))

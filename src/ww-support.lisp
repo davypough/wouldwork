@@ -206,39 +206,67 @@
             (setf (gethash (get-complement-prop proposition) db) t)))))))
 
 
+(defun bijective-index-propositions (proposition)
+  "For a bijective relation, returns list of internal index propositions.
+   For (on A B) where ON is bijective, returns ((ON1 A B) (ON2 A B)).
+   Returns NIL if the relation is not bijective."
+  (let* ((relation-name (car proposition))
+         (args (cdr proposition))
+         (index-names (gethash relation-name *bijective-relations*)))
+    (when index-names
+      (mapcar (lambda (index-name)
+                (cons index-name args))
+              index-names))))
+
+
 (defun add-proposition (proposition db)  
-  "Adds an atomic proposition and all its symmetries to the database."
+  "Adds an atomic proposition and all its symmetries to the database.
+   For bijective relations, adds both internal index propositions."
   (declare (type hash-table db))
-  (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
-    (if (null symmetric-indexes)
-      (add-prop proposition db)
-      (let ((symmetric-variables
-               (loop for indexes in symmetric-indexes
-                     collect (loop for index in indexes
-                                 collect (nth index (cdr proposition)))))
-            (props (list (copy-list proposition))))
-        (loop for vars in symmetric-variables
-              for idxs in symmetric-indexes do
-              (setf props (generate-new-propositions vars props idxs)))
-        (loop for prop in props do
-              (add-prop prop db))))))
+  (let ((bijective-props (bijective-index-propositions proposition)))
+    (if bijective-props
+        ;; Handle bijective relation: add both index propositions
+        (dolist (index-prop bijective-props)
+          (add-prop index-prop db))
+        ;; Handle normal relation (existing logic)
+        (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
+          (if (null symmetric-indexes)
+            (add-prop proposition db)
+            (let ((symmetric-variables
+                     (loop for indexes in symmetric-indexes
+                           collect (loop for index in indexes
+                                       collect (nth index (cdr proposition)))))
+                  (props (list (copy-list proposition))))
+              (loop for vars in symmetric-variables
+                    for idxs in symmetric-indexes do
+                    (setf props (generate-new-propositions vars props idxs)))
+              (loop for prop in props do
+                    (add-prop prop db))))))))
 
               
 (defun delete-proposition (proposition db)
+  "Deletes an atomic proposition and all its symmetries from the database.
+   For bijective relations, deletes both internal index propositions."
   (declare (type hash-table db))
-  (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
-    (if (null symmetric-indexes)
-      (del-prop proposition db)
-      (let ((symmetric-variables
-               (loop for indexes in symmetric-indexes
-                     collect (loop for index in indexes
-                                 collect (nth index (cdr proposition)))))
-            (props (list (copy-list proposition))))
-        (loop for vars in symmetric-variables
-              for idxs in symmetric-indexes do
-              (setf props (generate-new-propositions vars props idxs)))
-        (loop for prop in props do
-              (del-prop prop db))))))
+  (let ((bijective-props (bijective-index-propositions proposition)))
+    (if bijective-props
+        ;; Handle bijective relation: delete both index propositions
+        (dolist (index-prop bijective-props)
+          (del-prop index-prop db))
+        ;; Handle normal relation (existing logic)
+        (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
+          (if (null symmetric-indexes)
+            (del-prop proposition db)
+            (let ((symmetric-variables
+                     (loop for indexes in symmetric-indexes
+                           collect (loop for index in indexes
+                                       collect (nth index (cdr proposition)))))
+                  (props (list (copy-list proposition))))
+              (loop for vars in symmetric-indexes
+                    for idxs in symmetric-indexes do
+                    (setf props (generate-new-propositions vars props idxs)))
+              (loop for prop in props do
+                    (del-prop prop db))))))))
 
 
 (defun generate-new-propositions (vars propositions idxs)
