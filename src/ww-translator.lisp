@@ -70,32 +70,71 @@
 
 
 (defun translate-simple-atom (form flag)
-  "Example usage of get-state-reference with proper database selection logic.
-   Eg, (velocity ?car wheel1 50) -> (list 'velocity ?car 'wheel1 50) with no fluents."
+  "Translates propositions without fluent variables for database lookup.
+   For bijective relations, uses the indexed lookup format (e.g., ON1)
+   since the canonical key is not stored in the database."
   (let ((state-db (if (gethash (car form) *relations*)
                       (if *happening-names*
                           '(merge-idb-hidb state)
-                          `(problem-state.idb state))  ;,(get-state-reference flag)))
-                      '*static-db*)))
-    `(eql t (gethash ,(translate-list form flag) ,state-db))))
+                          `(problem-state.idb state))
+                      '*static-db*))
+        (index-names (gethash (car form) *bijective-relations*)))
+    ;; Bijective relation handling block
+    (if index-names
+        ;; Bijective relation: use index1 (keyed by position 1)
+        ;; Storage format: (ON1 arg1) -> (arg2)
+        ;; Check if retrieved value matches arg2
+        (let* ((index1-name (first index-names))
+               (arg1 (second form))
+               (arg2 (third form)))
+          `(equalp (gethash ,(translate-list (list index1-name arg1) flag) ,state-db)
+                   (list ,(if (or (varp arg2)
+                                  (numberp arg2)
+                                  (stringp arg2)
+                                  (characterp arg2)
+                                  (listp arg2))
+                            arg2
+                            `',arg2))))
+        ;; Non-bijective relation: direct lookup
+        `(eql t (gethash ,(translate-list form flag) ,state-db)))))
 
 
 (defun translate-fluent-atom (form flag)
-  "Translates propositions with fluents using standardized database reference."
+  "Translates propositions with fluent variables using standardized database reference.
+   For bijective relations, uses the indexed lookup format (e.g., ON1)
+   since the canonical key is not stored in the database."
   (let* ((fluent-indices (get-prop-fluent-indices form))
-         (fluentless-atom (ut::remove-at-indexes fluent-indices form))
-         (fluents (ut::collect-at-indexes fluent-indices form))
-         (database-ref (get-database-reference form flag)))
-    `(equalp (gethash ,(translate-list fluentless-atom flag) ,database-ref)
-             (list ,@(mapcar (lambda (x)
-                               (if (or (varp x)
-                                       (and (consp x)
-                                         (symbolp (car x))
-                                         (or (fboundp (car x))
-                                             (special-operator-p (car x)))))
-                                  x
-                                  `',x))
-                             fluents)))))
+         (database-ref (get-database-reference form flag))
+         (index-names (gethash (car form) *bijective-relations*)))
+    ;; Bijective relation handling block
+    (if index-names
+        ;; Bijective relation: use index1 (keyed by position 1)
+        ;; Storage format: (ON1 arg1) -> (arg2)
+        ;; Check if retrieved value matches arg2
+        (let* ((index1-name (first index-names))
+               (arg1 (second form))
+               (arg2 (third form)))
+          `(equalp (gethash ,(translate-list (list index1-name arg1) flag) ,database-ref)
+                   (list ,(if (or (varp arg2)
+                                  (and (consp arg2)
+                                       (symbolp (car arg2))
+                                       (or (fboundp (car arg2))
+                                           (special-operator-p (car arg2)))))
+                            arg2
+                            `',arg2))))
+        ;; Non-bijective relation
+        (let* ((fluentless-atom (ut::remove-at-indexes fluent-indices form))
+               (fluents (ut::collect-at-indexes fluent-indices form)))
+          `(equalp (gethash ,(translate-list fluentless-atom flag) ,database-ref)
+                   (list ,@(mapcar (lambda (x)
+                                     (if (or (varp x)
+                                             (and (consp x)
+                                                  (symbolp (car x))
+                                                  (or (fboundp (car x))
+                                                      (special-operator-p (car x)))))
+                                       x
+                                       `',x))
+                                   fluents)))))))
 
 
 (defun translate-proposition (form flag)
@@ -226,6 +265,14 @@
             (second args)))))      ; $var2 (e.g., $SUPPORT)
 
 
+(defun quote-if-constant (item)
+  "Returns a form that evaluates to item. Variables are kept as references;
+   constants are quoted."
+  (if (varp item)
+      item
+      `',item))
+
+
 (defun translate-bind (form flag)
   "Revised binding translation with unified state reference strategy.
    Translates binding operations like (bind (loc ?obj $area)) where fluent variables
@@ -248,24 +295,24 @@
     (if bijective-info
         ;; Handle bijective relation with compile-time index selection when possible
         (destructuring-bind (index1-name index2-name var1 var2) bijective-info
-          (let ((var1-unbound ($varp var1))    ; CHANGED: $var might be unbound
-                (var2-unbound ($varp var2)))   ; CHANGED: $var might be unbound
+          (let ((var1-unbound ($varp var1))
+                (var2-unbound ($varp var2)))
             (cond
-              ;; Both are non-$: neither can receive a value - error  ; CHANGED
-              ((and (not var1-unbound) (not var2-unbound))            ; CHANGED
+              ;; Both are non-$: neither can receive a value - error
+              ((and (not var1-unbound) (not var2-unbound))
                (error "Bijective bind ~A: both arguments are bound (~A, ~A), ~
-                       neither can receive a value" proposition var1 var2))  ; CHANGED
-              ;; var1 is bound (not $var) - use index1 to look up var2  ; CHANGED
-              ((not var1-unbound)                                      ; CHANGED
+                       neither can receive a value" proposition var1 var2))
+              ;; var1 is bound (not $var) - use index1 to look up var2
+              ((not var1-unbound)
                `(multiple-value-bind (vals present-p)
-                    (gethash (list ',index1-name ,var1) ,database-ref)
+                    (gethash (list ',index1-name ,(quote-if-constant var1)) ,database-ref)
                   (when present-p
                     (setf ,var2 (first vals))
                     t)))
-              ;; var2 is bound (not $var) - use index2 to look up var1  ; CHANGED
-              ((not var2-unbound)                                      ; CHANGED
+              ;; var2 is bound (not $var) - use index2 to look up var1
+              ((not var2-unbound)
                `(multiple-value-bind (vals present-p)
-                    (gethash (list ',index2-name ,var2) ,database-ref)
+                    (gethash (list ',index2-name ,(quote-if-constant var2)) ,database-ref)
                   (when present-p
                     (setf ,var1 (first vals))
                     t)))

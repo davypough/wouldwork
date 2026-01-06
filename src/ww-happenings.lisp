@@ -40,7 +40,10 @@
                                  (ut::prt hap-updates))
             ;; Check for rebound after updates applied (reactive model)
             (when (rebound-condition object hap-state)
-              (setf following-happening (apply-rebound following-happening))))
+              (setf following-happening (apply-rebound following-happening)))
+            ;; Apply aftereffect updates if defined (eg, relocate objects on patroller)
+            (apply-aftereffect object hap-state)
+            (apply-aftereffect object act-state))
           ;; Check for kill condition after updates applied (prunes state)
           ;; Use act-state which has agent's current location post-action
           (when (kill-condition object act-state)
@@ -60,6 +63,7 @@
                (constraint-violated-in-act-hap-net act-state hap-state net-state))
         (values nil nil)
         (values net-state act-state)))))  ;act-state is final state
+
 
 (defun get-following-happening (act-state object index time direction ref-time)  ;not state
   "Derive the following happening update for an object."
@@ -101,6 +105,22 @@
   (ut::if-it (get object :kill)
              (funcall ut::it state)
              nil))
+
+
+(defun apply-aftereffect (object state)
+  "Applies the aftereffect update for object to state if defined.
+   Unlike condition functions, this executes an update rather than testing a predicate.
+   Used to propagate consequences after a patroller moves (eg, relocating cargo on top)."
+  (declare (type symbol object) (type problem-state state))
+  (ut::if-it (get object :aftereffect)
+             (let ((updated-dbs (funcall ut::it state)))
+               (dolist (update updated-dbs)
+                 (when update
+                   (let ((changes (update.changes update)))
+                     (when (hash-table-p changes)
+                       (maphash (lambda (key value)
+                                  (setf (gethash key (problem-state.idb state)) value))
+                                changes))))))))
 
 
 (defun apply-rebound (following-happening)

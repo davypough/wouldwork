@@ -14,7 +14,7 @@
 
 (defun parse-patroller-slots (slots)
   "Parse the slot-value pairs from define-patroller into a plist.
-   Recognized slots: path, mode, timings, interrupt, rebound, kill"  ; <- CHANGED: added kill to docstring
+   Recognized slots: path, mode, timings, interrupt, rebound, kill, aftereffect"
   (let (plist)
     (iter (for (slot value) on slots by #'cddr)
           (case slot
@@ -23,7 +23,8 @@
             (timings  (setf (getf plist :timings) value))
             (interrupt (setf (getf plist :interrupt) value))
             (rebound  (setf (getf plist :rebound) value))
-            (kill     (setf (getf plist :kill) value))  ; <- ADDED
+            (kill     (setf (getf plist :kill) value))
+            (aftereffect (setf (getf plist :aftereffect) value))
             (otherwise (error "Unknown patroller slot: ~A" slot))))
     plist))
 
@@ -154,7 +155,8 @@
           (timings (getf plist :timings))
           (interrupt (getf plist :interrupt))
           (rebound (getf plist :rebound))
-          (kill (getf plist :kill)))
+          (kill (getf plist :kill))
+          (aftereffect (getf plist :aftereffect)))
       ;; Clear any prior settings from previous problem loads
       (setf (symbol-plist object) nil)
       ;; Generate and store events array
@@ -199,7 +201,18 @@
                      ,(when $vars
                         `(declare (ignorable ,@$vars)))
                      ,(translate kill 'pre)))))
-        (fix-if-ignore '(state) (get object :kill-lambda))))))
+        (fix-if-ignore '(state) (get object :kill-lambda)))
+      ;; Handle aftereffect update (executed after happening fires)
+      (when aftereffect
+        (setf (get object :aftereffect) aftereffect)
+        (let (($vars (get-all-nonspecial-vars #'$varp aftereffect)))
+          (setf (get object :aftereffect-lambda)
+                `(lambda (state)
+                   (let (updated-dbs followups ,@$vars)
+                     (declare (ignorable updated-dbs followups ,@$vars))
+                     ,(translate aftereffect 'pre)
+                     updated-dbs))))
+  (fix-if-ignore '(state) (get object :aftereffect-lambda))))))
 
 
 ;;; ============================================================================
@@ -211,19 +224,23 @@
   "Define a path-following patroller object.
    
    Syntax:
-     (define-patroller <name>
+     (define-patroller <object>
        path <area-list>
        mode <:reverse | :cycle>
        [timings <time-list>]
        [interrupt <condition>]
-       [rebound <condition>])
+       [rebound <condition>]
+       [kill <condition>]
+       [aftereffect <update-form>])
    
    Arguments:
-     path     - Required. List of areas defining the path (minimum 2).
-     mode     - Required. :reverse for ping-pong, :cycle for wrap-around.
-     timings  - Optional. List of durations for each segment. Default: all 1s.
-     interrupt - Optional. Condition that pauses patroller movement.
-     rebound  - Optional. Condition that reverses direction (Phase 2).
+     path        - Required. List of areas defining the path (minimum 2).
+     mode        - Required. :reverse for ping-pong, :cycle for wrap-around.
+     timings     - Optional. List of durations for each segment. Default: all 1s.
+     interrupt   - Optional. Condition that pauses patroller movement.
+     rebound     - Optional. Condition that reverses direction.
+     kill        - Optional. Condition that prunes the state from search.
+     aftereffect - Optional. Update form executed after patroller moves.
    
    The patroller's initial location must be specified via define-init.
    The path traversal begins from that location.
@@ -234,5 +251,6 @@
        mode :reverse
        rebound (exists (?c cargo)
                  (and (loc buzzer1 $area)
-                      (loc ?c $area))))"
+                      (loc ?c $area)))
+       aftereffect (propagate-changes!))"
   `(install-patroller ',object ',slots))

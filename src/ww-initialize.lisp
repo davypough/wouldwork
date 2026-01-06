@@ -22,6 +22,7 @@
                                                    (first (aref (get object :events) 0)))))
   (init-start-state)  ;finish start-state init later in converter.lisp
   (do-integer-conversion)                      ; Full conversion and compilation of baseline
+  (finalize-patroller-happenings)              ; Check initial rebound conditions
   (do-init-action-updates *start-state*)       ; Add init action propositions
   (convert-databases-to-integers)              ; Only convert new propositions, no recompilation
   (validate-start-state-consistency)
@@ -85,18 +86,92 @@
   (setf *ww-loading* nil))
 
 
+(defun finalize-patroller-happenings ()
+  "Check rebound conditions for patrollers at t=0 and adjust direction if needed.
+   Must be called after compile-all-functions so rebound lambdas are available."
+  (when *happening-names*
+    (setf (problem-state.happenings *start-state*)
+          (loop for happening in (problem-state.happenings *start-state*)
+                collect (finalize-single-happening happening)))))
+
+
+(defun finalize-single-happening (happening)
+  "Check and possibly adjust a single happening for initial rebound.
+   For patrollers in :reverse mode starting where rebound condition is satisfied,
+   mirrors the index and reverses direction as if the object just arrived.
+   Matches the behavior of apply-rebound in ww-happenings.lisp."
+  (destructuring-bind (object (index time direction)) happening
+    (let ((rebound-fn (get object :rebound)))
+      (if (and rebound-fn 
+               (funcall rebound-fn *start-state*))
+          ;; Rebound condition satisfied at t=0 - apply same logic as apply-rebound
+          (if (eq (get object :patroller-mode) :reverse)
+              (let* ((events (get object :events))
+                     (n-events (length events))
+                     (mirror-index (mod (- n-events index) n-events)))
+                (format t "~&DEBUG: Initial rebound for ~A: index ~A -> ~A, direction ~A -> ~A~%"
+                        object index mirror-index direction (- direction))
+                (list object (list mirror-index time (- direction))))
+              ;; Non-reverse mode with rebound - keep unchanged (matches apply-rebound)
+              happening)
+          ;; No rebound condition or not satisfied
+          happening))))
+
+
 (defun init-start-state ()
   (with-slots (name instantiations happenings time value heuristic) *start-state*
     (let ((first-event-time (loop for object in *happening-names* 
                               minimize (car (aref (get object :events) 0)))))
-      (setf happenings (loop for object in *happening-names* ;property list of happening objects
-                             collect (list object 
-                                          (list 0 first-event-time +1))))  ;next (index time direction)
+      (loop for obj in *happening-names*
+            do (format t "~&DEBUG: ~A start-index = ~S, initial-loc = ~S, path = ~S~%" 
+                       obj 
+                       (compute-happening-start-index obj)
+                       (find-initial-location obj)
+                       (get obj :patroller-path)))
+      ;; Build happenings with computed start index
+      (setf happenings 
+            (loop for object in *happening-names*
+                  collect (list object 
+                               (list (compute-happening-start-index object)
+                                     first-event-time
+                                     +1))))
+      (format t "~&DEBUG init-start-state: happenings = ~S~%" happenings)
       (setf time 0.0)
       (setf value 0.0)
       (setf heuristic 0.0)
       (setf instantiations nil)
       (setf name 'start))))  ;updates start-state db & static-db, but not idb & hidb yet
+
+
+(defun compute-happening-start-index (object)
+  "Compute the starting event index for a happening object.
+   For patrollers: returns the path index matching the object's initial location.
+   For regular happenings: returns 0 (events are explicitly enumerated)."
+  (let ((path (get object :patroller-path)))
+    (if (null path)
+        0  ; Regular happening - use default index 0
+        (let ((initial-loc (find-initial-location object)))
+          (if initial-loc
+              (or (position initial-loc path) 0)
+              0)))))
+
+
+(defun find-initial-location (object)
+  "Find the initial location of an object from *db*.
+   Handles both fluent relations (loc obj) -> (area) and 
+   non-fluent relations (loc obj area) -> t."
+  (let ((fluent-key (list 'loc object)))
+    ;; First try fluent lookup: key = (loc object), value = (area)
+    (let ((fluent-value (gethash fluent-key *db*)))
+      (when (and fluent-value (listp fluent-value))
+        (return-from find-initial-location (first fluent-value)))))
+  ;; Fallback: non-fluent lookup by scanning keys
+  (loop for key being the hash-keys of *db*
+        when (and (listp key)
+                  (eq (first key) 'loc)
+                  (eq (second key) object)
+                  (= (length key) 3))
+        return (third key)))
 
 
 (defun validate-start-state-consistency ()

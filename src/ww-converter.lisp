@@ -72,6 +72,13 @@
           (finish-output)
           (setf (get obj :kill)
                 (compile nil (subst-int-code (get obj :kill-lambda))))))
+  ;; Compile happening aftereffect functions
+  (iter (for obj in *happening-names*)
+        (when (get obj :aftereffect-lambda)
+          (format t "~&  ~A aftereffect...~%" obj)
+          (finish-output)
+          (setf (get obj :aftereffect)
+                (compile nil (subst-int-code (get obj :aftereffect-lambda))))))
   ;; Compile goal function
   (when (boundp 'goal-fn)
     (format t "~&  ~A...~%" 'goal-fn)
