@@ -458,6 +458,7 @@
                  (setq *objective-value-p* t))  ;this is a normal action rule with optimization
               (t (setq *objective-value-p* nil)))  ;normal rule, but no optimization
         (setq *eff-param-vars* eff-param-vars)  ;used in translate-assert
+        (setq *has-sim-state* (member '$sim-state pre-$vars))
         (setf action (make-action
                        :name name
                        :pre-defun-name (ut::intern-symbol name '-PRE-FN)

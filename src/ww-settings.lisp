@@ -238,6 +238,9 @@
 (define-global *eff-param-vars* nil
   "Make eff-param-vars available in translate-assert.")
 
+(define-global *has-sim-state* nil
+  "True when $sim-state appears in precondition variables.")
+
 (define-global *unique-solutions* nil)
   ;The culled list of unique solutions.
 

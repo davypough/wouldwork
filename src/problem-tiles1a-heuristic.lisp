@@ -57,13 +57,11 @@
   (?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
   (and (bind (loc ?tile $tile-coords))
        (bind (empty $empty-coords))
-       ;(bind (blocked $blocked-coords))
        (setq $new-empty-coords (copy-list $empty-coords))
-       (setq $new-tile-coords nil)
+       (progn (setq $new-tile-coords nil) t)
        (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
              (when (or (not (in-bounds new-tile-coord)))
-                       ;(member new-tile-coord $blocked-coords :test #'equal))  ;added for blocked coords
                (return nil))
              (if (member new-tile-coord $empty-coords :test #'equal)
                (setq $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
@@ -82,36 +80,7 @@
                              (t (error "Incorrect direction"))))
       (assert (loc ?tile (sort-coords $new-tile-coords))
               (empty (sort-coords $new-empty-coords)))))
-      
-
-#|
-(define-action move
-  1
-  (?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
-  (and (bind (loc ?tile $tile-coords))
-       (bind (empty $empty-coords))
-       (setf $new-empty-coords (copy-list $empty-coords))
-       (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
-             (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
-             (push new-tile-coord $new-tile-coords)
-             (if (member new-tile-coord $empty-coords :test #'equal)
-               (setf $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
-               (unless (member new-tile-coord $tile-coords :test #'equal)  ;tile coord can move into spot vacated by other tile coord
-                 (return nil)))  ;can't make this move
-             (for opposite-coord = (cons (- (car tile-coord) ?d-row) (- (cdr tile-coord) ?d-col)))
-             (when (or (member opposite-coord $empty-coords :test #'equal)  ;check before next
-                       (not (member opposite-coord $tile-coords :test #'equal)))
-               (push tile-coord $new-empty-coords))
-             (finally (return t))))
-  (?tile $direction)
-  (do (setf $direction (cond ((= ?d-col 1) 'right)
-                             ((= ?d-row 1) 'down)
-                             ((= ?d-col -1) 'left)
-                             ((= ?d-row -1) 'up)
-                             (t (error "Incorrect direction"))))
-      (assert (loc ?tile (sort-coords $new-tile-coords))
-              (empty (sort-coords $new-empty-coords)))))
-|#      
+           
 
 (define-init
   (loc SQ ((3 . 2)))  ;initial locations of all parts of a tile

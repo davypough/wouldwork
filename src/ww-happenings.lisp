@@ -146,3 +146,109 @@
   (or ;(and (not (funcall (symbol-function '*constraint*) act-state))
       (not (funcall (symbol-function 'constraint-fn) hap-state))  ;disallow swaps
       (not (funcall (symbol-function 'constraint-fn) net-state))))
+
+
+;;; ============================================================================
+;;; STRATEGIC WAIT SIMULATION
+;;; ============================================================================
+
+
+(defun find-earliest-happening (happenings)
+  "Returns the happening with the earliest time from the happenings list.
+   Each happening is (object (index time direction)).
+   Returns NIL if happenings is empty."
+  (when happenings
+    (reduce (lambda (a b)
+              (if (<= (second (second a)) (second (second b)))
+                  a b))
+            happenings)))
+
+
+(defun simulate-happenings-until-true-fn (state max-wait-time target-lambda)
+  "Forward-simulates happenings until target-lambda returns true or timeout.
+   Processes happenings one step at a time, checking target condition after each.
+   Returns (values sim-time sim-state) if target satisfied within deadline.
+   Returns (values nil nil) on timeout or kill condition.
+   Used by strategic-wait action to determine if waiting would be beneficial."
+  (declare (type problem-state state) (type real max-wait-time) (type function target-lambda))
+  ;; Early exit if no happenings to simulate
+  (unless (problem-state.happenings state)
+    (return-from simulate-happenings-until-true-fn (values nil nil)))
+  (let* ((sim-state (copy-problem-state state))
+         (start-time (problem-state.time state))
+         (deadline (+ start-time max-wait-time)))
+    (block simulation
+      (dotimes (iteration 100 
+           (error "simulate-happenings-until-true exceeded 100 events. ~
+                   Possible malformed event timing or bug in happening machinery. ~
+                   Current sim-time=~A, deadline=~A, happenings=~S"
+                  (problem-state.time sim-state) deadline 
+                  (problem-state.happenings sim-state)))  ; safety bound, returns nil if exceeded
+        (let* ((happenings (problem-state.happenings sim-state))
+               (earliest (find-earliest-happening happenings)))
+          ;; No happenings left to process
+          (unless earliest
+            (return-from simulation (values nil nil)))
+          (destructuring-bind (object (index time direction)) earliest
+            ;; Timeout: earliest event is past deadline
+            (when (> time deadline)
+              (return-from simulation (values nil nil)))
+            ;; Get event data from object's events array
+            (let* ((events (get object :events))
+                   (event (aref events index))
+                   (ref-time (first event))
+                   (hap-updates (rest event))
+                   (following-happening 
+                     (get-following-happening sim-state object index time direction ref-time)))
+              ;; Handle non-repeating object reaching end of events
+              (cond
+                ((null following-happening)
+                 ;; Remove this object from happenings and continue
+                 (setf (problem-state.happenings sim-state)
+                       (remove object happenings :key #'first)))
+                (t
+                 ;; Process happening normally
+                 ;; Apply updates only if not interrupted (index advanced)
+                 (when (/= (first (second following-happening)) index)
+                   ;; Apply database updates to both hidb and idb
+                   (revise (problem-state.hidb sim-state) hap-updates)
+                   (revise (problem-state.idb sim-state) hap-updates)
+                   ;; Check and apply rebound condition
+                   (when (rebound-condition object sim-state)
+                     (setf following-happening (apply-rebound following-happening)))
+                   ;; Apply aftereffect if defined
+                   (apply-aftereffect object sim-state))
+                 ;; Check kill condition - agent died during wait
+                 (when (kill-condition object sim-state)
+                   (return-from simulation (values nil nil)))
+                 ;; Update this object's entry in happenings list
+                 (setf (problem-state.happenings sim-state)
+                       (mapcar (lambda (h)
+                                 (if (eq (first h) object)
+                                     following-happening
+                                     h))
+                               happenings))
+                 ;; Advance simulation time to when this event fired
+                 (setf (problem-state.time sim-state) time)
+                 ;; Check if target condition now satisfied
+                 (when (funcall target-lambda sim-state)
+                   (return-from simulation 
+                     (values (- (problem-state.time sim-state) start-time) sim-state))))))))))))
+
+
+(defun apply-simulated-state! (state sim-state)
+  "Applies the simulated state's database changes to the current state.
+   Copies idb entries from sim-state to state.
+   Called from strategic-wait effect to transfer simulation results.
+   Returns updated-dbs list for consistency with other update functions."
+  (declare (type problem-state state sim-state))
+  ;; Merge sim-state.idb into state.idb
+  (maphash (lambda (key value)
+             (setf (gethash key (problem-state.idb state)) value))
+           (problem-state.idb sim-state))
+  ;; Merge sim-state.hidb into state.hidb  
+  (maphash (lambda (key value)
+             (setf (gethash key (problem-state.hidb state)) value))
+           (problem-state.hidb sim-state))
+  ;; Return empty updated-dbs (changes already applied directly)
+  nil)

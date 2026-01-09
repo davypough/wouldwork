@@ -122,12 +122,6 @@
   (with-slots (name instantiations happenings time value heuristic) *start-state*
     (let ((first-event-time (loop for object in *happening-names* 
                               minimize (car (aref (get object :events) 0)))))
-      (loop for obj in *happening-names*
-            do (format t "~&DEBUG: ~A start-index = ~S, initial-loc = ~S, path = ~S~%" 
-                       obj 
-                       (compute-happening-start-index obj)
-                       (find-initial-location obj)
-                       (get obj :patroller-path)))
       ;; Build happenings with computed start index
       (setf happenings 
             (loop for object in *happening-names*
@@ -135,7 +129,6 @@
                                (list (compute-happening-start-index object)
                                      first-event-time
                                      +1))))
-      (format t "~&DEBUG init-start-state: happenings = ~S~%" happenings)
       (setf time 0.0)
       (setf value 0.0)
       (setf heuristic 0.0)

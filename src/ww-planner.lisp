@@ -215,22 +215,34 @@
 
 
 (defun get-new-states (state action updated-dbs)
-  "Creates new states given current state and the new updates."
+  "Creates new states given current state and the new updates.
+   For strategic-wait: skips amend-happenings since simulation already processed them."
   (mapcan
       (lambda (updated-db)  ;process one update structure
         (let ((act-state (initialize-act-state action state updated-db))  ;act-state from action = state+
               net-state new-state)
           (declare (ignorable net-state))
           (when act-state  ;no new act-state if wait action was cancelled
-            (if *happening-names*  ;note that act-state = state+
-              (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
-              (progn
-                (setf net-state act-state)
-                (if (and (boundp 'constraint-fn)
-                         (symbol-value 'constraint-fn) 
-                         (not (funcall (symbol-function 'constraint-fn) act-state))) ;violated
-                  (setf new-state nil)
-                  (setf new-state act-state))))
+            (cond
+              ;; Strategic-wait: happenings already processed by simulation
+              ((eql (action.name action) 'strategic-wait)
+               (setf net-state act-state)
+               (if (and (boundp 'constraint-fn)
+                        (symbol-value 'constraint-fn) 
+                        (not (funcall (symbol-function 'constraint-fn) act-state)))
+                   (setf new-state nil)
+                   (setf new-state act-state)))
+              ;; Normal actions with happenings
+              (*happening-names*  ;note that act-state = state+
+               (ut::mvs (net-state new-state) (amend-happenings state act-state)))  ;check for violation
+              ;; Normal actions without happenings
+              (t
+               (setf net-state act-state)
+               (if (and (boundp 'constraint-fn)
+                        (symbol-value 'constraint-fn) 
+                        (not (funcall (symbol-function 'constraint-fn) act-state))) ;violated
+                   (setf new-state nil)
+                   (setf new-state act-state))))
             #+:ww-debug (when (>= *debug* 4)
                           (if net-state
                             (when (and (boundp 'constraint-fn) (symbol-value 'constraint-fn))
@@ -254,24 +266,36 @@
 
 
 (defun create-action-state (action state updated-db)  ;if action is non-wait
-  "Creates a new wait or non-wait state."
+  "Creates a new wait or non-wait state.
+   For strategic-wait: extracts time and happenings from sim-state in update."
   (let* ((new-state-idb (update.changes updated-db))
-         (new-action-duration (if (eql (action.name action) 'wait)
-                                (- (get-next-event-time state) (problem-state.time state))
-                                (action.duration action)))
-         (new-state-instantiations (if (eql (action.name action) 'wait)
-                                     (list new-action-duration)
-                                     (update.instantiations updated-db))))
+         (new-state-instantiations (cond 
+                                     ((eql (action.name action) 'wait)
+                                      (list (- (get-next-event-time state) 
+                                               (problem-state.time state))))
+                                     (t (update.instantiations updated-db))))
+         ;; For strategic-wait: get sim-state from update structure
+         (sim-state (when (eql (action.name action) 'strategic-wait)
+                      (update.sim-state updated-db)))
+         (new-action-duration (cond
+                                ((eql (action.name action) 'wait)
+                                 (- (get-next-event-time state) 
+                                    (problem-state.time state)))
+                                ((eql (action.name action) 'strategic-wait)
+                                 (- (problem-state.time sim-state)
+                                    (problem-state.time state))) 
+                                (t (action.duration action))))
+         (new-happenings (when (eql (action.name action) 'strategic-wait)
+                           (problem-state.happenings sim-state))))
     (when (eql (problem-state.name state) 'wait)
       (remhash (gethash 'waiting *constant-integers*) new-state-idb))  ;if prior was wait
     (make-problem-state
        :name (action.name action)
        :instantiations new-state-instantiations
-       :happenings nil  ;to be updated by happenings
+       :happenings new-happenings  ;nil for normal actions, sim-state happenings for strategic-wait
        :time (+ (problem-state.time state) new-action-duration)
        :value (update.value updated-db)
        :idb new-state-idb)))
-;       :hidb (copy-idb (problem-state.hidb state)))))  ;to be updated by happenings
 
 
 (defun get-wait-happenings (state)

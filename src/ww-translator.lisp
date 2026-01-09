@@ -541,7 +541,9 @@
                                          '$objective-value
                                          0.0)
                                :instantiations (list ,@*eff-param-vars*)
-                               :followups (nreverse followups))
+                               :followups (nreverse followups)
+                               ,@(when *has-sim-state*
+                                   '(:sim-state $sim-state)))
                   updated-dbs)))))
 
 
@@ -565,7 +567,9 @@
                                          '$objective-value
                                          0.0) 
                                :instantiations (list ,@*eff-param-vars*) 
-                               :followups (reverse followups))
+                               :followups (reverse followups)
+                               ,@(when *has-sim-state*
+                                   '(:sim-state $sim-state)))
                   updated-dbs)
             updated-dbs))))
 
@@ -598,17 +602,13 @@
 
 
 (defun translate-mvsetq (form flag)
-  "Translates a multiple-value-setq clause.
-   Always returns t to maintain logical continuation semantics."
-  `(progn (multiple-value-setq ,(second form) ,(translate (third form) flag))
-          t))
+  "Translates a multiple-value-setq clause."
+  `(multiple-value-setq ,(second form) ,(translate (third form) flag)))
 
 
 (defun translate-setq (form flag)
-  "Translates a setq statement. Used to assign a variable the value of a function.
-   Always returns t, even if nil is assigned."
-  `(progn (setq ,(second form) ,(translate (third form) flag))
-          t))
+  "Translates a setq statement. Used to assign a variable the value of a function."
+  `(setq ,(second form) ,(translate (third form) flag)))
 
 
 (defun translate-case (form flag)
@@ -690,6 +690,28 @@
           (find-package :common-lisp))))
 
 
+(defun translate-simulate-happenings-until-true (form flag)
+  "Translates (simulate-happenings-until-true max-wait-time target-condition).
+   Compiles target-condition into a lambda that captures lexical $variables.
+   The lambda takes sim-state (bound to 'state' for translated code compatibility).
+   Returns call to runtime function simulate-happenings-until-true-fn."
+  (declare (ignore flag))
+  (unless (= (length form) 3)
+    (error "simulate-happenings-until-true requires exactly 2 arguments: ~
+            (simulate-happenings-until-true max-wait-time target-condition), got: ~A" form))
+  (let ((max-wait-time (second form))
+        (target-condition (third form)))
+    ;; Translate target condition in 'pre mode (read-only query)
+    ;; The lambda parameter is 'state' so translated code works unchanged
+    (let ((translated-condition (translate target-condition 'pre)))
+      `(simulate-happenings-until-true-fn 
+         state 
+         ,max-wait-time
+         (lambda (state)
+           (declare (ignorable state))
+           ,translated-condition)))))
+
+
 (defun translate (form flag)  ;test-then distinguishes between if stmt forms
   "Beginning translator for all forms in actions."
   (cond ((atom form) form)  ;atom or (always-true) translates as itself
@@ -714,6 +736,8 @@
         ((member (car form) '(mvsetq multiple-value-setq)) (translate-mvsetq form flag))
         ((eql (car form) 'declare) form)
         ((eql (car form) 'print) (translate-print form flag))
+        ((eql (car form) 'simulate-happenings-until-true)
+           (translate-simulate-happenings-until-true form flag))
         ((eql (char (format nil "~S" form) 0) #\`) (translate (eval form) flag))
         ((and (eql (car form) 'not)
               (consp (cadr form))
@@ -722,7 +746,8 @@
         ((member (car form) *connectives*) (translate-connective form flag))
         ((or (gethash (car form) *relations*) (gethash (car form) *static-relations*))
            (translate-positive-relation form flag))
-        ((member (car form) (append *query-names* *update-names*)) (translate-function-call form flag))
+        ((member (car form) (append *query-names* *update-names* '(apply-simulated-state!)))
+           (translate-function-call form flag))
         ((and (listp form)
               (symbolp (car form))
               (not ($varp (car form)))

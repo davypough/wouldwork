@@ -165,7 +165,8 @@
   (changes nil :type (or hash-table list))
   (value 0.0 :type real)
   (instantiations nil :type list)
-  (followups nil :type list))  ;next & finally followup function calls
+  (followups nil :type list)    ;next & finally followup function calls
+  (sim-state nil))              ;strategic-wait simulation state
 
 
 (defstruct (solution (:conc-name solution.))
