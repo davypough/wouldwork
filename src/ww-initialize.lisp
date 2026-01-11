@@ -109,8 +109,6 @@
               (let* ((events (get object :events))
                      (n-events (length events))
                      (mirror-index (mod (- n-events index) n-events)))
-                (format t "~&DEBUG: Initial rebound for ~A: index ~A -> ~A, direction ~A -> ~A~%"
-                        object index mirror-index direction (- direction))
                 (list object (list mirror-index time (- direction))))
               ;; Non-reverse mode with rebound - keep unchanged (matches apply-rebound)
               happening)
