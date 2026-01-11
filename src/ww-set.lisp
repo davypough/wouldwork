@@ -10,7 +10,7 @@
   `(progn
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
-       ((*depth-cutoff* *solution-type* *progress-reporting-interval* *randomize-search* *branch*)
+       ((*depth-cutoff* *solution-type* *progress-reporting-interval* *randomize-search* *branch* *auto-wait*)
           (setf ,param ',val)
           (unless *ww-loading*
             (save-globals)

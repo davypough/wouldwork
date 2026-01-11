@@ -126,90 +126,71 @@
     
     (when verbose
       (format t "  Effect variables: ~S~%" (action.effect-variables action))
-      (format t "  Provided values : ~S~%" provided-args)
-      (format t "  Precondition variables: ~S~%"
-                (remove-if-not #'?varp (action.precondition-variables action))))
+      (format t "  Provided values : ~S~%" provided-args))
     
     ;; Get precondition argument combinations (handle dynamic vs static)
-    (let ((precondition-args (get-precondition-args action state)))
+    (let ((precondition-args (get-precondition-args action state))
+          (first-passing-pre-result nil)
+          (first-passing-pre-args nil)
+          (all-instantiations nil))                              ; ADDED
       
-      ;; Find matching precondition instantiation
-      (let ((matching-pre-result nil)
-            (checked-count 0)
-            (passed-count 0)
-            (first-passing-effect-args nil))
-        
-        ;; Search through precondition argument combinations
-        (dolist (pre-args precondition-args)
-          (incf checked-count)
-          (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
-            (when pre-result
-              (incf passed-count)
-              ;; Check if this instantiation matches provided arguments
-              (let ((effect-args (extract-effect-args action pre-args pre-result)))
-                (when verbose
-                  (format t "  Precondition satisfied for: ~S~%" pre-args))
-                ;; Save first passing effect-args for mismatch reporting
-                (unless first-passing-effect-args
-                  (setf first-passing-effect-args effect-args))
-                (when (args-match-with-combinations action effect-args provided-args)
-                  (setf matching-pre-result pre-result)
-                  (return))))))
-        
-        ;; If no matching instantiation found, determine failure type
-        (unless matching-pre-result
-          (return-from apply-action-to-state
-            (if (> passed-count 0)
-                ;; Precondition passed but bindings don't match provided args
-                (values nil nil (cons :state-mismatch first-passing-effect-args))
-                ;; True precondition failure
-                (values nil nil :precondition-failure))))
-        
-        ;; Apply effect to produce updated-dbs
-        (let ((updated-dbs (if (eql matching-pre-result t)
-                               (funcall (action.eff-defun-name action) state)
-                               (apply (action.eff-defun-name action) state matching-pre-result))))
-          
-          (unless updated-dbs
-            (return-from apply-action-to-state
-              (values nil nil "Effect produced no state update")))
-          
-          ;; Select correct effect if multiple exist
-          (let ((update (select-matching-effect updated-dbs state action next-action-form)))
+      ;; Find any passing precondition, execute effect, collect instantiations
+      (dolist (pre-args precondition-args)
+        (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
+          (when pre-result
+            ;; Save first passing for diagnostics
+            (unless first-passing-pre-result
+              (setf first-passing-pre-result pre-result)
+              (setf first-passing-pre-args pre-args))
             
-            (unless update
-              (return-from apply-action-to-state
-                (values nil nil "No effect consistent with next action")))
+            (when verbose
+              (format t "  Precondition satisfied for: ~S~%" pre-args))
             
-            ;; Create new state with applied changes
-            (let ((new-state (copy-problem-state state)))
-              ;; Apply the update changes to new state
-              (apply-update-to-state new-state update action)
+            ;; Execute effect to get updated-dbs                 ; CHANGED
+            (let ((updated-dbs (if (eql pre-result t)
+                                   (funcall (action.eff-defun-name action) state)
+                                   (apply (action.eff-defun-name action) state pre-result))))
               
-              ;; Remove (WAITING) when transitioning from a WAIT action
-              ;; (mirrors logic in ww-planner.lisp create-action-state)
-              (when (eql (problem-state.name state) 'wait)
-                (remhash (gethash 'waiting *constant-integers*)
-                         (problem-state.idb new-state)))
-              
-              ;; For WAIT, override time with actual duration from solution
-              (when wait-duration
-                (setf (problem-state.time new-state)
-                      (+ (problem-state.time state) wait-duration)))
-              
-              ;; Apply followups if any
-              (when (update.followups update)
-                (apply-followups new-state update))
-              
-              ;; Process happenings if present
-              (when *happening-names*
-                (let ((net-state (amend-happenings state new-state)))
-                  (unless net-state
-                    (return-from apply-action-to-state
-                      (values nil nil "Happening violation (kill condition)")))
-                  (setf new-state net-state)))
-              
-              (values new-state t nil))))))))
+              ;; Check each update's instantiations for match    ; CHANGED
+              (dolist (update updated-dbs)
+                (let ((inst (update.instantiations update)))
+                  (push inst all-instantiations)
+                  (when (equal inst provided-args)
+                    ;; Found matching update - apply it
+                    (let ((new-state (copy-problem-state state)))
+                      (apply-update-to-state new-state update action)
+                      
+                      ;; Remove (WAITING) when transitioning from a WAIT action
+                      (when (eql (problem-state.name state) 'wait)
+                        (remhash (gethash 'waiting *constant-integers*)
+                                 (problem-state.idb new-state)))
+                      
+                      ;; For WAIT, override time with actual duration
+                      (when wait-duration
+                        (setf (problem-state.time new-state)
+                              (+ (problem-state.time state) wait-duration)))
+                      
+                      ;; Apply followups if any
+                      (when (update.followups update)
+                        (apply-followups new-state update))
+                      
+                      ;; Process happenings if present
+                      (when *happening-names*
+                        (let ((net-state (amend-happenings state new-state)))
+                          (unless net-state
+                            (return-from apply-action-to-state
+                              (values nil nil "Happening violation (kill condition)")))
+                          (setf new-state net-state)))
+                      
+                      (return-from apply-action-to-state
+                        (values new-state t nil))))))))))
+      
+      ;; No matching update found - determine failure type       ; CHANGED
+      (if first-passing-pre-result
+          ;; Precondition passed but no instantiation matched
+          (values nil nil (cons :state-mismatch (first all-instantiations)))
+          ;; No precondition passed at all
+          (values nil nil :precondition-failure)))))
 
 
 (defun get-precondition-args (action state)
@@ -273,9 +254,14 @@
         (dolist (pre-args precondition-args)
           (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
             (when pre-result
-              (let ((effect-args (extract-effect-args action pre-args pre-result)))
-                (when (args-match-with-combinations action effect-args args)
-                  (return-from next-action-valid-p t))))))))))
+              ;; Execute effect to get updated-dbs with actual instantiations
+              (let ((updated-dbs (if (eql pre-result t)
+                                     (funcall (action.eff-defun-name action) state)
+                                     (apply (action.eff-defun-name action) state pre-result))))
+                ;; Check if any update's instantiations match provided args
+                (dolist (update updated-dbs)
+                  (when (equal (update.instantiations update) args)
+                    (return-from next-action-valid-p t)))))))))))
 
 
 (defun apply-followups (state update)
@@ -286,24 +272,6 @@
       (let ((updated-idb (apply (car followup) state+ (cdr followup))))
         (setf (problem-state.idb state) updated-idb)
         (setf (problem-state.idb state+) updated-idb)))))
-
-
-(defun extract-effect-args (action pre-args pre-result)
-  "Extract effect variable values from precondition args and result.
-   Maps precondition variables to effect variables."
-  (let* ((precond-vars (action.precondition-variables action))
-         (effect-vars (action.effect-variables action))
-         ;; Build variable -> value mapping from precondition
-         (var-values (if (eql pre-result t)
-                         (pairlis precond-vars pre-args)
-                         (pairlis precond-vars pre-result))))
-    ;; Extract values for effect variables in order
-    (mapcar (lambda (var)
-              (let ((binding (assoc var var-values)))
-                (if binding
-                    (cdr binding)
-                    var)))  ; Should not happen if well-formed
-            effect-vars)))
 
 
 (defun apply-update-to-state (state update action)
@@ -345,46 +313,6 @@
           ((member (first item) *parameter-headers*)
            (setf groups (nconc (find-combination-var-groups item) groups))))))
     (nreverse groups)))
-
-
-(defun args-match-with-combinations (action effect-args provided-args)
-  "Compare effect-args with provided-args, treating combination-derived
-   positions as order-independent (set equality).
-   Returns T if arguments match, NIL otherwise."
-  (let ((combo-groups (find-combination-var-groups (action.precondition-params action))))
-    ;; No combination parameters - use simple equality
-    (when (null combo-groups)
-      (return-from args-match-with-combinations (equal effect-args provided-args)))
-    
-    (let* ((effect-vars (action.effect-variables action))
-           ;; Build list of all positions involved in combinations
-           (combo-positions
-             (loop for group in combo-groups
-                   nconc (loop for var in group
-                               for pos = (position var effect-vars)
-                               when pos collect pos)))
-           ;; Check non-combination positions match exactly
-           (non-combo-match
-             (loop for i from 0 below (length effect-vars)
-                   always (or (member i combo-positions)
-                              (equal (nth i effect-args)
-                                     (nth i provided-args))))))
-      
-      (unless non-combo-match
-        (return-from args-match-with-combinations nil))
-      
-      ;; Check each combination group has matching values (as sets)
-      (dolist (group combo-groups t)
-        (let* ((positions (loop for var in group
-                                for pos = (position var effect-vars)
-                                when pos collect pos))
-               (effect-vals (mapcar (lambda (p) (nth p effect-args)) positions))
-               (provided-vals (mapcar (lambda (p) (nth p provided-args)) positions))
-               ;; Sort canonically for comparison
-               (sorted-effect (sort (copy-list effect-vals) #'string< :key #'symbol-name))
-               (sorted-provided (sort (copy-list provided-vals) #'string< :key #'symbol-name)))
-          (unless (equal sorted-effect sorted-provided)
-            (return-from args-match-with-combinations nil)))))))
 
 
 ;;; ==================== Output Functions ====================

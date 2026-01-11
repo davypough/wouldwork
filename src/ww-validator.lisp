@@ -267,6 +267,24 @@
                         whose second element is a list of instances for that action,
                         whose third element is the depth>0,
                         and whose optional fourth element is how many times to skip over previous instances." val)))
+    (*auto-wait* (unless (typep val 'boolean)
+                   (error "Can't set *auto-wait* to ~S. Must be either T or NIL." val))
+                 (when val  ; Only check dependencies when enabling
+                   (unless (eql *tree-or-graph* 'tree)
+                     (error "Can't enable *auto-wait* when *tree-or-graph* is ~S. ~
+                             *auto-wait* requires *tree-or-graph* = TREE." *tree-or-graph*))
+                   (unless (eql *problem-type* 'planning)
+                     (error "Can't enable *auto-wait* when *problem-type* is ~S. ~
+                             *auto-wait* requires *problem-type* = PLANNING." *problem-type*))
+                   (unless (zerop *threads*)
+                     (error "Can't enable *auto-wait* when *threads* is ~D. ~
+                             *auto-wait* requires *threads* = 0." *threads*))
+                   (unless (eql *algorithm* 'depth-first)
+                     (error "Can't enable *auto-wait* when *algorithm* is ~S. ~
+                             *auto-wait* requires *algorithm* = DEPTH-FIRST." *algorithm*))))
+                   ;(unless *happening-names*
+                   ;  (error "Can't enable *auto-wait* without exogenous happenings. ~
+                   ;          Define patrollers or other happening objects first.")))
     (*threads* (error "Cannot set *threads* in the REPL or in a problem specification.
                        Specify the number of *threads* in ww-settings.lisp instead (but only if running SBCL),
                        then exit SBCL, and reload."))

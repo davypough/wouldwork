@@ -74,22 +74,27 @@
    For path (a1 a2 a3 a4 a5), generates transitions:
    a1→a2→a3→a4→a5→a4→a3→a2→a1, then repeats.
    
-   Event format matches define-happening:
-   (cumulative-time (not (loc obj from)) (loc obj to))"
+   Event format depends on whether loc is a fluent relation:
+   - Fluent:     (cumulative-time (loc obj to))
+   - Non-fluent: (cumulative-time (not (loc obj from)) (loc obj to))"
   (let* ((n (length path))
          (segment-times (or timings (make-list (1- n) :initial-element 1)))
          (reverse-times (reverse segment-times))
          (events nil)
-         (cumulative-time 0))
+         (cumulative-time 0)
+         (loc-is-fluent (gethash 'loc *fluent-relation-indices*)))
     ;; Forward pass: a1→a2→...→aN
     (iter (for i from 0 below (1- n))
           (for from-area = (nth i path))
           (for to-area = (nth (1+ i) path))
           (for dt in segment-times)
           (incf cumulative-time dt)
-          (push `(,cumulative-time
-                  (not (loc ,object ,from-area))
-                  (loc ,object ,to-area))
+          (push (if loc-is-fluent
+                    `(,cumulative-time
+                      (loc ,object ,to-area))
+                    `(,cumulative-time
+                      (not (loc ,object ,from-area))
+                      (loc ,object ,to-area)))
                 events))
     ;; Backward pass: aN→a(N-1)→...→a1
     (iter (for i from (1- n) above 0)
@@ -97,9 +102,12 @@
           (for to-area = (nth (1- i) path))
           (for dt in reverse-times)
           (incf cumulative-time dt)
-          (push `(,cumulative-time
-                  (not (loc ,object ,from-area))
-                  (loc ,object ,to-area))
+          (push (if loc-is-fluent
+                    `(,cumulative-time
+                      (loc ,object ,to-area))
+                    `(,cumulative-time
+                      (not (loc ,object ,from-area))
+                      (loc ,object ,to-area)))
                 events))
     (coerce (nreverse events) 'simple-vector)))
 
@@ -109,26 +117,37 @@
    For path (a1 a2 a3 a4 a5), generates transitions:
    a1→a2→a3→a4→a5→a1, then repeats.
    
-   The wrap-around segment (aN→a1) uses 1 time unit by default."
+   The wrap-around segment (aN→a1) uses 1 time unit by default.
+   
+   Event format depends on whether loc is a fluent relation:
+   - Fluent:     (cumulative-time (loc obj to))
+   - Non-fluent: (cumulative-time (not (loc obj from)) (loc obj to))"
   (let* ((n (length path))
          (segment-times (or timings (make-list (1- n) :initial-element 1)))
          (events nil)
-         (cumulative-time 0))
+         (cumulative-time 0)
+         (loc-is-fluent (gethash 'loc *fluent-relation-indices*)))
     ;; Forward through all segments
     (iter (for i from 0 below (1- n))
           (for from-area = (nth i path))
           (for to-area = (nth (1+ i) path))
           (for dt in segment-times)
           (incf cumulative-time dt)
-          (push `(,cumulative-time
-                  (not (loc ,object ,from-area))
-                  (loc ,object ,to-area))
+          (push (if loc-is-fluent
+                    `(,cumulative-time
+                      (loc ,object ,to-area))
+                    `(,cumulative-time
+                      (not (loc ,object ,from-area))
+                      (loc ,object ,to-area)))
                 events))
     ;; Wrap-around: aN→a1 (default 1 time unit)
     (incf cumulative-time 1)
-    (push `(,cumulative-time
-            (not (loc ,object ,(car (last path))))
-            (loc ,object ,(first path)))
+    (push (if loc-is-fluent
+              `(,cumulative-time
+                (loc ,object ,(first path)))
+              `(,cumulative-time
+                (not (loc ,object ,(car (last path))))
+                (loc ,object ,(first path))))
           events)
     (coerce (nreverse events) 'simple-vector)))
 

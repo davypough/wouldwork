@@ -187,7 +187,8 @@
                    (node.state node) (node.depth node)))))
   (state (make-problem-state) :type problem-state)    ;problem state
   (depth 0 :type fixnum)           ;depth in the search tree
-  (parent nil :type (or null node list)))  ;this node's parent
+  (parent nil :type (or null node list))  ;this node's parent
+  (wait-tried nil :type boolean))  ;tracks if backtrack-wait has been attempted
 
 
 (defun node-parents-list (node)

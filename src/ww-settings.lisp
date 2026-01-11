@@ -23,7 +23,7 @@
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* *progress-reporting-interval*
-           *threads* *randomize-search* *debug* *probe* *goal*)
+           *threads* *randomize-search* *debug* *probe* *goal* *auto-wait*)
   (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
@@ -158,6 +158,17 @@
 
 (defvar *branch* -1  ;
   "If n>0, explore only the nth branch from the *start-state*.")
+
+(defvar *auto-wait* nil
+  "When T, enables hybrid automatic wait mechanism for problems with happenings.
+   Only activates when *happening-names* is non-nil and *tree-or-graph* is tree.
+   Replaces explicit wait action with:
+   1. Stuck-triggered macro-wait: auto-waits when no actions are applicable
+   2. Backtrack-triggered wait: deferred wait tried after regular actions exhaust")
+
+(defvar *auto-wait-max-time* 100
+  "Maximum time units to wait during auto-wait simulation before giving up.
+   Prevents infinite waiting in problems with no enabling happenings.")
 
 (define-global *types* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Table of all types.")
@@ -302,6 +313,7 @@
             *branch* -1
             *probe* nil
             *debug* 0
-            *goal* nil)
+            *goal* nil
+            *auto-wait* nil)  ; ADDED LINE
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

@@ -252,3 +252,165 @@
            (problem-state.hidb sim-state))
   ;; Return empty updated-dbs (changes already applied directly)
   nil)
+
+
+;;; ============================================================================
+;;; AUTO-WAIT INFRASTRUCTURE
+;;; ============================================================================
+
+
+(defun auto-wait-enabled-p ()
+  "Returns T if auto-wait mechanism should be active.
+   Requires: *auto-wait* is T, *happening-names* is non-nil,
+   and *tree-or-graph* is tree."
+  (and *auto-wait*
+       *happening-names*
+       (eql *tree-or-graph* 'tree)))
+
+
+(defun any-action-applicable-p (state)
+  "Returns T if any non-wait action has satisfied preconditions in STATE.
+   Used by auto-wait mechanism to determine if agent is 'stuck'.
+   Checks each action's precondition function without executing effects.
+   Skips actions named WAIT (the user-defined wait action)."
+  (declare (type problem-state state))
+  (dolist (action *actions*)
+    (let ((name (action.name action))
+          (dynamic (action.dynamic action))
+          (precondition-args (action.precondition-args action))
+          (pre-defun-name (action.pre-defun-name action)))
+      ;; Skip user-defined wait action; process all others
+      (unless (eql name 'wait)
+        ;; Handle dynamic precondition arguments (require re-evaluation)
+        (let ((effective-args precondition-args))
+          (when dynamic
+            (let ((new-args (remove-if (lambda (sublist)
+                                         (or (null sublist) (member nil sublist)))
+                                       (eval-instantiated-spec dynamic state))))
+              (if new-args
+                  (setf effective-args new-args)
+                  (setf effective-args nil))))
+          ;; Check if any instantiation satisfies preconditions
+          (when effective-args
+            (dolist (pinsts effective-args)
+              (let ((result (apply pre-defun-name state pinsts)))
+                (when result
+                  ;; Found an applicable action
+                  (return-from any-action-applicable-p t)))))))))
+  ;; No action was applicable
+  nil)
+
+
+(defun simulate-until-action-applicable (state max-wait-time)
+  "Forward-simulates happenings until some action becomes applicable or goal is reached.
+   Used by auto-wait mechanism when agent is stuck (no applicable actions).
+   
+   Returns multiple values indicating outcome:
+     :goal sim-time sim-state    - Goal was reached during simulation
+     :action sim-time sim-state  - An action became applicable
+     :timeout nil nil            - Max wait time exceeded
+     :killed nil nil             - Agent died during wait
+     :no-happenings nil nil      - No happenings to simulate
+   
+   The sim-state has updated idb, hidb, happenings, and time fields."
+  (declare (type problem-state state) (type real max-wait-time))
+  ;; Early exit if no happenings to simulate
+  (unless (problem-state.happenings state)
+    (return-from simulate-until-action-applicable (values :no-happenings nil nil)))
+  (let* ((sim-state (copy-problem-state state))
+         (start-time (problem-state.time state))
+         (deadline (+ start-time max-wait-time)))
+    (loop
+      (let* ((happenings (problem-state.happenings sim-state))
+             (earliest (find-earliest-happening happenings)))
+        ;; No happenings left to process
+        (unless earliest
+          (return (values :no-happenings nil nil)))
+        
+        (destructuring-bind (object (index time direction)) earliest
+          ;; Timeout: earliest event is past deadline
+          (when (> time deadline)
+            (return (values :timeout nil nil)))
+          
+          ;; Get event data from object's events array
+          (let* ((events (get object :events))
+                 (event (aref events index))
+                 (ref-time (first event))
+                 (hap-updates (rest event))
+                 (following-happening 
+                   (get-following-happening sim-state object index time direction ref-time)))
+            
+            (cond
+              ;; Handle non-repeating object reaching end of events
+              ((null following-happening)
+               (setf (problem-state.happenings sim-state)
+                     (remove object happenings :key #'first)))
+              
+              ;; Process happening normally
+              (t
+               ;; Apply updates only if not interrupted (index advanced)
+               (when (/= (first (second following-happening)) index)
+                 ;; Apply database updates to both hidb and idb
+                 (revise (problem-state.hidb sim-state) hap-updates)
+                 (revise (problem-state.idb sim-state) hap-updates)
+                 ;; Check and apply rebound condition
+                 (when (rebound-condition object sim-state)
+                   (setf following-happening (apply-rebound following-happening)))
+                 ;; Apply aftereffect if defined
+                 (apply-aftereffect object sim-state))
+               
+               ;; Check kill condition - agent died during wait
+               (when (kill-condition object sim-state)
+                 (return (values :killed nil nil)))
+               
+               ;; Update this object's entry in happenings list
+               (setf (problem-state.happenings sim-state)
+                     (mapcar (lambda (h)
+                               (if (eq (first h) object)
+                                   following-happening
+                                   h))
+                             happenings))
+               
+               ;; Advance simulation time to when this event fired
+               (setf (problem-state.time sim-state) time)
+               
+               ;; Check if goal is now satisfied
+               (when (and (boundp 'goal-fn)
+                          (funcall (symbol-function 'goal-fn) sim-state))
+                 (return
+                   (values :goal 
+                           (- (problem-state.time sim-state) start-time) 
+                           sim-state)))
+               
+               ;; Check if any action is now applicable
+               (when (any-action-applicable-p sim-state)
+                 (return
+                   (values :action 
+                           (- (problem-state.time sim-state) start-time) 
+                           sim-state)))))))))))
+
+
+(defun create-auto-wait-state (state sim-state wait-duration)
+  "Creates a new problem-state representing the result of an auto-wait.
+   Used by the stuck-triggered wait mechanism.
+   
+   STATE is the original state before waiting.
+   SIM-STATE is the simulated state after happenings occurred.
+   WAIT-DURATION is the elapsed time (for recording in solution path).
+   
+   Returns a new problem-state with:
+   - name: WAIT
+   - instantiations: (wait-duration) for solution path recording
+   - Updated idb, hidb, happenings from sim-state
+   - Updated time from sim-state"
+  (declare (type problem-state state sim-state) (type real wait-duration))
+  (make-problem-state
+    :name 'wait
+    :instantiations (list wait-duration)
+    :happenings (problem-state.happenings sim-state)
+    :time (problem-state.time sim-state)
+    :value (problem-state.value state)  ; Preserve value from original state
+    :heuristic 0.0
+    :idb (problem-state.idb sim-state)
+    :hidb (problem-state.hidb sim-state)
+    :idb-hash nil))  ; Will be computed when needed

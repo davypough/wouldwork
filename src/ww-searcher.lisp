@@ -250,6 +250,34 @@
                                   'exhausted)))))
 
 
+(defun auto-wait-debug-find-prop (props pred &rest prefix)
+  "Return the first proposition in PROPS whose (car ...) is PRED and whose
+   arguments begin with PREFIX. Used for compact debug signatures."
+  ;; ADDED
+  (declare (type list props))
+  (find-if (lambda (p)
+             (and (consp p)
+                  (eql (car p) pred)
+                  (loop for x in prefix
+                        for y in (cdr p)
+                        always (eql x y))))
+           props))
+
+
+(defun auto-wait-debug-state-signature (state)
+  "Compact signature to detect whether STATE drifted/mutated between re-push and backtrack-wait."
+  ;; ADDED
+  (declare (type problem-state state))
+  (let* ((idb (problem-state.idb state))
+         (props (list-database idb)))
+    (list :time (problem-state.time state)
+          :idb-count (hash-table-count idb)
+          :idb-hash (compute-idb-hash idb)
+          :elev-agent1 (auto-wait-debug-find-prop props 'ELEVATION 'AGENT1)
+          :loc-buzzer1 (auto-wait-debug-find-prop props 'LOC 'BUZZER1)
+          :loc-box2    (auto-wait-debug-find-prop props 'LOC 'BOX2))))
+
+
 (defun search-serial ()
   "Branch & Bound DFS serial search."
   (iter
@@ -272,6 +300,15 @@
         (setf succ-nodes (subseq succ-nodes (1- *branch*) *branch*)))
       (setf *num-init-successors* (length succ-nodes))
       (setf *rem-init-successors* (reverse succ-nodes)))
+    ;; Backtrack-triggered wait setup
+    ;; If we have successors and auto-wait is enabled, re-push current-node with wait-tried=T.
+    ;; This ensures that after all successors are exhausted, we'll encounter current-node again
+    ;; and df-bnb1 will attempt backtrack-triggered wait before truly backtracking.
+    (when (and succ-nodes
+               (auto-wait-enabled-p)
+               (not (node.wait-tried current-node)))
+      (setf (node.wait-tried current-node) t)
+      (hs::push-hstack current-node *open* :new-only nil))  ; Push underneath successors
     (iter (for succ-node in succ-nodes)
           (hs::push-hstack succ-node *open* :new-only (eq *tree-or-graph* 'graph)))  ;push lowest heuristic value last
     (increment-global *program-cycles* 1)  ;finished with this cycle
@@ -292,6 +329,128 @@
                               (simple-break)))))  ;allows continuing search for next *probe*
 
 
+;;; ============================================================================
+;;; AUTO-WAIT STUCK HANDLER
+;;; ============================================================================
+
+
+(defun handle-auto-wait-stuck (current-node)
+  "Attempts auto-wait when node has no successors (agent is stuck).
+   Called from df-bnb1 when succ-states is nil and auto-wait is enabled.
+   
+   Returns one of:
+     (:goal goal-state)        - Goal reached during wait; goal-state for registration
+     (:continue wait-state)    - Action became possible; wait-state as single successor
+     (:fail)                   - Auto-wait failed or not applicable; use normal dead-end handling
+   
+   The wait-state returned for :continue has name WAIT and instantiations (duration)
+   for proper solution path recording."
+  (declare (type node current-node))
+  (let ((state (node.state current-node)))
+    ;; Attempt macro-wait simulation
+    (multiple-value-bind (outcome wait-duration sim-state)
+        (simulate-until-action-applicable state *auto-wait-max-time*)
+      (case outcome
+        ;; Goal was reached during waiting
+        (:goal
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Auto-wait: Goal reached after waiting ~A time units~%" wait-duration))
+         (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
+           (values :goal wait-state)))
+        
+        ;; An action became applicable after waiting
+        (:action
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Auto-wait: Action became applicable after waiting ~A time units~%" wait-duration))
+         (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
+           (values :continue wait-state)))
+        
+        ;; Timeout - waited too long without progress
+        (:timeout
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Auto-wait: Timeout after ~A time units~%" *auto-wait-max-time*))
+         (values :fail nil))
+        
+        ;; Agent was killed during wait
+        (:killed
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Auto-wait: Agent killed during wait~%"))
+         (values :fail nil))
+        
+        ;; No happenings to simulate
+        (:no-happenings
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Auto-wait: No happenings available~%"))
+         (values :fail nil))
+        
+        ;; Unknown outcome - treat as failure
+        (otherwise
+         (values :fail nil))))))
+
+
+(defun handle-auto-wait-backtrack (current-node)
+  "Attempts backtrack-triggered wait when all regular successors have been exhausted.
+   Called from df-bnb1 when node.wait-tried is T (second visit after children exhausted).
+   
+   Returns one of:
+     (list wait-node)          - Wait succeeded, continue exploring from wait-node
+     '(first)                  - Goal reached during wait and *solution-type* is first
+     nil                       - Wait failed, continue backtracking
+   
+   This enables finding solutions that require waiting when regular actions exist
+   but all lead to dead ends."
+  (declare (type node current-node))
+  (let ((state (node.state current-node)))
+    #+:ww-debug (when (>= *debug* 3)
+                  (format t "~&Backtrack-triggered wait attempt at depth ~D~%" (node.depth current-node)))
+    ;; Attempt macro-wait simulation
+    (multiple-value-bind (outcome wait-duration sim-state)
+        (simulate-until-action-applicable state *auto-wait-max-time*)
+      (case outcome
+        ;; Goal was reached during waiting
+        (:goal
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Backtrack-wait: Goal reached after waiting ~A time units~%" wait-duration))
+         (let* ((wait-state (create-auto-wait-state state sim-state wait-duration))
+                (succ-depth (1+ (node.depth current-node))))
+           ;; Check if we can improve on existing solutions
+           (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+             (unless (f-value-better wait-state succ-depth)
+               ;; Can't improve, continue backtracking
+               (return-from handle-auto-wait-backtrack nil)))
+           ;; Register solution
+           #+:ww-debug (when (>= *debug* 1)
+                         (update-search-tree wait-state (1+ (node.depth current-node)) "backtrack-wait->goal"))
+           (register-solution current-node wait-state)
+           (update-max-depth-explored succ-depth)
+           (finalize-path-depth succ-depth)
+           (increment-global *total-states-processed* 1)
+           (if (eql *solution-type* 'first)
+               '(first)
+               nil)))  ; Continue searching for more solutions
+        
+        ;; An action became applicable after waiting
+        (:action
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Backtrack-wait: Action became applicable after waiting ~A time units~%" wait-duration))
+         (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
+           #+:ww-debug (when (>= *debug* 1)
+                         (update-search-tree wait-state (1+ (node.depth current-node)) "backtrack-wait->continue"))
+           (update-max-depth-explored (1+ (node.depth current-node)))
+           (increment-global *total-states-processed* 1)
+           ;; Return wait-node as successor for further exploration
+           (list (make-node :state wait-state
+                            :depth (1+ (node.depth current-node))
+                            :parent current-node
+                            :wait-tried nil))))  ; New node starts fresh
+        
+        ;; Timeout, killed, no-happenings, or unknown - continue backtracking
+        (otherwise
+         #+:ww-debug (when (>= *debug* 3)
+                       (format t "~&Backtrack-wait: Failed with outcome ~A~%" outcome))
+         nil)))))
+
+
 (defun df-bnb1 (open)
   "Performs expansion of one node from open. Returns
    new successor nodes, (first), or nil if no new nodes generated."
@@ -310,6 +469,11 @@
       (return-from df-bnb1 nil))
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
+    ;; Backtrack-triggered wait check
+    ;; If this node was re-pushed with wait-tried=T, all regular successors were exhausted.
+    ;; Now try waiting as a "second chance" before truly backtracking.
+    (when (and (auto-wait-enabled-p) (node.wait-tried current-node))
+      (return-from df-bnb1 (handle-auto-wait-backtrack current-node)))
     ;; States are now reserved in *closed* when added to open in process-successors
     (let ((succ-states (expand current-node)))  ;from generate-children
       (when *troubleshoot-current-node*
@@ -317,6 +481,47 @@
         (setf *troubleshoot-current-node* nil)
         (next-iteration))  ;redo current-node
       (when (null succ-states)  ;no successors
+        ;; Auto-wait stuck handling
+        (when (auto-wait-enabled-p)
+          (multiple-value-bind (outcome wait-state) (handle-auto-wait-stuck current-node)
+            (case outcome
+              ;; Goal reached during auto-wait
+              (:goal
+               (let ((succ-depth (1+ (node.depth current-node))))
+                 ;; Register the wait action in search tree for debugging
+                 #+:ww-debug (when (>= *debug* 1)
+                               (update-search-tree wait-state (node.depth current-node) "auto-wait->goal"))
+                 ;; Check if we can improve on existing solutions
+                 (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+                   (unless (f-value-better wait-state succ-depth)
+                     ;; Can't improve, treat as dead end
+                     (update-max-depth-explored (node.depth current-node))
+                     (finalize-path-depth (node.depth current-node))
+                     (return-from df-bnb1 nil)))
+                 ;; Register solution: current-node is predecessor, wait-state is goal
+                 ;; The solution path will show: ... -> (current-node's action) -> (WAIT duration)
+                 (register-solution current-node wait-state)
+                 (update-max-depth-explored succ-depth)
+                 (finalize-path-depth succ-depth)
+                 (increment-global *total-states-processed* 1)
+                 (if (eql *solution-type* 'first)
+                     (return-from df-bnb1 '(first))
+                     (return-from df-bnb1 nil))))
+              
+              ;; Action became applicable after auto-wait
+              (:continue
+               #+:ww-debug (when (>= *debug* 1)
+                             (update-search-tree wait-state (node.depth current-node) "auto-wait->continue"))
+               ;; Return wait-state as the single successor for further expansion
+               (update-max-depth-explored (1+ (node.depth current-node)))
+               (increment-global *total-states-processed* 1)
+               (return-from df-bnb1 
+                 (list (make-node :state wait-state
+                                  :depth (1+ (node.depth current-node))
+                                  :parent current-node))))
+              
+              ;; Auto-wait failed - fall through to normal dead-end handling
+              (:fail nil))))
         (update-max-depth-explored (node.depth current-node))
         (narrate "No successor states" (node.state current-node) (node.depth current-node))
         (finalize-path-depth (node.depth current-node)) 
@@ -762,7 +967,7 @@
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
         (cond (*hybrid-mode*
-               (format t "~2%Hybrid mode enumerated all paths to goal states at depth Ã¢â€°Â¤ ~D."
+               (format t "~2%Hybrid mode enumerated all paths to goal states at depth ~D."
                        *depth-cutoff*))
               ((eql *tree-or-graph* 'tree)
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
@@ -862,21 +1067,22 @@
 
 (defun print-search-tree ()
   (when (and (not (> *threads* 0)) (or (= *debug* 1) (= *debug* 2)))
-    (format t "~2%Search tree:~%")
-    (loop for act in (reverse *search-tree*)
-          do (if (alexandria:length= 2 act)
-               (format t "~vT~d:~a~%" (* 3 (second act)) (second act) (first act))
-               (case *debug*
-                 (1 (format t "~vT~d:~a ~a~%"
-                              (* 3 (second act)) (second act) (first act) (third act)))
-                 (2 (format t "~vT~d:~a ~a~%" 
-                              (* 3 (second act)) (second act) (first act) (third act))
-                    (format t "~vT  ~a~%"
-                              (* 3 (second act)) (fourth act))
-                    (when (fifth act)
+    (when (y-or-n-p "~%Display search tree?")
+      (format t "~2%Search tree:~%")
+      (loop for act in (reverse *search-tree*)
+            do (if (alexandria:length= 2 act)
+                 (format t "~vT~d:~a~%" (* 3 (second act)) (second act) (first act))
+                 (case *debug*
+                   (1 (format t "~vT~d:~a ~a~%"
+                                (* 3 (second act)) (second act) (first act) (third act)))
+                   (2 (format t "~vT~d:~a ~a~%" 
+                                (* 3 (second act)) (second act) (first act) (third act))
                       (format t "~vT  ~a~%"
-                                (* 3 (second act)) (fifth act))))))
-          finally (terpri))))
+                                (* 3 (second act)) (fourth act))
+                      (when (fifth act)
+                        (format t "~vT  ~a~%"
+                                  (* 3 (second act)) (fifth act))))))
+            finally (terpri)))))
 
  
 (defun register-solution (current-node goal-state)
@@ -946,11 +1152,100 @@
 
 (defun printout-solution (soln)
   (declare (type solution soln))
+  #+:ww-debug
+  (when (>= *debug* 2)
+    (printout-solution-with-states soln)
+    (return-from printout-solution))
+  ;; Standard output (always compiled)
   (dolist (item (solution.path soln))
     (write item :pretty t)
     (terpri))
   (format t "~%Final state:~%~A~2%"
     (list-database (problem-state.idb (solution.goal soln)))))
+
+
+#+:ww-debug
+(defun printout-solution-with-states (soln)
+  "Print solution path with database state after each action.
+   Used when *debug* >= 2 to show state progression."
+  (declare (type solution soln))
+  (let ((path (solution.path soln))
+        (current-state (copy-problem-state *start-state*)))
+    ;; Print start state at time 0.0
+    (write '(0.0 (START-STATE)) :pretty t)
+    (terpri)
+    (format t "~A~%" (list-database (problem-state.idb current-state)))
+    ;; Process each action, showing resulting state
+    (dolist (item path)
+      (let* ((action-form (second item))
+             (new-state (replay-action-to-state action-form current-state)))
+        (write item :pretty t)
+        (terpri)
+        (if new-state
+            (progn
+              (setf current-state new-state)
+              (format t "~A~%" (list-database (problem-state.idb current-state))))
+            (format t "[Action replay failed]~%"))))
+    (terpri)))
+
+
+#+:ww-debug
+(defun replay-action-to-state (action-form state)
+  "Replay a single action from a solution path to state.
+   Returns the new state, or NIL if replay fails.
+   
+   ACTION-FORM is (action-name arg1 arg2 ...) from solution path.
+   STATE is the current problem-state.
+   
+   Unlike apply-action-to-state, this trusts the solution is valid and
+   selects the correct effect by matching update.instantiations."
+  (let* ((action-name (first action-form))
+         (provided-args (rest action-form))
+         (action (find action-name *actions* :key #'action.name)))
+    
+    ;; Handle WAIT action: duration is informational, not an effect variable
+    (when (eql action-name 'wait)
+      (let ((wait-duration (first provided-args))
+            (new-state (copy-problem-state state)))
+        (incf (problem-state.time new-state) wait-duration)
+        (setf (problem-state.name new-state) 'wait)
+        (return-from replay-action-to-state new-state)))
+    
+    (unless action
+      (return-from replay-action-to-state nil))
+    
+    ;; Get precondition argument combinations
+    (let ((precondition-args (if (action.dynamic action)
+                                  (eval-instantiated-spec (action.precondition-type-inst action) state)
+                                  (action.precondition-args action))))
+      
+      ;; Find any passing precondition and execute effect
+      (dolist (pre-args precondition-args)
+        (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
+          (when pre-result
+            ;; Execute effect to get all possible updates
+            (let ((updated-dbs (if (eql pre-result t)
+                                   (funcall (action.eff-defun-name action) state)
+                                   (apply (action.eff-defun-name action) state pre-result))))
+              
+              ;; Find update with matching instantiations
+              (dolist (update updated-dbs)
+                (when (equal (update.instantiations update) provided-args)
+                  ;; Found the matching effect - apply it
+                  (let ((new-state (copy-problem-state state)))
+                    (apply-update-to-state new-state update action)
+                    ;; Apply followups if any
+                    (when (update.followups update)
+                      (apply-followups new-state update))
+                    ;; Process happenings if present
+                    (when *happening-names*
+                      (let ((net-state (amend-happenings state new-state)))
+                        (when net-state
+                          (setf new-state net-state))))
+                    (return-from replay-action-to-state new-state))))))))
+      
+      ;; No matching update found
+      nil)))
 
 
 (defun print-search-progress ()

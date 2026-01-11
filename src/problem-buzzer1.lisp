@@ -26,7 +26,9 @@
 
 (ww-set *tree-or-graph* tree)
 
-(ww-set *depth-cutoff* 7)
+(ww-set *depth-cutoff* 16)
+
+(ww-set *auto-wait* t)  ;enables waiting for exogenous events to occur
 
 (ww-set *progress-reporting-interval* 100000)
 
@@ -127,36 +129,6 @@
 
 ;;;; ACTIONS ;;;;
 
-
-#+ignore (define-action strategic-wait  ;wait for buzzer to arrive at agent's location
-    0
-  (?agent agent)
-  (and (bind (loc ?agent $area))
-       (member $area '(area1 area2 area3 area4 area5))  ;agent is on buzzer's path
-       (not (loc buzzer1 $area))                        ;buzzer not already here
-       (bind (elevation ?agent $h-agent))
-       ;; At least one interaction mode is ready
-       (or
-         ;; Case 1: Ready to place box on buzzer (holding box, elevated, buzzer clear)
-         (and (bind (holds ?agent $cargo))
-              (box $cargo)
-              (>= $h-agent 1)
-              (cleartop buzzer1))
-         ;; Case 2: Ready to jump onto box riding buzzer
-         (and (bind (supports buzzer1 $box))
-              (cleartop $box)
-              (bind (elevation $box $h-box))
-              (< (- $h-box $h-agent) 1))
-         ;; Case 3: Ready to pickup box from buzzer
-         (and (bind (supports buzzer1 $box))
-              (not (bind (holds ?agent $any-cargo)))
-              (bind (elevation $box $h-box))
-              (<= (abs (- $h-box $h-agent)) 1)))
-       ;; Simulate happenings until buzzer arrives; nil=fail if timeout or kill
-       (mvsetq ($sim-time $sim-state) (simulate-happenings-until-true 5 (loc buzzer1 $area))))
-  (?agent $sim-time $area)
-  (assert (apply-simulated-state! $sim-state)))
-    
 
 (define-action put-cargo-on-place
   ;; Agent can place a cargo object on a box, buzzer, mine or the ground.   ???not working: agent1 on box1 holding box2, want to drop box2 on ground
@@ -283,14 +255,6 @@
                  (safe ?area2))
           (assert (loc ?agent ?area2))))
       (finally (propagate-changes!))))
-
-
-(define-action wait
-    0  ;always 0, as a last resort wait 1 time unit if no other action possible
-  (?agent agent ?area area)
-  (always-true)
-  (?agent ?area)
-  (assert (waiting)))
 
 
 ;;;; INITIALIZATION ;;;;
