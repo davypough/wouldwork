@@ -217,6 +217,7 @@ any such settings appearing in the problem specification file.
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it.
    Preserves REPL-set parameters not overridden in the problem file."
+  (save-globals)
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (setf *goal* nil)
   (when *undo-checkpoint*

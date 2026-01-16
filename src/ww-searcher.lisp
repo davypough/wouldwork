@@ -1152,19 +1152,9 @@
 
 (defun printout-solution (soln)
   (declare (type solution soln))
-  #+:ww-debug
-  (when (>= *debug* 2)
-    (printout-solution-with-states soln)
-    (return-from printout-solution))
-  ;; Standard output (always compiled)
-  (dolist (item (solution.path soln))
-    (write item :pretty t)
-    (terpri))
-  (format t "~%Final state:~%~A~2%"
-    (list-database (problem-state.idb (solution.goal soln)))))
+  (printout-solution-with-states soln))
 
 
-#+:ww-debug
 (defun printout-solution-with-states (soln)
   "Print solution path with database state after each action.
    Used when *debug* >= 2 to show state progression."
@@ -1175,6 +1165,7 @@
     (write '(0.0 (START-STATE)) :pretty t)
     (terpri)
     (format t "~A~%" (list-database (problem-state.idb current-state)))
+    (terpri)
     ;; Process each action, showing resulting state
     (dolist (item path)
       (let* ((action-form (second item))
@@ -1184,12 +1175,12 @@
         (if new-state
             (progn
               (setf current-state new-state)
-              (format t "~A~%" (list-database (problem-state.idb current-state))))
+              (format t "~A~%" (list-database (problem-state.idb current-state)))
+              (terpri))
             (format t "[Action replay failed]~%"))))
     (terpri)))
 
 
-#+:ww-debug
 (defun replay-action-to-state (action-form state)
   "Replay a single action from a solution path to state.
    Returns the new state, or NIL if replay fails.

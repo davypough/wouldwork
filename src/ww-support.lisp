@@ -262,7 +262,7 @@
                            collect (loop for index in indexes
                                        collect (nth index (cdr proposition)))))
                   (props (list (copy-list proposition))))
-              (loop for vars in symmetric-indexes
+              (loop for vars in symmetric-variables
                     for idxs in symmetric-indexes do
                     (setf props (generate-new-propositions vars props idxs)))
               (loop for prop in props do
