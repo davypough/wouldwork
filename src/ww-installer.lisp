@@ -404,8 +404,16 @@
 
 (defun install-action (name duration pre-params precondition eff-params effect)
   (format t "~&Installing ~A action..." name)
-  (push (create-action name duration pre-params precondition eff-params effect nil)
-        *actions*))
+  (let ((pre-param-types (nth-value 1 (dissect-pre-params
+                                        (if (member (first pre-params) *parameter-headers*)
+                                          pre-params
+                                          (cons 'standard pre-params))))))
+    (let ((uninstantiable (check-action-parameter-instantiability name pre-param-types)))
+      (if uninstantiable
+        (format t "skipped (no instances for type~P: ~{~A~^, ~})~%"
+                (length uninstantiable) uninstantiable)
+        (push (create-action name duration pre-params precondition eff-params effect nil)
+              *actions*)))))
 
 
 (defmacro define-init-action (name duration pre-params precondition eff-params effect)
@@ -415,8 +423,16 @@
 (defun install-init-action (name duration pre-params precondition eff-params effect)
   (declare (ignore duration))
   (format t "~&Installing ~A init action..." name)
-  (push (create-action name 0 pre-params precondition eff-params effect t)
-    *init-actions*))
+  (let ((pre-param-types (nth-value 1 (dissect-pre-params
+                                        (if (member (first pre-params) *parameter-headers*)
+                                          pre-params
+                                          (cons 'standard pre-params))))))
+    (let ((uninstantiable (check-action-parameter-instantiability name pre-param-types)))
+      (if uninstantiable
+        (format t "skipped (no instances for type~P: ~{~A~^, ~})~%"
+                (length uninstantiable) uninstantiable)
+        (push (create-action name 0 pre-params precondition eff-params effect t)
+              *init-actions*)))))
 
 
 (defun create-action (name duration pre-params precondition eff-params effect init-action)

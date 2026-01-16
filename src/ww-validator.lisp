@@ -217,6 +217,34 @@
   (unless (every #'varp eff-parameter-list)
     (error "Expecting only variables with a ? or $ prefix in an effect parameter list: ~A" eff-parameter-list)))
 
+
+(defun check-action-parameter-instantiability (action-name pre-param-types)
+  "Checks if all static parameter types have at least one instance.
+   Returns a list of uninstantiable type names, or NIL if all types are instantiable.
+   Dynamic types (queries) are skipped as they are evaluated at runtime."
+  (let ((uninstantiable-types nil))
+    (labels ((check-types (spec)
+               (dolist (item spec)
+                 (cond
+                   ;; Skip headers (standard, product, combination, dot-product)
+                   ((member item *parameter-headers*)
+                    nil)
+                   ;; Skip query forms (dynamic - evaluated at runtime)
+                   ((and (listp item)
+                         (member (first item) *query-names*))
+                    nil)
+                   ;; Recurse into nested subspecs
+                   ((and (listp item)
+                         (member (first item) *parameter-headers*))
+                    (check-types item))
+                   ;; Static type symbol - check for instances
+                   ((symbolp item)
+                    (multiple-value-bind (instances exists-p) (gethash item *types*)
+                      (when (and exists-p (null instances))
+                        (pushnew item uninstantiable-types))))))))
+      (check-types pre-param-types))
+    (nreverse uninstantiable-types)))
+
         
 (defun check-predicate (proposition)
   "Detects an error in the use of an unknown predicate."

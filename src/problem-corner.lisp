@@ -582,6 +582,7 @@
                       #'remove-orphaned-beams!
                       #'recalculate-all-beams!          ;always returns nil
                       #'update-beams-if-interference!   ;always returns nil
+                      #'deactivate-conflicted-relays!
                       #'deactivate-receivers-that-lost-power!
                       #'deactivate-unpowered-relays!
                       #'activate-receivers-that-gained-power!
@@ -781,6 +782,32 @@
           (do
             (not (color ?r $c-hue))
             (setq $deactivated-any t)))))
+    $deactivated-any))
+
+
+(define-update deactivate-conflicted-relays! ()
+  ;; Deactivates relays receiving beams from multiple different-colored sources
+  ;; Returns t if any relay was deactivated, nil otherwise
+  (do
+    (doall (?r relay)
+      (if (bind (color ?r $existing-hue))
+        ;; Relay is active - check for conflicting incoming beams
+        (do
+          ;; Collect all hues from beams that reach this relay
+          (setq $reaching-hues nil)
+          (doall (?src terminus)
+            (if (or (paired ?r ?src) (paired ?src ?r))
+              (do
+                (setq $src-hue (get-hue-if-source ?src))
+                (if (and $src-hue
+                         (beam-reaches-target ?src ?r))
+                  (push $src-hue $reaching-hues)))))
+          ;; Check for consensus - if multiple different hues, deactivate
+          (setq $consensus-hue (resolve-consensus-hue $reaching-hues))
+          (if (and $reaching-hues              ; At least one beam reaches
+                   (not $consensus-hue))       ; But no consensus (conflicting hues)
+            (do (not (color ?r $existing-hue))
+                (setq $deactivated-any t))))))
     $deactivated-any))
 
 
@@ -1075,41 +1102,41 @@
 
 (define-action pickup-box
     1
-  (?agent agent)
-  (and (not (bind (holds ?agent $any-cargo)))
+  (?agent agent ?box box)
+  (and (same-type ?agent ?box)
+       (not (bind (holds ?agent $any-cargo)))
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent)))
-  (?agent $box $area)
-  (do (doall (?box box)
-        (if (and (not (on ?agent ?box))                   ; can't pick up box you're standing on
-                 (loc ?box $area)
-                 (bind (elevation ?box $h-box))
-                 (<= (abs (- $h-box $h-agent)) 1))        ; within reach (+1,0,-1)
-          (assert (holds ?agent ?box)
-                  (not (loc ?box $area))
-                  (not (elevation ?box $h-box))
-                  ;; First update elevations while on relationships still exist
-                  (collapse-cargo-above-box! ?box)
-                  ;; Now handle removal of relationships and establishing new ones
-                  (cond ((bind (supports $rover ?box))
-                           ;; Box was on buzzer or mine - remove supports, transfer cargo to rover
-                           (not (supports $rover ?box))
-                           (if (bind (on $cargo ?box))
-                             (do (not (on $cargo ?box))
-                                 (if (box $cargo)
-                                   (supports $rover $cargo)
-                                   (elevation $cargo 0)))))  ; non-box cargo falls to ground
-                        ((bind (on ?box $under-box))
-                           ;; Box was on another box - remove on, transfer cargo to under-box
-                           (not (on ?box $under-box))
-                           (if (bind (on $cargo ?box))
-                             (do (not (on $cargo ?box))
-                                 (on $cargo $under-box))))
-                        (t
-                           ;; Box was on ground - just remove on relationship for cargo
-                           (if (bind (on $cargo ?box))
-                             (not (on $cargo ?box))))))))
-      (finally (propagate-changes!))))
+       (bind (elevation ?agent $h-agent))
+       (loc ?box $area)
+       (not (on ?agent ?box))
+       (bind (elevation ?box $h-box))
+       (<= (abs (- $h-box $h-agent)) 1))
+  (?agent ?box $area)
+  (assert (holds ?agent ?box)
+          (not (loc ?box $area))
+          (not (elevation ?box $h-box))
+          ;; First update elevations while on relationships still exist
+          (collapse-cargo-above-box! ?box)
+          ;; Now handle removal of relationships and establishing new ones
+          (cond ((bind (supports $rover ?box))
+                   ;; Box was on buzzer or mine - remove supports, transfer cargo to rover
+                   (not (supports $rover ?box))
+                   (if (bind (on $cargo ?box))
+                     (do (not (on $cargo ?box))
+                         (if (box $cargo)
+                           (supports $rover $cargo)
+                           (elevation $cargo 0)))))        ; non-box cargo falls to ground
+                ((bind (on ?box $under-box))
+                   ;; Box was on another box - remove on, transfer cargo to under-box
+                   (not (on ?box $under-box))
+                   (if (bind (on $cargo ?box))
+                     (do (not (on $cargo ?box))
+                         (on $cargo $under-box))))
+                (t
+                   ;; Box was on ground - just remove on relationship for cargo
+                   (if (bind (on $cargo ?box))
+                     (not (on $cargo ?box)))))
+          (propagate-changes!)))
 
 
 (define-action jump-to-place
