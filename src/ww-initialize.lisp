@@ -19,9 +19,19 @@
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
   (setf *init-actions* (nreverse *init-actions*))
   (setq *happening-names* (sort (copy-list *happening-names*) #'< :key (lambda (object)
-                                                   (first (aref (get object :events) 0)))))
+                                                  (first (aref (get object :events) 0)))))
   (init-start-state)  ;finish start-state init later in converter.lisp
+  ;; Restore saved parameters BEFORE symmetry detection
+  (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
+    (cond (*refreshing*
+           (save-globals))
+          ((probe-file vals-file)
+           (read-globals))
+          (t
+           (save-globals))))
+  (initialize-symmetry-detection)
   (do-integer-conversion)                      ; Full conversion and compilation of baseline
+  (initialize-initial-signatures)              ;symmetry signatures
   (finalize-patroller-happenings)              ; Check initial rebound conditions
   (do-init-action-updates *start-state*)       ; Add init action propositions
   (convert-databases-to-integers)              ; Only convert new propositions, no recompilation
@@ -60,15 +70,8 @@
   (when (and (> *threads* 0) (> *debug* 1))
     (setf *debug* 1)
     (format t "~%Note: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
-  (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
-    (cond (*refreshing*     ; skip read-globals on refresh
-           (save-globals))  ; just save current in-memory state
-          ((probe-file vals-file)
-           (read-globals))       ; restore globals from vals.lisp
-          (t
-           (save-globals))))     ; save globals for new problem
   (when (eq *problem-name* 'unspecified)
-    (format t "~%Note: Please specify the problem name in the problem specification file with (ww-set *problem-name* <name>).~%"))
+    (format t "~%Note: Please specify the problem name in the problem specification file with (ww-set *problem-name* <n>).~%"))
   (when (and (eq *algorithm* 'backtracking) (> *threads* 0))
     (error "~%Note: Backtracking is not compatible with parallel processing.~%"))
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))
@@ -82,6 +85,13 @@
     (if (eq *problem-type* 'csp)
       (format t "~%Note: For CSP problems, suggest setting *depth-cutoff* to the number of variables to avoid possible dive to infinite depth.~%")
       (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%")))
+  ;; Symmetry pruning warnings
+  (when *symmetry-pruning*
+    (when (eql *solution-type* 'every)
+      (format t "~%Note: *symmetry-pruning* is enabled with *solution-type* = EVERY.")
+      (format t "~%      Solutions differing only by symmetric objects will be pruned.~%"))
+    (when (> *threads* 0)
+      (format t "~%Note: Symmetry pruning statistics may be approximate in parallel mode.~%")))
   (display-current-parameters)
   (setf *ww-loading* nil))
 

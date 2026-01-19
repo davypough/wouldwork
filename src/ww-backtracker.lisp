@@ -108,7 +108,10 @@
                                       ;; Static case: use pre-computed combinations
                                       (action.precondition-args action)))
             (precondition-fn (action.pre-defun-name action)))
-
+        ;; Filter symmetric instantiations if symmetry pruning enabled
+        (when *symmetry-pruning*
+          (setf parameter-combinations 
+                (filter-symmetric-instantiations action parameter-combinations *backtrack-state*)))
         ;; Process each parameter combination individually against current state
         (dolist (param-combo parameter-combinations)
           (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))

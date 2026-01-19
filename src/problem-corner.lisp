@@ -15,9 +15,9 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 11)
+(ww-set *depth-cutoff* 7)  ;11)
 
-;(ww-set *progress-reporting-interval* 3000000)
+(ww-set *progress-reporting-interval* 100000)
 
 
 (define-types
@@ -1164,18 +1164,6 @@
                   (not (on ?agent $box)))
                 (setq $place 'ground)))
       (finally (propagate-changes!))))
-
-
-(define-action drop
-    1
-  (?agent agent)
-  (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area))
-       (placeable $cargo $area))
-  (?agent $cargo $area)
-  (assert (not (holds ?agent $cargo))
-          (loc $cargo $area)
-          (propagate-changes!)))
 
 
 #+ignore (define-action toggle-plate

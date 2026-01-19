@@ -63,18 +63,18 @@
                    ;; Apply forward operations sequentially to state database
                    (let ((forward-list (first changes)))
                      (revise (problem-state.idb state) forward-list)
-                     ;; CHANGED: Update global databases using proper update mechanism
+                     ;; Update global databases using proper update mechanism
                      ;; This correctly handles fluent extraction and storage
                      (dolist (forward-op forward-list)
                        (let ((proposition forward-op))
                          ;; Check for negation wrapper
                          (when (and (listp proposition) (eql (car proposition) 'not))
                            (setf proposition (second proposition)))
-                         ;; CHANGED: Use update instead of direct setf/gethash
+                         ;; Use update instead of direct setf/gethash
                          ;; This ensures fluents are extracted and stored correctly
                          (if (gethash (car proposition) *relations*)
-                           (update *db* forward-op)           ; CHANGED LINE
-                           (update *static-db* forward-op)))) ; CHANGED LINE
+                           (update *db* forward-op)
+                           (update *static-db* forward-op))))
                      )))))))))))
 
 
@@ -109,6 +109,10 @@
                                  (or (null sublist) (member nil sublist)))
                                (eval-instantiated-spec dynamic state)))
             (next-iteration)))
+        ;; Filter symmetric instantiations if symmetry pruning enabled
+        (when *symmetry-pruning*
+          (setf precondition-args 
+                (filter-symmetric-instantiations action precondition-args state)))
         (let (pre-results updated-dbs)
           (setf pre-results  ;process this action, collecting all ? and $ vars
             (remove-if #'null (mapcar (lambda (pinsts)  ;nil = failed precondition

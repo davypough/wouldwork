@@ -309,10 +309,11 @@
                              *auto-wait* requires *threads* = 0." *threads*))
                    (unless (eql *algorithm* 'depth-first)
                      (error "Can't enable *auto-wait* when *algorithm* is ~S. ~
-                             *auto-wait* requires *algorithm* = DEPTH-FIRST." *algorithm*))))
-                   ;(unless *happening-names*
-                   ;  (error "Can't enable *auto-wait* without exogenous happenings. ~
-                   ;          Define patrollers or other happening objects first.")))
+                             *auto-wait* requires *algorithm* = DEPTH-FIRST." *algorithm*))
+                   (unless *happening-names*
+                     (format t "~%It's normally inefficient to enable *auto-wait* without exogenous happenings.~%~
+                                Define patrollers or other happening objects first.~2%"))))
+    (*symmetry-pruning* nil)
     (*threads* (error "Cannot set *threads* in the REPL or in a problem specification.
                        Specify the number of *threads* in ww-settings.lisp instead (but only if running SBCL),
                        then exit SBCL, and reload."))

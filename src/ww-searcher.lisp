@@ -154,13 +154,13 @@
   ;; Check remaining constraints with diagnostics
   (let ((constraints-met t))
     (unless (eql *algorithm* 'depth-first)
-      (format t "~&Note: *solution-type* EVERY with *algorithm* ~A not supported for hybrid mode; using standard search.~%"
+      (format t "~&Note: *solution-type* = EVERY with *algorithm* = ~A not supported for hybrid mode; using standard search.~%"
               *algorithm*)
       (setf constraints-met nil))
     (unless (eql *tree-or-graph* 'graph)
       (unless *happening-names*  ; Suppress message when tree is required for happenings
-        (format t "~&Note: *solution-type* EVERY with *tree-or-graph* TREE uses standard search to find every solution.~%~
-                   Using *tree-or-graph* GRAPH may be more efficient (hybrid mode), but may find fewer solutions.~%"))
+        (format t "~&Note: *solution-type* = EVERY with *tree-or-graph* = TREE uses standard search to find every solution.~%~
+                   Using *tree-or-graph* = GRAPH may be more efficient (hybrid mode), but may find fewer solutions.~%"))
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (format t "~&Note: *solution-type* EVERY requires *depth-cutoff* > 0 for hybrid mode; using standard search.~%")
@@ -969,7 +969,7 @@
         (cond (*hybrid-mode*
                (format t "~2%Hybrid mode enumerated all paths to goal states at depth ~D."
                        *depth-cutoff*))
-              ((eql *tree-or-graph* 'tree)
+              ((and (eql *tree-or-graph* 'tree) (eql *symmetry-pruning* nil))
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
               (t
                (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches)."))))))
@@ -1287,6 +1287,8 @@
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
                       (/ (- (get-internal-real-time) *prior-time*)
                          internal-time-units-per-second))))
+    (when *symmetry-pruning*
+      (format t "~%~A" (format-symmetry-statistics)))
     (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
                                                      internal-time-units-per-second)))
     (finish-output)

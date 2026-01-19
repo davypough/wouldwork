@@ -23,7 +23,7 @@
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* *progress-reporting-interval*
-           *threads* *randomize-search* *debug* *probe* *goal* *auto-wait*)
+           *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
   (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
@@ -170,6 +170,9 @@
   "Maximum time units to wait during auto-wait simulation before giving up.
    Prevents infinite waiting in problems with no enabling happenings.")
 
+(defvar *symmetry-pruning* nil
+  "When T, detect symmetry groups and prune symmetric action instantiations.")
+
 (define-global *types* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Table of all types.")
 
@@ -314,6 +317,7 @@
             *probe* nil
             *debug* 0
             *goal* nil
-            *auto-wait* nil)  ; ADDED LINE
+            *auto-wait* nil
+            *symmetry-pruning* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

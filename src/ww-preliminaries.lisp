@@ -222,7 +222,7 @@
       (let ((parameters (read stream)))
         (setf *problem-name* (first parameters)      ; position 0
               *algorithm* (third parameters)         ; position 2  
-              *debug* (nth 10 parameters))           ; position 10
+              *debug* (nth 11 parameters))           ; position 11
         ;; Handle debug feature flag based on loaded value
         (if (> *debug* 0)
             (pushnew :ww-debug *features*)

@@ -18,6 +18,7 @@
     -1               ; *branch*
     nil              ; *probe*
     0                ; *debug*
+    nil              ; *symmetry-pruning*
     nil)             ; *goal* 
   "Default parameter values in save/read order")
 
@@ -90,6 +91,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                          -1 (search all branches)>)
        (ww-set *debug* <one of 0 (no debugging), 1-4 (increasing debugging info),
                                5 (step through search)>)
+       (ww-set *symmetry-pruning* <t (prune symmetric states) or
+                                   nil (don't prune symmetric states>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
               see ww-settings.lisp and User Manual for probe format examples
@@ -208,10 +211,11 @@ any such settings appearing in the problem specification file.
                *randomize-search* ~A~%
                *branch* ~A~%
                *probe* ~A~%
+               *symmetry-pruning* ~A~%
                *debug* ~A~2%"
             *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
-            *probe* *debug*))
+            *probe* *symmetry-pruning* *debug*))
 
 
 (defun refresh ()
@@ -236,7 +240,7 @@ any such settings appearing in the problem specification file.
   (destructuring-bind 
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
         default-problem-type default-solution-type default-progress-reporting-interval 
-        default-randomize-search default-branch default-probe default-debug default-goal)
+        default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal)
       *default-parameters*
     (setf *problem-name* default-problem-name
           *depth-cutoff* default-depth-cutoff  
@@ -248,6 +252,7 @@ any such settings appearing in the problem specification file.
           *randomize-search* default-randomize-search
           *branch* default-branch
           *probe* default-probe
+          *symmetry-pruning* default-symmetry-pruning
           *debug* default-debug
           *goal* default-goal))
   (setf *features* (remove :ww-debug *features*)))
@@ -257,7 +262,7 @@ any such settings appearing in the problem specification file.
   "Save the values of the globals in the vals.lisp file."
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
                       *solution-type* *progress-reporting-interval* *randomize-search* 
-                      *branch* *probe* *debug* *goal*)
+                      *branch* *probe* *symmetry-pruning* *debug* *goal*)
                 *globals-file*))
 
 
@@ -265,7 +270,7 @@ any such settings appearing in the problem specification file.
   "Read and setf values for global variables from vals.lisp file."
   (destructuring-bind 
        (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
-        progress-reporting-interval randomize-search branch probe debug goal)
+        progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal)
       (read-from-file *globals-file* *default-parameters*)
       (setf *problem-name* problem-name
             *depth-cutoff* depth-cutoff
@@ -277,6 +282,7 @@ any such settings appearing in the problem specification file.
             *randomize-search* randomize-search
             *branch* branch
             *probe* probe
+            *symmetry-pruning* symmetry-pruning
             *debug* debug
             *goal* goal)))
 
@@ -398,6 +404,7 @@ any such settings appearing in the problem specification file.
         *debug* 0
         *branch* -1
         *randomize-search* nil
+        *symmetry-pruning* nil
         *features* (remove :ww-debug *features*))
   (with-silenced-compilation
     (load-problem problem-name-str)))
