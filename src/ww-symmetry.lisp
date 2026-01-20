@@ -3,7 +3,9 @@
 ;;; Symmetry detection and pruning for Wouldwork planner.
 ;;; Identifies groups of interchangeable objects based on type membership,
 ;;; static relations, initial dynamic state, and goal references.
-;;; Provides generation-time filtering to prune symmetric action instantiations.
+;;; Provides two pruning strategies:
+;;;   - Local (tree/backtracking): generation-time filtering of symmetric instantiations
+;;;   - Global (graph): canonical closed-list hashing treats symmetric states as duplicates
 
 
 (in-package :ww)
@@ -37,6 +39,11 @@
 (define-global *symmetry-check-count* 0
   "Count of symmetry checks performed during search.")
 (declaim (type fixnum *symmetry-check-count*))
+
+
+(define-global *symmetric-duplicates-pruned* 0
+  "Count of states pruned as symmetric duplicates in canonical mode (global strategy).")
+(declaim (type fixnum *symmetric-duplicates-pruned*))
 
 
 ;;;; PRE-SEARCH SYMMETRY DETECTION ;;;;
@@ -255,16 +262,19 @@
     (t nil)))
 
 
-;;;; GENERATION-TIME FILTERING ;;;;
+;;;; GENERATION-TIME FILTERING (LOCAL STRATEGY) ;;;;
 
 
 (defun filter-symmetric-instantiations (action instantiations state)
   "Filter INSTANTIATIONS to remove symmetric equivalents.
-   Uses committed-ordering approach: among undistinguished symmetric objects,
-   only the canonical (first) one is allowed. Once an object is distinguished
-   (its dynamic state differs from initial), it's no longer interchangeable.
+   For graph search with canonical hashing: returns all instantiations
+   (closed list handles symmetry via canonical hash equality).
+   For tree/backtracking: uses committed-ordering approach.
    Returns filtered list of instantiations."
   (unless *symmetry-pruning*
+    (return-from filter-symmetric-instantiations instantiations))
+  ;; For graph search with canonical hashing, closed list handles symmetry
+  (when (use-canonical-symmetry-p)
     (return-from filter-symmetric-instantiations instantiations))
   (let ((param-indices (gethash (action.name action) *symmetric-type-parameters*)))
     ;; Fast path: action has no symmetric parameters
@@ -333,13 +343,171 @@
            (compute-current-state-signature obj2 state))))
 
 
+;;;; GLOBAL SYMMETRY STRATEGY (GRAPH SEARCH) ;;;;
+;;; Canonical hashing makes the closed list treat symmetrically-equivalent
+;;; states as identical by computing permutation-invariant hash values.
+
+
+(defun use-canonical-symmetry-p ()
+  "Returns T if canonical symmetry hashing should be used.
+   Canonical hashing is used for graph search with symmetry pruning enabled."
+  (and *symmetry-pruning*
+       *symmetry-groups*              ; groups were detected
+       (eql *tree-or-graph* 'graph))) ; graph search only
+
+
+(defun compute-canonical-idb-hash (idb)
+  "Compute a hash of IDB that is invariant under permutation of symmetric
+   objects. Two states differing only by swapping symmetric objects will
+   hash identically.
+   Algorithm:
+   1. For each symmetry group, sort members by their current signatures
+   2. Map each symmetric object's int-code to a canonical marker (group . pos)
+   3. When hashing propositions, replace symmetric object codes with markers
+   4. Sum all canonicalized (key . value) pair hashes (not XOR, to avoid
+      cancellation when multiple keys map to the same canonical form)"
+  (declare (type hash-table idb))
+  (let ((canonical-map (build-canonical-mapping idb))
+        (hash 0))
+    (declare (type fixnum hash))
+    (maphash (lambda (key val)
+               (let ((canon-key (if (integerp key)
+                                    (canonicalize-proposition-key key canonical-map)
+                                    key))
+                     (canon-val (canonicalize-value val canonical-map)))  ; <-- ADDED
+                 (setf hash (ldb (byte 62 0) (+ hash (sxhash (cons canon-key canon-val)))))))
+             idb)
+    hash))
+
+
+(defun build-canonical-mapping (idb)
+  "Build a mapping from symmetric object int-codes to canonical markers.
+   Within each symmetry group, objects are sorted by their current-state
+   signatures. Returns a hash-table: int-code -> (group-index . position)
+   Objects with identical signatures get the same position, ensuring that
+   swapping two currently-equivalent objects produces the same canonical form."
+  (let ((mapping (make-hash-table :test #'eql))
+        (group-index 0))
+    (dolist (group *symmetry-groups*)
+      (let ((group-int-codes (mapcar (lambda (obj) (gethash obj *constant-integers*)) group)))
+        (let ((obj-sigs nil))
+          (dolist (obj group)
+            (let ((int-code (gethash obj *constant-integers*)))
+              (when int-code
+                (push (cons obj (compute-idb-object-signature int-code idb group-int-codes))
+                      obj-sigs))))
+          (setf obj-sigs (sort obj-sigs #'canonical-signature-less-p
+                               :key #'cdr))
+          (let ((position 0)
+                (prev-sig nil))
+            (dolist (obj-sig obj-sigs)
+              (let ((obj (car obj-sig))
+                    (sig (cdr obj-sig)))
+                (when (and prev-sig (not (equal sig prev-sig)))
+                  (incf position))
+                (setf prev-sig sig)
+                (let ((int-code (gethash obj *constant-integers*)))
+                  (setf (gethash int-code mapping)
+                        (cons group-index position))))))))
+      (incf group-index))
+    mapping))
+
+
+(defun compute-idb-object-signature (int-object idb &optional symmetric-codes)
+  "Compute signature of an object (by int-code) from current IDB state.
+   Returns sorted list of (normalized-key . normalized-value) pairs where:
+   - In keys: self's int-code → 0, other symmetric int-codes → 1
+   - In values: self's symbol → 0, other symmetric symbols → 1
+   This handles both integer-coded keys and symbolic $var values."
+  (let ((normalized-props nil)
+        (self-symbol (gethash int-object *integer-constants*))
+        (symmetric-symbols (when symmetric-codes
+                             (remove nil 
+                               (mapcar (lambda (code) (gethash code *integer-constants*))
+                                       symmetric-codes)))))
+    (maphash (lambda (int-key value)
+               (when (integerp int-key)
+                 (let ((components (extract-integer-components int-key)))
+                   (when (member int-object components :test #'eql)
+                     (let* ((norm-key (mapcar (lambda (code)
+                                                (cond ((eql code int-object) 0)
+                                                      ((and symmetric-codes
+                                                            (member code symmetric-codes :test #'eql))
+                                                       1)
+                                                      (t code)))
+                                              components))
+                            (norm-val (cond ((eql value self-symbol) 0)
+                                            ((and symmetric-symbols
+                                                  (member value symmetric-symbols :test #'eql))
+                                             1)
+                                            (t value))))
+                       (push (cons norm-key norm-val) normalized-props))))))
+             idb)
+    (sort normalized-props #'signature-element-less-p)))
+
+
+(defun canonical-signature-less-p (sig1 sig2)
+  "Lexicographic comparison of signatures (lists of (key . value) pairs).
+   Used to sort objects within a symmetry group by their current state."
+  (cond ((null sig1) (not (null sig2)))           ; empty < non-empty
+        ((null sig2) nil)                          ; non-empty > empty
+        (t (let ((elem1 (car sig1))
+                 (elem2 (car sig2)))
+             (cond ((signature-element-less-p elem1 elem2) t)
+                   ((signature-element-less-p elem2 elem1) nil)
+                   (t (canonical-signature-less-p (cdr sig1) (cdr sig2))))))))
+
+
+(defun canonicalize-proposition-key (int-key canonical-map)
+  "Replace symmetric object codes in INT-KEY with their canonical markers.
+   Non-symmetric codes are left unchanged.
+   Returns a list suitable for hashing (mixed codes and markers)."
+  (let ((components (extract-integer-components int-key))
+        (result nil)
+        (any-mapped nil))
+    (dolist (code components)
+      (let ((marker (gethash code canonical-map)))
+        (if marker
+            (progn
+              (push marker result)
+              (setf any-mapped t))
+            (push code result))))
+    ;; Return original key if nothing mapped (avoid consing for non-symmetric)
+    (if any-mapped
+        (nreverse result)
+        int-key)))
+
+
+(defun canonicalize-value (val canonical-map)
+  "Canonicalize a value by replacing symmetric object symbols with canonical markers.
+   - Symmetric object symbols: symbol → int-code → canonical-marker
+   - Non-symmetric object symbols: symbol → int-code
+   - Non-object symbols (T, NIL, keywords): pass through unchanged
+   - Lists: recurse through elements"
+  (cond
+    ;; List: recurse through elements
+    ((consp val)
+     (mapcar (lambda (elem) (canonicalize-value elem canonical-map)) val))
+    ;; Symbol: check if it's an object constant
+    ((symbolp val)
+     (let ((int-code (gethash val *constant-integers*)))
+       (if int-code
+           ;; Object constant - return marker if symmetric, else int-code
+           (gethash int-code canonical-map int-code)
+           ;; Not an object constant
+           val)))
+    ;; Other atoms (numbers, etc.): pass through
+    (t val)))
+
+
 ;;;; STATISTICS AND REPORTING ;;;;
 
 
 (defun reset-symmetry-statistics ()
   "Reset symmetry pruning statistics for a new search."
   (setf *symmetry-pruning-count* 0)
-  (setf *symmetry-check-count* 0))
+  (setf *symmetry-check-count* 0)
+  (setf *symmetric-duplicates-pruned* 0))
 
 
 (defun symmetry-pruning-percentage ()
@@ -351,12 +519,19 @@
 
 (defun format-symmetry-statistics ()
   "Return formatted string of symmetry statistics for progress reporting."
-  (if *symmetry-pruning*
-      (format nil "Symmetry: ~,1F% pruned (~:D/~:D)"
-              (symmetry-pruning-percentage)
-              *symmetry-pruning-count*
-              *symmetry-check-count*)
-      ""))
+  (cond ((not *symmetry-pruning*) nil)
+        ((use-canonical-symmetry-p)
+         (if (> *repeated-states* 0)
+             (format nil "Symmetry: ~:D canonical duplicates pruned (~,1F% of repeated states)"
+                     *symmetric-duplicates-pruned*
+                     (* 100.0 (/ *symmetric-duplicates-pruned* *repeated-states*)))
+             (format nil "Symmetry: ~:D canonical duplicates pruned"
+                     *symmetric-duplicates-pruned*)))
+        (t
+         (format nil "Symmetry: Local pruning ~,1F% (~:D/~:D instantiations filtered)"
+                 (symmetry-pruning-percentage)
+                 *symmetry-pruning-count*
+                 *symmetry-check-count*))))
 
 
 (defun find-group-type (group)
@@ -400,50 +575,11 @@
         (setf (gethash object *initial-object-signatures*) sig)))))
 
 
-(defun object-distinguished-p (object state)
-  "Returns T if OBJECT has been distinguished from its symmetry group.
-   An object is distinguished if its current dynamic state signature
-   differs from its initial signature. This is domain-independent:
-   works for location changes, holding, activation, or any other
-   dynamic property change.
-   OBJECT is a symbol; STATE contains the current idb."
-  (let ((initial-sig (gethash object *initial-object-signatures*)))
-    ;; If no initial signature recorded, treat as undistinguished
-    (unless initial-sig
-      (return-from object-distinguished-p nil))
-    (let ((current-sig (compute-current-state-signature object state)))
-      (not (equal current-sig initial-sig)))))
-
-
-(defun canonical-among-undistinguished-p (object state)
-  "Returns T if OBJECT is the canonical choice among equivalent
-   undistinguished objects in its symmetry group.
-   Two objects compete for canonical status only if they have the 
-   same current state signature (i.e., they're actually interchangeable).
-   Returns T if OBJECT is the first such equivalent undistinguished object."
-  (let ((group (gethash object *object-to-symmetry-group*)))
-    ;; Not in a symmetry group - allow
-    (unless group
-      (return-from canonical-among-undistinguished-p t))
-    ;; Get this object's current signature
-    (let ((obj-sig (compute-current-state-signature object state)))
-      ;; Find first undistinguished object with the same signature
-      (dolist (member group)
-        (unless (object-distinguished-p member state)
-          (when (equal (compute-current-state-signature member state) obj-sig)
-            ;; First equivalent undistinguished member - is it us?
-            (return-from canonical-among-undistinguished-p (eq member object)))))
-      ;; No equivalent undistinguished found (shouldn't happen if object itself is undistinguished)
-      t)))
-
-
 (defun instantiation-allowed-p (instantiation param-indices state)
   "Returns T if INSTANTIATION should be kept (not pruned).
-   Implements committed ordering: for each symmetry group, undistinguished
-   objects must be selected in canonical (group) order across parameters.
-   - Distinguished objects are always allowed
-   - For undistinguished objects from a group, each must be the first
-     undistinguished member not yet committed by an earlier parameter"
+   Implements current-state equivalence: objects are interchangeable only if
+   they have identical current state signatures. Among equivalent objects,
+   canonical (group) order is enforced across parameters."
   (let ((committed (make-hash-table :test #'eq)))  ; group -> list of committed objects
     (loop for idx in param-indices
           for obj = (nth idx instantiation)
@@ -452,21 +588,23 @@
           (cond
             ;; Not in a symmetry group → allow
             ((null group) t)
-            ;; Distinguished → allow  
-            ((object-distinguished-p obj state) t)
-            ;; Undistinguished → must be first undistinguished among uncommitted
+            ;; Already committed this exact object → allow (same object in multiple params)
+            ((member obj (gethash group committed) :test #'eq) t)
+            ;; Check if obj is canonical among currently-equivalent uncommitted objects
             (t 
-             (let* ((already-committed (gethash group committed))
-                    ;; Find first undistinguished not yet committed (group is in canonical order)
-                    (first-available
+             (let* ((obj-sig (compute-current-state-signature obj state))
+                    (already-committed (gethash group committed))
+                    ;; Find first group member with same current signature, not yet committed
+                    (first-equivalent
                       (find-if (lambda (member)
                                  (and (not (member member already-committed :test #'eq))
-                                      (not (object-distinguished-p member state))))
+                                      (equal (compute-current-state-signature member state)
+                                             obj-sig)))
                                group)))
                ;; Commit this object for future parameters
                (push obj (gethash group committed))
-               ;; Object must be the first available
-               (eq obj first-available)))))))
+               ;; Object must be first equivalent (or no equivalent exists)
+               (eq obj first-equivalent)))))))
 
 
 (defun initialize-symmetry-detection ()
@@ -478,17 +616,21 @@
       (*symmetry-groups*
        (format t "~2%Symmetry groups detected: ~D~%" (length *symmetry-groups*))
        (dolist (group *symmetry-groups*)
-         (format t "  ~A [~D interchangeable objects of type ~A]~%"
+         (format t "  ~A [~D potentially interchangeable objects of type ~A]~%"
                  group
                  (length group)
                  (find-group-type group)))
-       ;; Explain goal reference impact
+       ;; Explain goal reference impact and strategy
        (let ((goal-objects (extract-goal-object-references)))
-         (if goal-objects
-             (format t "  Note: Goal-referenced objects (~A) excluded from symmetry groups.~%"
-                     (format-object-list goal-objects))
-             (format t "  Note: Goal contains no explicit object references.~%"))
-         (format t "        Search will avoid exploring equivalent paths that simply swap interchangeable objects.~%"))
+         (when goal-objects
+           (format t "  Note: Goal-referenced objects (~A) excluded from symmetry groups.~%"
+                   (format-object-list goal-objects))
+           (format t "        These objects participate in goal conditions, so any symmetries involving them will not be pruned.~%"))
+         (format t "  Search will prune equivalent paths that simply swap interchangeable objects.~%")
+         ;; Report which strategy will be used
+         (if (eql *tree-or-graph* 'graph)
+             (format t "  Strategy: Global — symmetric states are detected as duplicates in closed list and pruned.~%")
+             (format t "  Strategy: Local — symmetric actions are detected at generation time and pruned.~%")))
        (terpri))
       (t
        (format t "~2%No symmetry groups detected. Set *symmetry-pruning* = nil for greater efficiency.~2%")))))

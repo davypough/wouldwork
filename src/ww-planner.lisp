@@ -184,7 +184,7 @@
       (list
        ;; Backtracking algorithm: changes now contains (forward-list inverse-list)
        ;; Check forward-list for inconsistent-state marker
-       (let ((forward-list (first changes)))  ; CHANGED: extract forward-list
+       (let ((forward-list (first changes)))
          (some (lambda (forward-op)
                  (and forward-op
                       (listp forward-op)
@@ -332,9 +332,8 @@
                       (ut::prt (list-database updated-idb)))
         (setf (problem-state.idb net-state) updated-idb)
         (setf (problem-state.idb state+) updated-idb)
-    (finally (setf (problem-state.idb-hash net-state)
-               (compute-idb-hash (problem-state.idb net-state)))
-             (return-from process-followups net-state))))
+    (finally (setf (problem-state.idb-hash net-state) nil)
+             (return-from process-followups net-state))))  ; Let ensure-idb-hash compute lazily
 
 
 (defun expand (current-node)  ;called from df-bnb1

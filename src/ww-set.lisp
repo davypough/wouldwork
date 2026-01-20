@@ -60,9 +60,10 @@
            (asdf:load-system :wouldwork :force t)))
        (*symmetry-pruning*
           (setf ,param ',val)
-          (save-globals)
-          (with-silenced-compilation
-            (asdf:load-system :wouldwork :force t)))
+          (unless *ww-loading*
+            (save-globals)
+            (with-silenced-compilation
+              (asdf:load-system :wouldwork :force t))))
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)

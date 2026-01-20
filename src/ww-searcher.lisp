@@ -71,10 +71,14 @@
 
 (defun ensure-idb-hash (state)
   "Ensures the idb-hash is computed and cached for the given state.
+   When canonical symmetry is active (graph search with symmetry pruning),
+   computes a permutation-invariant hash so symmetric states hash identically.
    Returns the state's idb-hash."
   (unless (problem-state.idb-hash state)
     (setf (problem-state.idb-hash state)
-          (compute-idb-hash (problem-state.idb state))))
+          (if (use-canonical-symmetry-p)
+              (compute-canonical-idb-hash (problem-state.idb state))
+              (compute-idb-hash (problem-state.idb state)))))
   (problem-state.idb-hash state))
 
 
@@ -663,13 +667,70 @@
     hash))
 
 
+(defun canonical-idb-equal-p (idb1 idb2)
+  "Check if two idb hash-tables are equal under canonical symmetry.
+   Returns T if the states are identical or symmetric permutations.
+   For non-symmetric mode, uses standard equalp comparison."
+  (declare (type hash-table idb1 idb2))
+  (if (use-canonical-symmetry-p)
+      ;; Canonical comparison: build canonical forms and compare
+      (let ((canon1 (build-canonical-idb-form idb1))
+            (canon2 (build-canonical-idb-form idb2)))
+        (equal canon1 canon2))
+      ;; Standard comparison
+      (equalp idb1 idb2)))
+
+
+(defun build-canonical-idb-form (idb)
+  "Build a canonical (sorted) representation of IDB for equality comparison.
+   Replaces symmetric object codes with canonical markers and sorts all
+   propositions for deterministic comparison."
+  (declare (type hash-table idb))
+  (let ((canonical-map (build-canonical-mapping idb))
+        (canon-props nil))
+    (maphash (lambda (key val)
+               (let ((canon-key (if (integerp key)
+                                    (canonicalize-proposition-key key canonical-map)
+                                    key))
+                     (canon-val (canonicalize-value val canonical-map)))
+                 (push (cons canon-key canon-val) canon-props)))
+             idb)
+    ;; Sort for deterministic comparison
+    (sort canon-props #'canonical-prop-less-p)))
+
+
+(defun canonical-prop-less-p (prop1 prop2)
+  "Comparison function for sorting canonicalized propositions."
+  (string< (prin1-to-string (car prop1))
+           (prin1-to-string (car prop2))))
+
+
 (defun get-closed-values (state depth)
   "Retrieve the closed values for a state.
+   When canonical symmetry is active, verifies canonical equality to prevent
+   false positives from hash collisions.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (gethash (closed-key state depth)
-           (if (> *threads* 0) 
-               (closed-shard state)
-               *closed*)))
+  (let ((closed-values (gethash (closed-key state depth)
+                                (if (> *threads* 0) 
+                                    (closed-shard state)
+                                    *closed*))))
+    (when closed-values
+      (if (use-canonical-symmetry-p)
+          ;; Canonical mode: distinguish exact vs symmetric duplicates
+          (let ((succ-idb (problem-state.idb state))
+                (closed-idb (first closed-values)))
+            (cond ((equalp closed-idb succ-idb)
+                   ;; Exact duplicate
+                   closed-values)
+                  ((canonical-idb-equal-p closed-idb succ-idb)
+                   ;; Symmetric duplicate - structurally equivalent
+                   (increment-global *symmetric-duplicates-pruned*)
+                   closed-values)
+                  (t
+                   ;; Hash collision - different states
+                   nil)))
+          ;; Standard mode: hash match is sufficient
+          closed-values))))
 
 
 (defun get-closed-node (state depth)
@@ -919,9 +980,28 @@
 
 (defun defer-hybrid-goal (current-node goal-state)
   "Stores a goal-reaching pair for deferred enumeration after search completes.
-   Called in hybrid mode when a goal is reached."
+   Called in hybrid mode when a goal is reached.
+   When canonical symmetry is active, skips canonically-equivalent goals."
   (declare (type node current-node) (type problem-state goal-state))
-  (push-global (cons current-node goal-state) *hybrid-goals*))
+  (let ((goal-depth (1+ (node.depth current-node))))
+    ;; For canonical symmetry, check if equivalent goal already deferred
+    (when (use-canonical-symmetry-p)
+      (ensure-idb-hash goal-state)
+      (let ((goal-hash (problem-state.idb-hash goal-state)))
+        (when (find-if (lambda (pair)
+                         (let ((existing-goal (cdr pair)))
+                           (ensure-idb-hash existing-goal)
+                           (and (= (problem-state.idb-hash existing-goal)
+                                   goal-hash)
+                                (canonical-idb-equal-p
+                                 (problem-state.idb goal-state)
+                                 (problem-state.idb existing-goal)))))
+                       *hybrid-goals*)
+          (narrate "Duplicate solution found (via symmetry) ***" goal-state goal-depth)
+          (increment-global *repeated-states*)
+          (return-from defer-hybrid-goal))))
+    (narrate "Solution found (hybrid mode) ***" goal-state goal-depth)
+    (push-global (cons current-node goal-state) *hybrid-goals*)))
 
 
 (defun finalize-hybrid-solutions ()
@@ -935,7 +1015,7 @@
            (paths-to-current (enumerate-paths-to-node current-node))
            (num-paths (length paths-to-current))
            (goal-idb (problem-state.idb goal-state)))
-      (format t "~%Enumerating ~D path~:P to goal at depth ~D~%" num-paths state-depth)
+      ;(format t "~%Enumerating ~D path~:P to goal at depth ~D~%" num-paths state-depth)
       (dolist (path paths-to-current)
         (let* ((full-path (append path (list goal-move)))
                (solution (make-solution
@@ -980,12 +1060,14 @@
   (when (eql *tree-or-graph* 'graph)
     (format t "~2%Repeated states = ~:D, ie, ~,1F percent"
               *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
-  ;(format t "~2%Unique states encountered = ~:D" (unique-states-encountered-graph))
   (when (> *inconsistent-states-dropped* 0)
-    (format t "~%~%Dropped ~D inconsistent successor state~:P due to convergence failure."
+    (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
             *inconsistent-states-dropped*))
-  (format t "~2%Average branching factor = ~,1F" *average-branching-factor*)
-  (format t "~2%Start state:~%~A" (list-database (problem-state.idb *start-state*)))
+  (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*)
+  (let ((sym-stats (format-symmetry-statistics)))
+    (when sym-stats
+      (format t "~%~A~%" sym-stats)))
+  (format t "~%Start state:~%~A" (list-database (problem-state.idb *start-state*)))
   (format t "~2%Goal:~%~A~2%" (when (boundp 'goal-fn)
                                 (get 'goal-fn :form)))  ;(symbol-value 'goal-fn)
   (when (and (eql *solution-type* 'count)) (> *solution-count* 0)
@@ -1287,8 +1369,9 @@
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
                       (/ (- (get-internal-real-time) *prior-time*)
                          internal-time-units-per-second))))
-    (when *symmetry-pruning*
-      (format t "~%~A" (format-symmetry-statistics)))
+    (let ((sym-stats (format-symmetry-statistics)))
+      (when sym-stats
+        (format t "~%~A" sym-stats)))
     (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
                                                      internal-time-units-per-second)))
     (finish-output)

@@ -102,7 +102,7 @@
       :heuristic (problem-state.heuristic state)
       :idb (copy-idb (problem-state.idb state))
       :hidb (copy-idb (problem-state.hidb state))
-      :idb-hash (problem-state.idb-hash state)))
+      :idb-hash nil))
 
 
 (defun copy-problem-state-without-idb (state)
