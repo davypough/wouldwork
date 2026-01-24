@@ -79,8 +79,8 @@
   (controls (either receiver plate) (either gate blower))
   ;(blows> blower $area $area)
   (chroma (either transmitter receiver) $hue)  ;fixed color
-  (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
-  (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
+  (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
+  (gate-segments $list)    ; ((gate1 x1 y1 x2 y2) ...)
   ;(toggles plate (either gate blower))
   ;potential clear los from an area to a focus
   (los0 area focus)  
@@ -390,41 +390,70 @@
 
 
 (define-query find-first-obstacle-intersection (?source-x ?source-y ?target-x ?target-y)
-  ; Establishes each beam's intended full path by finding intersections with static obstacles only
-  ; Returns the endpoint coordinates where the beam terminates and what blocks it
+  ;; Establishes each beam's intended full path by finding intersections with static obstacles only
+  ;; Returns the endpoint coordinates where the beam terminates
   (do
     ;; Initialize closest intersection tracking
     (setq $closest-t 1.0)  ; Default to target if no intersections
     (setq $result-x ?target-x)   
     (setq $result-y ?target-y)
-    ;; Check static obstacles only - exclude beams
-    (doall (?obj occluder)
-      (if (and ;; Type-specific coordinate binding and conditions
-               (or (and (gate ?obj) 
-                        (not (open ?obj))  ; Block UNLESS explicitly open
-                        (bind (gate-segment ?obj $x1 $y1 $x2 $y2)))
-                   ;(and (wall ?obj)
-                   ;     (bind (wall-segment ?obj $x1 $y1 $x2 $y2)))
-                   (and (or (cargo ?obj) (agent ?obj))
-                        (bind (loc ?obj $area))
-                        (bind (coords $area $x1 $y1 $z1))
-                        (setq $x2 $x1) (setq $y2 $y1)))
-               ;; Endpoint exclusion logic for all obstacle types
-               (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
-                        (and (= $x2 ?source-x) (= $y2 ?source-y))
-                        (and (= $x1 ?target-x) (= $y1 ?target-y))
-                        (and (= $x2 ?target-x) (= $y2 ?target-y)))))
-        ;; Calculate intersection with obstacle
+    
+    ;; Bind cached geometry lists once
+    (bind (wall-segments $walls))
+    (bind (gate-segments $gates))
+    
+    ;; Loop 1: Check walls (always block)
+    (ww-loop for $entry in $walls do
+      (setq $x1 (second $entry))
+      (setq $y1 (third $entry))
+      (setq $x2 (fourth $entry))
+      (setq $y2 (fifth $entry))
+      ;; Endpoint exclusion
+      (if (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
+                   (and (= $x2 ?source-x) (= $y2 ?source-y))
+                   (and (= $x1 ?target-x) (= $y1 ?target-y))
+                   (and (= $x2 ?target-x) (= $y2 ?target-y))))
         (do (mvsetq ($int-t $int-x $int-y)
-              (if (and (= $x1 $x2) (= $y1 $y2))
-                ;; Point occlusion (cargo)
-                (beam-segment-occlusion ?source-x ?source-y ?target-x ?target-y $x1 $y1)
-                ;; Line segment interference (gates)
-                (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2)))
+              (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
             (if (and $int-t (< $int-t $closest-t))
               (do (setq $closest-t $int-t)
                   (setq $result-x $int-x)
                   (setq $result-y $int-y))))))
+    
+    ;; Loop 2: Check gates (only if closed)
+    (ww-loop for $entry in $gates do
+      (setq $gate (first $entry))
+      (if (not (open $gate))
+        (do (setq $x1 (second $entry))
+            (setq $y1 (third $entry))
+            (setq $x2 (fourth $entry))
+            (setq $y2 (fifth $entry))
+            ;; Endpoint exclusion
+            (if (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
+                         (and (= $x2 ?source-x) (= $y2 ?source-y))
+                         (and (= $x1 ?target-x) (= $y1 ?target-y))
+                         (and (= $x2 ?target-x) (= $y2 ?target-y))))
+              (do (mvsetq ($int-t $int-x $int-y)
+                    (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
+                  (if (and $int-t (< $int-t $closest-t))
+                    (do (setq $closest-t $int-t)
+                        (setq $result-x $int-x)
+                        (setq $result-y $int-y))))))))
+    
+    ;; Loop 3: Check cargo and agents (dynamic positions)
+    (doall (?obj (either cargo agent))
+      (if (and (bind (loc ?obj $area))
+               (bind (coords $area $x1 $y1 $z1))
+               ;; Endpoint exclusion
+               (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
+                        (and (= $x1 ?target-x) (= $y1 ?target-y)))))
+        (do (mvsetq ($int-t $int-x $int-y)
+              (beam-segment-occlusion ?source-x ?source-y ?target-x ?target-y $x1 $y1))
+            (if (and $int-t (< $int-t $closest-t))
+              (do (setq $closest-t $int-t)
+                  (setq $result-x $int-x)
+                  (setq $result-y $int-y))))))
+    
     ;; Return closest intersection coordinates
     (values $result-x $result-y)))
 
@@ -886,13 +915,13 @@
                 (if (eql ?b $beam1)
                   (do (setq $t-param $t1)
                       (setq $blocking-beam $beam2)
-                      (setq $blocking-t $t2))                                      ; ADDED
+                      (setq $blocking-t $t2))
                   (if (eql ?b $beam2)
                     (do (setq $t-param $t2)
                         (setq $blocking-beam $beam1)
-                        (setq $blocking-t $t1))                                    ; ADDED
+                        (setq $blocking-t $t1))
                     (setq $t-param nil)))
-                ;; Verify blocking beam actually reaches the intersection point   ; ADDED BLOCK START
+                ;; Verify blocking beam actually reaches the intersection point
                 (if $t-param
                   (do (bind (beam-segment $blocking-beam $b-src $b-tgt $b-end-x $b-end-y))
                       (mvsetq ($b-src-x $b-src-y $b-src-z) (get-coordinates $b-src))
@@ -1109,117 +1138,24 @@
 ;;;; ACTIONS ;;;;
 
 
-(define-action put-cargo-on-place
-  ;; Agent can place inactive cargo on a box, buzzer/mine (boxes only), or the ground.
-  1
-  (?agent agent)
-  (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent)))
-  (?agent $cargo $place $area)
-  (do ;; Box-only: can put box on a buzzer or mine
-      (if (box $cargo)
-        (doall (?rover (either buzzer mine))
-          (if (and (loc ?rover $area)
-                   (cleartop ?rover)
-                   (>= $e-agent 1))  ;must be above buzzer/mine
-            (assert (not (holds ?agent $cargo))
-                    (loc $cargo $area)
-                    (supports ?rover $cargo)
-                    (elevation $cargo 1)
-                    (setq $place ?rover)
-                    (finally (propagate-changes!))))))
-      ;; All cargo: can put on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (setq $e-delta (- $e-box $e-agent))
-                 (< $e-delta 1))  ;within reach +1 up or any level down
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; All cargo: can put on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-(define-action connect-to-1-terminus
+(define-action pickup-connector
     1
-  (?agent agent ?terminus terminus)
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       (same-type ?agent $cargo)
-       (different $cargo ?terminus)
+  (?agent agent ?connector connector)
+  (and (same-type ?agent ?connector)
+       (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
        (bind (elevation ?agent $e-agent))
-       (connectable $cargo $area)
-       (selectable ?agent $area ?terminus))
-  (?agent $cargo ?terminus $area $place)
-  (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?terminus)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (paired $cargo ?terminus)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-(define-action connect-to-2-terminus
-    1
-  (?agent agent (combination (?t1 ?t2) terminus))
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       (same-type ?agent $cargo)
-       (different $cargo ?t1)
-       (different $cargo ?t2)
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (connectable $cargo $area)
-       (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2))
-  (?agent $cargo ?t1 ?t2 $area $place)
-  (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (paired $cargo ?t2)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (paired $cargo ?t1)
-              (paired $cargo ?t2)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
+       (loc ?connector $area)
+       (bind (elevation ?connector $e-conn))
+       (<= (abs (- $e-conn $e-agent)) 1))          ; within reach
+  (?agent ?connector $area)
+  (assert (holds ?agent ?connector)
+          (not (loc ?connector $area))
+          (not (elevation ?connector $e-conn))
+          (if (bind (on ?connector $box))
+            (not (on ?connector $box)))
+          (disconnect-connector! ?connector)
+          (finally (propagate-changes!))))
 
 
 (define-action connect-to-3-terminus
@@ -1264,27 +1200,120 @@
               (finally (propagate-changes!)))))
 
 
-(define-action pickup-connector
+(define-action connect-to-2-terminus
     1
-  (?agent agent ?connector connector)
-  (and (same-type ?agent ?connector)
-       (not (bind (holds ?agent $held)))
+  (?agent agent (combination (?t1 ?t2) terminus))
+  (and (bind (holds ?agent $cargo))
+       (connector $cargo)
+       (same-type ?agent $cargo)
+       (different $cargo ?t1)
+       (different $cargo ?t2)
        (bind (loc ?agent $area))
        (bind (elevation ?agent $e-agent))
-       (loc ?connector $area)
-       (bind (elevation ?connector $e-conn))
-       (<= (abs (- $e-conn $e-agent)) 1))                 ; within reach
-  (?agent ?connector $area)
-  (assert (holds ?agent ?connector)
-          (not (loc ?connector $area))
-          (not (elevation ?connector $e-conn))
-          (if (bind (on ?connector $box))
-            (not (on ?connector $box)))
-          (disconnect-connector! ?connector)
-          (finally (propagate-changes!))))
+       (connectable $cargo $area)
+       (selectable ?agent $area ?t1)
+       (selectable ?agent $area ?t2))
+  (?agent $cargo ?t1 ?t2 $area $place)
+  (do ;; Can place on a box
+      (doall (?box box)
+        (if (and (loc ?box $area)
+                 (cleartop ?box)
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; within reach
+          (assert (not (holds ?agent $cargo))
+                  (loc $cargo $area)
+                  (on $cargo ?box)
+                  (elevation $cargo (1+ $e-box))
+                  (paired $cargo ?t1)
+                  (paired $cargo ?t2)
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
+      ;; Can place on ground
+      (assert (not (holds ?agent $cargo))
+              (loc $cargo $area)
+              (elevation $cargo 0)
+              (paired $cargo ?t1)
+              (paired $cargo ?t2)
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
 
 
-(define-action pickup-box
+(define-action connect-to-1-terminus
+    1
+  (?agent agent ?terminus terminus)
+  (and (bind (holds ?agent $cargo))
+       (connector $cargo)
+       (same-type ?agent $cargo)
+       (different $cargo ?terminus)
+       (bind (loc ?agent $area))
+       (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
+       (selectable ?agent $area ?terminus))
+  (?agent $cargo ?terminus $area $place)
+  (do ;; Can place on a box
+      (doall (?box box)
+        (if (and (loc ?box $area)
+                 (cleartop ?box)
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; within reach
+          (assert (not (holds ?agent $cargo))
+                  (loc $cargo $area)
+                  (on $cargo ?box)
+                  (elevation $cargo (1+ $e-box))
+                  (paired $cargo ?terminus)
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
+      ;; Can place on ground
+      (assert (not (holds ?agent $cargo))
+              (loc $cargo $area)
+              (elevation $cargo 0)
+              (paired $cargo ?terminus)
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
+
+
+(define-action put-cargo-on-place
+  ;; Agent can place inactive cargo on a box, buzzer/mine (boxes only), or the ground.
+  1
+  (?agent agent)
+  (and (bind (holds ?agent $cargo))
+       (bind (loc ?agent $area))
+       (bind (elevation ?agent $e-agent)))
+  (?agent $cargo $place $area)
+  (do ;; Box-only: can put box on a buzzer or mine
+      (if (box $cargo)
+        (doall (?rover (either buzzer mine))
+          (if (and (loc ?rover $area)
+                   (cleartop ?rover)
+                   (>= $e-agent 1))  ;must be above buzzer/mine
+            (assert (not (holds ?agent $cargo))
+                    (loc $cargo $area)
+                    (supports ?rover $cargo)
+                    (elevation $cargo 1)
+                    (setq $place ?rover)
+                    (finally (propagate-changes!))))))
+      ;; All cargo: can put on a box
+      (doall (?box box)
+        (if (and (loc ?box $area)
+                 (cleartop ?box)
+                 (bind (elevation ?box $e-box))
+                 (setq $e-delta (- $e-box $e-agent))
+                 (< $e-delta 1))  ;within reach +1 up or any level down
+          (assert (not (holds ?agent $cargo))
+                  (loc $cargo $area)
+                  (on $cargo ?box)
+                  (elevation $cargo (1+ $e-box))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
+      ;; All cargo: can put on ground
+      (assert (not (holds ?agent $cargo))
+              (loc $cargo $area)
+              (elevation $cargo 0)
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
+
+
+#+ignore (define-action pickup-box
     1
   (?agent agent ?box box)
   (and (same-type ?agent ?box)
@@ -1323,7 +1352,7 @@
           (finally (propagate-changes!))))
 
 
-(define-action jump-to-place
+#+ignore (define-action jump-to-place
   ;; Agent can jump up or down to any reachable box or the ground.
   1
   (?agent agent)
@@ -1373,7 +1402,7 @@
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
        (bind (elevation ?agent $e-agent))
-       (= $e-agent 0)                                     ; must be on ground
+       (= $e-agent 0)                          ; must be on ground
        (accessible ?agent $area1 ?area2)
        (safe ?area2))
   (?agent $area1 ?area2)
@@ -1409,11 +1438,8 @@
   (coords receiver3 1 11 1)
   (controls receiver1 gate1)
   ;(blows> blower1 area3 area1)
-  (gate-segment gate1 8 3 8 7)
-  (gate-segment gate2 2 11 6 11)
-  (wall-segment wall1 8 10 8 11)  ;internal walls only
-  (wall-segment wall2 8 7 8 8)
-  (wall-segment wall3 8 0 8 3)
+  (wall-segments ((wall1 8 10 8 11) (wall2 8 7 8 8) (wall3 8 0 8 3)))  ;internal walls only needed
+  (gate-segments ((gate1 8 3 8 7) (gate2 2 11 6 11)))
   (chroma transmitter1 red)
   (chroma transmitter2 blue)
   (chroma receiver1 red)
