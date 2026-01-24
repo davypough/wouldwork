@@ -130,9 +130,10 @@
                         (handle-trace-interception state action pre-results precondition-variables))
           (setf updated-dbs
             (mapcan (lambda (pre-result)
-                      (if (eql pre-result t)
-                        (funcall eff-defun-name state)
-                        (apply eff-defun-name state pre-result)))
+                      (nreverse   ;reverse the list of multiple asserts in an action
+                       (if (eql pre-result t)
+                         (funcall eff-defun-name state)
+                         (apply eff-defun-name state pre-result))))
                     pre-results))
           #+:ww-debug (when (>= *debug* 4)
                         (let ((*package* (find-package :ww)))
