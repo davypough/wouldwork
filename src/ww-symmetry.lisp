@@ -46,6 +46,42 @@
 (declaim (type fixnum *symmetric-duplicates-pruned*))
 
 
+(defvar *signature-element-string-cache* nil
+  "When non-NIL, a hash-table used to memoize (prin1-to-string elem) results
+   during signature sorting and canonical signature comparisons.")
+
+
+(defvar *intkey-components-cache* nil
+  "Global cache: packed int-key -> decoded component list.")
+
+
+(defvar *symmetry-group-code-set-cache* nil
+  "Global cache: group(list identity) -> hash-set of member int-codes.")
+
+
+(defvar *symmetry-group-symbol-set-cache* nil
+  "Global cache: group(list identity) -> hash-set of member object symbols.")
+
+
+(defparameter +canon-marker-offset+ 1000
+  "marker digits start here, to avoid colliding with normal component codes (<1000).")
+
+
+(defparameter +canon-marker-scale+ 1000
+  "marker = offset + group-index*scale + position (scale assumes position < 1000).")
+
+
+(defparameter +canon-pack-base+ 1000000
+  "smaller base to keep packed keys/bignums cheaper while still exceeding any digit.")
+
+
+
+(defmacro with-signature-element-string-cache (&body body)
+  "Evaluate BODY with a fresh cache for signature-element->string."
+  `(let ((*signature-element-string-cache* (make-hash-table :test #'eql)))
+     ,@body))
+
+
 ;;;; PRE-SEARCH SYMMETRY DETECTION ;;;;
 
 
@@ -58,6 +94,7 @@
   (clrhash *object-to-symmetry-group*)
   (clrhash *symmetric-type-parameters*)
   (clrhash *initial-object-signatures*)
+  (reset-symmetry-caches)
   (setf *symmetry-pruning-count* 0)
   (setf *symmetry-check-count* 0)
   ;; Step 1: Identify candidate types (types with multiple instances)
@@ -145,9 +182,54 @@
                  (normalize-proposition (cdr proposition) object)))))
 
 
+(defun signature-element->string (elem)
+  "Return a cached printed representation of ELEM when cache is active."
+  (let ((cache *signature-element-string-cache*))
+    (if cache
+        (multiple-value-bind (s presentp) (gethash elem cache)
+          (if presentp
+              s
+              (setf (gethash elem cache) (prin1-to-string elem))))
+        (prin1-to-string elem))))
+
+
+(defun ww-object< (a b)
+  "Deterministic total order over the object shapes used in signatures/canonical keys.
+   Orders by type, then lexicographically for cons trees."
+  (labels ((rank (x)
+             (cond ((integerp x) 0)
+                   ((symbolp x)  1)
+                   ((consp x)    2)
+                   (t            3)))
+           (sym< (s1 s2)
+             (let ((n1 (symbol-name s1))
+                   (n2 (symbol-name s2)))
+               (cond ((string< n1 n2) t)
+                     ((string< n2 n1) nil)
+                     (t
+                      ;; Tie-break by package to ensure total order.
+                      (let ((p1 (let ((p (symbol-package s1))) (if p (package-name p) "")))
+                            (p2 (let ((p (symbol-package s2))) (if p (package-name p) ""))))
+                        (string< p1 p2))))))
+           (cons< (x y)
+             ;; Lexicographic compare: car, then cdr
+             (cond ((ww-object< (car x) (car y)) t)
+                   ((ww-object< (car y) (car x)) nil)
+                   (t (ww-object< (cdr x) (cdr y))))))
+    (let ((ra (rank a))
+          (rb (rank b)))
+      (cond ((< ra rb) t)
+            ((> ra rb) nil)
+            ((integerp a) (< a b))
+            ((symbolp a) (sym< a b))
+            ((consp a)   (cons< a b))
+            (t nil)))))
+
+
 (defun signature-element-less-p (elem1 elem2)
   "Comparison function for sorting signature elements."
-  (string< (prin1-to-string elem1) (prin1-to-string elem2)))
+  ;; structural order, no prin1-to-string allocation
+  (ww-object< elem1 elem2))
 
 
 (defun partition-by-signature (candidate-types signatures)
@@ -265,6 +347,26 @@
 ;;;; GENERATION-TIME FILTERING (LOCAL STRATEGY) ;;;;
 
 
+(defun ensure-symmetry-caches ()
+  "Ensure global symmetry caches are initialized to hash-tables."
+  (unless (hash-table-p *intkey-components-cache*)
+    (setf *intkey-components-cache* (make-hash-table :test #'eql)))
+  (unless (hash-table-p *symmetry-group-code-set-cache*)
+    (setf *symmetry-group-code-set-cache* (make-hash-table :test #'eq)))
+  (unless (hash-table-p *symmetry-group-symbol-set-cache*)
+    (setf *symmetry-group-symbol-set-cache* (make-hash-table :test #'eq)))
+  t)
+
+
+(defun reset-symmetry-caches ()
+  "Clear global symmetry caches for a fresh problem/run."
+  (ensure-symmetry-caches)
+  (clrhash *intkey-components-cache*)
+  (clrhash *symmetry-group-code-set-cache*)
+  (clrhash *symmetry-group-symbol-set-cache*)
+  t)
+
+
 (defun filter-symmetric-instantiations (action instantiations state)
   "Filter INSTANTIATIONS to remove symmetric equivalents.
    For graph search with canonical hashing: returns all instantiations
@@ -318,6 +420,20 @@
     (sort normalized-props #'signature-element-less-p)))
 
 
+;; helper for uncached decoding
+(defun extract-integer-components/uncached (int-key)
+  "Extract component integer codes from a packed integer key.
+   Keys are packed as: code0 + code1*1000 + code2*1000000 + ...
+   Returns list of component codes in original order (predicate first)."
+  (let ((components nil)
+        (x int-key))
+    (loop while (> x 0)
+          do (multiple-value-bind (quotient remainder) (truncate x 1000)
+               (push remainder components)
+               (setf x quotient)))
+    (nreverse components)))
+
+
 (defun extract-integer-components (int-key)
   "Extract the component integer codes from a packed integer key.
    Keys are packed as: code0 + code1*1000 + code2*1000000 + ...
@@ -329,6 +445,41 @@
                (push remainder components)
                (setf x quotient)))
     (nreverse components)))
+
+
+(defun canonicalize-proposition-components (components canonical-map original-int-key)
+  "Like CANONICALIZE-PROPOSITION-KEY, but takes decoded COMPONENTS.
+   Returns ORIGINAL-INT-KEY if nothing maps (avoids consing)."
+  (let ((result nil)
+        (any-mapped nil))
+    (dolist (code components)
+      (let ((marker (gethash code canonical-map)))
+        (if marker
+            (progn (push marker result) (setf any-mapped t))
+            (push code result))))
+    (if any-mapped
+        (nreverse result)
+        original-int-key)))
+
+
+(defun ensure-symmetry-group-sets (group)
+  "Return two values: (code-set symbol-set) for GROUP.
+   Memoized so we don't rebuild these sets per state."
+  (let ((code-set (gethash group *symmetry-group-code-set-cache*))
+        (symbol-set (gethash group *symmetry-group-symbol-set-cache*)))
+    (unless (and code-set symbol-set)
+      (setf code-set (make-hash-table :test #'eql))
+      (setf symbol-set (make-hash-table :test #'eq))
+      (dolist (obj group)
+        (let ((code (gethash obj *constant-integers*)))
+          (when code
+            (setf (gethash code code-set) t)
+            (let ((sym (gethash code *integer-constants*)))
+              (when sym
+                (setf (gethash sym symbol-set) t))))))
+      (setf (gethash group *symmetry-group-code-set-cache*) code-set)
+      (setf (gethash group *symmetry-group-symbol-set-cache*) symbol-set))
+    (values code-set symbol-set)))
 
 
 (defun objects-equivalent-in-state-p (obj1 obj2 state)
@@ -357,47 +508,45 @@
 
 
 (defun compute-canonical-idb-hash (idb)
-  "Compute a hash of IDB that is invariant under permutation of symmetric
-   objects. Two states differing only by swapping symmetric objects will
-   hash identically.
-   Algorithm:
-   1. For each symmetry group, sort members by their current signatures
-   2. Map each symmetric object's int-code to a canonical marker (group . pos)
-   3. When hashing propositions, replace symmetric object codes with markers
-   4. Sum all canonicalized (key . value) pair hashes (not XOR, to avoid
-      cancellation when multiple keys map to the same canonical form)"
+  "Compute a hash of IDB invariant under permutation of symmetric objects."
   (declare (type hash-table idb))
-  (let ((canonical-map (build-canonical-mapping idb))
-        (hash 0))
-    (declare (type fixnum hash))
-    (maphash (lambda (key val)
-               (let ((canon-key (if (integerp key)
-                                    (canonicalize-proposition-key key canonical-map)
-                                    key))
-                     (canon-val (canonicalize-value val canonical-map)))  ; <-- ADDED
-                 (setf hash (ldb (byte 62 0) (+ hash (sxhash (cons canon-key canon-val)))))))
-             idb)
-    hash))
+  (ww-with-timing :symm/canon-hash
+    ;; Predecode integer keys once per state (if you already have this, keep yours)
+    (let ((decoded-int-keys (make-hash-table :test #'eql)))
+      (maphash (lambda (k v)
+                 (declare (ignore v))
+                 (when (integerp k)
+                   (setf (gethash k decoded-int-keys)
+                         (extract-integer-components k))))
+               idb)
+      (let ((canonical-map (build-canonical-mapping idb decoded-int-keys))
+            (hash 0))
+        (declare (type fixnum hash))
+        (maphash (lambda (key val)
+                   (let* ((components (and (integerp key) (gethash key decoded-int-keys)))
+                          ;; PH4C: pass COMPONENTS so canonicalize-proposition-key doesn't decode again
+                          (canon-key (if (integerp key)
+                                         (canonicalize-proposition-key key canonical-map components)  ;; PH4C
+                                         key))
+                          (canon-val (canonicalize-value val canonical-map)))
+                     ;; keep your existing combiner here (whatever you currently use)
+                     (setf hash (ldb (byte 62 0)
+                                     (+ hash (sxhash (cons canon-key canon-val)))))))
+                 idb)
+        hash))))
 
 
-(defun build-canonical-mapping (idb)
+(defun build-canonical-mapping (idb &optional decoded-int-keys)
   "Build a mapping from symmetric object int-codes to canonical markers.
-   Within each symmetry group, objects are sorted by their current-state
-   signatures. Returns a hash-table: int-code -> (group-index . position)
-   Objects with identical signatures get the same position, ensuring that
-   swapping two currently-equivalent objects produces the same canonical form."
-  (let ((mapping (make-hash-table :test #'eql))
-        (group-index 0))
-    (dolist (group *symmetry-groups*)
-      (let ((group-int-codes (mapcar (lambda (obj) (gethash obj *constant-integers*)) group)))
-        (let ((obj-sigs nil))
-          (dolist (obj group)
-            (let ((int-code (gethash obj *constant-integers*)))
-              (when int-code
-                (push (cons obj (compute-idb-object-signature int-code idb group-int-codes))
-                      obj-sigs))))
-          (setf obj-sigs (sort obj-sigs #'canonical-signature-less-p
-                               :key #'cdr))
+   markers are fixnums in a reserved range:
+   marker = +canon-marker-offset+ + group-index*+canon-marker-scale+ + position
+   DECODED-INT-KEYS, when supplied, is used downstream (signature-building) to avoid repeated decoding."
+  (ww-with-timing :symm/canon-map
+    (let ((mapping (make-hash-table :test #'eql))
+          (group-index 0))
+      (dolist (group *symmetry-groups*)
+        (let ((obj-sigs (compute-group-object-signatures group idb decoded-int-keys)))
+          (setf obj-sigs (sort obj-sigs #'canonical-signature-less-p :key #'cdr))
           (let ((position 0)
                 (prev-sig nil))
             (dolist (obj-sig obj-sigs)
@@ -407,27 +556,85 @@
                   (incf position))
                 (setf prev-sig sig)
                 (let ((int-code (gethash obj *constant-integers*)))
+                  ;; PH4C: integer marker instead of (group-index . position)
                   (setf (gethash int-code mapping)
-                        (cons group-index position))))))))
-      (incf group-index))
-    mapping))
+                        (+ +canon-marker-offset+
+                           (* group-index +canon-marker-scale+)
+                           position)))))))
+        (incf group-index))
+      mapping)))
 
 
-(defun compute-idb-object-signature (int-object idb &optional symmetric-codes)
+(defun compute-group-object-signatures (group idb &optional decoded-int-keys)
+  "PH4A: Compute signatures for all objects in GROUP with a single pass over IDB,
+but avoid consing normalized KEY lists by packing them into integers (with terminator).
+
+Returns an alist (obj . signature), where signature is a sorted list of
+(packed-normalized-key . normalized-value) pairs."
+  (ww-with-timing :symm/group-sigs
+    (let* ((group-int-codes (remove nil
+                                   (mapcar (lambda (obj)
+                                             (gethash obj *constant-integers*))
+                                           group)))
+           (code-set (make-hash-table :test #'eql))
+           (symbol-set (make-hash-table :test #'eq))
+           (buckets (make-hash-table :test #'eql)))
+      ;; membership + buckets
+      (dolist (code group-int-codes)
+        (setf (gethash code code-set) t)
+        (setf (gethash code buckets) nil)
+        (let ((sym (gethash code *integer-constants*)))
+          (when sym
+            (setf (gethash sym symbol-set) t))))
+
+      ;; single pass over IDB
+      (maphash
+       (lambda (int-key value)
+         (when (integerp int-key)
+           (let* ((components (or (and decoded-int-keys (gethash int-key decoded-int-keys))
+                                  (extract-integer-components int-key)))
+                  (members nil))
+             ;; find which group objects appear in this key
+             (dolist (code components)
+               (when (gethash code code-set)
+                 (pushnew code members :test #'eql)))
+             (when members
+               (dolist (self members)
+                 (let* ((self-symbol (gethash self *integer-constants*))
+                        ;; PH4A: packed normalized key (no list allocation)
+                        (packed-key (pack-normalized-components components self code-set))
+                        (norm-val (cond ((eql value self-symbol) 0)
+                                        ((and (symbolp value) (gethash value symbol-set)) 1)
+                                        (t value))))
+                   (push (cons packed-key norm-val)
+                         (gethash self buckets))))))))
+       idb)
+
+      ;; build (obj . sorted-signature) alist
+      (let ((obj-sigs nil))
+        (dolist (obj group)
+          (let ((code (gethash obj *constant-integers*)))
+            (when code
+              (push (cons obj
+                          (sort (gethash code buckets) #'signature-element-less-p))
+                    obj-sigs))))
+        (nreverse obj-sigs)))))
+
+
+(defun compute-idb-object-signature (int-object idb &optional symmetric-codes decoded-int-keys)
   "Compute signature of an object (by int-code) from current IDB state.
-   Returns sorted list of (normalized-key . normalized-value) pairs where:
-   - In keys: self's int-code → 0, other symmetric int-codes → 1
-   - In values: self's symbol → 0, other symmetric symbols → 1
-   This handles both integer-coded keys and symbolic $var values."
+   if DECODED-INT-KEYS is supplied, use it to avoid repeated calls to
+   EXTRACT-INTEGER-COMPONENTS for each INT-KEY."
   (let ((normalized-props nil)
         (self-symbol (gethash int-object *integer-constants*))
         (symmetric-symbols (when symmetric-codes
-                             (remove nil 
-                               (mapcar (lambda (code) (gethash code *integer-constants*))
-                                       symmetric-codes)))))
+                             (remove nil
+                                     (mapcar (lambda (code) (gethash code *integer-constants*))
+                                             symmetric-codes)))))
     (maphash (lambda (int-key value)
                (when (integerp int-key)
-                 (let ((components (extract-integer-components int-key)))
+                 (let ((components (or (and decoded-int-keys (gethash int-key decoded-int-keys))
+                                       (extract-integer-components int-key))))
                    (when (member int-object components :test #'eql)
                      (let* ((norm-key (mapcar (lambda (code)
                                                 (cond ((eql code int-object) 0)
@@ -458,23 +665,23 @@
                    (t (canonical-signature-less-p (cdr sig1) (cdr sig2))))))))
 
 
-(defun canonicalize-proposition-key (int-key canonical-map)
+(defun canonicalize-proposition-key (int-key canonical-map &optional components)
   "Replace symmetric object codes in INT-KEY with their canonical markers.
-   Non-symmetric codes are left unchanged.
-   Returns a list suitable for hashing (mixed codes and markers)."
-  (let ((components (extract-integer-components int-key))
-        (result nil)
-        (any-mapped nil))
+  - Returns INT-KEY unchanged when nothing maps.
+  - Otherwise returns a packed integer with an arity-preserving terminator.
+  - Optional COMPONENTS allows callers to supply decoded digits to avoid extraction."
+  (let* ((components (or components (extract-integer-components int-key)))
+         (digits nil)
+         (any-mapped nil))
     (dolist (code components)
       (let ((marker (gethash code canonical-map)))
         (if marker
             (progn
-              (push marker result)
+              (push marker digits)
               (setf any-mapped t))
-            (push code result))))
-    ;; Return original key if nothing mapped (avoid consing for non-symmetric)
+            (push code digits))))
     (if any-mapped
-        (nreverse result)
+        (pack-canonical-digits (nreverse digits))
         int-key)))
 
 
@@ -634,3 +841,35 @@
        (terpri))
       (t
        (format t "~2%No symmetry groups detected. Set *symmetry-pruning* = nil for greater efficiency.~2%")))))
+
+
+(defun pack-normalized-components (components self-code code-set)
+  "Pack normalized COMPONENTS into an integer with an arity-preserving terminator.
+Normalization:
+  self-code -> 0
+  other group member -> 1
+  else unchanged
+We append a terminator digit (a 1 in the next base-1000 place) so that
+trailing zeros in normalized components do NOT collapse."
+  (let ((packed 0)
+        (mult 1))
+    (dolist (code components)
+      (let ((mapped (cond ((eql code self-code) 0)
+                          ((and code-set (gethash code code-set)) 1)
+                          (t code))))
+        (incf packed (* mapped mult))
+        (setf mult (* mult 1000))))
+    ;; Arity terminator (prevents collisions when trailing normalized zeros occur)
+    (+ packed mult)))
+
+
+(defun pack-canonical-digits (digits)
+  "Pack DIGITS into an integer with an arity-preserving terminator.
+  We append a terminator digit (a 1 in the next base place) so trailing zeros
+  do not collapse (e.g., (... 0) differs from (...))."
+  (let ((packed 0)
+        (mult 1))
+    (dolist (d digits)
+      (incf packed (* d mult))
+      (setf mult (* mult +canon-pack-base+)))
+    (+ packed mult)))  ; terminator

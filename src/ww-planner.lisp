@@ -327,13 +327,13 @@
         (for followup in (update.followups updated-db))
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt followup))
-        (for updated-idb = (apply (car followup) state+ (cdr followup)))
+        (apply (car followup) state+ (cdr followup))
+        (for updated-idb = (problem-state.idb state+))
         #+:ww-debug (when (>= *debug* 4)
                       (ut::prt (list-database updated-idb)))
         (setf (problem-state.idb net-state) updated-idb)
-        (setf (problem-state.idb state+) updated-idb)
     (finally (setf (problem-state.idb-hash net-state) nil)
-             (return-from process-followups net-state))))  ; Let ensure-idb-hash compute lazily
+             (return-from process-followups net-state))))
 
 
 (defun expand (current-node)  ;called from df-bnb1

@@ -155,7 +155,7 @@
               (dolist (update updated-dbs)
                 (let ((inst (update.instantiations update)))
                   (push inst all-instantiations)
-                  (when (equal inst provided-args)
+                  (when (instantiations-match-p action inst provided-args)
                     ;; Found matching update - apply it
                     (let ((new-state (copy-problem-state state)))
                       (apply-update-to-state new-state update action)
@@ -260,18 +260,19 @@
                                      (apply (action.eff-defun-name action) state pre-result))))
                 ;; Check if any update's instantiations match provided args
                 (dolist (update updated-dbs)
-                  (when (equal (update.instantiations update) args)
+                  (when (instantiations-match-p action (update.instantiations update) args)
                     (return-from next-action-valid-p t)))))))))))
 
 
 (defun apply-followups (state update)
   "Apply followup functions to state, modifying it in place.
-   Followups are (function-name . args) pairs."
+   Followups are (function-name . args) pairs that modify state in-place."
   (let ((state+ (copy-problem-state state)))
     (dolist (followup (update.followups update))
-      (let ((updated-idb (apply (car followup) state+ (cdr followup))))
-        (setf (problem-state.idb state) updated-idb)
-        (setf (problem-state.idb state+) updated-idb)))))
+      (apply (car followup) state+ (cdr followup))
+      (let ((updated-idb (problem-state.idb state+)))
+        (setf (problem-state.idb state) updated-idb))))
+  (setf (problem-state.idb-hash state) nil))                 ; clear stale hash
 
 
 (defun apply-update-to-state (state update action)
@@ -313,6 +314,50 @@
           ((member (first item) *parameter-headers*)
            (setf groups (nconc (find-combination-var-groups item) groups))))))
     (nreverse groups)))
+
+
+(defun get-combination-positions (action)
+  "Returns a list of position-lists for combination variable groups.
+   Each position-list contains the indices in effect-variables where
+   combination variables appear.
+   Example: For effect-vars (?AGENT $CARGO ?T1 ?T2 $AREA $PLACE) with
+   combination (?T1 ?T2), returns ((2 3))."
+  (let* ((precond-params (action.precondition-params action))
+         (effect-vars (action.effect-variables action))
+         (var-groups (find-combination-var-groups precond-params))
+         (position-groups nil))
+    (dolist (group var-groups)
+      (let ((positions (mapcar (lambda (var)
+                                 (position var effect-vars))
+                               group)))
+        ;; Only include if all variables found in effect-vars
+        (when (every #'identity positions)
+          (push (sort (copy-list positions) #'<) position-groups))))
+    (nreverse position-groups)))
+
+
+(defun instantiations-match-p (action provided-args actual-args)
+  "Compare instantiations, treating combination variable groups as unordered sets.
+   For non-combination variables, uses strict positional equality.
+   For combination variables, compares the group values as sets."
+  (let ((combo-positions (get-combination-positions action)))
+    (if (null combo-positions)
+        ;; No combinations - use strict equality
+        (equal provided-args actual-args)
+        ;; Has combinations - compare carefully
+        (and (= (length provided-args) (length actual-args))
+             ;; Check all non-combination positions for equality
+             (let ((combo-indices (reduce #'append combo-positions)))
+               (loop for i from 0 below (length provided-args)
+                     always (or (member i combo-indices)
+                                (equal (nth i provided-args)
+                                       (nth i actual-args)))))
+             ;; Check each combination group as an unordered set
+             (every (lambda (group)
+                      (alexandria:set-equal
+                       (mapcar (lambda (pos) (nth pos provided-args)) group)
+                       (mapcar (lambda (pos) (nth pos actual-args)) group)))
+                    combo-positions)))))
 
 
 ;;; ==================== Output Functions ====================

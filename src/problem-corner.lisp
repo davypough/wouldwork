@@ -15,17 +15,19 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 7)
+(ww-set *depth-cutoff* 6)  ;15)
 
-(ww-set *progress-reporting-interval* 1000000)
+;(ww-set *symmetry-pruning* t)
+
+(ww-set *progress-reporting-interval* 500000)
 
 
 (define-types
   real-agent      (agent1)  ;the name of the main agent performing actions
   ghost-agent     ()  ;ghost objects are starred--eg, agent1*
   agent           (either real-agent ghost-agent)
-  gate            (gate1)
-  wall            ()
+  gate            (gate1 gate2)
+  wall            (wall1 wall2 wall3)  ;internal possible occluding walls
   real-connector  (connector1 connector2 connector3)
   ghost-connector ()
   connector       (either real-connector ghost-connector)
@@ -40,7 +42,7 @@
   receiver        (receiver1 receiver2 receiver3)
   beam            ()  ;initial beams
   hue             (blue red)  ;the hue of a transmitter, receiver, repeater, or active connector
-  area            (area1 area2 area3 area4 area5)  ;position points
+  area            (area1 area2 area3 area4)  ;position points
   real-cargo      (either real-connector real-box)
   ghost-cargo     (either ghost-connector ghost-box)
   cargo           (either connector box)  ;what the player can pickup & carry
@@ -78,7 +80,7 @@
   ;(blows> blower $area $area)
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (gate-segment gate $fixnum $fixnum $fixnum $fixnum)
-  ;(wall-segment wall $fixnum $fixnum $fixnum $fixnum)
+  (wall-segment wall $fixnum $fixnum $fixnum $fixnum)
   ;(toggles plate (either gate blower))
   ;potential clear los from an area to a focus
   (los0 area focus)  
@@ -166,21 +168,21 @@
 
 
 (define-query get-fixed-coordinates (?area/fixture)
-  ;; Efficiently get x,y coordinates for fixed objects
+  ;; Efficiently get x,y,z coordinates for fixed objects
   (do (bind (coords ?area/fixture $x $y $z))
-      (values $x $y)))
+      (values $x $y $z)))
 
 
 (define-query get-coordinates (?object)
-  ;; Finds x,y coordinates for any arbitrary object
+  ;; Finds x,y,z coordinates for any arbitrary object
   (cond 
     ;; Direct coords for areas and fixtures
     ((bind (coords ?object $x $y $z))
-     (values $x $y))
+     (values $x $y $z))
     ;; Indirect via loc for movable objects (agents, cargo, buzzer, mine)
     ((and (bind (loc ?object $area))
           (bind (coords $area $x $y $z)))
-     (values $x $y))
+     (values $x $y $z))
     (t (error "~%No coordinates found for ~A~%" ?object))))
 
 
@@ -268,13 +270,13 @@
                       (not (blower-activated-by-ghost ?b))))))))  ;;   only if ghost didn't cause it
 
 
-(define-query placeable (?cargo ?area)
-  ;; Area can hold multiple cargos, but only one connector;
-  ;; can be extended if future domains require area capacity constraints.
-  (if (connector ?cargo)
-    (not (exists (?c connector)
-           (loc ?c ?area)))
-    t))
+(define-query connectable (?connector ?area)
+  ;; A connector can be connected (activated) in an area only if
+  ;; there is no already-colored connector in that area.
+  (not (exists (?c connector)
+         (and (different ?c ?connector)
+              (loc ?c ?area)
+              (bind (color ?c $hue))))))
 
 
 (define-query same-type (?agent ?cargo)
@@ -284,12 +286,39 @@
     (ghost-cargo ?cargo)))
 
 
-(define-query resolve-consensus-hue (?hue-list)
-  ; Returns consensus hue from list of available hues, nil if no consensus
-  (do (setq $unique-hues (remove-duplicates (remove nil ?hue-list)))
-      (if (= (length $unique-hues) 1)
-        (first $unique-hues)  ; Single unique hue (consensus achieved)
-        nil)))               ; Multiple different hues or no hues (no consensus)
+(define-query resolve-hue-by-distance (?hue-distance-pairs)
+  ;; Resolves color conflict using path distance priority
+  ;; Input: list of (hue . distance) pairs
+  ;; Returns: winning hue, or nil if true conflict (equal minimum distances)
+  (do
+    ;; Handle empty input
+    (if (null ?hue-distance-pairs)
+      (return-from resolve-hue-by-distance nil))
+    ;; Find minimum distance for each unique hue
+    (setq $hue-min-dist (make-hash-table :test 'eq))
+    (ww-loop for $pair in ?hue-distance-pairs do
+      (setq $hue (car $pair))
+      (setq $dist (cdr $pair))
+      (setq $existing (gethash $hue $hue-min-dist))
+      (if (or (null $existing)
+              (< $dist $existing))
+        (setf (gethash $hue $hue-min-dist) $dist)))
+    ;; Find the globally minimum distance and which hue(s) achieve it
+    (setq $min-dist most-positive-fixnum)
+    (setq $winning-hue nil)
+    (setq $tie nil)
+    (maphash (lambda ($h $d)
+               (cond ((< $d $min-dist)
+                      (setq $min-dist $d)
+                      (setq $winning-hue $h)
+                      (setq $tie nil))
+                     ((= $d $min-dist)
+                      (setq $tie t))))
+             $hue-min-dist)
+    ;; Return winner only if no tie at minimum distance
+    (if $tie
+      nil
+      $winning-hue)))
 
 
 (define-query beam-segment-interference
@@ -529,6 +558,39 @@
     $powered-relays))
 
 
+(define-query compute-relay-distances ()
+  ;; BFS from all transmitters, returning hash table of relay -> min distance
+  ;; Distance represents hop count from nearest transmitter
+  (do
+    ;; Initialize distance table - transmitters are at distance 0
+    (setq $distances (make-hash-table :test 'eq))
+    (setq $frontier nil)
+    (doall (?t transmitter)
+      (do (setf (gethash ?t $distances) 0)
+          (push ?t $frontier)))
+    ;; BFS loop
+    (ww-loop while $frontier do
+      (setq $next-frontier nil)
+      (ww-loop for $source in $frontier do
+        (setq $source-dist (gethash $source $distances))
+        ;; Check all beams originating from this source
+        (doall (?b (get-current-beams))
+          (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+              (if (eql $src $source)
+                ;; Beam originates from current source - check if target is a relay
+                (if (relay $tgt)
+                  ;; Verify beam actually reaches target coordinates
+                  (do (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+                      (if (and (= $end-x $tgt-x)
+                               (= $end-y $tgt-y))
+                        ;; Beam reaches target - record distance if not yet visited
+                        (if (not (gethash $tgt $distances))
+                          (do (setf (gethash $tgt $distances) (1+ $source-dist))
+                              (push $tgt $next-frontier))))))))))
+      (setq $frontier $next-frontier))
+    $distances))
+
+
 #+ignore (define-query find-blower-on-path (?area1 ?area2)
   ;; Returns the blower controlling path from ?area1 to ?area2, or nil if none.
   (ww-loop for ?b in (gethash 'blower *types*)
@@ -714,6 +776,89 @@
   (do
     ;; Collect all intersections ONCE before processing any beams
     (setq $all-intersections (collect-all-beam-intersections))
+    
+    ;; PASS 1: Compute effective endpoint t for each beam
+    ;; (minimum of current endpoint t and all intersection t values)
+    (setq $effective-t (make-hash-table :test 'eq))
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
+          (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
+          (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+          (setq $dx (- $tgt-x $src-x))
+          (setq $dy (- $tgt-y $src-y))
+          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (setq $curr-dx (- $old-end-x $src-x))
+          (setq $curr-dy (- $old-end-y $src-y))
+          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+          (setq $min-t (/ $dot $length-sq))
+          ;; Find minimum t across all intersections for this beam
+          (ww-loop for $intersection in $all-intersections do
+                (setq $beam1 (first $intersection))
+                (setq $beam2 (second $intersection))
+                (setq $t1 (fifth $intersection))
+                (setq $t2 (sixth $intersection))
+                (if (and (eql ?b $beam1) (< $t1 $min-t))
+                  (setq $min-t $t1))
+                (if (and (eql ?b $beam2) (< $t2 $min-t))
+                  (setq $min-t $t2)))
+          (setf (gethash ?b $effective-t) $min-t)))
+    
+    ;; PASS 2: For each beam, find closest VALID intersection
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
+          (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
+          (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+          (setq $dx (- $tgt-x $src-x))
+          (setq $dy (- $tgt-y $src-y))
+          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (setq $curr-dx (- $old-end-x $src-x))
+          (setq $curr-dy (- $old-end-y $src-y))
+          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+          (setq $closest-t (/ $dot $length-sq))
+          (setq $new-end-x $old-end-x)
+          (setq $new-end-y $old-end-y)
+          ;; Check all intersections involving this beam
+          (ww-loop for $intersection in $all-intersections do
+                (setq $beam1 (first $intersection))
+                (setq $beam2 (second $intersection))
+                (setq $int-x (third $intersection))
+                (setq $int-y (fourth $intersection))
+                (setq $t1 (fifth $intersection))
+                (setq $t2 (sixth $intersection))
+                ;; Determine which t-parameter applies to this beam
+                (if (eql ?b $beam1)
+                  (do (setq $t-param $t1)
+                      (setq $blocking-beam $beam2)
+                      (setq $blocking-t $t2))
+                  (if (eql ?b $beam2)
+                    (do (setq $t-param $t2)
+                        (setq $blocking-beam $beam1)
+                        (setq $blocking-t $t1))
+                    (setq $t-param nil)))
+                ;; Validate: blocking beam must reach intersection
+                (if $t-param
+                  (do (setq $blocker-eff-t (gethash $blocking-beam $effective-t))
+                      ;; If blocker's effective endpoint is BEFORE intersection, phantom
+                      (if (< $blocker-eff-t $blocking-t)
+                        (setq $t-param nil))))
+                ;; Update closest intersection if this one is closer
+                (if (and $t-param (< $t-param $closest-t))
+                  (do (setq $closest-t $t-param)
+                      (setq $new-end-x $int-x)
+                      (setq $new-end-y $int-y))))
+          ;; Update beam segment if endpoint changed
+          (if (or (/= $new-end-x $old-end-x) 
+                  (/= $new-end-y $old-end-y))
+            (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
+    nil))  ;must return nil
+
+
+#+ignore (define-update update-beams-if-interference! ()
+  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
+  ;; at their intersection points, eliminating sequential processing dependencies
+  (do
+    ;; Collect all intersections ONCE before processing any beams
+    (setq $all-intersections (collect-all-beam-intersections))
     ;; Phase 1: For each beam, determine its closest intersection point
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
@@ -740,11 +885,29 @@
                 ;; Determine which t-parameter applies to this beam and identify blocking beam
                 (if (eql ?b $beam1)
                   (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2))
+                      (setq $blocking-beam $beam2)
+                      (setq $blocking-t $t2))                                      ; ADDED
                   (if (eql ?b $beam2)
                     (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1))
+                        (setq $blocking-beam $beam1)
+                        (setq $blocking-t $t1))                                    ; ADDED
                     (setq $t-param nil)))
+                ;; Verify blocking beam actually reaches the intersection point   ; ADDED BLOCK START
+                (if $t-param
+                  (do (bind (beam-segment $blocking-beam $b-src $b-tgt $b-end-x $b-end-y))
+                      (mvsetq ($b-src-x $b-src-y $b-src-z) (get-coordinates $b-src))
+                      (mvsetq ($b-tgt-x $b-tgt-y $b-tgt-z) (get-coordinates $b-tgt))
+                      ;; Calculate blocking beam's current t-parameter at its endpoint
+                      (setq $b-dx (- $b-tgt-x $b-src-x))
+                      (setq $b-dy (- $b-tgt-y $b-src-y))
+                      (setq $b-length-sq (+ (* $b-dx $b-dx) (* $b-dy $b-dy)))
+                      (setq $b-curr-dx (- $b-end-x $b-src-x))
+                      (setq $b-curr-dy (- $b-end-y $b-src-y))
+                      (setq $b-dot (+ (* $b-curr-dx $b-dx) (* $b-curr-dy $b-dy)))
+                      (setq $b-current-t (/ $b-dot $b-length-sq))
+                      ;; If blocking beam's endpoint is BEFORE intersection, it's phantom
+                      (if (< $b-current-t $blocking-t)
+                        (setq $t-param nil))))
                 ;; Update closest intersection if this one is closer
                 (if (and $t-param (< $t-param $closest-t))
                   (do (setq $closest-t $t-param)
@@ -786,26 +949,34 @@
 
 
 (define-update deactivate-conflicted-relays! ()
-  ;; Deactivates relays receiving beams from multiple different-colored sources
+  ;; Deactivates relays receiving beams where a different color wins by distance,
+  ;; or where there's a true conflict (equal minimum distances for different colors)
   ;; Returns t if any relay was deactivated, nil otherwise
   (do
+    ;; Compute distance table once for all relays
+    (setq $distances (compute-relay-distances))
     (doall (?r relay)
       (if (bind (color ?r $existing-hue))
-        ;; Relay is active - check for conflicting incoming beams
+        ;; Relay is active - check for conflicts using distance priority
         (do
-          ;; Collect all hues from beams that reach this relay
-          (setq $reaching-hues nil)
+          ;; Collect all (hue . distance) pairs from beams that reach this relay
+          (setq $reaching-pairs nil)
           (doall (?src terminus)
             (if (or (paired ?r ?src) (paired ?src ?r))
               (do
                 (setq $src-hue (get-hue-if-source ?src))
                 (if (and $src-hue
                          (beam-reaches-target ?src ?r))
-                  (push $src-hue $reaching-hues)))))
-          ;; Check for consensus - if multiple different hues, deactivate
-          (setq $consensus-hue (resolve-consensus-hue $reaching-hues))
-          (if (and $reaching-hues              ; At least one beam reaches
-                   (not $consensus-hue))       ; But no consensus (conflicting hues)
+                  ;; Compute distance and collect pair
+                  (do (setq $src-dist (gethash ?src $distances))
+                      (if $src-dist
+                        (push (cons $src-hue (1+ $src-dist)) $reaching-pairs)))))))
+          ;; Resolve using distance priority
+          (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
+          ;; Deactivate if true conflict (nil) or winner differs from current
+          (if (and $reaching-pairs
+                   (or (null $winning-hue)
+                       (not (eql $winning-hue $existing-hue))))
             (do (not (color ?r $existing-hue))
                 (setq $deactivated-any t))))))
     $deactivated-any))
@@ -826,29 +997,34 @@
 
 
 (define-update activate-reachable-relays! ()
-  ;; Returns t if any connector was activated, nil otherwise
-  ;; Now uses consensus logic: connector only activates if ALL reaching beams have same hue
+  ;; Returns t if any relay was activated, nil otherwise
+  ;; Uses distance-aware resolution: shorter path to transmitter wins
   (do
+    ;; Compute distance table once for all relays
+    (setq $distances (compute-relay-distances))
     (doall (?r relay)
       (if (not (bind (color ?r $existing-hue)))
         (do
-          ;; Collect all hues from beams that reach this connector
-          (setq $reaching-hues nil)
+          ;; Collect all (hue . distance) pairs from beams that reach this relay
+          (setq $reaching-pairs nil)
           ;; Check all paired termini that could be sources
           (doall (?src terminus)
             (if (or (paired ?r ?src) (paired ?src ?r))  ; Pairing exists (bidirectional)
               (do
-                ;; Get source hue if it's an active source (transmitter or powered connector)
+                ;; Get source hue if it's an active source (transmitter or powered relay)
                 (setq $src-hue (get-hue-if-source ?src))
-                ;; If source has hue AND beam reaches connector, collect hue
+                ;; If source has hue AND beam reaches relay, collect pair with distance
                 (if (and $src-hue
                          (beam-reaches-target ?src ?r))
-                  (push $src-hue $reaching-hues)))))
-          ;; Check for consensus among all reaching hues
-          (setq $consensus-hue (resolve-consensus-hue $reaching-hues))
-          ;; Only activate if consensus achieved (all hues identical)
-          (if $consensus-hue
-            (do (color ?r $consensus-hue)
+                  ;; Compute distance and collect pair
+                  (do (setq $src-dist (gethash ?src $distances))
+                      (if $src-dist
+                        (push (cons $src-hue (1+ $src-dist)) $reaching-pairs)))))))
+          ;; Resolve using distance priority instead of consensus
+          (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
+          ;; Only activate if there's a clear winner (not a tie)
+          (if $winning-hue
+            (do (color ?r $winning-hue)
                 (setq $activated-any t))))))
     $activated-any))
 
@@ -924,8 +1100,8 @@
 (define-update collapse-cargo-above-box! (?box)
   ;; Collapses all the cargo items above a box by one level
   (if (bind (on $cargo ?box))
-    (do (bind (elevation $cargo $h-cargo))
-        (elevation $cargo (1- $h-cargo))
+    (do (bind (elevation $cargo $e-cargo))
+        (elevation $cargo (1- $e-cargo))
         (if (box $cargo)
           (collapse-cargo-above-box! $cargo)))))
 
@@ -939,118 +1115,125 @@
   (?agent agent)
   (and (bind (holds ?agent $cargo))
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent)))
+       (bind (elevation ?agent $e-agent)))
   (?agent $cargo $place $area)
   (do ;; Box-only: can put box on a buzzer or mine
       (if (box $cargo)
         (doall (?rover (either buzzer mine))
           (if (and (loc ?rover $area)
                    (cleartop ?rover)
-                   (>= $h-agent 1))  ;must be above buzzer/mine
+                   (>= $e-agent 1))  ;must be above buzzer/mine
             (assert (not (holds ?agent $cargo))
                     (loc $cargo $area)
                     (supports ?rover $cargo)
                     (elevation $cargo 1)
-                    (setq $place ?rover)))))
+                    (setq $place ?rover)
+                    (finally (propagate-changes!))))))
       ;; All cargo: can put on a box
       (doall (?box box)
         (if (and (loc ?box $area)
                  (cleartop ?box)
-                 (bind (elevation ?box $h-box))
-                 (setq $h-delta (- $h-box $h-agent))
-                 (< $h-delta 1))  ;within reach +1 up or any level down
+                 (bind (elevation ?box $e-box))
+                 (setq $e-delta (- $e-box $e-agent))
+                 (< $e-delta 1))  ;within reach +1 up or any level down
           (assert (not (holds ?agent $cargo))
                   (loc $cargo $area)
                   (on $cargo ?box)
-                  (elevation $cargo (1+ $h-box))
-                  (setq $place ?box))))
+                  (elevation $cargo (1+ $e-box))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
       ;; All cargo: can put on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
               (elevation $cargo 0)
-              (setq $place 'ground))
-      (finally (propagate-changes!))))
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
 
 
 (define-action connect-to-1-terminus
     1
   (?agent agent ?terminus terminus)
   (and (bind (holds ?agent $cargo))
+       (connector $cargo)
        (same-type ?agent $cargo)
        (different $cargo ?terminus)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent))
-       (placeable $cargo $area)
+       (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?terminus))
   (?agent $cargo ?terminus $area $place)
   (do ;; Can place on a box
       (doall (?box box)
         (if (and (loc ?box $area)
                  (cleartop ?box)
-                 (bind (elevation ?box $h-box))
-                 (< (- $h-box $h-agent) 1))               ; within reach
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; within reach
           (assert (not (holds ?agent $cargo))
                   (loc $cargo $area)
                   (on $cargo ?box)
-                  (elevation $cargo (1+ $h-box))
+                  (elevation $cargo (1+ $e-box))
                   (paired $cargo ?terminus)
-                  (setq $place ?box))))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
               (elevation $cargo 0)
               (paired $cargo ?terminus)
-              (setq $place 'ground))
-      (finally (propagate-changes!))))
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
 
 
 (define-action connect-to-2-terminus
     1
   (?agent agent (combination (?t1 ?t2) terminus))
   (and (bind (holds ?agent $cargo))
+       (connector $cargo)
        (same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent))
-       (placeable $cargo $area)
+       (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2))
-  (?agent $cargo ?t1 ?t2 $area $place)                    ; ADDED $place
+  (?agent $cargo ?t1 ?t2 $area $place)
   (do ;; Can place on a box
       (doall (?box box)
         (if (and (loc ?box $area)
                  (cleartop ?box)
-                 (bind (elevation ?box $h-box))
-                 (< (- $h-box $h-agent) 1))               ; within reach
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; within reach
           (assert (not (holds ?agent $cargo))
                   (loc $cargo $area)
                   (on $cargo ?box)
-                  (elevation $cargo (1+ $h-box))
+                  (elevation $cargo (1+ $e-box))
                   (paired $cargo ?t1)
                   (paired $cargo ?t2)
-                  (setq $place ?box))))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
               (elevation $cargo 0)
               (paired $cargo ?t1)
               (paired $cargo ?t2)
-              (setq $place 'ground))
-      (finally (propagate-changes!))))
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
 
 
 (define-action connect-to-3-terminus
     1
   (?agent agent (combination (?t1 ?t2 ?t3) terminus))
   (and (bind (holds ?agent $cargo))
+       (connector $cargo)
        (same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (different $cargo ?t3)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent))
-       (placeable $cargo $area)
+       (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2)
        (selectable ?agent $area ?t3))
@@ -1059,16 +1242,17 @@
       (doall (?box box)
         (if (and (loc ?box $area)
                  (cleartop ?box)
-                 (bind (elevation ?box $h-box))
-                 (< (- $h-box $h-agent) 1))               ; within reach
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; within reach
           (assert (not (holds ?agent $cargo))
                   (loc $cargo $area)
                   (on $cargo ?box)
-                  (elevation $cargo (1+ $h-box))
+                  (elevation $cargo (1+ $e-box))
                   (paired $cargo ?t1)
                   (paired $cargo ?t2)
                   (paired $cargo ?t3)
-                  (setq $place ?box))))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
@@ -1076,8 +1260,8 @@
               (paired $cargo ?t1)
               (paired $cargo ?t2)
               (paired $cargo ?t3)
-              (setq $place 'ground))
-      (finally (propagate-changes!))))
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
 
 
 (define-action pickup-connector
@@ -1086,18 +1270,18 @@
   (and (same-type ?agent ?connector)
        (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent))
+       (bind (elevation ?agent $e-agent))
        (loc ?connector $area)
-       (bind (elevation ?connector $h-conn))
-       (<= (abs (- $h-conn $h-agent)) 1))                 ; within reach
+       (bind (elevation ?connector $e-conn))
+       (<= (abs (- $e-conn $e-agent)) 1))                 ; within reach
   (?agent ?connector $area)
   (assert (holds ?agent ?connector)
           (not (loc ?connector $area))
-          (not (elevation ?connector $h-conn))
+          (not (elevation ?connector $e-conn))
           (if (bind (on ?connector $box))
             (not (on ?connector $box)))
           (disconnect-connector! ?connector)
-          (propagate-changes!)))
+          (finally (propagate-changes!))))
 
 
 (define-action pickup-box
@@ -1106,15 +1290,15 @@
   (and (same-type ?agent ?box)
        (not (bind (holds ?agent $any-cargo)))
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent))
+       (bind (elevation ?agent $e-agent))
        (loc ?box $area)
        (not (on ?agent ?box))
-       (bind (elevation ?box $h-box))
-       (<= (abs (- $h-box $h-agent)) 1))
+       (bind (elevation ?box $e-box))
+       (<= (abs (- $e-box $e-agent)) 1))
   (?agent ?box $area)
   (assert (holds ?agent ?box)
           (not (loc ?box $area))
-          (not (elevation ?box $h-box))
+          (not (elevation ?box $e-box))
           ;; First update elevations while on relationships still exist
           (collapse-cargo-above-box! ?box)
           ;; Now handle removal of relationships and establishing new ones
@@ -1136,7 +1320,7 @@
                    ;; Box was on ground - just remove on relationship for cargo
                    (if (bind (on $cargo ?box))
                      (not (on $cargo ?box)))))
-          (propagate-changes!)))
+          (finally (propagate-changes!))))
 
 
 (define-action jump-to-place
@@ -1144,26 +1328,27 @@
   1
   (?agent agent)
   (and (bind (loc ?agent $area))
-       (bind (elevation ?agent $h-agent)))
+       (bind (elevation ?agent $e-agent)))
   (?agent $place $area)
   (do ;; Can jump to a reachable box
       (doall (?box box)
         (if (and (cleartop ?box)
                  (loc ?box $area)                         ; agent and box must be in same area
-                 (bind (elevation ?box $h-box))
-                 (< (- $h-box $h-agent) 1))               ; can only reach box at same level or below
+                 (bind (elevation ?box $e-box))
+                 (< (- $e-box $e-agent) 1))               ; can only reach box at same level or below
           (assert (if (bind (on ?agent $old-box))
                     (not (on ?agent $old-box)))
                   (on ?agent ?box)
-                  (elevation ?agent (1+ $h-box))
-                  (setq $place ?box))))
+                  (elevation ?agent (1+ $e-box))
+                  (setq $place ?box)
+                  (finally (propagate-changes!)))))
       ;; Can jump to the ground
-      (if (> $h-agent 0)
+      (if (> $e-agent 0)
         (assert (elevation ?agent 0)
                 (if (bind (on ?agent $box))
                   (not (on ?agent $box)))
-                (setq $place 'ground)))
-      (finally (propagate-changes!))))
+                (setq $place 'ground)
+                (finally (propagate-changes!))))))
 
 
 #+ignore (define-action toggle-plate
@@ -1179,7 +1364,7 @@
             (not (active ?plate))
             (active ?plate))
           (log-if-ghost-toggle! ?agent ?plate)  ;tracks ghost toggling for playback validation
-          (propagate-changes!)))
+          (finally (propagate-changes!))))
 
 
 (define-action move
@@ -1187,13 +1372,13 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       (bind (elevation ?agent $h-agent))
-       (= $h-agent 0)                                     ; must be on ground
+       (bind (elevation ?agent $e-agent))
+       (= $e-agent 0)                                     ; must be on ground
        (accessible ?agent $area1 ?area2)
        (safe ?area2))
   (?agent $area1 ?area2)
   (assert (loc ?agent ?area2)
-          (propagate-changes!)))
+          (finally (propagate-changes!))))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -1213,22 +1398,22 @@
   ;moves-pending-validation ())  ;empty list of recorded blower-path moves
 
   ;; Static spatial configuration
-  (coords area1 13 3 0)
-  (coords area2 13 1 0)
-  (coords area3 10 8 0)
-  (coords area4 5 5 0)
-  (coords area5 10 10 0)
-  ;(coords recorder1 4 20 0)
-  (coords transmitter1 11 0 0)
-  (coords transmitter2 10 0 0)
-  (coords receiver1 8 1 0)
-  (coords receiver2 7 11 0)
-  (coords receiver3 1 11 0)
+  (coords area1 9 1 0)
+  (coords area2 9 8 0)
+  (coords area3 10 9 0)
+  (coords area4 7 8 0)
+  (coords transmitter1 11 0 1)
+  (coords transmitter2 10 0 1)
+  (coords receiver1 8 1 1)
+  (coords receiver2 7 11 1)
+  (coords receiver3 1 11 1)
   (controls receiver1 gate1)
   ;(blows> blower1 area3 area1)
   (gate-segment gate1 8 3 8 7)
-  ;(wall-segment wall1 8 7 8 8)
-  ;(wall-segment wall2 8 0 8 3)
+  (gate-segment gate2 2 11 6 11)
+  (wall-segment wall1 8 10 8 11)  ;internal walls only
+  (wall-segment wall2 8 7 8 8)
+  (wall-segment wall3 8 0 8 3)
   (chroma transmitter1 red)
   (chroma transmitter2 blue)
   (chroma receiver1 red)
@@ -1239,52 +1424,36 @@
   (los0 area1 transmitter1)
   (los0 area1 transmitter2)
   (los0 area1 receiver1)
-  (los0 area1 receiver2)
-  (los1 area1 gate1 receiver3)
   (los0 area2 transmitter1)
   (los0 area2 transmitter2)
   (los0 area2 receiver1)
   (los0 area2 receiver2)
-  (los1 area2 gate1 receiver3)
+  (los0 area2 receiver3)
   (los0 area3 transmitter1)
   (los0 area3 transmitter2)
   (los0 area3 receiver1)
-  (los0 area3 receiver2)
   (los0 area3 receiver3)
   (los1 area4 gate1 transmitter1)
   (los1 area4 gate1 transmitter2)
   (los0 area4 receiver2)
   (los0 area4 receiver3)
-  (los0 area5 transmitter1)
-  (los0 area5 transmitter2)
-  (los0 area5 receiver1)
-  (los0 area5 receiver2)
-  (los0 area5 receiver3)
   
   ;; Visibility relationships (connector area to area)
   (visible0 area1 area2)
   (visible0 area1 area3)
   (visible1 area1 gate1 area4)
-  (visible0 area1 area5)
   (visible0 area2 area3)
-  (visible1 area2 gate1 area4)
-  (visible0 area2 area5)
-  (visible1 area3 gate1 area4)
-  (visible0 area3 area5)
-  (visible0 area4 area5)
+  (visible0 area2 area4)
+  (visible0 area3 area4)
   
 
-  ;; Accessibility (move area to area); chain moves between areas to lower search branching
+  ;; Accessibility (move area to area) ; chain moves between areas to lower search branching
   (accessible0 area1 area2)  
   (accessible0 area1 area3)
   (accessible1 area1 gate1 area4)
-  (accessible0 area1 area5)
   (accessible0 area2 area3)
   (accessible1 area2 gate1 area4)
-  (accessible0 area2 area5)
   (accessible1 area3 gate1 area4)
-  (accessible0 area3 area5)
-  (accessible1 area4 gate1 area5)
 )
 
 
@@ -1295,5 +1464,5 @@
   (and (active receiver2)
        (active receiver3)
        (loc agent1 area4)
-       ;(recording-playback-valid?)  ;if invalid state, return nil, continue searching
+       ;(recording-playback-valid?)  ;if invalid state, return nil, continue searching (only for ghost)
   ))     

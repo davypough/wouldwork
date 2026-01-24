@@ -599,16 +599,7 @@
             ;; State is new or reopened - reserve immediately
             (let ((succ-node (generate-new-node current-node succ-state)))
               (setf (gethash (closed-key succ-state succ-depth) *closed*)
-                    (if *hybrid-mode*
-                        (list (problem-state.idb succ-state)
-                              succ-depth
-                              (problem-state.time succ-state)
-                              (problem-state.value succ-state)
-                              succ-node)
-                        (list (problem-state.idb succ-state)
-                              succ-depth
-                              (problem-state.time succ-state)
-                              (problem-state.value succ-state))))
+                    (make-closed-entry succ-state succ-depth succ-node))
               (collecting succ-node))))
         ;; Tree search path - generate node without closed tracking
         (when (eql *tree-or-graph* 'tree)
@@ -672,37 +663,70 @@
    Returns T if the states are identical or symmetric permutations.
    For non-symmetric mode, uses standard equalp comparison."
   (declare (type hash-table idb1 idb2))
+ (ww-with-timing :symm/canon-equal
   (if (use-canonical-symmetry-p)
       ;; Canonical comparison: build canonical forms and compare
       (let ((canon1 (build-canonical-idb-form idb1))
             (canon2 (build-canonical-idb-form idb2)))
         (equal canon1 canon2))
       ;; Standard comparison
-      (equalp idb1 idb2)))
+      (equalp idb1 idb2))))
 
 
 (defun build-canonical-idb-form (idb)
   "Build a canonical (sorted) representation of IDB for equality comparison.
-   Replaces symmetric object codes with canonical markers and sorts all
-   propositions for deterministic comparison."
+  - Canonical proposition keys become packed integers (when any symmetric mapping occurs),
+  which reduces consing and makes sorting cheaper."
   (declare (type hash-table idb))
-  (let ((canonical-map (build-canonical-mapping idb))
-        (canon-props nil))
-    (maphash (lambda (key val)
-               (let ((canon-key (if (integerp key)
-                                    (canonicalize-proposition-key key canonical-map)
-                                    key))
-                     (canon-val (canonicalize-value val canonical-map)))
-                 (push (cons canon-key canon-val) canon-props)))
-             idb)
-    ;; Sort for deterministic comparison
-    (sort canon-props #'canonical-prop-less-p)))
+  (ww-with-timing :symm/canon-form
+    (let ((decoded-int-keys (make-hash-table :test #'eql)))
+      (maphash (lambda (k v)
+                 (declare (ignore v))
+                 (when (integerp k)
+                   (setf (gethash k decoded-int-keys)
+                         (extract-integer-components k))))
+               idb)
+      (let ((canonical-map (build-canonical-mapping idb decoded-int-keys))
+            (canon-props nil))
+        (maphash (lambda (key val)
+                   (let* ((components (and (integerp key) (gethash key decoded-int-keys)))
+                          (canon-key (if (integerp key)
+                                         (canonicalize-proposition-key key canonical-map components) ;; PH4C
+                                         key))
+                          (canon-val (canonicalize-value val canonical-map)))
+                     (push (cons canon-key canon-val) canon-props)))
+                 idb)
+        (sort canon-props #'canonical-prop-less-p)))))
 
 
 (defun canonical-prop-less-p (prop1 prop2)
-  "Comparison function for sorting canonicalized propositions."
-  (string< (prin1-to-string (car prop1))
-           (prin1-to-string (car prop2))))
+  "Comparison function for sorting canonicalized propositions.
+
+;; PH4C: fast path for integer keys."
+  (let ((k1 (car prop1))
+        (k2 (car prop2)))
+    (cond ((and (integerp k1) (integerp k2)) (< k1 k2))
+          ((integerp k1) t)
+          ((integerp k2) nil)
+          (t (string< (prin1-to-string k1)
+                      (prin1-to-string k2))))))
+
+
+(defun make-closed-entry (state depth &optional node)
+  "Build the value stored in *closed* for STATE at DEPTH.
+   PH3A: adds a CANON-FORM slot (initially NIL) for lazy canonical-form caching."
+  (if *hybrid-mode*
+      (list (problem-state.idb state)
+            depth
+            (problem-state.time state)
+            (problem-state.value state)
+            nil          ; <-- PH3A: cached canonical form goes here
+            node)
+      (list (problem-state.idb state)
+            depth
+            (problem-state.time state)
+            (problem-state.value state)
+            nil)))
 
 
 (defun get-closed-values (state depth)
@@ -711,24 +735,30 @@
    false positives from hash collisions.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
   (let ((closed-values (gethash (closed-key state depth)
-                                (if (> *threads* 0) 
+                                (if (> *threads* 0)
                                     (closed-shard state)
                                     *closed*))))
     (when closed-values
       (if (use-canonical-symmetry-p)
-          ;; Canonical mode: distinguish exact vs symmetric duplicates
           (let ((succ-idb (problem-state.idb state))
                 (closed-idb (first closed-values)))
-            (cond ((equalp closed-idb succ-idb)
-                   ;; Exact duplicate
-                   closed-values)
-                  ((canonical-idb-equal-p closed-idb succ-idb)
-                   ;; Symmetric duplicate - structurally equivalent
-                   (increment-global *symmetric-duplicates-pruned*)
-                   closed-values)
-                  (t
-                   ;; Hash collision - different states
-                   nil)))
+            (cond
+              ((equalp closed-idb succ-idb)
+               ;; Exact duplicate
+               closed-values)
+              (t
+               ;; lazy-cache canonical form for CLOSED entry
+               (let ((closed-canon (fifth closed-values)))
+                 (unless closed-canon
+                   (setf (fifth closed-values)
+                         (build-canonical-idb-form closed-idb))
+                   (setf closed-canon (fifth closed-values)))
+                 (if (equal (build-canonical-idb-form succ-idb) closed-canon)
+                     (progn
+                       (increment-global *symmetric-duplicates-pruned*)
+                       closed-values)
+                     ;; Hash collision - different states
+                     nil)))))
           ;; Standard mode: hash match is sufficient
           closed-values))))
 
@@ -741,7 +771,7 @@
                              (closed-shard state)
                              *closed*))))
     (when values
-      (fifth values))))  ; Node is 5th element in hybrid mode
+      (sixth values))))  ; node moved from 5th -> 6th
 
 
 (defun goal (state)

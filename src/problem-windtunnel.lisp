@@ -1030,3 +1030,27 @@
 (define-goal
   (and (loc agent1 area5)
        (recording-playback-valid?)))  ;if invalid state, return nil, continue searching
+
+
+#|  NOTES:
+Role of recording-playback-valid?
+This query function serves as a deferred constraint validator for Talos Principle ghost-agent mechanics. It enforces a critical rule: the real agent's moves through blower-controlled paths must remain legal when the ghost replays its recorded sequence.
+The Problem It Solves
+In the game mechanics:
+
+The ghost agent (agent1*) records a sequence of actions first
+Those actions are later played back while the real agent (agent1) acts simultaneously
+During recording, the ghost might toggle plates that control blowers
+When playback begins, the environment reflects the final state the ghost left it in
+
+The issue: The real agent may traverse a blower-controlled path (e.g., area2 → area3 via blower1) before the ghost has toggled the plate. At that moment, the blower is off, so the move succeeds. However, if the ghost eventually toggles that plate ON, then during actual playback the blower would be active from the start—making that same move impossible (the agent would be blown back).
+How It Works
+
+During search: Every time the real agent moves through a blower-controlled path, record-move-for-playback-validation! logs it to moves-pending-validation
+Meanwhile: log-if-ghost-toggle! tracks which plates the ghost has toggled (via ghost-toggled-active)
+At goal check: recording-playback-valid? examines all logged moves and verifies that none of them pass through blowers that would be active at playback start (i.e., via playback-blower-active)
+If any recorded real-agent move would be blocked by a ghost-activated blower, the goal returns nil, forcing the planner to continue searching for a valid solution sequence.
+
+In Essence
+It ensures temporal consistency—the solution found during planning must actually be executable when the recording is replayed with both agents acting simultaneously.
+|#

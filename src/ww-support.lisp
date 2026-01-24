@@ -484,3 +484,78 @@
                     (make-list (length value-lists) :initial-element nil))
                 (error "Unknown header label ~A in an instantiated-spec: ~A"
                        header instantiated-spec)))))))))
+
+
+;;; =========================
+;;; WW TIMING (coarse counters)
+;;; =========================
+
+
+(defvar *ww-timing-enabled* nil
+  "When true, ww-with-timing records inclusive CPU time per label.")
+
+
+(defvar *ww-timing-table* (make-hash-table :test #'eq)
+  "Maps label -> #(ticks calls). ticks are GET-INTERNAL-RUN-TIME deltas.")
+
+
+(defun ww-reset-timing ()
+  (clrhash *ww-timing-table*)
+  t)
+
+
+(defun ww--timing-cell (label)
+  (or (gethash label *ww-timing-table*)
+      (setf (gethash label *ww-timing-table*)
+            (vector 0 0))))
+
+(defun ww--timing-add (label ticks)
+  (let ((cell (ww--timing-cell label)))
+    (incf (aref cell 0) ticks)
+    (incf (aref cell 1) 1))
+  nil)
+
+
+(defmacro ww-with-timing (label &body body)  ;disables timing instrumentation
+  (declare (ignore label))
+  `(progn ,@body))
+
+
+#+ignore (defmacro ww-with-timing (label &body body)  ;enables timing instrumentation
+  "Inclusive CPU-time timing for BODY under LABEL."
+  (let ((start (gensym "START")))
+    `(if *ww-timing-enabled*
+         (let ((,start (get-internal-run-time)))
+           (multiple-value-prog1 (progn ,@body)
+             (ww--timing-add ,label (- (get-internal-run-time) ,start))))
+         (progn ,@body))))
+
+
+(defun ww-report-timing (&key (stream *standard-output*) (top 30))
+  "Print timings sorted by total seconds."
+  (let* ((units internal-time-units-per-second)
+         (rows nil)
+         (total-ticks 0))
+    (maphash (lambda (label cell)
+               (let ((ticks (aref cell 0))
+                     (calls (aref cell 1)))
+                 (incf total-ticks ticks)
+                 (push (list label ticks calls) rows)))
+             *ww-timing-table*)
+    (setf rows (sort rows #'> :key #'second))
+    (format stream "~%~%=== WW TIMING (inclusive CPU) ===~%")
+    (format stream "Total timed: ~,3F s~%~%"
+            (/ (float total-ticks) units))
+    (format stream "~16A ~12A ~12A ~12A ~10A~%"
+            "label" "seconds" "calls" "sec/call" "%")
+    (format stream "~A~%" (make-string 68 :initial-element #\-))
+    (loop for (label ticks calls) in rows
+          for i from 1
+          while (<= i top)
+          for sec = (/ (float ticks) units)
+          for spc = (if (plusp calls) (/ sec calls) 0.0)
+          for pct = (if (plusp total-ticks) (* 100.0 (/ ticks total-ticks)) 0.0)
+          do (format stream "~16S ~12,3F ~12D ~12,6F ~9,1F~%"
+                     label sec calls spc pct))
+    (terpri stream)
+    t))
