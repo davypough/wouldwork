@@ -64,7 +64,7 @@
   (active (either plate blower receiver))
   (on (either $agent $cargo) $box :bijective)
   (supports (either $buzzer $mine) $box :bijective)
-  (elevation (either agent cargo) $fixnum)
+  (elevation (either agent cargo) $rational)
   (paired terminus terminus)  ;potential beam between two terminus
   (color relay $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
@@ -75,7 +75,7 @@
 
 
 (define-static-relations
-  (coords (either area fixture) $fixnum $fixnum $fixnum)  ;the (x,y,z) position
+  (coords (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
   (controls (either receiver plate) (either gate blower))
   ;(blows> blower $area $area)
   (chroma (either transmitter receiver) $hue)  ;fixed color
@@ -1431,11 +1431,11 @@
   (coords area2 9 8 0)
   (coords area3 10 9 0)
   (coords area4 7 8 0)
-  (coords transmitter1 11 0 1)
-  (coords transmitter2 10 0 1)
-  (coords receiver1 8 1 1)
-  (coords receiver2 7 11 1)
-  (coords receiver3 1 11 1)
+  (coords transmitter1 11 1/10 1)
+  (coords transmitter2 10 1/10 1)
+  (coords receiver1 81/10 1 1)
+  (coords receiver2 7 109/10 1)
+  (coords receiver3 1 109/10 1)
   (controls receiver1 gate1)
   ;(blows> blower1 area3 area1)
   (wall-segments ((wall1 8 10 8 11) (wall2 8 7 8 8) (wall3 8 0 8 3)))  ;internal walls only needed

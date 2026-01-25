@@ -83,15 +83,15 @@
     (when (listp relation-def)
       (iter (for arg in (cdr proposition))
             (for type-def in relation-def)
-            (for position from 1)  ; <<< CHANGED: Add position tracking
+            (for position from 1)  ; Add position tracking
             (or (?varp arg)  ;arg is a ?var
                 ($varp arg)  ;arg is a $var
                 (member arg (gethash type-def *types*))  ;arg is a value of a user defined type
-                (and (member position (get-prop-fluent-indices proposition))  ; <<< CHANGED: was ($varp type-def)
+                (and (member position (get-prop-fluent-indices proposition))
                      (or (null arg)
                          (member arg (gethash type-def *types*))))
-                (and (member position (get-prop-fluent-indices proposition))  ; <<< CHANGED: was ($varp type-def)
-                     (lisp-type-p type-def)  ; <<< ADDED: Guard against composite types
+                (and (member position (get-prop-fluent-indices proposition))
+                     (lisp-type-p type-def)  ; Guard against composite types
                      (typep arg type-def))
                 (and (lisp-type-p type-def)  ;arg is a value of a Common Lisp type
                      (typep arg type-def))
