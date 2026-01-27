@@ -15,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 8)  ;15)
+(ww-set *depth-cutoff* 6)  ;15)
 
 ;(ww-set *symmetry-pruning* t)
 
@@ -323,65 +323,35 @@
       $winning-hue)))
 
 
-(define-query beam-obstacle-intersection
-    (?source-x ?source-y ?end-x ?end-y ?obs-x1 ?obs-y1 ?obs-x2 ?obs-y2)
-  ;; Determines if a static obstacle (gate, wall, window) intersects the beam segment.
-  ;; Uses strict bounds - no epsilon tolerance since obstacles have no topological
-  ;; relationship with beams. Explicit endpoint exclusion is handled by caller.
-  ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
-  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam direction x
-      (setq $dy1 (- ?end-y ?source-y))      ; Beam direction y
-      (setq $dx2 (- ?obs-x2 ?obs-x1))       ; Obstacle direction x
-      (setq $dy2 (- ?obs-y2 ?obs-y1))       ; Obstacle direction y
-      (setq $dx3 (- ?obs-x1 ?source-x))     ; Displacement x
-      (setq $dy3 (- ?obs-y1 ?source-y))     ; Displacement y
-      ;; Calculate determinant for parallel line detection
-      (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
-      ;; Handle parallel lines case
-      (if (< (abs $det) 1e-10)
-        (values nil nil nil)
-        ;; Solve for intersection parameters using Cramer's rule
-        (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
-            (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
-            ;; Strict bounds: intersection must be in interior of both segments
-            (if (and (> $t 0.0) (< $t 1.0)      ; beam interior
-                     (> $s 0.0) (< $s 1.0))     ; obstacle interior  ; <-- CHANGED: no epsilon
-              ;; Calculate and return intersection coordinates
-              (do (setq $int-x (+ ?source-x (* $t $dx1)))
-                  (setq $int-y (+ ?source-y (* $t $dy1)))
-                  (values $t $int-x $int-y))
-              ;; No valid intersection
-              (values nil nil nil))))))
-
-
-(define-query beam-beam-intersection
+(define-query beam-segment-interference
     (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
-  ;; Determines if two beam segments intersect, with epsilon tolerance to handle
-  ;; shared endpoints (beams from same connector) and chained beams (relay points).
-  ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
-  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam 1 direction x
-      (setq $dy1 (- ?end-y ?source-y))      ; Beam 1 direction y
-      (setq $dx2 (- ?cross-x2 ?cross-x1))   ; Beam 2 direction x
-      (setq $dy2 (- ?cross-y2 ?cross-y1))   ; Beam 2 direction y
-      (setq $dx3 (- ?cross-x1 ?source-x))   ; Displacement x
-      (setq $dy3 (- ?cross-y1 ?source-y))   ; Displacement y
-      ;; Calculate determinant for parallel line detection
+  ; Determines if a cross segment (beam, gate, etc) interferes with the main beam-segment
+  ; Returns the interference endpoint, or nil
+  ; Step 1: Calculate direction vectors and displacement
+  (do (setq $dx1 (- ?end-x ?source-x))    ; Beam direction x
+      (setq $dy1 (- ?end-y ?source-y))    ; Beam direction y
+      (setq $dx2 (- ?cross-x2 ?cross-x1)) ; Obstacle direction x
+      (setq $dy2 (- ?cross-y2 ?cross-y1)) ; Obstacle direction y
+      (setq $dx3 (- ?cross-x1 ?source-x)) ; Displacement x
+      (setq $dy3 (- ?cross-y1 ?source-y)) ; Displacement y
+      ;; Step 2: Calculate determinant for parallel line detection
       (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
-      ;; Handle parallel lines case
+      ;; Step 3: Handle parallel lines case
       (if (< (abs $det) 1e-10)
         (values nil nil nil)
-        ;; Solve for intersection parameters using Cramer's rule
+        ;; Step 4: Solve for intersection parameters using Cramer's rule
         (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
             (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
-            ;; Epsilon bounds: avoid false intersections at shared endpoints
-            (setq $eps 2e-2)
-            (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; beam 1 interior
-                     (> $s $eps) (< $s (- 1.0 $eps)))     ; beam 2 interior
-              ;; Calculate and return intersection coordinates
+            ;; Treat hits within 2% of either endpoint as "at the endpoint" => no interference
+            (setq $eps 2e-2)  ; parameter-space epsilon (2%)
+            ;; Step 5: Validate intersection lies well inside both segments
+            (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; main beam interior only
+                     (> $s $eps) (< $s (- 1.0 $eps)))     ; cross segment interior only
+              ;; Step 6: Calculate and return intersection coordinates
               (do (setq $int-x (+ ?source-x (* $t $dx1)))
                   (setq $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
-              ;; No valid intersection
+              ;; No valid intersection within (epsilon-trimmed) interiors
               (values nil nil nil))))))
 
 
@@ -446,7 +416,7 @@
                    (and (= $x1 ?target-x) (= $y1 ?target-y))
                    (and (= $x2 ?target-x) (= $y2 ?target-y))))
         (do (mvsetq ($int-t $int-x $int-y)
-              (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
+              (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
             (if (and $int-t (< $int-t $closest-t))
               (do (setq $closest-t $int-t)
                   (setq $result-x $int-x)
@@ -466,7 +436,7 @@
                          (and (= $x1 ?target-x) (= $y1 ?target-y))
                          (and (= $x2 ?target-x) (= $y2 ?target-y))))
               (do (mvsetq ($int-t $int-x $int-y)
-                    (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
+                    (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
                   (if (and $int-t (< $int-t $closest-t))
                     (do (setq $closest-t $int-t)
                         (setq $result-x $int-x)
@@ -521,14 +491,14 @@
                 (setq $tgt2-y $end2-y)
                 ;; Check intersection between current segments (not intended paths)
                 (mvsetq ($t1 $int-x $int-y)
-                  (beam-beam-intersection
+                  (beam-segment-interference
                     $src1-x $src1-y $tgt1-x $tgt1-y
                     $src2-x $src2-y $tgt2-x $tgt2-y))
                 (if $t1
                   (do
                     ;; Get t2 parameter by checking beam2 vs beam1
                     (mvsetq ($t2 $int-x2 $int-y2)
-                      (beam-beam-intersection
+                      (beam-segment-interference
                         $src2-x $src2-y $tgt2-x $tgt2-y
                         $src1-x $src1-y $tgt1-x $tgt1-y))
                     ;; Only push if both intersections valid
@@ -1060,7 +1030,6 @@
 (define-update activate-reachable-relays! ()
   ;; Returns t if any relay was activated, nil otherwise
   ;; Uses distance-aware resolution: shorter path to transmitter wins
-  ;; For connectors: enforces single-active-connector-per-area constraint
   (do
     ;; Compute distance table once for all relays
     (setq $distances (compute-relay-distances))
@@ -1085,12 +1054,7 @@
           ;; Resolve using distance priority instead of consensus
           (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
           ;; Only activate if there's a clear winner (not a tie)
-          ;; For connectors: also verify no other active connector in same area
-          (if (and $winning-hue                                          ; <-- CHANGED: added guard
-                   (or (repeater ?r)                                     ; <-- ADDED: repeaters always OK
-                       (and (connector ?r)                               ; <-- ADDED: connectors need check
-                            (bind (loc ?r $relay-area))                  ; <-- ADDED
-                            (connectable ?r $relay-area))))              ; <-- ADDED: use existing query
+          (if $winning-hue
             (do (color ?r $winning-hue)
                 (setq $activated-any t))))))
     $activated-any))
@@ -1207,6 +1171,7 @@
        (different $cargo ?t3)
        (bind (loc ?agent $area))
        (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2)
        (selectable ?agent $area ?t3))
@@ -1247,6 +1212,7 @@
        (different $cargo ?t2)
        (bind (loc ?agent $area))
        (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2))
   (?agent $cargo ?t1 ?t2 $area $place)
@@ -1283,6 +1249,7 @@
        (different $cargo ?terminus)
        (bind (loc ?agent $area))
        (bind (elevation ?agent $e-agent))
+       (connectable $cargo $area)
        (selectable ?agent $area ?terminus))
   (?agent $cargo ?terminus $area $place)
   (do ;; Can place on a box
@@ -1462,10 +1429,10 @@
   ;moves-pending-validation ())  ;empty list of recorded blower-path moves
 
   ;; Static spatial configuration
-(coords AREA1 9 2 0)
-(coords AREA2 10 5 0)
-(coords AREA3 10 8 0)
-(coords AREA4 4 9 0)
+  (coords area1 9 1 0)
+  (coords area2 9 8 0)
+  (coords area3 10 9 0)
+  (coords area4 7 8 0)
   (coords transmitter1 11 1/10 1)
   (coords transmitter2 10 1/10 1)
   (coords receiver1 81/10 1 1)
@@ -1483,41 +1450,39 @@
   (chroma receiver3 blue)
   
   ;; Line-of-sight relationships (connector area to fixture)
-(LOS0 AREA1 TRANSMITTER1)
-(LOS0 AREA1 TRANSMITTER2)
-(LOS0 AREA1 RECEIVER1)
-(LOS1 AREA1 GATE1 RECEIVER2)
-(LOS1 AREA1 GATE1 RECEIVER3)
-(LOS0 AREA2 TRANSMITTER1)
-(LOS0 AREA2 TRANSMITTER2)
-(LOS0 AREA2 RECEIVER1)
-(LOS0 AREA2 RECEIVER2)
-(LOS1 AREA2 GATE1 RECEIVER3)
-(LOS0 AREA3 TRANSMITTER1)
-(LOS0 AREA3 TRANSMITTER2)
-(LOS0 AREA3 RECEIVER1)
-(LOS0 AREA3 RECEIVER2)
-(LOS0 AREA3 RECEIVER3)
-(LOS1 AREA4 GATE1 TRANSMITTER1)
-(LOS1 AREA4 GATE1 TRANSMITTER2)
-(LOS0 AREA4 RECEIVER2)
-(LOS0 AREA4 RECEIVER3)
+  (los0 area1 transmitter1)
+  (los0 area1 transmitter2)
+  (los0 area1 receiver1)
+  (los0 area2 transmitter1)
+  (los0 area2 transmitter2)
+  (los0 area2 receiver1)
+  (los0 area2 receiver2)
+  (los0 area2 receiver3)
+  (los0 area3 transmitter1)
+  (los0 area3 transmitter2)
+  (los0 area3 receiver1)
+  (los0 area3 receiver3)
+  (los1 area4 gate1 transmitter1)
+  (los1 area4 gate1 transmitter2)
+  (los0 area4 receiver2)
+  (los0 area4 receiver3)
   
   ;; Visibility relationships (connector area to area)
-(VISIBLE0 AREA1 AREA2)
-(VISIBLE0 AREA1 AREA3)
-(VISIBLE1 AREA1 GATE1 AREA4)
-(VISIBLE0 AREA2 AREA3)
-(VISIBLE1 AREA2 GATE1 AREA4)
-(VISIBLE0 AREA3 AREA4)
+  (visible0 area1 area2)
+  (visible0 area1 area3)
+  (visible1 area1 gate1 area4)
+  (visible0 area2 area3)
+  (visible0 area2 area4)
+  (visible0 area3 area4)
   
 
   ;; Accessibility (move area to area) ; chain moves between areas to lower search branching
-(ACCESSIBLE0 AREA1 AREA2)
-(ACCESSIBLE0 AREA1 AREA3)
-(ACCESSIBLE1 AREA1 GATE1 AREA4)
-(ACCESSIBLE0 AREA2 AREA3)
-(ACCESSIBLE1 AREA2 GATE1 AREA4)
+  (accessible0 area1 area2)  
+  (accessible0 area1 area3)
+  (accessible1 area1 gate1 area4)
+  (accessible0 area2 area3)
+  (accessible1 area2 gate1 area4)
+  (accessible1 area3 gate1 area4)
 )
 
 
