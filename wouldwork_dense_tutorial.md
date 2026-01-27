@@ -432,7 +432,7 @@ Extend the previous specification by adding block `D`.  Increase `*depth-cutoff*
 
 ## Further Reading
 
-Wouldwork draws heavily on decades of research in artificial intelligence planning.  For a gentle introduction to planning problems and how Wouldwork extends them, see the developer’s Medium article “Traditional AI problem solving with Wouldwork”.  For more examples and optional features, explore the original manual.
+Wouldwork draws heavily on decades of research in artificial intelligence planning.  For a gentle introduction to planning problems and how Wouldwork extends them, see the developer’s Medium article [“Traditional AI problem solving with Wouldwork”](https://medium.com/@davypough/traditional-ai-problem-solving-with-wouldwork-fcb0c4a71226).  For more examples and optional features, explore the original manual.
 
 ---
 
