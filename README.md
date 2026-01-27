@@ -280,15 +280,29 @@ For questions, feedback, or domain-wrangling war stories, contact the author:
 
 Dave Brown — davypough@gmail.com
 
-For questions around the improvements of the user interface or bugs, you can also alternatively poke:
+For questions or suggestions for improvements of the user interface, you can also alternatively poke:
 
 Gwang-Jin Kim - gwang.jin.kim.phd@gmail.com
 
-The best is to search first in the github issues and open an issue - we both will look at it.
-And if you want to collaborate, you are welcome (as long as your suggestions are reasonable :D).
+---
+
+## Contributing & Support
+
+- If you have a question, idea, or bug report: open a **GitHub issue**.
+  Please search first (including closed issues) to avoid duplicates. 
+  Tip: use GitHub search filters like:
+
+```
+is:issue is:closed <your-keywords>
+```
+
+- **Collaborators are welcome**. 
+  Reasonable, well-scoped suggestions and PRs are appreciated — especially 
+  when they come with a small repro, a test, or a concrete example domain.
+
 
 ---
 
 ## License
 
-(See the repository for license details.)
+(See the LICENSE file.)
