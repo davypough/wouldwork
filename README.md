@@ -1,107 +1,294 @@
 # Wouldwork
-CLASSICAL PLANNING WITH THE WOULDWORK PLANNER
+  
+*A classical AI planner in Common Lisp — PDDL-flavored, Lisp-powered, and REPL-friendly.*
 
-The Wouldwork Planner enables users to solve planning and constraint satisfaction problems without extensive programming experience.  It is yet one more in a long line of classical planners.  A brief listing of some other well-known classical planners would include Fast Forward, LPG, MIPS-XXL, SATPLAN, SGPLAN, Metric-FF Planner, Optop, SHOP3 and PDDL4j.  All of these planners are major developments by small research teams to investigate the performance of a wide variety of planning algorithms.  But each has its own limitations in its ability to specify and deal with certain kinds of problems.  In contrast, the Wouldwork Planner was developed by one individual, not to investigate different planning algorithms, but to extend the baseline capabilities for handling a wider variety of classical problems.  It focuses on the problem templates and program interfaces that allow a user to flexibly and conveniently specify a problem of modest size, and perform an efficient search for a solution.  The core planning algorithm itself performs a simple depth-first search through state-space, optimized for efficiently examining thousands or, in a few cases, millions of states per second.  The program attempts to combine many of the interface capabilities of the other planners into one package.  Some of the basic features of the user interface include:
+Wouldwork is a **classical planning / search** system: you describe a world (objects, relations, actions, constraints, goals…), and it searches for **plans** that reach your goal. It’s “old-school AI” in the best way — but with a modern, developer-friendly workflow: **stage → solve → tweak → refresh**.
 
--General conformance with the expressive capabilities of the PDDL language, plus extensions, for problem specification
+If you like planners, constraint-y domains, debugging search, or just want to feel the joy of a Lisp REPL doing AI… you’re home.
 
--Arbitrary object type hierarchies
+---
 
--Mixing of object types to allow efficient selection of objects during search
+## What you get
 
--Action rules with preconditions and effects, based on predicate logic
+Wouldwork supports a bunch of “classic planner” features, but with a **Lisp-native** problem language:
 
--Full nested predicate logic expressiveness in action rules with quantifiers and equality
+- **Objects, types, relations** (dynamic + static)
+- **Actions** with preconditions/effects
+- **Goals**, **constraints**, and **derived relations**
+- **Functions** (including on-the-fly and even recursive computations)
+- **Exogenous events** (things that happen independently of the agent)
+- **Temporal planning** (action schedules / timestamps)
+- **Search control**: depth cutoffs, tree vs graph search, randomization, branching
+- **Solution modes**: first solution, shortest plan, min-time, min/max objective, enumerate all, …
+- **Optional parallel search** (SBCL is the sweet spot)
+- **Diagnostics & debugging hooks** (including step-through search)
 
--Specification of initial conditions
+For a gentle narrative intro, see the Medium article:
+https://medium.com/@davypough/traditional-ai-problem-solving-with-wouldwork-fcb0c4a71226
 
--Goal specification
+---
 
--Fluents (ie, continuous variables, in addition to discrete variables)
+## Installation (pick your flavor)
 
--Durative actions taking time to complete
+Wouldwork is available via **Quicklisp**, **Ultralisp**, and **GitHub / Roswell**.
 
--Exogenous events (ie, happenings occurring independently of the planning agent’s actions)
+### Option A — Quicklisp (simplest)
+```lisp
+(ql:quickload :wouldwork)
+(in-package :ww)
+(test)           ; sanity check
+(help)           ; see available commands
+```
 
--Temporal plan generation (ie, action schedules)
+### Option B — Ultralisp
+```lisp
+(ql-dist:install-dist "http://dist.ultralisp.org/" :prompt nil)
+(ql:quickload :wouldwork)
+(in-package :ww)
+(test)           ; sanity check
+(help)           ; see available commands
+```
 
--Global constraint specification, independent of action preconditions
+### Option C — GitHub via Roswell (nice if you don’t already have SBCL/Quicklisp)
 
--Derived relations for simplifying action preconditions
+Install Roswell (examples):
+```bash
+# macOS
+brew install roswell
 
--Function specification for on-the-fly, possibly recursive, computations
+# Debian/Ubuntu
+sudo apt update && sudo apt install libcurl4-openssl-dev automake
+# (or use your distro’s roswell package)
+```
 
--Inclusion of arbitrary Lisp code in action rules, derived relations, constraints, and functions
+Install SBCL + Quicklisp:
+```bash
+ros install sbcl
+ros install quicklisp
+```
 
--User control over search depth
+(Optional but recommended: nicer REPL history/editing)
+```bash
+# macOS
+brew install rlwrap
 
--Generation of shortest plan found, plus other possible plans
+# Debian/Ubuntu
+sudo apt install rlwrap
+```
 
--Optional parallel processing to speed up search
+Install Wouldwork from GitHub:
+```bash
+ros install davypough/wouldwork
+```
 
--Output diagnostics describing details of the search
+Run SBCL and load Wouldwork:
+```bash
+rlwrap ros run
+```
 
-For an example of a simple planning problem, see my medium.com article at:
-https://medium.com/@davypough/traditional-ai-problem-solving-with-wouldwork-fcb0c4a71226 
+Inside SBCL:
+```lisp
+(ql:quickload :wouldwork)
+(in-package :ww)
+(test)           ; sanity checks
+(help)           ; see available commands
+```
 
-For additional program details, please see the Wouldwork User Manual,
-or email Dave Brown at davypough@gmail.com
+---
 
+## Ultra-Quickstart (the “coffee break” version)
 
-# Quickstart Setup:
-1)	Install the SBCL Common Lisp release for your computer from http://www.sbcl.org/platform-table.html
-2)	Install Quicklisp from https://www.quicklisp.org/beta/ 
-3)	Clone or download the Wouldwork repository to your computer from https://github.com/davypough/quick-wouldwork placing it in your ~/quicklisp/local-projects/ directory (the path to the project files should then be ~/quicklisp/local-projects/quick-wouldwork/)
-4)	Start SBCL from your terminal command prompt.
-5)	At the SBCL prompt, enter (ql:quickload :wouldwork :force t)
-6)	Enter (in-package :ww) to switch the current package from cl-user to wouldwork.
-7)	Enter (test) to verify everything is loaded and running properly.
-8)	Review the printout from any of the test problems to see the format of solutions.
-9)	Look at the sample problem specifications (eg, problem-blocks3.lisp) in the src directory to become acquainted with how problems are defined.
+Start SBCL, then:
 
-# Additional Information
+```lisp
+(ql:quickload :wouldwork)
+(in-package :ww)
 
-1. INSTALLING WOULDWORK TO A CUSTOM DIRECTORY
+(help)     ; shows the REPL command menu
+(test)     ; runs a bunch of example problems
 
-After cloning or downloading the quick-wouldwork repo to your chosen local directory,
-make sure Quicklisp is installed. Then tell Quicklisp where your directory is with
-`(push #p"/path/to/your/directory/quick-wouldwork/" ql:*local-project-directories*)`
-and `(ql:register-local-projects)`. You should be able to load Wouldwork with
-`(progn (ql:quickload :wouldwork :force t) (in-package :ww))`. 
+(run "blocks3")   ; stage + solve a sample domain
+```
 
-2. ACCESS MORE HELP
+That’s it. You’ll see a plan printed, plus search diagnostics depending on your settings.
 
-After loading Wouldwork with `(ql:quickload "wouldwork" :force t)` and `(in-package :ww)`,
-you can get more help with REPL commands by entering `(help)` at the REPL prompt.
+---
 
-3. PORTABILITY
+## The Wouldwork REPL workflow
 
-For efficiency purposes, Wouldwork was originally designed to take advantage of some non-standard features in SBCL.
-However, it has since been extended with generic libraries to also run on CCL, although not with parallel multi-threading.
-As a result, expect significantly slower performance with CCL for large problems.
+Wouldwork is designed for iterative development: write a problem file, run it, tweak it, re-run it.
 
-4. WORKFLOW
+### Core commands
 
-When you are working on a problem (composing, testing, debugging, etc),
-Wouldwork remembers the last state when your common lisp session is closed.
-This allows you to pick up from where you left off in a previous session
-without having to remember the settings of all the search parameters.
-To cancel the current parameters and start working on a new problem,
-enter `(stage <new-problem-name>)` to load the new problem into Wouldwork.
-Staging assumes that you have created the new `problem-<new-problem-name>.lisp` file
-in the src directory, or that it already exists.
-After correcting any compile errors or warnings during staging, and changing any parameters,
-enter (solve) to direct Wouldwork to solve the currently staged problem.
-If there are run-time errors, fix the `problem-<new-problem-name>.lisp` file,
-or include diagnostic checkpoints such as `(ut::prt <S-expression>)` in the file,
-and then do (refresh) to tell Wouldwork to recompile the changes.
-You can also enter `(ww-set *debug* 5)` at the REPL to step through the search one expansion node at a time.
+```lisp
+(stage <problem-name>)   ; load a problem spec (compile + prepare), don't solve yet
+(solve)                  ; solve the currently staged problem
+(refresh)                ; recompile/reload the current problem after edits
+(run <problem-name>)     ; stage + solve in one go
+```
 
-5. TROUBLESHOOTING
+Useful helpers:
 
-Wouldwork runs best in a terminal window, where you can allocate a lot of memory
-if needed for long runs--eg, >sbcl --dynamic-space-size 10000. If you get into a
-configuration that won't compile or load correctly, try (reset) to reinitialize everything.
-If you modify the Wouldwork program itself, occasionally ASDF will not automatically
-recompile everything that the modification depends on. If this occurs, simply exit SBCL
-and reload. See the User Manual for additional troubleshooting tips.
+```lisp
+(list-all-problems)      ; (probs) in the REPL help text
+(display-current-parameters)  ; (params) in the REPL help text
+(test)                   ; solve the included test problems
+```
+
+If anything gets into a weird state:
+
+```lisp
+(ww-reset)               ; reinitialize Wouldwork after an error (and continue)
+```
+
+### Settings you’ll actually touch
+
+Wouldwork settings are “earmuffed” globals, and you change them with `ww-set`:
+
+```lisp
+(ww-set *solution-type* 'first)       ; default
+(ww-set *solution-type* 'min-length)
+(ww-set *solution-type* 'min-time)
+(ww-set *solution-type* 'min-value)
+(ww-set *solution-type* 'max-value)
+(ww-set *solution-type* 'every)
+
+(ww-set *tree-or-graph* 'graph)       ; or 'tree
+(ww-set *depth-cutoff* 0)             ; 0 = no limit (go as deep as needed)
+(ww-set *progress-reporting-interval* 100000)
+
+(ww-set *randomize-search* t)         ; random DFS
+(ww-set *branch* -1)                  ; -1 = all branches
+```
+
+Debugging knobs:
+
+```lisp
+(ww-set *debug* 5)    ; step through search one expansion at a time
+;; *debug* = 0..4 gives increasing levels of debug output
+```
+
+> Practical tip: set most domain-specific parameters in your problem file,  
+> then use `ww-set` at the REPL while experimenting. It’s a nice rhythm.
+
+---
+
+## “Wait… it remembers my last session?” (Yes.)
+
+Wouldwork keeps your working context in a small file (`vals.lisp`) inside the system directory.  
+That means when you restart your Lisp image, it can restore:
+
+- the last problem you staged
+- your parameter choices (algorithm, search settings, debug level, …)
+
+This is deliberate: planning is exploratory, and retyping 12 parameters every session is pain.
+
+There’s also a small but important design choice: when you call `refresh`, Wouldwork avoids clobbering the values you just set at the REPL (so your live tuning stays live).  
+
+If you ever want to wipe state clean and go back to defaults, use the reset command from the REPL.
+
+---
+
+## Solution types (how the planner “aims”)
+
+Wouldwork can search for different notions of “best,” depending on what you’re doing:
+
+- `first` — find the first goal-satisfying plan encountered (fastest feedback)
+- `min-length` — shortest number of actions
+- `min-time` — least total time (when actions have durations)
+- `min-value` / `max-value` — optimize an objective function (even without a goal)
+- `every` — enumerate solutions (careful: state spaces explode)
+
+Worth knowing:
+
+- Tree search vs graph search matters a lot for `every`.
+- With graph search, repeated states are pruned (so alternative paths to the *same* state may be skipped).
+- There’s a **hybrid mode** when `every` + graph search + a positive depth cutoff are combined, to enumerate distinct action sequences up to that bound while staying memory-conscious.
+
+After a run:
+
+- `*solutions*` contains all found solution paths.
+- `*unique-solutions*` contains one solution path per unique goal state.
+
+---
+
+## Debugging: invariants + “troubleshoot mode” (surprisingly nice)
+
+When you’re writing action rules, the hardest part is usually not “search” — it’s *domain consistency*.
+
+Wouldwork gives you a very practical tool for that: **invariants**, both local (inside updates) and global (checked across generated states). When an invariant fails, Wouldwork can drop you into a troubleshooting environment that helps you see what happened and why.
+
+The user manual has several good examples (including invariant checks like “this list must be a set” and “cargo cannot be both held and located”).
+
+During development you can also sprinkle in diagnostics:
+```lisp
+(ut::prt some-expression other-expression)
+```
+
+…and later remove them once the domain is stable.
+
+---
+
+## A small taste of “Lisp-powered PDDL”
+
+Wouldwork’s problem files are **PDDL-inspired**, but they’re not trying to be PDDL.  
+The point is: you get a familiar planning structure *plus* the ability to use Lisp where it helps.
+
+Example (high-level sketch):
+
+- `define-types` — objects and types
+- `define-dynamic-relations` / `define-static-relations`
+- `define-actions` — actions with preconditions/effects
+- `define-invariant` — global safety conditions
+- `define-query` / functions — computed relations / heuristics / bounds
+
+And yes: you can include **arbitrary Common Lisp** where it makes the domain clearer or faster.
+
+---
+
+## Performance notes (SBCL recommended)
+
+Wouldwork was originally designed to take advantage of SBCL performance features and can optionally use parallelism there. It also runs on CCL via more generic libraries, but expect large problems to be noticeably slower.
+
+If you run into memory limits for bigger searches, give SBCL more heap:
+
+```bash
+sbcl --dynamic-space-size 10000
+```
+
+(Scale as needed: 2048, 4096, 8192, 24000, … depending on your machine.)
+
+---
+
+## Documentation
+
+- **User Manual**: `Wouldwork User Manual(26.7).docx` (in this repo)
+- **Parameter loading notes** (for the curious): `parameter loading sequence.txt`
+- **Medium intro**: https://medium.com/@davypough/traditional-ai-problem-solving-with-wouldwork-fcb0c4a71226
+
+---
+
+## Want a fun example?
+
+If you like “plans as timelines” and multi-agent-ish traces, check out the recorder / windtunnel artifacts in this repo (there’s a full integrated sequence table showing how a solution can be post-processed into recording/playback phases).
+
+---
+
+## Contact
+
+For questions, feedback, or domain-wrangling war stories, contact the author:
+
+Dave Brown — davypough@gmail.com
+
+For questions around the improvements of the user interface or bugs, you can also alternatively poke:
+
+Gwang-Jin Kim - gwang.jin.kim.phd@gmail.com
+
+The best is to search first in the github issues and open an issue - we both will look at it.
+And if you want to collaborate, you are welcome (as long as your suggestions are reasonable :D).
+
+---
+
+## License
+
+(See the repository for license details.)
