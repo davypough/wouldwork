@@ -101,6 +101,7 @@
                              (:file "ww-action-trace")
                              (:file "ww-goal-chaining")
                              (:file "ww-solution-validation")
+                             (:file "ww-backwards")
 		                     (:file "ww-planner")
                              (:file "ww-symmetry")
 		                     (:file "ww-searcher")

@@ -1,25 +1,24 @@
-;;; Filename: problem-corner.lisp
+;;; Filename: problem-corner-macro.lisp
 
-;;; Talos Principle problem 'Around the Corner' in Purgatory workshop.
+;;; Talos Principle problem 'Around the Corner' in Purgatory workshop 3.
 ;;; Represents coords as 3D, but uses only 2D for beam calculations.
+;;; Uses macro actions
 
 
 (in-package :ww)
 
 
-(ww-set *problem-name* corner)
+(ww-set *problem-name* corner-macro)
 
 (ww-set *problem-type* planning)
 
 (ww-set *solution-type* min-length)
 
-(ww-set *tree-or-graph* graph)
+(ww-set *tree-or-graph* tree)  ;graph)
 
-(ww-set *depth-cutoff* 6)  ;15)
+(ww-set *depth-cutoff* 10)
 
-;(ww-set *symmetry-pruning* t)
-
-(ww-set *progress-reporting-interval* 500000)
+(ww-set *progress-reporting-interval* 1000000)
 
 
 (define-types
@@ -27,7 +26,7 @@
   ghost-agent     ()  ;ghost objects are starred--eg, agent1*
   agent           (either real-agent ghost-agent)
   gate            (gate1 gate2)
-  wall            (wall1 wall2 wall3)  ;internal possible occluding walls
+  wall            (wall1 wall2)  ;internal possible occluding walls
   window          (window1)
   real-connector  (connector1 connector2 connector3)
   ghost-connector ()
@@ -70,20 +69,16 @@
   (color relay $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
-  (ghost-toggled-active plate)  ;used to track ghost plate activations during playback to catch illegal moves
-  ;(moves-pending-validation $list)
 )
 
 
 (define-static-relations
   (coords (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
   (controls (either receiver plate) (either gate blower))
-  ;(blows> blower $area $area)
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
   (gate-segments $list)    ; ((gate1 x1 y1 x2 y2) ...)
   (window-segments $list)
-  ;(toggles plate (either gate blower))
   ;potential clear los from an area to a focus
   (los0 area focus)  
   (los1 area (either $gate $area) focus)  ;los can be blocked either by a closed $gate or object in $area
@@ -99,44 +94,184 @@
 )
 
 
-#+ignore (define-patroller buzzer1
-  path (area1 area2 area3 area4 area5)
-  mode :reverse
-  rebound (exists (?c cargo)  ;buzzer just pushes agent aside in an area and continues on (no rebound or kill)
-            (and (bind (loc buzzer1 $area))
-                 (loc ?c $area)))
-  aftereffect (if (and (bind (supports buzzer1 $box))
-                       (bind (loc buzzer1 $buzzer-area)))
-                (assert (relocate-stacked-object! $box $buzzer-area)))
-)
+;;;; HEURISTIC FUNCTIONS ;;;;
 
 
-;;;; QUERY FUNCTIONS ;;;;
+;;; The heuristic? function for this problem estimates the remaining "cost"
+;;; to reach the goal from the current state. It combines multiple component
+;;; heuristics using weighted summation, where higher weights indicate more
+;;; important factors.
+;;;
+;;; Component Design Principles:
+;;;   - Each component returns a non-negative integer
+;;;   - Return 0 when the condition is satisfied (no penalty)
+;;;   - Return positive values proportional to "distance" from satisfaction
+;;;   - Weights encode relative importance and help break ties
+;;;
+;;; For this problem, the goal is:
+;;;   (and (active receiver2) (active receiver3) (loc agent1 area4))
+;;; Note that using heuristic guidance for this problem is counterproductive
+;;;   since progress must often be undone
 
 
 #+ignore (define-query heuristic? ()
-  ;; Estimates minimum actions to reach goal (agent1 in area5)
+   ;Combines weighted heuristic components to estimate cost to goal.
+   ;Components ordered by priority:
+   ;  h-color-path-deficit (200): Missing ACTIVE transmitter→receiver paths
+   ;  h-unpowered-placed-connectors (100): Placed but inactive connectors
+   ;  h-color-mismatch (80): Powered connectors with wrong color for targets
+   ;  h-goal-receivers-inactive (50): Goal receivers still needing activation  
+   ;  h-gate1-blocks-goal (30): Gate1 must open for agent to reach area4
+   ;  h-useless-pairings (20): Receiver-only pairings (can never activate)
+   ;  h-agent-goal-distance (10): Agent must end in area4
+   ;Returns: Non-negative integer estimate of remaining cost"
+  (do (combine-heuristics            ;combine-heuristics function in ww-support.lisp
+        state
+        '((200  . h-color-path-deficit)
+          (100  . h-unpowered-placed-connectors)
+          (80   . h-color-mismatch)
+          (50   . h-goal-receivers-inactive)
+          (30   . h-gate1-blocks-goal)
+          (20   . h-useless-pairings)
+          (10   . h-agent-goal-distance))
+        :combiner :weighted-sum)))
+
+
+#+ignore (define-query h-color-path-deficit ()
+  ;; Counts receivers that need power but have no viable ACTIVE path from transmitter.
+  ;; A viable path requires actual beam connectivity, not just structural potential.
+  ;; Returns: 0-3 (deficit count)
+  (do (setq $deficit 0)
+      ;; receiver1 (red) - needed to open gate1
+      (if (and (not (active receiver1))
+               (not (active-path-to-receiver-p transmitter1 receiver1 red)))
+        (incf $deficit))
+      ;; receiver2 (red) - goal
+      (if (and (not (active receiver2))
+               (not (active-path-to-receiver-p transmitter1 receiver2 red)))
+        (incf $deficit))
+      ;; receiver3 (blue) - goal  
+      (if (and (not (active receiver3))
+               (not (active-path-to-receiver-p transmitter2 receiver3 blue)))
+        (incf $deficit))
+      $deficit))
+
+
+#+ignore (define-query active-path-to-receiver-p (?transmitter ?receiver ?hue)
+  ;; Returns t only if an ACTUALLY POWERED connector provides a path to receiver
+  ;; AND that path originates from the specified transmitter.
+  ;; Requires connector to have correct color (be actually receiving power).
+  ;; This is stricter than checking structural potential.
+  (or
+    ;; 1-hop: connector MUST be powered with correct color, paired with BOTH transmitter and receiver
+    (exists (?c connector)
+      (and (bind (loc ?c $c-area))
+           (bind (color ?c $c-hue))           ; MUST be powered
+           (eql $c-hue ?hue)                   ; with correct color
+           (paired ?c ?transmitter)            ; paired with the specific transmitter
+           (paired ?c ?receiver)
+           (los agent1 $c-area ?receiver)))
+    ;; 2-hop: c1 paired with transmitter and powered, c2 powered and paired with receiver
+    (exists (?c1 connector)
+      (and (bind (loc ?c1 $c1-area))
+           (bind (color ?c1 $c1-hue))          ; c1 MUST be powered
+           (eql $c1-hue ?hue)                   ; with correct color
+           (paired ?c1 ?transmitter)            ; c1 paired with the specific transmitter
+           (exists (?c2 connector)
+             (and (different ?c1 ?c2)
+                  (bind (loc ?c2 $c2-area))
+                  (bind (color ?c2 $c2-hue))    ; c2 MUST be powered
+                  (eql $c2-hue ?hue)             ; with correct color
+                  (or (paired ?c1 ?c2) (paired ?c2 ?c1))
+                  (paired ?c2 ?receiver)
+                  (visible agent1 $c1-area $c2-area)
+                  (los agent1 $c2-area ?receiver)))))))
+
+
+#+ignore (define-query h-unpowered-placed-connectors ()
+  ;; Counts placed connectors that are not powered (no color).
+  ;; A placed connector without power represents wasted work - it's not
+  ;; contributing to any beam network yet.
+  ;; Returns: 0-3 (count of unpowered placed connectors)
+  (do (setq $count 0)
+      (doall (?c connector)
+        (if (and (bind (loc ?c $area))           ; connector is placed
+                 (not (bind (color ?c $hue))))   ; but not powered
+          (incf $count)))
+      $count))
+
+
+#+ignore (define-query h-color-mismatch ()
+  ;; Counts powered connectors paired with receivers of WRONG color.
+  ;; Example: connector has color=blue but paired with receiver2 (red).
+  ;; This is actively harmful - the connector is working but can never help.
+  ;; Returns: count of mismatched pairings
+  (do (setq $count 0)
+      (doall (?c connector)
+        (if (bind (color ?c $c-hue))  ; connector is powered
+          (doall (?r receiver)
+            (if (and (paired ?c ?r)
+                     (bind (chroma ?r $r-hue))
+                     (not (eql $c-hue $r-hue)))  ; colors don't match
+              (incf $count)))))
+      $count))
+
+
+#+ignore (define-query h-goal-receivers-inactive ()
+  ;Counts how many goal receivers still need activation.
+  ;The goal requires both receiver2 and receiver3 to be active.
+  ; Each inactive receiver contributes 1 to the heuristic.
+  ; This is the most direct measure of goal distance since activating
+  ; receivers is the primary objective.
+  ; Returns: 0 (both active) to 2 (neither active)
+  (do (setq $n 0)
+      (if (not (active receiver2)) (incf $n))
+      (if (not (active receiver3)) (incf $n))
+      $n))
+
+
+#+ignore (define-query h-gate1-blocks-goal ()
+  ;Penalty for gate1 being closed.
+  ;Gate1 separates areas 1-3 from area4. Since the goal requires
+  ;the agent to be in area4, gate1 must eventually open.
+  ;Gate1 is controlled by receiver1, which requires a red beam.
+  ;Returns: 0 (gate open) or 1 (gate closed)
+  (if (open gate1) 0 1))
+
+
+#+ignore (define-query h-agent-goal-distance ()
+  ;Penalty for agent not being in the goal area.
+  ;The goal requires (loc agent1 area4). This component provides
+  ;a small incentive to move toward area4 once other conditions
+  ;allow it.
+  ;Lower weight than gate1-closed because reaching area4 is only
+  ;possible after gate1 opens.
+  ;Returns: 0 (in area4) or 1 (elsewhere)
   (do (bind (loc agent1 $area))
-      ;; Base distance considering topology
-      (setq $base-distance
-        (cond ((eql $area 'area5) 0)    ; At goal
-              ((eql $area 'area4) 1)    ; One move (through gate2)
-              ((eql $area 'area3) 2)    ; area3 -> area4 -> area5
-              ;; From area1/area2: can reach area4 directly if blower off
-              ((or (eql $area 'area1) (eql $area 'area2)) 2)
-              (t 10)))                   ; Should not occur
-      ;; Penalties for obstacles on path to goal
-      (setq $penalty 0)
-      ;; blower blocks area1/area2 -> area3/area4 passage
-      (if (and (or (eql $area 'area1) (eql $area 'area2))
-               (active blower1))
-        (setq $penalty (+ $penalty 1)))  ; Need to toggle plate1
-      ;; Gate2 blocks area4 -> area5 passage
-      (if (and (not (eql $area 'area5))
-               (not (open gate2)))
-        (setq $penalty (+ $penalty 1)))  ; Need to activate receiver1
-      ;; Return total heuristic value
-      (+ $base-distance $penalty)))
+      (if (eql $area 'area4) 0 1)))
+
+
+#+ignore (define-query h-useless-pairings ()  ;remove because pairings can always become useful
+  ;; Penalizes placed connectors with pairings that cannot carry beams.
+  ;; A pairing is useless if it connects two receivers (neither emits).
+  ;; Returns: count of useless pairings
+  (do (setq $useless 0)
+      (doall (?c connector)
+        (if (bind (loc ?c $area))  ; only placed connectors
+          (doall (?t1 terminus)
+            (if (paired ?c ?t1)
+              (doall (?t2 terminus)
+                (if (and (different ?t1 ?t2)
+                         (paired ?c ?t2)
+                         (receiver ?t1)
+                         (receiver ?t2))
+                  ;; Both paired targets are receivers - useless
+                  (incf $useless)))))))
+      ;; Divide by 2 since we count each pair twice
+      (floor $useless 2)))
+
+
+;;;; SEARCH QUERIES ;;;;
 
 
 (define-query cleartop (?support)
@@ -265,11 +400,12 @@
         (and (accessible1 ?area1 ?g ?area2)
              (or (ghost-agent ?agent)
                  (open ?g))))
-      (exists (?b blower)
-        (and (accessible1 ?area1 ?b ?area2)
-             (or (not (active ?b))                                 ;; blower off: anyone can pass
-                 (and (ghost-agent ?agent)                         ;; blower on + ghost:
-                      (not (blower-activated-by-ghost ?b))))))))  ;;   only if ghost didn't cause it
+      ;(exists (?b blower)
+      ;  (and (accessible1 ?area1 ?b ?area2)
+      ;       (or (not (active ?b))                              ;blower off: anyone can pass
+      ;           (and (ghost-agent ?agent)                      ;blower on + ghost:
+      ;                (not (blower-activated-by-ghost ?b))))))  ;only if ghost didn't cause it
+))
 
 
 (define-query connectable (?connector ?area)
@@ -323,35 +459,121 @@
       $winning-hue)))
 
 
-(define-query beam-segment-interference
-    (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
-  ; Determines if a cross segment (beam, gate, etc) interferes with the main beam-segment
-  ; Returns the interference endpoint, or nil
-  ; Step 1: Calculate direction vectors and displacement
-  (do (setq $dx1 (- ?end-x ?source-x))    ; Beam direction x
-      (setq $dy1 (- ?end-y ?source-y))    ; Beam direction y
-      (setq $dx2 (- ?cross-x2 ?cross-x1)) ; Obstacle direction x
-      (setq $dy2 (- ?cross-y2 ?cross-y1)) ; Obstacle direction y
-      (setq $dx3 (- ?cross-x1 ?source-x)) ; Displacement x
-      (setq $dy3 (- ?cross-y1 ?source-y)) ; Displacement y
-      ;; Step 2: Calculate determinant for parallel line detection
+(define-query beam-obstacle-intersection
+    (?source-x ?source-y ?end-x ?end-y ?obs-x1 ?obs-y1 ?obs-x2 ?obs-y2)
+  ;; Determines if a static obstacle (gate, wall, window) intersects the beam segment.
+  ;; Uses strict bounds - no epsilon tolerance since obstacles have no topological
+  ;; relationship with beams. Explicit endpoint exclusion is handled by caller.
+  ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
+  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam direction x
+      (setq $dy1 (- ?end-y ?source-y))      ; Beam direction y
+      (setq $dx2 (- ?obs-x2 ?obs-x1))       ; Obstacle direction x
+      (setq $dy2 (- ?obs-y2 ?obs-y1))       ; Obstacle direction y
+      (setq $dx3 (- ?obs-x1 ?source-x))     ; Displacement x
+      (setq $dy3 (- ?obs-y1 ?source-y))     ; Displacement y
+      ;; Calculate determinant for parallel line detection
       (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
-      ;; Step 3: Handle parallel lines case
+      ;; Handle parallel lines case
       (if (< (abs $det) 1e-10)
         (values nil nil nil)
-        ;; Step 4: Solve for intersection parameters using Cramer's rule
+        ;; Solve for intersection parameters using Cramer's rule
         (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
             (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
-            ;; Treat hits within 2% of either endpoint as "at the endpoint" => no interference
-            (setq $eps 2e-2)  ; parameter-space epsilon (2%)
-            ;; Step 5: Validate intersection lies well inside both segments
-            (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; main beam interior only
-                     (> $s $eps) (< $s (- 1.0 $eps)))     ; cross segment interior only
-              ;; Step 6: Calculate and return intersection coordinates
+            ;; Strict bounds: intersection must be in interior of both segments
+            (if (and (> $t 0.0) (< $t 1.0)      ; beam interior
+                     (> $s 0.0) (< $s 1.0))     ; obstacle interior  ; <-- CHANGED: no epsilon
+              ;; Calculate and return intersection coordinates
               (do (setq $int-x (+ ?source-x (* $t $dx1)))
                   (setq $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
-              ;; No valid intersection within (epsilon-trimmed) interiors
+              ;; No valid intersection
+              (values nil nil nil))))))
+
+
+(define-query beam-beam-intersection
+    (?source-x ?source-y ?end-x ?end-y ?cross-x1 ?cross-y1 ?cross-x2 ?cross-y2)
+  ;; Determines if two beam segments intersect, with epsilon tolerance to handle
+  ;; shared endpoints (beams from same connector) and chained beams (relay points).
+  ;; Also handles collinear beams traveling toward each other (head-on collision).
+  ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
+  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam 1 direction x
+      (setq $dy1 (- ?end-y ?source-y))      ; Beam 1 direction y
+      (setq $dx2 (- ?cross-x2 ?cross-x1))   ; Beam 2 direction x
+      (setq $dy2 (- ?cross-y2 ?cross-y1))   ; Beam 2 direction y
+      (setq $dx3 (- ?cross-x1 ?source-x))   ; Displacement x
+      (setq $dy3 (- ?cross-y1 ?source-y))   ; Displacement y
+      ;; Calculate determinant for parallel line detection
+      (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
+      (setq $eps 2e-2)
+      ;; Handle parallel/collinear lines case
+      (if (< (abs $det) 1e-10)
+        ;; Lines are parallel - check if collinear
+        (do (setq $cross-disp (- (* $dx1 $dy3) (* $dy1 $dx3)))
+            (if (>= (abs $cross-disp) 1e-10)
+              ;; Parallel but not collinear - no intersection
+              (values nil nil nil)
+              ;; Collinear - check for overlap
+              (do (setq $len-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
+                  (if (< $len-sq 1e-10)
+                    ;; Degenerate beam1
+                    (values nil nil nil)
+                    ;; Project beam2 endpoints onto beam1's parameterization
+                    (do (setq $t-start (/ (+ (* $dx3 $dx1) (* $dy3 $dy1)) $len-sq))
+                        (setq $vx4 (- ?cross-x2 ?source-x))
+                        (setq $vy4 (- ?cross-y2 ?source-y))
+                        (setq $t-end (/ (+ (* $vx4 $dx1) (* $vy4 $dy1)) $len-sq))
+                        ;; Determine overlap with beam1's valid range [0,1]
+                        (setq $proj-min (min $t-start $t-end))
+                        (setq $proj-max (max $t-start $t-end))
+                        (setq $overlap-min (max 0.0 $proj-min))
+                        (setq $overlap-max (min 1.0 $proj-max))
+                        ;; Check if there's meaningful overlap
+                        (if (<= $overlap-max $overlap-min)
+                          ;; No overlap
+                          (values nil nil nil)
+                          ;; Have overlap - check if it's in interior of both beams
+                          (do ;; Interior of beam1: (eps, 1-eps)
+                              (setq $int-min (max $overlap-min $eps))
+                              (setq $int-max (min $overlap-max (- 1.0 $eps)))
+                              (if (>= $int-min $int-max)
+                                ;; Overlap doesn't include interior
+                                (values nil nil nil)
+                                ;; Also check interior of beam2
+                                (do (setq $t-range (- $t-end $t-start))
+                                    (if (< (abs $t-range) 1e-10)
+                                      ;; Degenerate beam2
+                                      (values nil nil nil)
+                                      ;; Find t range where s ∈ (eps, 1-eps)
+                                      (do (if (> $t-range 0)
+                                            (do (setq $s-valid-min (+ $t-start (* $eps $t-range)))
+                                                (setq $s-valid-max (+ $t-start (* (- 1.0 $eps) $t-range))))
+                                            (do (setq $s-valid-min (+ $t-start (* (- 1.0 $eps) $t-range)))
+                                                (setq $s-valid-max (+ $t-start (* $eps $t-range)))))
+                                          ;; Intersect with beam1's interior range
+                                          (setq $final-min (max $int-min $s-valid-min))
+                                          (setq $final-max (min $int-max $s-valid-max))
+                                          (if (>= $final-min $final-max)
+                                            ;; No valid overlap in both interiors
+                                            (values nil nil nil)
+                                            ;; Return midpoint of overlap using RATIONAL arithmetic
+                                            ;; Use original rational bounds, not epsilon-adjusted floats
+                                            (do (setq $rational-min (max 0 $proj-min))  ; <-- CHANGED: 0 not 0.0
+                                                (setq $rational-max (min 1 $proj-max))  ; <-- CHANGED: 1 not 1.0
+                                                (setq $t (/ (+ $rational-min $rational-max) 2))  ; <-- CHANGED: 2 not 2.0
+                                                (setq $int-x (+ ?source-x (* $t $dx1)))
+                                                (setq $int-y (+ ?source-y (* $t $dy1)))
+                                                (values $t $int-x $int-y))))))))))))))  ; <-- ADDED: collinear handling
+        ;; Non-parallel case: Solve for intersection parameters using Cramer's rule
+        (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
+            (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
+            ;; Epsilon bounds: avoid false intersections at shared endpoints
+            (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; beam 1 interior
+                     (> $s $eps) (< $s (- 1.0 $eps)))     ; beam 2 interior
+              ;; Calculate and return intersection coordinates
+              (do (setq $int-x (+ ?source-x (* $t $dx1)))
+                  (setq $int-y (+ ?source-y (* $t $dy1)))
+                  (values $t $int-x $int-y))
+              ;; No valid intersection
               (values nil nil nil))))))
 
 
@@ -416,7 +638,7 @@
                    (and (= $x1 ?target-x) (= $y1 ?target-y))
                    (and (= $x2 ?target-x) (= $y2 ?target-y))))
         (do (mvsetq ($int-t $int-x $int-y)
-              (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
+              (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
             (if (and $int-t (< $int-t $closest-t))
               (do (setq $closest-t $int-t)
                   (setq $result-x $int-x)
@@ -436,7 +658,7 @@
                          (and (= $x1 ?target-x) (= $y1 ?target-y))
                          (and (= $x2 ?target-x) (= $y2 ?target-y))))
               (do (mvsetq ($int-t $int-x $int-y)
-                    (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
+                    (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
                   (if (and $int-t (< $int-t $closest-t))
                     (do (setq $closest-t $int-t)
                         (setq $result-x $int-x)
@@ -491,14 +713,14 @@
                 (setq $tgt2-y $end2-y)
                 ;; Check intersection between current segments (not intended paths)
                 (mvsetq ($t1 $int-x $int-y)
-                  (beam-segment-interference
+                  (beam-beam-intersection
                     $src1-x $src1-y $tgt1-x $tgt1-y
                     $src2-x $src2-y $tgt2-x $tgt2-y))
                 (if $t1
                   (do
                     ;; Get t2 parameter by checking beam2 vs beam1
                     (mvsetq ($t2 $int-x2 $int-y2)
-                      (beam-segment-interference
+                      (beam-beam-intersection
                         $src2-x $src2-y $tgt2-x $tgt2-y
                         $src1-x $src1-y $tgt1-x $tgt1-y))
                     ;; Only push if both intersections valid
@@ -622,37 +844,20 @@
     $distances))
 
 
-#+ignore (define-query find-blower-on-path (?area1 ?area2)
-  ;; Returns the blower controlling path from ?area1 to ?area2, or nil if none.
-  (ww-loop for ?b in (gethash 'blower *types*)
-           do (if (accessible1 ?area1 ?b ?area2)
-                (return ?b))))
-
-
-#+ignore (define-query playback-blower-active (?blower)
-  ;; Returns t if blower will be active when playback begins.
-  ;; This occurs when any controlling plate has been ghost-toggled to active.
-  (exists (?p plate)
-    (and (controls ?p ?blower)
-         (ghost-toggled-active ?p))))
-
-
-(define-query blower-activated-by-ghost (?blower)
-  ;; Returns t if blower is currently active due to ghost plate toggle.
-  ;; Used to enforce recording-phase physics on ghost agent.
-  (and (active ?blower)
-       (exists (?p plate)
-         (and (controls ?p ?blower)
-              (ghost-toggled-active ?p)))))
-
-
-#+ignore (define-query recording-playback-valid? ()
-  ;; Validates that all real agent moves through blower-controlled paths
-  ;; were legal given the recording-final blower states.
-  ;; Returns t if valid, nil if any move was illegal.
-  (do (bind (moves-pending-validation $moves))
-      (not (ww-loop for $move in $moves
-                    thereis (playback-blower-active (third $move))))))
+(define-query occlusion-area (?area)
+  ;; True if placing any cargo at ?area would occlude at least one CURRENT beam
+  ;; that is reaching a meaningful target (receiver/relay)
+  (do (bind (coords ?area $px $py $pz))
+      (exists (?b (get-current-beams))
+        (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
+             (or (receiver $tgt)
+                 (relay $tgt))
+             ;; only consider beams that are actually reaching their target
+             (beam-reaches-target $src $tgt)
+        ;; would the point (?area) occlude the segment from src -> current end?
+        (mvsetq ($sx $sy $sz) (get-coordinates $src))
+        (mvsetq ($t $ix $iy) (beam-segment-occlusion $sx $sy $end-x $end-y $px $py))
+        $t))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -680,66 +885,6 @@
                       #'deactivate-unpowered-relays!
                       #'activate-receivers-that-gained-power!
                       #'activate-reachable-relays!))))
-
-
-#+ignore (define-update update-plate-controlled-devices! ()
-  ;; Propagates plate activation state to controlled gates and blowers
-  ;; Returns t if any change occurred, nil otherwise
-  (do
-    (doall (?p plate)
-      (if (active ?p)
-        ;; Plate is active: open controlled gates, activate controlled blowers
-        (do (doall (?g gate)
-              (if (and (controls ?p ?g) (not (open ?g)))
-                (do (open ?g)
-                    (setq $changed t))))
-            (doall (?b blower)
-              (if (and (controls ?p ?b) (not (active ?b)))
-                (do (active ?b)
-                    (setq $changed t)))))
-        ;; Plate is inactive: close controlled gates, deactivate controlled blowers
-        (do (doall (?g gate)
-              (if (and (controls ?p ?g) (open ?g))
-                (do (not (open ?g))
-                    (setq $changed t))))
-            (doall (?b blower)
-              (if (and (controls ?p ?b) (active ?b))
-                (do (not (active ?b))
-                    (setq $changed t)))))))
-    $changed))
-
-
-#+ignore (define-update blow-objects-if-active! ()
-  ;; Blows objects according to blows> relation when blower is active.
-  ;; Real agents/cargo: always subject to active blowers.
-  ;; Ghost agents/cargo: only subject if ghost activated the blower
-  ;;   (recording-phase physics); immune if real agent activated it
-  ;;   (playback-phase, ghost follows pre-recorded trajectory).
-  ;; Returns t if any object was moved, nil otherwise.
-  (do
-    (doall (?b blower)
-      (if (and (active ?b)
-               (bind (blows> ?b $from $to)))
-        (do ;; Real objects always affected
-            (doall (?a real-agent)
-              (if (loc ?a $from)
-                (do (loc ?a $to)
-                    (setq $moved-any t))))
-            (doall (?c real-cargo)
-              (if (loc ?c $from)
-                (do (loc ?c $to)
-                    (setq $moved-any t))))
-            ;; Ghost objects only affected if ghost activated blower
-            (if (blower-activated-by-ghost ?b)
-              (do (doall (?a ghost-agent)
-                    (if (loc ?a $from)
-                      (do (loc ?a $to)
-                          (setq $moved-any t))))
-                  (doall (?c ghost-cargo)
-                    (if (loc ?c $from)
-                      (do (loc ?c $to)
-                          (setq $moved-any t)))))))))
-    $moved-any))
 
 
 (define-update create-missing-beams! ()
@@ -884,73 +1029,6 @@
     nil))  ;must return nil
 
 
-#+ignore (define-update update-beams-if-interference! ()
-  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
-  ;; at their intersection points, eliminating sequential processing dependencies
-  (do
-    ;; Collect all intersections ONCE before processing any beams
-    (setq $all-intersections (collect-all-beam-intersections))
-    ;; Phase 1: For each beam, determine its closest intersection point
-    (doall (?b (get-current-beams))
-      (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
-          ;; Calculate t-parameter for current endpoint position
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $closest-t (/ $dot $length-sq))
-          (setq $new-end-x $old-end-x)
-          (setq $new-end-y $old-end-y)
-          ;; Check all intersections involving this beam
-          (ww-loop for $intersection in $all-intersections do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $int-x (third $intersection))
-                (setq $int-y (fourth $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
-                ;; Determine which t-parameter applies to this beam and identify blocking beam
-                (if (eql ?b $beam1)
-                  (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2)
-                      (setq $blocking-t $t2))
-                  (if (eql ?b $beam2)
-                    (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1)
-                        (setq $blocking-t $t1))
-                    (setq $t-param nil)))
-                ;; Verify blocking beam actually reaches the intersection point
-                (if $t-param
-                  (do (bind (beam-segment $blocking-beam $b-src $b-tgt $b-end-x $b-end-y))
-                      (mvsetq ($b-src-x $b-src-y $b-src-z) (get-coordinates $b-src))
-                      (mvsetq ($b-tgt-x $b-tgt-y $b-tgt-z) (get-coordinates $b-tgt))
-                      ;; Calculate blocking beam's current t-parameter at its endpoint
-                      (setq $b-dx (- $b-tgt-x $b-src-x))
-                      (setq $b-dy (- $b-tgt-y $b-src-y))
-                      (setq $b-length-sq (+ (* $b-dx $b-dx) (* $b-dy $b-dy)))
-                      (setq $b-curr-dx (- $b-end-x $b-src-x))
-                      (setq $b-curr-dy (- $b-end-y $b-src-y))
-                      (setq $b-dot (+ (* $b-curr-dx $b-dx) (* $b-curr-dy $b-dy)))
-                      (setq $b-current-t (/ $b-dot $b-length-sq))
-                      ;; If blocking beam's endpoint is BEFORE intersection, it's phantom
-                      (if (< $b-current-t $blocking-t)
-                        (setq $t-param nil))))
-                ;; Update closest intersection if this one is closer
-                (if (and $t-param (< $t-param $closest-t))
-                  (do (setq $closest-t $t-param)
-                      (setq $new-end-x $int-x)
-                      (setq $new-end-y $int-y))))
-          ;; Phase 2: Atomically update beam segment if endpoint changed
-          (if (or (/= $new-end-x $old-end-x) 
-                  (/= $new-end-y $old-end-y))
-            (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
-    nil))  ;must return nil
-
-
 (define-update deactivate-receivers-that-lost-power! ()
   ;; Returns t if any receiver was deactivated, nil otherwise
   (do
@@ -1030,6 +1108,7 @@
 (define-update activate-reachable-relays! ()
   ;; Returns t if any relay was activated, nil otherwise
   ;; Uses distance-aware resolution: shorter path to transmitter wins
+  ;; For connectors: enforces single-active-connector-per-area constraint
   (do
     ;; Compute distance table once for all relays
     (setq $distances (compute-relay-distances))
@@ -1054,7 +1133,12 @@
           ;; Resolve using distance priority instead of consensus
           (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
           ;; Only activate if there's a clear winner (not a tie)
-          (if $winning-hue
+          ;; For connectors: also verify no other active connector in same area
+          (if (and $winning-hue
+                   (or (repeater ?r)
+                       (and (connector ?r)
+                            (bind (loc ?r $relay-area))
+                            (connectable ?r $relay-area))))
             (do (color ?r $winning-hue)
                 (setq $activated-any t))))))
     $activated-any))
@@ -1103,298 +1187,171 @@
     nil))
 
 
-#+ignore (define-update record-move-for-playback-validation! (?agent ?area1 ?area2)
-  ;; Records blower-path moves by real agents for playback validation.
-  ;; Only records if agent is real and path is blower-controlled.
-  (if (real-agent ?agent)
-    (do (setq $blower (find-blower-on-path ?area1 ?area2))
-        (if $blower
-          (do (bind (moves-pending-validation $moves))
-              (moves-pending-validation (cons (list ?area1 ?area2 $blower) $moves)))))))
-
-
-#+ignore (define-update log-if-ghost-toggle! (?agent ?plate)
-  ;; Track ghost toggle parity for playback validation.
-  ;; Only affects state when agent is a ghost-agent.
-  (if (ghost-agent ?agent)
-    (if (ghost-toggled-active ?plate)
-      (not (ghost-toggled-active ?plate))
-      (ghost-toggled-active ?plate))))
-
-
-(define-update relocate-stacked-object! (?object ?area)
-  (do (loc ?object ?area)
-      (if (bind (on $higher-object ?object))
-        (relocate-stacked-object! $higher-object ?area))))
-  
-
-(define-update collapse-cargo-above-box! (?box)
-  ;; Collapses all the cargo items above a box by one level
-  (if (bind (on $cargo ?box))
-    (do (bind (elevation $cargo $e-cargo))
-        (elevation $cargo (1- $e-cargo))
-        (if (box $cargo)
-          (collapse-cargo-above-box! $cargo)))))
-
-
 ;;;; ACTIONS ;;;;
 
 
-(define-action pickup-connector
-    1
+(define-action acquire-unpaired-connector
+  ;Move to unpaired connector (optional) + pickup unpaired connector (ends holding the connector)
+  ;Put this simple pickup before the following disruptive pickup (separate ordered actions avoids thrashing)
+  1
   (?agent agent ?connector connector)
-  (and (same-type ?agent ?connector)
-       (not (bind (holds ?agent $held)))
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (loc ?connector $area)
-       (bind (elevation ?connector $e-conn))
-       (<= (abs (- $e-conn $e-agent)) 1))          ; within reach
-  (?agent ?connector $area)
-  (assert (holds ?agent ?connector)
-          (not (loc ?connector $area))
-          (not (elevation ?connector $e-conn))
+  (and (not (exists (?t terminus)
+              (paired ?connector ?t)))
+       (same-type ?agent ?connector)
+       (not (bind (holds ?agent $any-cargo)))
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (bind (elevation ?agent $agent-elevation))
+       (bind (elevation ?connector $connector-elevation))
+       (or (eql $agent-area $connector-area)  ;no move needed
+           (and (= $agent-elevation 0)  ;move needed
+                (accessible ?agent $agent-area $connector-area)
+                (safe $connector-area)))
+       (<= (abs (- $connector-elevation $agent-elevation)) 1))  ;pickup reach constraint
+  (?agent ?connector $connector-area)
+  (assert (loc ?agent $connector-area)  ;OK even if already there
+          (holds ?agent ?connector)
+          (not (loc ?connector $connector-area))
+          (not (elevation ?connector $connector-elevation))
+          (if (bind (on ?connector $any-box))
+            (not (on ?connector $any-box)))
+          (finally (propagate-changes!))))
+
+
+(define-action acquire-paired-connector
+  ;Move to paired connector (optional) + pickup paired connector (ends holding the connector)
+  ;Put this disruptive pickup after the previous simple pickup (separate ordered actions avoids thrashing)
+  1
+  (?agent agent ?connector connector)
+  (and (exists (?t terminus)
+         (paired ?connector ?t))
+       (same-type ?agent ?connector)
+       (not (bind (holds ?agent $any-cargo)))
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (bind (elevation ?agent $agent-elevation))
+       (bind (elevation ?connector $connector-elevation))
+       (or (eql $agent-area $connector-area)  ;no move needed
+           (and (= $agent-elevation 0)  ;move needed
+                (accessible ?agent $agent-area $connector-area)
+                (safe $connector-area)))
+       (<= (abs (- $connector-elevation $agent-elevation)) 1))  ;pickup reach constraint
+  (?agent ?connector $connector-area)
+  (assert (loc ?agent $connector-area)  ;OK even if already there
+          (holds ?agent ?connector)
+          (not (loc ?connector $connector-area))
+          (not (elevation ?connector $connector-elevation))
           (if (bind (on ?connector $box))
             (not (on ?connector $box)))
           (disconnect-connector! ?connector)
           (finally (propagate-changes!))))
 
 
-(define-action connect-to-3-terminus
-    1
-  (?agent agent (combination (?t1 ?t2 ?t3) terminus))
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       (same-type ?agent $cargo)
-       (different $cargo ?t1)
-       (different $cargo ?t2)
-       (different $cargo ?t3)
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (connectable $cargo $area)
-       (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2)
-       (selectable ?agent $area ?t3))
-  (?agent $cargo ?t1 ?t2 ?t3 $area $place)
-  (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (paired $cargo ?t2)
-                  (paired $cargo ?t3)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (paired $cargo ?t1)
-              (paired $cargo ?t2)
-              (paired $cargo ?t3)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-(define-action connect-to-2-terminus
-    1
-  (?agent agent (combination (?t1 ?t2) terminus))
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       (same-type ?agent $cargo)
-       (different $cargo ?t1)
-       (different $cargo ?t2)
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (connectable $cargo $area)
-       (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2))
-  (?agent $cargo ?t1 ?t2 $area $place)
-  (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (paired $cargo ?t2)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (paired $cargo ?t1)
-              (paired $cargo ?t2)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-(define-action connect-to-1-terminus
-    1
-  (?agent agent ?terminus terminus)
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       (same-type ?agent $cargo)
-       (different $cargo ?terminus)
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (connectable $cargo $area)
-       (selectable ?agent $area ?terminus))
-  (?agent $cargo ?terminus $area $place)
-  (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?terminus)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (paired $cargo ?terminus)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-(define-action put-cargo-on-place
-  ;; Agent can place inactive cargo on a box, buzzer/mine (boxes only), or the ground.
+(define-action connect-with-1-terminus
+  ;Starts holding a connector + move to destination (optional) + pair with terminus
+  ;Put most constrained networking (to 1 terminus) first
   1
-  (?agent agent)
-  (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent)))
-  (?agent $cargo $place $area)
-  (do ;; Box-only: can put box on a buzzer or mine
-      (if (box $cargo)
-        (doall (?rover (either buzzer mine))
-          (if (and (loc ?rover $area)
-                   (cleartop ?rover)
-                   (>= $e-agent 1))  ;must be above buzzer/mine
-            (assert (not (holds ?agent $cargo))
-                    (loc $cargo $area)
-                    (supports ?rover $cargo)
-                    (elevation $cargo 1)
-                    (setq $place ?rover)
-                    (finally (propagate-changes!))))))
-      ;; All cargo: can put on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (setq $e-delta (- $e-box $e-agent))
-                 (< $e-delta 1))  ;within reach +1 up or any level down
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; All cargo: can put on ground
-      (assert (not (holds ?agent $cargo))
-              (loc $cargo $area)
-              (elevation $cargo 0)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-#+ignore (define-action pickup-box
-    1
-  (?agent agent ?box box)
-  (and (same-type ?agent ?box)
-       (not (bind (holds ?agent $any-cargo)))
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (loc ?box $area)
-       (not (on ?agent ?box))
-       (bind (elevation ?box $e-box))
-       (<= (abs (- $e-box $e-agent)) 1))
-  (?agent ?box $area)
-  (assert (holds ?agent ?box)
-          (not (loc ?box $area))
-          (not (elevation ?box $e-box))
-          ;; First update elevations while on relationships still exist
-          (collapse-cargo-above-box! ?box)
-          ;; Now handle removal of relationships and establishing new ones
-          (cond ((bind (supports $rover ?box))
-                   ;; Box was on buzzer or mine - remove supports, transfer cargo to rover
-                   (not (supports $rover ?box))
-                   (if (bind (on $cargo ?box))
-                     (do (not (on $cargo ?box))
-                         (if (box $cargo)
-                           (supports $rover $cargo)
-                           (elevation $cargo 0)))))        ; non-box cargo falls to ground
-                ((bind (on ?box $under-box))
-                   ;; Box was on another box - remove on, transfer cargo to under-box
-                   (not (on ?box $under-box))
-                   (if (bind (on $cargo ?box))
-                     (do (not (on $cargo ?box))
-                         (on $cargo $under-box))))
-                (t
-                   ;; Box was on ground - just remove on relationship for cargo
-                   (if (bind (on $cargo ?box))
-                     (not (on $cargo ?box)))))
+  (?agent agent ?t1 terminus ?area2 area)
+  (and (selectable ?agent ?area2 ?t1)
+       (not (and (connector ?t1)  ;don't connect with another connector in the same area
+                 (loc ?t1 ?area2)))
+       (bind (holds ?agent $connector))
+       (different $connector ?t1)
+       (bind (loc ?agent $area1))
+       (bind (elevation ?agent $agent-elevation))
+       (or (eql $area1 ?area2)  ;no move needed
+           (and (= $agent-elevation 0)  ;move needed
+                (accessible ?agent $area1 ?area2)
+                (safe ?area2))))
+  (?agent $connector ?t1 ?area2)
+  (assert (loc ?agent ?area2)  ;OK even if already there
+          (not (holds ?agent $connector))
+          (loc $connector ?area2)
+          (elevation $connector 0)
+          (paired $connector ?t1)
           (finally (propagate-changes!))))
 
 
-#+ignore (define-action jump-to-place
-  ;; Agent can jump up or down to any reachable box or the ground.
+(define-action connect-with-2-terminus
   1
-  (?agent agent)
-  (and (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent)))
-  (?agent $place $area)
-  (do ;; Can jump to a reachable box
-      (doall (?box box)
-        (if (and (cleartop ?box)
-                 (loc ?box $area)                         ; agent and box must be in same area
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; can only reach box at same level or below
-          (assert (if (bind (on ?agent $old-box))
-                    (not (on ?agent $old-box)))
-                  (on ?agent ?box)
-                  (elevation ?agent (1+ $e-box))
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
-      ;; Can jump to the ground
-      (if (> $e-agent 0)
-        (assert (elevation ?agent 0)
-                (if (bind (on ?agent $box))
-                  (not (on ?agent $box)))
-                (setq $place 'ground)
-                (finally (propagate-changes!))))))
+  (?agent agent (combination (?t1 ?t2) terminus) ?area2 area)
+  (and (selectable ?agent ?area2 ?t1)
+       (selectable ?agent ?area2 ?t2)
+       (not (and (connector ?t1)  ;don't connect with another connector in the same area
+                 (loc ?t1 ?area2)))
+       (not (and (connector ?t2)  ;don't connect with another connector in the same area
+                 (loc ?t2 ?area2)))
+       (bind (holds ?agent $connector))
+       (different $connector ?t1)
+       (different $connector ?t2)
+       (bind (loc ?agent $area1))
+       (bind (elevation ?agent $agent-elevation))
+       (or (eql $area1 ?area2)  ;no move needed
+           (and (= $agent-elevation 0)  ;move needed
+                (accessible ?agent $area1 ?area2)
+                (safe ?area2))))
+  (?agent $connector ?t1 ?t2 ?area2)
+  (assert (loc ?agent ?area2)  ;OK even if already there
+          (not (holds ?agent $connector))
+          (loc $connector ?area2)
+          (elevation $connector 0)
+          (paired $connector ?t1)
+          (paired $connector ?t2)
+          (finally (propagate-changes!))))
 
 
-#+ignore (define-action toggle-plate
+(define-action connect-with-3-terminus
   1
-  (?agent agent ?plate plate)
-  (and (bind (loc ?agent $area))
-       (bind (coords $area $agent-x $agent-y $agent-z))
-       (bind (coords ?plate $plate-x $plate-y $plate-z))
-       (= $agent-x $plate-x)
-       (= $agent-y $plate-y))
-  (?agent ?plate)
-  (assert (if (active ?plate)
-            (not (active ?plate))
-            (active ?plate))
-          (log-if-ghost-toggle! ?agent ?plate)  ;tracks ghost toggling for playback validation
+  (?agent agent (combination (?t1 ?t2 ?t3) terminus) ?area2 area)
+  (and (selectable ?agent ?area2 ?t1)
+       (selectable ?agent ?area2 ?t2)
+       (selectable ?agent ?area2 ?t3)
+       (not (and (connector ?t1)  ;don't connect with another connector in the same area
+                 (loc ?t1 ?area2)))
+       (not (and (connector ?t2)  ;don't connect with another connector in the same area
+                 (loc ?t2 ?area2)))
+       (not (and (connector ?t3)  ;don't connect with another connector in the same area
+                 (loc ?t3 ?area2)))
+       (bind (holds ?agent $connector))
+       (different $connector ?t1)
+       (different $connector ?t2)
+       (different $connector ?t3)
+       (bind (loc ?agent $area1))
+       (bind (elevation ?agent $agent-elevation))
+       (or (eql $area1 ?area2)  ;no move needed
+           (and (= $agent-elevation 0)  ;move needed
+                (accessible ?agent $area1 ?area2)
+                (safe ?area2))))
+  (?agent $connector ?t1 ?t2 ?t3 ?area2)
+  (assert (loc ?agent ?area2)  ;OK even if already there
+          (not (holds ?agent $connector))
+          (loc $connector ?area2)
+          (elevation $connector 0)
+          (paired $connector ?t1)
+          (paired $connector ?t2)
+          (paired $connector ?t3)
+          (finally (propagate-changes!))))
+
+
+(define-action deliver-to-place
+  ;Generic delivery of cargo to an area
+  ;But constrained to be potentially useful by occluding a beam
+    1
+  (?agent agent ?area2 area)
+  (and (safe ?area2)
+       (occlusion-area ?area2)  ;placement should block a beam to be useful
+       (bind (elevation ?agent $agent-elevation))
+       (= $agent-elevation 0)
+       (bind (holds ?agent $cargo))
+       (bind (loc ?agent $area1))
+       (different $area1 ?area2)
+       (accessible ?agent $area1 ?area2))
+  (?agent $cargo ?area2 $place)
+  (assert (loc ?agent ?area2)
+          (not (holds ?agent $cargo))
+          (loc $cargo ?area2)
+          (elevation $cargo 0)
+          (setq $place 'ground)
           (finally (propagate-changes!))))
 
 
@@ -1403,8 +1360,8 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       (bind (elevation ?agent $e-agent))
-       (= $e-agent 0)                          ; must be on ground
+       (bind (elevation ?agent $agent-elevation))
+       (= $agent-elevation 0)                          ; must be on ground
        (accessible ?agent $area1 ?area2)
        (safe ?area2))
   (?agent $area1 ?area2)
@@ -1426,7 +1383,6 @@
   (elevation connector2 0)
   (elevation connector3 0)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
-  ;moves-pending-validation ())  ;empty list of recorded blower-path moves
 
   ;; Static spatial configuration
   (coords area1 9 1 0)
@@ -1439,10 +1395,9 @@
   (coords receiver2 7 109/10 1)
   (coords receiver3 1 109/10 1)
   (controls receiver1 gate1)
-  ;(blows> blower1 area3 area1)
-  (wall-segments ((wall1 8 10 8 11) (wall2 8 7 8 8) (wall3 8 0 8 3)))  ;internal walls only needed
+  (wall-segments ((wall1 8 7 8 8) (wall2 8 0 8 3)))  ;internal walls only needed
   (gate-segments ((gate1 8 3 8 7) (gate2 2 11 6 11)))
-  (window-segments ((window1 8 8 8 10)))
+  (window-segments ((window1 8 8 8 11)))
   (chroma transmitter1 red)
   (chroma transmitter2 blue)
   (chroma receiver1 red)
@@ -1461,6 +1416,7 @@
   (los0 area3 transmitter1)
   (los0 area3 transmitter2)
   (los0 area3 receiver1)
+  (los0 area3 receiver2)
   (los0 area3 receiver3)
   (los1 area4 gate1 transmitter1)
   (los1 area4 gate1 transmitter2)
@@ -1492,6 +1448,4 @@
 (define-goal
   (and (active receiver2)
        (active receiver3)
-       (loc agent1 area4)
-       ;(recording-playback-valid?)  ;if invalid state, return nil, continue searching (only for ghost)
-  ))     
+       (loc agent1 area4)))

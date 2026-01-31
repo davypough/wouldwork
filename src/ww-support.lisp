@@ -559,3 +559,28 @@
                      label sec calls spc pct))
     (terpri stream)
     t))
+
+
+;;;; heuristic calculations ;;;;
+
+
+(defun combine-heuristics (state specs &key (combiner :weighted-sum) admissible)
+  "Combines weighted heuristic components into single cost estimate.
+   SPECS: list of (weight . function-symbol) pairs
+   COMBINER: :weighted-sum | :max | :sum
+   Returns: non-negative numeric estimate"
+  (declare (ignore admissible))
+  (let ((result
+          (ecase combiner
+            (:weighted-sum 
+             (loop for (weight . fn) in specs
+                   for raw-value = (funcall fn state)
+                   for weighted-value = (* weight raw-value)
+                   sum weighted-value))
+            (:max 
+             (loop for (weight . fn) in specs
+                   maximize (funcall fn state)))
+            (:sum 
+             (loop for (weight . fn) in specs
+                   sum (funcall fn state))))))
+    result))
