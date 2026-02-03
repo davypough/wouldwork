@@ -79,7 +79,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (ww-set <problem-parameter> <new-value>)
    -- set a problem parameter to a new value
    eg, (ww-set *solution-type* <one of first, every, min-length, min-time,
-                                       min-value, or max-value>)
+                                       min-value, max-value, or a positive integer N
+                                       to find exactly N solutions>)
        (ww-set *tree-or-graph* <one of tree or graph>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)

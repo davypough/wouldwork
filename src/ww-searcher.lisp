@@ -148,6 +148,14 @@
   t)
 
 
+(defun solution-count-reached-p ()
+  "Returns T if we should stop searching because the requested solution count is reached.
+   Handles both *solution-type* = 'first and *solution-type* = <positive-fixnum>."
+  (or (eql *solution-type* 'first)
+      (and (typep *solution-type* 'fixnum)
+           (>= (length *solutions*) *solution-type*))))
+
+
 (defun initialize-hybrid-mode ()
   "Checks constraints for hybrid graph search mode.
    Returns T if hybrid mode should activate, NIL otherwise.
@@ -249,7 +257,7 @@
     (finalize-hybrid-solutions))
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
-      (summarize-search-results (if (eql *solution-type* 'first)
+      (summarize-search-results (if (solution-count-reached-p)  ; CHANGED: handle fixnum
                                   'first
                                   'exhausted)))))
 
@@ -429,7 +437,7 @@
            (update-max-depth-explored succ-depth)
            (finalize-path-depth succ-depth)
            (increment-global *total-states-processed* 1)
-           (if (eql *solution-type* 'first)
+           (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
                '(first)
                nil)))  ; Continue searching for more solutions
         
@@ -508,7 +516,7 @@
                  (update-max-depth-explored succ-depth)
                  (finalize-path-depth succ-depth)
                  (increment-global *total-states-processed* 1)
-                 (if (eql *solution-type* 'first)
+                 (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
                      (return-from df-bnb1 '(first))
                      (return-from df-bnb1 nil))))
               
@@ -553,7 +561,7 @@
               (defer-hybrid-goal current-node succ-state)
               (register-solution current-node succ-state))
           (finalize-path-depth succ-depth)
-          (if (eql *solution-type* 'first)
+          (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
             (return-from process-successors '(first))
             (next-iteration)))
         (unless (boundp 'goal-fn)
@@ -1072,7 +1080,10 @@
   (ecase condition
     (first
       (when *solutions*
-        (format t "~2%Search ended with first solution found." )))
+        (if (typep *solution-type* 'fixnum)  ; ADDED: handle fixnum case
+            (format t "~2%Search ended after finding ~D solution~:P (as requested)." 
+                    (length *solutions*))
+            (format t "~2%Search ended with first solution found."))))
     (exhausted
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'every)
@@ -1251,7 +1262,7 @@
 
 (defun solution-better-p (new-soln old-soln)
   "Returns T if NEW-SOLN is better than OLD-SOLN based on *solution-type*."
-  (ecase *solution-type*
+  (case *solution-type*  ; CHANGED: ecase -> case to allow otherwise clause
     ((min-length first every)
      (< (solution.depth new-soln) (solution.depth old-soln)))
     (min-time
@@ -1259,7 +1270,9 @@
     (min-value
      (< (solution.value new-soln) (solution.value old-soln)))
     (max-value
-     (> (solution.value new-soln) (solution.value old-soln)))))
+     (> (solution.value new-soln) (solution.value old-soln)))
+    (otherwise  ; ADDED: fixnum case - prefer shorter depth
+     (< (solution.depth new-soln) (solution.depth old-soln)))))
 
 
 (defun printout-solution (soln)

@@ -307,7 +307,7 @@ are passed through unchanged."
 
       ;; Partial-goal-state shorthand: list of literals => (and ...)
       ((literal-list-p goal-spec)
-       (let ((form (if (null goal-spec) (list 'and t) (cons 'and goal-spec))))
+       (let ((form (cons 'and goal-spec)))  ; goal-spec guaranteed non-nil here
          (values form form)))
 
       ;; Regular goal form (including quantifiers): pass through

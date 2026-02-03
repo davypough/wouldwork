@@ -139,7 +139,8 @@
    backtracking: DFS with single state and undo operations (memory efficient)")
 
 (defvar *solution-type* 'first
-  "Specify whether to search for first, min-length, min-time, or every solution.")
+  "Specify whether to search for first, min-length, min-time, every solution,
+   or a positive integer N to find exactly N solutions.")
 
 (defvar *tree-or-graph* 'graph  ;
   "Whether there are repeated states (graph) or not (tree); try both.")

@@ -76,10 +76,10 @@
                   (when (goal succ-state)
                     ;; Register solution immediately (serial, no locking needed)
                     (register-solution node succ-state)
-                    (when (eql *solution-type* 'first)
-                      ;; Early termination: found solution during task gen
-                      (format t "~&Solution found during task generation!~%")
-                      (return-from generate-root-tasks nil))
+                    (when (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+                    ;; Early termination: found requested number of solutions during task gen
+                    (format t "~&Solution found during task generation!~%")
+                    (return-from generate-root-tasks nil))
                     (return-from process-succ))
                   
                   ;; Tree search: check for cycle on current path
@@ -276,7 +276,7 @@
         (when (goal succ-state)
           (register-parallel-solution current-node succ-state worker-id)
           (ws-finalize-path stats succ-depth)
-          (when (eql *solution-type* 'first)
+          (when (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
             (return-from worker-process-successors-phase1 'first-found))
           (return-from process-one))
         
