@@ -199,19 +199,24 @@
   (let* ((action-name (action.name action))
          (effect-vars (action.effect-variables action))
          (precond-vars (action.precondition-variables action))
-         ;; Create mapping from variable names to values
-         (var-value-alist (pairlis precond-vars pre-result))
+         ;; normalize PRE-RESULT so we always have a proper list for zipping.
+         ;; - can be T for some actions (no bindings).
+         ;; - PRE-RESULT can also be a single atom in some edge cases.
+         (pre-values (cond ((or (null pre-result) (eql pre-result t)) nil)
+                           ((listp pre-result) pre-result)
+                           (t (list pre-result))))
+         (var-value-alist (mapcar #'cons precond-vars pre-values))
          ;; Extract effect values in effect-variables order
-         (effect-values 
+         (effect-values
            (mapcar (lambda (var)
-                     (cond 
+                     (cond
                        ;; For precondition variables (starting with ?)
                        ((char= (char (symbol-name var) 0) #\?)
                         (cdr (assoc var var-value-alist)))
                        ;; For effect-computed variables (starting with $)
                        ((char= (char (symbol-name var) 0) #\$)
                         (if (update.instantiations updated-db)
-                            (nth (position var effect-vars) 
+                            (nth (position var effect-vars)
                                  (update.instantiations updated-db))
                             var))
                        (t var)))

@@ -23,10 +23,12 @@
 ;;; Suggested ASDF integration (in wouldwork.asd):
 ;;;   add (:file "ww-backwards") after (:file "ww-solution-validation")
 
+
 (in-package :ww)
 
 
 ;;;; ==================== Configuration ====================
+
 
 (defparameter *bw-normalize-strip-relations*
   ;; Relations to drop before recomputing derived consequences.
@@ -34,17 +36,20 @@
   '(beam-segment current-beams active open color)
   "Relations removed by BW-NORMALIZE! prior to recomputing derived consequences.")
 
+
 (defparameter *bw-default-normalizer*
   ;; A SYMBOL naming a function of one arg (STATE) that recomputes derived closure.
   ;; For problem-corner, PROPAGATE-CHANGES! is the canonical choice.
   'propagate-changes!
   "Default normalizer function symbol used by BW-NORMALIZE!.")
 
+
 (defparameter *bw-default-projection-relations*
   ;; Relations included in BW-PROJECT / BW-EQUIVALENT-P by default.
   ;; You can tune this per domain.
   '(loc elevation on holds paired supports active open color)
   "Relations included in BW-PROJECT / BW-EQUIVALENT-P by default.")
+
 
 (defparameter *bw-base-fact-relations*
   ;; Base facts only (decision-layer), excluding derived facts (active, open, color).
@@ -56,9 +61,11 @@
 
 ;;;; ==================== Small state utilities ====================
 
+
 (defun bw--all-props (state)
   "Return a readable list of propositions in STATE."
   (list-database (problem-state.idb state)))
+
 
 (defun bw--delete-props-by-relation! (state relation)
   "Delete *all* propositions whose car is RELATION."
@@ -69,6 +76,7 @@
   (setf (problem-state.idb-hash state) nil)
   state)
 
+
 (defun bw--delete-props-matching! (state predicate)
   "Delete all propositions for which (PREDICATE prop) is true."
   (let ((idb (problem-state.idb state)))
@@ -78,12 +86,14 @@
   (setf (problem-state.idb-hash state) nil)
   state)
 
+
 (defun bw--set-current-beams-empty! (state)
   "Ensure (CURRENT-BEAMS ()) exists, and no other CURRENT-BEAMS proposition exists."
   (bw--delete-props-by-relation! state 'current-beams)
   (add-proposition '(current-beams ()) (problem-state.idb state))
   (setf (problem-state.idb-hash state) nil)
   state)
+
 
 (defun bw--get-binary-fluent (state relation subject)
   "Return the 3rd element of (RELATION SUBJECT <value>) if present, else NIL."
@@ -95,6 +105,7 @@
 
 
 ;;;; ==================== Building / projecting states ====================
+
 
 (defun bw-make-state-from-propositions (propositions &key
                                                      (relations nil)
@@ -118,6 +129,7 @@ Intended for REPL experiments (e.g., pasting a validator printout)."
         (add-proposition p (problem-state.idb st))))
     (setf (problem-state.idb-hash st) nil)
     st))
+
 
 (defun bw-project (state &key
                          (relations *bw-default-projection-relations*)
@@ -147,6 +159,7 @@ excluded from the projection (useful for footprint-aware comparisons)."
           (lambda (x y)
             (string< (prin1-to-string x) (prin1-to-string y))))))
 
+
 (defun bw-equivalent-p (state-a state-b &key
                                 (relations *bw-default-projection-relations*)
                                 ignore-predicate)
@@ -157,7 +170,39 @@ If IGNORE-PREDICATE is supplied, it is applied to both states' projections."
          (bw-project state-b :relations relations :ignore-predicate ignore-predicate)))
 
 
+(defun bw-milestone-props (state &key
+                                 (relations *bw-base-fact-relations*)
+                                 ignore-predicate)
+  "Return a canonicalized, sorted list of milestone propositions derived from STATE.
+
+This is a thin wrapper around BW-PROJECT, defaulting to *BW-BASE-FACT-RELATIONS*.
+Use IGNORE-PREDICATE to filter out propositions (PROP -> boolean) before projection."
+  (bw-project state :relations relations :ignore-predicate ignore-predicate))
+
+
+(defun bw-milestone-goal-form (state &key
+                                     (relations *bw-base-fact-relations*)
+                                     ignore-predicate
+                                     (operator 'and))
+  "Return a goal form suitable for INSTALL-GOAL / COERCE-GOAL, derived from STATE.
+
+The returned form is (OPERATOR <milestone-prop>...).
+
+Important: Wouldwork's translator rejects empty connectives like (AND) or (OR).
+If projection yields no milestone propositions, this returns (AND T) for OPERATOR=AND,
+(OR NIL) for OPERATOR=OR, and (OPERATOR T) otherwise."
+  (let ((props (bw-milestone-props state
+                                   :relations relations
+                                   :ignore-predicate ignore-predicate)))
+    (cond
+      (props (cons operator props))
+      ((eql operator 'and) (list 'and t))
+      ((eql operator 'or)  (list 'or nil))
+      (t (list operator t)))))
+
+
 ;;;; ==================== Normalization ====================
+
 
 (defun bw-normalize! (state &key
                             (strip-relations *bw-normalize-strip-relations*)
@@ -181,6 +226,7 @@ Returns STATE (mutated)."
 
 ;;;; ==================== One-step regression ====================
 
+
 (defun bw-regress (target-state action-form)
   "Dispatch to action-family regressors.
 Returns a list of predecessor candidate states (each is a PROBLEM-STATE)."
@@ -200,6 +246,7 @@ Returns a list of predecessor candidate states (each is a PROBLEM-STATE)."
       (connect-to-3-terminus (bw-regress-connect-to-n-terminus target-state action-form 3))
       (otherwise nil))))
 
+
 (defun bw-regress-move (target-state agent from to)
   "Regress a MOVE step.
 Action instance: (MOVE agent from to)."
@@ -214,6 +261,7 @@ Action instance: (MOVE agent from to)."
     (add-proposition (list 'loc agent from) idb)
     (setf (problem-state.idb-hash pred) nil)
     (list pred)))
+
 
 (defun bw-regress-pickup-connector (target-state agent connector area)
   "Regress a PICKUP-CONNECTOR step.
@@ -250,6 +298,7 @@ set of candidates for the connector's prior elevation (typically {e-agent-1,
             ;; CONNECTOR here; see BW-IGNORE-PREDICATE-FOR-ACTION and BW-DIFF.
             (setf (problem-state.idb-hash pred) nil)
             pred))))
+
 
 (defun bw-regress-connect-to-n-terminus (target-state action-form n)
   "Regress CONNECT-TO-N-TERMINUS (N in {1,2,3}).
@@ -294,6 +343,53 @@ Other facts are preserved from TARGET-STATE."
 
 ;;;; ==================== Regression + forward validation ====================
 
+
+(defun bw-regress+validate-subsuming (target-state action-form &key
+                                                  (normalizer *bw-default-normalizer*)
+                                                  (strip-relations *bw-normalize-strip-relations*)
+                                                  (projection-relations *bw-default-projection-relations*)
+                                                  (required-props nil)
+                                                  (max-results nil)
+                                                  (verbose t))
+  "Like BW-REGRESS+VALIDATE, but accepts NEXT states that *subsumes* REQUIRED-PROPS
+(on PROJECTION-RELATIONS after normalization), rather than requiring equivalence.
+
+If REQUIRED-PROPS is NIL, uses (BW-GOAL-REQUIRED-PROPS normalized-target)."
+  (let ((target (copy-problem-state target-state))
+        (ignore-pred (bw-ignore-predicate-for-action action-form)))
+    ;; Normalize target for canonical comparison
+    (bw-normalize! target :strip-relations strip-relations :normalizer normalizer)
+
+    ;; Compute required footprint (canonicalized via BW-PROJECT)
+    (let* ((req-props (or required-props (bw-goal-required-props target)))
+           (req-state (bw-make-state-from-propositions req-props :relations :all))
+           (required (bw-project req-state
+                                 :relations projection-relations
+                                 :ignore-predicate ignore-pred)))
+      (loop with results = nil
+            for pred0 in (bw-regress target action-form)
+            for pred = (copy-problem-state pred0) do
+              (bw-normalize! pred :strip-relations strip-relations :normalizer normalizer)
+              (multiple-value-bind (next-state ok failure-reason)
+                  (apply-action-to-state action-form pred nil nil)
+                (cond
+                  ((not ok)
+                   (when verbose
+                     (format t "~&BW: candidate rejected (precondition failed): ~S~%  ~A~%"
+                             action-form failure-reason)))
+                  (t
+                   (let* ((next (copy-problem-state next-state)))
+                     (bw-normalize! next :strip-relations strip-relations :normalizer normalizer)
+                     (let ((next-proj (bw-project next
+                                                  :relations projection-relations
+                                                  :ignore-predicate ignore-pred)))
+                       (when (subsetp required next-proj :test #'equal)
+                         (push pred results)
+                         (when (and max-results (>= (length results) max-results))
+                           (return (nreverse results)))))))))
+            finally (return (nreverse results))))))
+
+
 (defun bw-regress+validate (target-state action-form &key
                                          (normalizer *bw-default-normalizer*)
                                          (strip-relations *bw-normalize-strip-relations*)
@@ -335,7 +431,323 @@ Returns a list of validated predecessor states."
           finally (return (nreverse results)))))
 
 
+(defun bw-regressed-predecessor-report (candidate-goal-states candidate-actions &key
+                                                             (validator #'bw-regress+validate) ; CHANGED
+                                                             (normalizer *bw-default-normalizer*)
+                                                             (strip-relations *bw-normalize-strip-relations*)
+                                                             (projection-relations *bw-default-projection-relations*)
+                                                             (milestone-relations *bw-base-fact-relations*)
+                                                             (milestone-format :props)
+                                                             (max-results nil)
+                                                             (verbose nil))
+  "Phase-3 driver: regress+validate each (goal, action) for one or more candidate goal states.
+
+Returns a list of per-goal report plists:
+  (:GOAL-INDEX i :GOAL-STATE <state> :ACTION-REPORTS (<plist> ...))"
+  (let ((goal-states (bw-coerce-goal-states candidate-goal-states)))
+    (loop for goal-state in goal-states
+          for goal-index from 0
+          collect
+          (let ((action-reports
+                  (loop for action in candidate-actions
+                        collect
+                        (let* ((validated
+                                 (funcall validator goal-state action             ; CHANGED
+                                          :normalizer normalizer
+                                          :strip-relations strip-relations
+                                          :projection-relations projection-relations
+                                          :max-results max-results
+                                          :verbose verbose))
+                               (milestones
+                                 (ecase milestone-format
+                                   (:props
+                                    (mapcar (lambda (pred)
+                                              (bw-milestone-props pred
+                                                                  :relations milestone-relations))
+                                            validated))
+                                   (:goal-form
+                                    (mapcar (lambda (pred)
+                                              (bw-milestone-goal-form pred
+                                                                      :relations milestone-relations))
+                                            validated)))))
+                          (list :action action
+                                :validated-predecessors validated
+                                :milestones milestones
+                                :validated-count (length validated))))))
+            (list :goal-index goal-index
+                  :goal-state goal-state
+                  :action-reports action-reports)))))
+
+
+(defun bw-regressed-predecessor-report/enumerated (candidate-actions &rest keys
+                                                   &key &allow-other-keys)
+  "Convenience wrapper: runs BW-REGRESSED-PREDECESSOR-REPORT using *ENUMERATED-GOAL-STATES*."
+  (unless (and (boundp '*enumerated-goal-states*) *enumerated-goal-states*)
+    (warn "BW-REGRESSED-PREDECESSOR-REPORT/ENUMERATED: *ENUMERATED-GOAL-STATES* is empty or unbound."))
+  (apply #'bw-regressed-predecessor-report
+         (append (list *enumerated-goal-states* candidate-actions) keys)))
+
+
+(defun bw-coerce-goal-states (candidate-goal-states)
+  "Coerce CANDIDATE-GOAL-STATES into a list of PROBLEM-STATE objects.
+
+Accepted inputs:
+  - NIL                               => NIL (no goal states)
+  - a PROBLEM-STATE                   => (list <that state>)
+  - a list of PROBLEM-STATEs          => that list
+  - a proposition list                => (list (bw-make-state-from-propositions ...))
+  - a list of proposition lists       => (mapcar bw-make-state-from-propositions ...)
+  - a report plist with :GOAL-STATES  => coerces (GETF <report> :GOAL-STATES)  ;; NEW
+
+Note: NIL by itself is treated as \"no goal states\". To represent a single empty
+proposition list as a goal-state, pass (list nil)."
+  (cond
+    ;; NIL means: no goal states (important for enumerator bridges)
+    ((null candidate-goal-states)
+     nil)
+
+    ;; NEW: Allow passing a FIND-GOAL-STATES report plist directly.
+    ;; We detect this by the presence of the :GOAL-STATES key.
+    ((and (consp candidate-goal-states)
+          (keywordp (first candidate-goal-states))
+          (member :goal-states candidate-goal-states))                 ;; NEW
+     (bw-coerce-goal-states (getf candidate-goal-states :goal-states))) ;; NEW
+
+    ;; Single PROBLEM-STATE
+    ((typep candidate-goal-states 'problem-state)
+     (list candidate-goal-states))
+
+    ;; List of PROBLEM-STATEs
+    ((and (listp candidate-goal-states)
+          (every (lambda (x) (typep x 'problem-state)) candidate-goal-states))
+     candidate-goal-states)
+
+    ;; Single proposition list (must be non-empty and start with a proposition)
+    ((and (consp candidate-goal-states)
+          (consp (first candidate-goal-states))
+          (symbolp (caar candidate-goal-states)))
+     (list (bw-make-state-from-propositions candidate-goal-states)))
+
+    ;; List of proposition lists (each element is a prop-list; prop-list may be NIL)
+    ((and (listp candidate-goal-states)
+          (every (lambda (pl)
+                   (and (listp pl)
+                        (every (lambda (p)
+                                 (and (consp p) (symbolp (car p))))
+                               pl)))
+                 candidate-goal-states))
+     (mapcar #'bw-make-state-from-propositions candidate-goal-states))
+
+    (t
+     (error "BW-COERCE-GOAL-STATES: unsupported goal-states input: ~S"
+            candidate-goal-states))))
+
+
+(defun bw-milestone->props (milestone &key (format :auto))
+  "Normalize MILESTONE into a proposition list suitable for hashing/comparison.
+
+FORMAT:
+  :props     => MILESTONE is already a proposition list
+  :goal-form => MILESTONE is (OP <prop>...) (e.g., (AND ...))
+  :auto      => try to detect (OP ...) vs props list
+
+Special cases:
+  (AND T) => NIL (empty milestone)
+  (OR NIL) => NIL (empty milestone)"
+  (cond
+    ((null milestone) nil)
+
+    ((eq format :props)
+     milestone)
+
+    ((or (eq format :goal-form)
+         (and (eq format :auto)
+              (consp milestone)
+              (symbolp (first milestone))
+              ;; goal-form is (OP <...>); props-list begins with a proposition like (LOC ...)
+              (not (and (consp (first (rest milestone)))
+                        (symbolp (car (first (rest milestone))))))))
+     (let ((op (first milestone))
+           (args (rest milestone)))
+       (cond
+         ((and (eql op 'and) (equal args (list t))) nil)
+         ((and (eql op 'or)  (equal args (list nil))) nil)
+         (t args))))
+
+    (t
+     ;; Assume it is already a prop list
+     milestone)))
+
+
+(defun bw-rank-milestones (report &key
+                                  (milestone-format :auto)
+                                  (max-examples 3)
+                                  (include-empty nil))
+  "Return ranked milestone summaries derived from REPORT.
+
+Each summary is a plist:
+  (:MILESTONE-PROPS <props> :COUNT n :CLAUSES k :EXAMPLES (<plist> ...))
+
+Ranking: higher COUNT first; ties broken by fewer CLAUSES."
+  (let ((ht (make-hash-table :test #'equal)))
+    ;; Accumulate
+    (loop for goal-report in report do
+          (let ((goal-index (getf goal-report :goal-index))
+                (action-reports (getf goal-report :action-reports)))
+            (loop for ar in action-reports do
+                  (let ((action (getf ar :action))
+                        (milestones (getf ar :milestones)))
+                    (loop for m in milestones
+                          for pred-index from 0 do
+                          (let* ((props (bw-milestone->props m :format milestone-format)))
+                            (when (or include-empty props)
+                              (let ((entry (gethash props ht)))
+                                (if entry
+                                    (progn
+                                      (setf (getf entry :count) (1+ (getf entry :count)))
+                                      (when (< (length props) (getf entry :clauses))
+                                        (setf (getf entry :clauses) (length props)))
+                                      (let ((ex (getf entry :examples)))
+                                        (when (< (length ex) max-examples)
+                                          (setf (getf entry :examples)
+                                                (append ex (list (list :goal-index goal-index
+                                                                       :action action
+                                                                       :predecessor-index pred-index)))))))
+                                  (setf (gethash props ht)
+                                        (list :milestone-props props
+                                              :count 1
+                                              :clauses (length props)
+                                              :examples (list (list :goal-index goal-index
+                                                                    :action action
+                                                                    :predecessor-index pred-index)))))))))))))
+
+    ;; Extract + sort
+    (let ((summaries nil))
+      (maphash (lambda (_k v) (declare (ignore _k)) (push v summaries)) ht)
+      (stable-sort summaries
+                   (lambda (a b)
+                     (let ((ca (getf a :count))
+                           (cb (getf b :count)))
+                       (or (> ca cb)
+                           (and (= ca cb)
+                                (< (getf a :clauses) (getf b :clauses))))))))))
+
+
+(defun bw-top-milestones (report &key
+                                 (n 10)
+                                 (return :props) ; :props | :summaries
+                                 (milestone-format :auto)
+                                 (max-examples 3)
+                                 (include-empty nil))
+  "Return the top-N milestones from REPORT.
+
+RETURN:
+  :props     => list of milestone prop-lists
+  :summaries => list of summary plists (see BW-RANK-MILESTONES)"
+  (let* ((ranked (bw-rank-milestones report
+                                     :milestone-format milestone-format
+                                     :max-examples max-examples
+                                     :include-empty include-empty))
+         (top (subseq ranked 0 (min n (length ranked)))))
+    (ecase return
+      (:props (mapcar (lambda (s) (getf s :milestone-props)) top))
+      (:summaries top))))
+
+
+(defun bw-report-summary (report)
+  "Summarize a regressed-predecessor REPORT.
+
+Returns a plist:
+  (:GOALS n :ACTION-REPORTS n :VALIDATED-TOTAL n :MILESTONES-TOTAL n)"
+  (let ((goals 0)
+        (action-reports 0)
+        (validated-total 0)
+        (milestones-total 0))
+    (loop for goal-report in report do
+          (incf goals)
+          (loop for ar in (getf goal-report :action-reports) do
+                (incf action-reports)
+                (incf validated-total (or (getf ar :validated-count) 0))
+                (incf milestones-total (length (or (getf ar :milestones) nil)))))
+    (list :goals goals
+          :action-reports action-reports
+          :validated-total validated-total
+          :milestones-total milestones-total)))
+
+
+(defun bw-report-action-totals (report)
+  "Aggregate validated/milestone counts per action across the whole REPORT.
+
+Returns a list of plists sorted by descending :VALIDATED-COUNT, then descending
+:MILESTONE-COUNT:
+  (:ACTION <form> :VALIDATED-COUNT n :MILESTONE-COUNT m)"
+  (let ((ht (make-hash-table :test #'equal)))
+    (loop for goal-report in report do
+          (loop for ar in (getf goal-report :action-reports) do
+                (let* ((action (getf ar :action))
+                       (vc (or (getf ar :validated-count) 0))
+                       (mc (length (or (getf ar :milestones) nil)))
+                       (entry (gethash action ht)))
+                  (if entry
+                      (progn
+                        (incf (getf entry :validated-count) vc)
+                        (incf (getf entry :milestone-count) mc))
+                    (setf (gethash action ht)
+                          (list :action action
+                                :validated-count vc
+                                :milestone-count mc))))))
+
+    (let ((totals nil))
+      (maphash (lambda (_k v) (declare (ignore _k)) (push v totals)) ht)
+      (stable-sort totals
+                   (lambda (a b)
+                     (let ((va (getf a :validated-count))
+                           (vb (getf b :validated-count)))
+                       (or (> va vb)
+                           (and (= va vb)
+                                (> (getf a :milestone-count)
+                                   (getf b :milestone-count))))))))))
+
+
+(defun bw-report-top-actions (report &key (n 10))
+  "Return the top-N actions by total validated-count across REPORT."
+  (let* ((totals (bw-report-action-totals report))
+         (top (subseq totals 0 (min n (length totals)))))
+    (mapcar (lambda (x) (getf x :action)) top)))
+
+
+(defun bw-milestone-props->goal-form (props &key (operator 'and))
+  "Convert a milestone proposition list PROPS into a translator-safe goal form.
+
+Never returns (AND) or (OR) with no arguments:
+  NIL + AND => (AND T)
+  NIL + OR  => (OR NIL)"
+  (cond
+    (props (cons operator props))
+    ((eql operator 'and) (list 'and t))
+    ((eql operator 'or)  (list 'or nil))
+    (t (list operator t))))
+
+
+(defun bw-top-milestone-goals (report &key
+                                      (n 10)
+                                      (operator 'and)
+                                      (milestone-format :auto)
+                                      (max-examples 3)
+                                      (include-empty nil))
+  "Return top-N milestone goal-forms from REPORT."
+  (mapcar (lambda (props)
+            (bw-milestone-props->goal-form props :operator operator))
+          (bw-top-milestones report
+                             :n n
+                             :return :props
+                             :milestone-format milestone-format
+                             :max-examples max-examples
+                             :include-empty include-empty)))
+
+
 ;;;; ==================== Footprint-aware equivalence helpers ====================
+
 
 (defun bw-ignore-predicate-for-action (action-form)
   "Return a predicate (PROP -> boolean) that marks propositions we should
@@ -366,6 +778,7 @@ whether a regressed predecessor 'matches' the previous trace state."
                   (eql (third p) cargo))))))
     (t nil)))
 
+
 (defun bw--normalized-copy (state &key
                                   (strip-relations *bw-normalize-strip-relations*)
                                   (normalizer *bw-default-normalizer*))
@@ -373,6 +786,7 @@ whether a regressed predecessor 'matches' the previous trace state."
   (let ((st (copy-problem-state state)))
     (bw-normalize! st :strip-relations strip-relations :normalizer normalizer)
     st))
+
 
 (defun bw-matches-previous-p (candidate-predecessors previous-state action-form &key
                                                      (projection-relations *bw-base-fact-relations*))
@@ -392,7 +806,23 @@ for pickup), which would cause derived facts to differ after normalization."
             candidate-predecessors))))
 
 
+(defun bw-goal-required-props (state)
+  "Extract a minimal 'goal footprint' from STATE:
+   - all (ACTIVE x)
+   - (LOC agent* area) only for agent subjects."
+  (let ((req nil))
+    (dolist (p (bw--all-props state))
+      (case (car p)
+        (active (push p req))
+        (loc (when (bw--agent-symbol-p (second p))
+               (push p req)))))
+    (sort (remove-duplicates req :test #'equal)
+          (lambda (x y)
+            (string< (prin1-to-string x) (prin1-to-string y))))))
+
+
 ;;;; ==================== Trace-driven regression tests ====================
+
 
 (defun bw-trace-step->triple (step)
   "Return (values ACTION PREVIOUS TARGET) from STEP.
@@ -412,6 +842,7 @@ Supported STEP shapes:
      (values (first step) (second step) (third step)))
     (t
      (values nil nil nil))))
+
 
 (defun bw-backward-check-trace (trace &key
                                       (normalizer *bw-default-normalizer*)
@@ -450,6 +881,7 @@ Returns a list of plists:
 ;;; State indexing: S0 = start state, Sn = state after action n.
 ;;; Action n transitions S(n-1) -> Sn.
 
+
 (defparameter *corner-actions*
   '((pickup-connector agent1 connector1 area1)                                      ; 1
     (connect-to-2-terminus agent1 connector1 transmitter1 receiver1 area1 ground)   ; 2
@@ -467,6 +899,7 @@ Returns a list of plists:
     (move agent1 area3 area4)                                                       ; 14
     (pickup-connector agent1 connector2 area4))                                     ; 15
   "The 15-action optimal solution for problem-corner.")
+
 
 (defparameter *corner-state-props*
   ;; Vector indexed 0..15. Entry i holds propositions for state Si.
@@ -817,6 +1250,7 @@ Returns a list of plists:
 
 ;;;; ==================== REPL test helpers ====================
 
+
 (defun bw-corner-state (n)
   "Return a fresh PROBLEM-STATE for state Sn (0 <= n <= 15)."
   (check-type n (integer 0 15))
@@ -824,10 +1258,12 @@ Returns a list of plists:
                                    :relations nil
                                    :time (float n)))
 
+
 (defun bw-corner-action (n)
   "Return the Nth action form (1 <= n <= 15)."
   (check-type n (integer 1 15))
   (nth (1- n) *corner-actions*))
+
 
 (defun bw-corner-build-trace (start-action end-action)
   "Build a trace list for actions START-ACTION through END-ACTION (inclusive).
@@ -841,6 +1277,7 @@ Action n uses state S(n-1) as :prev and Sn as :target."
         collect (list :action (bw-corner-action n)
                       :prev (bw-corner-state (1- n))
                       :target (bw-corner-state n))))
+
 
 (defun bw-test-corner-range (start-action end-action &key (verbose t))
   "Test backward regression on actions START-ACTION through END-ACTION.
@@ -868,6 +1305,7 @@ Returns a list of result plists, one per action."
                        (getf r :validated-count)
                        (getf r :matched-previous-p))))
     results))
+
 
 (defun bw-test-corner-single (action-num &key (verbose t))
   "Test backward regression on a single action.
@@ -899,6 +1337,7 @@ Example: (bw-test-corner-single 15)"
 ;;;   - Third connector: held by agent or placed somewhere
 ;;;
 ;;; Enumeration: 2 areas × 2 areas × 5 dispositions = 20 candidate configurations
+
 
 (defparameter *corner-static-facts*
   '(;; Coordinates
@@ -957,12 +1396,14 @@ Example: (bw-test-corner-single 15)"
     (accessible1 area3 gate1 area4))
   "Static facts from problem-corner's define-init, required for action preconditions.")
 
+
 (defun bw-corner-goal-satisfied-p (state)
   "Check if STATE satisfies the problem-corner goal condition."
   (let ((props (bw--all-props state)))
     (and (member '(active receiver2) props :test #'equal)
          (member '(active receiver3) props :test #'equal)
          (member '(loc agent1 area4) props :test #'equal))))
+
 
 (defun bw-corner-build-goal-candidate (c-red-area c-blue-area c-other-disposition)
   "Build a goal state candidate for problem-corner with MINIMAL base facts.
@@ -1013,6 +1454,7 @@ Returns a PROBLEM-STATE with minimal base facts, before propagation."
     
     (bw-make-state-from-propositions base-facts :relations nil :time 0.0)))
 
+
 (defun bw-corner-enumerate-goal-candidates ()
   "Enumerate all 20 candidate goal configurations for problem-corner.
 
@@ -1037,6 +1479,7 @@ Configuration numbering:
                       :state (bw-corner-build-goal-candidate c-red-area c-blue-area c-other))
                 results))))
     (nreverse results)))
+
 
 (defun bw-corner-test-goal-candidates (&key (verbose t))
   "Test all 20 goal candidate configurations for problem-corner.
@@ -1087,6 +1530,7 @@ Example usage:
     
     (nreverse valid)))
 
+
 (defun bw-corner-show-goal-state (config &key (relations *bw-default-projection-relations*))
   "Display the key propositions of a goal state configuration.
 
@@ -1105,6 +1549,7 @@ Example:
     (dolist (prop (bw-project state :relations relations))
       (format t "  ~S~%" prop))))
 
+
 (defun bw-corner-valid-goal-states ()
   "Return list of valid goal states for problem-corner (states only, not full configs).
 
@@ -1115,6 +1560,64 @@ Example:
     (format t \"Found ~D goal states to regress from.\" (length goal-states)))"
   (mapcar (lambda (config) (getf config :state))
           (bw-corner-test-goal-candidates :verbose nil)))
+
+
+(defun bw--collect-connectors (state)
+  "Collect connector symbols appearing anywhere in STATE props."
+  (let ((cs nil))
+    (dolist (p (bw--all-props state))
+      (dolist (x (rest p))
+        (when (bw--connector-symbol-p x)
+          (push x cs))))
+    (sort (remove-duplicates cs :test #'eq)
+          #'string< :key #'symbol-name)))
+
+
+(defun bw-candidate-last-actions-for-goal (target-state &key
+                                                       (include-move t)
+                                                       (include-pickup t)
+                                                       (include-connect nil)
+                                                       (n-values '(1 2 3))
+                                                       (place 'ground))
+  "Generate plausible last-action candidates for a *goal-ish* TARGET-STATE.
+
+Key behavior: uses *TYPES* to source areas/connectors/agents when TARGET-STATE
+doesn't mention enough objects (common with enumerated or projected states).
+
+MOVE candidates: (MOVE ag from goal-area) for all FROM areas != goal-area.
+PICKUP candidates: (PICKUP-CONNECTOR ag conn goal-area) for all connectors.
+CONNECT candidates (optional): uses BW-CANDIDATE-CONNECT-ACTIONS."
+  (let* ((agents (bw--union-symbol-lists
+                  (bw--collect-agents target-state)
+                  (bw--type-instances 'real-agent)
+                  (bw--type-instances 'agent)))
+         (areas (bw--union-symbol-lists
+                 (bw--collect-areas target-state)
+                 (bw--type-instances 'area)))
+         (connectors (bw--union-symbol-lists
+                      (bw--collect-connectors target-state)
+                      (bw--type-instances 'connector)))
+         (actions nil))
+    (dolist (ag agents)
+      (let ((goal-area (bw--loc-of target-state ag)))
+        (when goal-area
+          (when include-move
+            (dolist (from areas)
+              (when (and from (not (eql from goal-area)))
+                (push (list 'move ag from goal-area) actions))))
+          (when include-pickup
+            (dolist (c connectors)
+              (push (list 'pickup-connector ag c goal-area) actions))))))
+    (when include-connect
+      (setf actions
+            (nconc actions
+                   (bw-candidate-connect-actions target-state
+                                                :agents agents
+                                                :n-values n-values
+                                                :place place))))
+    (let ((uniq (remove-duplicates actions :test #'equal)))
+      (sort uniq (lambda (x y)
+                   (string< (prin1-to-string x) (prin1-to-string y)))))))
 
 
 ;;;; ==================== Backward Search Loop (problem-corner) ====================
@@ -1132,6 +1635,7 @@ Example:
 ;;;   8. If stack empty → FAILURE
 
 ;;; ---------- Action candidate generation ----------
+
 
 (defun bw-corner-candidate-actions (state)
   "Generate candidate actions that could have produced STATE.
@@ -1277,6 +1781,7 @@ For problem-corner, we check:
 
 ;;; ---------- Start state matching ----------
 
+
 (defun bw-corner-matches-start-p (state)
   "Check if STATE matches the problem-corner start state on base facts."
   (let ((start-props '((loc agent1 area1)
@@ -1295,6 +1800,7 @@ For problem-corner, we check:
 
 
 ;;; ---------- Main search loop ----------
+
 
 (defun bw-corner-backward-search (&key (depth-cutoff 20) (verbose t) (max-states 100000))
   "Run backward DFS search from goal states to start state for problem-corner.
@@ -1404,7 +1910,6 @@ Example:
     (values success path)))
 
 
-
 (defun bw-diagnose-connect-validation ()
   "Diagnose why CONNECT candidates fail validation."
   (let* ((gs (first (bw-corner-valid-goal-states)))
@@ -1491,6 +1996,7 @@ Example:
         (let ((validated (bw-regress+validate pred connect-action :verbose t)))
           (format t "Validated predecessors: ~D~%" (length validated)))))))
 
+
 (defun bw-diagnose-depth-1 ()
   "Diagnose what happens after first regression step."
   (let* ((gs (first (bw-corner-valid-goal-states)))
@@ -1539,6 +2045,7 @@ Example:
             (dolist (c pred-candidates)
               (format t "  ~S~%" c))))))))
 
+
 (defun bw-diagnose-move-regression ()
   "Diagnose why MOVE regressions fail.
 
@@ -1583,6 +2090,7 @@ Traces through the regression and forward validation step by step."
 
 ;;; ---------- Diagnostics ----------
 
+
 (defun bw-diagnose-goal-state (&optional (config-index 0))
   "Diagnose why backward search fails from a goal state.
 
@@ -1620,6 +2128,7 @@ Shows:
         (let ((validated (bw-regress+validate gs action :verbose t)))
           (format t "  => ~D validated predecessor~:P~%" (length validated)))))))
 
+
 (defun bw-diagnose-from-actual-s15 ()
   "Diagnose backward search from actual solution state S15.
 
@@ -1645,3 +2154,240 @@ rather than the enumerated minimal goal state."
         (format t "~%--- Action: ~S ---~%" action)
         (let ((validated (bw-regress+validate s15 action :verbose t)))
           (format t "  => ~D validated predecessor~:P~%" (length validated)))))))
+
+
+;;;;;;;
+
+
+(defun bw--symbol-prefix-p (sym prefix)
+  (and (symbolp sym)
+       (let ((name (symbol-name sym)))
+         (and (<= (length prefix) (length name))
+              (string= prefix name :end2 (length prefix))))))
+
+
+(defun bw--agent-symbol-p (sym)
+  (bw--symbol-prefix-p sym "AGENT"))
+
+
+(defun bw--area-symbol-p (sym)
+  (bw--symbol-prefix-p sym "AREA"))
+
+
+(defun bw--connector-symbol-p (sym)
+  (bw--symbol-prefix-p sym "CONNECTOR"))
+
+
+(defun bw--collect-areas (state)
+  "Collect area symbols seen in (LOC _ area) and (COORDS area ...), if present."
+  (let ((areas nil))
+    (dolist (p (bw--all-props state))
+      (case (car p)
+        (loc
+         (let ((a (third p)))
+           (when (bw--area-symbol-p a) (push a areas))))
+        (coords
+         (let ((a (second p)))
+           (when (bw--area-symbol-p a) (push a areas))))))
+    (sort (remove-duplicates areas :test #'eq)
+          #'string< :key #'symbol-name)))
+
+
+(defun bw--collect-agents (state)
+  "Collect agent symbols seen as the subject of (LOC agent area)."
+  (let ((agents nil))
+    (dolist (p (bw--all-props state))
+      (when (eql (car p) 'loc)
+        (let ((obj (second p)))
+          (when (bw--agent-symbol-p obj)
+            (push obj agents)))))
+    (sort (remove-duplicates agents :test #'eq)
+          #'string< :key #'symbol-name)))
+
+
+(defun bw--holds-pairs (state)
+  "Return list of (agent . cargo) pairs from (HOLDS agent cargo)."
+  (let ((pairs nil))
+    (dolist (p (bw--all-props state))
+      (when (eql (car p) 'holds)
+        (push (cons (second p) (third p)) pairs)))
+    pairs))
+
+
+(defun bw--paired-partners-of (state cargo)
+  "Return unique partners T such that (PAIRED cargo T) or (PAIRED T cargo)."
+  (let ((partners nil))
+    (dolist (p (bw--all-props state))
+      (when (eql (car p) 'paired)
+        (let ((a (second p)) (b (third p)))
+          (cond ((eql a cargo) (push b partners))
+                ((eql b cargo) (push a partners))))))
+    (sort (remove-duplicates partners :test #'eq)
+          #'string< :key #'symbol-name)))
+
+
+(defun bw--has-any-prop-with-subject-p (state relation subject)
+  "True iff STATE contains (RELATION SUBJECT ...)."
+  (some (lambda (p)
+          (and (eql (car p) relation)
+               (eql (second p) subject)))
+        (bw--all-props state)))
+
+
+(defun bw--loc-of (state obj)
+  (bw--get-binary-fluent state 'loc obj))
+
+
+(defun bw--elevation-of (state obj)
+  (bw--get-binary-fluent state 'elevation obj))
+
+
+(defun bw--combinations-k (lst k)
+  "Return all k-combinations of LST, preserving order."
+  (cond
+    ((= k 0) (list nil))
+    ((null lst) nil)
+    (t
+     (append
+      (mapcar (lambda (rest) (cons (car lst) rest))
+              (bw--combinations-k (cdr lst) (1- k)))
+      (bw--combinations-k (cdr lst) k)))))
+
+
+;;;;;;;;;; Candidate generators per action family
+
+
+(defun bw-candidate-move-actions (target-state &key agents areas)
+  "Generate MOVE last-action hypotheses that end at the agent's current LOC."
+  (let* ((agents (or agents (bw--collect-agents target-state)))
+         (areas  (or areas  (bw--collect-areas target-state)))
+         (actions nil))
+    (dolist (ag agents)
+      (let ((to (bw--loc-of target-state ag)))
+        (when to
+          (dolist (from areas)
+            (when (and from (not (eql from to)))
+              (push (list 'move ag from to) actions))))))
+    (nreverse actions)))
+
+
+(defun bw-candidate-pickup-actions (target-state &key holds-pairs)
+  "Generate PICKUP-CONNECTOR last-action hypotheses from (HOLDS agent cargo).
+
+We only propose pickup when:
+  - cargo looks like a CONNECTOR,
+  - target contains (HOLDS agent cargo),
+  - target does NOT contain any (LOC cargo ...) (because pickup deletes it),
+  - target does NOT contain any (ELEVATION cargo ...) (because pickup deletes it).
+Area argument is set to the agent's current LOC."
+  (let ((pairs (or holds-pairs (bw--holds-pairs target-state)))
+        (actions nil))
+    (dolist (pr pairs)
+      (let* ((ag (car pr))
+             (cargo (cdr pr)))
+        (when (and (bw--connector-symbol-p cargo)
+                   (not (bw--has-any-prop-with-subject-p target-state 'loc cargo))
+                   (not (bw--has-any-prop-with-subject-p target-state 'elevation cargo)))
+          (let ((area (bw--loc-of target-state ag)))
+            (when area
+              (push (list 'pickup-connector ag cargo area) actions))))))
+    (nreverse actions)))
+
+
+(defun bw--connect-op-for-n (n)
+  (case n
+    (1 'connect-to-1-terminus)
+    (2 'connect-to-2-terminus)
+    (3 'connect-to-3-terminus)
+    (otherwise (error "BW--CONNECT-OP-FOR-N: unsupported n=~S" n))))
+
+
+(defun bw-candidate-connect-actions (target-state &key
+                                                 agents
+                                                 (n-values '(1 2 3))
+                                                 (place 'ground))
+  "Generate CONNECT-TO-N-TERMINUS last-action hypotheses.
+
+We propose connect only when, in TARGET-STATE:
+  - agent AG has LOC = AREA
+  - some connector C has (LOC C AREA)
+  - (ELEVATION C 0) holds (connect asserts elevation 0)
+  - terminus candidates come from PAIRED partners of C
+We also avoid terminus choices that are connectors located in the same AREA (precondition)."
+  (let* ((agents (or agents (bw--collect-agents target-state)))
+         (actions nil))
+    (dolist (ag agents)
+      (let ((area (bw--loc-of target-state ag)))
+        (when area
+          ;; Consider each connector located at the agent's area
+          (dolist (p (bw--all-props target-state))
+            (when (and (eql (car p) 'loc)
+                       (bw--connector-symbol-p (second p))
+                       (eql (third p) area))
+              (let* ((cargo (second p))
+                     (elev (bw--elevation-of target-state cargo)))
+                (when (eql elev 0)
+                  (let* ((partners (bw--paired-partners-of target-state cargo))
+                         ;; Filter out cargo itself and any connector terminus in same area
+                         (partners
+                           (remove-if (lambda (term)  ;; CHANGED: was (lambda (t) ...)
+                                        (or (eql term cargo)
+                                            (and (bw--connector-symbol-p term)
+                                                 (eql (bw--loc-of target-state term) area))))
+                                      partners)))
+                    (dolist (n n-values)
+                      (when (and (<= 1 n) (<= n 3) (<= n (length partners)))
+                        (dolist (combo (bw--combinations-k partners n))
+                          (push (append (list (bw--connect-op-for-n n) ag cargo)
+                                        combo
+                                        (list area place))
+                                actions))))))))))))
+    ;; Dedup deterministically
+    (let ((uniq (remove-duplicates actions :test #'equal)))
+      (sort uniq (lambda (x y)
+                   (string< (prin1-to-string x) (prin1-to-string y)))))))
+
+
+(defun bw-candidate-last-actions (target-state &key
+                                              (include-move t)
+                                              (include-pickup t)
+                                              (include-connect t)
+                                              (n-values '(1 2 3))
+                                              (place 'ground))
+  "Construct a bounded, plausible candidate last-action set for TARGET-STATE."
+  (let* ((agents (bw--collect-agents target-state))
+         (areas  (bw--collect-areas target-state))
+         (holds  (bw--holds-pairs target-state))
+         (actions nil))
+    (when include-move
+      (setf actions (nconc actions (bw-candidate-move-actions target-state
+                                                             :agents agents
+                                                             :areas areas))))
+    (when include-pickup
+      (setf actions (nconc actions (bw-candidate-pickup-actions target-state
+                                                               :holds-pairs holds))))
+    (when include-connect
+      (setf actions (nconc actions (bw-candidate-connect-actions target-state
+                                                                :agents agents
+                                                                :n-values n-values
+                                                                :place place))))
+    (let ((uniq (remove-duplicates actions :test #'equal)))
+      (sort uniq (lambda (x y)
+                   (string< (prin1-to-string x) (prin1-to-string y)))))))
+
+
+(defun bw--type-instances (type)
+  "Return instances for TYPE from *TYPES*, or NIL if unavailable."
+  (when (and (boundp '*types*) (hash-table-p *types*))
+    (let ((xs (gethash type *types*)))
+      (and xs (copy-list xs)))))
+
+
+(defun bw--union-symbol-lists (&rest lists)
+  "Union of LISTS (symbols), stable-ish and duplicate-free."
+  (let ((out nil))
+    (dolist (lst lists)
+      (dolist (x lst)
+        (when (symbolp x)
+          (pushnew x out :test #'eq))))
+    (sort out #'string< :key #'symbol-name)))

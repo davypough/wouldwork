@@ -491,10 +491,23 @@
                                       (car open-positions) depth))))))
 
 
-(defmacro check-parens (problem-name)
-  "Check parenthesis balance in a problem file.
-   Usage: (check-parens buzzer1) checks problem-buzzer1.lisp"
-  (let ((filename (format nil "problem-~A.lisp" (string-downcase (symbol-name problem-name)))))
-    `(check-parens-file 
-      (merge-pathnames ,filename
-                       (asdf:system-relative-pathname :wouldwork "src/")))))
+(defun check-parens (filename)
+  "Check parenthesis balance in a file anywhere under the wouldwork project.
+   Usage: (check-parens \"ww-searcher.lisp\")"
+  (let* ((root (asdf:system-relative-pathname :wouldwork ""))
+         (pattern (merge-pathnames
+                   (make-pathname :directory '(:relative :wild-inferiors)
+                                  :name :wild :type :wild)
+                   root))
+         (matches (remove-if-not
+                   (lambda (path)
+                     (string-equal filename (file-namestring path)))
+                   (directory pattern))))
+    (cond
+      ((null matches)
+       (format nil "File ~S not found under ~A" filename root))
+      ((= (length matches) 1)
+       (check-parens-file (first matches)))
+      (t
+       (format nil "Ambiguous: ~D files named ~S found:~%~{  ~A~%~}"
+               (length matches) filename matches)))))

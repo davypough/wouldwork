@@ -15,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 5)
 
 (ww-set *progress-reporting-interval* 500000)
 
@@ -61,13 +61,16 @@
   (loc (either agent cargo buzzer mine) $area)  ;a location in an area
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either plate blower receiver))
-  (on (either $agent $cargo) $box :bijective)
-  (supports (either $buzzer $mine) $box :bijective)
-  (elevation (either agent cargo) $rational)
+  ;(elevation (either agent cargo) $fixnum)
   (paired terminus terminus)  ;potential beam between two terminus
   (color relay $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
+)
+
+
+(define-base-relations  ;relations which are not derived
+  (holds loc paired)
 )
 
 
@@ -273,18 +276,6 @@
 ;;;; SEARCH QUERIES ;;;;
 
 
-(define-query cleartop (?support)
-  ;; True if nothing is on top of a box, buzzer, or mine.
-  (cond ((box ?support) (not (bind (on $anything ?support))))
-        ((buzzer ?support) (not (bind (supports ?support $any-box))))
-        ((mine ?support) (not (bind (supports ?support $any-box))))))
-
-
-(define-query safe (?area)
-  (not (exists (?mine mine)
-         (loc ?mine ?area))))
-
-
 (define-query get-current-beams ()
   (do (bind (current-beams $beams))
       (remove nil $beams)))  ; Filter out placeholders
@@ -414,13 +405,6 @@
          (and (different ?c ?connector)
               (loc ?c ?area)
               (bind (color ?c $hue))))))
-
-
-(define-query same-type (?agent ?cargo)
-  ; Agent type and cargo type are the same (real or ghost).
-  (if (real-agent ?agent)
-    (real-cargo ?cargo)
-    (ghost-cargo ?cargo)))
 
 
 (define-query resolve-hue-by-distance (?hue-distance-pairs)
@@ -948,10 +932,12 @@
           (setq $dx (- $tgt-x $src-x))
           (setq $dy (- $tgt-y $src-y))
           (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $min-t (/ $dot $length-sq))
+          (if (< $length-sq 1e-20)
+            (setq $min-t 0)            ;; zero-length beam: fully collapsed
+            (do (setq $curr-dx (- $old-end-x $src-x))
+                (setq $curr-dy (- $old-end-y $src-y))
+                (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+                (setq $min-t (/ $dot $length-sq))))
           ;; Find minimum t across all intersections for this beam
           (ww-loop for $intersection in $all-intersections do
                 (setq $beam1 (first $intersection))
@@ -972,10 +958,12 @@
           (setq $dx (- $tgt-x $src-x))
           (setq $dy (- $tgt-y $src-y))
           (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $closest-t (/ $dot $length-sq))
+          (if (< $length-sq 1e-20)
+            (setq $closest-t 0)        ;; zero-length beam: fully collapsed
+            (do (setq $curr-dx (- $old-end-x $src-x))
+                (setq $curr-dy (- $old-end-y $src-y))
+                (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+                (setq $closest-t (/ $dot $length-sq))))
           (setq $new-end-x $old-end-x)
           (setq $new-end-y $old-end-y)
           ;; Check all intersections involving this beam
@@ -1178,19 +1166,19 @@
 (define-action pickup-connector
     1
   (?agent agent ?connector connector)
-  (and (same-type ?agent ?connector)
+  (and ;(same-type ?agent ?connector)
        (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
-       (loc ?connector $area)
-       (bind (elevation ?connector $e-conn))
-       (<= (abs (- $e-conn $e-agent)) 1))          ; within reach
+       (loc ?connector $area))
+       ;(bind (elevation ?agent $agent-elevation))
+       ;(bind (elevation ?connector $connector-elevation))
+       ;(<= (abs (- $connector-elevation $agent-elevation)) 1))          ; within reach
   (?agent ?connector $area)
   (assert (holds ?agent ?connector)
           (not (loc ?connector $area))
-          (not (elevation ?connector $e-conn))
-          (if (bind (on ?connector $box))
-            (not (on ?connector $box)))
+          ;(not (elevation ?connector $connector-elevation))
+          ;(if (bind (on ?connector $box))
+          ;  (not (on ?connector $box)))
           (disconnect-connector! ?connector)
           (finally (propagate-changes!))))
 
@@ -1200,12 +1188,12 @@
   (?agent agent (combination (?t1 ?t2 ?t3) terminus))
   (and (bind (holds ?agent $cargo))
        (connector $cargo)
-       (same-type ?agent $cargo)
+       ;(same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (different $cargo ?t3)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
+       ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
        (not (and (connector ?t3) (loc ?t3 $area)))
@@ -1214,24 +1202,24 @@
        (selectable ?agent $area ?t3))
   (?agent $cargo ?t1 ?t2 ?t3 $area $place)
   (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (paired $cargo ?t2)
-                  (paired $cargo ?t3)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
+      ;    (assert (not (holds ?agent $cargo))
+      ;            (loc $cargo $area)
+      ;            (on $cargo ?box)
+      ;            (elevation $cargo (1+ $box-elevation))
+      ;            (paired $cargo ?t1)
+      ;            (paired $cargo ?t2)
+      ;            (paired $cargo ?t3)
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
-              (elevation $cargo 0)
+              ;(elevation $cargo 0)
               (paired $cargo ?t1)
               (paired $cargo ?t2)
               (paired $cargo ?t3)
@@ -1244,34 +1232,34 @@
   (?agent agent (combination (?t1 ?t2) terminus))
   (and (bind (holds ?agent $cargo))
        (connector $cargo)
-       (same-type ?agent $cargo)
+       ;(same-type ?agent $cargo)
        (different $cargo ?t1)
        (different $cargo ?t2)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
+       ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2))
   (?agent $cargo ?t1 ?t2 $area $place)
   (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (paired $cargo ?t2)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
+      ;    (assert (not (holds ?agent $cargo))
+      ;            (loc $cargo $area)
+      ;            (on $cargo ?box)
+      ;            (elevation $cargo (1+ $box-elevation))
+      ;            (paired $cargo ?t1)
+      ;            (paired $cargo ?t2)
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
-              (elevation $cargo 0)
+              ;(elevation $cargo 0)
               (paired $cargo ?t1)
               (paired $cargo ?t2)
               (setq $place 'ground)
@@ -1283,30 +1271,30 @@
   (?agent agent ?t1 terminus)
   (and (bind (holds ?agent $cargo))
        (connector $cargo)
-       (same-type ?agent $cargo)
+       ;(same-type ?agent $cargo)
        (different $cargo ?t1)
        (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent))
+       ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (selectable ?agent $area ?t1))
   (?agent $cargo ?t1 $area $place)
   (do ;; Can place on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (< (- $e-box $e-agent) 1))               ; within reach
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (paired $cargo ?t1)
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
+      ;    (assert (not (holds ?agent $cargo))
+      ;            (loc $cargo $area)
+      ;            (on $cargo ?box)
+      ;            (elevation $cargo (1+ $box-elevation))
+      ;            (paired $cargo ?t1)
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
-              (elevation $cargo 0)
+              ;(elevation $cargo 0)
               (paired $cargo ?t1)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
@@ -1317,38 +1305,38 @@
   1
   (?agent agent)
   (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area))
-       (bind (elevation ?agent $e-agent)))
+       (bind (loc ?agent $area)))
+       ;(bind (elevation ?agent $agent-elevation)))
   (?agent $cargo $place $area)
   (do ;; Box-only: can put box on a buzzer or mine
-      (if (box $cargo)
-        (doall (?rover (either buzzer mine))
-          (if (and (loc ?rover $area)
-                   (cleartop ?rover)
-                   (>= $e-agent 1))  ;must be above buzzer/mine
-            (assert (not (holds ?agent $cargo))
-                    (loc $cargo $area)
-                    (supports ?rover $cargo)
-                    (elevation $cargo 1)
-                    (setq $place ?rover)
-                    (finally (propagate-changes!))))))
+      ;(if (box $cargo)
+      ;  (doall (?rover (either buzzer mine))
+      ;    (if (and (loc ?rover $area)
+      ;             (cleartop ?rover)
+      ;             (>= $agent-elevation 1))  ;must be above buzzer/mine
+      ;      (assert (not (holds ?agent $cargo))
+      ;              (loc $cargo $area)
+      ;              (supports ?rover $cargo)
+      ;              (elevation $cargo 1)
+      ;              (setq $place ?rover)
+      ;              (finally (propagate-changes!))))))
       ;; All cargo: can put on a box
-      (doall (?box box)
-        (if (and (loc ?box $area)
-                 (cleartop ?box)
-                 (bind (elevation ?box $e-box))
-                 (setq $e-delta (- $e-box $e-agent))
-                 (< $e-delta 1))  ;within reach +1 up or any level down
-          (assert (not (holds ?agent $cargo))
-                  (loc $cargo $area)
-                  (on $cargo ?box)
-                  (elevation $cargo (1+ $e-box))
-                  (setq $place ?box)
-                  (finally (propagate-changes!)))))
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (setq $delta (- $box-elevation $agent-elevation))
+      ;           (< $delta 1))  ;within reach +1 up or any level down
+      ;    (assert (not (holds ?agent $cargo))
+      ;            (loc $cargo $area)
+      ;            (on $cargo ?box)
+      ;            (elevation $cargo (1+ $box-elevation))
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
       ;; All cargo: can put on ground
       (assert (not (holds ?agent $cargo))
               (loc $cargo $area)
-              (elevation $cargo 0)
+              ;(elevation $cargo 0)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
 
@@ -1358,10 +1346,10 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       (bind (elevation ?agent $agent-elevation))
-       (= $agent-elevation 0)                          ; must be on ground
-       (accessible ?agent $area1 ?area2)
-       (safe ?area2))
+       ;(bind (elevation ?agent $agent-elevation))
+       ;(= $agent-elevation 0)                          ; must be on ground
+       ;(safe ?area2)
+       (accessible ?agent $area1 ?area2))
   (?agent $area1 ?area2)
   (assert (loc ?agent ?area2)
           (finally (propagate-changes!))))
@@ -1376,10 +1364,10 @@
   (loc connector1 area1)
   (loc connector2 area2)
   (loc connector3 area3)
-  (elevation agent1 0)
-  (elevation connector1 0)
-  (elevation connector2 0)
-  (elevation connector3 0)
+  ;(elevation agent1 0)
+  ;(elevation connector1 0)
+  ;(elevation connector2 0)
+  ;(elevation connector3 0)
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
 
   ;; Static spatial configuration
@@ -1443,12 +1431,7 @@
 ;;;; GOAL ;;;;
 
 
-#+ignore (define-goal
+(define-goal
   (and (active receiver2)
        (active receiver3)
-       (loc agent1 area4)))
-
-
-(define-goal
-  (and (active receiver1)
        (loc agent1 area4)))

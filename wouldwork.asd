@@ -69,6 +69,7 @@
                              (:file "ww-problem-tests")
 		                     (:file "ww-set")
                              (:file "ww-command-tests")
+		                     (:file "ww-enumerator")
 		                     (always-compile-file "problem" :around-compile 
                                       (lambda (thunk)
                                         (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t)
