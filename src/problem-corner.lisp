@@ -69,9 +69,191 @@
 )
 
 
-(define-base-relations  ;relations which are not derived
-  (holds loc paired)
+(define-base-relations  ;dyanamic relations which are not derived
+  (loc paired)
 )
+
+
+(define-prefilter corner-paths (state)  ; Used only for goal state
+  ;enumeration--eg, (find-goal-states goal-fn :solution-type every).
+  ;Provides optional optimization to prune complete base states in enumeration,
+  ;before propagate-changes! (expensive) and final goal checks run.
+  ;An optional way to reduce search space further.
+  ;Prefilters are most valuable for non-base constraints that are necessary for the goal,
+  ;but not present as simple base literals in the goal form
+  "Prune base states where required transmitter-receiver paths are not connected."
+  (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
+       (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))
+
+
+(defun prefilter-paired-reachable-p (state source target)  ;used with define-prefilter in enumerator
+  "Check if TARGET is reachable from SOURCE via PAIRED relations in STATE.
+   Uses breadth-first search on the undirected pairing graph."
+  (let ((visited (make-hash-table :test 'eq))
+        (queue (list source))
+        (idb (problem-state.idb state)))
+    (setf (gethash source visited) t)
+    (loop while queue do
+      (let ((current (pop queue)))
+        (when (eq current target)
+          (return-from prefilter-paired-reachable-p t))
+        ;; Check all PAIRED relations involving current
+        (maphash (lambda (key val)
+                   (declare (ignore val))
+                   (let ((prop (convert-to-proposition key)))
+                     (when (and (consp prop)
+                                (eq (first prop) 'paired))
+                       (let ((a (second prop))
+                             (b (third prop)))
+                         (cond
+                           ((and (eq a current) (not (gethash b visited)))
+                            (setf (gethash b visited) t)
+                            (setf queue (nconc queue (list b))))
+                           ((and (eq b current) (not (gethash a visited)))
+                            (setf (gethash a visited) t)
+                            (setf queue (nconc queue (list a)))))))))
+                 idb)))
+    nil))
+
+
+;;;; ============================================================
+;;;; CORNER canonical goal-key  ; used to cull *unique-states* 
+;;;; ============================================================
+
+
+(define-uniqueness :goal-key #'corner-goal-key)  ;operates on goal state to cull *unique-solutions* to user defined equivalence
+
+
+(defun corner-goal-key-prefixp (prefix s)
+  ;; NEW
+  (let ((lp (length prefix))
+        (ls (length s)))
+    (and (<= lp ls)
+         (string= prefix s :end2 lp))))
+
+
+(defun corner-goal-key-connectors-from-idb (props)
+  ;; NEW
+  ;; Prefer the type system if available; otherwise fall back to scanning.
+  (or (and (fboundp 'maybe-type-instances)
+           (ignore-errors (maybe-type-instances 'connector)))
+      (let ((acc nil))
+        (labels ((walk (x)
+                   (cond
+                     ((symbolp x)
+                      (when (corner-goal-key-prefixp "CONNECTOR" (symbol-name x))
+                        (pushnew x acc :test #'eq)))
+                     ((consp x)
+                      (walk (car x))
+                      (walk (cdr x))))))
+          (dolist (p props) (walk p)))
+        (nreverse acc))))
+
+
+(defun corner-goal-key-make-labels (n)
+  ;; NEW
+  (loop for i from 1 to n
+        collect (intern (format nil "C~D" i) :keyword)))
+
+
+(defun corner-goal-key-rename-tree (x map)
+  ;; NEW
+  (cond
+    ((symbolp x) (or (gethash x map) x))
+    ((consp x) (cons (corner-goal-key-rename-tree (car x) map)
+                     (corner-goal-key-rename-tree (cdr x) map)))
+    (t x)))
+
+
+(defun corner-goal-key-normalize-prop (prop)
+  ;; NEW
+  ;; Normalization that is independent of connector renaming.
+  (cond
+    ;; Ignore beam-name/order list (redundant + unstable)
+    ((and (consp prop) (eq (car prop) 'current-beams))
+     nil)
+    ;; Drop BEAM symbol from beam-segment: (beam-segment BEAM SRC TGT X Y)
+    ;; -> (beam-segment SRC TGT X Y)
+    ((and (consp prop)
+          (eq (car prop) 'beam-segment)
+          (consp (cdr prop)))
+     (cons 'beam-segment (cddr prop)))
+    (t prop)))
+
+
+(defun corner-goal-key-permute (lst)
+  ;; NEW
+  ;; Returns list of permutations of LST (small in CORNER).
+  (if (endp lst)
+      (list nil)
+      (mapcan (lambda (x)
+                (mapcar (lambda (p) (cons x p))
+                        (corner-goal-key-permute
+                         (remove x lst :count 1 :test #'eq))))
+              lst)))
+
+
+(defun corner-goal-key-candidate-key (props labels perm)
+  ;; NEW
+  ;; Build one candidate normalized string for a particular connector renaming PERM.
+  (let ((map (make-hash-table :test #'eq)))
+    (loop for old in perm
+          for new in labels
+          do (setf (gethash old map) new))
+    (let* ((lines
+             (loop for p in props
+                   for np = (corner-goal-key-normalize-prop p)
+                   when np
+                     collect (prin1-to-string
+                              (corner-goal-key-rename-tree np map))))
+           (sorted (sort lines #'string<)))
+      (with-output-to-string (s)
+        (dolist (line sorted)
+          (write-string line s)
+          (write-char #\Newline s))))))
+
+
+(defun corner-goal-key-simple-key (props)
+  ;; NEW
+  ;; Beam-normalize + sort, with no connector canonicalization.
+  (let* ((lines
+           (loop for p in props
+                 for np = (corner-goal-key-normalize-prop p)
+                 when np collect (prin1-to-string np)))
+         (sorted (sort lines #'string<)))
+    (with-output-to-string (s)
+      (dolist (line sorted)
+        (write-string line s)
+        (write-char #\Newline s)))))
+
+
+(defun corner-goal-key (idb)
+  "Canonical goal-key for CORNER:
+   - Drops BEAM identity from (beam-segment BEAM SRC TGT X Y) -> (beam-segment SRC TGT X Y)
+   - Ignores (current-beams ...) completely
+   - Canonicalizes under connector renaming by minimizing over all connector permutations
+     (brute force; fine for CORNER-sized connector sets).
+   Returns a deterministic string key."
+  (declare (type hash-table idb))
+  (let ((*package* (find-package :ww))
+        (*print-escape* t)
+        (*print-readably* t)
+        (*print-circle* nil))
+    (let* ((props (list-database idb))
+           (connectors (corner-goal-key-connectors-from-idb props)))
+      (if (endp connectors)
+          (corner-goal-key-simple-key props)
+          (let* ((labels (corner-goal-key-make-labels (length connectors)))
+                 (perms (corner-goal-key-permute connectors))
+                 (best nil))
+            (dolist (perm perms)
+              (let ((k (corner-goal-key-candidate-key props labels perm)))
+                (when (or (null best) (string< k best))
+                  (setf best k))))
+            best)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (define-static-relations
@@ -833,7 +1015,7 @@
 
 
 (define-update propagate-changes! ()
-  (ww-loop for $iteration from 1 to 10
+  (ww-loop for $iteration from 1 to 5
            do (if (not (propagate-consequences!))
                 (return))  ;convergence achieved
            finally (inconsistent-state)))  ;no convergence, mark state inconsistent for pruning
@@ -843,7 +1025,8 @@
   ;; All functions must execute in order; returns t if any change occurred
   (some #'identity
         (mapcar (lambda (fn) (funcall fn state))
-                (list ;#'update-plate-controlled-devices!
+                (list #'derive-holds!                   ;always returns nil
+                      ;#'update-plate-controlled-devices!
                       ;#'blow-objects-if-active!
                       #'create-missing-beams!
                       #'remove-orphaned-beams!
@@ -854,6 +1037,21 @@
                       #'deactivate-unpowered-relays!
                       #'activate-receivers-that-gained-power!
                       #'activate-reachable-relays!))))
+
+
+(define-update derive-holds! ()
+  ;; Derives holds relation from loc state.
+  ;; Cargo without loc is held; otherwise nothing is held.
+  ;; Returns nil (no downstream propagation effects).
+  (do
+    (doall (?agent agent)
+      (if (exists (?cargo cargo)
+            (and (not (bind (loc ?cargo $any-loc)))
+                 (setq $held ?cargo)))
+        (holds ?agent $held)
+        (do (bind (holds ?agent $any-cargo))
+            (not (holds ?agent $any-cargo)))))
+    nil))
 
 
 (define-update create-missing-beams! ()
@@ -1174,7 +1372,7 @@
        ;(bind (elevation ?connector $connector-elevation))
        ;(<= (abs (- $connector-elevation $agent-elevation)) 1))          ; within reach
   (?agent ?connector $area)
-  (assert (holds ?agent ?connector)
+  (assert ;(holds ?agent ?connector)
           (not (loc ?connector $area))
           ;(not (elevation ?connector $connector-elevation))
           ;(if (bind (on ?connector $box))
@@ -1207,7 +1405,7 @@
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (not (holds ?agent $cargo))
+      ;    (assert ;(not (holds ?agent $cargo))
       ;            (loc $cargo $area)
       ;            (on $cargo ?box)
       ;            (elevation $cargo (1+ $box-elevation))
@@ -1217,7 +1415,7 @@
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
+      (assert ;(not (holds ?agent $cargo))
               (loc $cargo $area)
               ;(elevation $cargo 0)
               (paired $cargo ?t1)
@@ -1248,7 +1446,7 @@
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (not (holds ?agent $cargo))
+      ;    (assert ;(not (holds ?agent $cargo))
       ;            (loc $cargo $area)
       ;            (on $cargo ?box)
       ;            (elevation $cargo (1+ $box-elevation))
@@ -1257,7 +1455,7 @@
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
+      (assert ;(not (holds ?agent $cargo))
               (loc $cargo $area)
               ;(elevation $cargo 0)
               (paired $cargo ?t1)
@@ -1284,7 +1482,7 @@
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (not (holds ?agent $cargo))
+      ;    (assert ;(not (holds ?agent $cargo))
       ;            (loc $cargo $area)
       ;            (on $cargo ?box)
       ;            (elevation $cargo (1+ $box-elevation))
@@ -1292,7 +1490,7 @@
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert (not (holds ?agent $cargo))
+      (assert ;(not (holds ?agent $cargo))
               (loc $cargo $area)
               ;(elevation $cargo 0)
               (paired $cargo ?t1)
@@ -1314,7 +1512,7 @@
       ;    (if (and (loc ?rover $area)
       ;             (cleartop ?rover)
       ;             (>= $agent-elevation 1))  ;must be above buzzer/mine
-      ;      (assert (not (holds ?agent $cargo))
+      ;      (assert ;(not (holds ?agent $cargo))
       ;              (loc $cargo $area)
       ;              (supports ?rover $cargo)
       ;              (elevation $cargo 1)
@@ -1327,14 +1525,14 @@
       ;           (bind (elevation ?box $box-elevation))
       ;           (setq $delta (- $box-elevation $agent-elevation))
       ;           (< $delta 1))  ;within reach +1 up or any level down
-      ;    (assert (not (holds ?agent $cargo))
+      ;    (assert ;(not (holds ?agent $cargo))
       ;            (loc $cargo $area)
       ;            (on $cargo ?box)
       ;            (elevation $cargo (1+ $box-elevation))
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; All cargo: can put on ground
-      (assert (not (holds ?agent $cargo))
+      (assert ;(not (holds ?agent $cargo))
               (loc $cargo $area)
               ;(elevation $cargo 0)
               (setq $place 'ground)
@@ -1434,4 +1632,17 @@
 (define-goal
   (and (active receiver2)
        (active receiver3)
-       (loc agent1 area4)))
+       (loc agent1 area4)
+       (exists (?c connector)
+         (not (bind (loc ?c $anywhere))))
+       (exists (?c connector)
+         (and (loc ?c area2)
+              (color ?c blue)
+              (paired ?c transmitter2)
+              (paired ?c receiver3)))
+       (exists (?c connector)
+         (and (loc ?c area3)
+              (color ?c red)
+              (paired ?c transmitter1)
+              (paired ?c receiver2))))
+)

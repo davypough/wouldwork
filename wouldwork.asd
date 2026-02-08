@@ -78,7 +78,8 @@
                                               (update-names (find-symbol "*UPDATE-NAMES*" "WOULDWORK"))
                                               (happening-names (find-symbol "*HAPPENING-NAMES*" "WOULDWORK"))
                                               (problem-path (asdf:system-relative-pathname :wouldwork "src/problem.lisp"))
-                                              (*package* (find-package "WOULDWORK")))
+                                              (*package* (find-package "WOULDWORK"))
+                                              (defun-names '()))
                                           (with-open-file (stream problem-path :direction :input)
                                             (loop for form = (read stream nil nil)
                                                   while form
@@ -97,7 +98,17 @@
                                                          (when (member form-name
                                                                        '("DEFINE-HAPPENING" "DEFINE-PATROLLER")
                                                                        :test #'string=)
-                                                           (push (second form) (symbol-value happening-names))))))))
+                                                           (push (second form) (symbol-value happening-names)))
+                                                         ;; Collect defun names for forward-reference stubs
+                                                         (when (string= form-name "DEFUN")
+                                                           (push (second form) defun-names))))))
+                                          ;; Create stub definitions for forward-referenced defuns
+                                          (dolist (name defun-names)
+                                            (unless (fboundp name)
+                                              (setf (fdefinition name)
+                                                    (lambda (&rest args)
+                                                      (declare (ignore args))
+                                                      (error "Stub for ~A was called before real definition loaded" name))))))
                                         (funcall thunk)))
                              (:file "ww-action-trace")
                              (:file "ww-goal-chaining")

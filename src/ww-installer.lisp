@@ -17,6 +17,13 @@
     (char= (elt str (1- (length str))) final-char)))
 
 
+(defmacro define-uniqueness (&key goal-key)
+  "Problem-level hook. Example:
+  (define-uniqueness :goal-key #'corner-goal-key)"
+  `(setf *ww-goal-uniqueness-key-fn* ,goal-key))
+
+
+
 (defmacro define-types (&rest types&values)
   `(install-types ',types&values))
 
