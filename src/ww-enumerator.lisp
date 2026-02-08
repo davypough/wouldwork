@@ -5,16 +5,17 @@
 ;;; Provides:
 ;;;   1) DEFINE-BASE-RELATIONS — problem specs declare the "base" (non-derived)
 ;;;      relations/types that the enumerator branches on.
-;;;   2) Auto-detection of symmetric (undirected) relations and interchangeable
+;;;   2) DEFINE-ENUM-RELATION — problem specs declare per-relation enumeration
+;;;      metadata (pattern, allow-unassigned, early-keys, on-assign,
+;;;      symmetric-batch, max-per-key) to drive generic action generation.
+;;;   3) Auto-detection of symmetric (undirected) relations and interchangeable
 ;;;      object groups from relation metadata and static-relation signatures.
-;;;   3) DEFINE-PREFILTER — problem-spec hook to prune base states before
+;;;   4) DEFINE-PREFILTER — problem-spec hook to prune base states before
 ;;;      propagation.
-;;;   4) FIND-GOAL-STATES — user-facing entry point for goal-state enumeration.
-;;;   5) GENERATE-ENUM-ACTIONS — data-driven generator that creates a CSP
+;;;   5) FIND-GOAL-STATES — user-facing entry point for goal-state enumeration.
+;;;   6) GENERATE-ENUM-ACTIONS — data-driven generator that creates a CSP
 ;;;      enum-action sequence from declared base relations, auto-detected
-;;;      symmetries, and prefilters, with support for HOLDS, PAIRED (subset
-;;;      enumeration with symmetry breaking and global degree caps), and
-;;;      ELEVATION (defaulting).
+;;;      symmetries, and prefilters.
 
 
 (in-package :ww)
@@ -61,6 +62,14 @@
    When non-nil, applied at ENUM-FINALIZE to prune states before propagation.")
 
 
+(defparameter *enum-relation-metadata* (make-hash-table :test 'eq)
+  "Hash table mapping relation symbols to enum metadata plists.
+   Set by DEFINE-ENUM-RELATION in problem specifications.
+   Keys: relation symbols.  Values: plists with keys
+   :PATTERN :ALLOW-UNASSIGNED :EARLY-KEYS :ON-ASSIGN :SYMMETRIC-BATCH :MAX-PER-KEY
+   :KEY-TYPES :REQUIRES-FLUENT.")
+
+
 ;;;; ----------------------------------------------------------------------
 ;;;; Macros
 ;;;; ----------------------------------------------------------------------
@@ -83,6 +92,27 @@
        (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
             (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))"
   `(install-prefilter ',name (lambda ,lambda-list ,@body)))
+
+
+(defmacro define-enum-relation (relation &rest keys)
+  "Problem-spec macro: declare enumeration metadata for RELATION.
+   Keys:
+   :PATTERN          :FLUENT | :SUBSET | :DERIVED  (default :FLUENT)
+   :ALLOW-UNASSIGNED T | (:TYPES type...)  — which keys may be unassigned
+   :EARLY-KEYS       (:TYPES type...)  — enumerate these key-types first
+   :ON-ASSIGN        ((rel val)...)  — default other relations when assigned
+   :SYMMETRIC-BATCH  T | NIL  — use canonical multisets for interchangeable groups
+   :MAX-PER-KEY      positive integer  — cardinality cap (for :SUBSET pattern)
+   :KEY-TYPES        (:TYPES type...)  — restrict subset keys to these types
+   :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets
+   Example:
+     (define-enum-relation loc
+       :pattern :fluent
+       :allow-unassigned (:types cargo)
+       :early-keys (:types agent)
+       :on-assign ((elevation 0))
+       :symmetric-batch t)"
+  `(install-enum-relation-meta ',relation ',keys))
 
 
 ;;;; ----------------------------------------------------------------------
@@ -225,7 +255,7 @@
 
 
 (defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
-                                       (max-pairs-per-connector 4) (propagate t)
+                                       (default-max-per-key 4) (propagate t)
                                        (prefilter nil))
   "Enumerate compatible goal states via CSP-based variable assignment.
    GOAL-SPEC may be a goal form (including quantifiers) or a partial goal-state
@@ -247,13 +277,13 @@
   (enumerate-state-csp goal-spec
                        :algorithm algorithm
                        :solution-type solution-type
-                       :max-pairs-per-connector max-pairs-per-connector
+                       :default-max-per-key default-max-per-key
                        :propagate propagate
                        :prefilter prefilter))
 
 
 (defun enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
-                                           (max-pairs-per-connector 4) (propagate t)
+                                           (default-max-per-key 4) (propagate t)
                                            (prefilter nil))
   "Enumerate compatible states via a CSP-style, generated enum-action sequence.
    SOLUTION-TYPE:
@@ -271,7 +301,7 @@
            (gf (coerce-goal norm-goal-spec))
            (enum-actions (generate-enum-actions
                           :goal-form goal-form
-                          :max-pairs-per-connector max-pairs-per-connector
+                          :default-max-per-key default-max-per-key
                           :propagate propagate
                           :prefilter prefilter))
            ;; When propagate=NIL, collect ALL finalize states (defer goal test).
@@ -308,7 +338,7 @@
             (setf *enumerator-action-settings*
                   (list :algorithm algorithm
                         :solution-type requested-solution-type
-                        :max-pairs-per-connector max-pairs-per-connector
+                        :default-max-per-key default-max-per-key
                         :propagate propagate
                         :prefilter (if prefilter t nil)))
             (enum-actions-summary enum-actions)
@@ -456,6 +486,12 @@ If the user answers NO, returns immediately."
           *enumerated-goal-states*))
 
 
+(defun maybe-propagate-changes! (state)
+  "Invoke problem-specific propagation when available."
+  (when (fboundp 'propagate-changes!)
+    (funcall (symbol-function 'propagate-changes!) state)))
+
+
 (defun propagate-and-filter-states (states goal-fn)
   "Propagate each state in STATES and return those satisfying GOAL-FN.
    STATES: list of PROBLEM-STATE objects (typically unpropagated leaf states).
@@ -467,7 +503,7 @@ If the user answers NO, returns immediately."
         (checked 0))
     (dolist (s states (nreverse goal-states))
       (incf checked)
-      (propagate-changes! s)
+      (maybe-propagate-changes! s)
       (when (funcall goal-fn s)
         (push s goal-states))
       (when (zerop (mod checked 10000))
@@ -476,14 +512,14 @@ If the user answers NO, returns immediately."
 
 
 (defun enumerate-unpropagated-leaves (goal-spec &key (algorithm *algorithm*)
-                                                     (max-pairs-per-connector 4))
+                                                     (default-max-per-key 4))
   "Enumerate all leaf states WITHOUT propagation; return the list of raw states.
    These states contain only base relation assignments (no derived relations).
    Use PROPAGATE-AND-FILTER-STATES to batch-propagate and filter afterward."
   (enumerate-state goal-spec
                    :algorithm algorithm
                    :solution-type 'every
-                   :max-pairs-per-connector max-pairs-per-connector
+                   :default-max-per-key default-max-per-key
                    :propagate nil))
 
 
@@ -542,6 +578,191 @@ If the user answers NO, returns immediately."
 Checks dynamic binding first (for temporary overrides), then problem property."
   (or *enumerator-base-relations*
       (get problem :enumerator-base-relations)))
+
+
+;;;; ----------------------------------------------------------------------
+;;;; Enum relation metadata
+;;;; ----------------------------------------------------------------------
+
+
+(defun install-enum-relation-meta (relation keys)
+  "Install enumeration metadata for RELATION.
+   RELATION: a symbol naming the relation.
+   KEYS: a property list (:PATTERN val :ALLOW-UNASSIGNED val ...).
+   Valid keys:
+   :PATTERN          :FLUENT | :SUBSET | :DERIVED  (default :FLUENT)
+   :ALLOW-UNASSIGNED T | (:TYPES type...)  — which keys may be unassigned
+   :EARLY-KEYS       (:TYPES type...)  — enumerate these key-types first
+   :ON-ASSIGN        ((rel val)...)  — default other relations when assigned
+   :SYMMETRIC-BATCH  T | NIL  — use canonical multisets for interchangeable groups
+   :MAX-PER-KEY      positive integer  — cardinality cap (for :SUBSET pattern)
+   :KEY-TYPES        (:TYPES type...)  — restrict subset keys to these types
+   :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets"
+  (check-type relation symbol)
+  (let ((plist (enum-canonicalize-meta-keys keys)))
+    (enum-validate-relation-meta relation plist)
+    (setf (gethash relation *enum-relation-metadata*) plist)
+    (when (and (boundp '*problem-name*) *problem-name*)
+      (let ((tbl (or (get *problem-name* :enum-relation-metadata)
+                     (let ((h (make-hash-table :test 'eq)))
+                       (setf (get *problem-name* :enum-relation-metadata) h)
+                       h))))
+        (setf (gethash relation tbl) plist)))
+    (format t "~&Installing enumerator metadata for ~S...~%" relation)
+    relation))
+
+
+(defun enum-canonicalize-meta-keys (keys)
+  "Canonicalize KEYS plist: ensure :PATTERN defaults to :FLUENT when absent."
+  (let ((plist (copy-list keys)))
+    (unless (getf plist :pattern)
+      (setf plist (list* :pattern :fluent plist)))
+    plist))
+
+
+(defun enum-validate-relation-meta (relation plist)
+  "Validate enumeration metadata PLIST for RELATION.  Signals error on invalid entries."
+  (let ((pattern (getf plist :pattern))
+        (allow-unassigned (getf plist :allow-unassigned))
+        (early-keys (getf plist :early-keys))
+        (on-assign (getf plist :on-assign))
+        (max-per-key (getf plist :max-per-key)))
+    (unless (member pattern '(:fluent :subset :derived))
+      (error "DEFINE-ENUM-RELATION ~S: :PATTERN must be :FLUENT, :SUBSET, or :DERIVED; got ~S"
+             relation pattern))
+    (when allow-unassigned
+      (unless (or (eq allow-unassigned t)
+                  (and (consp allow-unassigned)
+                       (eql (car allow-unassigned) :types)
+                       (every #'symbolp (cdr allow-unassigned))))
+        (error "DEFINE-ENUM-RELATION ~S: :ALLOW-UNASSIGNED must be T or (:TYPES type...); got ~S"
+               relation allow-unassigned)))
+    (when early-keys
+      (unless (and (consp early-keys)
+                   (eql (car early-keys) :types)
+                   (every #'symbolp (cdr early-keys)))
+        (error "DEFINE-ENUM-RELATION ~S: :EARLY-KEYS must be (:TYPES type...); got ~S"
+               relation early-keys)))
+    (when on-assign
+      (unless (and (listp on-assign)
+                   (every (lambda (entry)
+                            (and (consp entry)
+                                 (symbolp (first entry))
+                                 (= (length entry) 2)))
+                          on-assign))
+        (error "DEFINE-ENUM-RELATION ~S: :ON-ASSIGN must be ((rel val)...); got ~S"
+               relation on-assign)))
+    (when max-per-key
+      (unless (and (integerp max-per-key) (plusp max-per-key))
+        (error "DEFINE-ENUM-RELATION ~S: :MAX-PER-KEY must be a positive integer; got ~S"
+               relation max-per-key)))
+    (let ((key-types (getf plist :key-types)))
+      (when key-types
+        (unless (and (consp key-types)
+                     (eql (car key-types) :types)
+                     (every #'symbolp (cdr key-types)))
+          (error "DEFINE-ENUM-RELATION ~S: :KEY-TYPES must be (:TYPES type...); got ~S"
+                 relation key-types))))
+    (let ((requires-fluent (getf plist :requires-fluent)))
+      (when requires-fluent
+        (unless (symbolp requires-fluent)
+          (error "DEFINE-ENUM-RELATION ~S: :REQUIRES-FLUENT must be a symbol; got ~S"
+                 relation requires-fluent))))))
+
+
+(defun enum-relation-meta (rel)
+  "Return the enum metadata plist for REL, or NIL if none declared."
+  (or (gethash rel *enum-relation-metadata*)
+      (let ((tbl (and (boundp '*problem-name*) *problem-name*
+                      (get *problem-name* :enum-relation-metadata))))
+        (and tbl (gethash rel tbl)))))
+
+
+(defun enum-pattern (rel)
+  "Return the enumeration pattern for REL.  Defaults to :FLUENT."
+  (let ((meta (enum-relation-meta rel)))
+    (if meta (getf meta :pattern) :fluent)))
+
+
+(defun enum-allow-unassigned (rel)
+  "Return the :ALLOW-UNASSIGNED spec for REL, or NIL."
+  (getf (enum-relation-meta rel) :allow-unassigned))
+
+
+(defun enum-early-keys (rel)
+  "Return the :EARLY-KEYS spec for REL, or NIL."
+  (getf (enum-relation-meta rel) :early-keys))
+
+
+(defun enum-on-assign (rel)
+  "Return the :ON-ASSIGN list for REL, or NIL."
+  (getf (enum-relation-meta rel) :on-assign))
+
+
+(defun enum-symmetric-batch-p (rel)
+  "Return T if REL declares :SYMMETRIC-BATCH."
+  (getf (enum-relation-meta rel) :symmetric-batch))
+
+
+(defun enum-max-per-key (rel)
+  "Return the :MAX-PER-KEY integer for REL, or NIL."
+  (getf (enum-relation-meta rel) :max-per-key))
+
+
+(defun enum-key-types (rel)
+  "Return the :KEY-TYPES spec for REL, or NIL."
+  (getf (enum-relation-meta rel) :key-types))
+
+
+(defun enum-requires-fluent (rel)
+  "Return the :REQUIRES-FLUENT symbol for REL, or NIL."
+  (getf (enum-relation-meta rel) :requires-fluent))
+
+
+(defun enum-key-allows-unassigned-p (rel key-tuple)
+  "Return T if KEY-TUPLE for REL qualifies for an unassigned sentinel.
+   Dispatches on the :ALLOW-UNASSIGNED spec:
+   T — all keys qualify.
+   (:TYPES type...) — qualify if any object in KEY-TUPLE is an instance of
+   one of the listed types."
+  (let ((spec (enum-allow-unassigned rel)))
+    (cond
+      ((null spec) nil)
+      ((eq spec t) t)
+      ((and (consp spec) (eql (car spec) :types))
+       (let ((types (cdr spec)))
+         (some (lambda (obj)
+                 (some (lambda (ty) (member obj (maybe-type-instances ty) :test #'eq))
+                       types))
+               key-tuple))))))
+
+
+(defun enum-key-matches-types-p (key-tuple type-list)
+  "Return T if any object in KEY-TUPLE is an instance of one of the types in TYPE-LIST."
+  (some (lambda (obj)
+          (some (lambda (ty) (member obj (maybe-type-instances ty) :test #'eq))
+                type-list))
+        key-tuple))
+
+
+(defun enum-compute-allowed-values (rel key fixed vtuples)
+  "Compute allowed value tuples for REL at KEY.
+   When FIXED provides a forced value for KEY, return only that value.
+   Otherwise return VTUPLES, appending (:UNASSIGNED) when the key qualifies
+   via the relation's :ALLOW-UNASSIGNED metadata."
+  (let* ((f (and fixed (gethash key fixed)))
+         (base (or (and f (list f)) vtuples)))
+    (if (and (null f) (enum-key-allows-unassigned-p rel key))
+        (append base (list '(:unassigned)))
+        base)))
+
+
+(defun clear-enum-relation-metadata ()
+  "Clear all enum relation metadata."
+  (clrhash *enum-relation-metadata*)
+  (when (and (boundp '*problem-name*) *problem-name*)
+    (setf (get *problem-name* :enum-relation-metadata) nil))
+  nil)
 
 
 ;;;; ----------------------------------------------------------------------
@@ -620,7 +841,7 @@ Checks dynamic binding first (for temporary overrides), then problem property."
    FN must be a function of one argument (state) returning T to keep, NIL to prune."
   (check-type name symbol)
   (check-type fn function)
-  (format t "~&Installing enumeration prefilter: ~S~%" name)
+  (format t "~&Installing enumeration prefilter for ~S...~%" name)
   (setf *enumerator-prefilter* fn)
   (when (and (boundp '*problem-name*) *problem-name*)
     (setf (get *problem-name* :enumerator-prefilter) fn)
@@ -710,13 +931,6 @@ Checks dynamic binding first (for temporary overrides), then problem property."
   (multiple-value-bind (v present-p) (fluent-value state fluentless-prop)
     (declare (ignore v))
     present-p))
-
-
-(defun held-by-p (state agent cargo)
-  "True iff (holds AGENT CARGO) is currently true in STATE."
-  (multiple-value-bind (vals present-p)
-      (fluent-value state (list 'holds agent))
-    (and present-p (equal vals (list cargo)))))
 
 
 (defun copy-state (state)
@@ -982,29 +1196,28 @@ fluent positions removed). FLUENT-ARGS are in the order of REL's fluent indices.
         (multisets-with-repetition xs k))))))
 
 
-(defun canonical-loc-assignments (objects areas)
-  "Generate canonical (sorted) location assignments for symmetric OBJECTS over AREAS.
-   Returns a list of assignment plists, each mapping object -> area.
-   Canonical means the area sequence is non-decreasing by area index.
-   For 3 connectors × 4 areas: 64 full assignments → 20 canonical multisets."
+(defun canonical-value-assignments (objects values)
+  "Generate canonical (sorted) value assignments for symmetric OBJECTS over VALUES.
+   Returns a list of assignment alists, each mapping object -> value.
+   Canonical means the value sequence is non-decreasing by value index."
   (let* ((n (length objects))
-         (multisets (multisets-with-repetition areas n)))
-    (mapcar (lambda (area-tuple)
-              (mapcar #'cons objects area-tuple))
+         (multisets (multisets-with-repetition values n)))
+    (mapcar (lambda (value-tuple)
+              (mapcar #'cons objects value-tuple))
             multisets)))
 
 
 (defun enum-assignment-respects-fixed-p (assignment fixed-table)
   "Return T if ASSIGNMENT respects all fixed constraints in FIXED-TABLE.
-   ASSIGNMENT is an alist of (object . area) pairs.
-   FIXED-TABLE maps (object) keys to (area) values."
+   ASSIGNMENT is an alist of (object . value) pairs.
+   FIXED-TABLE maps (object) keys to (value) tuples."
   (every (lambda (pair)
            (let* ((obj (car pair))
-                  (area (cdr pair))
+                  (val (cdr pair))
                   (key (list obj))
                   (fixed (and fixed-table (gethash key fixed-table))))
              (or (null fixed)
-                 (equal (list area) fixed))))
+                 (equal (list val) fixed))))
          assignment))
 
 
@@ -1079,15 +1292,15 @@ from the product are appended."
       (cartesian-product v-domains))))
 
 
-(defun enum-make-fluent-action (rel key-args allowed-value-tuples have-elevation
-                               &key (propagate t))
+(defun enum-make-fluent-action (rel key-args allowed-value-tuples &key (propagate t))
   "Create a per-key enum action for REL.
-   When REL is LOC and the value tuple is (:NO-AREA), the object is left unplaced
-   (no LOC or elevation update), representing a held cargo item."
+   When the value tuple is (:UNASSIGNED), the object is left unassigned (no update).
+   When REL declares :ON-ASSIGN metadata, default relations are applied on assignment."
   (let* ((name (if key-args
                    (intern (format nil "ENUM-~A-~{~A~^-~}" rel key-args) *package*)
                    (intern (format nil "ENUM-~A" rel) *package*)))
-         (fluentless-prop (cons rel key-args)))
+         (fluentless-prop (cons rel key-args))
+         (on-assign (enum-on-assign rel)))
     (install-enum-action
      name
      (lambda (state &rest vals)
@@ -1096,179 +1309,170 @@ from the product are appended."
             vals))
      (lambda (state &rest vals)
        (let ((s (copy-state state)))
-         (unless (and (eql rel 'loc) (eq (first vals) :no-area))           ;; CHANGED
+         (unless (eq (first vals) :unassigned)
            (let ((lit (assemble-proposition rel key-args vals)))
              (update (problem-state.idb s) lit))
-           ;; Elevation defaults to 0 when loc is set and no elevation yet bound.
-           (when (and have-elevation (eql rel 'loc))
+           (when on-assign
              (let ((obj (first key-args)))
-               (when (and obj (not (fluent-bound-p s (list 'elevation obj))))
-                 (update (problem-state.idb s) (list 'elevation obj 0))))))
+               (dolist (entry on-assign)
+                 (let ((target-rel (first entry))
+                       (default-val (second entry)))
+                   (when (not (fluent-bound-p s (list target-rel obj)))
+                       (update (problem-state.idb s)
+                             (list target-rel obj default-val))))))))
          (when propagate
-           (propagate-changes! s))
+           (maybe-propagate-changes! s))
          (make-update-from s vals)))
      (mapcar (lambda (tuple) tuple) allowed-value-tuples))))
 
 
-(defun enum-make-symmetric-loc-action (sym-type objects areas have-elevation
-                                       &key (propagate t) (fixed-maps nil))   ;; CHANGED: added :fixed-maps
-  "Create a single enum action that assigns locations to all symmetric OBJECTS at once.
+(defun enum-make-symmetric-batch-action (rel sym-type objects value-domain
+                                         &key (propagate t) (fixed-maps nil))
+  "Create a single enum action that assigns values to all symmetric OBJECTS at once.
    Uses canonical (sorted) multiset assignments to avoid enumerating symmetric permutations.
-   SYM-TYPE is the symmetry group type name (e.g., CONNECTOR) for naming.
+   REL is the relation being assigned.
+   SYM-TYPE is the symmetry group type name (for action naming).
    OBJECTS is the list of symmetric objects.
-   AREAS is the list of possible locations.  A :NO-AREA sentinel is appended to allow
-   objects to remain unplaced (held by the agent).
+   VALUE-DOMAIN is the list of possible values.
+   When REL's :ALLOW-UNASSIGNED metadata applies, :UNASSIGNED is appended to the domain.
    FIXED-MAPS: when provided, filters assignments to respect goal-fixed constraints.
    Returns a single action with one instantiation per canonical assignment."
-  (let* ((name (intern (format nil "ENUM-LOC-~AS" sym-type) *package*))
-         (areas+none (append areas (list :no-area)))                      ;; CHANGED
-         (all-assignments (canonical-loc-assignments objects areas+none))  ;; CHANGED
-         (fixed (and fixed-maps (gethash 'loc fixed-maps)))               ;; ADDED
-         (assignments (if fixed                                            ;; ADDED
-                          (remove-if-not                                   ;; ADDED
-                           (lambda (asgn)                                  ;; ADDED
-                             (enum-assignment-respects-fixed-p asgn fixed)) ;; ADDED
-                           all-assignments)                                ;; ADDED
-                          all-assignments)))                               ;; ADDED
+  (let* ((name (intern (format nil "ENUM-~A-~AS" rel sym-type) *package*))
+         (allow-unassigned (some (lambda (obj)
+                                   (enum-key-allows-unassigned-p rel (list obj)))
+                                 objects))
+         (effective-domain (if allow-unassigned
+                               (append value-domain (list :unassigned))
+                               value-domain))
+         (all-assignments (canonical-value-assignments objects effective-domain))
+         (fixed (and fixed-maps (gethash rel fixed-maps)))
+         (assignments (if fixed
+                          (remove-if-not
+                           (lambda (asgn)
+                             (enum-assignment-respects-fixed-p asgn fixed))
+                           all-assignments)
+                          all-assignments))
+         (on-assign (enum-on-assign rel)))
     (install-enum-action
      name
-     ;; Precondition: none of these objects have LOC bound yet
+     ;; Precondition: none of these objects have REL bound yet
      (lambda (state assignment)
        (and (every (lambda (pair)
-                     (not (fluent-bound-p state (list 'loc (car pair)))))
+                     (not (fluent-bound-p state (list rel (car pair)))))
                    assignment)
             (member assignment assignments :test #'equal)
             (list assignment)))
-     ;; Effect: bind LOC for each placed object; skip :NO-AREA (unplaced/held)
+     ;; Effect: bind REL for each assigned object; skip :UNASSIGNED
      (lambda (state assignment)
        (let ((s (copy-state state)))
          (dolist (pair assignment)
            (let ((obj (car pair))
-                 (area (cdr pair)))
-             (unless (eq area :no-area)                                    ;; CHANGED
-               (update (problem-state.idb s) (list 'loc obj area))
-               (when (and have-elevation
-                          (not (fluent-bound-p s (list 'elevation obj))))
-                 (update (problem-state.idb s) (list 'elevation obj 0))))))
+                 (val (cdr pair)))
+             (unless (eq val :unassigned)
+               (update (problem-state.idb s) (list rel obj val))
+               (when on-assign
+                 (dolist (entry on-assign)
+                   (let ((target-rel (first entry))
+                         (default-val (second entry)))
+                     (when (not (fluent-bound-p s (list target-rel obj)))
+                       (update (problem-state.idb s)
+                               (list target-rel obj default-val)))))))))
          (when propagate
-           (propagate-changes! s))
+           (maybe-propagate-changes! s))
          (make-update-from s (list assignment))))
      (mapcar #'list assignments))))
 
 
-(defun enum-make-holds-action (agent cargo-domain fixed-table &key (propagate t))
-  "Create a HOLDS enum action for AGENT with :NONE as the no-hold choice.
-   If FIXED-TABLE provides a fixed value for this key, restrict to that value only."
-  (let* ((key-args (list agent))
-         (fixed (and fixed-table (gethash key-args fixed-table)))
-         (choices (if fixed
-                      (list fixed)
-                      (cons (list :none)
-                            (mapcar (lambda (c) (list c)) cargo-domain)))))
-    (install-enum-action
-     (intern (format nil "ENUM-HOLDS-~A" agent) *package*)
-     (lambda (state choice)
-       (and (not (fluent-bound-p state (list 'holds agent)))
-            (member (list choice) choices :test #'equal)
-            (list choice)))
-     (lambda (state choice)
-       (let ((s (copy-state state)))
-         (unless (eql choice :none)
-           (update (problem-state.idb s) (list 'holds agent choice)))
-         (when propagate
-           (propagate-changes! s))
-         (make-update-from s (list choice))))
-     (mapcar (lambda (x) x) choices))))
+(defun enum-key-index (key keys)
+  "Return the position of KEY in the KEYS list."
+  (position key keys))
 
 
-(defun enum-connector-index (c connectors)
-  "Return the position of connector C in the CONNECTORS list."
-  (position c connectors))
-
-
-(defun enum-allowed-termini-for (c connectors termini &key symmetric-relation-p)
-  "Return termini that C may pair with, excluding itself.
-   When SYMMETRIC-RELATION-P is true, also exclude lower-indexed connectors
+(defun enum-allowed-partners-for (key keys partners &key symmetric-relation-p)
+  "Return partners that KEY may pair with, excluding itself.
+   When SYMMETRIC-RELATION-P is true, also exclude lower-indexed keys
    (since the undirected pair will be covered from the other direction)."
-  (let ((i (enum-connector-index c connectors)))
+  (let ((i (enum-key-index key keys)))
     (remove-if
      (lambda (x)
-       (or (eql x c)
+       (or (eql x key)
            (and symmetric-relation-p
-                (member x connectors :test #'eq)
-                (<= (enum-connector-index x connectors) i))))
-     termini)))
+                (member x keys :test #'eq)
+                (<= (enum-key-index x keys) i))))
+     partners)))
 
 
-(defun enum-paired-present-p (state a b)
-  "True iff (PAIRED A B) is present in STATE's idb."
-  (gethash (convert-to-integer (list 'paired a b))
+(defun enum-subset-present-p (state rel a b)
+  "True iff (REL A B) is present in STATE's idb."
+  (gethash (convert-to-integer (list rel a b))
            (problem-state.idb state)))
 
 
-(defun enum-connector-partners (state conn termini)
-  "Return a duplicate-free list of CONN's current partners (all termini)."
+(defun enum-key-partners (state rel key partners)
+  "Return a duplicate-free list of KEY's current partners under REL."
   (let (out)
-    (dolist (term termini out)
-      (when (and (not (eql term conn))
-                 (or (enum-paired-present-p state conn term)
-                     (enum-paired-present-p state term conn)))
-        (pushnew term out :test #'eq)))))
+    (dolist (p partners out)
+      (when (and (not (eql p key))
+                 (or (enum-subset-present-p state rel key p)
+                     (enum-subset-present-p state rel p key)))
+        (pushnew p out :test #'eq)))))
 
 
-(defun enum-global-degree-ok-p (state conn chosen-set connectors termini max-pairs-per-connector)
-  "True iff adding CHOSEN-SET to CONN does not violate the global degree cap.
+(defun enum-subset-degree-ok-p (state rel key chosen-set keys partners max-per-key)
+  "True iff adding CHOSEN-SET to KEY does not violate the global degree cap for REL.
    The cap applies to:
-   1) CONN itself, counting all of its partners (termini), and
-   2) any TARGET in CHOSEN-SET that is itself a CONNECTOR.
+   1) KEY itself, counting all of its partners, and
+   2) any TARGET in CHOSEN-SET that is itself a key.
    Existing symmetric duplicates are ignored (partner sets are de-duplicated)."
-  (let* ((max max-pairs-per-connector)
-         (existing (enum-connector-partners state conn termini))
+  (let* ((existing (enum-key-partners state rel key partners))
          (new (set-difference chosen-set existing :test #'eq)))
-    (and (<= (+ (length existing) (length new)) max)
+    (and (<= (+ (length existing) (length new)) max-per-key)
          (every (lambda (tgt)
-                  (or (not (member tgt connectors :test #'eq))
-                      (let* ((tgt-existing (enum-connector-partners state tgt termini))
-                             (adds-one (not (member conn tgt-existing :test #'eq))))
+                  (or (not (member tgt keys :test #'eq))
+                      (let* ((tgt-existing (enum-key-partners state rel tgt partners))
+                             (adds-one (not (member key tgt-existing :test #'eq))))
                         (<= (+ (length tgt-existing)
                                (if adds-one 1 0))
-                            max))))
+                            max-per-key))))
                 new))))
 
 
-(defun enum-make-paired-actions (connectors termini max-pairs-per-connector
-                                 &key (propagate t) (symmetric-relation-p nil))
-  "Create subset-enumeration actions for (PAIRED terminus terminus) with global degree cap.
-   For each connector, generates an action whose instantiations are all subsets (up to
-   MAX-PAIRS-PER-CONNECTOR) of the connector's allowed termini.
-   When SYMMETRIC-RELATION-P, excludes lower-indexed connectors from pairing targets.
-   Unplaced connectors (no LOC bound) are restricted to empty pairing sets."
-  (when (and connectors termini)
-    ;; bind C freshly per loop iteration to avoid closure capture.
-    (loop for c0 in connectors append
-          (let ((c c0))
-            (let* ((allowed (enum-allowed-termini-for c connectors termini
-                                                     :symmetric-relation-p symmetric-relation-p))
-                   (sets (subsets-up-to allowed max-pairs-per-connector))
+(defun enum-make-subset-actions (rel keys partners max-per-key
+                                 &key (propagate t) (symmetric-relation-p nil)
+                                      (requires-fluent nil))
+  "Create subset-enumeration actions for REL with global degree cap.
+   For each key, generates an action whose instantiations are all subsets (up to
+   MAX-PER-KEY) of the key's allowed partners.
+   When SYMMETRIC-RELATION-P, excludes lower-indexed keys from pairing targets.
+   When REQUIRES-FLUENT is non-nil, keys without that fluent bound are restricted
+   to empty subsets."
+  (when (and keys partners)
+    ;; bind K freshly per loop iteration to avoid closure capture.
+    (loop for k0 in keys append
+          (let ((k k0))
+            (let* ((allowed (enum-allowed-partners-for k keys partners
+                                                      :symmetric-relation-p symmetric-relation-p))
+                   (sets (subsets-up-to allowed max-per-key))
                    (args (mapcar (lambda (set) (list set)) sets)))
               (list
                (install-enum-action
-                (intern (format nil "ENUM-PAIR-~A" c) *package*)
+                (intern (format nil "ENUM-~A-~A" rel k) *package*)
                 (lambda (state set)
                   (cond
-                    ((not (fluent-bound-p state (list 'loc c)))            ;; CHANGED
+                    ((and requires-fluent
+                          (not (fluent-bound-p state (list requires-fluent k))))
                      (when (null set) (list set)))
                     (t
-                     ;; Placed connector: enumerate pairing subsets with degree cap.
-                     (and (member set sets :test #'equal)                  ;; CHANGED
-                          (enum-global-degree-ok-p state c set connectors termini max-pairs-per-connector)
+                     ;; Key with fluent bound (or no fluent required): enumerate subsets.
+                     (and (member set sets :test #'equal)
+                          (enum-subset-degree-ok-p state rel k set keys partners max-per-key)
                           (list set)))))
                 (lambda (state set)
                   (let ((s (copy-state state)))
                     (dolist (tgt set)
-                      (update (problem-state.idb s) (list 'paired c tgt)))
+                      (update (problem-state.idb s) (list rel k tgt)))
                     (when propagate
-                      (propagate-changes! s))
+                      (maybe-propagate-changes! s))
                     (make-update-from s (list set))))
                 args)))))))
 
@@ -1288,7 +1492,7 @@ from the product are appended."
    (lambda (state)
      (let ((s (copy-state state)))
        (when propagate
-         (propagate-changes! s))
+         (maybe-propagate-changes! s))
        (make-update-from s nil)))
    (list nil)))
 
@@ -1298,160 +1502,99 @@ from the product are appended."
 ;;;; ----------------------------------------------------------------------
 
 
-(defun enum-generate-other-fluent-actions (ctx propagate)
-  "Generate enum actions for fluent relations other than LOC, HOLDS, ELEVATION.
-   Data-driven: iterates over relations in schema with signatures and fluent indices.
-   Returns a list of actions (in reverse execution order for push accumulation)."
+(defun enum-generate-fluent-actions (ctx propagate)
+  "Generate enum actions for all :FLUENT-pattern relations using metadata.
+   Returns two values: EARLY-ACTIONS and MAIN-ACTIONS.
+   Each relation is processed using its enum metadata:
+     :EARLY-KEYS — keys matching these types are enumerated first (early actions)
+     :ALLOW-UNASSIGNED — qualifying keys get an :UNASSIGNED sentinel value
+     :SYMMETRIC-BATCH — interchangeable groups use canonical multisets
+     :DERIVED — relations with this pattern are skipped entirely"
   (let ((relations (getf ctx :relations))
-        (have-elevation (getf ctx :have-elevation))
         (focus-objs (getf ctx :focus-objs))
         (focus-set (getf ctx :focus-set))
         (fixed-maps (getf ctx :fixed-maps))
-        (actions nil))
+        (interchangeable-groups (getf ctx :interchangeable-groups))
+        (sym-objects (getf ctx :sym-objects))
+        (early-actions nil)
+        (main-actions nil))
     (dolist (r relations)
-      (when (and (relation-signature r)
-                 (relation-fluent-indices r)
-                 (not (member r '(loc holds elevation) :test #'eq)))
+      (when (and (eq (enum-pattern r) :fluent)
+                 (relation-signature r)
+                 (relation-fluent-indices r))
         (let* ((fixed (gethash r fixed-maps))
-               (keys (enum-key-tuples-for r fixed focus-objs focus-set))
-               (vtuples (enum-value-tuples-for r)))
+               (all-keys (enum-key-tuples-for r fixed focus-objs focus-set))
+               (vtuples (enum-value-tuples-for r))
+               (early-spec (enum-early-keys r))
+               (early-types (and early-spec (cdr early-spec))))
           (when vtuples
-            (dolist (k keys)
-              (let* ((f (and fixed (gethash k fixed)))
-                     (allowed (or (and f (list f)) vtuples)))
-                (push (enum-make-fluent-action r k allowed have-elevation
-                                               :propagate propagate)
-                      actions)))))))
-    actions))
-
-
-(defun enum-generate-holds-actions (ctx propagate)
-  "Generate HOLDS enum action from context CTX.
-   Creates a single HOLDS action for the primary agent with :NONE choice.
-   Returns a list of actions (empty if HOLDS not in schema or no primary agent)."
-  (let ((have-holds (getf ctx :have-holds))
-        (primary-agent (getf ctx :primary-agent))
-        (focus-objs (getf ctx :focus-objs))
-        (focus-set (getf ctx :focus-set))
-        (fixed-maps (getf ctx :fixed-maps)))
-    (when (and have-holds primary-agent)
-      (let* ((fixed-h (gethash 'holds fixed-maps))
-             (cargo-domain
-               (let* ((v-specs (relation-fluent-type-specs 'holds))
-                      (dom (and v-specs
-                                (expand-type-spec-instances* (first v-specs)))))
-                 (or (enum-filter-focus dom focus-objs focus-set) dom))))
-        (when cargo-domain
-          (list (enum-make-holds-action primary-agent cargo-domain fixed-h
-                                        :propagate propagate)))))))
-
-
-(defun enum-generate-loc-actions (ctx propagate)
-  "Generate LOC enum actions from context CTX.
-   Handles three phases:
-   1. Agent LOC keys (for early pruning)
-   2. Symmetric batch assignment for interchangeable object groups (includes :NO-AREA)
-   3. Individual LOC keys for non-symmetric objects (cargo types get :NO-AREA option)
-   Returns a list of actions (in reverse execution order for push accumulation)."
-  (let* ((have-loc (getf ctx :have-loc))
-         (areas (getf ctx :areas))
-         (agents (getf ctx :agents))
-         (have-elevation (getf ctx :have-elevation))
-         (focus-objs (getf ctx :focus-objs))
-         (focus-set (getf ctx :focus-set))
-         (fixed-maps (getf ctx :fixed-maps))
-         (interchangeable-groups (getf ctx :interchangeable-groups))
-         (sym-objects (getf ctx :sym-objects))
-         (cargo-objects (getf ctx :cargo-objects))                         ;; ADDED
-         (actions nil))
-    (when have-loc
-      (let* ((fixed (gethash 'loc fixed-maps))
-             (all-keys (enum-key-tuples-for 'loc fixed focus-objs focus-set))
-             (agent-keys (and agents
-                              (remove-if-not (lambda (k)
-                                               (and (member (first k) agents)
-                                                    (not (member (first k) sym-objects))))
-                                             all-keys)))
-             (other-keys (if agent-keys
-                             (set-difference all-keys agent-keys :test #'equal)
-                             all-keys))
-             (vtuples (or (enum-value-tuples-for 'loc)
-                          (and areas (mapcar (lambda (a) (list a)) areas)))))
-        ;; Phase 1: Agent LOC keys
-        (dolist (k agent-keys)
-          (let* ((f (and fixed (gethash k fixed)))
-                 (allowed (or (and f (list f)) vtuples)))
-            (when allowed
-              (push (enum-make-fluent-action 'loc k allowed have-elevation
-                                             :propagate propagate)
-                    actions))))
-        ;; Phase 2 & 3: Symmetric and non-symmetric other keys
-        (let ((batch-objects (make-hash-table :test 'eq)))                ;; CHANGED
-          ;; Phase 2: Symmetric batch LOC actions for interchangeable groups
-          (dolist (group interchangeable-groups)                          ;; CHANGED
-            (let ((group-in-keys (remove-if-not                           ;; CHANGED
-                                  (lambda (obj)                           ;; CHANGED
-                                    (member (list obj) other-keys         ;; CHANGED
-                                            :test #'equal))               ;; CHANGED
-                                  group)))                                ;; CHANGED
-              (when (and (> (length group-in-keys) 1) areas)              ;; CHANGED
-                (let ((stype (or (find-group-type group) 'symmetric)))    ;; CHANGED
-                  (push (enum-make-symmetric-loc-action                   ;; CHANGED
-                         stype group-in-keys areas have-elevation         ;; CHANGED
-                         :propagate propagate                             ;; CHANGED
-                         :fixed-maps fixed-maps)                          ;; CHANGED
-                        actions)                                          ;; CHANGED
-                  (dolist (obj group-in-keys)                             ;; CHANGED
-                    (setf (gethash obj batch-objects) t))))))             ;; CHANGED
-          ;; Phase 3: Individual LOC actions for non-symmetric keys
-          (dolist (k other-keys)
-            (let ((obj (first k)))
-              (unless (gethash obj batch-objects)                          ;; CHANGED
+            ;; Split keys into early and non-early.
+            ;; Early keys exclude symmetric objects (handled in batch).
+            (let ((e-keys nil) (o-keys nil))
+              (if early-types
+                  (dolist (k all-keys)
+                    (if (and (enum-key-matches-types-p k early-types)
+                             (not (some (lambda (obj)
+                                          (member obj sym-objects :test #'eq))
+                                        k)))
+                        (push k e-keys)
+                        (push k o-keys)))
+                  (setf o-keys all-keys))
+              (setf e-keys (nreverse e-keys)
+                    o-keys (nreverse o-keys))
+              ;; Early-key actions (no unassigned sentinel)
+              (dolist (k e-keys)
                 (let* ((f (and fixed (gethash k fixed)))
-                       (base-allowed (or (and f (list f)) vtuples))
-                       (allowed (if (and (null f)
-                                         (member obj cargo-objects :test #'eq))
-                                    (append base-allowed (list '(:no-area)))
-                                    base-allowed)))
-                  (when allowed
-                    (push (enum-make-fluent-action
-                           'loc k allowed have-elevation
-                           :propagate propagate)
-                          actions)))))))))
-    actions))
+                       (allowed (or (and f (list f)) vtuples)))
+                  (push (enum-make-fluent-action r k allowed :propagate propagate)
+                        early-actions)))
+              ;; Main-key actions: symmetric batch + individual
+              (let ((batch-objects (make-hash-table :test 'eq)))
+                ;; Symmetric batch for interchangeable groups (single-fluent only)
+                (when (and (enum-symmetric-batch-p r)
+                           (= (length (relation-fluent-indices r)) 1))
+                  (dolist (group interchangeable-groups)
+                    (let ((group-in-keys (remove-if-not
+                                          (lambda (obj)
+                                            (member (list obj) o-keys :test #'equal))
+                                          group)))
+                      (when (> (length group-in-keys) 1)
+                        (let ((stype (or (find-group-type group) 'symmetric))
+                              (value-domain (mapcar #'first vtuples)))
+                          (push (enum-make-symmetric-batch-action
+                                 r stype group-in-keys value-domain
+                                 :propagate propagate
+                                 :fixed-maps fixed-maps)
+                                main-actions)
+                          (dolist (obj group-in-keys)
+                            (setf (gethash obj batch-objects) t)))))))
+                ;; Individual key actions
+                (dolist (k o-keys)
+                  (unless (gethash (first k) batch-objects)
+                    (let ((allowed (enum-compute-allowed-values r k fixed vtuples)))
+                      (push (enum-make-fluent-action r k allowed :propagate propagate)
+                            main-actions))))))))))
+    (values (nreverse early-actions) (nreverse main-actions))))
 
 
 (defun enum-compute-context (goal-form)
   "Compute context plist for enum action generation.
    Gathers schema metadata, type domains, goal analysis, and fixed-maps.
    Returns a plist with keys:
-     :schema :focus-objs :focus-set :relations
-     :areas :agents :primary-agent :connectors :termini :cargo-objects
-     :goal-form
-     :have-loc :have-holds :have-elevation :have-paired
-     :sym-groups :sym-objects :fixed-maps"
+     :schema :focus-objs :focus-set :relations :goal-form
+     :symmetric-relations :interchangeable-groups :sym-objects :fixed-maps"
   (let* ((schema (get-base-relations))
          (focus-objs (schema-focus-instances schema))
          (focus-set (let ((h (make-hash-table :test 'eq)))
                       (dolist (o focus-objs h)
                         (setf (gethash o h) t))))
          (relations (remove-duplicates (schema-relations schema) :test #'eq))
-         (areas (maybe-type-instances 'area))
-         (agents (maybe-type-instances 'agent))
-         (primary-agent (and agents (first agents)))
-         (connectors (maybe-type-instances 'connector))
-         (termini (maybe-type-instances 'terminus))
-         (have-loc (member 'loc relations))
-         (have-holds (member 'holds relations))
-         (have-elevation (member 'elevation relations))
-         (have-paired (member 'paired relations))
          (symmetric-relations (enum-detect-symmetric-relations relations))
          (interchangeable-groups (enum-detect-interchangeable-groups schema goal-form))
          (sym-objects (let ((objs nil))
                         (dolist (group interchangeable-groups objs)
                           (dolist (o group)
                             (pushnew o objs :test #'eq)))))
-         (cargo-objects (maybe-type-instances 'cargo))                    ;; ADDED
          (fixed-maps (make-hash-table :test #'eq)))
     (dolist (r relations)
       (when (and (relation-signature r) (relation-fluent-indices r))
@@ -1461,53 +1604,63 @@ from the product are appended."
           :focus-objs focus-objs
           :focus-set focus-set
           :relations relations
-          :areas areas
-          :agents agents
-          :primary-agent primary-agent
-          :connectors connectors
-          :termini termini
-          :cargo-objects cargo-objects
           :goal-form goal-form
-          :have-loc have-loc
-          :have-holds have-holds
-          :have-elevation have-elevation
-          :have-paired have-paired
           :symmetric-relations symmetric-relations
           :interchangeable-groups interchangeable-groups
           :sym-objects sym-objects
           :fixed-maps fixed-maps)))
 
 
-(defun enum-generate-paired-actions (ctx max-pairs-per-connector propagate)
-  "Generate PAIRED subset-enumeration actions from context CTX.
-   Creates one action per connector, sorted fail-first by instantiation count.
-   When PAIRED is auto-detected as symmetric, applies index-based deduplication.
+(defun enum-generate-subset-actions (ctx default-max-per-key propagate)
+  "Generate subset-enumeration actions for all :SUBSET-pattern relations.
+   For each relation, derives keys and partners from the signature and metadata.
+   Creates one action per key, sorted fail-first by instantiation count.
+   When a relation is auto-detected as symmetric, applies index-based deduplication.
    Returns a list of actions in execution order."
-  (let ((have-paired (getf ctx :have-paired))
-        (connectors (getf ctx :connectors))
-        (termini (getf ctx :termini))
-        (symmetric-relations (getf ctx :symmetric-relations)))
-    (when have-paired
-      (let* ((pas (enum-make-paired-actions connectors termini max-pairs-per-connector
-                                            :propagate propagate
-                                            :symmetric-relation-p (member 'paired symmetric-relations))))
-        (stable-sort (copy-list pas) #'<
-                     :key (lambda (a)
-                            (length (action.precondition-args a))))))))
+  (let ((relations (getf ctx :relations))
+        (symmetric-relations (getf ctx :symmetric-relations))
+        (all-actions nil))
+    (dolist (r relations)
+      (when (eq (enum-pattern r) :subset)
+        (let* ((sig (relation-signature r))
+               (key-type-spec (first sig))
+               (partner-type-spec (second sig))
+               (all-key-instances (expand-type-spec-instances* key-type-spec))
+               (key-types-spec (enum-key-types r))
+               (keys (if key-types-spec
+                         (let ((types (cdr key-types-spec)))
+                           (remove-if-not
+                            (lambda (obj)
+                              (some (lambda (ty)
+                                      (member obj (maybe-type-instances ty) :test #'eq))
+                                    types))
+                            all-key-instances))
+                         all-key-instances))
+               (partners (expand-type-spec-instances* partner-type-spec))
+               (max-k (or (enum-max-per-key r) default-max-per-key))
+               (requires-fluent (enum-requires-fluent r))
+               (actions (enum-make-subset-actions
+                         r keys partners max-k
+                         :propagate propagate
+                         :symmetric-relation-p (member r symmetric-relations)
+                         :requires-fluent requires-fluent)))
+          (setf all-actions (nconc all-actions
+                                   (stable-sort (copy-list actions) #'<
+                                                :key (lambda (a)
+                                                       (length (action.precondition-args a)))))))))
+    all-actions))
 
 
-(defun generate-enum-actions (&key (goal-form nil) (max-pairs-per-connector 4)
+(defun generate-enum-actions (&key (goal-form nil) (default-max-per-key 4)
                                    (propagate t) (prefilter nil))
-  "Generate a CSP enum-action sequence driven by the declared base relations,
-   symmetry groups, and prefilter.
-   Orchestrates phase-specific generators and assembles final action list.
+  "Generate a CSP enum-action sequence driven by declared base relations,
+   enum-relation metadata, symmetry groups, and prefilter.
+   Orchestrates metadata-driven generators and assembles final action list.
    Phases:
-   1. LOC for agent keys (early pruning via goal-fixed assignments)
-   2. HOLDS (if in schema)
-   3. LOC for remaining keys (symmetric batch + individual)
-   4. Other fluent relations (data-driven)
-   5. PAIRED subset enumeration (fail-first ordering)
-   6. ENUM-FINALIZE (triggers propagation, applies prefilter)
+   1. Early fluent actions (:EARLY-KEYS from metadata, for pruning)
+   2. Main fluent actions (:SYMMETRIC-BATCH + individual, with :UNASSIGNED)
+   3. Subset enumeration for :SUBSET-pattern relations (fail-first ordering)
+   4. ENUM-FINALIZE (triggers propagation, applies prefilter)
    PROPAGATE: T — propagate after every action (default).
               :FINALIZE-ONLY — skip intermediate propagation, propagate at finalize.
               NIL — no propagation anywhere (raw leaf collection).
@@ -1518,28 +1671,15 @@ from the product are appended."
          (ctx (enum-compute-context goal-form)))
     (setf *enumerator-detected-groups* (getf ctx :interchangeable-groups)
           *enumerator-detected-symmetric-relations* (getf ctx :symmetric-relations))
-    (let* ((agents (getf ctx :agents))
-           (loc-actions (enum-generate-loc-actions ctx intermediate-propagate))
-           (holds-actions (enum-generate-holds-actions ctx intermediate-propagate))
-           (other-actions (enum-generate-other-fluent-actions ctx intermediate-propagate))
-           (paired-actions (enum-generate-paired-actions ctx max-pairs-per-connector intermediate-propagate))
-           (finalize-action (enum-make-finalize-action :propagate finalize-propagate :prefilter prefilter))
-           ;; Split LOC actions: agent-locs go first, then other-locs after HOLDS
-           (agent-loc-actions
-             (remove-if-not
-              (lambda (a)
-                (let ((name (symbol-name (action.name a))))
-                  (some (lambda (ag)
-                          (search (symbol-name ag) name))
-                        agents)))
-              loc-actions))
-           (other-loc-actions (set-difference loc-actions agent-loc-actions :test #'eq)))
-      ;; Assemble in execution order:
-      ;; LOC(agent) -> HOLDS -> LOC(others) -> other fluents -> PAIRED -> FINALIZE
-      (nconc (nreverse agent-loc-actions)
-             holds-actions
-             (nreverse other-loc-actions)
-             (nreverse other-actions)
-             paired-actions
-             (list finalize-action)))))
-
+    (multiple-value-bind (early-actions main-actions)
+        (enum-generate-fluent-actions ctx intermediate-propagate)
+      (let* ((subset-actions (enum-generate-subset-actions
+                              ctx default-max-per-key intermediate-propagate))
+             (finalize-action (enum-make-finalize-action
+                               :propagate finalize-propagate :prefilter prefilter)))
+        ;; Assemble in execution order:
+        ;; early-fluents -> main-fluents -> subset -> FINALIZE
+        (nconc early-actions
+               main-actions
+               subset-actions
+               (list finalize-action))))))

@@ -1016,61 +1016,6 @@
                       parents))))))
 
 
-(defun defer-hybrid-goal (current-node goal-state)
-  "Stores a goal-reaching pair for deferred enumeration after search completes.
-   Called in hybrid mode when a goal is reached.
-   When canonical symmetry is active, skips canonically-equivalent goals."
-  (declare (type node current-node) (type problem-state goal-state))
-  (let ((goal-depth (1+ (node.depth current-node))))
-    ;; For canonical symmetry, check if equivalent goal already deferred
-    (when (use-canonical-symmetry-p)
-      (ensure-idb-hash goal-state)
-      (let ((goal-hash (problem-state.idb-hash goal-state)))
-        (when (find-if (lambda (pair)
-                         (let ((existing-goal (cdr pair)))
-                           (ensure-idb-hash existing-goal)
-                           (and (= (problem-state.idb-hash existing-goal)
-                                   goal-hash)
-                                (canonical-idb-equal-p
-                                 (problem-state.idb goal-state)
-                                 (problem-state.idb existing-goal)))))
-                       *hybrid-goals*)
-          (narrate "Duplicate solution found (via symmetry) ***" goal-state goal-depth)
-          (increment-global *repeated-states*)
-          (return-from defer-hybrid-goal))))
-    (narrate "Solution found (hybrid mode) ***" goal-state goal-depth)
-    (push-global (cons current-node goal-state) *hybrid-goals*)))
-
-
-(defun finalize-hybrid-solutions ()
-  "Enumerates all solutions from stored goal-reaching pairs after search completes.
-   Called once when all parent DAGs are fully constructed."
-  (dolist (pair *hybrid-goals*)
-    (let* ((current-node (car pair))
-           (goal-state (cdr pair))
-           (state-depth (1+ (node.depth current-node)))
-           (goal-move (record-move goal-state))
-           (paths-to-current (enumerate-paths-to-node current-node))
-           (num-paths (length paths-to-current))
-           (goal-idb (problem-state.idb goal-state)))
-      ;(format t "~%Enumerating ~D path~:P to goal at depth ~D~%" num-paths state-depth)
-      (dolist (path paths-to-current)
-        (let* ((full-path (append path (list goal-move)))
-               (solution (make-solution
-                           :depth state-depth
-                           :time (problem-state.time goal-state)
-                           :value (problem-state.value goal-state)
-                           :path full-path
-                           :goal goal-state)))
-          (push-global solution *solutions*)
-          (with-search-structures-lock
-            (unless (find goal-idb *unique-solutions*
-                          :key (lambda (soln)
-                                 (problem-state.idb (solution.goal soln)))
-                          :test #'equalp)
-              (push-global solution *unique-solutions*))))))))
-
-  
 (defun summarize-search-results (condition)
   (declare (type symbol condition))
   (format t "~2%In problem ~A, performed ~A~A search for ~A solution."
@@ -1432,149 +1377,11 @@
   (in-package :ww))
 
 
-;;;; ============================================================
-;;;; SEARCHER INSTRUMENTATION (tack onto end of ww-searcher.lisp)
-;;;; ============================================================
-
-(defparameter *ww-searcher-instrumentation-enabled* t)
-(declaim (type boolean *ww-searcher-instrumentation-enabled*))
-
-;; Counters (reset each ww-solve run)
-(defparameter *ww-goals-hit-total* 0)                       ; goal test succeeded (incl duplicates)
-(defparameter *ww-goals-recorded-unique* 0)                 ; pushed into *unique-solutions*
-(defparameter *ww-goals-rejected-duplicate-raw* 0)          ; goal hit but already in *unique-solutions* (equalp IDB)
-(defparameter *ww-goals-replaced-better* 0)                 ; goal hit replaced existing unique (better)
-(defparameter *ww-goals-deferred-hybrid* 0)                 ; deferred into *hybrid-goals*
-(defparameter *ww-goals-rejected-duplicate-symmetry* 0)      ; hybrid defer skipped via canonical symmetry
-(defparameter *ww-goals-rejected-duplicate-canonical* 0)     ; RESERVED for future canonical goal-key culling
-(defparameter *ww-solutions-recorded-total* 0)              ; pushed into *solutions*
-(defparameter *ww-states-pruned-by-symmetry* 0)             ; canonical-symmetry duplicate state pruned
-
-(declaim (type fixnum
-               *ww-goals-hit-total*
-               *ww-goals-recorded-unique*
-               *ww-goals-rejected-duplicate-raw*
-               *ww-goals-replaced-better*
-               *ww-goals-deferred-hybrid*
-               *ww-goals-rejected-duplicate-symmetry*
-               *ww-goals-rejected-duplicate-canonical*
-               *ww-solutions-recorded-total*
-               *ww-states-pruned-by-symmetry*))
-
-(defmacro ww-instr-incf (var &optional (delta 1))
-  "Fast counter increment guarded by *ww-searcher-instrumentation-enabled*."
-  ;; CHANGED: drop sb-ext:atomic-incf (doesn't work on special variables).
-  `(when *ww-searcher-instrumentation-enabled*
-     (incf ,var ,delta)))
-
-
-(defun ww-reset-searcher-instrumentation ()
-  "Reset all searcher instrumentation counters (called at start of WW-SOLVE)."
-  (setf *ww-goals-hit-total* 0
-        *ww-goals-recorded-unique* 0
-        *ww-goals-rejected-duplicate-raw* 0
-        *ww-goals-replaced-better* 0
-        *ww-goals-deferred-hybrid* 0
-        *ww-goals-rejected-duplicate-symmetry* 0
-        *ww-goals-rejected-duplicate-canonical* 0
-        *ww-solutions-recorded-total* 0
-        *ww-states-pruned-by-symmetry* 0
-        ;; CHANGED: always initialize a hash-table when instrumentation is enabled
-        *ww-seen-goal-keys*
-        (when *ww-searcher-instrumentation-enabled*
-          (make-hash-table :test #'equal))))
-
-
-(defun ww-print-searcher-instrumentation-summary ()
-  "Print a compact per-run instrumentation summary."
-  (when *ww-searcher-instrumentation-enabled*
-    (flet ((pct (num den)
-             (if (and (integerp den) (> den 0))
-                 (* 100.0 (/ (float num) (float den)))
-                 0.0))
-           (safe (sym)
-             (if (and (symbolp sym) (boundp sym))
-                 (symbol-value sym)
-                 nil))
-           (ht-count (x)
-             ;; CHANGED: avoid HASH-TABLE-COUNT on NIL
-             (if (hash-table-p x) (hash-table-count x) 0)))
-      (let* ((goals-hit *ww-goals-hit-total*)
-             (uniq-goals *ww-goals-recorded-unique*)
-             (dup-raw *ww-goals-rejected-duplicate-raw*)
-             (dup-sym *ww-goals-rejected-duplicate-symmetry*)
-             (dup-can *ww-goals-rejected-duplicate-canonical*)
-             (solns *ww-solutions-recorded-total*)
-             (sym-pruned *ww-states-pruned-by-symmetry*)
-             (repeated (safe '*repeated-states*))
-             (symdup-global (safe '*symmetric-duplicates-pruned*))
-             ;; NEW:
-             (canon-keys (ht-count *ww-seen-goal-keys*)))
-        (format t "~&~%;;;; SEARCHER-INSTRUMENTATION ;;;;~%")
-        (format t "~&Goal hits total:~20T~:D~%" goals-hit)
-        (format t "~&Unique goals recorded:~20T~:D~%" uniq-goals)
-        (format t "~&Raw goal duplicates:~20T~:D  (~,1F%)~%"
-                dup-raw (pct dup-raw goals-hit))
-        (format t "~&Symmetry goal duplicates:~20T~:D  (~,1F%)~%"
-                dup-sym (pct dup-sym goals-hit))
-        (format t "~&Canonical goal duplicates:~20T~:D  (~,1F%)~%"
-                dup-can (pct dup-can goals-hit))
-        ;; NEW: confirms whether canonical keys are actually being tracked
-        (format t "~&Canonical keys seen:~20T~:D~%" canon-keys)
-        (format t "~&Goal key function:~20T~S~%"
-                (and (boundp '*ww-goal-uniqueness-key-fn*)
-                     *ww-goal-uniqueness-key-fn*))
-        (format t "~&Solutions recorded total:~20T~:D~%" solns)
-        (format t "~&States pruned by symmetry:~20T~:D~%" sym-pruned)
-        (when repeated
-          (format t "~&*repeated-states* (run):~20T~:D~%" repeated))
-        (when symdup-global
-          (format t "~&*symmetric-duplicates-pruned*:~20T~:D~%" symdup-global))
-        (terpri)))))
-
-
-(defun get-closed-values (state depth)
-  "Retrieve the closed values for a state.
-   When canonical symmetry is active, verifies canonical equality to prevent
-   false positives from hash collisions.
-   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (let ((closed-values (gethash (closed-key state depth)
-                                (if (> *threads* 0)
-                                    (closed-shard state)
-                                    *closed*))))
-    (when closed-values
-      (if (use-canonical-symmetry-p)
-          (let ((succ-idb (problem-state.idb state))
-                (closed-idb (first closed-values)))
-            (cond
-              ((equalp closed-idb succ-idb)
-               ;; Exact duplicate
-               closed-values)
-              (t
-               ;; lazy-cache canonical form for CLOSED entry
-               (let ((closed-canon (fifth closed-values)))
-                 (unless closed-canon
-                   (setf (fifth closed-values)
-                         (build-canonical-idb-form closed-idb))
-                   (setf closed-canon (fifth closed-values)))
-                 (if (equal (build-canonical-idb-form succ-idb) closed-canon)
-                     (progn
-                       (increment-global *symmetric-duplicates-pruned*)
-                       (ww-instr-incf *ww-states-pruned-by-symmetry*)  ;; INSTRUMENTATION: added
-                       closed-values)
-                     ;; Hash collision - different states
-                     nil)))))
-          ;; Standard mode: hash match is sufficient
-          closed-values))))
-
-
 (defun defer-hybrid-goal (current-node goal-state)
   "Stores a goal-reaching pair for deferred enumeration after search completes.
    Called in hybrid mode when a goal is reached.
    When canonical symmetry is active, skips canonically-equivalent goals."
   (declare (type node current-node) (type problem-state goal-state))
-  (ww-instr-incf *ww-goals-hit-total*)  ;; INSTRUMENTATION
-  (ww-instr-note-goal-canonical-key goal-state) ;; CHANGED: canonical seen-table instrumentation
   (let ((goal-depth (1+ (node.depth current-node))))
     ;; For canonical symmetry, check if equivalent goal already deferred
     (when (use-canonical-symmetry-p)
@@ -1591,10 +1398,8 @@
                        *hybrid-goals*)
           (narrate "Duplicate solution found (via symmetry) ***" goal-state goal-depth)
           (increment-global *repeated-states*)
-          (ww-instr-incf *ww-goals-rejected-duplicate-symmetry*)  ;; INSTRUMENTATION: added
           (return-from defer-hybrid-goal))))
     (narrate "Solution found (hybrid mode) ***" goal-state goal-depth)
-    (ww-instr-incf *ww-goals-deferred-hybrid*)  ;; INSTRUMENTATION: added
     (push-global (cons current-node goal-state) *hybrid-goals*)))
 
 
@@ -1619,7 +1424,6 @@
                            :path full-path
                            :goal goal-state)))
           (push-global solution *solutions*)
-          (ww-instr-incf *ww-solutions-recorded-total*) ;; INSTRUMENTATION: added
           (with-search-structures-lock
             (let ((existing
                     (find goal-idb *unique-solutions*
@@ -1627,110 +1431,9 @@
                                  (problem-state.idb (solution.goal soln)))
                           :test #'equalp)))
               (cond (existing
-                     (ww-instr-incf *ww-goals-rejected-duplicate-raw*) ;; INSTRUMENTATION: added
-                     ;; Replace if new solution is better
+                    ;; Replace if new solution is better
                      (when (solution-better-p solution existing)
                        (setf *unique-solutions*
-                             (substitute solution existing *unique-solutions*))
-                       (ww-instr-incf *ww-goals-replaced-better*)))
+                             (substitute solution existing *unique-solutions*))))
                     (t
-                     (push-global solution *unique-solutions*)
-                     (ww-instr-incf *ww-goals-recorded-unique*)))))))))) ;; INSTRUMENTATION: added
-
-
-(defun register-solution (current-node goal-state)
-  "Inserts a new solution on the list of *solutions*."
-  (declare (type node current-node) (type problem-state goal-state))
-  (ww-instr-incf *ww-goals-hit-total*)  ;; INSTRUMENTATION
-  (ww-instr-note-goal-canonical-key goal-state) ;; CHANGED: canonical seen-table instrumentation
-  (let* ((state-depth (1+ (node.depth current-node)))
-         (solution
-           (make-solution
-             :depth state-depth
-             :time (problem-state.time goal-state)
-             :value (problem-state.value goal-state)
-             :path (let ((nominal-path (append (record-solution-path current-node)
-                                               (list (record-move
-                                                      goal-state)))))
-                     (if (= (hash-table-count *state-codes*) 0)
-                         nominal-path
-                         (append nominal-path
-                                 (reverse
-                                  (gethash (funcall (symbol-function 'encode-state)
-                                                   (list-database (problem-state.idb goal-state)))
-                                           *state-codes*)))))
-             :goal goal-state)))
-    (cond ((> *threads* 0)
-           #+:ww-debug (when (>= *debug* 1) (lprt))
-           (let ((ctrl-str "~&New path to goal found at depth = ~:D~%"))
-             (bt:with-lock-held (*lock*)
-               (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-                   (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
-                           state-depth (solution.value solution))
-                   (format t ctrl-str state-depth)))))
-          (t
-           (format t "~%New path to goal found at depth = ~:D~%" state-depth)
-           (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-             (format t "Objective value = ~:A~%" (solution.value solution)))
-           (when (eql *solution-type* 'min-time)
-             (format t "Time = ~:A~%" (solution.time solution)))))
-    (when (eql *algorithm* 'depth-first)
-      (narrate "Solution found ***" goal-state state-depth))
-    (push-global solution *solutions*)
-    (ww-instr-incf *ww-solutions-recorded-total*) ;; INSTRUMENTATION: added
-
-    ;; Replace existing unique solution if new one is better
-    (with-search-structures-lock
-      (let* ((new-idb (problem-state.idb (solution.goal solution)))
-             (existing (find new-idb *unique-solutions*
-                             :key (lambda (soln)
-                                    (problem-state.idb (solution.goal soln)))
-                             :test #'equalp)))
-        (cond (existing
-               (ww-instr-incf *ww-goals-rejected-duplicate-raw*) ;; INSTRUMENTATION: added
-               ;; Replace if new solution is better
-               (when (solution-better-p solution existing)
-                 (setf *unique-solutions*
-                       (substitute solution existing *unique-solutions*))
-                 (ww-instr-incf *ww-goals-replaced-better*))) ;; INSTRUMENTATION: added
-              (t
-               (push-global solution *unique-solutions*)
-               (ww-instr-incf *ww-goals-recorded-unique*))))))) ;; INSTRUMENTATION: added
-
-
-(defun ww-solve ()
-  "Runs a branch & bound search on the problem specification."
-  (ww-reset-searcher-instrumentation)  ;; INSTRUMENTATION: added
-  (if (> *threads* 0)
-      (format t "~%working with ~D thread(s)...~2%" *threads*)
-      (format t "~%working...~2%"))
-  (time (dfs))
-  (ww-print-searcher-instrumentation-summary) ;; INSTRUMENTATION: added
-  (in-package :ww))
-
-
-;; Canonical goal-key instrumentation hook:
-;; If non-NIL, this function is called on each GOAL hit to produce a canonical key.
-;; The key is used only for instrumentation (seen-table + duplicate count) for now.
-(defparameter *ww-goal-uniqueness-key-fn* nil)
-
-;; Seen-table for canonical goal keys (reset per ww-solve run).
-(defparameter *ww-seen-goal-keys* nil)
-
-
-(defun ww-instr-note-goal-canonical-key (goal-state)
-  "Instrumentation-only: track canonical goal-key repeats without affecting search.
-If *ww-goal-uniqueness-key-fn* is NIL, does nothing.
-
-The key function is called as (funcall *ww-goal-uniqueness-key-fn* idb),
-where IDB is (problem-state.idb goal-state)."
-  (when (and *ww-searcher-instrumentation-enabled*
-             *ww-goal-uniqueness-key-fn*)
-    (let* ((idb (problem-state.idb goal-state))
-           (key (funcall *ww-goal-uniqueness-key-fn* idb)))
-      (when key
-        (let ((ht (or *ww-seen-goal-keys*
-                      (setf *ww-seen-goal-keys* (make-hash-table :test #'equal)))))
-          (if (gethash key ht)
-              (ww-instr-incf *ww-goals-rejected-duplicate-canonical*)
-              (setf (gethash key ht) t)))))))
+                     (push-global solution *unique-solutions*))))))))))

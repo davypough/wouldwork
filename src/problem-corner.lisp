@@ -69,12 +69,61 @@
 )
 
 
-(define-base-relations  ;dyanamic relations which are not derived
+(define-static-relations
+  (coords (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
+  (controls (either receiver plate) (either gate blower))
+  (chroma (either transmitter receiver) $hue)  ;fixed color
+  (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
+  (gate-segments $list)    ; ((gate1 x1 y1 x2 y2) ...)
+  (window-segments $list)
+  ;potential clear los from an area to a focus
+  (los0 area focus)  
+  (los1 area (either $gate $area) focus)  ;los can be blocked either by a closed $gate or object in $area
+  ;(los2 area (either $gate $area) (either $gate $area) focus)
+  ;potential visibility from an area to another area
+  (visible0 area area)  
+  (visible1 area (either $gate $area) area)  ;visibility from one area through a potential occluder to another area
+  ;(visible2 area (either $gate $area) (either $gate $area) area)
+  ;potential accesibility to move from an area to another area
+  (accessible0 area area)
+  (accessible1 area (either $gate $blower) area)
+  ;(accessible2 area (either $gate $blower) (either $gate $blower) area)
+)
+
+
+;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
+
+
+(define-base-relations  ;specify for enumerator only
+  ;dyanamic relations which are not derived
   (loc paired)
 )
 
 
-(define-prefilter corner-paths (state)  ; Used only for goal state
+(define-enum-relation loc  ;specify for enumerator only
+  :pattern :fluent
+  :allow-unassigned (:types cargo)
+  :early-keys (:types agent)
+  :symmetric-batch t)
+
+
+(define-enum-relation holds  ;specify for enumerator only
+  :pattern :fluent
+  :allow-unassigned t)
+
+
+(define-enum-relation paired  ;specify for enumerator only
+  :pattern :subset
+  :max-per-key 4
+  :key-types (:types connector)
+  :requires-fluent loc)
+
+
+(define-enum-relation elevation  ;specify for enumerator only
+  :pattern :derived)
+
+
+(define-prefilter corner-paths (state)  ;specify for enumerator only
   ;enumeration--eg, (find-goal-states goal-fn :solution-type every).
   ;Provides optional optimization to prune complete base states in enumeration,
   ;before propagate-changes! (expensive) and final goal checks run.
@@ -86,7 +135,7 @@
        (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))
 
 
-(defun prefilter-paired-reachable-p (state source target)  ;used with define-prefilter in enumerator
+(defun prefilter-paired-reachable-p (state source target)  ;specify for enumerator only
   "Check if TARGET is reachable from SOURCE via PAIRED relations in STATE.
    Uses breadth-first search on the undirected pairing graph."
   (let ((visited (make-hash-table :test 'eq))
@@ -114,168 +163,6 @@
                             (setf queue (nconc queue (list a)))))))))
                  idb)))
     nil))
-
-
-;;;; ============================================================
-;;;; CORNER canonical goal-key  ; used to cull *unique-states* 
-;;;; ============================================================
-
-
-(define-uniqueness :goal-key #'corner-goal-key)  ;operates on goal state to cull *unique-solutions* to user defined equivalence
-
-
-(defun corner-goal-key-prefixp (prefix s)
-  ;; NEW
-  (let ((lp (length prefix))
-        (ls (length s)))
-    (and (<= lp ls)
-         (string= prefix s :end2 lp))))
-
-
-(defun corner-goal-key-connectors-from-idb (props)
-  ;; NEW
-  ;; Prefer the type system if available; otherwise fall back to scanning.
-  (or (and (fboundp 'maybe-type-instances)
-           (ignore-errors (maybe-type-instances 'connector)))
-      (let ((acc nil))
-        (labels ((walk (x)
-                   (cond
-                     ((symbolp x)
-                      (when (corner-goal-key-prefixp "CONNECTOR" (symbol-name x))
-                        (pushnew x acc :test #'eq)))
-                     ((consp x)
-                      (walk (car x))
-                      (walk (cdr x))))))
-          (dolist (p props) (walk p)))
-        (nreverse acc))))
-
-
-(defun corner-goal-key-make-labels (n)
-  ;; NEW
-  (loop for i from 1 to n
-        collect (intern (format nil "C~D" i) :keyword)))
-
-
-(defun corner-goal-key-rename-tree (x map)
-  ;; NEW
-  (cond
-    ((symbolp x) (or (gethash x map) x))
-    ((consp x) (cons (corner-goal-key-rename-tree (car x) map)
-                     (corner-goal-key-rename-tree (cdr x) map)))
-    (t x)))
-
-
-(defun corner-goal-key-normalize-prop (prop)
-  ;; NEW
-  ;; Normalization that is independent of connector renaming.
-  (cond
-    ;; Ignore beam-name/order list (redundant + unstable)
-    ((and (consp prop) (eq (car prop) 'current-beams))
-     nil)
-    ;; Drop BEAM symbol from beam-segment: (beam-segment BEAM SRC TGT X Y)
-    ;; -> (beam-segment SRC TGT X Y)
-    ((and (consp prop)
-          (eq (car prop) 'beam-segment)
-          (consp (cdr prop)))
-     (cons 'beam-segment (cddr prop)))
-    (t prop)))
-
-
-(defun corner-goal-key-permute (lst)
-  ;; NEW
-  ;; Returns list of permutations of LST (small in CORNER).
-  (if (endp lst)
-      (list nil)
-      (mapcan (lambda (x)
-                (mapcar (lambda (p) (cons x p))
-                        (corner-goal-key-permute
-                         (remove x lst :count 1 :test #'eq))))
-              lst)))
-
-
-(defun corner-goal-key-candidate-key (props labels perm)
-  ;; NEW
-  ;; Build one candidate normalized string for a particular connector renaming PERM.
-  (let ((map (make-hash-table :test #'eq)))
-    (loop for old in perm
-          for new in labels
-          do (setf (gethash old map) new))
-    (let* ((lines
-             (loop for p in props
-                   for np = (corner-goal-key-normalize-prop p)
-                   when np
-                     collect (prin1-to-string
-                              (corner-goal-key-rename-tree np map))))
-           (sorted (sort lines #'string<)))
-      (with-output-to-string (s)
-        (dolist (line sorted)
-          (write-string line s)
-          (write-char #\Newline s))))))
-
-
-(defun corner-goal-key-simple-key (props)
-  ;; NEW
-  ;; Beam-normalize + sort, with no connector canonicalization.
-  (let* ((lines
-           (loop for p in props
-                 for np = (corner-goal-key-normalize-prop p)
-                 when np collect (prin1-to-string np)))
-         (sorted (sort lines #'string<)))
-    (with-output-to-string (s)
-      (dolist (line sorted)
-        (write-string line s)
-        (write-char #\Newline s)))))
-
-
-(defun corner-goal-key (idb)
-  "Canonical goal-key for CORNER:
-   - Drops BEAM identity from (beam-segment BEAM SRC TGT X Y) -> (beam-segment SRC TGT X Y)
-   - Ignores (current-beams ...) completely
-   - Canonicalizes under connector renaming by minimizing over all connector permutations
-     (brute force; fine for CORNER-sized connector sets).
-   Returns a deterministic string key."
-  (declare (type hash-table idb))
-  (let ((*package* (find-package :ww))
-        (*print-escape* t)
-        (*print-readably* t)
-        (*print-circle* nil))
-    (let* ((props (list-database idb))
-           (connectors (corner-goal-key-connectors-from-idb props)))
-      (if (endp connectors)
-          (corner-goal-key-simple-key props)
-          (let* ((labels (corner-goal-key-make-labels (length connectors)))
-                 (perms (corner-goal-key-permute connectors))
-                 (best nil))
-            (dolist (perm perms)
-              (let ((k (corner-goal-key-candidate-key props labels perm)))
-                (when (or (null best) (string< k best))
-                  (setf best k))))
-            best)))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(define-static-relations
-  (coords (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
-  (controls (either receiver plate) (either gate blower))
-  (chroma (either transmitter receiver) $hue)  ;fixed color
-  (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
-  (gate-segments $list)    ; ((gate1 x1 y1 x2 y2) ...)
-  (window-segments $list)
-  ;potential clear los from an area to a focus
-  (los0 area focus)  
-  (los1 area (either $gate $area) focus)  ;los can be blocked either by a closed $gate or object in $area
-  ;(los2 area (either $gate $area) (either $gate $area) focus)
-  ;potential visibility from an area to another area
-  (visible0 area area)  
-  (visible1 area (either $gate $area) area)  ;visibility from one area through a potential occluder to another area
-  ;(visible2 area (either $gate $area) (either $gate $area) area)
-  ;potential accesibility to move from an area to another area
-  (accessible0 area area)
-  (accessible1 area (either $gate $blower) area)
-  ;(accessible2 area (either $gate $blower) (either $gate $blower) area)
-)
 
 
 ;;;; HEURISTIC FUNCTIONS ;;;;
@@ -455,7 +342,7 @@
       (floor $useless 2)))
 
 
-;;;; SEARCH QUERIES ;;;;
+;;;; QUERY FUNCTIONS ;;;;
 
 
 (define-query get-current-beams ()
@@ -1007,8 +894,6 @@
                               (push $tgt $next-frontier))))))))))
       (setq $frontier $next-frontier))
     $distances))
-
-
 
 
 ;;;; UPDATE FUNCTIONS ;;;;

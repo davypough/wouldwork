@@ -104,6 +104,12 @@
     (when prop (third prop))))
 
 
+(defun bw--maybe-propagate-changes! (state)
+  "Invoke problem-specific propagation when available."
+  (when (fboundp 'propagate-changes!)
+    (funcall (symbol-function 'propagate-changes!) state)))
+
+
 ;;;; ==================== Building / projecting states ====================
 
 
@@ -1507,7 +1513,7 @@ Example usage:
         ;; Run propagation to compute derived facts (active, open, color, beam-segment)
         (let (forward-list inverse-list)
           (declare (special forward-list inverse-list))
-          (propagate-changes! state))
+          (bw--maybe-propagate-changes! state))
         ;; Check goal satisfaction
         (let ((satisfied (bw-corner-goal-satisfied-p state)))
           (when verbose
