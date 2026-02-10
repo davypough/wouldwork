@@ -93,7 +93,7 @@
 
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
-#|
+
 (define-base-relations  ;specify for enumerator only
   ;dyanamic relations which are not derived
   (loc paired)
@@ -163,7 +163,7 @@
                             (setf queue (nconc queue (list a)))))))))
                  idb)))
     nil))
-|#
+
 
 ;;;; HEURISTIC FUNCTIONS ;;;;
 
