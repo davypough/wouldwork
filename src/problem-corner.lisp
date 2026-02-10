@@ -93,7 +93,7 @@
 
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
-
+#|
 (define-base-relations  ;specify for enumerator only
   ;dyanamic relations which are not derived
   (loc paired)
@@ -163,11 +163,11 @@
                             (setf queue (nconc queue (list a)))))))))
                  idb)))
     nil))
-
+|#
 
 ;;;; HEURISTIC FUNCTIONS ;;;;
 
-
+#|
 ;;; The heuristic? function for this problem estimates the remaining "cost"
 ;;; to reach the goal from the current state. It combines multiple component
 ;;; heuristics using weighted summation, where higher weights indicate more
@@ -185,7 +185,7 @@
 ;;;   since progress must often be undone
 
 
-#+ignore (define-query heuristic? ()
+(define-query heuristic? ()
    ;Combines weighted heuristic components to estimate cost to goal.
    ;Components ordered by priority:
    ;  h-color-path-deficit (200): Missing ACTIVE transmitter→receiver paths
@@ -208,7 +208,7 @@
         :combiner :weighted-sum)))
 
 
-#+ignore (define-query h-color-path-deficit ()
+(define-query h-color-path-deficit ()
   ;; Counts receivers that need power but have no viable ACTIVE path from transmitter.
   ;; A viable path requires actual beam connectivity, not just structural potential.
   ;; Returns: 0-3 (deficit count)
@@ -228,7 +228,7 @@
       $deficit))
 
 
-#+ignore (define-query active-path-to-receiver-p (?transmitter ?receiver ?hue)
+(define-query active-path-to-receiver-p (?transmitter ?receiver ?hue)
   ;; Returns t only if an ACTUALLY POWERED connector provides a path to receiver
   ;; AND that path originates from the specified transmitter.
   ;; Requires connector to have correct color (be actually receiving power).
@@ -259,7 +259,7 @@
                   (los agent1 $c2-area ?receiver)))))))
 
 
-#+ignore (define-query h-unpowered-placed-connectors ()
+(define-query h-unpowered-placed-connectors ()
   ;; Counts placed connectors that are not powered (no color).
   ;; A placed connector without power represents wasted work - it's not
   ;; contributing to any beam network yet.
@@ -272,7 +272,7 @@
       $count))
 
 
-#+ignore (define-query h-color-mismatch ()
+(define-query h-color-mismatch ()
   ;; Counts powered connectors paired with receivers of WRONG color.
   ;; Example: connector has color=blue but paired with receiver2 (red).
   ;; This is actively harmful - the connector is working but can never help.
@@ -288,7 +288,7 @@
       $count))
 
 
-#+ignore (define-query h-goal-receivers-inactive ()
+(define-query h-goal-receivers-inactive ()
   ;Counts how many goal receivers still need activation.
   ;The goal requires both receiver2 and receiver3 to be active.
   ; Each inactive receiver contributes 1 to the heuristic.
@@ -301,7 +301,7 @@
       $n))
 
 
-#+ignore (define-query h-gate1-blocks-goal ()
+(define-query h-gate1-blocks-goal ()
   ;Penalty for gate1 being closed.
   ;Gate1 separates areas 1-3 from area4. Since the goal requires
   ;the agent to be in area4, gate1 must eventually open.
@@ -310,7 +310,7 @@
   (if (open gate1) 0 1))
 
 
-#+ignore (define-query h-agent-goal-distance ()
+(define-query h-agent-goal-distance ()
   ;Penalty for agent not being in the goal area.
   ;The goal requires (loc agent1 area4). This component provides
   ;a small incentive to move toward area4 once other conditions
@@ -322,7 +322,7 @@
       (if (eql $area 'area4) 0 1)))
 
 
-#+ignore (define-query h-useless-pairings ()  ;remove because pairings can always become useful
+(define-query h-useless-pairings ()  ;remove because pairings can always become useful
   ;; Penalizes placed connectors with pairings that cannot carry beams.
   ;; A pairing is useless if it connects two receivers (neither emits).
   ;; Returns: count of useless pairings
@@ -340,7 +340,7 @@
                   (incf $useless)))))))
       ;; Divide by 2 since we count each pair twice
       (floor $useless 2)))
-
+|#
 
 ;;;; QUERY FUNCTIONS ;;;;
 
@@ -1518,16 +1518,5 @@
   (and (active receiver2)
        (active receiver3)
        (loc agent1 area4)
-       (exists (?c connector)
-         (not (bind (loc ?c $anywhere))))
-       (exists (?c connector)
-         (and (loc ?c area2)
-              (color ?c blue)
-              (paired ?c transmitter2)
-              (paired ?c receiver3)))
-       (exists (?c connector)
-         (and (loc ?c area3)
-              (color ?c red)
-              (paired ?c transmitter1)
-              (paired ?c receiver2))))
-)
+))
+

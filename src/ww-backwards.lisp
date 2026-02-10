@@ -1568,6 +1568,85 @@ Example:
           (bw-corner-test-goal-candidates :verbose nil)))
 
 
+(defun bw-corner-goal->penultimate-goals (&key
+                                          (goal-props '((active receiver2)
+                                                        (active receiver3)
+                                                        (loc agent1 area4)))
+                                          candidate-actions
+                                          (include-move t)
+                                          (include-pickup t)
+                                          (include-connect nil)
+                                          (n-values '(1 2 3))
+                                          (place 'ground)
+                                          (projection-relations *bw-default-projection-relations*)
+                                          (milestone-relations *bw-base-fact-relations*)
+                                          (top-n 10)
+                                          (verbose t))
+  "Regress from a goal *condition* (not a complete goal state) to candidate
+penultimate goal conditions for problem-corner.
+
+Workflow:
+  1. Build a minimal target state from GOAL-PROPS + corner static facts
+  2. Generate candidate last actions (or use CANDIDATE-ACTIONS)
+  3. Regress+validate each action with BW-REGRESS+VALIDATE-SUBSUMING
+     using GOAL-PROPS as REQUIRED-PROPS
+  4. Rank predecessor milestones and return top goal-forms
+
+Returns a plist with:
+  :GOAL-PROPS
+  :TARGET-STATE
+  :CANDIDATE-ACTIONS
+  :REPORT
+  :SUMMARY
+  :ACTION-TOTALS
+  :TOP-PENULTIMATE-GOALS"
+  (let* ((target-props (append goal-props
+                               '((current-beams ()))
+                               *corner-static-facts*))
+         (target-state (bw-make-state-from-propositions target-props :relations :all))
+         (actions (or candidate-actions
+                      (bw-candidate-last-actions-for-goal target-state
+                                                          :include-move include-move
+                                                          :include-pickup include-pickup
+                                                          :include-connect include-connect
+                                                          :n-values n-values
+                                                          :place place)))
+         (validator (lambda (state action
+                              &key normalizer strip-relations projection-relations
+                                max-results verbose)
+                      (bw-regress+validate-subsuming
+                       state action
+                       :normalizer normalizer
+                       :strip-relations strip-relations
+                       :projection-relations projection-relations
+                       :required-props goal-props
+                       :max-results max-results
+                       :verbose verbose)))
+         (report (bw-regressed-predecessor-report
+                  target-state actions
+                  :validator validator
+                  :projection-relations projection-relations
+                  :milestone-relations milestone-relations
+                  :milestone-format :goal-form
+                  :verbose verbose))
+         (summary (bw-report-summary report))
+         (action-totals (bw-report-action-totals report))
+         (top-goals (bw-top-milestone-goals report
+                                            :n top-n
+                                            :milestone-format :goal-form)))
+    (when verbose
+      (format t "~&BW goal->penultimate: ~D candidate action~:P, ~D validated predecessor~:P.~%"
+              (length actions)
+              (getf summary :validated-total)))
+    (list :goal-props goal-props
+          :target-state target-state
+          :candidate-actions actions
+          :report report
+          :summary summary
+          :action-totals action-totals
+          :top-penultimate-goals top-goals)))
+
+
 (defun bw--collect-connectors (state)
   "Collect connector symbols appearing anywhere in STATE props."
   (let ((cs nil))
