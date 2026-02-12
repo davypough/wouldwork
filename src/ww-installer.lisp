@@ -7,8 +7,10 @@
 
 
 (defun either (&rest types)
-  (loop for type in types
-      append (gethash type *types*)))
+  (apply #'append
+         (mapcar (lambda (type)
+                   (copy-list (gethash type *types*)))
+                 types)))
 
 
 (defun final-charp (final-char sym)

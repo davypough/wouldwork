@@ -167,9 +167,7 @@
       ;; Backtracking with incremental updates
       `(multiple-value-bind (forward inverse) 
            (update-bt (problem-state.idb state) ,(translate-list form flag))
-         ;; Apply forward operation immediately to state
-         (update (problem-state.idb state) forward)
-         ;; Track both for later use
+         ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
          (push forward forward-list)
          (push inverse inverse-list))
       ;; Depth-first algorithm
@@ -186,9 +184,7 @@
       ;; Backtracking with incremental updates
       `(multiple-value-bind (forward inverse) 
            (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-         ;; Apply forward operation immediately to state
-         (update (problem-state.idb state) forward)
-         ;; Track both for later use
+         ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
          (push forward forward-list)
          (push inverse inverse-list))
       ;; Depth-first algorithm

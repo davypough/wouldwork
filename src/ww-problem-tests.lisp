@@ -367,3 +367,65 @@
                (write-hash-table-to-file problem-test-solutions test-solutions-file))
              t)
       t)))
+
+
+;;; SIMPLE DEPTH-FIRST VS BACKTRACKING BENCHMARK ;;;
+
+
+(defun bench-depth&back (problem-name depth-cutoff &key (solution-type 'every))
+  "Runs depth-first and backtracking once each on PROBLEM-NAME.
+   Enforces tree mode and identical depth cutoff/settings for both runs.
+   Returns plist of the two result rows."
+  (let* ((problem-str (string-downcase (string problem-name)))
+         (results nil))
+    (format t "~%========================================~%")
+    (format t "BENCH DEPTH-FIRST VS BACKTRACKING~%")
+    (format t "problem=~A depth-cutoff=~D solution-type=~A~%"
+            (string-upcase problem-str) depth-cutoff solution-type)
+    (format t "========================================~%")
+    (dolist (algorithm '(depth-first backtracking))
+      (%stage problem-str)
+      (setf *algorithm* algorithm
+            *tree-or-graph* 'tree
+            *depth-cutoff* depth-cutoff
+            *solution-type* solution-type
+            *threads* 0
+            *randomize-search* nil
+            *debug* 0
+            *probe* nil)
+      ;; Keep native CSP problems as CSP; otherwise default to planning.
+      (unless (member *problem-type* '(planning csp))
+        (setf *problem-type* 'planning))
+      (refresh)
+      (let ((start (get-internal-real-time)))
+        (ww-solve)
+        (let ((row (list :algorithm algorithm
+                         :problem-type *problem-type*
+                         :elapsed (/ (- (get-internal-real-time) start)
+                                     internal-time-units-per-second)
+                         :cycles *program-cycles*
+                         :states *total-states-processed*
+                         :max-depth *max-depth-explored*
+                         :solutions (length *solutions*)
+                         :unique-solutions (length *unique-solutions*))))
+          (push row results)
+          (format t "~%~A: elapsed=~,6F s cycles=~D states=~D max-depth=~D solutions=~D unique=~D type=~A~%"
+                  algorithm
+                  (getf row :elapsed)
+                  (getf row :cycles)
+                  (getf row :states)
+                  (getf row :max-depth)
+                  (getf row :solutions)
+                  (getf row :unique-solutions)
+                  (getf row :problem-type)))))
+    (setf results (nreverse results))
+    (let* ((dfs (find 'depth-first results :key (lambda (r) (getf r :algorithm))))
+           (bt (find 'backtracking results :key (lambda (r) (getf r :algorithm))))
+           (dfs-elapsed (getf dfs :elapsed))
+           (bt-elapsed (getf bt :elapsed))
+           (speedup (if (> bt-elapsed 0.0) (/ dfs-elapsed bt-elapsed) 0.0)))
+      (format t "~%----------------------------------------~%")
+      (format t "Summary: depth-first=~,6F s backtracking=~,6F s speedup(df/bt)=~,3Fx~%"
+              dfs-elapsed bt-elapsed speedup)
+      (format t "----------------------------------------~%"))
+    results))

@@ -1,0 +1,166 @@
+ENUMERATOR NOTES
+
+Implementation:
+  ww-enumerator.lisp
+
+Test problem:
+  problem-corner.lisp
+
+
+PURPOSE
+
+Generate candidate states that satisfy a goal condition via exhaustive
+enumeration of base-relation assignments.  These are "candidate" states
+because they satisfy the goal but are not guaranteed to be reachable from
+the problem's start state via legal actions.
+
+Two entry points:
+  find-goal-states         — enumerate states satisfying a goal directly.
+  find-penultimate-states  — enumerate states one action away from the goal.
+
+
+APPROACH
+
+The enumerator converts declared base-relation metadata into a sequence of
+CSP-style enum-actions, then runs the existing WouldWork solver in tree/CSP
+mode over those actions starting from an empty state.  Each enum-action
+represents a branching assignment for one relation-key combination (or a
+batch assignment for interchangeable groups).  After all base relations are
+assigned, propagate-changes! derives additional relations, and the resulting
+state is tested against the goal condition.
+
+
+PROCEDURE (find-goal-states)
+
+1. Read the problem's base-relation schema (define-base-relations) and
+   per-relation enumeration metadata (define-enum-relation).
+
+2. Compute the effective base-relation schema for this run, applying any
+   :exclude-relations or :include-relations overrides.
+
+3. Analyze the goal form to extract fixed-fluent constraints and identify
+   goal-invariant literals for prefiltering.
+
+4. Auto-detect symmetric (undirected) relations and interchangeable object
+   groups from relation signatures and static-relation analysis.
+
+5. Generate the enum-action sequence from metadata in four phases:
+     a) Early-fluent actions — keys matching :early-keys types, enumerated
+        first for better pruning (e.g., agent location).
+     b) Main-fluent actions — remaining fluent assignments, using canonical
+        multiset (symmetric-batch) assignment for interchangeable groups,
+        and individual per-key actions otherwise.  Keys qualifying for
+        :allow-unassigned receive an :UNASSIGNED sentinel option.
+     c) Subset actions — for :subset-pattern relations (e.g., paired),
+        enumerate subsets of allowed partners per key, ordered fail-first
+        by instantiation count.
+     d) Finalize action — triggers propagation and applies prefilters.
+
+6. Temporarily rebind the solver's global state (*actions*, *start-state*,
+   *solution-type*, *depth-cutoff*, etc.) to run the enum-actions as a CSP
+   tree search from an empty start state.  Globals are restored afterward.
+
+7. At each leaf (finalize step):
+     a) Apply the prefilter (if any) to the base state before propagation.
+     b) Run propagate-changes! to derive additional relations.
+     c) Test the propagated state against the goal condition.
+
+8. Record passing states in *enumerated-goal-states*.
+
+
+PROCEDURE (find-penultimate-states)
+
+Steps 1-7a are the same as find-goal-states, with the following differences:
+
+- The goal test at step 7c is replaced by a penultimate-state test: for each
+  candidate state, enumerate all applicable instantiations of the selected
+  action families, apply each one forward, and check whether the resulting
+  next-state satisfies the goal.  States with at least one goal-reaching
+  action are accepted.
+
+- The :action-families keyword restricts which problem actions are considered
+  as the "last action" (choices: :move, :pickup, :connect, or :all).
+
+- A goal-invariant prefilter is automatically constructed and composed with
+  any user prefilter.  It enforces goal literals that cannot be modified by
+  the selected action families, pruning states that could never reach the
+  goal through those families.
+
+- Results include the reaching actions for each penultimate state, stored
+  in *enumerated-penultimate-states* and *enumerated-penultimate-results*.
+
+
+PROBLEM-SPEC DECLARATIONS
+
+define-base-relations (schema)
+  Declare which dynamic relations the enumerator branches on.
+  Example:
+    (define-base-relations (loc paired))
+
+define-enum-relation relation &key ...
+  Declare per-relation enumeration metadata.  Keys:
+    :pattern           :fluent | :subset | :derived
+    :allow-unassigned  t | (:types type...) — keys that may be left unassigned
+    :early-keys        (:types type...) — key types to enumerate first
+    :on-assign         ((rel val)...) — default other relations when assigned
+    :symmetric-batch   t | nil — canonical multiset for interchangeable groups
+    :max-per-key       integer — cardinality cap for :subset patterns
+    :key-types         (:types type...) — restrict subset keys to these types
+    :requires-fluent   symbol — fluent that must be bound for non-empty subsets
+  Example:
+    (define-enum-relation loc
+      :pattern :fluent
+      :allow-unassigned (:types cargo)
+      :early-keys (:types agent)
+      :symmetric-batch t)
+
+define-prefilter name (state) &body body
+  Declare a prefilter applied to each base state before propagation.
+  Return t to keep the state, nil to prune it.
+  Example:
+    (define-prefilter corner-paths (state)
+      (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
+           (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))
+
+
+RESULT VARIABLES
+
+*enumerated-goal-states*         — goal states from find-goal-states
+*enumerated-penultimate-states*  — penultimate states from find-penultimate-states
+*enumerated-penultimate-results* — per-state reaching-action result plists
+*enumerated-unique-solutions*    — raw solution structs from the last enumeration
+
+
+KEYWORD OPTIONS
+
+:solution-type  first | every | <integer N>
+  Controls how many states to find (default: first).
+
+:algorithm  symbol
+  Search algorithm for enumeration (default: *algorithm*).
+
+:exclude-relations / :include-relations  symbol or list
+  Temporarily modify the base schema for this run.
+
+:prefilter  function | :use-installed | nil
+  State filter applied before propagation.
+  find-goal-states defaults to :use-installed.
+  find-penultimate-states defaults to nil (for completeness).
+
+:action-families  list of (:move :pickup :connect)
+  For find-penultimate-states only.  Restricts which action families are
+  considered as the last action (default: all three).
+
+
+EXAMPLES (corner problem)
+
+(find-goal-states
+  (and (active receiver2) (active receiver3) (loc agent1 area4))
+  :solution-type every)
+=> Goal states found: 4279, 66 seconds  (expanded goal condition)
+
+(find-penultimate-states
+  (and (active receiver2) (active receiver3) (loc agent1 area4))
+  :solution-type every
+  :action-families (:pickup))
+=> Penultimate states found: 1816, 356 seconds

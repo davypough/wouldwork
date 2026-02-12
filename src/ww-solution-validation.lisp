@@ -285,12 +285,18 @@
       ;; Backtracking algorithm uses list of operations (forward-ops inverse-ops)
       (list
        (let ((forward-ops (first changes)))
-         (dolist (op forward-ops)
-           (destructuring-bind (operation key &optional val) op
-             (ecase operation
-               (:add (setf (gethash key (problem-state.idb state)) val))
-               (:remove (remhash key (problem-state.idb state)))
-               (:modify (setf (gethash key (problem-state.idb state)) val)))))))))
+         (when forward-ops
+           ;; Backtracking updates may be either explicit op triples
+           ;; (:add/:remove/:modify key value) or literal updates compatible with REVISE.
+           (if (and (consp (first forward-ops))
+                    (keywordp (first (first forward-ops))))
+               (dolist (op forward-ops)
+                 (destructuring-bind (operation key &optional val) op
+                   (ecase operation
+                     (:add (setf (gethash key (problem-state.idb state)) val))
+                     (:remove (remhash key (problem-state.idb state)))
+                     (:modify (setf (gethash key (problem-state.idb state)) val)))))
+               (revise (problem-state.idb state) forward-ops)))))))
   ;; Update state metadata
   (setf (problem-state.name state) (action.name action))
   (incf (problem-state.time state) (action.duration action))

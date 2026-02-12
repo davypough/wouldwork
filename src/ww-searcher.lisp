@@ -166,17 +166,13 @@
   ;; Check remaining constraints with diagnostics
   (let ((constraints-met t))
     (unless (eql *algorithm* 'depth-first)
-      (format t "~&Note: *solution-type* = EVERY with *algorithm* = ~A not supported for hybrid mode; using standard search.~%"
-              *algorithm*)
       (setf constraints-met nil))
     (unless (eql *tree-or-graph* 'graph)
-      (unless *happening-names*  ; Suppress message when tree is required for happenings
-        (format t "~&Note: *solution-type* = EVERY with *tree-or-graph* = TREE uses standard search to find every solution.~%~
-                   Using *tree-or-graph* = GRAPH may be more efficient (hybrid mode), but may find fewer solutions.~%"))
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
-      (format t "~&Note: *solution-type* EVERY requires *depth-cutoff* > 0 for hybrid mode; using standard search.~%")
       (setf constraints-met nil))
+    (unless constraints-met
+      (format t "~&Note: Hybrid mode not activated: requires *solution-type* = EVERY, *algorithm* = DEPTH-FIRST, *tree-or-graph* = GRAPH, and *depth-cutoff* > 0. Continuing with non-hybrid search.~%"))
     (when constraints-met
       (format t "~&Hybrid graph search mode active: enumerating all solutions at depth ~D.~%" *depth-cutoff*))
     constraints-met))
@@ -1049,7 +1045,8 @@
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
             *inconsistent-states-dropped*))
-  (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*)
+  (unless (eql *problem-type* 'csp)
+    (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (let ((sym-stats (format-symmetry-statistics)))
     (when sym-stats
       (format t "~%~A~%" sym-stats)))
@@ -1282,12 +1279,15 @@
       
       ;; Find any passing precondition and execute effect
       (dolist (pre-args precondition-args)
-        (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
+        ;; Effects can mutate the state while generating updates, so probe each
+        ;; precondition/effect on a trial copy to keep replay deterministic.
+        (let* ((trial-state (copy-problem-state state))
+               (pre-result (apply (action.pre-defun-name action) trial-state pre-args)))
           (when pre-result
             ;; Execute effect to get all possible updates
             (let ((updated-dbs (if (eql pre-result t)
-                                   (funcall (action.eff-defun-name action) state)
-                                   (apply (action.eff-defun-name action) state pre-result))))
+                                   (funcall (action.eff-defun-name action) trial-state)
+                                   (apply (action.eff-defun-name action) trial-state pre-result))))
               
               ;; Find update with matching instantiations
               (dolist (update updated-dbs)
@@ -1339,7 +1339,8 @@
                 (ecase *algorithm*
                   (depth-first (hs::length-hstack *open*))
                   (backtracking (length *choice-stack*)))))
-    (format t "~%net average branching factor = ~:D" (round *average-branching-factor*))
+    (unless (eql *problem-type* 'csp)
+      (format t "~%net average branching factor = ~:D" (round *average-branching-factor*)))
     (when (zerop *threads*)
       (iter (while (and *rem-init-successors*
                         (not (idb-in-open (node.state (first *rem-init-successors*))
@@ -1350,10 +1351,11 @@
               (the fixnum (- *num-init-successors*
                              (length *rem-init-successors*)))
               *num-init-successors*))
-    (format t "~%average search depth = ~A"
-            (if (> *num-paths* 0)
-                (round (/ *accumulated-depths* *num-paths*))
-                'pending))
+    (unless (eql *problem-type* 'csp)
+      (format t "~%average search depth = ~A"
+              (if (> *num-paths* 0)
+                  (round (/ *accumulated-depths* *num-paths*))
+                  'pending)))
     (format t "~%current average processing speed = ~:D states/sec" 
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
                       (/ (- (get-internal-real-time) *prior-time*)

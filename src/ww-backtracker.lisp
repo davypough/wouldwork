@@ -14,7 +14,10 @@
   act             ; (action-name arg1 arg2 ...)
   forward-update  ; The update structure that applies this choice
   inverse-update  ; The update structure that undoes this choice
-  level)          ; Depth in the search tree
+  forward-sig     ; Order-insensitive signature of forward-update
+  inverse-sig     ; Order-insensitive signature of inverse-update
+  level           ; Depth in the search tree
+  pre-applied-p)  ; T when effect already applied to *backtrack-state*
 
 
 (defparameter *backtrack-state* nil
@@ -23,6 +26,23 @@
 
 (defparameter *choice-stack* nil
   "Stack of choices made during backtracking search; path back to start state.")
+
+
+(defun update-set-signature (ops)
+  "Build an order-insensitive signature for OPS, ignoring duplicates.
+   Used as a cheap prefilter before exact set-equality checks."
+  (let ((seen (make-hash-table :test #'equal))
+        (unique-count 0)
+        (xor-hash 0)
+        (sum-hash 0))
+    (dolist (op ops)
+      (unless (gethash op seen)
+        (setf (gethash op seen) t)
+        (incf unique-count)
+        (let ((h (sxhash op)))
+          (setf xor-hash (logxor xor-hash h))
+          (incf sum-hash h))))
+    (list unique-count xor-hash sum-hash)))
 
 
 (defun search-backtracking ()
@@ -122,24 +142,28 @@
                 ;; Process each choice generated from this parameter combination
                 ;; (Multiple choices possible due to multiple assert statements in an action)
                 (dolist (choice choices-from-combination)
-                  (unless (detect-path-cycle choice)
-                    (when (register-choice-bt choice action level)
-                      (unwind-protect
-                        (if (is-complete-solution)
-                          ;; Solution found at current level - register and handle continuation
-                          (progn (register-solution-bt (1+ level))
-                                 (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
-                                 (finish-output)
-                                 (setf found-a-solution t)
-                                 (when (eq *solution-type* 'first)
-                                   (return-from backtrack t)))
-                          ;; No solution yet - continue recursive exploration
-                          (let ((deeper-result (backtrack (1+ level))))
-                            (when deeper-result
-                              (setf found-a-solution t)
-                              (when (eq *solution-type* 'first)
-                                (return-from backtrack t)))))
-                        (undo-choice-bt choice action level)))))))))))
+                  (if (detect-path-cycle choice)
+                      ;; If this choice was already applied during generation, restore now.
+                      (when (choice.pre-applied-p choice)
+                        (revise (problem-state.idb *backtrack-state*) (choice.inverse-update choice)))
+                      (when (register-choice-bt choice action level)
+                        (unwind-protect
+                          (if (is-complete-solution)
+                            ;; Solution found at current level - register and handle continuation
+                            (progn (register-solution-bt (1+ level))
+                                   (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
+                                   (when (> *debug* 0)
+                                     (finish-output))
+                                   (setf found-a-solution t)
+                                   (when (eq *solution-type* 'first)
+                                     (return-from backtrack t)))
+                            ;; No solution yet - continue recursive exploration
+                            (let ((deeper-result (backtrack (1+ level))))
+                              (when deeper-result
+                                (setf found-a-solution t)
+                                (when (eq *solution-type* 'first)
+                                  (return-from backtrack t)))))
+                          (undo-choice-bt choice action level)))))))))))
     found-a-solution))
 
 
@@ -156,22 +180,27 @@
                 (funcall effect-fn *backtrack-state*)
                 (apply effect-fn *backtrack-state* precondition-result))))
       
-      ;; Process each updated-db into separate choice structure
-      (dolist (updated-db updated-dbs)
-        (let ((change-lists (update.changes updated-db)))
-          (when change-lists
-            (destructuring-bind (forward-ops inverse-ops) change-lists
-              (let* ((combined-act (cons (action.name action)
-                                        (update.instantiations updated-db)))
-                     (new-choice (make-choice :act combined-act
-                                             :forward-update forward-ops
-                                             :inverse-update inverse-ops
-                                             :level level)))
-                (push new-choice choices)
-                
-                ;; CRITICAL: Undo changes immediately after capturing
-                ;;           So next action sees correct state
-                (revise (problem-state.idb *backtrack-state*) inverse-ops))))))
+      ;; Process each updated-db into separate choice structure.
+      ;; Fast path: if only one update exists, keep it applied and avoid undo/reapply.
+      (let ((single-update-p (and (consp updated-dbs) (null (cdr updated-dbs)))))
+        (dolist (updated-db updated-dbs)
+          (let ((change-lists (update.changes updated-db)))
+            (when change-lists
+              (destructuring-bind (forward-ops inverse-ops) change-lists
+                (let* ((combined-act (cons (action.name action)
+                                           (update.instantiations updated-db)))
+                       (new-choice (make-choice :act combined-act
+                                                :forward-update forward-ops
+                                                :inverse-update inverse-ops
+                                                :forward-sig (update-set-signature forward-ops)
+                                                :inverse-sig (update-set-signature inverse-ops)
+                                                :level level
+                                                :pre-applied-p single-update-p)))
+                  (push new-choice choices)
+                  ;; For multiple updates, restore immediately so each choice is explored from
+                  ;; the same base state. For single update, defer restore to undo-choice-bt.
+                  (unless single-update-p
+                    (revise (problem-state.idb *backtrack-state*) inverse-ops))))))))
       
       ;; Return choices in forward execution order
       (nreverse choices))))
@@ -184,8 +213,9 @@
   (when (>= *debug* 3)
     (format t "~%Current state: ~A~%" (list-database (problem-state.idb *backtrack-state*))))
 
-  ;; Step 1: Apply forward operations
-  (revise (problem-state.idb *backtrack-state*) (choice.forward-update choice))
+  ;; Step 1: Apply forward operations unless already applied during generation
+  (unless (choice.pre-applied-p choice)
+    (revise (problem-state.idb *backtrack-state*) (choice.forward-update choice)))
 
   ;; Step 2: Name and time update
   (setf (problem-state.name *backtrack-state*) (action.name action))
@@ -222,7 +252,7 @@
 
   ;; Reverse name & time
   (setf (problem-state.name *backtrack-state*) 
-        (if (> (length *choice-stack*) 1)
+        (if (cdr *choice-stack*)
           (first (choice.act (second *choice-stack*)))  ; Previous action name
           'start))
   (decf (problem-state.time *backtrack-state*) (action.duration action))
@@ -350,6 +380,8 @@
   (let ((last-choice (first *choice-stack*)))
     ;; Check if new forward-update matches last inverse-update (set comparison)
     (when last-choice
-      (alexandria:set-equal (choice.forward-update new-choice)
-                            (choice.inverse-update last-choice)
-                            :test #'equal))))
+      (and (equal (choice.forward-sig new-choice)
+                  (choice.inverse-sig last-choice))
+           (alexandria:set-equal (choice.forward-update new-choice)
+                                 (choice.inverse-update last-choice)
+                                 :test #'equal)))))
