@@ -123,8 +123,8 @@
                             arg2
                             `',arg2))))
         ;; Non-bijective relation
-        (let* ((fluentless-atom (ut::remove-at-indexes fluent-indices form))
-               (fluents (ut::collect-at-indexes fluent-indices form)))
+        (multiple-value-bind (fluentless-atom fluents)
+            (ut::split-at-indexes fluent-indices form)
           `(equalp (gethash ,(translate-list fluentless-atom flag) ,database-ref)
                    (list ,@(mapcar (lambda (x)
                                      (if (or (varp x)

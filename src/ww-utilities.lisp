@@ -87,18 +87,34 @@
   
 (defun remove-at-indexes (idxs lst)
   "Removes items at given indexes from a list."
-  (loop for i from 0
-    for elt in lst
-    unless (member i idxs :test #'=)
-    collect elt))
+  (multiple-value-bind (remaining removed)
+      (split-at-indexes idxs lst)
+    (declare (ignore removed))
+    remaining))
 
 
 (defun collect-at-indexes (idxs lst)
   "Collect items at given indexes from a list."
-  (loop for i from 0
-    for elt in lst
-    when (member i idxs :test #'=)
-    collect elt))
+  (multiple-value-bind (remaining removed)
+      (split-at-indexes idxs lst)
+    (declare (ignore remaining))
+    removed))
+
+
+(defun split-at-indexes (idxs lst)
+  "Returns two values: elements not at IDXS, and elements at IDXS."
+  (let ((sorted-idxs (sort (copy-list idxs) #'<)))
+    (loop with next-idxs = sorted-idxs
+          with keep = nil
+          with pick = nil
+          for i from 0
+          for elt in lst
+          do (if (and next-idxs (= i (first next-idxs)))
+                 (progn
+                   (push elt pick)
+                   (pop next-idxs))
+                 (push elt keep))
+          finally (return (values (nreverse keep) (nreverse pick))))))
 
 
 (defun subst-items-at-ascending-indexes (items idxs lst)
@@ -173,21 +189,19 @@
     ;; Position 0: Can't destructively modify head, return new list
     ((zerop position)
      (cons new-element lst))
+    ;; Empty list at position > 0: fabricate required NIL padding and append.
+    ((null lst)
+     (append (make-list position) (list new-element)))
     ;; Normal case: Insert at position > 0
     (t
      ;; Extend list if too short
      (let ((current-length (length lst)))
        (when (< current-length position)
-         ;; Find last cons cell
-         (let ((tail (last lst)))
-           ;; Extend with NIL elements up to position
-           (loop for i from current-length below position
-                 do (setf (cdr tail) (list nil))
-                    (setf tail (cdr tail))))))
+         ;; Extend with NIL elements up to position
+         (setf (cdr (last lst)) (make-list (- position current-length)))))
      ;; Now perform the insertion
      (let ((target-cell (nthcdr (1- position) lst)))
-       (when target-cell  ; Safety check
-         (push new-element (cdr target-cell))))
+       (push new-element (cdr target-cell)))
      lst)))
 
 
@@ -287,8 +301,11 @@
   (when (= (hash-table-count ht1) (hash-table-count ht2))
     (maphash (lambda (ht1-key ht1-value)
                (declare (ignore ht1-value))
-               (unless (gethash ht1-key ht2)
-                 (return-from hash-table-same-keys-p nil)))
+               (multiple-value-bind (_ present)
+                   (gethash ht1-key ht2)
+                 (declare (ignore _))
+                 (unless present
+                   (return-from hash-table-same-keys-p nil))))
              ht1)
     t))
 
@@ -431,6 +448,7 @@
           with in-line-comment = nil
           with in-block-comment = 0  ; depth counter for nested #|...|#
           with prev-char = nil
+          with backslash-run = 0
           for char = (read-char stream nil nil)
           while char
           do (cond
@@ -460,7 +478,7 @@
                 (setf in-line-comment t))
                
                ;; Handle string delimiters (not escaped)
-               ((and (char= char #\") (not (eql prev-char #\\)))
+               ((and (char= char #\") (evenp backslash-run))
                 (setf in-string (not in-string)))
                
                ;; Inside string - skip parens
@@ -484,6 +502,9 @@
                     (progn (decf depth) (pop open-positions)))))
              
              (setf prev-char char)
+             (if (char= char #\\)
+                 (incf backslash-run)
+                 (setf backslash-run 0))
           
           finally (return (if (zerop depth)
                               "Parentheses balanced."

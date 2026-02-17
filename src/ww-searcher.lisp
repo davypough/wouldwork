@@ -1028,7 +1028,7 @@
   (ecase condition
     (first
       (when *solutions*
-        (if (typep *solution-type* 'fixnum)  ; ADDED: handle fixnum case
+        (if (typep *solution-type* 'fixnum)
             (format t "~2%Search ended after finding ~D solution~:P (as requested)." 
                     (length *solutions*))
             (format t "~2%Search ended with first solution found."))))
@@ -1339,7 +1339,9 @@
           ;; Serial mode: single hash table
           (format t "~%ht count: ~:D    ht size: ~:D"
                   (hash-table-count *closed*)
-                  (hash-table-size *closed*))))
+                  (hash-table-size *closed*)))
+      (format t "~%repeated states = ~:D, ie, ~,1F percent"
+                *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
     (format t "~%frontier nodes: ~:D"
             (if (> *threads* 0)
                 (total-parallel-frontier)
