@@ -45,8 +45,9 @@
          (key (funcall (hstack.keyfn hstk) (aref vector fptr-1))))  ;key in elt at top of vec stack
     (let ((values (gethash key table)))  ;key guaranteed to be in table with list of values
       (pop values)
-      (when (null values)
-        (remhash key table))  ;key's value is now nil so remove it
+      (if (null values)
+          (remhash key table)  ;key's value is now nil so remove it
+          (setf (gethash key table) values))
       (vector-pop vector))))
 
 

@@ -195,6 +195,13 @@
       (hs::make-hstack :table (make-hash-table :test 'eql
                                                :synchronized nil)
                        :keyfn #'node.state.idb-hash))
+  ;; Always reset closed-state storage so prior runs do not retain old graph tables.
+  (setf *closed* (make-hash-table :test 'eql :synchronized nil))
+  ;; Drop shard references unless graph mode with parallelism reinitializes them below.
+  (when (boundp '*closed-shards*)
+    (setf *closed-shards* nil))
+  (when (boundp '*closed-shard-locks*)
+    (setf *closed-shard-locks* nil))
   (when (eql *tree-or-graph* 'graph)
     (let ((hash-test (if *hybrid-mode* 'equal 'eql))) 
       (setf *closed* (make-hash-table :test hash-test
