@@ -28,6 +28,11 @@
   "Stack of choices made during backtracking search; path back to start state.")
 
 
+(defun cycle-check-enabled-bt ()
+  "Enable immediate inverse-cycle detection only for planning problems."
+  (not (eql *problem-type* 'csp)))
+
+
 (defun update-set-signature (ops)
   "Build an order-insensitive signature for OPS, ignoring duplicates.
    Used as a cheap prefilter before exact set-equality checks."
@@ -182,7 +187,8 @@
       
       ;; Process each updated-db into separate choice structure.
       ;; Fast path: if only one update exists, keep it applied and avoid undo/reapply.
-      (let ((single-update-p (and (consp updated-dbs) (null (cdr updated-dbs)))))
+      (let ((single-update-p (and (consp updated-dbs) (null (cdr updated-dbs))))
+            (cycle-check-p (cycle-check-enabled-bt)))
         (dolist (updated-db updated-dbs)
           (let ((change-lists (update.changes updated-db)))
             (when change-lists
@@ -192,8 +198,10 @@
                        (new-choice (make-choice :act combined-act
                                                 :forward-update forward-ops
                                                 :inverse-update inverse-ops
-                                                :forward-sig (update-set-signature forward-ops)
-                                                :inverse-sig (update-set-signature inverse-ops)
+                                                :forward-sig (and cycle-check-p
+                                                                  (update-set-signature forward-ops))
+                                                :inverse-sig (and cycle-check-p
+                                                                  (update-set-signature inverse-ops))
                                                 :level level
                                                 :pre-applied-p single-update-p)))
                   (push new-choice choices)
@@ -377,11 +385,12 @@
 
 (defun detect-path-cycle (new-choice)
   "Check if new-choice immediately undoes the last choice using set-based comparison"
-  (let ((last-choice (first *choice-stack*)))
+  (when (cycle-check-enabled-bt)
+    (let ((last-choice (first *choice-stack*)))
     ;; Check if new forward-update matches last inverse-update (set comparison)
-    (when last-choice
-      (and (equal (choice.forward-sig new-choice)
-                  (choice.inverse-sig last-choice))
-           (alexandria:set-equal (choice.forward-update new-choice)
-                                 (choice.inverse-update last-choice)
-                                 :test #'equal)))))
+      (when last-choice
+        (and (equal (choice.forward-sig new-choice)
+                    (choice.inverse-sig last-choice))
+             (alexandria:set-equal (choice.forward-update new-choice)
+                                   (choice.inverse-update last-choice)
+                                   :test #'equal))))))

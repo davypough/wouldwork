@@ -1,4 +1,4 @@
-;;; Filename: ww-backwards.lisp
+;;; Filename: ww-backward.lisp
 ;;;
 ;;; Experimental backward-regression helpers.
 ;;;
@@ -273,37 +273,55 @@ Action instance: (MOVE agent from to)."
   "Regress a PICKUP-CONNECTOR step.
 Action instance: (PICKUP-CONNECTOR agent connector area).
 
-Because pickup deletes (LOC connector area) and (ELEVATION connector e), but the
-target state no longer contains ELEVATION for the connector, we generate a small
-set of candidates for the connector's prior elevation (typically {e-agent-1,
- e-agent, e-agent+1} clipped at 0)."
-  (let* ((e-agent (or (bw--get-binary-fluent target-state 'elevation agent) 0))
-         (candidates (remove-duplicates
-                      (remove-if (lambda (x) (and (numberp x) (< x 0)))
-                                 (list (- e-agent 1) e-agent (+ e-agent 1)))
-                      :test #'equal)))
-    (loop for e-conn in candidates
-          collect
-          (let* ((pred (copy-problem-state target-state))
-                 (idb (problem-state.idb pred)))
-            ;; Agent was not holding the connector before pickup.
-            (bw--delete-props-matching!
-             pred (lambda (p) (and (eql (car p) 'holds)
-                                   (eql (second p) agent))))
-            ;; Connector existed in AREA before pickup.
-            (bw--delete-props-matching!
-             pred (lambda (p) (and (eql (car p) 'loc)
-                                   (eql (second p) connector))))
-            (add-proposition (list 'loc connector area) idb)
-            ;; Connector had some elevation before pickup.
+Generates predecessor candidates by enumerating:
+  1. Plausible prior elevations for CONNECTOR (only when ELEVATION is a defined
+     relation; otherwise skipped entirely).
+  2. Plausible prior pairing subsets for CONNECTOR (subsets of size 0..3 from
+     type-valid partners of the PAIRED relation).
+Each (elevation x pairing-subset) combination produces one predecessor candidate.
+Forward validation filters inconsistent candidates."
+  (let* ((has-elevation (relation-signature 'elevation))
+         (elev-candidates
+           (if has-elevation
+               (let ((e-agent (or (bw--get-binary-fluent target-state 'elevation agent) 0)))
+                 (remove-duplicates
+                  (remove-if (lambda (x) (and (numberp x) (< x 0)))
+                             (list (- e-agent 1) e-agent (+ e-agent 1)))
+                  :test #'equal))
+               '(nil)))
+         (termini (bw--relation-partner-instances 'paired connector))
+         (pairing-subsets (bw--pairing-subsets termini))
+         (results nil))
+    (dolist (e-conn elev-candidates)
+      (dolist (pairings pairing-subsets)
+        (let* ((pred (copy-problem-state target-state))
+               (idb (problem-state.idb pred)))
+          ;; Agent was not holding the connector before pickup.
+          (bw--delete-props-matching!
+           pred (lambda (p) (and (eql (car p) 'holds)
+                                 (eql (second p) agent))))
+          ;; Connector existed in AREA before pickup.
+          (bw--delete-props-matching!
+           pred (lambda (p) (and (eql (car p) 'loc)
+                                 (eql (second p) connector))))
+          (add-proposition (list 'loc connector area) idb)
+          ;; Connector had some elevation before pickup (skip if relation undefined).
+          (when has-elevation
             (bw--delete-props-matching!
              pred (lambda (p) (and (eql (car p) 'elevation)
                                    (eql (second p) connector))))
-            (add-proposition (list 'elevation connector e-conn) idb)
-            ;; NOTE: we intentionally do not reconstruct (PAIRED ...) facts involving
-            ;; CONNECTOR here; see BW-IGNORE-PREDICATE-FOR-ACTION and BW-DIFF.
-            (setf (problem-state.idb-hash pred) nil)
-            pred))))
+            (add-proposition (list 'elevation connector e-conn) idb))
+          ;; Clear any existing connector pairings and install the subset.
+          (bw--delete-props-matching!
+           pred (lambda (p) (and (eql (car p) 'paired)
+                                 (or (eql (second p) connector)
+                                     (eql (third p) connector)))))
+          (dolist (term pairings)
+            (add-proposition (list 'paired connector term) idb)
+            (add-proposition (list 'paired term connector) idb))
+          (setf (problem-state.idb-hash pred) nil)
+          (push pred results))))
+    (nreverse results)))
 
 
 (defun bw-regress-connect-to-n-terminus (target-state action-form n)
@@ -2337,6 +2355,31 @@ rather than the enumerated minimal goal state."
       (mapcar (lambda (rest) (cons (car lst) rest))
               (bw--combinations-k (cdr lst) (1- k)))
       (bw--combinations-k (cdr lst) k)))))
+
+
+(defun bw--relation-partner-instances (relation exclude-object)
+  "Collect all object instances that can appear in any position of RELATION's
+   signature, excluding EXCLUDE-OBJECT.  Domain-independent: reads the type
+   signature from *RELATIONS* and expands via *TYPES*."
+  (let ((sig (relation-signature relation))
+        (all nil))
+    (dolist (type-spec sig)
+      (dolist (inst (expand-type-spec-instances* type-spec))
+        (pushnew inst all :test #'eq)))
+    (setf all (remove exclude-object all :test #'eq))
+    (sort all #'string< :key #'symbol-name)))
+
+
+(defun bw--pairing-subsets (termini)
+  "Return all subsets of TERMINI of sizes 0..3, capped at (length TERMINI).
+   Each subset is a list of terminus symbols.  Size 0 produces (NIL),
+   representing an unpaired connector."
+  (let ((max-n (min 3 (length termini)))
+        (subsets nil))
+    (loop for n from 0 to max-n
+          do (dolist (combo (bw--combinations-k termini n))
+               (push combo subsets)))
+    (nreverse subsets)))
 
 
 ;;;;;;;;;; Candidate generators per action family

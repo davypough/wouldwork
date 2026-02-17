@@ -372,7 +372,7 @@
 ;;; SIMPLE DEPTH-FIRST VS BACKTRACKING BENCHMARK ;;;
 
 
-(defun bench-depth&back (problem-name depth-cutoff &key (solution-type 'every))
+(defun bench-depth&back (problem-name depth-cutoff &key (solution-type 'first))
   "Runs depth-first and backtracking once each on PROBLEM-NAME.
    Enforces tree mode and identical depth cutoff/settings for both runs.
    Returns plist of the two result rows."

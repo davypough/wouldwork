@@ -155,7 +155,7 @@
   (precondition-lambda nil :type list)
   (iprecondition-lambda nil :type list)
   (effect-variables nil :type list)
-  (effect-adds nil :type list)  ;nonnegative literals only for backward search
+  (effect-adds nil :type list)  ;relation symbols modified by this action's effect (set by installer)
   (effect-lambda nil :type list)
   (ieffect-lambda nil :type list))
 

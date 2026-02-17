@@ -148,17 +148,21 @@
 ;;;;;;;;;;;;;;;;; Program Support Functions ;;;;;;;;;;;;;;;;
 
 
-(defun add-prop (proposition db)
+(defun add-prop (proposition db &optional indices precomputed-key precomputed-values)
   "Effectively adds an atomic proposition to the database."
   (declare (type hash-table db))
   (let ((int-db (eql (hash-table-test db) 'eql)))
-    (if (get-prop-fluent-indices proposition)
+    (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
+      (if fluent-indices
       ;do if proposition has fluents
-      (let ((fluentless-prop (get-fluentless-prop proposition))
-            (fluent-values (get-prop-fluents proposition)))
+      (let ((fluent-values (or precomputed-values
+                               (get-prop-fluents proposition fluent-indices))))
         (if int-db
-          (setf (gethash (convert-to-integer fluentless-prop) db) fluent-values)
-          (setf (gethash fluentless-prop db) fluent-values))
+          (setf (gethash (or precomputed-key
+                             (convert-fluentless-prop-to-integer proposition fluent-indices))
+                         db)
+                fluent-values)
+          (setf (gethash (get-fluentless-prop proposition fluent-indices) db) fluent-values))
         ;handle complement with fluents if it exists
         (when (gethash (car proposition) *complements*)
           (let ((complement-prop (get-complement-prop proposition)))
@@ -174,23 +178,24 @@
         (when (gethash (car proposition) *complements*)
           (if int-db
             (remhash (convert-to-integer (get-complement-prop proposition)) db)
-            (remhash (get-complement-prop proposition) db)))))))
+            (remhash (get-complement-prop proposition) db))))))))
 
 
 (defun del-prop (proposition db)
   "Effectively removes an atomic proposition from the database."
   (declare (type hash-table db))
   (let ((int-db (eql (hash-table-test db) 'eql)))
-    (if (get-prop-fluent-indices proposition)
+    (let ((fluent-indices (get-prop-fluent-indices proposition)))
+      (if fluent-indices
       ;do if proposition has fluents
-      (let ((fluentless-prop (get-fluentless-prop proposition))
-            (fluent-values (get-prop-fluents proposition)))
+      (progn
         (if int-db
-          (remhash (convert-to-integer fluentless-prop) db)
-          (remhash fluentless-prop db))
+          (remhash (convert-fluentless-prop-to-integer proposition fluent-indices) db)
+          (remhash (get-fluentless-prop proposition fluent-indices) db))
         ;handle complement with fluents if it exists
         (when (gethash (car proposition) *complements*)
-          (let ((complement-prop (get-complement-prop proposition)))
+          (let ((complement-prop (get-complement-prop proposition))
+                (fluent-values (get-prop-fluents proposition fluent-indices)))
             (if int-db
               (setf (gethash (convert-to-integer complement-prop) db) fluent-values)
               (setf (gethash complement-prop db) fluent-values)))))
@@ -203,7 +208,7 @@
         (when (gethash (car proposition) *complements*)
           (if int-db
             (setf (gethash (convert-to-integer (get-complement-prop proposition)) db) t)
-            (setf (gethash (get-complement-prop proposition) db) t)))))))
+            (setf (gethash (get-complement-prop proposition) db) t))))))))
 
 
 (defun bijective-index-propositions (proposition)
@@ -214,28 +219,29 @@
          (args (cdr proposition))
          (index-names (gethash relation-name *bijective-relations*)))
     (when index-names
-      (mapcar (lambda (index-name)
-                (cons index-name args))
-              index-names))))
+      (loop for index-name in index-names
+            collect (cons index-name args)))))
 
 
-(defun add-proposition (proposition db)  
+(defun add-proposition (proposition db &optional indices precomputed-key precomputed-values)  
   "Adds an atomic proposition and all its symmetries to the database.
    For bijective relations, adds both internal index propositions."
   (declare (type hash-table db))
-  (let ((bijective-props (bijective-index-propositions proposition)))
-    (if bijective-props
-        ;; Handle bijective relation: add both index propositions
-        (dolist (index-prop bijective-props)
-          (add-prop index-prop db))
+  (let* ((relation-name (car proposition))
+         (args (cdr proposition))
+         (index-names (gethash relation-name *bijective-relations*)))
+    (if index-names
+        ;; Handle bijective relation directly (avoids building an intermediate list)
+        (dolist (index-name index-names)
+          (add-prop (cons index-name args) db))
         ;; Handle normal relation (existing logic)
-        (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
+        (let ((symmetric-indexes (gethash relation-name *symmetrics*)))
           (if (null symmetric-indexes)
-            (add-prop proposition db)
+            (add-prop proposition db indices precomputed-key precomputed-values)
             (let ((symmetric-variables
                      (loop for indexes in symmetric-indexes
                            collect (loop for index in indexes
-                                       collect (nth index (cdr proposition)))))
+                                         collect (nth index args))))
                   (props (list (copy-list proposition))))
               (loop for vars in symmetric-variables
                     for idxs in symmetric-indexes do
@@ -248,19 +254,21 @@
   "Deletes an atomic proposition and all its symmetries from the database.
    For bijective relations, deletes both internal index propositions."
   (declare (type hash-table db))
-  (let ((bijective-props (bijective-index-propositions proposition)))
-    (if bijective-props
-        ;; Handle bijective relation: delete both index propositions
-        (dolist (index-prop bijective-props)
-          (del-prop index-prop db))
+  (let* ((relation-name (car proposition))
+         (args (cdr proposition))
+         (index-names (gethash relation-name *bijective-relations*)))
+    (if index-names
+        ;; Handle bijective relation directly (avoids building an intermediate list)
+        (dolist (index-name index-names)
+          (del-prop (cons index-name args) db))
         ;; Handle normal relation (existing logic)
-        (let ((symmetric-indexes (gethash (car proposition) *symmetrics*)))
+        (let ((symmetric-indexes (gethash relation-name *symmetrics*)))
           (if (null symmetric-indexes)
             (del-prop proposition db)
             (let ((symmetric-variables
                      (loop for indexes in symmetric-indexes
                            collect (loop for index in indexes
-                                       collect (nth index (cdr proposition)))))
+                                         collect (nth index args))))
                   (props (list (copy-list proposition))))
               (loop for vars in symmetric-variables
                     for idxs in symmetric-indexes do
@@ -320,26 +328,26 @@
         (delete-proposition (second literal) db)
         (values literal (second literal)))   ;should return inverse = not literal
       ;; Positive literal: addition/update case
-      (if (get-prop-fluent-indices literal)
+      (let ((fluent-indices (get-prop-fluent-indices literal)))
+        (if fluent-indices
           ;; Fluent case: capture current value before overwriting
-          (let* ((fluentless-prop (get-fluentless-prop literal))
-                 (key (convert-to-integer fluentless-prop)))
+          (let* ((key (convert-fluentless-prop-to-integer literal fluent-indices)))
             (multiple-value-bind (vals present-p)
                 (gethash key db)
-              (add-proposition literal db)
+              (add-proposition literal db
+                               fluent-indices
+                               key
+                               (get-prop-fluents literal fluent-indices))
               (if present-p
                   ;; Reconstruct previous literal
-                  (let ((previous-literal (copy-list fluentless-prop)))
-                    (loop for index in (get-prop-fluent-indices literal)
-                          for val in vals
-                          do (setf previous-literal (ut::ninsert-list val index previous-literal)))
-                    (values literal previous-literal))
+                  (values literal
+                          (reconstruct-literal-with-fluent-values literal fluent-indices vals))
                   ;; No previous value exists
                   (values literal (list 'not literal)))))
           ;; Non-fluent case: standard behavior
           (progn
             (add-proposition literal db)
-            (values literal (list 'not literal))))))
+            (values literal (list 'not literal)))))))
 
 
 (defun expand-into-plist (parameters)
@@ -351,10 +359,61 @@
         finally (return plist)))
 
 
-(defun get-fluentless-prop (proposition)
+(defun get-fluentless-prop (proposition &optional indices)
   "Derives the fluentless proposition counterpart from a full proposition."
-  (let ((indices (get-prop-fluent-indices proposition)))
-    (ut::remove-at-indexes indices proposition)))
+  (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
+    (if (null fluent-indices)
+        (copy-list proposition)
+        (loop with remaining-indices = fluent-indices
+              for i from 0
+              for item in proposition
+              unless (and remaining-indices (= i (first remaining-indices)))
+                collect item
+              else
+                do (setf remaining-indices (rest remaining-indices))))))
+
+
+(defun convert-fluentless-prop-to-integer (proposition &optional indices)
+  "Convert PROPOSITION with fluent slots removed directly to integer key.
+   Avoids constructing an intermediate fluentless list in int-db update paths."
+  (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
+    (if (null fluent-indices)
+        (convert-to-integer proposition)
+        (loop with remaining-indices = fluent-indices
+              with key of-type integer = 0
+              with multiplier of-type integer = 1
+              for i from 0
+              for item in proposition
+              unless (and remaining-indices (= i (first remaining-indices)))
+                do (let ((code (or (gethash item *constant-integers*)
+                                   ;; Fallback preserves object-indexing semantics while avoiding list allocation.
+                                   (bt:with-lock-held (*integer-lock*)
+                                     (or (gethash item *constant-integers*)
+                                         (progn
+                                           (when (>= *last-object-index* 999)
+                                             (error "Design Limit Error: Total # of actual + derived planning objects > 999"))
+                                           (incf *last-object-index*)
+                                           (setf (gethash item *constant-integers*) *last-object-index*)
+                                           (setf (gethash *last-object-index* *integer-constants*) item)
+                                           *last-object-index*))))))
+                     (incf key (* code multiplier))
+                     (setf multiplier (* multiplier 1000)))
+              else
+                do (setf remaining-indices (rest remaining-indices))
+              finally (return key)))))
+
+
+(defun reconstruct-literal-with-fluent-values (literal indices values)
+  "Return LITERAL with fluent positions replaced by VALUES."
+  (loop with remaining-indices = indices
+        with remaining-values = values
+        for i from 0
+        for item in literal
+        collect (if (and remaining-indices (= i (first remaining-indices)))
+                    (prog1 (first remaining-values)
+                      (setf remaining-indices (rest remaining-indices))
+                      (setf remaining-values (rest remaining-values)))
+                    item)))
 
 
 (defun get-complement-prop (proposition)

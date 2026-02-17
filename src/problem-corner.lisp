@@ -62,7 +62,7 @@
   (open gate)  ;a gate can be open or not open, default is not open
   (active (either plate blower receiver))
   ;(elevation (either agent cargo) $fixnum)
-  (paired terminus terminus)  ;potential beam between two terminus
+  (paired connector terminus)  ;potential beam between a connector and a terminus
   (color relay $hue)  ;having a color means it is active
   (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
@@ -101,68 +101,33 @@
 
 
 (define-enum-relation loc  ;specify for enumerator only
-  :pattern :fluent
-  :allow-unassigned (:types cargo)
-  :early-keys (:types agent)
+  :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
   :symmetric-batch t)
 
 
-(define-enum-relation holds  ;specify for enumerator only
-  :pattern :fluent
-  :allow-unassigned t)
-
-
 (define-enum-relation paired  ;specify for enumerator only
-  :pattern :subset
   :max-per-key 4
-  :key-types (:types connector)
-  :requires-fluent loc)
+  :requires-fluent loc  ;prevents generating beam pairings for connectors without a location (held)
+  :partner-feasible (:query observable :args ((:key-fluent loc) :partner)))
+
+;;; Observable enum CSP Pruning: checks 1–3 are all captured by the existing observable query.
+;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,
+;;;    considering all possible gate states.
+;;; 2. A connector paired with another connector must have potential inter-area visibility between their respective areas,
+;;;    considering all possible gate states.
+;;; 3. Two connectors in the same area cannot usefully pair with each other,
+;;;    since beams require nonzero distance and only one connector per area can be active.
 
 
-(define-enum-relation elevation  ;specify for enumerator only
-  :pattern :derived)
+#+ignore (find-goal-states goal-fn  ;example find best enumeration (fewest pairings)
+  :sort-key (lambda (st)
+              (count 'paired (list-database (problem-state.idb st))
+                    :key #'car)))
 
 
-(define-prefilter corner-paths (state)  ;specify for enumerator only
-  ;enumeration--eg, (find-goal-states goal-fn :solution-type every).
-  ;Provides optional optimization to prune complete base states in enumeration,
-  ;before propagate-changes! (expensive) and final goal checks run.
-  ;An optional way to reduce search space further.
-  ;Prefilters are most valuable for non-base constraints that are necessary for the goal,
-  ;but not present as simple base literals in the goal form
-  "Prune base states where required transmitter-receiver paths are not connected."
-  (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
-       (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))
-
-
-(defun prefilter-paired-reachable-p (state source target)  ;specify for enumerator only
-  "Check if TARGET is reachable from SOURCE via PAIRED relations in STATE.
-   Uses breadth-first search on the undirected pairing graph."
-  (let ((visited (make-hash-table :test 'eq))
-        (queue (list source))
-        (idb (problem-state.idb state)))
-    (setf (gethash source visited) t)
-    (loop while queue do
-      (let ((current (pop queue)))
-        (when (eq current target)
-          (return-from prefilter-paired-reachable-p t))
-        ;; Check all PAIRED relations involving current
-        (maphash (lambda (key val)
-                   (declare (ignore val))
-                   (let ((prop (convert-to-proposition key)))
-                     (when (and (consp prop)
-                                (eq (first prop) 'paired))
-                       (let ((a (second prop))
-                             (b (third prop)))
-                         (cond
-                           ((and (eq a current) (not (gethash b visited)))
-                            (setf (gethash b visited) t)
-                            (setf queue (nconc queue (list b))))
-                           ((and (eq b current) (not (gethash a visited)))
-                            (setf (gethash a visited) t)
-                            (setf queue (nconc queue (list a)))))))))
-                 idb)))
-    nil))
+#+ignore (define-base-filter connectors-in-areas2&3   ;provides no extra pruning
+  (exists ((?c1 ?c2) connector)
+    (and (loc ?c1 area2) (loc ?c2 area3))))
 
 
 ;;;; HEURISTIC FUNCTIONS ;;;;
@@ -171,7 +136,8 @@
 ;;; The heuristic? function for this problem estimates the remaining "cost"
 ;;; to reach the goal from the current state. It combines multiple component
 ;;; heuristics using weighted summation, where higher weights indicate more
-;;; important factors.
+;;; important factors. Note that heuristics are not recommended for this problem,
+;;; because intermediate good states must be undone to find a solution. No steady progress.
 ;;;
 ;;; Component Design Principles:
 ;;;   - Each component returns a non-negative integer
@@ -1212,6 +1178,11 @@
   (do (doall (?t terminus)
         (if (paired ?cargo ?t)
           (not (paired ?cargo ?t))))
+      ;; With (paired connector terminus), also remove facts where ?cargo appears
+      ;; as the terminus: (paired other-connector ?cargo).
+      (doall (?c connector)
+        (if (paired ?c ?cargo)
+          (not (paired ?c ?cargo))))
       (if (bind (color ?cargo $hue))
         (not (color ?cargo $hue)))))
 
@@ -1514,17 +1485,31 @@
 ;;;; GOAL ;;;;
 
 
+#+ignore (define-goal
+  (and (loc agent1 area4)
+       (loc connector1 area2)
+       (not (bind (loc connector2 $anywhere)))
+       (loc connector3 area3)
+       (paired connector1 transmitter2)
+       (paired connector1 receiver3)
+       (paired connector3 transmitter1)
+       (paired connector3 receiver2)
+))
+
+
 (define-goal
   (and (active receiver2)
        (active receiver3)
        (loc agent1 area4)
-       (exists (combination (?c1 ?c2) connector)
-         (and (loc ?c1 area2)
-              (color ?c1 blue)
-              (paired ?c1 transmitter2)
-              (paired ?c1 receiver3)
-              (loc ?c2 area3)
-              (color ?c2 red)
-              (paired ?c2 transmitter1)
-              (paired ?c2 receiver2)))
+       (loc connector1 area2)
+       (color connector1 blue)
+       (paired connector1 transmitter2)
+       (paired connector1 receiver3)
+       (loc connector3 area3)
+       (color connector3 red)
+       (paired connector3 transmitter1)
+       (paired connector3 receiver2)
+       (holds agent1 connector2)
+       (not (open gate1))
+       (not (active receiver1))
 ))

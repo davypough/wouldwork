@@ -1156,6 +1156,10 @@
   (do (doall (?t terminus)
         (if (paired ?cargo ?t)
           (not (paired ?cargo ?t))))
+      ;; Also remove pairings where ?cargo appears in slot 2.
+      (doall (?c connector)
+        (if (paired ?c ?cargo)
+          (not (paired ?c ?cargo))))
       (if (bind (color ?cargo $hue))
         (not (color ?cargo $hue)))))
 

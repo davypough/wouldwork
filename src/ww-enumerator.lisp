@@ -15,7 +15,10 @@
 ;;;   5) FIND-GOAL-STATES — user-facing entry point for goal-state enumeration.
 ;;;   6) GENERATE-ENUM-ACTIONS — data-driven generator that creates a CSP
 ;;;      enum-action sequence from declared base relations, auto-detected
-;;;      symmetries, and prefilters.
+;;;      symmetries, prefilters, and branch-time feasibility pruning.
+;;;   7) Branch-time feasibility pruning via :PARTNER-FEASIBLE metadata,
+;;;      which references existing problem-spec query functions to prune
+;;;      infeasible partner candidates during CSP subset branching.
 
 
 (in-package :ww)
@@ -54,6 +57,18 @@
   "After FIND-PENULTIMATE-STATES, holds per-state reaching-action result plists.")
 
 
+(defparameter *enumerated-reachable-goal-states* nil
+  "After FIND-REACHABLE-GOAL-STATES, holds the subset of *enumerated-goal-states*
+   reachable from at least one penultimate state.")
+
+
+(defparameter *frgs-artifact-relations* '(beam-segment current-beams)
+  "Relations excluded from derived-equivalence fingerprinting in
+   FIND-REACHABLE-GOAL-STATES.  These are implementation artifacts
+   (e.g., dynamically named beams) that vary non-meaningfully between
+   functionally equivalent goal states.")
+
+
 (defparameter *enumerator-detected-groups* nil
   "Auto-detected interchangeable object groups for the most recent enumeration.
    Each group is a list of objects that share identical static-relation signatures.")
@@ -70,13 +85,13 @@
    When non-nil, applied at ENUM-FINALIZE to prune states before propagation.")
 
 
-(defparameter *enum-family-modifiable-relations*
-  '((:move    (loc agent))
-    (:pickup  (loc cargo) (paired terminus))
-    (:connect (loc cargo) (paired terminus)))
-  "For each action family, the (relation key-object-type) pairs it can modify.
-   Used by the goal-invariant prefilter to determine which goal literals
-   are invariant under the selected action families.")
+(defparameter *enumerator-base-filter-form* nil
+  "Lambda form for a base filter defined via DEFINE-BASE-FILTER.
+   Stored at install time, compiled later by COMPILE-ALL-FUNCTIONS.")
+
+
+(defparameter *enumerator-base-filter-name* nil
+  "Name of the base filter defined via DEFINE-BASE-FILTER.")
 
 
 (defparameter *enum-relation-metadata* (make-hash-table :test 'eq)
@@ -84,7 +99,12 @@
    Set by DEFINE-ENUM-RELATION in problem specifications.
    Keys: relation symbols.  Values: plists with keys
    :PATTERN :ALLOW-UNASSIGNED :EARLY-KEYS :ON-ASSIGN :SYMMETRIC-BATCH :MAX-PER-KEY
-   :KEY-TYPES :REQUIRES-FLUENT.")
+   :KEY-TYPES :REQUIRES-FLUENT :PARTNER-FEASIBLE.")
+
+
+(defparameter *enum-residual-symmetry-enabled* t
+  "Master switch for residual symmetry pruning in subset enumeration.
+   Default T to enable pruning; set NIL to disable for verification.")
 
 
 ;;;; ----------------------------------------------------------------------
@@ -111,10 +131,48 @@
   `(install-prefilter ',name (lambda ,lambda-list ,@body)))
 
 
+(defmacro define-base-filter (name body)
+  "Problem-spec macro: define a base-state filter using WouldWork's logic DSL.
+   Like DEFINE-PREFILTER but the body uses the same syntax as query functions:
+   EXISTS, FORALL, AND, OR, NOT, BIND, relation lookups, etc.
+   NAME: symbol naming the filter (for documentation/debugging)
+   BODY: a WouldWork expression returning non-NIL to keep the state, NIL to prune
+   Example:
+     (define-base-filter connectors-in-areas2&3
+       (and (exists ((?c1 ?c2) connector)
+              (and (loc ?c1 area2) (loc ?c2 area3)))))"
+  `(install-base-filter ',name ',body))
+
+
+(defun install-base-filter (name body)
+  "Translate BODY using the WouldWork translator and store the resulting
+   lambda form for deferred compilation by COMPILE-ALL-FUNCTIONS.
+   The compiled function is later installed as the enumeration prefilter."
+  (format t "~&Installing base filter ~S...~%" name)
+  (let ((new-$vars (delete-duplicates
+                     (get-all-nonspecial-vars #'$varp body))))
+    (setf *enumerator-base-filter-name* name)
+    (setf (symbol-value name)
+      `(lambda (state)
+         ,(format nil "~A base-filter" name)
+         (declare (ignorable state))
+         (block ,name
+           (let (,@new-$vars)
+             (declare (ignorable ,@new-$vars))
+             ,(if (eql (car body) 'let)
+                `(let ,(second body)
+                   ,(third body)
+                   ,(translate (fourth body) 'pre))
+                (translate body 'pre))))))
+    (fix-if-ignore '(state) (symbol-value name))
+    (setf *enumerator-base-filter-form* (symbol-value name)))
+  name)
+
+
 (defmacro define-enum-relation (relation &rest keys)
   "Problem-spec macro: declare enumeration metadata for RELATION.
    Keys:
-   :PATTERN          :FLUENT | :SUBSET | :DERIVED  (default :FLUENT)
+   :PATTERN          :FLUENT | :SUBSET  (default inferred from relation)
    :ALLOW-UNASSIGNED T | (:TYPES type...)  — which keys may be unassigned
    :EARLY-KEYS       (:TYPES type...)  — enumerate these key-types first
    :ON-ASSIGN        ((rel val)...)  — default other relations when assigned
@@ -122,6 +180,7 @@
    :MAX-PER-KEY      positive integer  — cardinality cap (for :SUBSET pattern)
    :KEY-TYPES        (:TYPES type...)  — restrict subset keys to these types
    :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets
+   :PARTNER-FEASIBLE  (:QUERY name :ARGS (arg-specs...))  — branch-time feasibility check
    Example:
      (define-enum-relation loc
        :pattern :fluent
@@ -137,16 +196,11 @@
 ;;;; ----------------------------------------------------------------------
 
 
-(defmacro find-goal-states (goal-spec 
-                            &key 
-                            (algorithm nil algorithm-supplied-p)
-                            (solution-type nil solution-type-supplied-p)
-                            (exclude-relations nil exclude-relations-supplied-p)
-                            (include-relations nil include-relations-supplied-p)
-                            (prefilter :use-installed prefilter-supplied-p))
+(defmacro find-goal-states (&rest raw-args)
   "User-facing macro wrapper for FIND-GOAL-STATES-FN.
    Automatically quotes goal-spec, relation symbols/lists, and algorithm/solution-type symbols.
-   GOAL-SPEC: goal form, partial goal-state shorthand, or symbol naming a goal function
+   GOAL-SPEC: goal form, partial goal-state shorthand, or symbol naming a goal function.
+              Optional; defaults to GOAL-FN.
    Keywords:
    :SOLUTION-TYPE  FIRST | EVERY | <integer N>
    :ALGORITHM      enumeration/search algorithm symbol (e.g., DEPTH-FIRST)
@@ -154,40 +208,67 @@
    :INCLUDE-RELATIONS  symbol or list of symbols to add to base schema
    :PREFILTER  function of (state) to prune base states before propagation.
                Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
+   :SORT<  comparison function of (state-a state-b) for sorting goal states.
+           States for which (funcall sort< a b) is true sort first (best).
+           Default NIL (no sorting).
+   :SORT-KEY  function of (state) returning a numeric key for sorting.
+              Lower keys sort first.  More efficient than :SORT< because each
+              state's key is computed once (Schwartzian transform).
+              Default NIL (no sorting).  Mutually exclusive with :SORT<.
    Returns: T (the report plist is saved on (get 'find-goal-states :last-report))."
-  (flet ((literal-symbol-p (form)
-           (and (symbolp form) 
-                (not (keywordp form))
-                (not (null form))))
-         (literal-list-p (form)
-           (and (consp form)
-                (not (eq (car form) 'quote)))))
-    (labels ((maybe-quote (form)
-               (cond
-                 ((null form) nil)
-                 ((and (consp form) (eq (car form) 'quote)) form)
-                 ((literal-symbol-p form) `',form)
-                 ((literal-list-p form) `',form)
-                 (t form))))
-      `(find-goal-states-fn 
-        ,(maybe-quote goal-spec)
-        ,@(if algorithm-supplied-p
-              `(:algorithm ,(maybe-quote algorithm))
-              '(:algorithm *algorithm*))
-        ,@(if solution-type-supplied-p
-              `(:solution-type ,(maybe-quote solution-type))
-              '(:solution-type 'first))
-        ,@(when exclude-relations-supplied-p
-            `(:exclude-relations ,(maybe-quote exclude-relations)))
-        ,@(when include-relations-supplied-p
-            `(:include-relations ,(maybe-quote include-relations)))
-        ,@(when prefilter-supplied-p
-            `(:prefilter ,prefilter))))))
+  (let ((args (cond
+                ((null raw-args) (list 'goal-fn))
+                ((keywordp (car raw-args)) (cons 'goal-fn raw-args))
+                (t raw-args))))
+    (destructuring-bind (goal-spec
+                         &key
+                         (algorithm nil algorithm-supplied-p)
+                         (solution-type nil solution-type-supplied-p)
+                         (exclude-relations nil exclude-relations-supplied-p)
+                         (include-relations nil include-relations-supplied-p)
+                         (prefilter :use-installed prefilter-supplied-p)
+                         (sort< nil sort<-supplied-p)
+                         (sort-key nil sort-key-supplied-p))
+        args
+      (flet ((literal-symbol-p (form)
+               (and (symbolp form)
+                    (not (keywordp form))
+                    (not (null form))))
+             (literal-list-p (form)
+               (and (consp form)
+                    (not (eq (car form) 'quote)))))
+        (labels ((maybe-quote (form)
+                   (cond
+                     ((null form) nil)
+                     ((and (consp form) (eq (car form) 'quote)) form)
+                     ((literal-symbol-p form) `',form)
+                     ((literal-list-p form) `',form)
+                     (t form))))
+          `(find-goal-states-fn
+            ,(maybe-quote goal-spec)
+            ,@(if algorithm-supplied-p
+                  `(:algorithm ,(maybe-quote algorithm))
+                  '(:algorithm *algorithm*))
+            ,@(if solution-type-supplied-p
+                  `(:solution-type ,(maybe-quote solution-type))
+                  '(:solution-type 'every))
+            ,@(when exclude-relations-supplied-p
+                `(:exclude-relations ,(maybe-quote exclude-relations)))
+            ,@(when include-relations-supplied-p
+                `(:include-relations ,(maybe-quote include-relations)))
+            ,@(when prefilter-supplied-p
+                `(:prefilter ,prefilter))
+            ,@(when sort<-supplied-p
+                `(:sort< ,sort<))
+            ,@(when sort-key-supplied-p
+                `(:sort-key ,sort-key))))))))
 
 
-(defun find-goal-states-fn (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+(defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
+                                      &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
-                                        (prefilter :use-installed))
+                                        (prefilter :use-installed)
+                                        sort< sort-key)
   "Internal function for goal-state enumeration (called by FIND-GOAL-STATES macro).
    Internally uses :FINALIZE-ONLY propagation: base-relation assignments are
    enumerated without propagation, then each complete leaf state is propagated
@@ -195,6 +276,7 @@
    GOAL-SPEC can be:
    - a goal form, including quantifiers like (forall ...), (and ...), etc.
    - a partial goal-state shorthand: ((p a) (q b)) meaning (and (p a) (q b))
+   - omitted, in which case GOAL-FN is used
    Keywords:
    :SOLUTION-TYPE  FIRST | EVERY | <integer N>
    :ALGORITHM      enumeration/search algorithm (e.g., DEPTH-FIRST)
@@ -202,6 +284,12 @@
    :INCLUDE-RELATIONS  list (or single symbol) to add to base schema for this run
    :PREFILTER  function of (state) to prune base states before propagation.
                Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
+   :SORT<  comparison function of (state-a state-b) → generalized boolean.
+           When non-nil, goal states are stable-sorted so that states for which
+           (funcall sort< a b) is true appear first.  Default NIL (no sorting).
+   :SORT-KEY  function of (state) → number.  Lower keys sort first.
+              More efficient than :SORT< (Schwartzian transform: each key
+              computed once).  Default NIL.  Mutually exclusive with :SORT<.
    Returns: T (the report plist is saved on (get 'find-goal-states :last-report))."
   (unless (get-base-relations)
     (error "FIND-GOAL-STATES: no base relations declared.  ~
@@ -219,94 +307,164 @@
     (let* ((normalized-solution-type (fgs-normalize-solution-type solution-type))
            (run-base-relations (fgs-compute-run-base-relations exclude-relations include-relations)))
       ;; Resolve :use-installed prefilter default.
-      (let ((effective-prefilter (if (eq prefilter :use-installed)
-                                     (get-prefilter)
-                                     prefilter)))
+      (let* ((effective-prefilter (if (eq prefilter :use-installed)
+                                      (get-prefilter)
+                                      prefilter))
+             ;; Action-invariant prefilter: prune states violating goal literals
+             ;; on base relations that no action can modify.
+             (modifiable-rels (actions-modifiable-base-relations *actions*))          ;; ADDED
+             (invariants (enum-action-invariant-literals                              ;; ADDED
+                          goal-form run-base-relations modifiable-rels))              ;; ADDED
+             (invariant-prefilter (make-goal-invariant-prefilter                      ;; ADDED
+                                   invariants 'find-goal-states))                    ;; ADDED
+             (combined-prefilter (compose-prefilters                                  ;; ADDED
+                                  effective-prefilter invariant-prefilter)))          ;; ADDED
         ;; Dynamic binding provides temporary override for this run.
         (let ((*enumerator-base-relations* run-base-relations))
           (let ((states (enumerate-state norm-goal-spec
                                          :algorithm algorithm
                                          :solution-type normalized-solution-type
-                                         :propagate :finalize-only
-                                         :prefilter effective-prefilter)))
+                                         :propagate 'finalize-only
+                                         :prefilter combined-prefilter)))
+          (when (and sort< sort-key)
+            (error "FIND-GOAL-STATES: :SORT< and :SORT-KEY are mutually exclusive."))
+          (when sort<
+            (setf states (stable-sort states sort<)))
+          (when sort-key
+            (let ((decorated (mapcar (lambda (st) (cons (funcall sort-key st) st)) states)))
+              (setf states (mapcar #'cdr (stable-sort decorated #'< :key #'car)))))
           (let ((report (fgs-build-report goal-form states)))
             (fgs-print-report report)
             (setf (get 'find-goal-states :last-report) report)
             t)))))))
 
 
-(defmacro find-penultimate-states (goal-spec
-                                   &key
-                                   (algorithm nil algorithm-supplied-p)
-                                   (solution-type nil solution-type-supplied-p)
-                                   (exclude-relations nil exclude-relations-supplied-p)
-                                   (include-relations nil include-relations-supplied-p)
-                                   (prefilter nil prefilter-supplied-p)
-                                   (action-families nil action-families-supplied-p))
-  "User-facing macro wrapper for FIND-PENULTIMATE-STATES-FN.
+(defmacro find-penultimate-states (&rest raw-args)
+  "User-facing macro wrapper for penultimate-state enumeration.
    GOAL-SPEC: goal form, partial goal-state shorthand, or symbol naming a goal function.
+              Optional; defaults to GOAL-FN.
    Keywords:
-   :SOLUTION-TYPE   FIRST | EVERY | <integer N>
-   :ALGORITHM       enumeration/search algorithm symbol (e.g., DEPTH-FIRST)
-   :EXCLUDE-RELATIONS  symbol or list of symbols to remove from base schema
-   :INCLUDE-RELATIONS  symbol or list of symbols to add to base schema
-   :PREFILTER       function of (state) to prune base states before propagation.
-                    Default NIL (off) for penultimate completeness.
-                    Use :USE-INSTALLED to reuse the configured prefilter.
-   :ACTION-FAMILIES list drawn from (:MOVE :PICKUP :CONNECT), default all three.
+   :DIRECTION       FORWARD (default) or BACKWARD.
+                    FORWARD enumerates all base-relation assignments via CSP, testing
+                    each for one-step goal reachability.  May be intractable when the
+                    goal heavily constrains the state (skip-fixed-maps disables pruning).
+                    BACKWARD reverses from *ENUMERATED-GOAL-STATES* (requires prior
+                    FIND-GOAL-STATES call), generating predecessor candidates via
+                    regression and validating them with forward application.
+   :SOLUTION-TYPE   FIRST | EVERY | <integer N>  (forward only)
+   :ALGORITHM       enumeration/search algorithm symbol  (forward only)
+   :EXCLUDE-RELATIONS  symbol or list of symbols to remove from base schema  (forward only)
+   :INCLUDE-RELATIONS  symbol or list of symbols to add to base schema  (forward only)
+   :PREFILTER       function of (state) to prune base states  (forward only)
+   :ACTION-FAMILIES list drawn from (MOVE PICKUP CONNECT), default all three.
+   :SORT<  comparison function of (state-a state-b) for sorting penultimate states.
+           States for which (funcall sort< a b) is true sort first (best).
+           Default NIL (no sorting).
+   :SORT-KEY  function of (state) returning a numeric key for sorting.
+              Lower keys sort first.  More efficient than :SORT< because each
+              state's key is computed once (Schwartzian transform).
+              Default NIL (no sorting).  Mutually exclusive with :SORT<.
    Returns: T (the report plist is saved on (get 'find-penultimate-states :last-report))."
-  (flet ((literal-symbol-p (form)
-           (and (symbolp form)
-                (not (keywordp form))
-                (not (null form))))
-         (literal-list-p (form)
-           (and (consp form)
-                (not (eq (car form) 'quote)))))
-    (labels ((maybe-quote (form)
-               (cond
-                 ((null form) nil)
-                 ((and (consp form) (eq (car form) 'quote)) form)
-                 ((literal-symbol-p form) `',form)
-                 ((literal-list-p form) `',form)
-                 (t form))))
-      `(find-penultimate-states-fn
-        ,(maybe-quote goal-spec)
-        ,@(if algorithm-supplied-p
-              `(:algorithm ,(maybe-quote algorithm))
-              '(:algorithm *algorithm*))
-        ,@(if solution-type-supplied-p
-              `(:solution-type ,(maybe-quote solution-type))
-              '(:solution-type 'first))
-        ,@(when exclude-relations-supplied-p
-            `(:exclude-relations ,(maybe-quote exclude-relations)))
-        ,@(when include-relations-supplied-p
-            `(:include-relations ,(maybe-quote include-relations)))
-        ,@(when prefilter-supplied-p
-            `(:prefilter ,prefilter))
-        ,@(when action-families-supplied-p
-            `(:action-families ,(maybe-quote action-families)))))))
+  (let ((args (cond
+                ((null raw-args) (list 'goal-fn))
+                ((keywordp (car raw-args)) (cons 'goal-fn raw-args))
+                (t raw-args))))
+    (destructuring-bind (goal-spec
+                         &key
+                         (direction 'forward)
+                         (algorithm nil algorithm-supplied-p)
+                         (solution-type nil solution-type-supplied-p)
+                         (exclude-relations nil exclude-relations-supplied-p)
+                         (include-relations nil include-relations-supplied-p)
+                         (prefilter nil prefilter-supplied-p)
+                         (action-families nil action-families-supplied-p)
+                         (sort< nil sort<-supplied-p)
+                         (sort-key nil sort-key-supplied-p))
+        args
+      (flet ((literal-symbol-p (form)
+               (and (symbolp form)
+                    (not (keywordp form))
+                    (not (null form))))
+             (literal-list-p (form)
+               (and (consp form)
+                    (not (eq (car form) 'quote))))
+             (backward-direction-form-p (form)
+               (let ((x (if (and (consp form) (eq (car form) 'quote))
+                            (cadr form)
+                            form)))
+                 (or (eq x 'backward) (eq x :backward)))))
+        (labels ((maybe-quote (form)
+                   (cond
+                     ((null form) nil)
+                     ((and (consp form) (eq (car form) 'quote)) form)
+                     ((literal-symbol-p form) `',form)
+                     ((literal-list-p form) `',form)
+                     (t form))))
+          (if (backward-direction-form-p direction)
+              `(find-penultimate-states-backward-fn
+                ,(maybe-quote goal-spec)
+                ,@(when action-families-supplied-p
+                    `(:action-families ,(maybe-quote action-families)))
+                ,@(when sort<-supplied-p
+                    `(:sort< ,sort<))
+                ,@(when sort-key-supplied-p
+                    `(:sort-key ,sort-key)))
+              `(find-penultimate-states-fn
+                ,(maybe-quote goal-spec)
+                ,@(if algorithm-supplied-p
+                      `(:algorithm ,(maybe-quote algorithm))
+                      '(:algorithm *algorithm*))
+                ,@(if solution-type-supplied-p
+                      `(:solution-type ,(maybe-quote solution-type))
+                      '(:solution-type 'every))
+                ,@(when exclude-relations-supplied-p
+                    `(:exclude-relations ,(maybe-quote exclude-relations)))
+                ,@(when include-relations-supplied-p
+                    `(:include-relations ,(maybe-quote include-relations)))
+                ,@(when prefilter-supplied-p
+                    `(:prefilter ,prefilter))
+                ,@(when action-families-supplied-p
+                    `(:action-families ,(maybe-quote action-families)))
+                ,@(when sort<-supplied-p
+                    `(:sort< ,sort<))
+                ,@(when sort-key-supplied-p
+                    `(:sort-key ,sort-key)))))))))
+
+
+(defun enum-normalize-action-families (action-families)
+  "Normalize ACTION-FAMILIES to plain symbols MOVE, PICKUP, CONNECT.
+   Accepts either plain symbols or keywords; NIL/ALL means all families."
+  (let* ((families0 (fgs-ensure-list action-families))
+         (families (mapcar (lambda (fam)
+                             (cond
+                               ((or (eq fam 'move) (eq fam :move)) 'move)
+                               ((or (eq fam 'pickup) (eq fam :pickup)) 'pickup)
+                               ((or (eq fam 'connect) (eq fam :connect)) 'connect)
+                               ((or (eq fam 'all) (eq fam :all)) 'all)
+                               (t fam)))
+                           families0)))
+    (if (or (null families) (member 'all families))
+        '(move pickup connect)
+        families)))
 
 
 (defun enum-action-in-family-p (action-name family)
-  "True iff ACTION-NAME belongs to FAMILY (:MOVE, :PICKUP, :CONNECT)."
+  "True iff ACTION-NAME belongs to FAMILY (MOVE, PICKUP, CONNECT)."
   (case family
-    (:move (eql action-name 'move))
-    (:pickup (eql action-name 'pickup-connector))
-    (:connect (member action-name
-                      '(connect-to-1-terminus
-                        connect-to-2-terminus
-                        connect-to-3-terminus)
-                      :test #'eq))
+    (move (eql action-name 'move))
+    (pickup (eql action-name 'pickup-connector))
+    (connect (member action-name
+                     '(connect-to-1-terminus
+                       connect-to-2-terminus
+                       connect-to-3-terminus)
+                     :test #'eq))
     (otherwise nil)))
 
 
 (defun enum-select-actions-by-family (actions action-families)
   "Select ACTION structs from ACTIONS whose names match ACTION-FAMILIES.
-   ACTION-FAMILIES may include :MOVE, :PICKUP, :CONNECT, or :ALL."
-  (let* ((families (fgs-ensure-list action-families))
-         (families (if (or (null families) (member :all families))
-                       '(:move :pickup :connect)
-                       families)))
+   ACTION-FAMILIES may include MOVE/PICKUP/CONNECT/ALL (or keyword variants)."
+  (let* ((families (enum-normalize-action-families action-families)))
     (remove-if-not
      (lambda (a)
        (some (lambda (fam)
@@ -391,7 +549,8 @@
                 (prin1-to-string y))))))
 
 
-(defun fps-build-report (goal-form penultimate-states state-hit-table &key base-relations action-families)
+(defun fps-build-report (goal-form penultimate-states state-hit-table
+                       &key base-relations action-families settings)
   "Build and return a FIND-PENULTIMATE-STATES report plist."
   (let* ((results
            (mapcar
@@ -399,7 +558,8 @@
               (let ((hits (gethash st state-hit-table)))
                 (list
                  :state st
-                 :base-props (penultimate-state-base-props st base-relations)
+                 :props (sort (copy-list (list-database (problem-state.idb st)))  ;; CHANGED: all props
+                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))
                  :reaching-actions
                  (mapcar
                   (lambda (hit)
@@ -412,6 +572,7 @@
          (summary (list :penultimate-states (length penultimate-states))))
     (list
      :goal goal-form
+     :settings settings
      :action-families action-families
      :penultimate-states penultimate-states
      :results results
@@ -421,11 +582,13 @@
 (defun fps-print-report (report)
   "Print FIND-PENULTIMATE-STATES report interactively."
   (let ((goal (getf report :goal))
+        (settings (getf report :settings))
         (families (getf report :action-families))
         (summary (getf report :summary))
         (results (getf report :results)))
     (format t "~&~%;;;; FIND-PENULTIMATE-STATES REPORT ;;;;~%")
     (format t "~&Goal: ~S~%" goal)
+    (format t "~&Settings: ~S~%" settings)
     (format t "~&Action families: ~S~%" families)
     (format t "~&Penultimate states found: ~D~%" (getf summary :penultimate-states))
     (when results
@@ -433,7 +596,7 @@
         (loop for idx from 1 to n
               for item in results
               do (format t "~&~%Penultimate state ~D of ~D:~%" idx n)
-                 (fgs-print-props (getf item :base-props))
+                 (fgs-print-props (getf item :props))                         ;; CHANGED
                  (format t "~&Reaching actions (~D):~%"
                          (length (getf item :reaching-actions)))
                  (dolist (ra (getf item :reaching-actions))
@@ -444,25 +607,253 @@
   report)
 
 
-(defun enum-families-modifiable-keys (action-families)
-  "Collect (relation type) pairs modifiable by any family in ACTION-FAMILIES."
-  (let ((pairs nil))
-    (dolist (fam (fgs-ensure-list action-families) pairs)
-      (dolist (pair (cdr (assoc fam *enum-family-modifiable-relations*)))
-        (pushnew pair pairs :test #'equal)))))
+(defmacro find-reachable-goal-states ()
+  "User-facing macro: cross-reference *enumerated-goal-states* with
+   *enumerated-penultimate-results* to identify goal states reachable
+   from at least one penultimate state via a single action.
+   Requires prior calls to FIND-GOAL-STATES and FIND-PENULTIMATE-STATES.
+   Returns: T (the report plist is saved on (get 'find-reachable-goal-states :last-report))."
+  `(find-reachable-goal-states-fn))
 
 
-(defun enum-literal-modifiable-p (literal modifiable-pairs)
-  "True if LITERAL could be modified by actions whose modifiable-pairs
-   include matching (relation type) entries."
-  (let ((rel (car literal))
-        (args (cdr literal)))
-    (some (lambda (pair)
-            (and (eq rel (first pair))
-                 (some (lambda (arg)
-                         (member arg (maybe-type-instances (second pair)) :test #'eq))
-                       args)))
-          modifiable-pairs)))
+(defun state-base-prop-key (state)
+  "Return a canonical string key for STATE based on sorted base-relation propositions.
+   Two states with identical base propositions produce identical keys."
+  (let* ((base-rels (get-base-relations))
+         (props (remove-if-not (lambda (p) (member (car p) base-rels :test #'eq))
+                               (list-database (problem-state.idb state)))))
+    (prin1-to-string (sort (copy-list props) #'string< :key #'prin1-to-string))))
+
+
+(defun frgs-derived-equivalence-key (state)
+  "Compute a canonical string key from STATE's non-base, non-artifact propositions.
+   Two states with identical keys are functionally equivalent from the user's
+   perspective (same active receivers, gate states, colors, etc.)."
+  (let* ((base-rels (get-base-relations))
+         (artifact-rels *frgs-artifact-relations*)
+         (props (remove-if (lambda (p)
+                             (let ((rel (car p)))
+                               (or (member rel base-rels :test #'eq)
+                                   (member rel artifact-rels :test #'eq))))
+                           (list-database (problem-state.idb state)))))
+    (prin1-to-string (sort (copy-list props) #'string< :key #'prin1-to-string))))
+
+
+(defun frgs-count-equivalence-classes (states)
+  "Count distinct derived-equivalence classes among STATES.
+   States with identical non-base, non-artifact propositions are in the same class."
+  (let ((seen (make-hash-table :test 'equal)))
+    (dolist (st states)
+      (setf (gethash (frgs-derived-equivalence-key st) seen) t))
+    (hash-table-count seen)))
+
+
+(defun frgs-action-family-name (action-form)
+  "Classify ACTION-FORM into a family symbol: MOVE, PICKUP, CONNECT, or the raw name."
+  (let ((name (car action-form)))
+    (cond
+      ((eq name 'move) 'move)
+      ((eq name 'pickup-connector) 'pickup)
+      ((member name '(connect-to-1-terminus connect-to-2-terminus connect-to-3-terminus) :test #'eq)
+       'connect)
+      (t name))))
+
+
+(defun frgs-state-base-prop-count (state)
+  "Count base-relation propositions in STATE."
+  (let ((base-rels (get-base-relations)))
+    (count-if (lambda (p) (member (car p) base-rels :test #'eq))
+              (list-database (problem-state.idb state)))))
+
+
+(defun frgs-build-transition-groups (reaching-map)
+  "Flatten REACHING-MAP into transitions, group by action family, sort each
+   group ascending by penultimate base-prop count.  Returns a list of
+   (:family <sym> :count <n> :transitions <list>) plists, ordered:
+   MOVE, PICKUP, CONNECT, then any others."
+  (let ((all-transitions nil))
+    (maphash (lambda (key entries)
+               (declare (ignore key))
+               (dolist (entry entries)
+                 (push (list :penultimate-state (getf entry :penultimate-state)
+                             :action (getf entry :action)
+                             :goal-state (getf entry :goal-state)
+                             :base-prop-count (frgs-state-base-prop-count
+                                               (getf entry :penultimate-state)))
+                       all-transitions)))
+             reaching-map)
+    (let ((family-table (make-hash-table :test 'eq)))
+      (dolist (tr all-transitions)
+        (push tr (gethash (frgs-action-family-name (getf tr :action)) family-table)))
+      (let ((groups nil))
+        (maphash (lambda (fam trs)
+                   (push (list :family fam
+                               :count (length trs)
+                               :transitions (stable-sort trs #'<
+                                              :key (lambda (tr) (getf tr :base-prop-count))))
+                         groups))
+                 family-table)
+        (stable-sort groups (lambda (a b)
+                              (let ((order '(move pickup connect)))
+                                (< (or (position (getf a :family) order) 999)
+                                   (or (position (getf b :family) order) 999)))))))))
+
+
+(defun find-reachable-goal-states-fn ()
+  "Cross-reference enumerated goal states with penultimate reaching-actions.
+   Partitions *enumerated-goal-states* into reachable and unreachable sets
+   based on whether each goal state appears as a :GOAL-STATE in any
+   penultimate result's :REACHING-ACTIONS.
+   Stores reachable states in *enumerated-reachable-goal-states*.
+   Returns: T (the report plist is saved on (get 'find-reachable-goal-states :last-report))."
+  (unless *enumerated-goal-states*
+    (format t "~&[find-reachable-goal-states] No goal states available.  ~
+               Run (find-goal-states ...) first.~%")
+    (return-from find-reachable-goal-states-fn nil))
+  (unless *enumerated-penultimate-results*
+    (format t "~&[find-reachable-goal-states] No penultimate results available.  ~
+               Run (find-penultimate-states ...) first.~%")
+    (return-from find-reachable-goal-states-fn nil))
+  (let ((reachable-keys (make-hash-table :test 'equal))
+        (reaching-map (make-hash-table :test 'equal)))
+    (dolist (result *enumerated-penultimate-results*)
+      (let ((penult-state (getf result :state)))
+        (dolist (ra (getf result :reaching-actions))
+          (let* ((goal-state (getf ra :goal-state))
+                 (key (state-base-prop-key goal-state))
+                 (action (getf ra :action)))
+            (setf (gethash key reachable-keys) t)
+            (push (list :penultimate-state penult-state
+                        :action action
+                        :goal-state goal-state)
+                  (gethash key reaching-map))))))
+    (let ((reachable nil)
+          (unreachable nil))
+      (dolist (gs *enumerated-goal-states*)
+        (if (gethash (state-base-prop-key gs) reachable-keys)
+            (push gs reachable)
+            (push gs unreachable)))
+      (setf reachable (nreverse reachable)
+            unreachable (nreverse unreachable)
+            *enumerated-reachable-goal-states* reachable)
+      (let ((report (frgs-build-report reachable unreachable reaching-map
+                                       :equivalence-classes
+                                       (frgs-count-equivalence-classes reachable))))
+        (frgs-print-report report)
+        (setf (get 'find-reachable-goal-states :last-report) report)
+        t))))
+
+
+(defun frgs-build-report (reachable unreachable reaching-map
+                         &key equivalence-classes)
+  "Build a FIND-REACHABLE-GOAL-STATES report plist."
+  (let* ((total (+ (length reachable) (length unreachable)))
+         (transitions 0)
+         (reaching-penults (make-hash-table :test 'eq))
+         (reachable-details
+           (mapcar (lambda (gs)
+                     (let* ((key (state-base-prop-key gs))
+                            (reaches (gethash key reaching-map)))
+                       (incf transitions (length reaches))
+                       (dolist (r reaches)
+                         (setf (gethash (getf r :penultimate-state) reaching-penults) t))
+                       (list :goal-state gs
+                             :props (sort (copy-list (list-database (problem-state.idb gs)))
+                                          (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))
+                             :reached-by reaches)))
+                   reachable))
+         (unreachable-details
+           (mapcar (lambda (gs)
+                     (list :goal-state gs
+                           :props (sort (copy-list (list-database (problem-state.idb gs)))
+                                        (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))))
+                   unreachable))
+         (transition-groups (frgs-build-transition-groups reaching-map))     ;; ADDED
+         (summary (list :total-goal-states total
+                        :reachable (length reachable)
+                        :unreachable (length unreachable)
+                        :equivalence-classes (or equivalence-classes (length reachable))
+                        :transitions transitions
+                        :reaching-penultimate-states (hash-table-count reaching-penults)
+                        :total-penultimate-states (length *enumerated-penultimate-states*))))
+    (list :reachable-states reachable
+          :unreachable-states unreachable
+          :reachable-details reachable-details
+          :unreachable-details unreachable-details
+          :transition-groups transition-groups                                ;; ADDED
+          :summary summary)))
+
+
+(defun frgs-print-report (report)
+  "Print FIND-REACHABLE-GOAL-STATES report interactively.
+   Shows summary, unreachable states, then transition groups by action family
+   ranked by penultimate base-prop count (ascending)."
+  (let ((summary (getf report :summary))
+        (unreachable-details (getf report :unreachable-details)))
+    (format t "~&~%;;;; FIND-REACHABLE-GOAL-STATES REPORT ;;;;~%")
+    (format t "~&Total candidate goal states: ~D~%" (getf summary :total-goal-states))
+    (format t "~&Goal states reachable from some penultimate state: ~D~%" (getf summary :reachable))
+    (format t "~&Unreachable goal states from all penultimate states: ~D~%" (getf summary :unreachable))
+    (format t "~&Derived-equivalence classes: ~D~%" (getf summary :equivalence-classes))
+    (format t "~&Valid penultimate state -> goal state transitions: ~D~%" (getf summary :transitions))
+    (format t "~&Penultimate states that reach a goal state: ~D of ~D~%"
+            (getf summary :reaching-penultimate-states)
+            (getf summary :total-penultimate-states))
+    (when unreachable-details
+      (let ((n (length unreachable-details)))
+        (format t "~&~%--- Unreachable goal states ---~%")
+        (loop for idx from 1 to n
+              for item in unreachable-details
+              do (format t "~&~%Unreachable ~D of ~D:~%" idx n)
+                 (fgs-print-props (getf item :props))
+                 (when (< idx n)
+                   (unless (y-or-n-p "~&Show the next unreachable state of ~D?" n)
+                     (return))))))
+    (let ((groups (getf report :transition-groups)))
+      (when groups
+        (format t "~&~%--- Transitions by last-action family ---~%")
+        (loop for group in groups
+              for gidx from 1
+              do (format t "~&  ~D. ~A: ~D transition~:P~%"
+                         gidx (getf group :family) (getf group :count)))
+        (dolist (group groups)
+          (when (y-or-n-p "~&~%Display ~A transitions (~D, ranked by penultimate base-prop count)?"
+                          (getf group :family) (getf group :count))
+            (let ((trs (getf group :transitions))
+                  (n (getf group :count)))
+              (loop for tr in trs
+                    for tidx from 1
+                    do (format t "~&~%Transition ~D of ~D (penultimate base props: ~D):~%"
+                               tidx n (getf tr :base-prop-count))
+                       (format t "~&Penultimate state:~%")
+                       (fgs-print-props
+                        (sort (copy-list (list-database
+                                         (problem-state.idb (getf tr :penultimate-state))))
+                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
+                       (format t "~&Action: ~S~%" (getf tr :action))
+                       (format t "~&Goal state:~%")
+                       (fgs-print-props
+                        (sort (copy-list (list-database
+                                         (problem-state.idb (getf tr :goal-state))))
+                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
+                       (when (< tidx n)
+                         (unless (y-or-n-p "~&Show the next ~A transition of ~D?"
+                                           (getf group :family) n)
+                           (return))))))))))
+  report)
+
+
+(defun actions-modifiable-base-relations (actions)
+  "Compute the set of base relation symbols modifiable by any action in ACTIONS.
+   Intersects each action's EFFECT-ADDS with the current base-relation schema,
+   then takes the union across all actions."
+  (let ((base-rels (get-base-relations))
+        (result nil))
+    (dolist (a actions result)
+      (dolist (rel (action.effect-adds a))
+        (when (and (member rel base-rels :test #'eq)
+                   (not (member rel result :test #'eq)))
+          (push rel result))))))
 
 
 (defun enum-proposition-holds-p (state proposition)
@@ -475,23 +866,24 @@
                  (problem-state.idb state)))))
 
 
-(defun enum-invariant-goal-literals (goal-form base-relations modifiable-pairs)
-  "Return the subset of positive ground base-relation goal literals from GOAL-FORM
-   that are invariant under actions described by MODIFIABLE-PAIRS."
+(defun enum-action-invariant-literals (goal-form base-relations modifiable-rels)
+  "Return positive ground base-relation goal literals invariant under MODIFIABLE-RELS.
+   A literal is invariant when its relation is a base relation NOT in MODIFIABLE-RELS."
   (let* ((literals (collect-positive-ground-literals goal-form))
          (base-literals (remove-if-not (lambda (lit)
                                          (member (car lit) base-relations :test #'eq))
                                        literals)))
     (remove-if (lambda (lit)
-                 (enum-literal-modifiable-p lit modifiable-pairs))
+                 (member (car lit) modifiable-rels :test #'eq))
                base-literals)))
 
 
-(defun make-goal-invariant-prefilter (invariants)
+(defun make-goal-invariant-prefilter (invariants &optional (caller 'enumeration))
   "Build a prefilter enforcing INVARIANTS (list of ground literal lists).
+   CALLER names the calling context (for log messages).
    Returns a function of (state) or NIL when INVARIANTS is empty."
   (when invariants
-    (format t "~&[find-penultimate-states] Goal-invariant prefilter: ~S~%" invariants)
+    (format t "~&[~(~A~)] Goal-invariant prefilter: ~S~%" caller invariants)
     (lambda (state)
       (every (lambda (lit) (enum-proposition-holds-p state lit))
              invariants))))
@@ -506,13 +898,22 @@
     (t nil)))
 
 
-(defun find-penultimate-states-fn (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+(defun find-penultimate-states-fn (&optional (goal-spec 'goal-fn)
+                                             &key (algorithm *algorithm*) (solution-type 'every)
                                               exclude-relations include-relations
                                               (prefilter nil)
-                                              (action-families '(:move :pickup :connect)))
+                                              (action-families '(move pickup connect))
+                                              sort< sort-key)
   "Enumerate penultimate states that can reach GOAL-SPEC in one action.
    Enumeration uses the same CSP base-state generation as FIND-GOAL-STATES.
-   PREFILTER defaults to NIL for completeness (especially connect-last cases)."
+   GOAL-SPEC is optional; defaults to GOAL-FN.
+   PREFILTER defaults to NIL for completeness (especially connect-last cases).
+   :SORT<  comparison function of (state-a state-b) → generalized boolean.
+           When non-nil, penultimate states are stable-sorted so that states for which
+           (funcall sort< a b) is true appear first.  Default NIL (no sorting).
+   :SORT-KEY  function of (state) → number.  Lower keys sort first.
+              More efficient than :SORT< (Schwartzian transform: each key
+              computed once).  Default NIL.  Mutually exclusive with :SORT<."
   (unless (get-base-relations)
     (error "FIND-PENULTIMATE-STATES: no base relations declared.  ~
             Use (define-base-relations (...)) in the problem specification."))
@@ -529,14 +930,18 @@
            (run-base-relations (fgs-compute-run-base-relations exclude-relations include-relations))
            (problem-actions *actions*)
            (goal-fn (coerce-goal norm-goal-spec))
-           (selected-actions (enum-select-actions-by-family problem-actions action-families))
+           (normalized-families (enum-normalize-action-families action-families))
+           (selected-actions (enum-select-actions-by-family problem-actions normalized-families))
            (state-hit-table (make-hash-table :test 'eq))
-           (effective-prefilter (if (eq prefilter :use-installed)
+           (effective-prefilter (if (or (eq prefilter 'use-installed)
+                                        (eq prefilter :use-installed))
                                     (get-prefilter)
                                     prefilter))
-           (modifiable-pairs (enum-families-modifiable-keys action-families))
-           (invariants (enum-invariant-goal-literals goal-form run-base-relations modifiable-pairs))
-           (invariant-prefilter (make-goal-invariant-prefilter invariants))
+           (modifiable-rels (actions-modifiable-base-relations selected-actions))     ;; CHANGED
+           (invariants (enum-action-invariant-literals                                ;; CHANGED
+                        goal-form run-base-relations modifiable-rels))                ;; CHANGED
+           (invariant-prefilter (make-goal-invariant-prefilter                        ;; CHANGED
+                                 invariants 'find-penultimate-states))               ;; CHANGED
            (combined-prefilter (compose-prefilters effective-prefilter invariant-prefilter))
            (invariant-goal-form (when invariants (cons 'and invariants)))
            (penultimate-goal-fn
@@ -546,19 +951,36 @@
                                        state-hit-table)))
       (when (null selected-actions)
         (format t "~&[find-penultimate-states] No matching actions for families ~S.~%"
-                action-families))
+                normalized-families))
       (let ((*enumerator-base-relations* run-base-relations))
         (let ((states (enumerate-state penultimate-goal-fn
                                        :algorithm algorithm
                                        :solution-type normalized-solution-type
-                                       :propagate :finalize-only
+                                       :propagate 'finalize-only
                                        :prefilter combined-prefilter
-                                       :goal-form invariant-goal-form)))
+                                       :goal-form goal-form            ;; CHANGED: full goal for symmetry
+                                       :skip-fixed-maps t)))          ;; ADDED: no fixed-map pruning
+          (when (and sort< sort-key)
+            (error "FIND-PENULTIMATE-STATES: :SORT< and :SORT-KEY are mutually exclusive."))
+          (when sort<
+            (setf states (stable-sort states sort<)))
+          (when sort-key
+            (let ((decorated (mapcar (lambda (st) (cons (funcall sort-key st) st)) states)))
+              (setf states (mapcar #'cdr (stable-sort decorated #'< :key #'car)))))
           (let ((report (fps-build-report goal-form
                                           states
                                           state-hit-table
                                           :base-relations run-base-relations
-                                          :action-families action-families)))
+                                          :action-families normalized-families
+                                          :settings (list :direction 'forward
+                                                          :algorithm algorithm
+                                                          :solution-type normalized-solution-type
+                                                          :exclude-relations exclude-relations
+                                                          :include-relations include-relations
+                                                          :prefilter prefilter
+                                                          :action-families normalized-families
+                                                          :sort< (if sort< t nil)
+                                                          :sort-key (if sort-key t nil)))))
             (fps-print-report report)
             (setf *enumerated-penultimate-states* states
                   *enumerated-penultimate-results* (getf report :results))
@@ -566,9 +988,116 @@
             t))))))
 
 
+(defun fps-backward-derived-props (state)
+  "Extract sorted derived-relation propositions from STATE.
+   Derived relations are those in *BW-NORMALIZE-STRIP-RELATIONS* --
+   the relations that BW-NORMALIZE! strips and recomputes via propagation."
+  (sort (remove-if-not (lambda (p) (member (car p) *bw-normalize-strip-relations* :test #'eq))
+                       (copy-list (list-database (problem-state.idb state))))
+        (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
+
+
+(defun find-penultimate-states-backward-fn (&optional (goal-spec 'goal-fn)
+                                            &key
+                                            (action-families '(move pickup connect))
+                                            sort< sort-key)
+  "Backward penultimate-state search: regress from *ENUMERATED-GOAL-STATES*.
+   For each goal state, generates candidate last-action forms via
+   BW-CANDIDATE-LAST-ACTIONS, regresses each to produce predecessor candidates,
+   normalizes them via BW-NORMALIZE!, then validates by forward application.
+   A predecessor is accepted when the forward application succeeds and the
+   resulting state satisfies the goal.
+   Requires a prior call to FIND-GOAL-STATES to populate *ENUMERATED-GOAL-STATES*.
+   GOAL-SPEC is optional; defaults to GOAL-FN.
+   ACTION-FAMILIES: list drawn from (MOVE PICKUP CONNECT), default all three.
+   SORT<, SORT-KEY: as in FIND-PENULTIMATE-STATES (forward).
+   Returns: T (report saved on (get 'find-penultimate-states :last-report))."
+  (unless *enumerated-goal-states*
+    (format t "~&[find-penultimate-states :backward] No goal states available.  ~
+               Run (find-goal-states ...) first.~%")
+    (return-from find-penultimate-states-backward-fn nil))
+  (when (or (> *debug* 0) *probe*)
+    (format t "~&[find-penultimate-states :backward] Please reset first by entering ")
+    (when (> *debug* 0)
+      (format t " (ww-set *debug* 0)~%"))
+    (when *probe*
+      (format t " (ww-set *probe* nil)~%"))
+    (return-from find-penultimate-states-backward-fn nil))
+  (multiple-value-bind (norm-goal-spec goal-form)
+      (enum-normalize-goal-spec goal-spec)
+    (let* ((goal-fn (coerce-goal norm-goal-spec))
+           (families (enum-normalize-action-families action-families))
+           (n-goals (length *enumerated-goal-states*))
+           (penult-table (make-hash-table :test 'equal))
+           (state-hit-table (make-hash-table :test 'eq))
+           (total-candidates 0)
+           (total-validated 0))
+      (format t "~&[find-penultimate-states :backward] Regressing from ~D goal state~:P...~%"
+              n-goals)
+      (loop for gs in *enumerated-goal-states*
+            for gi from 1
+            do (let ((candidates (bw-candidate-last-actions gs
+                                  :include-move (member 'move families)
+                                  :include-pickup (member 'pickup families)
+                                  :include-connect (member 'connect families))))
+                 (incf total-candidates (length candidates))
+                 (dolist (action-form candidates)
+                   (dolist (pred0 (bw-regress gs action-form))
+                     (let ((pred (copy-problem-state pred0)))
+                       (bw-normalize! pred)
+                       (handler-case
+                           (multiple-value-bind (next ok failure)
+                               (apply-action-to-state action-form pred nil nil)
+                             (declare (ignore failure))
+                             (when ok
+                               (bw-normalize! next)
+                               (when (and (funcall goal-fn next)
+                                          (not (equal (fps-backward-derived-props pred)
+                                                      (fps-backward-derived-props next))))
+                                 (incf total-validated)
+                                 (let ((key (state-base-prop-key pred)))
+                                   (unless (gethash key penult-table)
+                                     (setf (gethash key penult-table) pred))
+                                   (let ((canonical (gethash key penult-table))
+                                         (hit (list :action action-form :goal-state next)))
+                                     (unless (member action-form
+                                                     (gethash canonical state-hit-table)
+                                                     :key (lambda (h) (getf h :action))
+                                                     :test #'equal)
+                                       (push hit (gethash canonical state-hit-table))))))))
+                           (error () nil))))))
+            when (zerop (mod gi 10))
+              do (format t "~&  ...processed ~D/~D goal states~%" gi n-goals))
+      (let ((states (loop for st being the hash-values of penult-table collect st)))
+        (format t "~&[find-penultimate-states :backward] ~D candidate actions, ~
+                   ~D validated, ~D unique penultimate states.~%"
+                total-candidates total-validated (length states))
+        (when (and sort< sort-key)
+          (error "FIND-PENULTIMATE-STATES :BACKWARD: :SORT< and :SORT-KEY are mutually exclusive."))
+        (when sort<
+          (setf states (stable-sort states sort<)))
+        (when sort-key
+          (let ((decorated (mapcar (lambda (st) (cons (funcall sort-key st) st)) states)))
+            (setf states (mapcar #'cdr (stable-sort decorated #'< :key #'car)))))
+        (let ((report (fps-build-report goal-form
+                                        states
+                                        state-hit-table
+                                        :base-relations (get-base-relations)
+                                        :action-families families
+                                        :settings (list :direction 'backward
+                                                        :action-families families
+                                                        :sort< (if sort< t nil)
+                                                        :sort-key (if sort-key t nil)))))
+          (fps-print-report report)
+          (setf *enumerated-penultimate-states* states
+                *enumerated-penultimate-results* (getf report :results))
+          (setf (get 'find-penultimate-states :last-report) report)
+          t)))))
+
+
 (defun fgs-normalize-solution-type (x)
   "Validate and normalize SOLUTION-TYPE for find-goal-states UI.
-   Accepts FIRST, EVERY, or a positive integer N. Invalid values default to FIRST."
+   Accepts FIRST, EVERY, or a positive integer N. Invalid values default to EVERY."
   (cond
     ((eq x 'first) 'first)
     ((eq x 'every) 'every)
@@ -576,11 +1105,11 @@
      (if (plusp x)
          x
          (progn
-           (format t "~&[find-goal-states] SOLUTION-TYPE integer must be > 0; got ~S. Using FIRST.~%" x)
-           'first)))
+           (format t "~&[find-goal-states] SOLUTION-TYPE integer must be > 0; got ~S. Using EVERY.~%" x)
+           'every)))
     (t
-     (format t "~&[find-goal-states] SOLUTION-TYPE must be FIRST, EVERY, or integer N; got ~S. Using FIRST.~%" x)
-     'first)))
+     (format t "~&[find-goal-states] SOLUTION-TYPE must be FIRST, EVERY, or integer N; got ~S. Using EVERY.~%" x)
+     'every)))
 
 
 (defun fgs-compute-run-base-relations (exclude-relations include-relations)
@@ -604,7 +1133,8 @@
 
 (defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
                                        (default-max-per-key 4) (propagate t)
-                                       (prefilter nil) (goal-form nil))
+                                       (prefilter nil) (goal-form nil)
+                                       (skip-fixed-maps nil))
   "Enumerate compatible goal states via CSP-based variable assignment.
    GOAL-SPEC may be a goal form (including quantifiers) or a partial goal-state
    shorthand ((p ...) (q ...)).
@@ -616,7 +1146,8 @@
    PREFILTER: when non-nil, prunes base states before propagation.
    GOAL-FORM: when non-nil, overrides the goal form used for CSP action generation
               pruning (e.g., goal-fixed-fluent constraints).  The actual leaf acceptance
-              test is still driven by GOAL-SPEC."
+              test is still driven by GOAL-SPEC.
+   SKIP-FIXED-MAPS: when T, disable goal-fixed-fluent pruning in CSP generation."
   (unless (get-base-relations)
     (error "ENUMERATE-STATE: no base relations declared.  ~
             Use (define-base-relations (...)) in the problem specification."))
@@ -631,12 +1162,14 @@
                        :default-max-per-key default-max-per-key
                        :propagate propagate
                        :prefilter prefilter
-                       :goal-form goal-form))
+                       :goal-form goal-form
+                       :skip-fixed-maps skip-fixed-maps))
 
 
 (defun enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
                                            (default-max-per-key 4) (propagate t)
-                                           (prefilter nil) (goal-form nil))
+                                           (prefilter nil) (goal-form nil)
+                                           (skip-fixed-maps nil))
   "Enumerate compatible states via a CSP-style, generated enum-action sequence.
    SOLUTION-TYPE:
    - any existing solver mode (FIRST, EVERY, MIN-LENGTH, etc.)
@@ -647,7 +1180,8 @@
    PREFILTER: when non-nil, a function of one argument (state) applied at
    ENUM-FINALIZE to prune states before propagation.
    GOAL-FORM: when non-nil, overrides the derived goal form for CSP action
-              generation pruning (goal-fixed-fluent constraints)."
+              generation pruning (goal-fixed-fluent constraints).
+   SKIP-FIXED-MAPS: when T, disable goal-fixed-fluent pruning in CSP generation."
   (multiple-value-bind (norm-goal-spec derived-goal-form)
       (enum-normalize-goal-spec goal-spec)
     (let* ((effective-goal-form (or goal-form derived-goal-form))
@@ -658,7 +1192,8 @@
                           :goal-form effective-goal-form
                           :default-max-per-key default-max-per-key
                           :propagate propagate
-                          :prefilter prefilter))
+                          :prefilter prefilter
+                          :skip-fixed-maps skip-fixed-maps))
            ;; When propagate=NIL, collect ALL finalize states (defer goal test).
            ;; When propagate=T, apply the real goal test at leaf nodes.
            (leaf-goal (if propagate
@@ -945,15 +1480,18 @@ Checks dynamic binding first (for temporary overrides), then problem property."
    RELATION: a symbol naming the relation.
    KEYS: a property list (:PATTERN val :ALLOW-UNASSIGNED val ...).
    Valid keys:
-   :PATTERN          :FLUENT | :SUBSET | :DERIVED  (default :FLUENT)
+   :PATTERN          :FLUENT | :SUBSET  (default inferred from relation)
    :ALLOW-UNASSIGNED T | (:TYPES type...)  — which keys may be unassigned
    :EARLY-KEYS       (:TYPES type...)  — enumerate these key-types first
    :ON-ASSIGN        ((rel val)...)  — default other relations when assigned
    :SYMMETRIC-BATCH  T | NIL  — use canonical multisets for interchangeable groups
    :MAX-PER-KEY      positive integer  — cardinality cap (for :SUBSET pattern)
    :KEY-TYPES        (:TYPES type...)  — restrict subset keys to these types
-   :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets"
+   :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets
+   :PARTNER-FEASIBLE  (:QUERY name :ARGS (arg-specs...))  — branch-time feasibility check"
   (check-type relation symbol)
+  (unless (gethash relation *relations*)
+    (error "DEFINE-ENUM-RELATION ~S: relation is not installed in *RELATIONS*." relation))
   (let ((plist (enum-canonicalize-meta-keys keys)))
     (enum-validate-relation-meta relation plist)
     (setf (gethash relation *enum-relation-metadata*) plist)
@@ -968,23 +1506,28 @@ Checks dynamic binding first (for temporary overrides), then problem property."
 
 
 (defun enum-canonicalize-meta-keys (keys)
-  "Canonicalize KEYS plist: ensure :PATTERN defaults to :FLUENT when absent."
-  (let ((plist (copy-list keys)))
-    (unless (getf plist :pattern)
-      (setf plist (list* :pattern :fluent plist)))
-    plist))
+  "Canonicalize KEYS plist."
+  (copy-list keys))
+
+
+(defun enum-infer-pattern (relation)
+  "Infer enumeration pattern for RELATION from installed relation metadata.
+   Relations with fluent positions are :FLUENT; otherwise they are :SUBSET."
+  (if (relation-fluent-indices relation) :fluent :subset))
 
 
 (defun enum-validate-relation-meta (relation plist)
   "Validate enumeration metadata PLIST for RELATION.  Signals error on invalid entries."
-  (let ((pattern (getf plist :pattern))
+  (let* ((explicit-pattern (getf plist :pattern))
+        (pattern (or explicit-pattern (enum-infer-pattern relation)))
         (allow-unassigned (getf plist :allow-unassigned))
         (early-keys (getf plist :early-keys))
         (on-assign (getf plist :on-assign))
         (max-per-key (getf plist :max-per-key)))
-    (unless (member pattern '(:fluent :subset :derived))
-      (error "DEFINE-ENUM-RELATION ~S: :PATTERN must be :FLUENT, :SUBSET, or :DERIVED; got ~S"
-             relation pattern))
+    (when (and explicit-pattern
+               (not (member explicit-pattern '(:fluent :subset))))
+      (error "DEFINE-ENUM-RELATION ~S: :PATTERN must be :FLUENT or :SUBSET; got ~S"
+             relation explicit-pattern))
     (when allow-unassigned
       (unless (or (eq allow-unassigned t)
                   (and (consp allow-unassigned)
@@ -1022,7 +1565,27 @@ Checks dynamic binding first (for temporary overrides), then problem property."
       (when requires-fluent
         (unless (symbolp requires-fluent)
           (error "DEFINE-ENUM-RELATION ~S: :REQUIRES-FLUENT must be a symbol; got ~S"
-                 relation requires-fluent))))))
+                 relation requires-fluent))))
+    (let ((pf (getf plist :partner-feasible)))
+      (when pf
+        (unless (eq pattern :subset)
+          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE only valid for :SUBSET pattern; got :PATTERN ~S"
+                 relation pattern))
+        (unless (and (consp pf) (getf pf :query) (getf pf :args))
+          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE must be (:QUERY name :ARGS (...))"
+                 relation))
+        (unless (symbolp (getf pf :query))
+          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE :QUERY must be a symbol; got ~S"
+                 relation (getf pf :query)))
+        (dolist (arg-spec (getf pf :args))
+          (unless (or (eq arg-spec :partner)
+                      (eq arg-spec :key)
+                      (and (consp arg-spec)
+                           (eq (first arg-spec) :key-fluent)
+                           (symbolp (second arg-spec))
+                           (= (length arg-spec) 2)))
+            (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE arg-spec must be :PARTNER, :KEY, or (:KEY-FLUENT sym); got ~S"
+                   relation arg-spec)))))))
 
 
 (defun enum-relation-meta (rel)
@@ -1034,9 +1597,11 @@ Checks dynamic binding first (for temporary overrides), then problem property."
 
 
 (defun enum-pattern (rel)
-  "Return the enumeration pattern for REL.  Defaults to :FLUENT."
+  "Return the enumeration pattern for REL.
+   Uses explicit :PATTERN metadata when provided; otherwise infers from REL."
   (let ((meta (enum-relation-meta rel)))
-    (if meta (getf meta :pattern) :fluent)))
+    (or (and meta (getf meta :pattern))
+        (enum-infer-pattern rel))))
 
 
 (defun enum-allow-unassigned (rel)
@@ -1072,6 +1637,49 @@ Checks dynamic binding first (for temporary overrides), then problem property."
 (defun enum-requires-fluent (rel)
   "Return the :REQUIRES-FLUENT symbol for REL, or NIL."
   (getf (enum-relation-meta rel) :requires-fluent))
+
+
+(defun enum-partner-feasible (rel)
+  "Return the :PARTNER-FEASIBLE spec for REL, or NIL."
+  (getf (enum-relation-meta rel) :partner-feasible))
+
+
+(defun enum-build-partner-feasible-fn (rel)
+  "Build a feasibility predicate from REL's :PARTNER-FEASIBLE metadata.
+   Returns a function (lambda (state key partner) ...) that returns T when
+   the partner is feasible for the key, or NIL if no spec is declared.
+   The query function must already be compiled (fboundp)."
+  (let ((spec (enum-partner-feasible rel)))
+    (when spec
+      (let* ((query-name (getf spec :query))
+             (arg-specs (getf spec :args))
+             (query-fn (symbol-function query-name)))
+        (format t "~&[partner-feasible] rel=~S query=~S args=~S~%"
+                rel query-name arg-specs)
+        (let ((resolvers
+                (mapcar (lambda (arg-spec)
+                          (cond
+                            ((eq arg-spec :partner)
+                             (lambda (state key partner)
+                               (declare (ignore state key))
+                               partner))
+                            ((eq arg-spec :key)
+                             (lambda (state key partner)
+                               (declare (ignore state partner))
+                               key))
+                            ((and (consp arg-spec)
+                                  (eq (first arg-spec) :key-fluent))
+                             (let ((fluent-rel (second arg-spec)))
+                               (lambda (state key partner)
+                                 (declare (ignore partner))
+                                 (first (fluent-value state (list fluent-rel key))))))
+                            (t (error "Unknown arg-spec: ~S" arg-spec))))
+                        arg-specs)))
+          (compile nil
+                   (lambda (state key partner)
+                     (apply query-fn state
+                            (mapcar (lambda (r) (funcall r state key partner))
+                                    resolvers)))))))))
 
 
 (defun enum-key-allows-unassigned-p (rel key-tuple)
@@ -1551,28 +2159,28 @@ fluent positions removed). FLUENT-ARGS are in the order of REL's fluent indices.
         (multisets-with-repetition xs k))))))
 
 
-(defun canonical-value-assignments (objects values)
-  "Generate canonical (sorted) value assignments for symmetric OBJECTS over VALUES.
-   Returns a list of assignment alists, each mapping object -> value.
-   Canonical means the value sequence is non-decreasing by value index."
+(defun canonical-value-assignments (objects value-tuples)
+  "Generate canonical (sorted) assignments for symmetric OBJECTS over VALUE-TUPLES.
+   Returns a list of assignment alists, each mapping object -> tuple.
+   Canonical means the tuple sequence is non-decreasing by tuple index."
   (let* ((n (length objects))
-         (multisets (multisets-with-repetition values n)))
-    (mapcar (lambda (value-tuple)
-              (mapcar #'cons objects value-tuple))
+         (multisets (multisets-with-repetition value-tuples n)))
+    (mapcar (lambda (tuple-selection)
+              (mapcar #'cons objects tuple-selection))
             multisets)))
 
 
 (defun enum-assignment-respects-fixed-p (assignment fixed-table)
   "Return T if ASSIGNMENT respects all fixed constraints in FIXED-TABLE.
-   ASSIGNMENT is an alist of (object . value) pairs.
-   FIXED-TABLE maps (object) keys to (value) tuples."
+   ASSIGNMENT is an alist of (object . tuple) pairs.
+   FIXED-TABLE maps (object) keys to fluent tuples."
   (every (lambda (pair)
            (let* ((obj (car pair))
-                  (val (cdr pair))
+                  (vals (cdr pair))
                   (key (list obj))
                   (fixed (and fixed-table (gethash key fixed-table))))
              (or (null fixed)
-                 (equal (list val) fixed))))
+                 (equal vals fixed))))
          assignment))
 
 
@@ -1681,15 +2289,15 @@ from the product are appended."
      (mapcar (lambda (tuple) tuple) allowed-value-tuples))))
 
 
-(defun enum-make-symmetric-batch-action (rel sym-type objects value-domain
+(defun enum-make-symmetric-batch-action (rel sym-type objects value-tuples
                                          &key (propagate t) (fixed-maps nil))
   "Create a single enum action that assigns values to all symmetric OBJECTS at once.
    Uses canonical (sorted) multiset assignments to avoid enumerating symmetric permutations.
    REL is the relation being assigned.
    SYM-TYPE is the symmetry group type name (for action naming).
    OBJECTS is the list of symmetric objects.
-   VALUE-DOMAIN is the list of possible values.
-   When REL's :ALLOW-UNASSIGNED metadata applies, :UNASSIGNED is appended to the domain.
+   VALUE-TUPLES is the list of possible fluent tuples.
+   When REL's :ALLOW-UNASSIGNED metadata applies, (:UNASSIGNED) is appended to the domain.
    FIXED-MAPS: when provided, filters assignments to respect goal-fixed constraints.
    Returns a single action with one instantiation per canonical assignment."
   (let* ((name (intern (format nil "ENUM-~A-~AS" rel sym-type) *package*))
@@ -1697,8 +2305,8 @@ from the product are appended."
                                    (enum-key-allows-unassigned-p rel (list obj)))
                                  objects))
          (effective-domain (if allow-unassigned
-                               (append value-domain (list :unassigned))
-                               value-domain))
+                               (append value-tuples (list '(:unassigned)))
+                               value-tuples))
          (all-assignments (canonical-value-assignments objects effective-domain))
          (fixed (and fixed-maps (gethash rel fixed-maps)))
          (assignments (if fixed
@@ -1717,14 +2325,15 @@ from the product are appended."
                    assignment)
             (member assignment assignments :test #'equal)
             (list assignment)))
-     ;; Effect: bind REL for each assigned object; skip :UNASSIGNED
+     ;; Effect: bind REL for each assigned object; skip (:UNASSIGNED)
      (lambda (state assignment)
        (let ((s (copy-state state)))
          (dolist (pair assignment)
            (let ((obj (car pair))
-                 (val (cdr pair)))
-             (unless (eq val :unassigned)
-               (update (problem-state.idb s) (list rel obj val))
+                 (vals (cdr pair)))
+             (unless (equal vals '(:unassigned))
+               (update (problem-state.idb s)
+                       (assemble-proposition rel (list obj) vals))
                (when on-assign
                  (dolist (entry on-assign)
                    (let ((target-rel (first entry))
@@ -1793,21 +2402,41 @@ from the product are appended."
 
 
 (defun enum-collect-fluent-relations (relations)
-  "Return the subset of RELATIONS with :FLUENT pattern and fluent indices."
+  "Return unary-key fluent relations from RELATIONS.
+   A relation qualifies when:
+   - its enum pattern is :FLUENT,
+   - it has fluent indices, and
+   - it has exactly one non-fluent (key) position."
   (remove-if-not (lambda (r)
                    (and (eq (enum-pattern r) :fluent)
-                        (relation-fluent-indices r)))
+                        (relation-fluent-indices r)
+                        (= (length (relation-key-type-specs r)) 1)))
                  relations))
+
+
+(defun enum-all-installed-relations ()
+  "Return all installed relation symbols."
+  (let (rels)
+    (maphash (lambda (r sig)
+               (declare (ignore sig))
+               (push r rels))
+             *relations*)
+    rels))
+
+
+(defun enum-object-matches-type-spec-p (obj type-spec)
+  "Return T when OBJ is an instance of TYPE-SPEC (symbol or (either ...))."
+  (member obj (expand-type-spec-instances* type-spec) :test #'eq))
 
 
 (defun enum-group-predecessors-map (keys interchangeable-groups)
   "Build hash table mapping each key to its preceding same-group members.
    Only keys belonging to an interchangeable group get entries.
-   Predecessors are in canonical group order (earliest first)."
+   Predecessors are in execution order (matching KEYS list order)."
   (let ((map (make-hash-table :test 'eq)))
     (dolist (group interchangeable-groups map)
-      (let ((group-keys (remove-if-not (lambda (obj) (member obj keys :test #'eq))
-                                       group)))
+      (let ((group-keys (remove-if-not (lambda (obj) (member obj group :test #'eq))
+                                       keys)))
         (loop for tail on group-keys
               for k = (car tail)
               for preds = (ldiff group-keys tail)
@@ -1817,12 +2446,18 @@ from the product are appended."
 
 (defun enum-objects-residually-equivalent-p (state obj1 obj2 fluent-relations)
   "True iff OBJ1 and OBJ2 have identical fluent values across all FLUENT-RELATIONS.
-   Both unbound counts as equivalent for a given relation."
+   Both unbound counts as equivalent for a given relation.
+   Relations where OBJ1/OBJ2 are not valid key instances are ignored."
   (every (lambda (rel)
-           (multiple-value-bind (v1 p1) (fluent-value state (list rel obj1))
-             (multiple-value-bind (v2 p2) (fluent-value state (list rel obj2))
-               (and (eq (not (null p1)) (not (null p2)))
-                    (or (not p1) (equal v1 v2))))))
+           (let ((key-spec (first (relation-key-type-specs rel))))
+             (if (and key-spec
+                      (enum-object-matches-type-spec-p obj1 key-spec)
+                      (enum-object-matches-type-spec-p obj2 key-spec))
+                 (multiple-value-bind (v1 p1) (fluent-value state (list rel obj1))
+                   (multiple-value-bind (v2 p2) (fluent-value state (list rel obj2))
+                     (and (eq (not (null p1)) (not (null p2)))
+                          (or (not p1) (equal v1 v2)))))
+                 t)))
          fluent-relations))
 
 
@@ -1835,42 +2470,317 @@ from the product are appended."
 
 
 (defun enum-subset-lex<= (set1 set2)
-  "True iff sorted SET1 is lexicographically <= sorted SET2.
-   Shorter sets are considered less when one is a prefix of the other."
-  (loop for a in set1
-        for b in set2
-        do (cond ((string< (symbol-name a) (symbol-name b)) (return t))
-                 ((string> (symbol-name a) (symbol-name b)) (return nil)))
-        finally (return (<= (length set1) (length set2)))))
+  "True iff sorted SET1 is lexicographically <= sorted SET2 under
+   proposition-level ordering.  Empty sets are maximal (a connector with
+   no partners contributes no propositions, sorting after all partners).
+   On prefix match the longer set is smaller (more paired-props sort earlier)."
+  (cond
+    ((and (null set1) (null set2)) t)
+    ((null set1) nil)
+    ((null set2) t)
+    (t (loop for a in set1
+             for b in set2
+             do (cond ((string< (symbol-name a) (symbol-name b)) (return t))
+                      ((string> (symbol-name a) (symbol-name b)) (return nil)))
+             finally (return (>= (length set1) (length set2)))))))
+
+
+(defun enum-filter-group-members (partner-set keys)
+  "Remove members of KEYS from PARTNER-SET to obtain the external-partner subset.
+   When interchangeable group members appear in each other's partner sets,
+   the raw lex comparison is not invariant under renaming.  Filtering to
+   external partners restores a stable comparison."
+  (remove-if (lambda (p) (member p keys :test #'eq)) partner-set))
 
 
 (defun enum-residual-symmetry-ok-p (state rel key chosen-set
                                     predecessors-map fluent-relations
                                     keys partners)
   "True iff CHOSEN-SET respects residual symmetry ordering for KEY.
-   If KEY has a residually-equivalent canonical predecessor, KEY's partner set
-   must be lexicographically >= the predecessor's partner set."
-  (let ((preds (and predecessors-map (gethash key predecessors-map))))
-    (or (null preds)
-        (null fluent-relations)
-        (let ((pred (enum-canonical-predecessor state key preds fluent-relations)))
-          (or (null pred)
-              (enum-subset-lex<= (sort (copy-list (enum-key-partners state rel pred partners))
-                                       #'string< :key #'symbol-name)
-                                 (sort (copy-list chosen-set)
-                                       #'string< :key #'symbol-name)))))))
+   If KEY has a residually-equivalent canonical predecessor, KEY's external
+   partner set (group members removed) must be lexicographically >= the
+   predecessor's external partner set."
+  (or (null *enum-residual-symmetry-enabled*)
+      (let ((preds (and predecessors-map (gethash key predecessors-map))))
+        (or (null preds)
+            (null fluent-relations)
+            (let ((pred (enum-canonical-predecessor state key preds fluent-relations)))
+              (or (null pred)
+                  ;; Same-area connectors are not truly interchangeable due to
+                  ;; connectable constraint + fixed activation order in propagation.
+                  ;; Skip pruning when key and predecessor share the same loc.
+                  (multiple-value-bind (pred-loc pred-bound-p)
+                      (fluent-value state (list 'loc pred))
+                    (multiple-value-bind (key-loc key-bound-p)
+                        (fluent-value state (list 'loc key))
+                      (and pred-bound-p key-bound-p (equal pred-loc key-loc))))
+                  (let* ((pred-ext (sort (copy-list (enum-filter-group-members
+                                                     (enum-key-partners state rel pred partners)
+                                                     keys))
+                                         #'string< :key #'symbol-name))
+                         ;; KEY may already have partners introduced by earlier keys
+                         ;; in symmetric subset relations. Compare against KEY's
+                         ;; complete post-action external partner set.
+                         (key-ext (sort
+                                   (copy-list
+                                    (enum-filter-group-members
+                                     (union (enum-key-partners state rel key partners)
+                                            chosen-set
+                                            :test #'eq)
+                                     keys))
+                                   #'string< :key #'symbol-name))
+                         ;; When predecessor has no external partners after filtering,
+                         ;; internal partner structure (filtered out above) may still
+                         ;; determine canonical orientation.  In that case, do not
+                         ;; prune on external-lex order alone.
+                         (ok (or (null pred-ext)
+                                 (enum-subset-lex<= pred-ext key-ext))))
+                    ok)))))))
+
+
+(defun enum-all-permutations (lst)
+  "Generate all permutations of LST."
+  (if (null lst)
+      (list nil)
+      (mapcan (lambda (x)
+                (mapcar (lambda (p) (cons x p))
+                        (enum-all-permutations (remove x lst :count 1))))
+              lst)))
+
+
+(defun enum-substitute-in-form (form alist)
+  "Recursively substitute symbols in FORM according to ALIST."
+  (cond
+    ((null form) nil)
+    ((symbolp form) (or (cdr (assoc form alist :test #'eq)) form))
+    ((consp form) (cons (enum-substitute-in-form (car form) alist)
+                        (enum-substitute-in-form (cdr form) alist)))
+    (t form)))
+
+
+(defun enum-canonical-base-key (state groups)
+  "Compute canonical base-proposition key for STATE under symmetry GROUPS.
+   Uses only base relations (loc, paired) to avoid beam-name artifacts.
+   Returns a sorted proposition list that is the lex minimum over all
+   group permutations.  Handles multiple disjoint groups sequentially."
+  (let* ((base-rels (get-base-relations))
+         (props (remove-if-not
+                 (lambda (p) (member (car p) base-rels :test #'eq))
+                 (list-database (problem-state.idb state))))
+         (current (sort (copy-list props) #'string< :key #'prin1-to-string)))
+    (dolist (group groups current)
+      (let ((best current))
+        (dolist (perm (enum-all-permutations group))
+          (let* ((alist (mapcar #'cons group perm))
+                 (subst (mapcar (lambda (p) (enum-substitute-in-form p alist))
+                                current))
+                 (sorted (sort (copy-list subst) #'string< :key #'prin1-to-string)))
+            (when (string< (prin1-to-string sorted) (prin1-to-string best))
+              (setf best sorted))))
+        (setf current best)))))
+
+
+(defun enum-count-canonical-uniques (&optional (states *enumerated-goal-states*)
+                                               (groups *enumerator-detected-groups*))
+  "Count unique canonical base-proposition forms among STATES.
+   Reports raw count, canonical unique count, and duplicate count."
+  (let ((seen (make-hash-table :test #'equal))
+        (unique-count 0)
+        (total (length states)))
+    (dolist (state states)
+      (let ((key (prin1-to-string (enum-canonical-base-key state groups))))
+        (unless (gethash key seen)
+          (setf (gethash key seen) t)
+          (incf unique-count))))
+    (format t "~&[canonical-uniques] ~D total states, ~D canonical uniques, ~D duplicates~%"
+            total unique-count (- total unique-count))
+    unique-count))
+
+
+(defun enum-connector-external-partners (state key group)
+  "Return sorted external partners of KEY under PAIRED in STATE.
+   External means not a member of GROUP (the interchangeable connector group).
+   Used by diagnostic functions to reconstruct what residual symmetry would see."
+  (let ((partners nil))
+    (dolist (prop (list-database (problem-state.idb state)))
+      (when (eq (car prop) 'paired)
+        (cond ((eq (second prop) key)
+               (pushnew (third prop) partners :test #'eq))
+              ((eq (third prop) key)
+               (pushnew (second prop) partners :test #'eq)))))
+    (sort (remove-if (lambda (p) (member p group :test #'eq)) partners)
+          #'string< :key #'symbol-name)))
+
+
+(defun enum-simulate-would-prune-p (state keys group)
+  "Simulate residual symmetry pruning on final STATE.
+   Checks only loc equivalence (the only fluent assigned during base enumeration).
+   Returns T if any key's subset assignment would have been rejected."
+  (let ((k1 (first keys)) (k2 (second keys)) (k3 (third keys)))
+    (multiple-value-bind (loc1 p1) (fluent-value state (list 'loc k1))
+      (multiple-value-bind (loc2 p2) (fluent-value state (list 'loc k2))
+        (multiple-value-bind (loc3 p3) (fluent-value state (list 'loc k3))
+          (let ((ext1 (enum-connector-external-partners state k1 group))
+                (ext2 (enum-connector-external-partners state k2 group))
+                (ext3 (enum-connector-external-partners state k3 group)))
+            ;; c2 vs c1: must check when same loc (both bound to same value,
+            ;; or both unbound)
+            (when (and (eq (not (null p1)) (not (null p2)))
+                       (or (and (not p1) (not p2))
+                           (and p1 p2 (equal loc1 loc2))))
+              (unless (or (null ext1) (enum-subset-lex<= ext1 ext2))
+                (return-from enum-simulate-would-prune-p
+                  (values t :c2-vs-c1 ext1 ext2))))
+            ;; c3: find latest equivalent predecessor
+            (let ((pred (cond
+                          ((and (eq (not (null p2)) (not (null p3)))
+                                (or (and (not p2) (not p3))
+                                    (and p2 p3 (equal loc2 loc3))))
+                           k2)
+                          ((and (eq (not (null p1)) (not (null p3)))
+                                (or (and (not p1) (not p3))
+                                    (and p1 p3 (equal loc1 loc3))))
+                           k1)
+                          (t nil))))
+              (when pred
+                (let ((ext-pred (if (eq pred k1) ext1 ext2)))
+                  (unless (or (null ext-pred) (enum-subset-lex<= ext-pred ext3))
+                    (return-from enum-simulate-would-prune-p
+                      (values t :c3-vs pred ext-pred ext3)))))))))))
+  nil)
+
+
+(defun enum-diagnose-over-pruning (&optional (states *enumerated-goal-states*)
+                                              (groups *enumerator-detected-groups*)
+                                              (max-examples 10))
+  "Find canonical keys that lose ALL representatives to residual symmetry pruning.
+   Prints summary and detailed examples of over-pruned equivalence classes."
+  (let ((keys '(connector1 connector2 connector3))
+        (group (first groups))
+        (canonical-table (make-hash-table :test #'equal))
+        (kept-keys (make-hash-table :test #'equal))
+        (over-pruned nil)
+        (example-count 0))
+    ;; Pass 1: group states by canonical key
+    (dolist (state states)
+      (let ((ckey (prin1-to-string (enum-canonical-base-key state groups))))
+        (push state (gethash ckey canonical-table))))
+    ;; Pass 2: for each state, check if it would survive pruning
+    (dolist (state states)
+      (unless (enum-simulate-would-prune-p state keys group)
+        (let ((ckey (prin1-to-string (enum-canonical-base-key state groups))))
+          (setf (gethash ckey kept-keys) t))))
+    ;; Pass 3: find canonical keys with no survivor
+    (maphash (lambda (ckey state-list)
+               (unless (gethash ckey kept-keys)
+                 (push (cons ckey state-list) over-pruned)))
+             canonical-table)
+    ;; Report
+    (format t "~&[diagnose] Total canonical keys: ~D~%" (hash-table-count canonical-table))
+    (format t "~&[diagnose] Canonical keys with at least one survivor: ~D~%"
+            (hash-table-count kept-keys))
+    (format t "~&[diagnose] Over-pruned canonical keys: ~D~%" (length over-pruned))
+    ;; Detailed examples
+    (dolist (entry over-pruned)
+      (when (>= example-count max-examples) (return))
+      (incf example-count)
+      (format t "~&~%--- Over-pruned class ~D (size ~D) ---~%" example-count (length (cdr entry)))
+      (dolist (state (cdr entry))
+        (let ((base-rels (get-base-relations)))
+          (format t "~&  State base props:~%")
+          (dolist (p (sort (remove-if-not
+                           (lambda (p) (member (car p) base-rels :test #'eq))
+                           (list-database (problem-state.idb state)))
+                          #'string< :key #'prin1-to-string))
+            (format t "    ~S~%" p)))
+        ;; Show simulation detail
+        (multiple-value-bind (pruned-p reason a b)
+            (enum-simulate-would-prune-p state keys group)
+          (format t "  Simulated prune: ~A  reason=~S  ~S vs ~S~%"
+                  pruned-p reason a b))))
+    (length over-pruned)))
+
+
+(defun enum-count-and-save-canonical-keys (filename &key (goal-spec 'goal-fn)
+                                                          (pruned t)
+                                                          (max-per-key 4))
+  "Enumerate goal states, count raw and canonical uniques, save canonical keys to file.
+   No states are retained in memory.  PRUNED controls *enum-residual-symmetry-enabled*.
+   FILENAME: path to write canonical keys (one per line).
+   Returns: (values raw-count canonical-count)."
+  (let* ((real-goal-fn (coerce-goal goal-spec))
+         (seen (make-hash-table :test #'equal))
+         (raw 0)
+         (counting-goal
+          (lambda (state)
+            (when (and (eql (problem-state.name state) 'enum-finalize)
+                       (funcall real-goal-fn state))
+              (incf raw)
+              (let ((ckey (prin1-to-string
+                           (enum-canonical-base-key state *enumerator-detected-groups*))))
+                (setf (gethash ckey seen) t))
+              nil))))
+    (setf *enum-residual-symmetry-enabled* pruned)
+    (format t "~&[count] Running with pruning=~A...~%" pruned)
+    (enumerate-state counting-goal
+                     :algorithm *algorithm*
+                     :solution-type 'every
+                     :default-max-per-key max-per-key
+                     :propagate 'finalize-only
+                     :prefilter (get-prefilter))
+    (let ((canonical (hash-table-count seen)))
+      (format t "~&[count] Raw: ~D  Canonical: ~D  Duplicates: ~D~%"
+              raw canonical (- raw canonical))
+      (with-open-file (out filename :direction :output :if-exists :supersede)
+        (maphash (lambda (k v)
+                   (declare (ignore v))
+                   (write-line k out))
+                 seen))
+      (format t "~&[count] Saved ~D canonical keys to ~A~%" canonical filename)
+      (values raw canonical))))
+
+
+(defun enum-compare-canonical-key-files (file1 file2)
+  "Compare two canonical-key files.  Reports missing and extra keys.
+   FILE1 is the reference (unpruned), FILE2 is the test (pruned)."
+  (let ((ref (make-hash-table :test #'equal))
+        (test (make-hash-table :test #'equal)))
+    (with-open-file (in file1 :direction :input)
+      (loop for line = (read-line in nil nil)
+            while line do (setf (gethash line ref) t)))
+    (with-open-file (in file2 :direction :input)
+      (loop for line = (read-line in nil nil)
+            while line do (setf (gethash line test) t)))
+    (let ((missing 0) (extra 0))
+      (maphash (lambda (k v) (declare (ignore v))
+                 (unless (gethash k test) (incf missing)))
+               ref)
+      (maphash (lambda (k v) (declare (ignore v))
+                 (unless (gethash k ref) (incf extra)))
+               test)
+      (format t "~&[compare] Reference keys: ~D  Test keys: ~D~%"
+              (hash-table-count ref) (hash-table-count test))
+      (format t "~&[compare] Missing from test: ~D  Extra in test: ~D~%"
+              missing extra)
+      (format t "~&[compare] Sound: ~A  Complete: ~A~%"
+              (zerop missing) (zerop extra))
+      (values missing extra))))
 
 
 (defun enum-make-subset-actions (rel keys partners max-per-key
                                  &key (propagate t) (symmetric-relation-p nil)
                                       (requires-fluent nil)
-                                      (predecessors-map nil) (fluent-relations nil))
+                                      (predecessors-map nil) (fluent-relations nil)
+                                      (partner-feasible-fn nil))
   "Create subset-enumeration actions for REL with global degree cap.
    For each key, generates an action whose instantiations are all subsets (up to
    MAX-PER-KEY) of the key's allowed partners.
    When SYMMETRIC-RELATION-P, excludes lower-indexed keys from pairing targets.
    When REQUIRES-FLUENT is non-nil, keys without that fluent bound are restricted
-   to empty subsets."
+   to empty subsets.
+   When PARTNER-FEASIBLE-FN is non-nil, each partner in a proposed subset must
+   satisfy (funcall partner-feasible-fn state key partner) for the subset to be
+   accepted.  Prunes the DFS tree by rejecting infeasible subsets at branch time."
   (when (and keys partners)
     ;; bind K freshly per loop iteration to avoid closure capture.
     (loop for k0 in keys append
@@ -1890,6 +2800,10 @@ from the product are appended."
                     (t
                      ;; Key with fluent bound (or no fluent required): enumerate subsets.
                      (and (member set sets :test #'equal)
+                          (or (null partner-feasible-fn)
+                              (every (lambda (p)
+                                       (funcall partner-feasible-fn state k p))
+                                     set))
                           (or (null requires-fluent)
                               (every (lambda (tgt)
                                        (or (not (member tgt keys :test #'eq))
@@ -1919,7 +2833,7 @@ from the product are appended."
    ;; Precondition: apply prefilter if provided
    (if prefilter
        (lambda (state)
-         (funcall prefilter state))
+         (when (funcall prefilter state) t))  ;; normalize to T for generate-children
        (lambda (state) t))
    ;; Effect: propagate (if enabled) and finalize
    (lambda (state)
@@ -1941,8 +2855,7 @@ from the product are appended."
    Each relation is processed using its enum metadata:
      :EARLY-KEYS — keys matching these types are enumerated first (early actions)
      :ALLOW-UNASSIGNED — qualifying keys get an :UNASSIGNED sentinel value
-     :SYMMETRIC-BATCH — interchangeable groups use canonical multisets
-     :DERIVED — relations with this pattern are skipped entirely"
+     :SYMMETRIC-BATCH — interchangeable groups use canonical multisets"
   (let ((relations (getf ctx :relations))
         (focus-objs (getf ctx :focus-objs))
         (focus-set (getf ctx :focus-set))
@@ -1983,9 +2896,8 @@ from the product are appended."
                         early-actions)))
               ;; Main-key actions: symmetric batch + individual
               (let ((batch-objects (make-hash-table :test 'eq)))
-                ;; Symmetric batch for interchangeable groups (single-fluent only)
-                (when (and (enum-symmetric-batch-p r)
-                           (= (length (relation-fluent-indices r)) 1))
+                ;; Symmetric batch for interchangeable groups.
+                (when (enum-symmetric-batch-p r)
                   (dolist (group interchangeable-groups)
                     (let ((group-in-keys (remove-if-not
                                           (lambda (obj)
@@ -1993,9 +2905,9 @@ from the product are appended."
                                           group)))
                       (when (> (length group-in-keys) 1)
                         (let ((stype (or (find-group-type group) 'symmetric))
-                              (value-domain (mapcar #'first vtuples)))
+                              (value-tuples vtuples))
                           (push (enum-make-symmetric-batch-action
-                                 r stype group-in-keys value-domain
+                                 r stype group-in-keys value-tuples
                                  :propagate propagate
                                  :fixed-maps fixed-maps)
                                 main-actions)
@@ -2010,9 +2922,12 @@ from the product are appended."
     (values (nreverse early-actions) (nreverse main-actions))))
 
 
-(defun enum-compute-context (goal-form)
+(defun enum-compute-context (goal-form &key skip-fixed-maps)
   "Compute context plist for enum action generation.
    Gathers schema metadata, type domains, goal analysis, and fixed-maps.
+   SKIP-FIXED-MAPS: when T, leave :FIXED-MAPS empty (penultimate enumeration
+   needs interchangeable-group detection from GOAL-FORM but must not fix
+   base-relation assignments, since penultimate states don't satisfy the goal).
    Returns a plist with keys:
      :schema :focus-objs :focus-set :relations :goal-form
      :symmetric-relations :interchangeable-groups :sym-objects :fixed-maps"
@@ -2029,10 +2944,11 @@ from the product are appended."
                           (dolist (o group)
                             (pushnew o objs :test #'eq)))))
          (fixed-maps (make-hash-table :test #'eq)))
-    (dolist (r relations)
-      (when (and (relation-signature r) (relation-fluent-indices r))
-        (setf (gethash r fixed-maps)
-              (goal-fixed-fluent-assignments goal-form r))))
+    (unless skip-fixed-maps
+      (dolist (r relations)
+        (when (and (relation-signature r) (relation-fluent-indices r))
+          (setf (gethash r fixed-maps)
+                (goal-fixed-fluent-assignments goal-form r)))))
     (list :schema schema
           :focus-objs focus-objs
           :focus-set focus-set
@@ -2044,17 +2960,45 @@ from the product are appended."
           :fixed-maps fixed-maps)))
 
 
+(defun enum-key-subset-count (key keys partners max-per-key
+                              &key symmetric-relation-p)
+  "Count the number of subset instantiations for KEY given current KEYS order.
+   Used to sort keys fail-first before building predecessor maps."
+  (let ((allowed (enum-allowed-partners-for key keys partners
+                                            :symmetric-relation-p symmetric-relation-p)))
+    (length (subsets-up-to allowed max-per-key))))
+
+
+(defun enum-sort-keys-fail-first (keys partners max-per-key
+                                  &key symmetric-relation-p)
+  "Sort KEYS by ascending instantiation count (fail-first heuristic).
+   Counts are estimated from the original KEYS order.  The resulting
+   execution order is used for predecessor-map construction so that
+   residual symmetry pruning is consistent with actual CSP execution."
+  (let ((counts (mapcar (lambda (k)
+                          (cons k (enum-key-subset-count
+                                   k keys partners max-per-key
+                                   :symmetric-relation-p symmetric-relation-p)))
+                        keys)))
+    (mapcar #'car (stable-sort counts #'< :key #'cdr))))
+
+
 (defun enum-generate-subset-actions (ctx default-max-per-key propagate)
   "Generate subset-enumeration actions for all :SUBSET-pattern relations.
    For each relation, derives keys and partners from the signature and metadata.
-   Creates one action per key, sorted fail-first by instantiation count.
+   Keys are sorted fail-first BEFORE building the predecessor map, ensuring
+   residual symmetry pruning is consistent with actual CSP execution order.
    When a relation is auto-detected as symmetric, applies index-based deduplication.
-   Residual symmetry breaking prunes equivalent subset assignments for co-valued keys.
-   Returns a list of actions in execution order."
+   When :PARTNER-FEASIBLE metadata is declared, builds a branch-time feasibility
+   predicate and threads it into subset preconditions.
+   Returns a list of actions in execution order (no post-hoc sort needed)."
   (let ((relations (getf ctx :relations))
         (symmetric-relations (getf ctx :symmetric-relations))
         (interchangeable-groups (getf ctx :interchangeable-groups))     ;residual symmetry
-        (fluent-relations (enum-collect-fluent-relations (getf ctx :relations)))  ;residual symmetry
+        ;; Use all installed unary fluent relations for residual-equivalence checks,
+        ;; not only base-schema relations.
+        (fluent-relations (enum-collect-fluent-relations
+                           (enum-all-installed-relations)))  ;residual symmetry
         (all-actions nil))
     (dolist (r relations)
       (when (eq (enum-pattern r) :subset)
@@ -2063,35 +3007,43 @@ from the product are appended."
                (partner-type-spec (second sig))
                (all-key-instances (expand-type-spec-instances* key-type-spec))
                (key-types-spec (enum-key-types r))
-               (keys (if key-types-spec
-                         (let ((types (cdr key-types-spec)))
-                           (remove-if-not
-                            (lambda (obj)
-                              (some (lambda (ty)
-                                      (member obj (maybe-type-instances ty) :test #'eq))
-                                    types))
-                            all-key-instances))
-                         all-key-instances))
+               (unsorted-keys (if key-types-spec
+                                  (let ((types (cdr key-types-spec)))
+                                    (remove-if-not
+                                     (lambda (obj)
+                                       (some (lambda (ty)
+                                               (member obj (maybe-type-instances ty) :test #'eq))
+                                             types))
+                                     all-key-instances))
+                                  all-key-instances))
                (partners (expand-type-spec-instances* partner-type-spec))
                (max-k (or (enum-max-per-key r) default-max-per-key))
+               (sym-rel-p (member r symmetric-relations :test #'eq))
+               (keys (enum-sort-keys-fail-first unsorted-keys partners max-k  ;; CHANGED: sort first
+                                                :symmetric-relation-p sym-rel-p))
                (requires-fluent (enum-requires-fluent r))
+               (pf-fn (enum-build-partner-feasible-fn r))
                (preds-map (enum-group-predecessors-map keys interchangeable-groups))  ;residual symmetry
                (actions (enum-make-subset-actions
                          r keys partners max-k
                          :propagate propagate
-                         :symmetric-relation-p (member r symmetric-relations)
+                         :symmetric-relation-p sym-rel-p
                          :requires-fluent requires-fluent
                          :predecessors-map preds-map               ;residual symmetry
-                         :fluent-relations fluent-relations)))     ;residual symmetry
-          (setf all-actions (nconc all-actions
-                                   (stable-sort (copy-list actions) #'<
-                                                :key (lambda (a)
-                                                       (length (action.precondition-args a)))))))))
+                         :fluent-relations fluent-relations         ;residual symmetry
+                         :partner-feasible-fn pf-fn)))
+          ;; Actions are already in execution order — no post-hoc sort.
+          (format t "~&[subset-actions] rel=~S keys=~S~%" r keys)
+          (when (> (hash-table-count preds-map) 0)
+            (format t "~&[subset-actions] predecessors-map:~%")
+            (maphash (lambda (k v) (format t "  ~S -> ~S~%" k v)) preds-map))
+          (setf all-actions (nconc all-actions actions)))))
     all-actions))
 
 
 (defun generate-enum-actions (&key (goal-form nil) (default-max-per-key 4)
-                                   (propagate t) (prefilter nil))
+                                   (propagate t) (prefilter nil)
+                                   (skip-fixed-maps nil))
   "Generate a CSP enum-action sequence driven by declared base relations,
    enum-relation metadata, symmetry groups, and prefilter.
    Orchestrates metadata-driven generators and assembles final action list.
@@ -2104,10 +3056,12 @@ from the product are appended."
               :FINALIZE-ONLY — skip intermediate propagation, propagate at finalize.
               NIL — no propagation anywhere (raw leaf collection).
    PREFILTER: when non-nil, a function applied at ENUM-FINALIZE to prune states
-     before propagation."
+     before propagation.
+   SKIP-FIXED-MAPS: when T, disable goal-fixed-fluent pruning (for penultimate
+     enumeration where the goal form drives symmetry detection only)."
   (let* ((intermediate-propagate (eq propagate t))
          (finalize-propagate (not (null propagate)))
-         (ctx (enum-compute-context goal-form)))
+         (ctx (enum-compute-context goal-form :skip-fixed-maps skip-fixed-maps)))
     (setf *enumerator-detected-groups* (getf ctx :interchangeable-groups)
           *enumerator-detected-symmetric-relations* (getf ctx :symmetric-relations))
     (multiple-value-bind (early-actions main-actions)

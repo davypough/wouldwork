@@ -221,16 +221,18 @@
                   (char= (char name-string (1- (length name-string))) #\!))))))
 
 
-(defun get-prop-fluents (proposition)
+(defun get-prop-fluents (proposition &optional indices)
   "Returns the fluent values in an arbitrary proposition."
-  (let ((indices (get-prop-fluent-indices proposition)))
-    (when indices
-      (mapcar (lambda (index)
-                (let ((item (nth index proposition)))
-                  (if (and (symbolp item) (boundp item))
-                    (symbol-value item)
-                    item)))
-              indices))))
+  (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
+    (when fluent-indices
+      (loop with remaining-indices = fluent-indices
+            for i from 0
+            for item in proposition
+            when (and remaining-indices (= i (first remaining-indices)))
+              collect (if (and (symbolp item) (boundp item))
+                          (symbol-value item)
+                          item)
+              and do (setf remaining-indices (rest remaining-indices))))))
 
 
 (defun validate-bind-form (form)

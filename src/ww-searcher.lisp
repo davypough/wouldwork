@@ -171,10 +171,10 @@
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (setf constraints-met nil))
-    (unless constraints-met
-      (format t "~&Note: Hybrid mode not activated: requires *solution-type* = EVERY, *algorithm* = DEPTH-FIRST, *tree-or-graph* = GRAPH, and *depth-cutoff* > 0. Continuing with non-hybrid search.~%"))
+    ;(unless constraints-met
+    ;  (format t "~&Note: Hybrid mode not activated: requires *solution-type* = EVERY, *algorithm* = DEPTH-FIRST, *tree-or-graph* = ;             GRAPH, and *depth-cutoff* > 0. Continuing with non-hybrid search.~%"))
     (when constraints-met
-      (format t "~&Hybrid graph search mode active: enumerating all solutions at depth ~D.~%" *depth-cutoff*))
+      (format t "~&Hybrid graph search mode active: finding all goal states (not paths) at depth ~D.~%" *depth-cutoff*))
     constraints-met))
 
 
@@ -1172,13 +1172,13 @@
     (cond ((> *threads* 0)
              #+:ww-debug (when (>= *debug* 1)
                            (lprt))
-             (let ((ctrl-str "~&New path to goal found at depth = ~:D~%"))
+             (let ((ctrl-str "~&New path to goal found at depth = ~:D"))
                (bt:with-lock-held (*lock*)
                  (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                    (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
                            state-depth (solution.value solution))
                    (format t ctrl-str state-depth)))))
-          (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
+          (t (format t "~%New path to goal found at depth = ~:D" state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                (format t "Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)

@@ -51,6 +51,12 @@
         (format t "~&  ~A...~%" fname)
         (finish-output)
         (compile fname (subst-int-code (symbol-value fname))))
+  ;; Compile base filter if present
+  (when *enumerator-base-filter-form*
+    (format t "~&  ~A (base-filter)...~%" *enumerator-base-filter-name*)
+    (finish-output)
+    (install-prefilter *enumerator-base-filter-name*
+      (compile nil (subst-int-code *enumerator-base-filter-form*))))
   ;; Compile happening interrupt functions
   (iter (for obj in *happening-names*)
         (format t "~&  ~A...~%" obj)

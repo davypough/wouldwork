@@ -366,6 +366,7 @@
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
   (push name *update-names*)
+  (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
   (let ((new-$vars (delete-duplicates
                      (set-difference
                        (get-all-nonspecial-vars #'$varp body) args))))
@@ -531,7 +532,43 @@
                        :effect-adds nil))
         (fix-if-ignore '(state) (action.precondition-lambda action))
         (fix-if-ignore `(state ,@eff-missing-vars) (action.effect-lambda action))
+        (setf (action.effect-adds action)                                ;; CHANGED
+              (extract-effect-modified-relations effect))                 ;; CHANGED
         action))))
+
+
+(defun extract-effect-modified-relations (effect-form)
+  "Walk EFFECT-FORM collecting dynamic relation symbols potentially modified.
+   Transitively walks raw bodies of called update functions (stored on their
+   symbol plists by install-update).  Skips quoted forms.
+   Returns a list of relation symbols (conservative over-approximation)."
+  (let ((modified (make-hash-table :test 'eq))
+        (visited (make-hash-table :test 'eq)))
+    (extract-effect-walk effect-form modified visited)
+    (let ((result nil))
+      (maphash (lambda (k v) (declare (ignore v)) (push k result)) modified)
+      result)))
+
+
+(defun extract-effect-walk (form modified visited)
+  "Recursive worker for EXTRACT-EFFECT-MODIFIED-RELATIONS.
+   Walks FORM collecting relation symbols into MODIFIED hash table.
+   VISITED tracks already-processed update function names to prevent cycles."
+  (cond
+    ((null form) nil)
+    ((symbolp form)
+     (when (gethash form *relations*)
+       (setf (gethash form modified) t))
+     (when (and (member form *update-names* :test #'eq)
+                (not (gethash form visited)))
+       (setf (gethash form visited) t)
+       (let ((raw-body (get form :raw-body)))
+         (when raw-body
+           (extract-effect-walk raw-body modified visited)))))
+    ((and (consp form) (eq (car form) 'quote)) nil)
+    ((consp form)
+     (extract-effect-walk (car form) modified visited)
+     (extract-effect-walk (cdr form) modified visited))))
 
 
 (defun get-bound-?vars (tree)
