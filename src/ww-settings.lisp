@@ -28,6 +28,7 @@
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
+  (format t "~&  MIN STEPS REMAINING? => ~A" (when (fboundp 'min-steps-remaining?) 'YES))
   (when (> *threads* 0)
     (format t "~&~%  For parallel settings: (display-parallel-parameters)"))
   (terpri) (terpri))
@@ -286,6 +287,11 @@
 (define-global *inconsistent-states-dropped* 0
   "Count of successor states dropped due to convergence failure.")
 (declaim (type fixnum *inconsistent-states-dropped*))
+
+
+(define-global *lower-bound-pruned* 0
+  "Count of nodes pruned by user-defined min-steps-remaining? function.")
+(declaim (type fixnum *lower-bound-pruned*))
 
 (define-global *prop-key-cache* 
   (make-hash-table :test #'equal :synchronized (> *threads* 0))

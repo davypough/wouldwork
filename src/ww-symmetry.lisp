@@ -728,10 +728,11 @@ Returns an alist (obj . signature), where signature is a sorted list of
   "Return formatted string of symmetry statistics for progress reporting."
   (cond ((not *symmetry-pruning*) nil)
         ((use-canonical-symmetry-p)
-         (if (> *repeated-states* 0)
-             (format nil "Symmetry: ~:D canonical duplicates pruned (~,1F% of repeated states)"
+         (if (> *total-states-processed* 0)                                      ;; CHANGED
+             (format nil "Symmetry: ~:D canonical duplicates pruned (~,1F% of total states)"  ;; CHANGED
                      *symmetric-duplicates-pruned*
-                     (* 100.0 (/ *symmetric-duplicates-pruned* *repeated-states*)))
+                     (* 100.0 (/ *symmetric-duplicates-pruned*                   ;; CHANGED
+                                 *total-states-processed*)))                     ;; CHANGED
              (format nil "Symmetry: ~:D canonical duplicates pruned"
                      *symmetric-duplicates-pruned*)))
         (t

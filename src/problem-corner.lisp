@@ -17,6 +17,8 @@
 
 (ww-set *depth-cutoff* 15)
 
+(ww-set *symmetry-pruning* t)
+
 (ww-set *progress-reporting-interval* 500000)
 
 
@@ -307,6 +309,46 @@
       ;; Divide by 2 since we count each pair twice
       (floor $useless 2)))
 |#
+
+
+;;;; LOWER BOUND FUNCTION ;;;;
+
+
+(define-query min-steps-remaining? ()
+  ;; Admissible lower bound on minimum remaining actions to reach any goal state.
+  ;; Counts pairing-establishment costs (pickup/connect actions, provably independent
+  ;; of move actions) plus minimum moves for agent relocation.
+  ;;
+  ;; For each inactive goal receiver without any paired connector:
+  ;;   - Agent holds a connector: 1 action (connect with receiver pairing)
+  ;;   - No connector held: 2 actions (pickup + connect)
+  ;; Shared resource: held connector can serve at most one receiver.
+  ;;
+  ;; Agent not in area4: 1 move action (independent of pickup/connect).
+  ;;
+  ;; Initial state estimate: 2 + 2 + 1 = 5 (no pairings, not holding, not in area4).
+  ;; With cutoff 15, pruning begins at depth 11 for states with no structural progress.
+  (do (setq $needs-chain 0)  ;count of receivers needing pairings from scratch
+      ;; Check receiver2 (red, needs chain from transmitter1)
+      (if (and (not (active receiver2))
+               (not (exists (?c connector) (paired ?c receiver2))))
+        (incf $needs-chain))
+      ;; Check receiver3 (blue, needs chain from transmitter2)
+      (if (and (not (active receiver3))
+               (not (exists (?c connector) (paired ?c receiver3))))
+        (incf $needs-chain))
+      ;; Compute pairing establishment cost with held-connector resource sharing
+      (setq $lb
+        (if (> $needs-chain 0)
+          (if (bind (holds agent1 $cargo))
+            (1+ (* 2 (1- $needs-chain)))     ;held serves one, rest need pickup+connect
+            (* 2 $needs-chain))               ;each needs pickup+connect
+          0))
+      ;; Agent relocation cost (moves are independent of pickup/connect actions)
+      (if (not (loc agent1 area4))
+        (incf $lb 1))
+      $lb))
+
 
 ;;;; QUERY FUNCTIONS ;;;;
 
@@ -1485,6 +1527,12 @@
 ;;;; GOAL ;;;;
 
 
+(define-goal
+  (and (loc agent1 area4)
+       (active receiver2)
+       (active receiver3)))
+
+
 #+ignore (define-goal
   (and (loc agent1 area4)
        (loc connector1 area2)
@@ -1497,7 +1545,7 @@
 ))
 
 
-(define-goal
+#+ignore (define-goal
   (and (active receiver2)
        (active receiver3)
        (loc agent1 area4)

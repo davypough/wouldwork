@@ -246,6 +246,7 @@
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
   (setf *inconsistent-states-dropped* 0)
+  (setf *lower-bound-pruned* 0)
   (clrhash *prop-key-cache*)
   (if (> *threads* 0)
     (if (eql *algorithm* 'backtracking)
@@ -482,6 +483,17 @@
     (when (and (> *depth-cutoff* 0) (= (node.depth current-node) *depth-cutoff*))
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
+    (when (fboundp 'min-steps-remaining?)                                                ;; ADDED
+      (let ((lb (funcall (symbol-function 'min-steps-remaining?) (node.state current-node))) ;; ADDED
+            (depth (node.depth current-node)))                                            ;; ADDED
+        (when (or (and (> *depth-cutoff* 0)                                               ;; ADDED
+                       (> (+ depth lb) *depth-cutoff*))                                   ;; ADDED
+                  (and *solutions*                                                        ;; ADDED
+                       (member *solution-type* '(min-length first))                       ;; ADDED
+                       (>= (+ depth lb) (solution.depth (first *solutions*)))))           ;; ADDED
+          (increment-global *lower-bound-pruned* 1)                                      ;; ADDED
+          (narrate "State pruned by lower bound" (node.state current-node) depth)        ;; ADDED
+          (return-from df-bnb1 nil))))                                                   ;; ADDED
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     ;; Backtrack-triggered wait check
@@ -1052,6 +1064,8 @@
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
             *inconsistent-states-dropped*))
+  (when (> *lower-bound-pruned* 0)                                                        ;; ADDED
+    (format t "~2%Lower-bound pruned ~:D node~:P." *lower-bound-pruned*))                ;; ADDED
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (let ((sym-stats (format-symmetry-statistics)))
@@ -1105,12 +1119,12 @@
                      (format t "~2%Duration of a minimum time solution = ~:D" minimum-time)
                      (format t "~2%A minimum time solution path from start state to goal state:~%")
                      (printout-solution minimum-time-solution))))))))
-  (if (boundp 'goal-fn)  ;(get 'goal-fn 'formula)
+  (if (boundp 'goal-fn)
     (when (or (and (eql *solution-type* 'count) (= *solution-count* 0))
               (and (not (eql *solution-type* 'count)) (null *solutions*)))
       (format t "~&No solutions found.~%"))
     (format t "~&No goal specified, but best results follow:"))
-  (unless (boundp 'goal-fn)  ; (null (get 'goal-fn 'formula))
+  (unless (boundp 'goal-fn)
     (format t "~2%Total number of results recorded = ~:D." (length *best-states*))
     (format t "~%Check *best-states* for all result records.")
     (case *solution-type*
