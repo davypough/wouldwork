@@ -97,13 +97,12 @@
       (when (probe-file problem-file)
         (delete-file problem-file))
       (uiop:copy-file source-file problem-file)
-      ;; Clear and reload with warning muffling
+      ;; Clear and reload
       (asdf:clear-system :wouldwork)
       (unwind-protect
-          (handler-bind ((warning #'muffle-warning))
-            (let ((*compile-verbose* nil)
-                  (*compile-print* nil))
-              (asdf:load-system :wouldwork :force t)))
+          (let ((*compile-verbose* nil)
+                (*compile-print* nil))
+            (asdf:load-system :wouldwork :force t))
         ;; Cleanup: reset refreshing flag (look up fresh after reload)
         (let* ((new-ww-pkg (find-package :ww))
                (new-refreshing-sym (and new-ww-pkg 

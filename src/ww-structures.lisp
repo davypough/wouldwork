@@ -76,20 +76,15 @@
 
 (defun print-problem-state (state &optional (stream t) depth)  ;potential bug here?
   (declare (type problem-state state) (ignore depth))
-  (handler-case
-      (format stream "<~A ~A ~A ~A ~A ~A~%  ~S~%  ~S>"
-              (problem-state.name state)
-              (problem-state.instantiations state)
-              (problem-state.happenings state)
-              (problem-state.time state)
-              (problem-state.value state)
-              (problem-state.heuristic state)
-              (handler-case (list-database (problem-state.idb state))
-                (error () "#<error printing idb>"))
-              (handler-case (list-database (problem-state.hidb state))
-                (error () "#<error printing hidb>")))
-    (error (e)
-      (format stream "#<ERROR PRINTING problem-state: ~A>" e))))
+  (format stream "<~A ~A ~A ~A ~A ~A~%  ~S~%  ~S>"
+          (problem-state.name state)
+          (problem-state.instantiations state)
+          (problem-state.happenings state)
+          (problem-state.time state)
+          (problem-state.value state)
+          (problem-state.heuristic state)
+          (list-database (problem-state.idb state))
+          (list-database (problem-state.hidb state))))
 
 
 (defun copy-problem-state (state)
