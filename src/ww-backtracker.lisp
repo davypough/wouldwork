@@ -50,6 +50,17 @@
     (list unique-count xor-hash sum-hash)))
 
 
+(defun bt-choice-inconsistent-p (choice)
+  "Return T when CHOICE encodes the inconsistent-state marker.
+   Supports both incremental list updates and snapshot hash-table updates."
+  (let ((update (choice.forward-update choice)))
+    (etypecase update
+      (list
+       (member '(inconsistent-state) update :test #'equal))
+      (hash-table
+       (gethash (convert-to-integer-memoized '(inconsistent-state)) update)))))
+
+
 (defun apply-update-forward-bt (update)
   "Apply UPDATE to *backtrack-state*.
    UPDATE may be a forward-op list or a hash-table idb snapshot."
@@ -177,21 +188,26 @@
                         (apply-update-inverse-bt (choice.inverse-update choice)))
                       (when (register-choice-bt choice action level)
                         (unwind-protect
-                          (if (is-complete-solution)
+                          (cond
+                            ;; Filter inconsistent states (parallels depth-first filtering in generate-children)
+                            ((bt-choice-inconsistent-p choice)
+                             (increment-global *inconsistent-states-dropped* 1))
                             ;; Solution found at current level - register and handle continuation
-                            (progn (register-solution-bt (1+ level))
-                                   (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
-                                   (when (> *debug* 0)
-                                     (finish-output))
-                                   (setf found-a-solution t)
-                                   (when (eq *solution-type* 'first)
-                                     (return-from backtrack t)))
+                            ((is-complete-solution)
+                             (register-solution-bt (1+ level))
+                             (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
+                             (when (> *debug* 0)
+                               (finish-output))
+                             (setf found-a-solution t)
+                             (when (eq *solution-type* 'first)
+                               (return-from backtrack t)))
                             ;; No solution yet - continue recursive exploration
-                            (let ((deeper-result (backtrack (1+ level))))
-                              (when deeper-result
-                                (setf found-a-solution t)
-                                (when (eq *solution-type* 'first)
-                                  (return-from backtrack t)))))
+                            (t
+                             (let ((deeper-result (backtrack (1+ level))))
+                               (when deeper-result
+                                 (setf found-a-solution t)
+                                 (when (eq *solution-type* 'first)
+                                   (return-from backtrack t))))))
                           (undo-choice-bt choice action level)))))))))))
     found-a-solution))
 
