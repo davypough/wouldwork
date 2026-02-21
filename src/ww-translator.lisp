@@ -165,11 +165,15 @@
   (if (write-operation-p flag)
     (if (eq *algorithm* 'backtracking)
       ;; Backtracking with incremental updates
-      `(multiple-value-bind (forward inverse) 
-           (update-bt (problem-state.idb state) ,(translate-list form flag))
-         ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
-         (push forward forward-list)
-         (push inverse inverse-list))
+      `(if (and (boundp 'forward-list) (boundp 'inverse-list))
+         (multiple-value-bind (forward inverse) 
+             (update-bt (problem-state.idb state) ,(translate-list form flag))
+           ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
+           (push forward forward-list)
+           (push inverse inverse-list))
+         ;; No active incremental-update context (eg, standalone propagation update):
+         ;; apply directly without logging forward/inverse operations.
+         (update (problem-state.idb state) ,(translate-list form flag)))
       ;; Depth-first algorithm
       `(update (problem-state.idb state) ,(translate-list form flag)))
     ;; Read operation
@@ -182,11 +186,15 @@
   (if (write-operation-p flag)
     (if (eq *algorithm* 'backtracking)
       ;; Backtracking with incremental updates
-      `(multiple-value-bind (forward inverse) 
-           (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
-         ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
-         (push forward forward-list)
-         (push inverse inverse-list))
+      `(if (and (boundp 'forward-list) (boundp 'inverse-list))
+         (multiple-value-bind (forward inverse) 
+             (update-bt (problem-state.idb state) (list 'not ,(translate-list (second form) flag)))
+           ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
+           (push forward forward-list)
+           (push inverse inverse-list))
+         ;; No active incremental-update context (eg, standalone propagation update):
+         ;; apply directly without logging forward/inverse operations.
+         (update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
       ;; Depth-first algorithm
       `(update (problem-state.idb state) (list 'not ,(translate-list (second form) flag))))
     ;; Read operation

@@ -41,6 +41,12 @@
   "Most recently used keyword settings for CSP action generation (for reporting).")
 
 
+(defparameter *enumerator-ui-settings* nil
+  "Optional caller-facing keyword settings for the current enumeration run.
+   Used by ENUM-ACTIONS-SUMMARY to print user-level settings (e.g. FIND-GOAL-STATES
+   keyword arguments) alongside internal enumerator settings.")
+
+
 (defparameter *enumerated-unique-solutions* nil
   "After ENUMERATE-STATE, holds the list of unique SOLUTION structs (unique goal states).")
 
@@ -58,13 +64,13 @@
 
 
 (defparameter *enumerated-reachable-goal-states* nil
-  "After FIND-REACHABLE-GOAL-STATES, holds the subset of *enumerated-goal-states*
+  "After FIND-REACHABLE-STATES, holds the subset of *enumerated-goal-states*
    reachable from at least one penultimate state.")
 
 
 (defparameter *frgs-artifact-relations* '(beam-segment current-beams)
   "Relations excluded from derived-equivalence fingerprinting in
-   FIND-REACHABLE-GOAL-STATES.  These are implementation artifacts
+   FIND-REACHABLE-STATES.  These are implementation artifacts
    (e.g., dynamically named beams) that vary non-meaningfully between
    functionally equivalent goal states.")
 
@@ -105,6 +111,13 @@
 (defparameter *enum-residual-symmetry-enabled* t
   "Master switch for residual symmetry pruning in subset enumeration.
    Default T to enable pruning; set NIL to disable for verification.")
+
+
+(defparameter *enumerator-disabled-search-hook-symbols*
+  '(min-steps-remaining? heuristic? prune-state? bounding-function?)
+  "Search hook function symbols temporarily disabled during CSP enumeration.
+   These hooks are designed for normal planning search states and can
+   incorrectly prune or bias synthetic partial states used by the enumerator.")
 
 
 ;;;; ----------------------------------------------------------------------
@@ -305,7 +318,14 @@
   (multiple-value-bind (norm-goal-spec goal-form)
       (enum-normalize-goal-spec goal-spec)
     (let* ((normalized-solution-type (fgs-normalize-solution-type solution-type))
-           (run-base-relations (fgs-compute-run-base-relations exclude-relations include-relations)))
+           (run-base-relations (fgs-compute-run-base-relations exclude-relations include-relations))
+           (goal-run-settings (list :algorithm algorithm
+                                    :solution-type normalized-solution-type
+                                    :exclude-relations exclude-relations
+                                    :include-relations include-relations
+                                    :prefilter prefilter
+                                    :sort< sort<
+                                    :sort-key sort-key)))
       ;; Resolve :use-installed prefilter default.
       (let* ((effective-prefilter (if (eq prefilter :use-installed)
                                       (get-prefilter)
@@ -321,11 +341,12 @@
                                   effective-prefilter invariant-prefilter)))          ;; ADDED
         ;; Dynamic binding provides temporary override for this run.
         (let ((*enumerator-base-relations* run-base-relations))
-          (let ((states (enumerate-state norm-goal-spec
-                                         :algorithm algorithm
-                                         :solution-type normalized-solution-type
-                                         :propagate 'finalize-only
-                                         :prefilter combined-prefilter)))
+          (let ((*enumerator-ui-settings* goal-run-settings))
+            (let ((states (enumerate-state norm-goal-spec
+                                           :algorithm algorithm
+                                           :solution-type normalized-solution-type
+                                           :propagate 'finalize-only
+                                           :prefilter combined-prefilter)))
           (when (and sort< sort-key)
             (error "FIND-GOAL-STATES: :SORT< and :SORT-KEY are mutually exclusive."))
           (when sort<
@@ -336,7 +357,7 @@
           (let ((report (fgs-build-report goal-form states)))
             (fgs-print-report report)
             (setf (get 'find-goal-states :last-report) report)
-            t)))))))
+            t))))))))
 
 
 (defmacro find-penultimate-states (&rest raw-args)
@@ -480,19 +501,14 @@
     (dolist (pre-args (get-precondition-args action state))
       (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
         (when pre-result
-          ;; Some effect branches can signal errors on inconsistent temporary
-          ;; instantiations; skip those branches during candidate generation.
-          (handler-case
-              (let ((updated-dbs
-                      (if (eql pre-result t)
-                          (funcall (action.eff-defun-name action) state)
-                          (apply (action.eff-defun-name action) state pre-result))))
-                (dolist (update updated-dbs)
-                  (let* ((inst (update.instantiations update))
-                         (args inst))
-                    (push (cons (action.name action) args) forms))))
-            (error ()
-              nil)))))
+          (let ((updated-dbs
+                  (if (eql pre-result t)
+                      (funcall (action.eff-defun-name action) state)
+                      (apply (action.eff-defun-name action) state pre-result))))
+            (dolist (update updated-dbs)
+              (let* ((inst (update.instantiations update))
+                     (args inst))
+                (push (cons (action.name action) args) forms)))))))
     (let ((uniq (remove-duplicates forms :test #'equal)))
       (sort uniq (lambda (x y)
                    (string< (prin1-to-string x)
@@ -517,25 +533,25 @@
         (hits nil))
     (dolist (action-form (enum-applicable-action-forms state selected-actions)
                          (nreverse hits))
-      ;; Keep enumeration robust if a candidate action triggers domain-specific
-      ;; runtime errors while being validated.
-      (handler-case
-          (multiple-value-bind (next-state success-p failure-reason)
-              (apply-action-to-state action-form state nil nil)
-            (declare (ignore failure-reason))
-            (when (and success-p (funcall goal-fn next-state))
-              (push (list :action action-form :goal-state next-state) hits)))
-        (error ()
-          nil)))))
+      (multiple-value-bind (next-state success-p failure-reason)
+          (apply-action-to-state action-form state nil nil)
+        (declare (ignore failure-reason))
+        (when (and success-p (funcall goal-fn next-state))
+          (push (list :action action-form :goal-state next-state) hits))))))
 
 
 (defun make-penultimate-goal-fn (goal-fn problem-actions selected-actions state-hit-table)
-  "Build predicate for penultimate-state acceptance."
+  "Build predicate for penultimate-state acceptance.
+   When the problem defines PENULTIMATE-STATE-FEASIBLE? (a reserved-name query),
+   it is called post-propagation before attempting reaching actions.  States for
+   which the query returns NIL are pruned without the expensive action search."
   (lambda (state)
-    (let ((hits (enum-goal-reaching-last-actions state goal-fn problem-actions selected-actions)))
-      (when hits
-        (setf (gethash state state-hit-table) hits)
-        t))))
+    (when (or (not (fboundp 'penultimate-state-feasible?))
+              (funcall (symbol-function 'penultimate-state-feasible?) state))
+      (let ((hits (enum-goal-reaching-last-actions state goal-fn problem-actions selected-actions)))
+        (when hits
+          (setf (gethash state state-hit-table) hits)
+          t)))))
 
 
 (defun penultimate-state-base-props (state base-relations)
@@ -549,80 +565,152 @@
                 (prin1-to-string y))))))
 
 
+(defun fps-state-base-prop-key (state &optional base-relations)
+  "Return canonical key for STATE from sorted base-relation propositions."
+  (prin1-to-string (penultimate-state-base-props state base-relations)))
+
+
 (defun fps-build-report (goal-form penultimate-states state-hit-table
                        &key base-relations action-families settings)
   "Build and return a FIND-PENULTIMATE-STATES report plist."
-  (let* ((results
+  (let* ((candidate-goal-key-table
+           (when *enumerated-goal-states*
+             (let ((ht (make-hash-table :test 'equal)))
+               (dolist (gs *enumerated-goal-states* ht)
+                 (setf (gethash (fps-state-base-prop-key gs base-relations) ht) t)))))
+         (candidate-reachable-goal-keys
+           (when candidate-goal-key-table
+             (make-hash-table :test 'equal)))
+         (candidate-transition-details nil)
+         (candidate-transitions 0)
+         (results
            (mapcar
             (lambda (st)
-              (let ((hits (gethash st state-hit-table)))
-                (list
-                 :state st
-                 :props (sort (copy-list (list-database (problem-state.idb st)))  ;; CHANGED: all props
-                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))
-                 :reaching-actions
-                 (mapcar
-                  (lambda (hit)
-                    (let ((goal-state (getf hit :goal-state)))
-                      (list :action (getf hit :action)
-                            :goal-state goal-state
-                            :goal-props (list-database (problem-state.idb goal-state)))))
-                  hits))))
+              (let* ((hits (gethash st state-hit-table))
+                     (reaching-actions
+                       (mapcar
+                        (lambda (hit)
+                          (let ((goal-state (getf hit :goal-state)))
+                            (list :action (getf hit :action)
+                                  :goal-state goal-state
+                                  :goal-props (list-database (problem-state.idb goal-state)))))
+                        hits)))
+                (when candidate-goal-key-table
+                  (let ((candidate-reaches nil))
+                    (dolist (ra reaching-actions)
+                      (let* ((goal-state (getf ra :goal-state))
+                             (goal-key (fps-state-base-prop-key goal-state base-relations)))
+                        (when (gethash goal-key candidate-goal-key-table)
+                          (push ra candidate-reaches)
+                          (setf (gethash goal-key candidate-reachable-goal-keys) t)
+                          (incf candidate-transitions))))
+                    (when candidate-reaches
+                      (push (list :penultimate-state st
+                                  :penultimate-props
+                                  (sort (copy-list (list-database (problem-state.idb st)))
+                                        (lambda (x y) (string< (prin1-to-string x)
+                                                               (prin1-to-string y))))
+                                  :reaches (nreverse candidate-reaches))
+                            candidate-transition-details))))
+                (list :state st
+                      :props (sort (copy-list (list-database (problem-state.idb st)))
+                                   (lambda (x y) (string< (prin1-to-string x)
+                                                          (prin1-to-string y))))
+                      :reaching-actions reaching-actions)))
             penultimate-states))
-         (summary (list :penultimate-states (length penultimate-states))))
+         (candidate-transition-details
+           (nreverse candidate-transition-details))
+         (summary (list :penultimate-states (length penultimate-states)
+                        :candidate-goal-states
+                        (when candidate-goal-key-table
+                          (length *enumerated-goal-states*))
+                        :candidate-reachable-goal-states
+                        (when candidate-goal-key-table
+                          (hash-table-count candidate-reachable-goal-keys))
+                        :candidate-unreachable-goal-states
+                        (when candidate-goal-key-table
+                          (- (length *enumerated-goal-states*)
+                             (hash-table-count candidate-reachable-goal-keys)))
+                        :candidate-transitions
+                        (when candidate-goal-key-table candidate-transitions)
+                        :candidate-transition-penultimate-states
+                        (when candidate-goal-key-table
+                          (length candidate-transition-details)))))
     (list
      :goal goal-form
      :settings settings
      :action-families action-families
      :penultimate-states penultimate-states
      :results results
+     :candidate-transition-details candidate-transition-details
      :summary summary)))
 
 
 (defun fps-print-report (report)
-  "Print FIND-PENULTIMATE-STATES report interactively."
+  "Print FIND-PENULTIMATE-STATES report interactively.
+   Displays summary counts, then pages through individual transitions
+   from feasible penultimate states to candidate goal states."
   (let ((goal (getf report :goal))
         (settings (getf report :settings))
-        (families (getf report :action-families))
         (summary (getf report :summary))
-        (results (getf report :results)))
+        (candidate-transition-details (getf report :candidate-transition-details)))
     (format t "~&~%;;;; FIND-PENULTIMATE-STATES REPORT ;;;;~%")
     (format t "~&Goal: ~S~%" goal)
     (format t "~&Settings: ~S~%" settings)
-    (format t "~&Action families: ~S~%" families)
     (format t "~&Penultimate states found: ~D~%" (getf summary :penultimate-states))
-    (when results
-      (let ((n (length results)))
-        (loop for idx from 1 to n
-              for item in results
-              do (format t "~&~%Penultimate state ~D of ~D:~%" idx n)
-                 (fgs-print-props (getf item :props))                         ;; CHANGED
-                 (format t "~&Reaching actions (~D):~%"
-                         (length (getf item :reaching-actions)))
-                 (dolist (ra (getf item :reaching-actions))
-                   (format t "  ~S~%" (getf ra :action)))
-                 (when (< idx n)
-                   (unless (y-or-n-p "~&Show the next penultimate state of ~D?" n)
-                     (return-from fps-print-report report)))))))
+    (when (getf summary :candidate-goal-states)
+      (format t "~&Candidate goal states (from find-goal-states): ~D~%"
+              (getf summary :candidate-goal-states))
+      (format t "~&Candidate goals reached from feasible penultimate states: ~D~%"
+              (getf summary :candidate-reachable-goal-states))
+      (format t "~&Candidate-goal transitions found: ~D~%"
+              (getf summary :candidate-transitions))
+      (format t "~&Penultimate states with candidate-goal transitions: ~D~%"
+              (getf summary :candidate-transition-penultimate-states)))
+    (let ((transitions (stable-sort (fps-flatten-transitions candidate-transition-details)
+                                     #'< :key (lambda (tr) (length (getf tr :penultimate-props))))))
+      (when transitions
+        (let ((n (length transitions)))
+          (loop for idx from 1 to n
+                for tr in transitions
+                do (format t "~&~%Transition ~D of ~D:~%" idx n)
+                   (format t "~&Penultimate state:~%")
+                   (fgs-print-props (getf tr :penultimate-props))
+                   (format t "~&Action: ~S~%" (getf tr :action))
+                   (format t "~&Resulting goal state:~%")
+                   (fgs-print-props (getf tr :goal-props))
+                   (when (< idx n)
+                     (unless (y-or-n-p "~&Show the next transition of ~D?" n)
+                       (return))))))))
   report)
 
 
-(defmacro find-reachable-goal-states ()
+(defun fps-flatten-transitions (candidate-transition-details)
+  "Flatten CANDIDATE-TRANSITION-DETAILS into a list of individual transition plists.
+   Each plist has keys :PENULTIMATE-PROPS, :ACTION, :GOAL-PROPS."
+  (let ((transitions nil))
+    (dolist (item candidate-transition-details (nreverse transitions))
+      (let ((penultimate-props (getf item :penultimate-props)))
+        (dolist (reach (getf item :reaches))
+          (push (list :penultimate-props penultimate-props
+                      :action (getf reach :action)
+                      :goal-props (getf reach :goal-props))
+                transitions))))))
+
+
+(defmacro find-reachable-states ()
   "User-facing macro: cross-reference *enumerated-goal-states* with
    *enumerated-penultimate-results* to identify goal states reachable
    from at least one penultimate state via a single action.
    Requires prior calls to FIND-GOAL-STATES and FIND-PENULTIMATE-STATES.
-   Returns: T (the report plist is saved on (get 'find-reachable-goal-states :last-report))."
-  `(find-reachable-goal-states-fn))
+   Returns: T (the report plist is saved on (get 'find-reachable-states :last-report))."
+  `(find-reachable-states-fn))
 
 
 (defun state-base-prop-key (state)
   "Return a canonical string key for STATE based on sorted base-relation propositions.
    Two states with identical base propositions produce identical keys."
-  (let* ((base-rels (get-base-relations))
-         (props (remove-if-not (lambda (p) (member (car p) base-rels :test #'eq))
-                               (list-database (problem-state.idb state)))))
-    (prin1-to-string (sort (copy-list props) #'string< :key #'prin1-to-string))))
+  (fps-state-base-prop-key state (get-base-relations)))
 
 
 (defun frgs-derived-equivalence-key (state)
@@ -699,21 +787,21 @@
                                    (or (position (getf b :family) order) 999)))))))))
 
 
-(defun find-reachable-goal-states-fn ()
+(defun find-reachable-states-fn ()
   "Cross-reference enumerated goal states with penultimate reaching-actions.
    Partitions *enumerated-goal-states* into reachable and unreachable sets
    based on whether each goal state appears as a :GOAL-STATE in any
    penultimate result's :REACHING-ACTIONS.
    Stores reachable states in *enumerated-reachable-goal-states*.
-   Returns: T (the report plist is saved on (get 'find-reachable-goal-states :last-report))."
+   Returns: T (the report plist is saved on (get 'find-reachable-states :last-report))."
   (unless *enumerated-goal-states*
-    (format t "~&[find-reachable-goal-states] No goal states available.  ~
+    (format t "~&[find-reachable-states] No goal states available.  ~
                Run (find-goal-states ...) first.~%")
-    (return-from find-reachable-goal-states-fn nil))
+    (return-from find-reachable-states-fn nil))
   (unless *enumerated-penultimate-results*
-    (format t "~&[find-reachable-goal-states] No penultimate results available.  ~
+    (format t "~&[find-reachable-states] No penultimate results available.  ~
                Run (find-penultimate-states ...) first.~%")
-    (return-from find-reachable-goal-states-fn nil))
+    (return-from find-reachable-states-fn nil))
   (let ((reachable-keys (make-hash-table :test 'equal))
         (reaching-map (make-hash-table :test 'equal)))
     (dolist (result *enumerated-penultimate-results*)
@@ -740,13 +828,13 @@
                                        :equivalence-classes
                                        (frgs-count-equivalence-classes reachable))))
         (frgs-print-report report)
-        (setf (get 'find-reachable-goal-states :last-report) report)
+        (setf (get 'find-reachable-states :last-report) report)
         t))))
 
 
 (defun frgs-build-report (reachable unreachable reaching-map
                          &key equivalence-classes)
-  "Build a FIND-REACHABLE-GOAL-STATES report plist."
+  "Build a FIND-REACHABLE-STATES report plist."
   (let* ((total (+ (length reachable) (length unreachable)))
          (transitions 0)
          (reaching-penults (make-hash-table :test 'eq))
@@ -768,7 +856,10 @@
                            :props (sort (copy-list (list-database (problem-state.idb gs)))
                                         (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))))
                    unreachable))
-         (transition-groups (frgs-build-transition-groups reaching-map))     ;; ADDED
+         (transition-groups (frgs-build-transition-groups reaching-map))
+         (reachable-goal-keys (make-hash-table :test 'equal))
+         (penult-groups-ht (make-hash-table :test 'eq))
+         (penultimate-details nil)
          (summary (list :total-goal-states total
                         :reachable (length reachable)
                         :unreachable (length unreachable)
@@ -776,70 +867,113 @@
                         :transitions transitions
                         :reaching-penultimate-states (hash-table-count reaching-penults)
                         :total-penultimate-states (length *enumerated-penultimate-states*))))
+    (dolist (gs reachable)
+      (setf (gethash (state-base-prop-key gs) reachable-goal-keys) t))
+    (maphash
+     (lambda (goal-key entries)
+       (when (gethash goal-key reachable-goal-keys)
+         (dolist (entry entries)
+           (let ((penult (getf entry :penultimate-state)))
+             (push (list :action (getf entry :action)
+                         :goal-state (getf entry :goal-state))
+                   (gethash penult penult-groups-ht))))))
+     reaching-map)
+    (maphash
+     (lambda (penult reaches)
+       (push (list :penultimate-state penult
+                   :penultimate-props
+                   (sort (copy-list (list-database (problem-state.idb penult)))
+                         (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y))))
+                   :reaches
+                   (nreverse
+                    (mapcar (lambda (reach)
+                              (list :action (getf reach :action)
+                                    :goal-state (getf reach :goal-state)
+                                    :goal-props
+                                    (sort (copy-list (list-database
+                                                      (problem-state.idb (getf reach :goal-state))))
+                                          (lambda (x y)
+                                            (string< (prin1-to-string x) (prin1-to-string y))))))
+                            reaches)))
+             penultimate-details))
+     penult-groups-ht)
+    (setf penultimate-details
+          (stable-sort penultimate-details #'<
+                       :key (lambda (item) (length (getf item :reaches)))))
     (list :reachable-states reachable
           :unreachable-states unreachable
           :reachable-details reachable-details
           :unreachable-details unreachable-details
-          :transition-groups transition-groups                                ;; ADDED
+          :transition-groups transition-groups
+          :penultimate-details penultimate-details
           :summary summary)))
 
 
 (defun frgs-print-report (report)
-  "Print FIND-REACHABLE-GOAL-STATES report interactively.
-   Shows summary, unreachable states, then transition groups by action family
-   ranked by penultimate base-prop count (ascending)."
+  "Print FIND-REACHABLE-STATES report interactively.
+   Shows summary and optional paged details for:
+   1) reachable goal states,
+   2) penultimate states grouped with reaching actions and resulting goal states.
+   Unreachable goal states are summarized but not printed."
   (let ((summary (getf report :summary))
-        (unreachable-details (getf report :unreachable-details)))
-    (format t "~&~%;;;; FIND-REACHABLE-GOAL-STATES REPORT ;;;;~%")
+        (reachable-details (getf report :reachable-details))
+        (penultimate-details (getf report :penultimate-details)))
+    (format t "~&~%;;;; FIND-REACHABLE-STATES REPORT ;;;;~%")
     (format t "~&Total candidate goal states: ~D~%" (getf summary :total-goal-states))
     (format t "~&Goal states reachable from some penultimate state: ~D~%" (getf summary :reachable))
-    (format t "~&Unreachable goal states from all penultimate states: ~D~%" (getf summary :unreachable))
+    ;(format t "~&Unreachable goal states from all penultimate states: ~D~%" (getf summary :unreachable))
     (format t "~&Derived-equivalence classes: ~D~%" (getf summary :equivalence-classes))
-    (format t "~&Valid penultimate state -> goal state transitions: ~D~%" (getf summary :transitions))
+    ;(format t "~&Valid penultimate state -> goal state transitions: ~D~%" (getf summary :transitions))
     (format t "~&Penultimate states that reach a goal state: ~D of ~D~%"
             (getf summary :reaching-penultimate-states)
             (getf summary :total-penultimate-states))
-    (when unreachable-details
-      (let ((n (length unreachable-details)))
-        (format t "~&~%--- Unreachable goal states ---~%")
+    (when penultimate-details
+      (format t "~&~%All reaching action transitions (~D):~%"
+              (let ((seen (make-hash-table :test 'equal))
+                    (count 0))
+                (dolist (item penultimate-details count)
+                  (dolist (reach (getf item :reaches))
+                    (let ((action (getf reach :action)))
+                      (unless (gethash action seen)
+                        (setf (gethash action seen) t)
+                        (incf count)))))))
+      (let ((idx 0)
+            (seen (make-hash-table :test 'equal)))
+        (dolist (item penultimate-details)
+          (dolist (reach (getf item :reaches))
+            (let ((action (getf reach :action)))
+              (unless (gethash action seen)
+                (setf (gethash action seen) t)
+                (incf idx)
+                (format t "~&  ~D. ~S~%" idx action)))))))
+    (when (and reachable-details
+               (y-or-n-p "~&~%Display reachable goal states (~D)?"
+                         (length reachable-details)))
+      (let ((n (length reachable-details)))
         (loop for idx from 1 to n
-              for item in unreachable-details
-              do (format t "~&~%Unreachable ~D of ~D:~%" idx n)
+              for item in reachable-details
+              do (format t "~&~%Reachable goal state ~D of ~D:~%" idx n)
                  (fgs-print-props (getf item :props))
                  (when (< idx n)
-                   (unless (y-or-n-p "~&Show the next unreachable state of ~D?" n)
+                   (unless (y-or-n-p "~&Show the next reachable goal state of ~D?" n)
                      (return))))))
-    (let ((groups (getf report :transition-groups)))
-      (when groups
-        (format t "~&~%--- Transitions by last-action family ---~%")
-        (loop for group in groups
-              for gidx from 1
-              do (format t "~&  ~D. ~A: ~D transition~:P~%"
-                         gidx (getf group :family) (getf group :count)))
-        (dolist (group groups)
-          (when (y-or-n-p "~&~%Display ~A transitions (~D, ranked by penultimate base-prop count)?"
-                          (getf group :family) (getf group :count))
-            (let ((trs (getf group :transitions))
-                  (n (getf group :count)))
-              (loop for tr in trs
-                    for tidx from 1
-                    do (format t "~&~%Transition ~D of ~D (penultimate base props: ~D):~%"
-                               tidx n (getf tr :base-prop-count))
-                       (format t "~&Penultimate state:~%")
-                       (fgs-print-props
-                        (sort (copy-list (list-database
-                                         (problem-state.idb (getf tr :penultimate-state))))
-                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
-                       (format t "~&Action: ~S~%" (getf tr :action))
-                       (format t "~&Goal state:~%")
-                       (fgs-print-props
-                        (sort (copy-list (list-database
-                                         (problem-state.idb (getf tr :goal-state))))
-                              (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
-                       (when (< tidx n)
-                         (unless (y-or-n-p "~&Show the next ~A transition of ~D?"
-                                           (getf group :family) n)
-                           (return))))))))))
+    (when (and penultimate-details
+               (y-or-n-p "~&~%Display reaching transitions (~D), grouped by state?"
+                         (length penultimate-details)))
+      (let ((n (length penultimate-details)))
+        (loop for idx from 1 to n
+              for item in penultimate-details
+              do (format t "~&~%Penultimate state ~D of ~D:~%" idx n)
+                 (fgs-print-props (getf item :penultimate-props))
+                 (format t "~&Reaching transitions (~D):~%"
+                         (length (getf item :reaches)))
+                 (dolist (reach (getf item :reaches))
+                   (format t "~&Action: ~S~%" (getf reach :action))
+                   (format t "~&Resulting reachable goal state:~%")
+                   (fgs-print-props (getf reach :goal-props)))
+                 (when (< idx n)
+                   (unless (y-or-n-p "~&Show the next reaching penultimate state of ~D?" n)
+                     (return)))))))
   report)
 
 
@@ -979,22 +1113,13 @@
                                                           :include-relations include-relations
                                                           :prefilter prefilter
                                                           :action-families normalized-families
-                                                          :sort< (if sort< t nil)
-                                                          :sort-key (if sort-key t nil)))))
+                                                          :sort< sort<
+                                                          :sort-key sort-key))))
             (fps-print-report report)
             (setf *enumerated-penultimate-states* states
                   *enumerated-penultimate-results* (getf report :results))
             (setf (get 'find-penultimate-states :last-report) report)
             t))))))
-
-
-(defun fps-backward-derived-props (state)
-  "Extract sorted derived-relation propositions from STATE.
-   Derived relations are those in *BW-NORMALIZE-STRIP-RELATIONS* --
-   the relations that BW-NORMALIZE! strips and recomputes via propagation."
-  (sort (remove-if-not (lambda (p) (member (car p) *bw-normalize-strip-relations* :test #'eq))
-                       (copy-list (list-database (problem-state.idb state))))
-        (lambda (x y) (string< (prin1-to-string x) (prin1-to-string y)))))
 
 
 (defun find-penultimate-states-backward-fn (&optional (goal-spec 'goal-fn)
@@ -1005,8 +1130,10 @@
    For each goal state, generates candidate last-action forms via
    BW-CANDIDATE-LAST-ACTIONS, regresses each to produce predecessor candidates,
    normalizes them via BW-NORMALIZE!, then validates by forward application.
-   A predecessor is accepted when the forward application succeeds and the
-   resulting state satisfies the goal.
+   A predecessor is accepted when:
+   1) it passes PENULTIMATE-STATE-FEASIBLE? (when defined),
+   2) forward application succeeds and satisfies the goal, and
+   3) the resulting successor matches a candidate goal state by base key.
    Requires a prior call to FIND-GOAL-STATES to populate *ENUMERATED-GOAL-STATES*.
    GOAL-SPEC is optional; defaults to GOAL-FN.
    ACTION-FAMILIES: list drawn from (MOVE PICKUP CONNECT), default all three.
@@ -1028,6 +1155,11 @@
     (let* ((goal-fn (coerce-goal norm-goal-spec))
            (families (enum-normalize-action-families action-families))
            (n-goals (length *enumerated-goal-states*))
+           (base-relations (get-base-relations))
+           (candidate-goal-key-table
+             (let ((ht (make-hash-table :test 'equal)))
+               (dolist (gs *enumerated-goal-states* ht)
+                 (setf (gethash (fps-state-base-prop-key gs base-relations) ht) t))))
            (penult-table (make-hash-table :test 'equal))
            (state-hit-table (make-hash-table :test 'eq))
            (total-candidates 0)
@@ -1045,29 +1177,29 @@
                    (dolist (pred0 (bw-regress gs action-form))
                      (let ((pred (copy-problem-state pred0)))
                        (bw-normalize! pred)
-                       (handler-case
-                           (multiple-value-bind (next ok failure)
-                               (apply-action-to-state action-form pred nil nil)
-                             (declare (ignore failure))
-                             (when ok
-                               (bw-normalize! next)
-                               (when (and (funcall goal-fn next)
-                                          (not (equal (fps-backward-derived-props pred)
-                                                      (fps-backward-derived-props next))))
-                                 (incf total-validated)
-                                 (let ((key (state-base-prop-key pred)))
-                                   (unless (gethash key penult-table)
-                                     (setf (gethash key penult-table) pred))
-                                   (let ((canonical (gethash key penult-table))
-                                         (hit (list :action action-form :goal-state next)))
-                                     (unless (member action-form
-                                                     (gethash canonical state-hit-table)
-                                                     :key (lambda (h) (getf h :action))
-                                                     :test #'equal)
-                                       (push hit (gethash canonical state-hit-table))))))))
-                           (error () nil))))))
-            when (zerop (mod gi 10))
-              do (format t "~&  ...processed ~D/~D goal states~%" gi n-goals))
+                       (when (or (not (fboundp 'penultimate-state-feasible?))
+                                 (funcall (symbol-function 'penultimate-state-feasible?) pred))
+                         (multiple-value-bind (next ok failure)
+                             (apply-action-to-state action-form pred nil nil)
+                           (declare (ignore failure))
+                           (when ok
+                             (bw-normalize! next)
+                             (when (and (funcall goal-fn next)
+                                        (gethash (fps-state-base-prop-key next base-relations)
+                                                 candidate-goal-key-table))
+                               (incf total-validated)
+                               (let ((key (state-base-prop-key pred)))
+                                 (unless (gethash key penult-table)
+                                   (setf (gethash key penult-table) pred))
+                                 (let ((canonical (gethash key penult-table))
+                                       (hit (list :action action-form :goal-state next)))
+                                   (unless (member action-form
+                                                   (gethash canonical state-hit-table)
+                                                   :key (lambda (h) (getf h :action))
+                                                   :test #'equal)
+                                     (push hit (gethash canonical state-hit-table))))))))))))))
+            ;when (zerop (mod gi 10))
+            ;  do (format t "~&  ...processed ~D/~D goal states~%" gi n-goals))
       (let ((states (loop for st being the hash-values of penult-table collect st)))
         (format t "~&[find-penultimate-states :backward] ~D candidate actions, ~
                    ~D validated, ~D unique penultimate states.~%"
@@ -1085,9 +1217,14 @@
                                         :base-relations (get-base-relations)
                                         :action-families families
                                         :settings (list :direction 'backward
+                                                        :algorithm nil
+                                                        :solution-type nil
+                                                        :exclude-relations nil
+                                                        :include-relations nil
+                                                        :prefilter nil
                                                         :action-families families
-                                                        :sort< (if sort< t nil)
-                                                        :sort-key (if sort-key t nil)))))
+                                                        :sort< sort<
+                                                        :sort-key sort-key))))
           (fps-print-report report)
           (setf *enumerated-penultimate-states* states
                 *enumerated-penultimate-results* (getf report :results))
@@ -1214,7 +1351,8 @@
            (saved-goal *goal*)
            (saved-goal-form (get 'goal-fn :form))
            (saved-goal-fn-expr (when (boundp 'goal-fn) (symbol-value 'goal-fn)))
-           (saved-goal-fn-def (when (fboundp 'goal-fn) (symbol-function 'goal-fn))))
+           (saved-goal-fn-def (when (fboundp 'goal-fn) (symbol-function 'goal-fn)))
+           (saved-disabled-hooks nil))
       ;; Validate integer N here too (defensive).
       (when (integerp requested-solution-type)
         (unless (plusp requested-solution-type)
@@ -1223,14 +1361,21 @@
       (unwind-protect
           (progn
             (setf (symbol-function 'goal-fn) leaf-goal)
+            ;; Disable normal planner hooks that are unsafe for partial CSP states.
+            (dolist (sym *enumerator-disabled-search-hook-symbols*)
+              (when (fboundp sym)
+                (push (cons sym (symbol-function sym)) saved-disabled-hooks)
+                (fmakunbound sym)))
 
             (setf *enumerator-actions* enum-actions)
             (setf *enumerator-action-settings*
-                  (list :algorithm algorithm
-                        :solution-type requested-solution-type
-                        :default-max-per-key default-max-per-key
-                        :propagate propagate
-                        :prefilter (if prefilter t nil)))
+                  (list :keyword-settings *enumerator-ui-settings*
+                        :internal-settings
+                        (list :algorithm algorithm
+                              :solution-type requested-solution-type
+                              :default-max-per-key default-max-per-key
+                              :propagate propagate
+                              :prefilter (if prefilter t nil))))
             (enum-actions-summary enum-actions)
             (setf *actions* enum-actions
                   *init-actions* nil
@@ -1271,7 +1416,9 @@
         (when saved-goal-fn-expr
           (setf (symbol-value 'goal-fn) saved-goal-fn-expr))
         (when saved-goal-fn-def
-          (setf (symbol-function 'goal-fn) saved-goal-fn-def))))))
+          (setf (symbol-function 'goal-fn) saved-goal-fn-def))
+        (dolist (entry saved-disabled-hooks)
+          (setf (symbol-function (car entry)) (cdr entry)))))))
 
 
 (defun goal-literal-list-p (x)
@@ -1432,7 +1579,14 @@ If the user answers NO, returns immediately."
   (when *enumerator-detected-groups*
     (format t "~&Interchangeable groups: ~S~%" *enumerator-detected-groups*))
   (when *enumerator-action-settings*
-    (format t "~&Settings: ~S~%" *enumerator-action-settings*)
+    (let ((keyword-settings (getf *enumerator-action-settings* :keyword-settings))
+          (internal-settings (getf *enumerator-action-settings* :internal-settings)))
+      (cond
+        (keyword-settings
+         (format t "~&Settings: ~S~%" keyword-settings)
+         (format t "~&Enumerator settings: ~S~%" internal-settings))
+        (t
+         (format t "~&Settings: ~S~%" *enumerator-action-settings*))))
     (format t "~&Goal form: ~S~%" (get 'goal-fn :form)))
   (format t "~&#actions: ~D~%" (length actions))
   (dolist (a actions)

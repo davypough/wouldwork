@@ -1064,8 +1064,10 @@
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
             *inconsistent-states-dropped*))
-  (when (> *lower-bound-pruned* 0)                                                        ;; ADDED
-    (format t "~2%Lower-bound pruned ~:D node~:P." *lower-bound-pruned*))                ;; ADDED
+  (when (> *lower-bound-pruned* 0)
+    (format t "~2%min-steps-remaining? pruned ~:D node~:P, ~,1F% of total states."
+            *lower-bound-pruned*
+            (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (let ((sym-stats (format-symmetry-statistics)))
@@ -1354,8 +1356,8 @@
           (format t "~%ht count: ~:D    ht size: ~:D"
                   (hash-table-count *closed*)
                   (hash-table-size *closed*)))
-      (format t "~%repeated states = ~:D, ie, ~,1F percent"
-                *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
+      (format t "~%repeated states = ~:D (~,1F% of total states)"
+                *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))
     (format t "~%frontier nodes: ~:D"
             (if (> *threads* 0)
                 (total-parallel-frontier)
@@ -1383,9 +1385,21 @@
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
                       (/ (- (get-internal-real-time) *prior-time*)
                          internal-time-units-per-second))))
-    (let ((sym-stats (format-symmetry-statistics)))
-      (when sym-stats
-        (format t "~%~A" sym-stats)))
+    (when (and *symmetry-pruning* *symmetry-groups*)
+      (if (use-canonical-symmetry-p)
+        (when (> *symmetric-duplicates-pruned* 0)
+          (format t "~%symmetry pruned = ~:D (~,1F% of total states)"
+                  *symmetric-duplicates-pruned*
+                  (* 100.0 (/ *symmetric-duplicates-pruned* *total-states-processed*))))
+        (when (> *symmetry-pruning-count* 0)
+          (format t "~%symmetry pruned = ~:D (~,1F% of ~:D instantiations checked)"
+                  *symmetry-pruning-count*
+                  (symmetry-pruning-percentage)
+                  *symmetry-check-count*))))
+    (when (> *lower-bound-pruned* 0)
+      (format t "~%min-steps-remaining? pruned = ~:D (~,1F% of total states)"
+              *lower-bound-pruned*
+              (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
     (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
                                                      internal-time-units-per-second)))
     (finish-output)

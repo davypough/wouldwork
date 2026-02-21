@@ -51,12 +51,19 @@
     (format t "~%No actions provided to validate.~%")
     (return-from %validate-solution nil))
   
-  ;; Normalize timestamped action lists to plain action lists
+  ;; Normalize timestamped action lists to plain action lists,
+  ;; filtering out interleaved state snapshots if present.
   (let ((first-entry (first action-list)))
     (when (and (consp first-entry)
                (numberp (first first-entry))
                (consp (second first-entry)))
-      (setf action-list (mapcar #'second action-list))))
+      (setf action-list
+            (mapcar #'second
+                    (remove-if-not (lambda (entry)
+                                    (and (consp entry)
+                                         (numberp (first entry))
+                                         (consp (second entry))))
+                                  action-list)))))
   
   ;; Initialize working state from *start-state*
   (let ((current-state (copy-problem-state *start-state*))

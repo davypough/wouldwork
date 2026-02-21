@@ -19,7 +19,7 @@
 
 (ww-set *symmetry-pruning* t)
 
-(ww-set *progress-reporting-interval* 500000)
+(ww-set *progress-reporting-interval* 1000000)
 
 
 (define-types
@@ -130,6 +130,48 @@
 #+ignore (define-base-filter connectors-in-areas2&3   ;provides no extra pruning
   (exists ((?c1 ?c2) connector)
     (and (loc ?c1 area2) (loc ?c2 area3))))
+
+
+;;;; PENULTIMATE STATE FEASIBILITY FILTER ;;;;
+;;; Reserved-name query called post-propagation during penultimate state enumeration.
+;;; Returns non-NIL to keep the state, NIL to prune.
+;;; Prunes states where the agent's area is not reachable from the initial area
+;;; through currently-passable accessibility edges (gates must be open).
+
+
+;;; Simple version: exploits problem-corner's fixed topology.
+;;; Areas 1,2,3 are unconditionally connected (all accessible0).
+;;; Area 4 is reachable only through gate1 (all paths are accessible1 via gate1).
+;;; Therefore: agent in area4 requires gate1 open; agent elsewhere is always reachable.
+(define-query penultimate-state-feasible? ()
+  (do (bind (loc agent1 $area))
+      (if (eql $area 'area4)
+        (open gate1)
+        t)))
+
+
+;;; BFS version: general for any area/gate structure.
+;;; BFS from initial agent area (area1) through currently-passable edges.
+;;; Uses the existing 'accessible' query which respects gate open/closed states.
+;;; Returns t if agent1's current area is reachable from area1.
+#+ignore
+(define-query penultimate-state-feasible? ()
+  (do (bind (loc agent1 $agent-area))
+      (setq $frontier (list area1))
+      (setq $visited nil)
+      (ww-loop while $frontier do
+        (setq $next nil)
+        (ww-loop for $cur in $frontier do
+          (if (eql $cur $agent-area)
+            (return-from penultimate-state-feasible? t))
+          (push $cur $visited)
+          (doall (?a area)
+            (if (and (not (member ?a $visited))
+                     (not (member ?a $next))
+                     (accessible agent1 $cur ?a))
+              (push ?a $next))))
+        (setq $frontier $next))
+      nil))
 
 
 ;;;; HEURISTIC FUNCTIONS ;;;;
@@ -316,38 +358,147 @@
 
 (define-query min-steps-remaining? ()
   ;; Admissible lower bound on minimum remaining actions to reach any goal state.
-  ;; Counts pairing-establishment costs (pickup/connect actions, provably independent
-  ;; of move actions) plus minimum moves for agent relocation.
+  ;; Decomposes into four independent cost components that can be safely summed:
+  ;;   1. Pairing establishment — pickup/connect actions for missing transmitter→receiver chains
+  ;;   2. Connector acquisition move — move to reach a connector when none is local
+  ;;   3. Placement viability move — move to an area with LOS to both transmitter and receiver
+  ;;   4. Reach goal area — move agent to area4, possibly opening gate1 first
   ;;
-  ;; For each inactive goal receiver without any paired connector:
-  ;;   - Agent holds a connector: 1 action (connect with receiver pairing)
-  ;;   - No connector held: 2 actions (pickup + connect)
-  ;; Shared resource: held connector can serve at most one receiver.
+  ;; Independence argument: pickup and connect are manipulation actions (not moves),
+  ;; so pairing costs and move costs use disjoint action types and sum validly.
+  ;; The placement viability move is independent of cost2 (only charged when cost2=0)
+  ;; and of cost4 (only charged when gate1 is closed, blocking the area4 move).
   ;;
-  ;; Agent not in area4: 1 move action (independent of pickup/connect).
-  ;;
-  ;; Initial state estimate: 2 + 2 + 1 = 5 (no pairings, not holding, not in area4).
-  ;; With cutoff 15, pruning begins at depth 11 for states with no structural progress.
-  (do (setq $needs-chain 0)  ;count of receivers needing pairings from scratch
-      ;; Check receiver2 (red, needs chain from transmitter1)
+  ;; Initial state estimate: 2 + 2 + 0 + 1 + 1 = 6 (no pairings, not holding,
+  ;; no local connector, not in area4). With cutoff 15, pruning begins at depth 10.
+  (do (bind (loc agent1 $agent-area))
+      (setq $holding (bind (holds agent1 $cargo)))
+      (setq $chains-needed (count-receivers-needing-chains))
+      (setq $cost1 (pairing-establishment-cost $chains-needed $holding))
+      (setq $cost2 (connector-acquisition-move-cost $chains-needed $holding $agent-area))
+      (setq $cost3 (placement-viability-move-cost $chains-needed $holding $agent-area))
+      (setq $cost4 (reach-goal-area-cost $chains-needed $holding $agent-area))
+      (+ $cost1 $cost2 $cost3 $cost4)))
+
+
+(define-query count-receivers-needing-chains ()
+  ;; How many goal receivers still lack a pairing chain from their transmitter?
+  ;; A "chain" is a path of paired connectors linking transmitter to receiver.
+  ;; Receivers already active are satisfied regardless of pairings.
+  ;; Returns: 0 (both connected or active), 1, or 2 (neither).
+  (do (setq $count 0)
       (if (and (not (active receiver2))
-               (not (exists (?c connector) (paired ?c receiver2))))
-        (incf $needs-chain))
-      ;; Check receiver3 (blue, needs chain from transmitter2)
+               (not (pairing-chain-exists? transmitter1 receiver2)))
+        (incf $count))
       (if (and (not (active receiver3))
-               (not (exists (?c connector) (paired ?c receiver3))))
-        (incf $needs-chain))
-      ;; Compute pairing establishment cost with held-connector resource sharing
-      (setq $lb
-        (if (> $needs-chain 0)
-          (if (bind (holds agent1 $cargo))
-            (1+ (* 2 (1- $needs-chain)))     ;held serves one, rest need pickup+connect
-            (* 2 $needs-chain))               ;each needs pickup+connect
-          0))
-      ;; Agent relocation cost (moves are independent of pickup/connect actions)
-      (if (not (loc agent1 area4))
-        (incf $lb 1))
-      $lb))
+               (not (pairing-chain-exists? transmitter2 receiver3)))
+        (incf $count))
+      $count))
+
+
+(define-query pairing-establishment-cost (?chains-needed ?holding)
+  ;; Minimum pickup/connect actions to establish missing pairing chains.
+  ;; Each new chain requires: pickup a connector (1) + connect with pairings (1) = 2.
+  ;; If agent already holds a connector, one pickup is saved.
+  ;; Returns: 0, 1, 2, 3, or 4.
+  (if (> ?chains-needed 0)
+    (if ?holding
+      (1+ (* 2 (1- ?chains-needed)))       ;held connector serves one; rest need pickup+connect
+      (* 2 ?chains-needed))                 ;each needs pickup+connect
+    0))
+
+
+(define-query connector-acquisition-move-cost (?chains-needed ?holding ?agent-area)
+  ;; When agent needs a connector but none is in the current area, one extra move
+  ;; is required to reach one. This move is independent of the move-to-area4 when
+  ;; either: (a) gate1 is closed (can't reach area4 yet), or
+  ;;         (b) no connector is in area4 (going to area4 wouldn't help acquire one).
+  ;; Returns: 0 or 1.
+  (if (and (> ?chains-needed 0)
+           (not ?holding)
+           (not (exists (?c connector) (loc ?c ?agent-area)))
+           (or (not (open gate1))
+               (not (exists (?c connector) (loc ?c area4)))))
+    1
+    0))
+
+
+(define-query placement-viability-move-cost (?chains-needed ?holding ?agent-area)
+  ;; When chains are needed but the agent's current area cannot support a 1-hop
+  ;; chain for any needed receiver (no observable LOS to both transmitter and
+  ;; receiver), one extra move is required to reach a viable placement area.
+  ;; Only charged when: (a) no connector-acquisition move to piggyback on
+  ;; (holding or connector locally available), and (b) gate1 is closed so the
+  ;; move to area4 cannot serve as the placement move.
+  ;; Returns: 0 or 1.
+  (if (and (> ?chains-needed 0)
+           (not (open gate1))
+           (or ?holding
+               (exists (?c connector) (loc ?c ?agent-area)))
+           (not (area-viable-for-any-needed-chain? ?agent-area)))
+    1
+    0))
+
+
+(define-query area-viable-for-any-needed-chain? (?area)
+  ;; Returns t if ?area has observable (static potential) LOS to both the
+  ;; transmitter and receiver for at least one goal receiver still needing
+  ;; a pairing chain.  Uses observable (ignores gate state and occupancy)
+  ;; to check whether a 1-hop chain is geometrically possible from ?area.
+  (or (and (not (active receiver2))
+           (not (pairing-chain-exists? transmitter1 receiver2))
+           (observable ?area transmitter1)
+           (observable ?area receiver2))
+      (and (not (active receiver3))
+           (not (pairing-chain-exists? transmitter2 receiver3))
+           (observable ?area transmitter2)
+           (observable ?area receiver3))))
+
+
+(define-query reach-goal-area-cost (?chains-needed ?holding ?agent-area)
+  ;; Minimum moves to get agent to area4, accounting for gate1 state.
+  ;;
+  ;; Already in area4: 0.
+  ;;
+  ;; Chains still needed OR gate1 already open:
+  ;;   1 move — either the move is subsumed by connector-acquisition movement,
+  ;;   or the gate is open and only a simple move remains.
+  ;;
+  ;; All chains done but gate1 still closed (must open gate1 via receiver1):
+  ;;   Holding a connector:              connect (piggyback receiver1 pairing) + move = 2
+  ;;   Connector in current area:        pickup + connect + move = 3
+  ;;   No connector locally available:   move-to-connector + pickup + connect + move = 4
+  (if (eql ?agent-area 'area4)
+    0
+    (if (or (> ?chains-needed 0) (open gate1))
+      1
+      (if ?holding
+        2
+        (if (exists (?c connector) (loc ?c ?agent-area))
+          3
+          4)))))
+
+
+(define-query pairing-chain-exists? (?transmitter ?receiver)
+  ;; BFS from ?transmitter through paired connectors to ?receiver.
+  ;; Returns t if a chain of connector pairings links transmitter to receiver.
+  ;; With only 3 connectors, BFS terminates in at most 3 iterations.
+  (do (setq $frontier (list ?transmitter))
+      (setq $visited nil)
+      (ww-loop while $frontier do
+        (setq $next-frontier nil)
+        (ww-loop for $current in $frontier do
+          (push $current $visited)
+          (doall (?c connector)
+            (if (and (not (member ?c $visited))
+                     (or (paired ?c $current)
+                         (and (connector $current) (paired $current ?c))))
+              (if (paired ?c ?receiver)
+                (return-from pairing-chain-exists? t)
+                (if (not (member ?c $next-frontier))
+                  (push ?c $next-frontier))))))
+        (setq $frontier $next-frontier))
+      nil))
 
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -1007,87 +1158,95 @@
 
 
 (define-update update-beams-if-interference! ()
-  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
-  ;; at their intersection points, eliminating sequential processing dependencies
+  ;; Resolves all beam-beam intersections using iterative fixed-point computation.
+  ;; Each iteration validates intersections against current effective endpoints,
+  ;; converging when no beam's effective endpoint changes.  This avoids the
+  ;; cascading phantom problem where a single-pass approach uses an invalid
+  ;; (phantom) intersection to deflate a beam's effective-t.
+  ;; Detects period-2 oscillation (mutual blocking cycles) and resolves by
+  ;; taking element-wise min of the two alternating states.
   (do
-    ;; Collect all intersections ONCE before processing any beams
+    ;; Phase 1: Collect all geometric intersections
     (setq $all-intersections (collect-all-beam-intersections))
-    
-    ;; PASS 1: Compute effective endpoint t for each beam
-    ;; (minimum of current endpoint t and all intersection t values)
+    ;; Phase 2: Build per-beam geometry cache and obstacle-only t parameters
+    (setq $obstacle-t (make-hash-table :test 'eq))
     (setq $effective-t (make-hash-table :test 'eq))
+    (setq $beam-geometry (make-hash-table :test 'eq))  ;beam -> (src-x src-y dx dy)
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
           (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
           (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
           (setq $dx (- $tgt-x $src-x))
           (setq $dy (- $tgt-y $src-y))
+          (setf (gethash ?b $beam-geometry) (list $src-x $src-y $dx $dy))
           (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
           (if (< $length-sq 1e-20)
-            (setq $min-t 0)            ;; zero-length beam: fully collapsed
+            (setq $t0 0)
             (do (setq $curr-dx (- $old-end-x $src-x))
                 (setq $curr-dy (- $old-end-y $src-y))
                 (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-                (setq $min-t (/ $dot $length-sq))))
-          ;; Find minimum t across all intersections for this beam
-          (ww-loop for $intersection in $all-intersections do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
-                (if (and (eql ?b $beam1) (< $t1 $min-t))
-                  (setq $min-t $t1))
-                (if (and (eql ?b $beam2) (< $t2 $min-t))
-                  (setq $min-t $t2)))
-          (setf (gethash ?b $effective-t) $min-t)))
-    
-    ;; PASS 2: For each beam, find closest VALID intersection
+                (setq $t0 (/ $dot $length-sq))))
+          (setf (gethash ?b $obstacle-t) $t0)
+          (setf (gethash ?b $effective-t) $t0)))
+    ;; Phase 3: Iterative fixed-point resolution of beam-beam interference
+    (setq $prev1-t (make-hash-table :test 'eq))  ;values from 1 iteration ago
+    (setq $prev2-t (make-hash-table :test 'eq))  ;values from 2 iterations ago
+    (ww-loop for $iteration from 1 to 10 do  ;bounded; converges in <= num-beams iterations
+      (setq $changed nil)
+      (doall (?b (get-current-beams))
+        (do (setq $new-t (gethash ?b $obstacle-t))  ;start from obstacle upper bound
+            (ww-loop for $intersection in $all-intersections do
+              (setq $beam1 (first $intersection))
+              (setq $beam2 (second $intersection))
+              (setq $t1 (fifth $intersection))
+              (setq $t2 (sixth $intersection))
+              (if (eql ?b $beam1)
+                (do (setq $t-param $t1)
+                    (setq $blocker $beam2)
+                    (setq $blocker-t $t2))
+                (if (eql ?b $beam2)
+                  (do (setq $t-param $t2)
+                      (setq $blocker $beam1)
+                      (setq $blocker-t $t1))
+                  (setq $t-param nil)))
+              ;; Valid only if blocker's effective endpoint reaches the crossing
+              (if (and $t-param
+                       (>= (gethash $blocker $effective-t) $blocker-t)
+                       (< $t-param $new-t))
+                (setq $new-t $t-param)))
+            (if (/= $new-t (gethash ?b $effective-t))
+              (do (setf (gethash ?b $effective-t) $new-t)
+                  (setq $changed t)))))
+      (if (not $changed)
+        (return))
+      ;; Detect period-2 oscillation: current state matches state from 2 iterations ago
+      (if (and (> $iteration 2)
+               (not (exists (?b (get-current-beams))
+                      (/= (gethash ?b $effective-t)
+                          (gethash ?b $prev2-t -1)))))
+        ;; Oscillation detected: resolve by element-wise min of the two alternating
+        ;; states (current = state A, prev1-t = state B).  Crossing beams that
+        ;; appear truncated in either state are truly intersecting, so min is correct.
+        (do (doall (?b (get-current-beams))
+              (do (setq $alt-val (gethash ?b $prev1-t))
+                  (if (< $alt-val (gethash ?b $effective-t))
+                    (setf (gethash ?b $effective-t) $alt-val))))
+            (return)))
+      ;; Rotate saved states: prev2 <- prev1, prev1 <- current
+      (doall (?b (get-current-beams))
+        (do (setf (gethash ?b $prev2-t) (gethash ?b $prev1-t))
+            (setf (gethash ?b $prev1-t) (gethash ?b $effective-t)))))
+    ;; Phase 4: Apply converged effective-t values to update beam endpoints
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (if (< $length-sq 1e-20)
-            (setq $closest-t 0)        ;; zero-length beam: fully collapsed
-            (do (setq $curr-dx (- $old-end-x $src-x))
-                (setq $curr-dy (- $old-end-y $src-y))
-                (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-                (setq $closest-t (/ $dot $length-sq))))
-          (setq $new-end-x $old-end-x)
-          (setq $new-end-y $old-end-y)
-          ;; Check all intersections involving this beam
-          (ww-loop for $intersection in $all-intersections do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $int-x (third $intersection))
-                (setq $int-y (fourth $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
-                ;; Determine which t-parameter applies to this beam
-                (if (eql ?b $beam1)
-                  (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2)
-                      (setq $blocking-t $t2))
-                  (if (eql ?b $beam2)
-                    (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1)
-                        (setq $blocking-t $t1))
-                    (setq $t-param nil)))
-                ;; Validate: blocking beam must reach intersection
-                (if $t-param
-                  (do (setq $blocker-eff-t (gethash $blocking-beam $effective-t))
-                      ;; If blocker's effective endpoint is BEFORE intersection, phantom
-                      (if (< $blocker-eff-t $blocking-t)
-                        (setq $t-param nil))))
-                ;; Update closest intersection if this one is closer
-                (if (and $t-param (< $t-param $closest-t))
-                  (do (setq $closest-t $t-param)
-                      (setq $new-end-x $int-x)
-                      (setq $new-end-y $int-y))))
-          ;; Update beam segment if endpoint changed
-          (if (or (/= $new-end-x $old-end-x) 
+          (setq $geom (gethash ?b $beam-geometry))
+          (setq $src-x (first $geom))
+          (setq $src-y (second $geom))
+          (setq $dx (third $geom))
+          (setq $dy (fourth $geom))
+          (setq $new-end-x (+ $src-x (* (gethash ?b $effective-t) $dx)))
+          (setq $new-end-y (+ $src-y (* (gethash ?b $effective-t) $dy)))
+          (if (or (/= $new-end-x $old-end-x)
                   (/= $new-end-y $old-end-y))
             (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
     nil))  ;must return nil
@@ -1362,7 +1521,7 @@
               (finally (propagate-changes!)))))
 
 
-(define-action connect-to-1-terminus
+#+ignore (define-action connect-to-1-terminus
     1
   (?agent agent ?t1 terminus)
   (and (bind (holds ?agent $cargo))

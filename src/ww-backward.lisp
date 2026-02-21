@@ -317,8 +317,9 @@ Forward validation filters inconsistent candidates."
                                  (or (eql (second p) connector)
                                      (eql (third p) connector)))))
           (dolist (term pairings)
-            (add-proposition (list 'paired connector term) idb)
-            (add-proposition (list 'paired term connector) idb))
+            ;; Respect relation typing: (paired connector terminus).
+            ;; Do not synthesize reverse (paired term connector) facts.
+            (add-proposition (list 'paired connector term) idb))
           (setf (problem-state.idb-hash pred) nil)
           (push pred results))))
     (nreverse results)))

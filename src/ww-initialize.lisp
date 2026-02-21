@@ -46,6 +46,9 @@
     (when *randomize-search*
       (format t "~%NOTE: Defining a heuristic? search function is incompatible with randomize-search setting.")
       (format t "~%Ignoring randomization.~%")))
+  (when (fboundp 'min-steps-remaining?)
+    (format t "~&Applying min-steps-remaining? to start state... = ~A~%"
+              (funcall (symbol-function 'min-steps-remaining?) *start-state*)))
   (when (fboundp 'bounding-function?)
     (format t "~&Applying bounding function to start state...")
     (multiple-value-setq (*cost* *upper*)
