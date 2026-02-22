@@ -21,7 +21,7 @@
 ;;;     regression/validation experiments.
 ;;;
 ;;; Suggested ASDF integration (in wouldwork.asd):
-;;;   add (:file "ww-backwards") after (:file "ww-solution-validation")
+;;;   add (:file "ww-backward") after (:file "ww-solution-validation")
 
 
 (in-package :ww)
@@ -395,23 +395,24 @@ If REQUIRED-PROPS is NIL, uses (BW-GOAL-REQUIRED-PROPS normalized-target)."
             for pred0 in (bw-regress target action-form)
             for pred = (copy-problem-state pred0) do
               (bw-normalize! pred :strip-relations strip-relations :normalizer normalizer)
-              (multiple-value-bind (next-state ok failure-reason)
-                  (apply-action-to-state action-form pred nil nil)
-                (cond
-                  ((not ok)
-                   (when verbose
-                     (format t "~&BW: candidate rejected (precondition failed): ~S~%  ~A~%"
-                             action-form failure-reason)))
-                  (t
-                   (let* ((next (copy-problem-state next-state)))
-                     (bw-normalize! next :strip-relations strip-relations :normalizer normalizer)
-                     (let ((next-proj (bw-project next
-                                                  :relations projection-relations
-                                                  :ignore-predicate ignore-pred)))
-                       (when (subsetp required next-proj :test #'equal)
-                         (push pred results)
-                         (when (and max-results (>= (length results) max-results))
-                           (return (nreverse results)))))))))
+              (when (fps-state-enumeration-feasible-p pred)
+                (multiple-value-bind (next-state ok failure-reason)
+                    (apply-action-to-state action-form pred nil nil)
+                  (cond
+                    ((not ok)
+                     (when verbose
+                       (format t "~&BW: candidate rejected (precondition failed): ~S~%  ~A~%"
+                               action-form failure-reason)))
+                    (t
+                     (let* ((next (copy-problem-state next-state)))
+                       (bw-normalize! next :strip-relations strip-relations :normalizer normalizer)
+                       (let ((next-proj (bw-project next
+                                                    :relations projection-relations
+                                                    :ignore-predicate ignore-pred)))
+                         (when (subsetp required next-proj :test #'equal)
+                           (push pred results)
+                           (when (and max-results (>= (length results) max-results))
+                             (return (nreverse results))))))))))
             finally (return (nreverse results))))))
 
 
@@ -437,22 +438,23 @@ Returns a list of validated predecessor states."
           for pred0 in (bw-regress target action-form)
           for pred = (copy-problem-state pred0) do
             (bw-normalize! pred :strip-relations strip-relations :normalizer normalizer)
-            (multiple-value-bind (next-state ok failure-reason)
-                (apply-action-to-state action-form pred nil nil)
-              (cond
-                ((not ok)
-                 (when verbose
-                   (format t "~&BW: candidate rejected (precondition failed): ~S~%  ~A~%"
-                           action-form failure-reason)))
-                (t
-                 (let ((next (copy-problem-state next-state)))
-                   (bw-normalize! next :strip-relations strip-relations :normalizer normalizer)
-                   (when (bw-equivalent-p next target 
-                                          :relations projection-relations
-                                          :ignore-predicate ignore-pred)
-                     (push pred results)
-                     (when (and max-results (>= (length results) max-results))
-                       (return (nreverse results))))))))
+            (when (fps-state-enumeration-feasible-p pred)
+              (multiple-value-bind (next-state ok failure-reason)
+                  (apply-action-to-state action-form pred nil nil)
+                (cond
+                  ((not ok)
+                   (when verbose
+                     (format t "~&BW: candidate rejected (precondition failed): ~S~%  ~A~%"
+                             action-form failure-reason)))
+                  (t
+                   (let ((next (copy-problem-state next-state)))
+                     (bw-normalize! next :strip-relations strip-relations :normalizer normalizer)
+                     (when (bw-equivalent-p next target
+                                            :relations projection-relations
+                                            :ignore-predicate ignore-pred)
+                       (push pred results)
+                       (when (and max-results (>= (length results) max-results))
+                         (return (nreverse results)))))))))
           finally (return (nreverse results)))))
 
 
@@ -802,15 +804,6 @@ whether a regressed predecessor 'matches' the previous trace state."
               (or (eql (second p) cargo)
                   (eql (third p) cargo))))))
     (t nil)))
-
-
-(defun bw--normalized-copy (state &key
-                                  (strip-relations *bw-normalize-strip-relations*)
-                                  (normalizer *bw-default-normalizer*))
-  "Copy STATE and run BW-NORMALIZE! on the copy."
-  (let ((st (copy-problem-state state)))
-    (bw-normalize! st :strip-relations strip-relations :normalizer normalizer)
-    st))
 
 
 (defun bw-matches-previous-p (candidate-predecessors previous-state action-form &key
@@ -1745,10 +1738,10 @@ CONNECT candidates (optional): uses BW-CANDIDATE-CONNECT-ACTIONS."
   "Compatibility wrapper for problem-corner candidate generation.
 Uses BW-CANDIDATE-LAST-ACTIONS so all backward code paths share one
 candidate-generation implementation."
-  (bw-candidate-last-actions state
-                             :include-move t
-                             :include-pickup t
-                             :include-connect t))
+  (let* ((families '(move pickup connect))
+         (selected-actions (enum-select-actions-by-family *actions* families)))
+    (fps-allowed-last-actions-from-state state *actions* selected-actions
+                                         :direction :backward)))
 
 
 ;;; ---------- Start state matching ----------

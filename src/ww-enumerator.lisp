@@ -64,6 +64,13 @@
 (defparameter *enumerated-penultimate-results* nil
   "After FIND-PENULTIMATE-STATES, holds per-state reaching-action result plists.")
 
+(defparameter *penultimate-equivalence-cache* (make-hash-table :test 'equal)
+  "Cross-run cache keyed by penultimate run signature for forward/backward set comparison.")
+
+(defparameter *enum-disable-csp-metadata-pruning* nil
+  "When non-NIL, enum subset-action generation ignores :REQUIRES-FLUENT and
+   :PARTNER-FEASIBLE metadata.")
+
 
 (defparameter *enumerator-detected-groups* nil
   "Auto-detected interchangeable object groups for the most recent enumeration.
@@ -375,6 +382,7 @@
               Lower keys sort first.  More efficient than :SORT< because each
               state's key is computed once (Schwartzian transform).
               Default NIL (no sorting).  Mutually exclusive with :SORT<.
+   :PRINT-REPORT  when NIL, skip interactive report printing (default T).
    Returns: T (the report plist is saved on (get 'find-penultimate-states :last-report))."
   (let ((args (cond
                 ((null raw-args) (list 'goal-fn))
@@ -390,7 +398,8 @@
                          (prefilter nil prefilter-supplied-p)
                          (action-families nil action-families-supplied-p)
                          (sort< nil sort<-supplied-p)
-                         (sort-key nil sort-key-supplied-p))
+                         (sort-key nil sort-key-supplied-p)
+                         (print-report nil print-report-supplied-p))
         args
       (flet ((literal-symbol-p (form)
                (and (symbolp form)
@@ -423,7 +432,9 @@
                   ,@(when sort<-supplied-p
                       `(:sort< ,sort<))
                   ,@(when sort-key-supplied-p
-                      `(:sort-key ,sort-key))))
+                      `(:sort-key ,sort-key))
+                  ,@(when print-report-supplied-p
+                      `(:print-report ,print-report))))
               `(find-penultimate-states-fn
                 ,(maybe-quote goal-spec)
                 ,@(if algorithm-supplied-p
@@ -443,7 +454,9 @@
                 ,@(when sort<-supplied-p
                     `(:sort< ,sort<))
                 ,@(when sort-key-supplied-p
-                    `(:sort-key ,sort-key)))))))))
+                    `(:sort-key ,sort-key))
+                ,@(when print-report-supplied-p
+                    `(:print-report ,print-report)))))))))
 
 
 (defun enum-normalize-action-families (action-families)
@@ -530,23 +543,106 @@
       (multiple-value-bind (next-state success-p failure-reason)
           (apply-action-to-state action-form state nil nil)
         (declare (ignore failure-reason))
-        (when (and success-p (funcall goal-fn next-state))
-          (push (list :action action-form :goal-state next-state) hits))))))
+          (when (and success-p (funcall goal-fn next-state))
+            (push (list :action action-form :goal-state next-state) hits))))))
 
+(defun fps-state-enumeration-feasible-p (state)
+  "Shared canonical state feasibility predicate for penultimate enumeration."
+  (or (not (fboundp 'penultimate-state-feasible?))
+      (funcall (symbol-function 'penultimate-state-feasible?) state)))
 
-(defun make-penultimate-goal-fn (goal-fn problem-actions selected-actions state-hit-table)
-  "Build predicate for penultimate-state acceptance.
-   When the problem defines PENULTIMATE-STATE-FEASIBLE? (a reserved-name query),
-   it is called post-propagation before attempting reaching actions.  States for
-   which the query returns NIL are pruned without the expensive action search."
-  (lambda (state)
-    (when (or (not (fboundp 'penultimate-state-feasible?))
-              (funcall (symbol-function 'penultimate-state-feasible?) state))
-      (let ((hits (enum-goal-reaching-last-actions state goal-fn problem-actions selected-actions)))
-        (when hits
-          (setf (gethash state state-hit-table) hits)
-          t)))))
+(defun fps-allowed-last-actions-from-state (state problem-actions selected-actions
+                                            &key (direction :forward))
+  "Shared last-action candidate API used by forward/backward penultimate enumeration."
+  (ecase direction
+    (:forward
+     (let ((*actions* problem-actions))
+       (enum-applicable-action-forms state selected-actions)))
+    (:backward
+     (let ((include-move (some (lambda (a)
+                                 (enum-action-in-family-p (action.name a) 'move))
+                               selected-actions))
+           (include-pickup (some (lambda (a)
+                                   (enum-action-in-family-p (action.name a) 'pickup))
+                                 selected-actions))
+           (include-connect (some (lambda (a)
+                                   (enum-action-in-family-p (action.name a) 'connect))
+                                 selected-actions)))
+       (bw-candidate-last-actions state
+                                  :include-move include-move
+                                  :include-pickup include-pickup
+                                  :include-connect include-connect)))))
 
+(defun fps-validate-penultimate-state (state goal-fn problem-actions selected-actions
+                                       &key base-relations
+                                            candidate-goal-key-table candidate-goal-match-required-p
+                                            direction allowed-actions)
+  "Shared penultimate validator used by both forward and backward modes.
+   Returns a list of reaching hit plists (:ACTION ... :GOAL-STATE ...)."
+  (when (fps-state-enumeration-feasible-p state)
+    (let ((actions (or allowed-actions
+                       (fps-allowed-last-actions-from-state state
+                                                            problem-actions
+                                                            selected-actions
+                                                            :direction direction)))
+          (hits nil))
+      (let ((*actions* problem-actions))
+        (dolist (action-form actions (nreverse hits))
+          (multiple-value-bind (next-state success-p failure-reason)
+              (apply-action-to-state action-form state nil nil)
+            (declare (ignore failure-reason))
+            (when (and success-p (funcall goal-fn next-state))
+              (let ((goal-key-ok
+                      (if candidate-goal-match-required-p
+                          (and candidate-goal-key-table
+                               (gethash (fps-state-base-prop-key next-state base-relations)
+                                        candidate-goal-key-table))
+                          t)))
+                (when goal-key-ok
+                  (push (list :action action-form :goal-state next-state) hits))))))))))
+
+(defun fps-penultimate-run-signature (goal-form action-families base-relations)
+  "Key used to compare forward/backward penultimate sets for the same settings."
+  (list :goal goal-form
+        :action-families (sort (copy-list (or action-families '(move pickup connect))) #'string<
+                               :key #'symbol-name)
+        :base-relations (sort (copy-list (or base-relations (get-base-relations))) #'string<
+                              :key #'symbol-name)))
+
+(defun fps-register-penultimate-set-and-compare (goal-form action-families
+                                                 base-relations direction state-keys)
+  "Update equivalence cache and return values:
+   (values expected-p matched-p other-direction-keys)."
+  (let* ((signature (fps-penultimate-run-signature goal-form action-families base-relations))
+         (entry (or (gethash signature *penultimate-equivalence-cache*)
+                    (let ((ht (make-hash-table :test #'eq)))
+                      (setf (gethash signature *penultimate-equivalence-cache*) ht)
+                      ht)))
+         (other-direction (if (eq direction 'forward) 'backward 'forward))
+         (other-keys (gethash other-direction entry))
+         (matched (and other-keys
+                       (null (set-exclusive-or state-keys other-keys :test #'equal)))))
+    (setf (gethash direction entry) (copy-list state-keys))
+    (values t (and other-keys matched) other-keys)))
+
+(defun fps-forward-raw-candidates-from-goals (candidate-goal-states problem-actions selected-actions
+                                              &key base-relations)
+  "Generate forward raw penultimate candidates by regressing from candidate goals.
+   Returns two values: list of unique predecessor states and raw predecessor count."
+  (let ((table (make-hash-table :test 'equal))
+        (raw-count 0))
+    (dolist (gs candidate-goal-states)
+      (dolist (action-form (fps-allowed-last-actions-from-state
+                            gs problem-actions selected-actions :direction :backward))
+        (dolist (pred0 (bw-regress gs action-form))
+          (incf raw-count)
+          (let ((pred (copy-problem-state pred0)))
+            (bw-normalize! pred)
+            (let ((key (fps-state-base-prop-key pred base-relations)))
+              (unless (gethash key table)
+                (setf (gethash key table) pred)))))))
+    (values (loop for st being the hash-values of table collect st)
+            raw-count)))
 
 (defun penultimate-state-base-props (state base-relations)
   "Return sorted base-relation propositions from STATE."
@@ -565,7 +661,10 @@
 
 
 (defun fps-build-report (goal-form penultimate-states state-hit-table
-                       &key base-relations action-families settings candidate-goal-states)
+                       &key base-relations action-families settings candidate-goal-states
+                            raw-candidates semantic-valid-penultimate-states
+                            equivalence-expected-p forward-backward-set-match
+                            forward-backward-other-count)
   "Build and return a FIND-PENULTIMATE-STATES report plist."
   (let* ((candidate-goal-states (or candidate-goal-states *enumerated-goal-states*))
          (candidate-goal-key-table
@@ -615,7 +714,10 @@
             penultimate-states))
          (candidate-transition-details
            (nreverse candidate-transition-details))
-         (summary (list :penultimate-states (length penultimate-states)
+         (summary (list :raw-candidates raw-candidates
+                        :semantic-valid-penultimate-states
+                        semantic-valid-penultimate-states
+                        :penultimate-states (length penultimate-states)
                         :candidate-goal-states
                         (when candidate-goal-key-table
                           (length candidate-goal-states))
@@ -630,7 +732,13 @@
                         (when candidate-goal-key-table candidate-transitions)
                         :candidate-transition-penultimate-states
                         (when candidate-goal-key-table
-                          (length candidate-transition-details)))))
+                          (length candidate-transition-details))
+                        :forward-backward-equivalence-expected
+                        equivalence-expected-p
+                        :forward-backward-set-match
+                        (if (null forward-backward-set-match) :pending forward-backward-set-match)
+                        :forward-backward-other-count
+                        forward-backward-other-count)))
     (list
      :goal goal-form
      :settings settings
@@ -654,7 +762,19 @@
     (format t "~&Goal: ~S~%" goal)
     (format t "~&Direction: ~S~%" direction)
     (format t "~&Settings: ~S~%" settings)
+    (when (getf summary :raw-candidates)
+      (format t "~&Raw candidates: ~D~%" (getf summary :raw-candidates)))
+    (when (getf summary :semantic-valid-penultimate-states)
+      (format t "~&Semantic-valid penultimate states: ~D~%"
+              (getf summary :semantic-valid-penultimate-states)))
     (format t "~&Penultimate states found: ~D~%" (getf summary :penultimate-states))
+    (when (getf summary :forward-backward-equivalence-expected)
+      (format t "~&Forward/backward equivalence expected: T~%")
+      (format t "~&Forward/backward sets matched (base-key): ~A~%"
+              (getf summary :forward-backward-set-match))
+      (when (getf summary :forward-backward-other-count)
+        (format t "~&Other direction set size: ~D~%"
+                (getf summary :forward-backward-other-count))))
     (when (getf summary :candidate-goal-states)
       (format t "~&Candidate goal states (from find-goal-states): ~D~%"
               (getf summary :candidate-goal-states))
@@ -695,10 +815,6 @@
                 transitions))))))
 
 
-(defun state-base-prop-key (state)
-  "Return a canonical string key for STATE based on sorted base-relation propositions.
-   Two states with identical base propositions produce identical keys."
-  (fps-state-base-prop-key state (get-base-relations)))
 (defun actions-modifiable-base-relations (actions)
   "Compute the set of base relation symbols modifiable by any action in ACTIONS.
    Intersects each action's EFFECT-ADDS with the current base-relation schema,
@@ -759,7 +875,8 @@
                                               exclude-relations include-relations
                                               (prefilter nil)
                                               (action-families '(move pickup connect))
-                                              sort< sort-key)
+                                              sort< sort-key
+                                              (print-report t))
   "Enumerate penultimate states that can reach GOAL-SPEC in one action.
    Enumeration uses the same CSP base-state generation as FIND-GOAL-STATES.
    GOAL-SPEC is optional; defaults to GOAL-FN.
@@ -792,7 +909,8 @@
                                            :prefilter prefilter
                                            :action-families (or action-families '(move pickup connect))
                                            :sort< sort<
-                                           :sort-key sort-key))
+                                           :sort-key sort-key
+                                           :print-report print-report))
            (problem-actions *actions*)
            (goal-fn (coerce-goal norm-goal-spec))
            (normalized-families (enum-normalize-action-families action-families))
@@ -808,25 +926,51 @@
            (invariant-prefilter (make-goal-invariant-prefilter                        ;; CHANGED
                                  invariants 'find-penultimate-states))               ;; CHANGED
            (combined-prefilter (compose-prefilters effective-prefilter invariant-prefilter))
-           (invariant-goal-form (when invariants (cons 'and invariants)))
            (candidate-goal-states-snapshot *enumerated-goal-states*)
-           (penultimate-goal-fn
-             (make-penultimate-goal-fn goal-fn
-                                       problem-actions
-                                       selected-actions
-                                       state-hit-table)))
+           (candidate-goal-match-required-p (not (null candidate-goal-states-snapshot)))
+           (candidate-goal-key-table
+            (when candidate-goal-states-snapshot
+              (let ((ht (make-hash-table :test 'equal)))
+                (dolist (gs candidate-goal-states-snapshot ht)
+                  (setf (gethash (fps-state-base-prop-key gs run-base-relations) ht) t))))))
       (when (null selected-actions)
         (format t "~&[find-penultimate-states] No matching actions for families ~S.~%"
                 normalized-families))
       (let ((*enumerator-base-relations* run-base-relations))
         (let ((*enumerator-ui-settings* penultimate-run-settings))
-          (let ((states (enumerate-state penultimate-goal-fn
-                                         :algorithm algorithm
-                                         :solution-type normalized-solution-type
-                                         :propagate 'finalize-only
-                                         :prefilter combined-prefilter
-                                         :goal-form goal-form            ;; CHANGED: full goal for symmetry
-                                         :skip-fixed-maps t)))          ;; ADDED: no fixed-map pruning
+          (let* ((*enum-disable-csp-metadata-pruning* t)
+                 (raw-states nil)
+                 (raw-candidate-count 0)
+                 (semantic-states nil))
+            (if candidate-goal-states-snapshot
+                (multiple-value-setq (raw-states raw-candidate-count)
+                  (fps-forward-raw-candidates-from-goals
+                   candidate-goal-states-snapshot
+                   problem-actions
+                   selected-actions
+                   :base-relations run-base-relations))
+                (let ((enumerated (enumerate-state (lambda (state) (declare (ignore state)) t)
+                                                   :algorithm algorithm
+                                                   :solution-type normalized-solution-type
+                                                   :propagate 'finalize-only
+                                                   :prefilter combined-prefilter
+                                                   :goal-form goal-form
+                                                   :skip-fixed-maps t)))
+                  (setf raw-states enumerated
+                        raw-candidate-count (length enumerated))))
+            (dolist (st raw-states)
+              (let ((semantic-hits
+                      (fps-validate-penultimate-state
+                       st goal-fn problem-actions selected-actions
+                       :base-relations run-base-relations
+                       :candidate-goal-key-table candidate-goal-key-table
+                       :candidate-goal-match-required-p candidate-goal-match-required-p
+                       :direction :forward)))
+                (when semantic-hits
+                  (push st semantic-states)
+                  (setf (gethash st state-hit-table) semantic-hits))))
+            (setf semantic-states (nreverse semantic-states))
+            (let ((states semantic-states))
           (when (and sort< sort-key)
             (error "FIND-PENULTIMATE-STATES: :SORT< and :SORT-KEY are mutually exclusive."))
           (when sort<
@@ -834,45 +978,58 @@
           (when sort-key
             (let ((decorated (mapcar (lambda (st) (cons (funcall sort-key st) st)) states)))
               (setf states (mapcar #'cdr (stable-sort decorated #'< :key #'car)))))
-          (let ((report (fps-build-report goal-form
-                                          states
-                                          state-hit-table
-                                          :base-relations run-base-relations
-                                          :action-families normalized-families
-                                          :candidate-goal-states candidate-goal-states-snapshot
-                                          :settings (list :direction 'forward
-                                                          :algorithm algorithm
-                                                          :solution-type normalized-solution-type
-                                                          :exclude-relations exclude-relations
-                                                          :include-relations include-relations
-                                                          :prefilter prefilter
-                                                          :action-families normalized-families
-                                                          :sort< sort<
-                                                          :sort-key sort-key))))
-            (fps-print-report report)
-            (setf *enumerated-penultimate-states* states
-                  *enumerated-penultimate-results* (getf report :results))
-            (setf (get 'find-penultimate-states :last-report) report)
-            t)))))))
+            (let* ((state-keys (mapcar (lambda (st) (fps-state-base-prop-key st run-base-relations))
+                                       states))
+                   (equivalence-expected-p nil)
+                   (set-match nil)
+                   (other-count nil))
+              (multiple-value-setq (equivalence-expected-p set-match)
+                (fps-register-penultimate-set-and-compare
+                 goal-form normalized-families run-base-relations
+                 'forward state-keys))
+              (setf other-count
+                    (let* ((signature (fps-penultimate-run-signature
+                                       goal-form normalized-families run-base-relations))
+                           (entry (gethash signature *penultimate-equivalence-cache*))
+                           (other-keys (and entry (gethash 'backward entry))))
+                      (and other-keys (length other-keys))))
+              (let ((report (fps-build-report goal-form
+                                              states
+                                              state-hit-table
+                                              :base-relations run-base-relations
+                                              :action-families normalized-families
+                                              :candidate-goal-states candidate-goal-states-snapshot
+                                              :raw-candidates raw-candidate-count
+                                              :semantic-valid-penultimate-states (length semantic-states)
+                                              :equivalence-expected-p equivalence-expected-p
+                                              :forward-backward-set-match set-match
+                                              :forward-backward-other-count other-count
+                                              :settings (list :direction 'forward
+                                                              :algorithm algorithm
+                                                              :solution-type normalized-solution-type
+                                                              :exclude-relations exclude-relations
+                                                              :include-relations include-relations
+                                                              :prefilter prefilter
+                                                              :action-families normalized-families
+                                                              :sort< sort<
+                                                              :sort-key sort-key
+                                                              :print-report print-report))))
+                (when print-report
+                  (fps-print-report report))
+                (setf *enumerated-penultimate-states* states
+                      *enumerated-penultimate-results* (getf report :results))
+                (setf (get 'find-penultimate-states :last-report) report)
+                t)))))))))
 
 
 (defun find-penultimate-states-backward-fn (&optional (goal-spec 'goal-fn)
                                             &key
                                             (action-families '(move pickup connect))
-                                            sort< sort-key)
+                                            sort< sort-key
+                                            (print-report t))
   "Backward penultimate-state search: regress from *ENUMERATED-GOAL-STATES*.
-   For each goal state, generates candidate last-action forms via
-   BW-CANDIDATE-LAST-ACTIONS, regresses each to produce predecessor candidates,
-   normalizes them via BW-NORMALIZE!, then validates by forward application.
-   A predecessor is accepted when:
-   1) it passes PENULTIMATE-STATE-FEASIBLE? (when defined),
-   2) forward application succeeds and satisfies the goal, and
-   3) the resulting successor matches a candidate goal state by base key.
-   Requires a prior call to FIND-GOAL-STATES to populate *ENUMERATED-GOAL-STATES*.
-   GOAL-SPEC is optional; defaults to GOAL-FN.
-   ACTION-FAMILIES: list drawn from (MOVE PICKUP CONNECT), default all three.
-   SORT<, SORT-KEY: as in FIND-PENULTIMATE-STATES (forward).
-   Returns: T (report saved on (get 'find-penultimate-states :last-report))."
+   Uses shared feasibility/validation logic and the same FPS-PRINT-REPORT
+   output format as forward mode."
   (unless *enumerated-goal-states*
     (format t "~&[find-penultimate-states :backward] No goal states available.  ~
                Run (find-goal-states ...) first.~%")
@@ -888,56 +1045,40 @@
       (enum-normalize-goal-spec goal-spec)
     (let* ((goal-fn (coerce-goal norm-goal-spec))
            (families (enum-normalize-action-families action-families))
-           (n-goals (length *enumerated-goal-states*))
            (base-relations (get-base-relations))
+           (problem-actions *actions*)
+           (selected-actions (enum-select-actions-by-family problem-actions families))
            (candidate-goal-key-table
-             (let ((ht (make-hash-table :test 'equal)))
-               (dolist (gs *enumerated-goal-states* ht)
-                 (setf (gethash (fps-state-base-prop-key gs base-relations) ht) t))))
+            (let ((ht (make-hash-table :test 'equal)))
+              (dolist (gs *enumerated-goal-states* ht)
+                (setf (gethash (fps-state-base-prop-key gs base-relations) ht) t))))
            (penult-table (make-hash-table :test 'equal))
            (state-hit-table (make-hash-table :test 'eq))
-           (total-candidates 0)
-           (total-validated 0))
-      (format t "~&[find-penultimate-states :backward] Regressing from ~D goal state~:P...~%"
-              n-goals)
-      (loop for gs in *enumerated-goal-states*
-            for gi from 1
-            do (let ((candidates (bw-candidate-last-actions gs
-                                  :include-move (member 'move families)
-                                  :include-pickup (member 'pickup families)
-                                  :include-connect (member 'connect families))))
-                 (incf total-candidates (length candidates))
-                 (dolist (action-form candidates)
-                   (dolist (pred0 (bw-regress gs action-form))
-                     (let ((pred (copy-problem-state pred0)))
-                       (bw-normalize! pred)
-                       (when (or (not (fboundp 'penultimate-state-feasible?))
-                                 (funcall (symbol-function 'penultimate-state-feasible?) pred))
-                         (multiple-value-bind (next ok failure)
-                             (apply-action-to-state action-form pred nil nil)
-                           (declare (ignore failure))
-                           (when ok
-                             (bw-normalize! next)
-                             (when (and (funcall goal-fn next)
-                                        (gethash (fps-state-base-prop-key next base-relations)
-                                                 candidate-goal-key-table))
-                               (incf total-validated)
-                               (let ((key (state-base-prop-key pred)))
-                                 (unless (gethash key penult-table)
-                                   (setf (gethash key penult-table) pred))
-                                 (let ((canonical (gethash key penult-table))
-                                       (hit (list :action action-form :goal-state next)))
-                                   (unless (member action-form
-                                                   (gethash canonical state-hit-table)
-                                                   :key (lambda (h) (getf h :action))
-                                                   :test #'equal)
-                                     (push hit (gethash canonical state-hit-table))))))))))))))
-            ;when (zerop (mod gi 10))
-            ;  do (format t "~&  ...processed ~D/~D goal states~%" gi n-goals))
-      (let ((states (loop for st being the hash-values of penult-table collect st)))
-        (format t "~&[find-penultimate-states :backward] ~D candidate actions, ~
-                   ~D validated, ~D unique penultimate states.~%"
-                total-candidates total-validated (length states))
+           (total-raw-predecessors 0))
+      (dolist (gs *enumerated-goal-states*)
+        (let ((candidates (fps-allowed-last-actions-from-state
+                           gs problem-actions selected-actions :direction :backward)))
+          (dolist (action-form candidates)
+            (dolist (pred0 (bw-regress gs action-form))
+              (incf total-raw-predecessors)
+              (let ((pred (copy-problem-state pred0)))
+                (bw-normalize! pred)
+                (let ((semantic-hits
+                        (fps-validate-penultimate-state
+                         pred goal-fn problem-actions selected-actions
+                         :base-relations base-relations
+                         :candidate-goal-key-table candidate-goal-key-table
+                         :candidate-goal-match-required-p t
+                         :direction :forward)))
+                  (when semantic-hits
+                    (let ((key (fps-state-base-prop-key pred base-relations)))
+                      (unless (gethash key penult-table)
+                        (setf (gethash key penult-table) pred))
+                      (setf (gethash (gethash key penult-table) state-hit-table)
+                            semantic-hits)))))))))
+      (let* ((semantic-states (loop for st being the hash-values of penult-table collect st))
+             (states semantic-states)
+             (hits-table state-hit-table))
         (when (and sort< sort-key)
           (error "FIND-PENULTIMATE-STATES :BACKWARD: :SORT< and :SORT-KEY are mutually exclusive."))
         (when sort<
@@ -945,25 +1086,46 @@
         (when sort-key
           (let ((decorated (mapcar (lambda (st) (cons (funcall sort-key st) st)) states)))
             (setf states (mapcar #'cdr (stable-sort decorated #'< :key #'car)))))
-        (let ((report (fps-build-report goal-form
-                                        states
-                                        state-hit-table
-                                        :base-relations (get-base-relations)
-                                        :action-families families
-                                        :settings (list :direction 'backward
-                                                        :algorithm nil
-                                                        :solution-type nil
-                                                        :exclude-relations nil
-                                                        :include-relations nil
-                                                        :prefilter nil
-                                                        :action-families families
-                                                        :sort< sort<
-                                                        :sort-key sort-key))))
-          (fps-print-report report)
-          (setf *enumerated-penultimate-states* states
-                *enumerated-penultimate-results* (getf report :results))
-          (setf (get 'find-penultimate-states :last-report) report)
-          t)))))
+        (let* ((state-keys (mapcar (lambda (st) (fps-state-base-prop-key st base-relations))
+                                   states))
+               (equivalence-expected-p nil)
+               (set-match nil)
+               (other-count nil))
+          (multiple-value-setq (equivalence-expected-p set-match)
+            (fps-register-penultimate-set-and-compare
+             goal-form families base-relations 'backward state-keys))
+          (setf other-count
+                (let* ((signature (fps-penultimate-run-signature
+                                   goal-form families base-relations))
+                       (entry (gethash signature *penultimate-equivalence-cache*))
+                       (other-keys (and entry (gethash 'forward entry))))
+                  (and other-keys (length other-keys))))
+          (let ((report (fps-build-report goal-form
+                                          states
+                                          hits-table
+                                          :base-relations base-relations
+                                          :action-families families
+                                          :raw-candidates total-raw-predecessors
+                                          :semantic-valid-penultimate-states (length semantic-states)
+                                          :equivalence-expected-p equivalence-expected-p
+                                          :forward-backward-set-match set-match
+                                          :forward-backward-other-count other-count
+                                          :settings (list :direction 'backward
+                                                          :algorithm nil
+                                                          :solution-type nil
+                                                          :exclude-relations nil
+                                                          :include-relations nil
+                                                          :prefilter nil
+                                                          :action-families families
+                                                          :sort< sort<
+                                                          :sort-key sort-key
+                                                          :print-report print-report))))
+            (when print-report
+              (fps-print-report report))
+            (setf *enumerated-penultimate-states* states
+                  *enumerated-penultimate-results* (getf report :results))
+            (setf (get 'find-penultimate-states :last-report) report)
+            t))))))
 
 
 (defun fgs-normalize-solution-type (x)
@@ -2909,8 +3071,10 @@ from the product are appended."
                (sym-rel-p (member r symmetric-relations :test #'eq))
                (keys (enum-sort-keys-fail-first unsorted-keys partners max-k  ;; CHANGED: sort first
                                                 :symmetric-relation-p sym-rel-p))
-               (requires-fluent (enum-requires-fluent r))
-               (pf-fn (enum-build-partner-feasible-fn r))
+               (requires-fluent (unless *enum-disable-csp-metadata-pruning*
+                                  (enum-requires-fluent r)))
+               (pf-fn (unless *enum-disable-csp-metadata-pruning*
+                        (enum-build-partner-feasible-fn r)))
                (preds-map (enum-group-predecessors-map keys interchangeable-groups))  ;residual symmetry
                (actions (enum-make-subset-actions
                          r keys partners max-k

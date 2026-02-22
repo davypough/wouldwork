@@ -103,11 +103,18 @@
 
 
 (define-enum-relation loc  ;specify for enumerator only
+  ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
+  ;being held).
+  ;Also, when equivalent objects are interchangeable, treat equivalent assignment batches as the same to avoid
+  ;duplicate symmetric cases.
   :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
   :symmetric-batch t)
 
 
 (define-enum-relation paired  ;specify for enumerator only
+  ;For each connector, enumerate up to 4 things it could be paired with.
+  ;Only allow pairings for connectors that currently have a location.
+  ;And for each candidate partner, keep it only if that partner is observable from the connector’s current area.
   :max-per-key 4
   :requires-fluent loc  ;prevents generating beam pairings for connectors without a location (held)
   :partner-feasible (:query observable :args ((:key-fluent loc) :partner)))
@@ -121,12 +128,6 @@
 ;;;    since beams require nonzero distance and only one connector per area can be active.
 
 
-#+ignore (find-goal-states goal-fn  ;example find best enumeration (fewest pairings)
-  :sort-key (lambda (st)
-              (count 'paired (list-database (problem-state.idb st))
-                    :key #'car)))
-
-
 #+ignore (define-base-filter connectors-in-areas2&3   ;provides no extra pruning
   (exists ((?c1 ?c2) connector)
     (and (loc ?c1 area2) (loc ?c2 area3))))
@@ -137,7 +138,6 @@
 ;;; Returns non-NIL to keep the state, NIL to prune.
 ;;; Prunes states where the agent's area is not reachable from the initial area
 ;;; through currently-passable accessibility edges (gates must be open).
-
 
 ;;; Simple version: exploits problem-corner's fixed topology.
 ;;; Areas 1,2,3 are unconditionally connected (all accessible0).
