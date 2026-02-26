@@ -2256,7 +2256,9 @@ rather than the enumerated minimal goal state."
       (let ((to (bw--loc-of target-state ag)))
         (when to
           (dolist (from areas)
-            (when (and from (not (eql from to)))
+            (when (and from
+                       (not (eql from to))
+                       (funcall (symbol-function 'accessible) target-state ag from to))
               (push (list 'move ag from to) actions))))))
     (nreverse actions)))
 
@@ -2294,7 +2296,7 @@ Area argument is set to the agent's current LOC."
 
 (defun bw-candidate-connect-actions (target-state &key
                                                  agents
-                                                 (n-values '(1 2 3))
+                                                 (n-values '(2 3))
                                                  (place 'ground))
   "Generate CONNECT-TO-N-TERMINUS last-action hypotheses.
 
@@ -2305,6 +2307,7 @@ We propose connect only when, in TARGET-STATE:
   - terminus candidates come from PAIRED partners of C
 We also avoid terminus choices that are connectors located in the same AREA (precondition)."
   (let* ((agents (or agents (bw--collect-agents target-state)))
+         (has-elevation (relation-signature 'elevation))
          (actions nil))
     (dolist (ag agents)
       (let ((area (bw--loc-of target-state ag)))
@@ -2316,7 +2319,7 @@ We also avoid terminus choices that are connectors located in the same AREA (pre
                        (eql (third p) area))
               (let* ((cargo (second p))
                      (elev (bw--elevation-of target-state cargo)))
-                (when (eql elev 0)
+                (when (or (not has-elevation) (eql elev 0))
                   (let* ((partners (bw--paired-partners-of target-state cargo))
                          ;; Filter out cargo itself and any connector terminus in same area
                          (partners
@@ -2342,7 +2345,7 @@ We also avoid terminus choices that are connectors located in the same AREA (pre
                                               (include-move t)
                                               (include-pickup t)
                                               (include-connect t)
-                                              (n-values '(1 2 3))
+                                              (n-values '(2 3))
                                               (place 'ground))
   "Construct a bounded, plausible candidate last-action set for TARGET-STATE."
   (let* ((agents (bw--collect-agents target-state))

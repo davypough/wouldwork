@@ -96,12 +96,6 @@
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
 
-(define-base-relations  ;specify for enumerator only
-  ;dyanamic relations which are not derived
-  (loc paired)
-)
-
-
 (define-enum-relation loc  ;specify for enumerator only
   ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
   ;being held).
@@ -111,13 +105,27 @@
   :symmetric-batch t)
 
 
+;#+ignore
+(define-query corner-explicit-paired-partner-feasible (?area ?partner)
+  ;; POTENTIALLY UNSOUND pruning policy disabled for completeness checks.
+  (and
+   (or (and (eql ?area 'area2)
+            (or (eql ?partner 'transmitter2)
+                (eql ?partner 'receiver3)))
+       (and (eql ?area 'area3)
+            (or (eql ?partner 'transmitter1)
+                (eql ?partner 'receiver2)))
+       t)
+   (observable ?area ?partner)))
+
+
 (define-enum-relation paired  ;specify for enumerator only
-  ;For each connector, enumerate up to 4 things it could be paired with.
-  ;Only allow pairings for connectors that currently have a location.
-  ;And for each candidate partner, keep it only if that partner is observable from the connector’s current area.
-  :max-per-key 4
-  :requires-fluent loc  ;prevents generating beam pairings for connectors without a location (held)
-  :partner-feasible (:query observable :args ((:key-fluent loc) :partner)))
+  ;Completeness-first profile: disable paired-domain pruning constraints.
+  ;Re-enable the keys below for faster but potentially incomplete runs.
+  :max-per-key 3
+  :requires-fluent loc)
+  ;:partner-feasible (:query corner-explicit-paired-partner-feasible
+  ;                          :args ((:key-fluent loc) :partner)))
 
 ;;; Observable enum CSP Pruning: checks 1–3 are all captured by the existing observable query.
 ;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,
@@ -131,6 +139,33 @@
 #+ignore (define-base-filter connectors-in-areas2&3   ;provides no extra pruning
   (exists ((?c1 ?c2) connector)
     (and (loc ?c1 area2) (loc ?c2 area3))))
+
+
+(define-base-filter corner-base-constraints
+  (and ;don't pair connectors in the same area
+       (not (exists ((?c1 ?c2) connector)
+              (and (paired ?c1 ?c2)
+                   (bind (loc ?c1 $area1))
+                   (loc ?c2 $area1))))
+       ;deduction from the goal condition, runs before propagate-changes!
+       (exists ((?c-blue ?c-red ?c-other) connector)
+         (and (loc agent1 area4)
+              (loc ?c-blue area2)
+              (loc ?c-red area3)
+              (or (loc ?c-other area1)
+                  (loc ?c-other area4)
+                  (not (bind (loc ?c-other $x))))  ;not held
+              (paired ?c-blue transmitter2)
+              (paired ?c-blue receiver3)
+              (paired ?c-red transmitter1)
+              (paired ?c-red receiver2)))
+))
+
+
+;; High-level enumerator spec (migration path): interpreted by
+;; ww-enum-interpreter and compiled to the current ww-enumerator architecture.
+(define-goal-enumerator
+  :base-relations (loc paired))
 
 
 ;;;; PENULTIMATE STATE FEASIBILITY FILTER ;;;;

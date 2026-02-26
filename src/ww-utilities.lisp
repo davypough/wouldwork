@@ -513,8 +513,8 @@
 
 
 (defun check-parens (filename)
-  "Check parenthesis balance in a file anywhere under the wouldwork project.
-   Usage: (check-parens \"ww-searcher.lisp\")"
+  ;Check parenthesis balance in a file anywhere under the wouldwork project.
+  ;Usage: (ut::check-parens "ww-searcher.lisp")
   (let* ((root (asdf:system-relative-pathname :wouldwork ""))
          (pattern (merge-pathnames
                    (make-pathname :directory '(:relative :wild-inferiors)

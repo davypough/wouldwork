@@ -173,6 +173,113 @@ Debugging knobs:
 
 ---
 
+## Enum-CSP cutover modes (staged migration controls)
+
+Wouldwork now has a coordinated cutover helper for goal-enumerator migration:
+
+```lisp
+(set-enum-csp-cutover-mode <mode>)
+```
+
+Supported modes:
+
+- `:legacy-safe`  
+  Uses the legacy backend only. No shadow parity checks. No next-backend pilot checks.
+- `:shadow`  
+  Uses legacy backend, but enables shadow parity comparison for migration confidence.
+- `:next-pilot-strict`  
+  Uses next backend with fluent/subset/finalize pilot execution and strict pilot bound-check gating.
+
+### Mode switch commands
+
+```lisp
+;; Keep production behavior
+(set-enum-csp-cutover-mode :legacy-safe)
+
+;; Legacy execution + parity instrumentation
+(set-enum-csp-cutover-mode :shadow)
+
+;; Next backend pilot with strict safety gate
+(set-enum-csp-cutover-mode :next-pilot-strict)
+```
+
+### Post-switch safety checks
+
+After switching modes, run:
+
+```lisp
+(stage corner)
+(report-enum-csp-migration-health)
+```
+
+Recommended CI/smoke checks:
+
+```lisp
+;; Full migration/parity suite
+(run-enum-csp-parity-checks)
+
+;; Mode profile smoke check
+(command-test-21)
+
+;; Finalize-pilot deterministic/bounded checks
+(command-test-22)
+(command-test-23)
+
+;; Finalize-focused migration checks (reporters/strict/cutover)
+;; Covers command-test-24 .. command-test-36
+```
+
+If you only want mismatch output (quiet on pass):
+
+```lisp
+(report-enum-csp-backend-mismatches)
+(report-enum-csp-next-pilot-bound-check)
+```
+
+### Finalize pilot metadata
+
+When next-backend pilot execution is enabled, adapter metadata now includes:
+
+- `:finalize-pilot-summary` with:
+  - `:subset-frontier-size-in`
+  - `:finalize-frontier-size-out` (also mirrored as `:accepted-final-size`)
+  - `:prefilter-status` and `:prefilter-counts`
+  - `:propagation-counts`
+  - `:goal-check-counts`
+  - `:prune-reason-counts` (`:prefilter`, `:propagation`, `:goal`)
+  - `:accept-reason-counts` (`:goal`, `:no-goal-check`)
+
+`enum-csp-next-pilot-bound-check` now validates finalize-phase accounting and bounds:
+
+- finalize input matches subset output
+- finalize output is bounded by finalize phase estimate
+- accepted + pruned = finalize input
+- prefilter-pass count matches propagation-attempt count
+
+### End-to-end finalize parity command
+
+Use this to compare legacy `find-goal-states` results against next finalize accepted states:
+
+```lisp
+(run-enum-csp-e2e-finalize-parity)
+```
+
+Strict mode (signals on mismatch):
+
+```lisp
+(run-enum-csp-e2e-finalize-parity nil :strict t)
+```
+
+Returned summary includes:
+
+- `:legacy-goal-count`
+- `:next-finalize-count`
+- `:match-p`
+- `:difference-keys` (compact mismatch overview)
+- `:differences` (detailed mismatch tuples)
+
+---
+
 ## “Wait… it remembers my last session?” (Yes.)
 
 Wouldwork keeps your working context in a small file (`vals.lisp`) inside the system directory.  
