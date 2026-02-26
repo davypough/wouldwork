@@ -100,12 +100,12 @@
 )
 
 
-(define-enum-relation loc  ;specify for enumerator only
+(define-base-relation loc  ;specify for enumerator only
   :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
   :symmetric-batch t)
 
 
-(define-enum-relation paired  ;specify for enumerator only
+(define-base-relation paired  ;specify for enumerator only
   :max-per-key 4
   :requires-fluent loc  ;prevents generating beam pairings for connectors without a location (held)
   :partner-feasible (:query observable :args ((:key-fluent loc) :partner)))

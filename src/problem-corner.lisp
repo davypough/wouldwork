@@ -1655,10 +1655,7 @@
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
 
-(define-base-relations (loc paired))
-
-
-(define-enum-relation loc  ;specify for enumerator only
+(define-base-relation loc  ;specify for enumerator only
   ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
   ;being held).
   ;Also, when equivalent objects are interchangeable, treat equivalent assignment batches as the same to avoid
@@ -1667,7 +1664,7 @@
   :symmetric-batch t)
 
 
-(define-enum-relation paired  ;specify for enumerator only
+(define-base-relation paired  ;specify for enumerator only
   ;Completeness-first profile: disable paired-domain pruning constraints.
   ;Re-enable the keys below for faster but potentially incomplete runs.
   :max-per-key 3

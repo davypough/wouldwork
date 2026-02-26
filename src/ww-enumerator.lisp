@@ -3,9 +3,9 @@
 ;;; CSP-based enumeration support for goal-state generation.
 ;;;
 ;;; Provides:
-;;;   1) DEFINE-BASE-RELATIONS — problem specs declare the "base" (non-derived)
-;;;      relations/types that the enumerator branches on.
-;;;   2) DEFINE-ENUM-RELATION — problem specs declare per-relation enumeration
+;;;   1) DEFINE-BASE-RELATIONS — optional problem-spec override for the
+;;;      enumerator's base schema (relations/types to branch on).
+;;;   2) DEFINE-BASE-RELATION — problem specs declare per-relation enumeration
 ;;;      metadata (pattern, allow-unassigned, early-keys, on-assign,
 ;;;      symmetric-batch, max-per-key) to drive generic action generation.
 ;;;   3) Auto-detection of symmetric (undirected) relations and interchangeable
@@ -106,10 +106,15 @@
 
 (defparameter *enum-relation-metadata* (make-hash-table :test 'eq)
   "Hash table mapping relation symbols to enum metadata plists.
-   Set by DEFINE-ENUM-RELATION in problem specifications.
+   Set by DEFINE-BASE-RELATION in problem specifications.
    Keys: relation symbols.  Values: plists with keys
    :PATTERN :ALLOW-UNASSIGNED :EARLY-KEYS :ON-ASSIGN :SYMMETRIC-BATCH :MAX-PER-KEY
    :KEY-TYPES :REQUIRES-FLUENT :PARTNER-FEASIBLE.")
+
+
+(defparameter *enum-relation-order* nil
+  "Declaration-order list of relations seen by DEFINE-BASE-RELATION.
+   Used to infer base relations when DEFINE-BASE-RELATIONS is omitted.")
 
 
 (defparameter *enumerator-domain-hints* (make-hash-table :test 'eq)
@@ -229,7 +234,7 @@
   name)
 
 
-(defmacro define-enum-relation (relation &rest keys)
+(defmacro define-base-relation (relation &rest keys)
   "Problem-spec macro: declare enumeration metadata for RELATION.
    Keys:
    :PATTERN          :FLUENT | :SUBSET  (default inferred from relation)
@@ -242,7 +247,7 @@
    :REQUIRES-FLUENT  symbol  — fluent that must be bound for non-empty subsets
    :PARTNER-FEASIBLE  (:QUERY name :ARGS (arg-specs...))  — branch-time feasibility check
    Example:
-     (define-enum-relation loc
+     (define-base-relation loc
        :pattern :fluent
        :allow-unassigned (:types cargo)
        :early-keys (:types agent)
@@ -353,7 +358,7 @@
    Returns: T (the report plist is saved on (get 'find-goal-states :last-report))."
   (unless (get-base-relations)
     (error "FIND-GOAL-STATES: no base relations declared.  ~
-            Use (define-base-relations (...)) in the problem specification."))
+            Declare relations with DEFINE-BASE-RELATION (or use DEFINE-BASE-RELATIONS)."))
   ;; Guard: *debug* and *probe* interfere with enumeration output.
   (when (or (> *debug* 0) *probe*)
     (format t "~&[find-goal-states] Please reset first by entering ")
@@ -1009,7 +1014,7 @@
               computed once).  Default NIL.  Mutually exclusive with :SORT<."
   (unless (get-base-relations)
     (error "FIND-PENULTIMATE-STATES: no base relations declared.  ~
-            Use (define-base-relations (...)) in the problem specification."))
+            Declare relations with DEFINE-BASE-RELATION (or use DEFINE-BASE-RELATIONS)."))
   (when (or (> *debug* 0) *probe*)
     (format t "~&[find-penultimate-states] Please reset first by entering ")
     (when (> *debug* 0)
@@ -1647,7 +1652,7 @@
    SKIP-FIXED-MAPS: when T, disable goal-fixed-fluent pruning in CSP generation."
   (unless (get-base-relations)
     (error "ENUMERATE-STATE: no base relations declared.  ~
-            Use (define-base-relations (...)) in the problem specification."))
+            Declare relations with DEFINE-BASE-RELATION (or use DEFINE-BASE-RELATIONS)."))
   ;; only validate integer N; otherwise accept existing solution-type modes.
   (when (integerp solution-type)
     (unless (plusp solution-type)
@@ -1981,7 +1986,9 @@ If the user answers NO, returns immediately."
   "Retrieve the enumerator base-relation schema.
 Checks dynamic binding first (for temporary overrides), then problem property."
   (or *enumerator-base-relations*
-      (get problem :enumerator-base-relations)))
+      (get problem :enumerator-base-relations)
+      *enum-relation-order*
+      (get problem :enum-relation-order)))
 
 
 ;;;; ----------------------------------------------------------------------
@@ -2005,16 +2012,22 @@ Checks dynamic binding first (for temporary overrides), then problem property."
    :PARTNER-FEASIBLE  (:QUERY name :ARGS (arg-specs...))  — branch-time feasibility check"
   (check-type relation symbol)
   (unless (gethash relation *relations*)
-    (error "DEFINE-ENUM-RELATION ~S: relation is not installed in *RELATIONS*." relation))
+    (error "DEFINE-BASE-RELATION ~S: relation is not installed in *RELATIONS*." relation))
   (let ((plist (enum-canonicalize-meta-keys keys)))
     (enum-validate-relation-meta relation plist)
     (setf (gethash relation *enum-relation-metadata*) plist)
+    (unless (member relation *enum-relation-order* :test #'eq)
+      (setf *enum-relation-order* (append *enum-relation-order* (list relation))))
     (when (and (boundp '*problem-name*) *problem-name*)
       (let ((tbl (or (get *problem-name* :enum-relation-metadata)
                      (let ((h (make-hash-table :test 'eq)))
                        (setf (get *problem-name* :enum-relation-metadata) h)
                        h))))
-        (setf (gethash relation tbl) plist)))
+        (setf (gethash relation tbl) plist))
+      (let ((rels (get *problem-name* :enum-relation-order)))
+        (unless (member relation rels :test #'eq)
+          (setf (get *problem-name* :enum-relation-order)
+                (append rels (list relation))))))
     (format t "~&Installing enumerator metadata for ~S...~%" relation)
     relation))
 
@@ -2040,20 +2053,20 @@ Checks dynamic binding first (for temporary overrides), then problem property."
         (max-per-key (getf plist :max-per-key)))
     (when (and explicit-pattern
                (not (member explicit-pattern '(:fluent :subset))))
-      (error "DEFINE-ENUM-RELATION ~S: :PATTERN must be :FLUENT or :SUBSET; got ~S"
+      (error "DEFINE-BASE-RELATION ~S: :PATTERN must be :FLUENT or :SUBSET; got ~S"
              relation explicit-pattern))
     (when allow-unassigned
       (unless (or (eq allow-unassigned t)
                   (and (consp allow-unassigned)
                        (eql (car allow-unassigned) :types)
                        (every #'symbolp (cdr allow-unassigned))))
-        (error "DEFINE-ENUM-RELATION ~S: :ALLOW-UNASSIGNED must be T or (:TYPES type...); got ~S"
+        (error "DEFINE-BASE-RELATION ~S: :ALLOW-UNASSIGNED must be T or (:TYPES type...); got ~S"
                relation allow-unassigned)))
     (when early-keys
       (unless (and (consp early-keys)
                    (eql (car early-keys) :types)
                    (every #'symbolp (cdr early-keys)))
-        (error "DEFINE-ENUM-RELATION ~S: :EARLY-KEYS must be (:TYPES type...); got ~S"
+        (error "DEFINE-BASE-RELATION ~S: :EARLY-KEYS must be (:TYPES type...); got ~S"
                relation early-keys)))
     (when on-assign
       (unless (and (listp on-assign)
@@ -2062,34 +2075,34 @@ Checks dynamic binding first (for temporary overrides), then problem property."
                                  (symbolp (first entry))
                                  (= (length entry) 2)))
                           on-assign))
-        (error "DEFINE-ENUM-RELATION ~S: :ON-ASSIGN must be ((rel val)...); got ~S"
+        (error "DEFINE-BASE-RELATION ~S: :ON-ASSIGN must be ((rel val)...); got ~S"
                relation on-assign)))
     (when max-per-key
       (unless (and (integerp max-per-key) (plusp max-per-key))
-        (error "DEFINE-ENUM-RELATION ~S: :MAX-PER-KEY must be a positive integer; got ~S"
+        (error "DEFINE-BASE-RELATION ~S: :MAX-PER-KEY must be a positive integer; got ~S"
                relation max-per-key)))
     (let ((key-types (getf plist :key-types)))
       (when key-types
         (unless (and (consp key-types)
                      (eql (car key-types) :types)
                      (every #'symbolp (cdr key-types)))
-          (error "DEFINE-ENUM-RELATION ~S: :KEY-TYPES must be (:TYPES type...); got ~S"
+          (error "DEFINE-BASE-RELATION ~S: :KEY-TYPES must be (:TYPES type...); got ~S"
                  relation key-types))))
     (let ((requires-fluent (getf plist :requires-fluent)))
       (when requires-fluent
         (unless (symbolp requires-fluent)
-          (error "DEFINE-ENUM-RELATION ~S: :REQUIRES-FLUENT must be a symbol; got ~S"
+          (error "DEFINE-BASE-RELATION ~S: :REQUIRES-FLUENT must be a symbol; got ~S"
                  relation requires-fluent))))
     (let ((pf (getf plist :partner-feasible)))
       (when pf
         (unless (eq pattern :subset)
-          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE only valid for :SUBSET pattern; got :PATTERN ~S"
+          (error "DEFINE-BASE-RELATION ~S: :PARTNER-FEASIBLE only valid for :SUBSET pattern; got :PATTERN ~S"
                  relation pattern))
         (unless (and (consp pf) (getf pf :query) (getf pf :args))
-          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE must be (:QUERY name :ARGS (...))"
+          (error "DEFINE-BASE-RELATION ~S: :PARTNER-FEASIBLE must be (:QUERY name :ARGS (...))"
                  relation))
         (unless (symbolp (getf pf :query))
-          (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE :QUERY must be a symbol; got ~S"
+          (error "DEFINE-BASE-RELATION ~S: :PARTNER-FEASIBLE :QUERY must be a symbol; got ~S"
                  relation (getf pf :query)))
         (dolist (arg-spec (getf pf :args))
           (unless (or (eq arg-spec :partner)
@@ -2098,7 +2111,7 @@ Checks dynamic binding first (for temporary overrides), then problem property."
                            (eq (first arg-spec) :key-fluent)
                            (symbolp (second arg-spec))
                            (= (length arg-spec) 2)))
-            (error "DEFINE-ENUM-RELATION ~S: :PARTNER-FEASIBLE arg-spec must be :PARTNER, :KEY, or (:KEY-FLUENT sym); got ~S"
+            (error "DEFINE-BASE-RELATION ~S: :PARTNER-FEASIBLE arg-spec must be :PARTNER, :KEY, or (:KEY-FLUENT sym); got ~S"
                    relation arg-spec)))))))
 
 
@@ -2237,8 +2250,10 @@ Checks dynamic binding first (for temporary overrides), then problem property."
 (defun clear-enum-relation-metadata ()
   "Clear all enum relation metadata."
   (clrhash *enum-relation-metadata*)
+  (setf *enum-relation-order* nil)
   (when (and (boundp '*problem-name*) *problem-name*)
-    (setf (get *problem-name* :enum-relation-metadata) nil))
+    (setf (get *problem-name* :enum-relation-metadata) nil)
+    (setf (get *problem-name* :enum-relation-order) nil))
   nil)
 
 

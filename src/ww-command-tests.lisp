@@ -26,6 +26,15 @@
       (list :name fn :pass-p nil :error e))))
 
 
+(defun detect-output (thunk)
+  "Capture THUNK's printed output and return it with trailing newlines removed."
+  (string-trim '(#\Newline #\Return)
+               (with-output-to-string (stream)
+                 (let ((*standard-output* stream)
+                       (*error-output* stream))
+                   (funcall thunk)))))
+
+
 (defun run-enumerator-checks (&key (stream *standard-output*))
   "CI entrypoint: run enumerator command test(s) and return compact pass/fail plist."
   (let* ((tests '(command-test-5))
