@@ -70,8 +70,6 @@
 		                     (:file "ww-set")
 		                     (:file "ww-command-tests")
 		                     (:file "ww-enumerator")
-                             (:file "ww-csp-ir")
-                             (:file "ww-enum-interpreter")
 		                     (always-compile-file "problem" :around-compile 
                                       (lambda (thunk)
                                         (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t)

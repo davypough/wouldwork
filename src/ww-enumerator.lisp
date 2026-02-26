@@ -141,7 +141,7 @@
   '(min-steps-remaining? heuristic? prune-state? bounding-function?)
   "Search hook function symbols temporarily disabled during CSP enumeration.
    These hooks are designed for normal planning search states and can
-   incorrectly prune or bias synthetic partial states used by the enumerator.")
+  incorrectly prune or bias synthetic partial states used by the enumerator.")
 
 
 (defstruct (fps-layer-stats (:constructor make-fps-layer-stats ()))
@@ -266,7 +266,6 @@
    :ALGORITHM      enumeration/search algorithm symbol (e.g., DEPTH-FIRST)
    :EXCLUDE-RELATIONS  symbol or list of symbols to remove from base schema
    :INCLUDE-RELATIONS  symbol or list of symbols to add to base schema
-   :BACKEND  :LEGACY | :NEXT-BACKEND (default :NEXT-BACKEND)
    :PREFILTER  function of (state) to prune base states before propagation.
                Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
    :SORT<  comparison function of (state-a state-b) for sorting goal states.
@@ -287,7 +286,6 @@
                          (solution-type nil solution-type-supplied-p)
                          (exclude-relations nil exclude-relations-supplied-p)
                          (include-relations nil include-relations-supplied-p)
-                         (backend nil backend-supplied-p)
                          (prefilter :use-installed prefilter-supplied-p)
                          (sort< nil sort<-supplied-p)
                          (sort-key nil sort-key-supplied-p))
@@ -318,9 +316,6 @@
                 `(:exclude-relations ,(maybe-quote exclude-relations)))
             ,@(when include-relations-supplied-p
                 `(:include-relations ,(maybe-quote include-relations)))
-            ,@(if backend-supplied-p
-                  `(:backend ,(maybe-quote backend))
-                  '(:backend :next-backend))
             ,@(when prefilter-supplied-p
                 `(:prefilter ,prefilter))
             ,@(when sort<-supplied-p
@@ -332,8 +327,6 @@
 (defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
                                       &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
-                                        (backend (and (boundp '*enum-csp-backend*)
-                                                      *enum-csp-backend*))
                                         (prefilter :use-installed)
                                         sort< sort-key)
   "Internal function for goal-state enumeration (called by FIND-GOAL-STATES macro).
@@ -349,7 +342,6 @@
    :ALGORITHM      enumeration/search algorithm (e.g., DEPTH-FIRST)
    :EXCLUDE-RELATIONS  list (or single symbol) to remove from base schema for this run
    :INCLUDE-RELATIONS  list (or single symbol) to add to base schema for this run
-   :BACKEND  :LEGACY or :NEXT-BACKEND. Defaults to *ENUM-CSP-BACKEND* when available.
    :PREFILTER  function of (state) to prune base states before propagation.
                Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
    :SORT<  comparison function of (state-a state-b) → generalized boolean.
@@ -370,19 +362,6 @@
     (when *probe*
       (format t " (ww-set *probe* nil)~%"))
     (return-from find-goal-states-fn nil))
-  (when (eq backend :next-backend)
-    (unless (fboundp 'enum-csp-next-find-goal-states-fn)
-      (error "FIND-GOAL-STATES: next-backend path unavailable; enum-csp IR module not loaded."))
-    (return-from find-goal-states-fn
-      (enum-csp-next-find-goal-states-fn
-       goal-spec
-       :algorithm algorithm
-       :solution-type solution-type
-       :exclude-relations exclude-relations
-       :include-relations include-relations
-       :prefilter prefilter
-       :sort< sort<
-       :sort-key sort-key)))
   (multiple-value-bind (norm-goal-spec goal-form)
       (enum-normalize-goal-spec goal-spec)
     (let* ((normalized-solution-type (fgs-normalize-solution-type solution-type))

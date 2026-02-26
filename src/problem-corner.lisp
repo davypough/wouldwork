@@ -93,81 +93,6 @@
 )
 
 
-;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
-
-
-(define-enum-relation loc  ;specify for enumerator only
-  ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
-  ;being held).
-  ;Also, when equivalent objects are interchangeable, treat equivalent assignment batches as the same to avoid
-  ;duplicate symmetric cases.
-  :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
-  :symmetric-batch t)
-
-
-;#+ignore
-(define-query corner-explicit-paired-partner-feasible (?area ?partner)
-  ;; POTENTIALLY UNSOUND pruning policy disabled for completeness checks.
-  (and
-   (or (and (eql ?area 'area2)
-            (or (eql ?partner 'transmitter2)
-                (eql ?partner 'receiver3)))
-       (and (eql ?area 'area3)
-            (or (eql ?partner 'transmitter1)
-                (eql ?partner 'receiver2)))
-       t)
-   (observable ?area ?partner)))
-
-
-(define-enum-relation paired  ;specify for enumerator only
-  ;Completeness-first profile: disable paired-domain pruning constraints.
-  ;Re-enable the keys below for faster but potentially incomplete runs.
-  :max-per-key 3
-  :requires-fluent loc)
-  ;:partner-feasible (:query corner-explicit-paired-partner-feasible
-  ;                          :args ((:key-fluent loc) :partner)))
-
-;;; Observable enum CSP Pruning: checks 1–3 are all captured by the existing observable query.
-;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,
-;;;    considering all possible gate states.
-;;; 2. A connector paired with another connector must have potential inter-area visibility between their respective areas,
-;;;    considering all possible gate states.
-;;; 3. Two connectors in the same area cannot usefully pair with each other,
-;;;    since beams require nonzero distance and only one connector per area can be active.
-
-
-#+ignore (define-base-filter connectors-in-areas2&3   ;provides no extra pruning
-  (exists ((?c1 ?c2) connector)
-    (and (loc ?c1 area2) (loc ?c2 area3))))
-
-
-(define-base-filter corner-base-constraints
-  (and ;don't pair connectors in the same area
-       (not (exists ((?c1 ?c2) connector)
-              (and (paired ?c1 ?c2)
-                   (bind (loc ?c1 $area1))
-                   (loc ?c2 $area1))))
-       ;deduction from the goal condition, runs before propagate-changes!
-       (exists ((?c-blue ?c-red ?c-other) connector)
-         (and (loc agent1 area4)
-              (loc ?c-blue area2)
-              (loc ?c-red area3)
-              (or (loc ?c-other area1)
-                  (loc ?c-other area4)
-                  (not (bind (loc ?c-other $x))))  ;not held
-              (paired ?c-blue transmitter2)
-              (paired ?c-blue receiver3)
-              (paired ?c-red transmitter1)
-              (paired ?c-red receiver2)))
-))
-
-
-;; High-level enumerator spec (migration path): interpreted by
-;; ww-enum-interpreter and compiled to the current ww-enumerator architecture.
-(define-goal-enumerator
-  :base-relations (loc paired))
-
-
 ;;;; PENULTIMATE STATE FEASIBILITY FILTER ;;;;
 ;;; Reserved-name query called post-propagation during penultimate state enumeration.
 ;;; Returns non-NIL to keep the state, NIL to prune.
@@ -1727,31 +1652,68 @@
        (active receiver3)))
 
 
-#+ignore (define-goal
-  (and (loc agent1 area4)
-       (loc connector1 area2)
-       (not (bind (loc connector2 $anywhere)))
-       (loc connector3 area3)
-       (paired connector1 transmitter2)
-       (paired connector1 receiver3)
-       (paired connector3 transmitter1)
-       (paired connector3 receiver2)
-))
+;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
 
-#+ignore (define-goal
-  (and (active receiver2)
-       (active receiver3)
-       (loc agent1 area4)
-       (loc connector1 area2)
-       (color connector1 blue)
-       (paired connector1 transmitter2)
-       (paired connector1 receiver3)
-       (loc connector3 area3)
-       (color connector3 red)
-       (paired connector3 transmitter1)
-       (paired connector3 receiver2)
-       (holds agent1 connector2)
-       (not (open gate1))
-       (not (active receiver1))
+(define-base-relations (loc paired))
+
+
+(define-enum-relation loc  ;specify for enumerator only
+  ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
+  ;being held).
+  ;Also, when equivalent objects are interchangeable, treat equivalent assignment batches as the same to avoid
+  ;duplicate symmetric cases.
+  :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
+  :symmetric-batch t)
+
+
+(define-enum-relation paired  ;specify for enumerator only
+  ;Completeness-first profile: disable paired-domain pruning constraints.
+  ;Re-enable the keys below for faster but potentially incomplete runs.
+  :max-per-key 3
+  :requires-fluent loc)
+  ;:partner-feasible (:query corner-explicit-paired-partner-feasible  ;observable
+  ;                   :args ((:key-fluent loc) :partner)))
+
+
+(define-query corner-explicit-paired-partner-feasible (?area ?partner)
+  ;; POTENTIALLY UNSOUND pruning policy disabled for completeness checks.
+  (and
+   (or (and (eql ?area 'area2)
+            (or (eql ?partner 'transmitter2)
+                (eql ?partner 'receiver3)))
+       (and (eql ?area 'area3)
+            (or (eql ?partner 'transmitter1)
+                (eql ?partner 'receiver2)))
+       t)
+   (observable ?area ?partner)))
+
+
+;;; Observable enum CSP Pruning: Evaluate these conditions later; probably incorrect
+;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,
+;;;    considering all possible gate states.
+;;; 2. A connector paired with another connector must have potential inter-area visibility between their respective areas,
+;;;    considering all possible gate states.
+;;; 3. Two connectors in the same area cannot usefully pair with each other,
+;;;    since beams require nonzero distance and only one connector per area can be active.
+
+
+(define-base-filter corner-base-constraints
+  (and ;don't pair connectors in the same area
+       (not (exists ((?c1 ?c2) connector)
+              (and (paired ?c1 ?c2)
+                   (bind (loc ?c1 $area1))
+                   (loc ?c2 $area1))))
+       ;deduction from the goal condition, runs before propagate-changes!
+       (exists ((?c-blue ?c-red ?c-other) connector)
+         (and (loc agent1 area4)
+              (loc ?c-blue area2)
+              (loc ?c-red area3)
+              (or (loc ?c-other area1)
+                  (loc ?c-other area4)
+                  (not (bind (loc ?c-other $x))))  ;not held
+              (paired ?c-blue transmitter2)
+              (paired ?c-blue receiver3)
+              (paired ?c-red transmitter1)
+              (paired ?c-red receiver2)))
 ))
