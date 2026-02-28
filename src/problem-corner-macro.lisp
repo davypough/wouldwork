@@ -105,10 +105,10 @@
   :symmetric-batch t)
 
 
-(define-base-relation paired  ;specify for enumerator only
-  :max-per-key 4
-  :requires-fluent loc  ;prevents generating beam pairings for connectors without a location (held)
-  :partner-feasible (:query observable :args ((:key-fluent loc) :partner)))
+(define-base-relation (paired ?connector ?terminus)  ;specify for enumerator only
+  :max-per (?connector 4)
+  :requires (and (bind (loc ?connector $any-area))
+                 (observable $any-area ?terminus)))
 
 ;;; Observable enum CSP Pruning: checks 1–3 are all captured by the existing observable query.
 ;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,

@@ -154,10 +154,9 @@ Enter (list-all-problems) for a complete list of problems."
 
 
 (defun command-test-5 ()
-  "Verify corner goal-enumerator diagnostics and goal-state count regression."
-  (format t "~%COMMAND-TEST-5: testing corner enumerator pruning diagnostics...~2%")
-  (let ((saved-problem *problem-name*)
-        (saved-diag *enum-hint-diagnostics-enabled*))
+  "Verify corner goal-state count regression."
+  (format t "~%COMMAND-TEST-5: testing corner goal-state count regression...~2%")
+  (let ((saved-problem *problem-name*))
     (unwind-protect
         (let* ((*standard-output* (make-broadcast-stream))
                (*error-output* (make-broadcast-stream))
@@ -165,16 +164,11 @@ Enter (list-all-problems) for a complete list of problems."
                             (make-string-input-stream "n\n")
                             (make-string-output-stream))))
           (stage corner)
-          (setf *enum-hint-diagnostics-enabled* t)
           (find-goal-states-fn (command-test-resolved-goal-spec))
           (let* ((report (get 'find-goal-states :last-report))
                  (summary (getf report :summary))
-                 (goal-count (getf summary :goal-states))
-                 (diag (gethash '(:value loc) *enum-hint-diagnostics*))
-                 (rejected (and diag (getf diag :rejected))))
-            (assert (= goal-count 113))
-            (assert (and (integerp rejected) (> rejected 0)))))
-      (setf *enum-hint-diagnostics-enabled* saved-diag)
+                 (goal-count (getf summary :goal-states)))
+            (assert (= goal-count 113))))
       (when (and saved-problem (not (eq *problem-name* saved-problem)))
         (stage saved-problem))))
   (format t "COMMAND-TEST-5 completed successfully.~2%")

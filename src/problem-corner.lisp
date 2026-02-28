@@ -93,47 +93,6 @@
 )
 
 
-;;;; PENULTIMATE STATE FEASIBILITY FILTER ;;;;
-;;; Reserved-name query called post-propagation during penultimate state enumeration.
-;;; Returns non-NIL to keep the state, NIL to prune.
-;;; Prunes states where the agent's area is not reachable from the initial area
-;;; through currently-passable accessibility edges (gates must be open).
-
-;;; Simple version: exploits problem-corner's fixed topology.
-;;; Areas 1,2,3 are unconditionally connected (all accessible0).
-;;; Area 4 is reachable only through gate1 (all paths are accessible1 via gate1).
-;;; Therefore: agent in area4 requires gate1 open; agent elsewhere is always reachable.
-(define-query penultimate-state-feasible? ()
-  (do (bind (loc agent1 $area))
-      (if (eql $area 'area4)
-        (open gate1)
-        t)))
-
-
-;;; BFS version: general for any area/gate structure.
-;;; BFS from initial agent area (area1) through currently-passable edges.
-;;; Uses the existing 'accessible' query which respects gate open/closed states.
-;;; Returns t if agent1's current area is reachable from area1.
-#+ignore
-(define-query penultimate-state-feasible? ()
-  (do (bind (loc agent1 $agent-area))
-      (setq $frontier (list area1))
-      (setq $visited nil)
-      (ww-loop while $frontier do
-        (setq $next nil)
-        (ww-loop for $cur in $frontier do
-          (if (eql $cur $agent-area)
-            (return-from penultimate-state-feasible? t))
-          (push $cur $visited)
-          (doall (?a area)
-            (if (and (not (member ?a $visited))
-                     (not (member ?a $next))
-                     (accessible agent1 $cur ?a))
-              (push ?a $next))))
-        (setq $frontier $next))
-      nil))
-
-
 ;;;; HEURISTIC FUNCTIONS ;;;;
 
 #|
@@ -1656,61 +1615,77 @@
 
 
 (define-base-relation loc  ;specify for enumerator only
-  ;While enumerating locations, let cargo objects be allowed to have no location assigned (that represents
-  ;being held).
-  ;Also, when equivalent objects are interchangeable, treat equivalent assignment batches as the same to avoid
-  ;duplicate symmetric cases.
+  ;While enumerating locations, let cargo objects be allowed to have no
+  ;location assigned (representing being held). Also, at most one cargo item
+  ;can be unassigned a location (ie, held).
   :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
-  :symmetric-batch t)
+  :max-unassigned (:types cargo 1))  ;at most one cargo object may be unassigned/held
 
 
-(define-base-relation paired  ;specify for enumerator only
+(define-base-relation (paired ?connector ?terminus)
+    :max-per (?connector 3)
+    :requires (and (bind (loc ?connector $connector-area))
+                   (or (not (connector ?terminus))
+                       (and (bind (loc ?terminus $terminus-area))
+                            (different $connector-area $terminus-area)))))
+
+
+(define-base-relation (paired ?connector ?terminus)  ;specify for enumerator only
   ;Completeness-first profile: disable paired-domain pruning constraints.
   ;Re-enable the keys below for faster but potentially incomplete runs.
-  :max-per-key 3
-  :requires-fluent loc)
-  ;:partner-feasible (:query corner-explicit-paired-partner-feasible  ;observable
-  ;                   :args ((:key-fluent loc) :partner)))
+  :max-per (?connector 3)  ;max pairings allowed when pairing a connector
+  :requires (and (bind (loc ?connector $connector-area))  ;only generate non-held connectors
+                 ;(potentially-selectable $connector-area ?terminus)  ;available but ineffective since all areas inter-selectable
+                 (or (not (connector ?terminus))  ;only connector terminus relevant
+                     (and (bind (loc ?terminus $terminus-area))  ;connector must have a different location
+                          (different $connector-area $terminus-area)))))
 
 
-(define-query corner-explicit-paired-partner-feasible (?area ?partner)
-  ;; POTENTIALLY UNSOUND pruning policy disabled for completeness checks.
-  (and
-   (or (and (eql ?area 'area2)
-            (or (eql ?partner 'transmitter2)
-                (eql ?partner 'receiver3)))
-       (and (eql ?area 'area3)
-            (or (eql ?partner 'transmitter1)
-                (eql ?partner 'receiver2)))
-       t)
-   (observable ?area ?partner)))
+(define-query potentially-selectable (?area ?terminus)
+    ;; Conservative over-approximation of (selectable ?agent ?area ?terminus):
+    ;; if selectable is true in any concrete state, this must be true.
+    (or (observable ?area ?terminus)
+        (exists (?adj-area area)
+          (and (or (accessible0 ?area ?adj-area)
+                   (bind (accessible1 ?area $zone ?adj-area)))
+               (observable ?adj-area ?terminus)))))
 
 
-;;; Observable enum CSP Pruning: Evaluate these conditions later; probably incorrect
-;;; 1. A connector paired with a fixture (transmitter or receiver) must have potential line-of-sight from its area to that fixture,
-;;;    considering all possible gate states.
-;;; 2. A connector paired with another connector must have potential inter-area visibility between their respective areas,
-;;;    considering all possible gate states.
-;;; 3. Two connectors in the same area cannot usefully pair with each other,
-;;;    since beams require nonzero distance and only one connector per area can be active.
-
-
-(define-base-filter corner-base-constraints
-  (and ;don't pair connectors in the same area
-       (not (exists ((?c1 ?c2) connector)
-              (and (paired ?c1 ?c2)
-                   (bind (loc ?c1 $area1))
-                   (loc ?c2 $area1))))
-       ;deduction from the goal condition, runs before propagate-changes!
+(define-base-filter filter-constraints  ;this is for the goal only
+  (and (loc agent1 area4)
        (exists ((?c-blue ?c-red ?c-other) connector)
-         (and (loc agent1 area4)
-              (loc ?c-blue area2)
+         (and (loc ?c-blue area2)
               (loc ?c-red area3)
               (or (loc ?c-other area1)
                   (loc ?c-other area4)
-                  (not (bind (loc ?c-other $x))))  ;not held
+                  (not (bind (loc ?c-other $x))))  ;held
               (paired ?c-blue transmitter2)
               (paired ?c-blue receiver3)
               (paired ?c-red transmitter1)
-              (paired ?c-red receiver2)))
-))
+              (paired ?c-red receiver2)))))
+
+
+(defparameter *known-goal-state*
+  ;Verify this state is in (find-goal-states) with (known-goal-states-enumerated-p)
+  '((ACTIVE RECEIVER2)
+    (ACTIVE RECEIVER3)
+    (BEAM-SEGMENT BEAM4 TRANSMITTER2 CONNECTOR1 9 8)
+    (BEAM-SEGMENT BEAM5 TRANSMITTER1 CONNECTOR3 10 9)
+    (BEAM-SEGMENT BEAM6 CONNECTOR3 RECEIVER2 7 109/10)
+    (BEAM-SEGMENT BEAM7 CONNECTOR3 CONNECTOR1 19/2 17/2)
+    (BEAM-SEGMENT BEAM8 CONNECTOR1 RECEIVER1 81/10 1)
+    (BEAM-SEGMENT BEAM9 CONNECTOR1 RECEIVER3 1 109/10)
+    (BEAM-SEGMENT BEAM10 CONNECTOR1 CONNECTOR3 19/2 17/2)
+    (COLOR CONNECTOR3 RED)
+    (COLOR CONNECTOR1 BLUE)
+    (CURRENT-BEAMS (BEAM10 BEAM9 BEAM8 BEAM7 BEAM6 BEAM5 BEAM4 NIL NIL NIL))
+    (HOLDS AGENT1 CONNECTOR2)
+    (LOC AGENT1 AREA4)
+    (LOC CONNECTOR1 AREA2)
+    (LOC CONNECTOR3 AREA3)
+    (PAIRED CONNECTOR1 RECEIVER3)
+    (PAIRED CONNECTOR1 RECEIVER1)
+    (PAIRED CONNECTOR1 TRANSMITTER2)
+    (PAIRED CONNECTOR3 CONNECTOR1)
+    (PAIRED CONNECTOR3 RECEIVER2)
+    (PAIRED CONNECTOR3 TRANSMITTER1)))

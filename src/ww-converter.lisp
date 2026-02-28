@@ -57,6 +57,11 @@
     (finish-output)
     (install-prefilter *enumerator-base-filter-name*
       (compile nil (subst-int-code *enumerator-base-filter-form*))))
+  ;; Compile enum :REQUIRES predicates if the enumerator module is loaded.
+  (when (fboundp 'compile-enum-relation-requires-predicates)
+    (format t "~&  enum relation requires predicates...~%")
+    (finish-output)
+    (compile-enum-relation-requires-predicates))
   ;; Compile happening interrupt functions
   (iter (for obj in *happening-names*)
         (format t "~&  ~A...~%" obj)

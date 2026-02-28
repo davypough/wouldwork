@@ -1,4 +1,6 @@
 AGENTS.md
+CLAUDE.md
 vals.lisp
 src/problem.lisp
 lib/
+.claude/
