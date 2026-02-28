@@ -788,7 +788,7 @@
                                                  (fps-layer-stats-layer-table stats))
                                         (cons candidate new-path))
                                   (return))           ; found, skip remaining forms
-                                (incf (fps-layer-stats-key-mismatch-count stats)))))))))))))))))
+                                (incf (fps-layer-stats-key-mismatch-count stats))))))))))))))))))
 
 
 (defun fps-expand-predecessor-layer-forward-ondemand (frontier reachable
@@ -801,14 +801,38 @@
    then validates each by forward application.
    Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
   (let ((stats (make-fps-layer-stats))
-        (domains (fps-compute-base-relation-domains base-relations)))
+        (domains (fps-compute-base-relation-domains base-relations))
+        (frontier-count (length frontier))
+        (frontier-idx 0)
+        (last-report-time (get-internal-real-time)))
+    (format t "~&  [forward-ondemand] Domains computed. Processing ~:D frontier states x ~:D actions...~%"
+            frontier-count (length selected-actions))
+    (force-output)
     (dolist (target frontier)
+      (incf frontier-idx)
+      (when (= frontier-idx 1)
+        (format t "~&  [forward-ondemand] Starting frontier state 1/~:D...~%" frontier-count)
+        (force-output))
       (let ((target-key (fps-state-base-prop-key target base-relations)))
         (dolist (action selected-actions)
           (fps-expand-one-state-forward target target-key action
                                         reachable (fps-layer-stats-layer-table stats)
                                         base-relations domains
-                                        problem-actions stats))))
+                                        problem-actions stats)))
+      (let ((now (get-internal-real-time)))
+        (when (or (= frontier-idx 1)
+                  (>= (- now last-report-time)
+                       (* 5 internal-time-units-per-second)))
+          (format t "~&  [forward-ondemand] ~:D/~:D frontier states (~,1F%%), ~
+                     raw=~:D, feasible=~:D, validated=~:D, found=~:D~%"
+                  frontier-idx frontier-count
+                  (* 100.0 (/ frontier-idx frontier-count))
+                  (fps-layer-stats-raw-count stats)
+                  (fps-layer-stats-feasible-count stats)
+                  (fps-layer-stats-validated-count stats)
+                  (hash-table-count (fps-layer-stats-layer-table stats)))
+          (force-output)
+          (setf last-report-time now))))
     (values (fps-layer-stats-layer-table stats)
             (fps-layer-stats-raw-count stats)
             (fps-layer-stats-feasible-count stats)
