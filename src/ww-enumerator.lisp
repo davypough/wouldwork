@@ -345,38 +345,6 @@
               '(:direction 'forward))))))
 
 
-(defmacro analyze-predecessor-prune (&key
-                                       (predicate 'predecessor-state-feasible? predicate-supplied-p)
-                                       (action-families :auto action-families-supplied-p)
-                                       (sample-limit 10 sample-limit-supplied-p))
-  "User-facing macro wrapper for ANALYZE-PREDECESSOR-PRUNE-FN.
-   Estimates forward-candidate prune impact of PREDICATE."
-  (flet ((literal-symbol-p (form)
-           (and (symbolp form)
-                (not (keywordp form))
-                (not (null form))))
-         (literal-list-p (form)
-           (and (consp form)
-                (not (eq (car form) 'quote)))))
-    (labels ((maybe-quote (form)
-               (cond
-                 ((null form) nil)
-                 ((and (consp form) (eq (car form) 'quote)) form)
-                 ((literal-symbol-p form) `',form)
-                 ((literal-list-p form) `',form)
-                 (t form))))
-      `(analyze-predecessor-prune-fn
-        ,@(if predicate-supplied-p
-              `(:predicate ,(maybe-quote predicate))
-              '(:predicate 'predecessor-state-feasible?))
-        ,@(if action-families-supplied-p
-              `(:action-families ,(maybe-quote action-families))
-              '(:action-families :auto))
-        ,@(if sample-limit-supplied-p
-              `(:sample-limit ,sample-limit)
-              '(:sample-limit 10))))))
-
-
 (defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
                                       &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
@@ -657,6 +625,197 @@
           (push rel result))))))
 
 
+(defun fps-compute-base-relation-domains (base-relations)
+  "Precompute domain information for each relation in BASE-RELATIONS.
+   Returns an alist keyed by relation symbol.  Each entry is a plist:
+     :PATTERN           :FLUENT or :SUBSET
+     :KEY-OBJECTS        instances of the key (non-fluent) type(s)
+     :VALUES             (fluent only) instances of the fluent value type
+     :ALLOW-UNASSIGNED   types whose key instances may have no assignment
+     :PARTNERS           (subset only) all partner instances (before self-exclusion)
+     :MAX-PER-KEY        (subset only) cardinality cap from metadata"
+  (mapcar
+   (lambda (rel)
+     (let* ((pattern (enum-pattern rel))
+            (key-specs (relation-key-type-specs rel))
+            (key-objects (mapcan #'expand-type-spec-instances* key-specs))
+            (allow-raw (enum-allow-unassigned rel))
+            (allow-types (cond ((eq allow-raw t)
+                                (mapcan (lambda (spec)
+                                          (copy-list (expand-type-spec-instances* spec)))
+                                        key-specs))
+                               ((and (consp allow-raw) (eql (car allow-raw) :types))
+                                (mapcan #'expand-type-spec-instances* (cdr allow-raw)))
+                               (t nil))))
+       (cons rel
+             (ecase pattern
+               (:fluent
+                (let* ((val-specs (relation-fluent-type-specs rel))
+                       (values (mapcan #'expand-type-spec-instances* val-specs)))
+                  (list :pattern :fluent
+                        :key-objects key-objects
+                        :values values
+                        :allow-unassigned allow-types)))
+               (:subset
+                (let* ((sig (relation-signature rel))
+                       (partners (mapcan #'expand-type-spec-instances* sig))
+                       (max-k (enum-max-per-key rel)))
+                  (list :pattern :subset
+                        :key-objects key-objects
+                        :partners (remove-duplicates partners :test #'eq)
+                        :max-per-key (or max-k 3))))))))
+   base-relations))
+
+
+(defun fps-enumerate-object-base-variations (frontier-state object modified-rels
+                                             domains base-relations)
+  "Enumerate candidate predecessor states by varying OBJECT's base propositions
+   across MODIFIED-RELS.  Returns a list of (candidate-state) after normalization.
+   Each candidate differs from FRONTIER-STATE in at least one base proposition
+   for OBJECT.  Unmodified base propositions are preserved from FRONTIER-STATE."
+  (let ((frontier-key (fps-state-base-prop-key frontier-state base-relations))
+        (per-rel-choices nil))
+    ;; Build the set of choices per modified relation for this object.
+    (dolist (rel modified-rels)
+      (let* ((domain (cdr (assoc rel domains :test #'eq)))
+             (pattern (getf domain :pattern))
+             (key-objects (getf domain :key-objects)))
+        (when (member object key-objects :test #'eq)
+          (let ((choices nil))
+            (ecase pattern
+              (:fluent
+               (let ((values (getf domain :values))
+                     (allow-unassigned (getf domain :allow-unassigned)))
+                 (dolist (val values)
+                   (push (list (list rel object val)) choices))
+                 (when (member object allow-unassigned :test #'eq)
+                   (push nil choices))))                 ; nil = no proposition
+              (:subset
+               (let* ((all-partners (getf domain :partners))
+                      (partners (remove object all-partners :test #'eq))
+                      (subsets (bw--pairing-subsets partners)))
+                 (dolist (subset subsets)
+                   (push (mapcar (lambda (partner) (list rel object partner))
+                                 subset)
+                         choices)))))
+            (when choices
+              (push (nreverse choices) per-rel-choices))))))
+    ;; If no per-rel-choices, object has no valid variations.
+    (unless per-rel-choices
+      (return-from fps-enumerate-object-base-variations nil))
+    ;; Cartesian product across relations, then build candidate states.
+    (let ((combos (reduce (lambda (acc rel-choices)
+                            (let ((result nil))
+                              (dolist (existing acc)
+                                (dolist (choice rel-choices)
+                                  (push (append existing choice) result)))
+                              (nreverse result)))
+                          (nreverse per-rel-choices)
+                          :initial-value '(nil)))
+          (candidates nil))
+      (dolist (combo combos)
+        ;; combo is a list of propositions (or nil entries for unassigned).
+        ;; Each entry is (rel object value) or nil (no proposition for that rel).
+        (let* ((props (remove nil combo))
+               (candidate (copy-problem-state frontier-state))
+               (idb (problem-state.idb candidate)))
+          ;; Delete existing base propositions for this object in all modified rels.
+          (dolist (rel modified-rels)
+            (bw--delete-props-matching!
+             candidate (lambda (p) (and (eql (car p) rel)
+                                        (eql (second p) object)))))
+          ;; Add new propositions (skip nil = unassigned).
+          (dolist (prop props)
+            (add-proposition prop idb))
+          ;; Normalize: strip derived relations, recompute closure.
+          (bw-normalize! candidate)
+          ;; Skip if the candidate has the same base-prop key as the frontier.
+          (let ((cand-key (fps-state-base-prop-key candidate base-relations)))
+            (unless (string= cand-key frontier-key)
+              (push candidate candidates)))))
+      (nreverse candidates))))
+
+
+(defun fps-expand-one-state-forward (frontier-state frontier-key action
+                                     reachable layer-table base-relations
+                                     domains problem-actions stats)
+  "Expand predecessors of FRONTIER-STATE via ACTION using on-demand variation.
+   Novel validated predecessors are recorded in the layer-table of STATS."
+  (let* ((modified-rels (intersection (action.effect-adds action)
+                                      base-relations :test #'eq)))
+    (unless modified-rels
+      (return-from fps-expand-one-state-forward nil))
+    (let ((key-objects nil))
+      ;; Collect all key-objects across modified relations.
+      (dolist (rel modified-rels)
+        (let ((domain (cdr (assoc rel domains :test #'eq))))
+          (dolist (obj (getf domain :key-objects))
+            (pushnew obj key-objects :test #'eq))))
+      ;; For each key-object, enumerate base-prop variations.
+      (let ((*actions* problem-actions))
+        (dolist (object key-objects)
+          (dolist (candidate (fps-enumerate-object-base-variations
+                              frontier-state object modified-rels
+                              domains base-relations))
+            (incf (fps-layer-stats-raw-count stats))
+            (let ((pred-key (fps-state-base-prop-key candidate base-relations)))
+              (cond
+                ((gethash pred-key reachable)
+                 (incf (fps-layer-stats-collision-reachable-count stats)))
+                ((gethash pred-key (fps-layer-stats-layer-table stats))
+                 (incf (fps-layer-stats-collision-layer-count stats)))
+                (t
+                 (incf (fps-layer-stats-feasible-count stats))
+                 ;; Get applicable instantiations of this single action.
+                 (let ((forms (enum-action-instantiated-forms action candidate)))
+                   (incf (fps-layer-stats-novel-validation-attempts stats))
+                   (dolist (action-form forms)
+                     (multiple-value-bind (next-state success-p)
+                         (apply-action-to-state action-form candidate nil nil)
+                       (cond
+                         ((not success-p)
+                          (incf (fps-layer-stats-apply-fail-count stats)))
+                         (t
+                          (incf (fps-layer-stats-apply-success-count stats))
+                          (let ((next-key (fps-state-base-prop-key
+                                           next-state base-relations)))
+                            (if (string= next-key frontier-key)
+                                (let* ((target-entry (gethash frontier-key reachable))
+                                       (target-path (cdr target-entry))
+                                       (new-path (cons action-form target-path)))
+                                  (incf (fps-layer-stats-validated-count stats))
+                                  (setf (gethash pred-key
+                                                 (fps-layer-stats-layer-table stats))
+                                        (cons candidate new-path))
+                                  (return))           ; found, skip remaining forms
+                                (incf (fps-layer-stats-key-mismatch-count stats)))))))))))))))))
+
+
+(defun fps-expand-predecessor-layer-forward-ondemand (frontier reachable
+                                                       base-relations
+                                                       problem-actions
+                                                       selected-actions)
+  "Expand one predecessor layer using on-demand forward candidate generation.
+   For each frontier state and each selected action, generates candidate
+   predecessors by varying only the base propositions the action can modify,
+   then validates each by forward application.
+   Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
+  (let ((stats (make-fps-layer-stats))
+        (domains (fps-compute-base-relation-domains base-relations)))
+    (dolist (target frontier)
+      (let ((target-key (fps-state-base-prop-key target base-relations)))
+        (dolist (action selected-actions)
+          (fps-expand-one-state-forward target target-key action
+                                        reachable (fps-layer-stats-layer-table stats)
+                                        base-relations domains
+                                        problem-actions stats))))
+    (values (fps-layer-stats-layer-table stats)
+            (fps-layer-stats-raw-count stats)
+            (fps-layer-stats-feasible-count stats)
+            (fps-layer-stats-validated-count stats)
+            (fps-build-layer-diagnostics stats))))
+
+
 (defun enum-proposition-holds-p (state proposition)
   "True iff PROPOSITION holds in STATE's idb."
   (let ((fluent-indices (get-prop-fluent-indices proposition)))
@@ -705,26 +864,6 @@
     ((or (eq direction 'backward) (eq direction :backward)) :backward)
     ((or (eq direction 'forward) (eq direction :forward)) :forward)
     (t (error "FIND-PREDECESSORS: :DIRECTION must be BACKWARD or FORWARD; got ~S." direction))))
-
-
-(defun fps-enumerate-all-base-configurations ()
-  "Enumerate all feasible base configurations while preserving previously
-   enumerated goal-state globals.  Disables symmetry pruning so that all
-   concrete object namings are covered (required for forward-index key
-   matching against non-canonical goal states).
-   Intentionally does NOT apply installed goal/base prefilters; predecessor
-   filtering is controlled separately (e.g., PREDECESSOR-STATE-FEASIBLE?)."
-  (let ((saved-goal-states *enumerated-goal-states*)
-        (saved-unique-solutions *enumerated-unique-solutions*)
-        (*symmetry-pruning* nil))                                        ;; CHANGED
-    (unwind-protect
-        (enumerate-state (lambda (state) (declare (ignore state)) t)
-                         :solution-type 'every
-                         :skip-fixed-maps t
-                         :propagate 'finalize-only
-                         :prefilter nil)
-      (setf *enumerated-goal-states* saved-goal-states
-            *enumerated-unique-solutions* saved-unique-solutions))))
 
 
 (defun fps-hash-table-alist-sorted (table)
@@ -839,246 +978,9 @@
         :op-feasible (fps-hash-table-alist-sorted (fps-layer-stats-op-feasible stats))))
 
 
-(defun fps-build-forward-predecessor-index (base-relations problem-actions selected-actions
-                                            &key immutable-relations goal-signature-set)
-  "Build inverse one-step transition index for forward predecessor expansion.
-   Returns (values index state-count edge-count indexed-state-count
-                   immutable-pruned-count feasible-pruned-count)."
-  (let ((index (make-hash-table :test 'equal))
-        (states (fps-enumerate-all-base-configurations))
-        (state-count 0)
-        (indexed-state-count 0)
-        (immutable-pruned-count 0)
-        (feasible-pruned-count 0)
-        (edge-count 0))
-    (let ((*actions* problem-actions))
-      (dolist (pred states)
-        (incf state-count)
-        (cond
-          ((not (fps-goal-signature-compatible-p pred immutable-relations goal-signature-set))
-           (incf immutable-pruned-count))
-          ((not (fps-predecessor-state-feasible-p pred))
-           (incf feasible-pruned-count))
-          (t
-            (progn
-              (incf indexed-state-count)
-              (let ((pred-key (fps-state-base-prop-key pred base-relations)))
-                (dolist (action-form (enum-applicable-action-forms pred selected-actions))
-                  (multiple-value-bind (next-state success-p)
-                      (apply-action-to-state action-form pred nil nil)
-                    (when success-p
-                      (let ((next-key (fps-state-base-prop-key next-state base-relations)))
-                        (push (list pred-key pred action-form) (gethash next-key index))
-                        (incf edge-count)))))))))))
-    (values index state-count edge-count indexed-state-count
-            immutable-pruned-count feasible-pruned-count)))
-
-
-(defstruct (fps-forward-lazy-index (:constructor make-fps-forward-lazy-index ()))
-  "Lazy forward predecessor cache keyed by successor base-prop key."
-  (entries-by-successor-key (make-hash-table :test 'equal))
-  (materialized-keys (make-hash-table :test 'equal))
-  (candidate-predecessors nil)
-  (selected-actions nil)
-  (base-relations nil)
-  (problem-actions nil)
-  (edge-count 0 :type fixnum))
-
-
-(defun fps-build-forward-predecessor-candidate-pool (base-relations
-                                                     &key immutable-relations goal-signature-set)
-  "Build forward predecessor candidate pool after immutable-signature filtering.
-   Returns (values candidates state-count pool-count immutable-pruned)."
-  (let ((states (fps-enumerate-all-base-configurations))
-        (state-count 0)
-        (immutable-pruned-count 0)
-        (candidates nil))
-    (dolist (pred states)
-      (incf state-count)
-      (cond
-        ((not (fps-goal-signature-compatible-p pred immutable-relations goal-signature-set))
-         (incf immutable-pruned-count))
-        (t
-         (push (cons (fps-state-base-prop-key pred base-relations) pred) candidates))))
-    (let ((pool (nreverse candidates)))
-      (values pool state-count (length pool) immutable-pruned-count))))
-
-
-(defun fps-build-forward-predecessor-candidates (base-relations problem-actions
-                                                 &key immutable-relations goal-signature-set)
-  "Build filtered predecessor candidates for lazy forward expansion.
-   Returns (values candidates state-count indexed-count immutable-pruned feasible-pruned)."
-  (declare (ignore problem-actions))
-  (multiple-value-bind (pool state-count pool-count immutable-pruned-count)
-      (fps-build-forward-predecessor-candidate-pool
-       base-relations
-       :immutable-relations immutable-relations
-       :goal-signature-set goal-signature-set)
-    (declare (ignore pool-count))
-    (let ((candidates nil)
-          (feasible-pruned-count 0))
-      (dolist (entry pool)
-        (if (fps-predecessor-state-feasible-p (cdr entry))
-            (push entry candidates)
-            (incf feasible-pruned-count)))
-      (let ((filtered (nreverse candidates)))
-        (values filtered state-count (length filtered) immutable-pruned-count
-                feasible-pruned-count)))))
-
-
-(defun fps-resolve-prune-predicate (predicate)
-  "Resolve PREDICATE to (values function display-name)."
-  (cond
-    ((functionp predicate)
-     (values predicate '#:anonymous-function))
-    ((and (symbolp predicate) (fboundp predicate))
-     (values (symbol-function predicate) predicate))
-    ((and (symbolp predicate) (not (fboundp predicate)))
-     ;; Match FIND-PREDECESSORS semantics: missing predicate means no extra prune.
-     (values (lambda (state) (declare (ignore state)) t) predicate))
-    (t
-     (error "ANALYZE-PREDECESSOR-PRUNE: :PREDICATE must be a function or a fbound symbol; got ~S."
-            predicate))))
-
-
-(defun analyze-predecessor-prune-fn (&key (predicate 'predecessor-state-feasible?)
-                                          (action-families :auto)
-                                          (sample-limit 10))
-  "Analyze forward predecessor candidate pruning impact of PREDICATE.
-   Stores report in (get 'analyze-predecessor-prune :last-report)."
-  (unless (and (integerp sample-limit) (>= sample-limit 0))
-    (error "ANALYZE-PREDECESSOR-PRUNE: :SAMPLE-LIMIT must be a non-negative integer; got ~S."
-           sample-limit))
-  (unless *enumerated-goal-states*
-    (format t "~&[analyze-predecessor-prune] No goal states. Run (find-goal-states) first.~%")
-    (return-from analyze-predecessor-prune-fn nil))
-  (multiple-value-bind (predicate-fn predicate-name)
-      (fps-resolve-prune-predicate predicate)
-    (let* ((base-relations (get-base-relations))
-           (problem-actions *actions*)
-           (resolved-action-families (if (eq action-families :auto)
-                                         (enum-default-action-families-from-actions problem-actions)
-                                         action-families))
-           (families (enum-normalize-action-families resolved-action-families))
-           (selected-actions (enum-select-actions-by-family problem-actions families))
-           (modifiable-rels (actions-modifiable-base-relations selected-actions))
-           (immutable-rels (set-difference base-relations modifiable-rels :test #'eq))
-           (goal-signature-set (fps-build-goal-signature-set *enumerated-goal-states*
-                                                             immutable-rels)))
-      (multiple-value-bind (pool state-count pool-count immutable-pruned-count)
-          (fps-build-forward-predecessor-candidate-pool
-           base-relations
-           :immutable-relations immutable-rels
-           :goal-signature-set goal-signature-set)
-        (let ((kept-count 0)
-              (rejected-count 0)
-              (rejected-sample nil))
-          (dolist (entry pool)
-            (if (funcall predicate-fn (cdr entry))
-                (incf kept-count)
-                (progn
-                  (incf rejected-count)
-                  (when (< (length rejected-sample) sample-limit)
-                    (push (car entry) rejected-sample)))))
-          (let* ((report (list :predicate predicate-name
-                               :action-families families
-                               :selected-actions (mapcar #'action.name selected-actions)
-                               :state-count state-count
-                               :pool-count pool-count
-                               :immutable-pruned immutable-pruned-count
-                               :kept kept-count
-                               :rejected rejected-count
-                               :rejected-rate
-                               (if (plusp pool-count)
-                                   (/ (* 100.0 rejected-count) pool-count)
-                                   0.0)
-                               :rejected-sample-keys (nreverse rejected-sample))))
-            (setf (get 'analyze-predecessor-prune :last-report) report)
-            (format t "~&[analyze-predecessor-prune] Predicate ~S over forward pool: ~
-                       states=~:D, pool=~:D, immutable-pruned=~:D, rejected=~:D (~,2F%%), kept=~:D.~%"
-                    predicate-name state-count pool-count immutable-pruned-count
-                    rejected-count (getf report :rejected-rate) kept-count)
-            (when (getf report :rejected-sample-keys)
-              (format t "~&[analyze-predecessor-prune] Sample rejected keys: ~S~%"
-                      (getf report :rejected-sample-keys)))
-            report))))))
-
-
-(defun fps-forward-lazy-materialize-successor-keys (lazy-index target-keys)
-  "Materialize predecessor entries in LAZY-INDEX for TARGET-KEYS not yet cached.
-   Returns (values missing-key-count new-edge-count)."
-  (let* ((materialized (fps-forward-lazy-index-materialized-keys lazy-index))
-         (missing (remove-if (lambda (k) (gethash k materialized)) target-keys)))
-    (if (null missing)
-        (values 0 0)
-        (let ((missing-set (make-hash-table :test 'equal))
-              (new-edge-count 0)
-              (entries (fps-forward-lazy-index-entries-by-successor-key lazy-index))
-              (base-relations (fps-forward-lazy-index-base-relations lazy-index))
-              (selected-actions (fps-forward-lazy-index-selected-actions lazy-index))
-              (problem-actions (fps-forward-lazy-index-problem-actions lazy-index)))
-          (dolist (k missing)
-            (setf (gethash k missing-set) t))
-          (let ((*actions* problem-actions))
-            (dolist (candidate (fps-forward-lazy-index-candidate-predecessors lazy-index))
-              (let ((pred-key (car candidate))
-                    (pred (cdr candidate)))
-                (dolist (action-form (enum-applicable-action-forms pred selected-actions))
-                  (multiple-value-bind (next-state success-p)
-                      (apply-action-to-state action-form pred nil nil)
-                    (when success-p
-                      (let ((next-key (fps-state-base-prop-key next-state base-relations)))
-                        (when (gethash next-key missing-set)
-                          (push (list pred-key pred action-form)
-                                (gethash next-key entries))
-                          (incf new-edge-count)))))))))
-          (dolist (k missing)
-            (setf (gethash k materialized) t))
-          (incf (fps-forward-lazy-index-edge-count lazy-index) new-edge-count)
-          (values (length missing) new-edge-count)))))
-
-
-(defun fps-expand-predecessor-layer-forward-lazy (frontier-keys reachable lazy-index
-                                                  direction layer)
-  "Expand one predecessor layer from FRONTIER-KEYS using LAZY-INDEX cache."
-  (multiple-value-bind (missing-count new-edge-count)
-      (fps-forward-lazy-materialize-successor-keys lazy-index frontier-keys)
-    (when (> missing-count 0)
-      (format t "~&[find-predecessors ~S] Layer ~D lazy cache: materialized ~:D keys, +~:D edges (~:D total edges, ~:D successor keys cached).~%"
-              direction layer missing-count new-edge-count
-              (fps-forward-lazy-index-edge-count lazy-index)
-              (hash-table-count (fps-forward-lazy-index-entries-by-successor-key lazy-index))))
-    (fps-expand-predecessor-layer-forward-indexed
-     frontier-keys reachable
-     (fps-forward-lazy-index-entries-by-successor-key lazy-index))))
-
-
-(defun fps-expand-predecessor-layer-forward-indexed (frontier-keys reachable forward-index)
-  "Expand one predecessor layer from FRONTIER-KEYS using FORWARD-INDEX."
-  (let ((layer-table (make-hash-table :test 'equal))
-        (raw-count 0)
-        (feasible-count 0)
-        (validated-count 0))
-    (dolist (target-key frontier-keys)
-      (dolist (entry (gethash target-key forward-index))
-        (let ((pred-key (first entry)))
-          (unless (or (gethash pred-key reachable)
-                      (gethash pred-key layer-table))
-            (incf raw-count)
-            (incf feasible-count)
-            (incf validated-count)
-            (let* ((pred (second entry))
-                   (action-form (third entry))
-                   (target-entry (gethash target-key reachable))
-                   (new-path (cons action-form (cdr target-entry))))
-              (setf (gethash pred-key layer-table) (cons pred new-path)))))))
-    (values layer-table raw-count feasible-count validated-count)))
-
-
 (defun fps-print-layer-diagnostics (direction layer diagnostics)
-  "Print backward-layer diagnostic details when DIAGNOSTICS is non-nil
-   and DIRECTION is :BACKWARD."
-  (when (and (eq direction :backward) diagnostics)
+  "Print layer diagnostic details when DIAGNOSTICS is non-nil."
+  (when diagnostics
     (format t "~&[find-predecessors ~S] Layer ~D diagnostics: ~
                collisions reachable=~:D, collisions layer=~:D, ~
                novel validations=~:D, apply success=~:D, apply fail=~:D, key mismatch=~:D.~%"
@@ -1131,8 +1033,9 @@
                                   (direction 'forward))
   "Interactive iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
    DIRECTION BACKWARD regresses from the current frontier.
-   DIRECTION FORWARD builds a one-step inverse transition index, then expands
-   by reachable successor-key frontiers.
+   DIRECTION FORWARD generates predecessor candidates on demand by varying
+   base propositions each action can modify, then validates by forward application.
+   When no *BACKWARD-REACHABLE-SET* exists, :FORWARD auto-seeds from goal states.
    Prompts (y-or-n-p) after each layer. Ctrl-C safely reverts to the last
    completed layer."
   (unless *enumerated-goal-states*
@@ -1156,13 +1059,16 @@
          (reachable (ecase norm-direction
                       (:backward (make-hash-table :test 'equal))
                       (:forward
-                       (if (and *backward-reachable-set*
-                                (> (hash-table-count *backward-reachable-set*) 0))
-                           *backward-reachable-set*
-                           (make-hash-table :test 'equal)))))
+                       (or *backward-reachable-set*
+                           ;; Auto-seed from enumerated goal states
+                           (let ((ht (make-hash-table :test 'equal)))
+                             (dolist (gs *enumerated-goal-states*)
+                               (let ((key (fps-state-base-prop-key gs base-relations)))
+                                 (unless (gethash key ht)
+                                   (setf (gethash key ht) (cons gs nil)))))
+                             (setf *backward-reachable-set* ht)
+                             ht)))))
          (frontier nil)
-         (forward-lazy-index nil)
-         (forward-frontier-keys nil)
          (layer 0))
     (ecase norm-direction
       (:backward
@@ -1174,55 +1080,19 @@
        (setf *backward-reachable-set* reachable)
        (format t "~&[find-predecessors ~S] Layer 0 (goals): ~:D unique states seeded.~%"
                norm-direction
-               (hash-table-count reachable))
-       ;; Initial frontier is all seeded goal states
-       (setf frontier (loop for entry being the hash-values of reachable
-                            collect (car entry))))
+               (hash-table-count reachable)))
       (:forward
-       (unless *enumerated-goal-states*
-         (format t "~&[find-predecessors ~S] No goal states available. Run (find-goal-states) first.~%"
-                 norm-direction)
-         (return-from find-predecessors-fn nil))
-       (when (zerop (hash-table-count reachable))
-         (dolist (gs *enumerated-goal-states*)
-           (let ((key (fps-state-base-prop-key gs base-relations)))
-             (unless (gethash key reachable)
-               (setf (gethash key reachable) (cons gs nil)))))
-         (setf *backward-reachable-set* reachable)
-         (format t "~&[find-predecessors ~S] Layer 0 (goals): ~:D unique states seeded.~%"
-                 norm-direction (hash-table-count reachable)))
-       (format t "~&[find-predecessors ~S] Starting from ~:D reachable states.~%"
-               norm-direction (hash-table-count reachable))
-       (format t "~&[find-predecessors ~S] Building forward predecessor index...~%"
-               norm-direction)
-       (if immutable-rels
-           (format t "~&[find-predecessors ~S] Immutable-signature pruning enabled over relations ~S (goal signatures=~:D).~%"
-                   norm-direction immutable-rels (hash-table-count goal-signature-set))
-           (format t "~&[find-predecessors ~S] Immutable-signature pruning disabled (selected actions can modify all base relations).~%"
-                   norm-direction))
-       (multiple-value-bind (candidates state-count indexed-count immutable-pruned feasible-pruned)
-           (fps-build-forward-predecessor-candidates base-relations problem-actions
-                                                     :immutable-relations immutable-rels
-                                                     :goal-signature-set goal-signature-set)
-         (setf forward-lazy-index (make-fps-forward-lazy-index))
-         (setf (fps-forward-lazy-index-candidate-predecessors forward-lazy-index) candidates
-               (fps-forward-lazy-index-selected-actions forward-lazy-index) selected-actions
-               (fps-forward-lazy-index-base-relations forward-lazy-index) base-relations
-               (fps-forward-lazy-index-problem-actions forward-lazy-index) problem-actions)
-         (format t "~&[find-predecessors ~S] Forward lazy cache initialized: ~:D states (~:D candidates, ~:D immutable-pruned, ~:D feasible-pruned).~%"
-                 norm-direction state-count indexed-count immutable-pruned feasible-pruned))
-       (setf forward-frontier-keys
-             (loop for key being the hash-keys of reachable collect key))))
+       (format t "~&[find-predecessors ~S] Starting from reachable set: ~:D states.~%"
+               norm-direction
+               (hash-table-count reachable))))
+    ;; Seed frontier from reachable set (both directions use same pattern)
+    (setf frontier (loop for entry being the hash-values of reachable
+                         collect (car entry)))
     ;; Iterative expansion
     (loop
       (incf layer)
-      (ecase norm-direction
-        (:backward
-         (format t "~&[find-predecessors ~S] Computing layer ~D from ~:D frontier states...~%"
-                 norm-direction layer (length frontier)))
-        (:forward
-         (format t "~&[find-predecessors ~S] Computing layer ~D from ~:D frontier keys...~%"
-                 norm-direction layer (length forward-frontier-keys))))
+      (format t "~&[find-predecessors ~S] Computing layer ~D from ~:D frontier states...~%"
+              norm-direction layer (length frontier))
       (let ((layer-table (make-hash-table :test 'equal))
             (raw-count 0)
             (feasible-count 0)
@@ -1237,18 +1107,8 @@
                  (fps-expand-predecessor-layer-backward frontier reachable base-relations
                                                         problem-actions selected-actions))
                 (:forward
-                 (let ((result
-                         (multiple-value-list
-                          (fps-expand-predecessor-layer-forward-lazy forward-frontier-keys
-                                                                     reachable
-                                                                     forward-lazy-index
-                                                                     norm-direction
-                                                                     layer))))
-                   (values (first result)
-                           (second result)
-                           (third result)
-                           (fourth result)
-                           nil)))))
+                 (fps-expand-predecessor-layer-forward-ondemand frontier reachable base-relations
+                                                                 problem-actions selected-actions))))
           (serious-condition (c)
             (setf interrupted t)
             (format t "~&[find-predecessors ~S] Layer ~D interrupted: ~A~%"
@@ -1267,13 +1127,8 @@
             (format t "~&[find-predecessors ~S] Saturated - no new states at layer ~D.~%"
                     norm-direction layer)
             (return))
-          (ecase norm-direction
-            (:backward
-             (setf frontier (loop for entry being the hash-values of layer-table
-                                  collect (car entry))))
-            (:forward
-             (setf forward-frontier-keys
-                   (loop for key being the hash-keys of layer-table collect key))))
+          (setf frontier (loop for entry being the hash-values of layer-table
+                               collect (car entry)))
           (unless (y-or-n-p "Continue to layer ~D? " (1+ layer))
             (return)))))
     (format t "~&[find-predecessors ~S] Done. *backward-reachable-set* contains ~:D states.~%"
