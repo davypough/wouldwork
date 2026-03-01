@@ -13,7 +13,7 @@
    :EXCLUDE-RELATIONS  symbol or list of symbols to remove from base schema
    :INCLUDE-RELATIONS  symbol or list of symbols to add to base schema
    :PREFILTER  function of (state) to prune base states before propagation.
-               Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
+               Default :USE-INSTALLED uses the installed base filter; pass NIL to disable.
    :SORT<  comparison function of (state-a state-b) for sorting goal states.
            States for which (funcall sort< a b) is true sort first (best).
            Default NIL (no sorting).
@@ -99,12 +99,69 @@
               `(:direction ,(maybe-quote direction))
               '(:direction 'forward))))))
 
-
 (defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
                                       &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
                                         (prefilter :use-installed)
                                         sort< sort-key)
+  "Top-level API wrapper. Full implementation is defined below in
+   %FIND-GOAL-STATES-FN to keep call flow top-down in this file."
+  (%find-goal-states-fn goal-spec
+                        :algorithm algorithm
+                        :solution-type solution-type
+                        :exclude-relations exclude-relations
+                        :include-relations include-relations
+                        :prefilter prefilter
+                        :sort< sort<
+                        :sort-key sort-key))
+
+(defun find-predecessors-fn (&key (action-families :auto)
+                                  (direction 'forward))
+  "Top-level API wrapper. Full implementation is defined below in
+   %FIND-PREDECESSORS-FN to keep call flow top-down in this file."
+  (%find-predecessors-fn :action-families action-families
+                         :direction direction))
+
+(defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+                                       (default-max-per-key 4) (propagate t)
+                                       (prefilter nil) (goal-form nil)
+                                       (skip-fixed-maps nil)
+                                       (canonical-dedupe nil))
+  "Top-level API wrapper. Full implementation is defined below in
+   %ENUMERATE-STATE to keep call flow top-down in this file."
+  (%enumerate-state goal-spec
+                    :algorithm algorithm
+                    :solution-type solution-type
+                    :default-max-per-key default-max-per-key
+                    :propagate propagate
+                    :prefilter prefilter
+                    :goal-form goal-form
+                    :skip-fixed-maps skip-fixed-maps
+                    :canonical-dedupe canonical-dedupe))
+
+(defun enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+                                           (default-max-per-key 4) (propagate t)
+                                           (prefilter nil) (goal-form nil)
+                                           (skip-fixed-maps nil)
+                                           (canonical-dedupe nil))
+  "Top-level API wrapper. Full implementation is defined below in
+   %ENUMERATE-STATE-CSP to keep call flow top-down in this file."
+  (%enumerate-state-csp goal-spec
+                        :algorithm algorithm
+                        :solution-type solution-type
+                        :default-max-per-key default-max-per-key
+                        :propagate propagate
+                        :prefilter prefilter
+                        :goal-form goal-form
+                        :skip-fixed-maps skip-fixed-maps
+                        :canonical-dedupe canonical-dedupe))
+
+
+(defun %find-goal-states-fn (&optional (goal-spec 'goal-fn)
+                                       &key (algorithm *algorithm*) (solution-type 'every)
+                                         exclude-relations include-relations
+                                         (prefilter :use-installed)
+                                         sort< sort-key)
   "Internal function for goal-state enumeration (called by FIND-GOAL-STATES macro).
    Internally uses :FINALIZE-ONLY propagation: base-relation assignments are
    enumerated without propagation, then each complete leaf state is propagated
@@ -119,7 +176,7 @@
    :EXCLUDE-RELATIONS  list (or single symbol) to remove from base schema for this run
    :INCLUDE-RELATIONS  list (or single symbol) to add to base schema for this run
    :PREFILTER  function of (state) to prune base states before propagation.
-               Default :USE-INSTALLED uses (get-prefilter); pass NIL to disable.
+               Default :USE-INSTALLED uses the installed base filter; pass NIL to disable.
    :SORT<  comparison function of (state-a state-b) → generalized boolean.
            When non-nil, goal states are stable-sorted so that states for which
            (funcall sort< a b) is true appear first.  Default NIL (no sorting).
@@ -137,7 +194,7 @@
       (format t " (ww-set *debug* 0)~%"))
     (when *probe*
       (format t " (ww-set *probe* nil)~%"))
-    (return-from find-goal-states-fn nil))
+    (return-from %find-goal-states-fn nil))
   (multiple-value-bind (norm-goal-spec goal-form)
       (enum-normalize-goal-spec goal-spec)
     (let* ((normalized-solution-type (fgs-normalize-solution-type solution-type))
@@ -158,7 +215,7 @@
             (get 'find-predecessors :last-report) nil)
       ;; Resolve :use-installed prefilter default.
       (let* ((effective-prefilter (if (eq prefilter :use-installed)
-                                      (get-prefilter)
+                                      *enumerator-prefilter*
                                       prefilter))
              ;; Action-invariant prefilter: prune states violating goal literals
              ;; on base relations that no action can modify.
@@ -1262,8 +1319,8 @@
     new-count))
 
 
-(defun find-predecessors-fn (&key (action-families :auto)
-                                  (direction 'forward))
+(defun %find-predecessors-fn (&key (action-families :auto)
+                                   (direction 'forward))
   "Interactive iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
    DIRECTION BACKWARD regresses from the current frontier.
    DIRECTION FORWARD generates predecessor candidates on demand by varying
@@ -1273,10 +1330,10 @@
    completed layer."
   (unless *enumerated-goal-states*
     (format t "~&[find-predecessors] No goal states. Run (find-goal-states) first.~%")
-    (return-from find-predecessors-fn nil))
+    (return-from %find-predecessors-fn nil))
   (when (or (> *debug* 0) *probe*)
     (format t "~&[find-predecessors] Please reset *debug* and *probe* first.~%")
-    (return-from find-predecessors-fn nil))
+    (return-from %find-predecessors-fn nil))
   (let* ((norm-direction (fps-normalize-predecessor-direction direction))
          (base-relations (get-base-relations))
          (problem-actions *actions*)
@@ -1461,11 +1518,11 @@
         (t (list x))))
 
 
-(defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
-                                       (default-max-per-key 4) (propagate t)
-                                       (prefilter nil) (goal-form nil)
-                                       (skip-fixed-maps nil)
-                                       (canonical-dedupe nil))
+(defun %enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+                                        (default-max-per-key 4) (propagate t)
+                                        (prefilter nil) (goal-form nil)
+                                        (skip-fixed-maps nil)
+                                        (canonical-dedupe nil))
   "Enumerate compatible goal states via CSP-based variable assignment.
    GOAL-SPEC may be a goal form (including quantifiers) or a partial goal-state
    shorthand ((p ...) (q ...)).
@@ -1499,11 +1556,11 @@
                        :canonical-dedupe canonical-dedupe))
 
 
-(defun enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
-                                           (default-max-per-key 4) (propagate t)
-                                           (prefilter nil) (goal-form nil)
-                                           (skip-fixed-maps nil)
-                                           (canonical-dedupe nil))
+(defun %enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
+                                            (default-max-per-key 4) (propagate t)
+                                            (prefilter nil) (goal-form nil)
+                                            (skip-fixed-maps nil)
+                                            (canonical-dedupe nil))
   "Enumerate compatible states via a CSP-style, generated enum-action sequence.
    SOLUTION-TYPE:
    - any existing solver mode (FIRST, EVERY, MIN-LENGTH, etc.)
@@ -1814,7 +1871,7 @@ If the user answers NO, returns immediately."
          (saved-symmetric-relations *enumerator-detected-symmetric-relations*))
     (multiple-value-bind (norm-goal-spec normalized-goal-form)
         (enum-normalize-goal-spec goal-form)
-      (let* ((effective-prefilter (get-prefilter))
+      (let* ((effective-prefilter *enumerator-prefilter*)
              (modifiable-rels (actions-modifiable-base-relations *actions*))
              (invariants (enum-action-invariant-literals
                           normalized-goal-form base-relations modifiable-rels))
@@ -1863,8 +1920,9 @@ If the user answers NO, returns immediately."
 
 (defun known-goal-state-enumerated-p (&optional
                                       (known-goal-state
-                                        (and (boundp '*known-goal-state*)
-                                             *known-goal-state*))
+                                        (let ((sym '*known-goal-state*))
+                                          (and (boundp sym)
+                                               (symbol-value sym))))
                                       (enumerated-goal-states *enumerated-goal-states*))
   "Return five values:
    1) T iff KNOWN-GOAL-STATE appears in the canonical goal universe.
@@ -1935,4 +1993,3 @@ If the user answers NO, returns immediately."
                    :solution-type 'every
                    :default-max-per-key default-max-per-key
                    :propagate nil))
-

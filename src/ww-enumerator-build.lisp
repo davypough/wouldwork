@@ -10,7 +10,7 @@
 ;;;      max-per, requires) to drive generic action generation.
 ;;;   3) Auto-detection of symmetric (undirected) relations and interchangeable
 ;;;      object groups from relation metadata and static-relation signatures.
-;;;   4) DEFINE-PREFILTER — problem-spec hook to prune base states before
+;;;   4) DEFINE-BASE-FILTER — problem-spec hook to prune base states before
 ;;;      propagation.
 ;;;   5) FIND-GOAL-STATES — user-facing entry point for goal-state enumeration.
 ;;;   6) GENERATE-ENUM-ACTIONS — data-driven generator that creates a CSP
@@ -89,7 +89,7 @@
 
 
 (defparameter *enumerator-prefilter* nil
-  "Prefilter function for enumeration, set via DEFINE-PREFILTER.
+  "Compiled prefilter function for enumeration, set via DEFINE-BASE-FILTER.
    When non-nil, applied at ENUM-FINALIZE to prune states before propagation.")
 
 
@@ -166,28 +166,9 @@
 ;;;; ----------------------------------------------------------------------
 
 
-(defmacro define-base-relations (schema)
-  "Problem-spec macro: (define-base-relations ( ...symbols... ))"
-  `(install-base-relations ',schema))
-
-
-(defmacro define-prefilter (name lambda-list &body body)
-  "Problem-spec macro: define a prefilter function for enumeration.
-   The prefilter is applied to each base state before propagation.
-   States for which the prefilter returns NIL are pruned.
-   NAME: symbol naming the prefilter (for documentation)
-   LAMBDA-LIST: must be (state) — the function receives a problem-state
-   BODY: code that returns T to keep the state, NIL to prune it
-   Example:
-     (define-prefilter corner-paths (state)
-       (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
-            (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))"
-  `(install-prefilter ',name (lambda ,lambda-list ,@body)))
-
-
 (defmacro define-base-filter (name body)
   "Problem-spec macro: define a base-state filter using WouldWork's logic DSL.
-   Like DEFINE-PREFILTER but the body uses the same syntax as query functions:
+   The body uses the same syntax as query functions:
    EXISTS, FORALL, AND, OR, NOT, BIND, relation lookups, etc.
    NAME: symbol naming the filter (for documentation/debugging)
    BODY: a WouldWork expression returning non-NIL to keep the state, NIL to prune
@@ -251,6 +232,17 @@
 ;;;; Top-level entry points
 ;;;; ----------------------------------------------------------------------
 
+(defun generate-enum-actions (&key (goal-form nil) (default-max-per-key 4)
+                                   (propagate t) (prefilter nil)
+                                   (skip-fixed-maps nil))
+  "Top-level API wrapper. Full implementation is defined below in
+   %GENERATE-ENUM-ACTIONS to keep call flow top-down in this file."
+  (%generate-enum-actions :goal-form goal-form
+                          :default-max-per-key default-max-per-key
+                          :propagate propagate
+                          :prefilter prefilter
+                          :skip-fixed-maps skip-fixed-maps))
+
 
 ;;;; ----------------------------------------------------------------------
 ;;;; Prefilter helpers
@@ -292,28 +284,14 @@
 
 
 ;;;; ----------------------------------------------------------------------
-;;;; Base-relation schema management
+;;;; Base-relation schema access
 ;;;; ----------------------------------------------------------------------
-
-
-(defun install-base-relations (schema)
-  "Install SCHEMA (a list of symbols) as the enumerator's base-relation schema.
-   SCHEMA is intentionally permissive (you may mix type names and predicate names).
-   The enumerator interprets this schema to generate CSP enum-actions."
-  (check-type schema list)
-  (format t "~&Installing base relations for enumerator...~%")
-  (setf *enumerator-base-relations* schema)
-  ;; Also store it under the current problem name when available.
-  (when (and (boundp '*problem-name*) *problem-name*)
-    (setf (get *problem-name* :enumerator-base-relations) schema))
-  schema)
 
 
 (defun get-base-relations (&optional (problem *problem-name*))
   "Retrieve the enumerator base-relation schema.
-Checks dynamic binding first (for temporary overrides), then problem property."
+Checks dynamic binding first (for temporary overrides), then declaration order."
   (or *enumerator-base-relations*
-      (get problem :enumerator-base-relations)
       *enum-relation-order*
       (get problem :enum-relation-order)))
 
@@ -715,45 +693,6 @@ Checks dynamic binding first (for temporary overrides), then problem property."
                     when (> (length unreferenced) 1)
                     collect unreferenced)))
       groups)))
-
-
-;;;; ----------------------------------------------------------------------
-;;;; Prefilter management
-;;;; ----------------------------------------------------------------------
-
-
-(defun install-prefilter (name fn)
-  "Install FN as the enumeration prefilter under NAME.
-   FN must be a function of one argument (state) returning T to keep, NIL to prune."
-  (check-type name symbol)
-  (check-type fn function)
-  (format t "~&Installing enumeration prefilter for ~S...~%" name)
-  (setf *enumerator-prefilter* fn)
-  (when (and (boundp '*problem-name*) *problem-name*)
-    (setf (get *problem-name* :enumerator-prefilter) fn)
-    (setf (get *problem-name* :enumerator-prefilter-name) name))
-  name)
-
-
-(defun get-prefilter (&optional (problem *problem-name*))
-  "Retrieve the enumeration prefilter function.
-   Checks dynamic variable first, then problem property."
-  (or *enumerator-prefilter*
-      (get problem :enumerator-prefilter)))
-
-
-(defun get-prefilter-name (&optional (problem *problem-name*))
-  "Retrieve the name of the installed prefilter (for reporting)."
-  (get problem :enumerator-prefilter-name))
-
-
-(defun clear-prefilter ()
-  "Clear the enumeration prefilter."
-  (setf *enumerator-prefilter* nil)
-  (when (and (boundp '*problem-name*) *problem-name*)
-    (setf (get *problem-name* :enumerator-prefilter) nil)
-    (setf (get *problem-name* :enumerator-prefilter-name) nil))
-  nil)
 
 
 ;;;; ----------------------------------------------------------------------
@@ -1655,7 +1594,7 @@ from the product are appended."
                      :solution-type 'every
                      :default-max-per-key max-per-key
                      :propagate 'finalize-only
-                     :prefilter (get-prefilter))
+                     :prefilter *enumerator-prefilter*)
     (let ((canonical (hash-table-count seen)))
       (format t "~&[count] Raw: ~D  Canonical: ~D  Duplicates: ~D~%"
               raw canonical (- raw canonical))
@@ -1959,9 +1898,9 @@ from the product are appended."
     all-actions))
 
 
-(defun generate-enum-actions (&key (goal-form nil) (default-max-per-key 4)
-                                   (propagate t) (prefilter nil)
-                                   (skip-fixed-maps nil))
+(defun %generate-enum-actions (&key (goal-form nil) (default-max-per-key 4)
+                                    (propagate t) (prefilter nil)
+                                    (skip-fixed-maps nil))
   "Generate a CSP enum-action sequence driven by declared base relations,
    enum-relation metadata, symmetry groups, and prefilter.
    Orchestrates metadata-driven generators and assembles final action list.

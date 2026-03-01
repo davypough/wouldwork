@@ -94,12 +94,6 @@
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
 
 #|
-(define-base-relations  ;specify for enumerator only
-  ;dyanamic relations which are not derived
-  (loc paired)
-)
-
-
 (define-base-relation loc  ;specify for enumerator only
   :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
   :symmetric-batch t)

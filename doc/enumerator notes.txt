@@ -32,8 +32,8 @@ state is tested against the goal condition.
 
 PROCEDURE (find-goal-states)
 
-1. Read the problem's base-relation schema (define-base-relations) and
-   per-relation enumeration metadata (define-enum-relation).
+1. Read the problem's base-relation schema from define-base-relation
+   declaration order, and per-relation enumeration metadata.
 
 2. Compute the effective base-relation schema for this run, applying any
    :exclude-relations or :include-relations overrides.
@@ -92,10 +92,8 @@ Steps 1-7a are the same as find-goal-states, with the following differences:
 
 PROBLEM-SPEC DECLARATIONS
 
-define-base-relations (schema)
-  Declare which dynamic relations the enumerator branches on.
-  Example:
-    (define-base-relations (loc paired))
+Base relation schema
+  Defined by define-base-relation declaration order.
 
 define-enum-relation relation &key ...
   Declare per-relation enumeration metadata.  Keys:
@@ -114,13 +112,13 @@ define-enum-relation relation &key ...
       :early-keys (:types agent)
       :symmetric-batch t)
 
-define-prefilter name (state) &body body
-  Declare a prefilter applied to each base state before propagation.
-  Return t to keep the state, nil to prune it.
+define-base-filter name body
+  Declare an installed base-state prefilter using WouldWork query DSL syntax.
+  Return non-nil to keep the state, nil to prune it.
   Example:
-    (define-prefilter corner-paths (state)
-      (and (prefilter-paired-reachable-p state 'transmitter1 'receiver2)
-           (prefilter-paired-reachable-p state 'transmitter2 'receiver3)))
+    (define-base-filter connectors-in-areas2&3
+      (exists ((?c1 ?c2) connector)
+        (and (loc ?c1 area2) (loc ?c2 area3))))
 
 
 RESULT VARIABLES

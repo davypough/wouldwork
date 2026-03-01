@@ -52,11 +52,14 @@
         (finish-output)
         (compile fname (subst-int-code (symbol-value fname))))
   ;; Compile base filter if present
-  (when *enumerator-base-filter-form*
-    (format t "~&  ~A (base-filter)...~%" *enumerator-base-filter-name*)
-    (finish-output)
-    (install-prefilter *enumerator-base-filter-name*
-      (compile nil (subst-int-code *enumerator-base-filter-form*))))
+  (if *enumerator-base-filter-form*
+      (progn
+        (format t "~&  ~A (base-filter)...~%" *enumerator-base-filter-name*)
+        (finish-output)
+        (setf *enumerator-prefilter*
+              (compile nil (subst-int-code *enumerator-base-filter-form*))))
+      ;; Ensure old filter state does not leak when a problem defines no base filter.
+      (setf *enumerator-prefilter* nil))
   ;; Compile enum :REQUIRES predicates if the enumerator module is loaded.
   (when (fboundp 'compile-enum-relation-requires-predicates)
     (format t "~&  enum relation requires predicates...~%")
