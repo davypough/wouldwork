@@ -225,7 +225,7 @@
      (define-base-relation (paired ?connector ?terminus)
        :max-per (?connector 3)
        :requires (bind (loc ?connector $any-area)))"
-  `(install-enum-relation-meta ',relation-spec ',keys))
+  `(install-base-relation ',relation-spec ',keys))
 
 
 ;;;; ----------------------------------------------------------------------
@@ -245,7 +245,7 @@
 
 
 ;;;; ----------------------------------------------------------------------
-;;;; Prefilter helpers
+;;;; Reporting helpers
 ;;;; ----------------------------------------------------------------------
 
 
@@ -301,7 +301,7 @@ Checks dynamic binding first (for temporary overrides), then declaration order."
 ;;;; ----------------------------------------------------------------------
 
 
-(defun install-enum-relation-meta (relation-spec keys)
+(defun install-base-relation (relation-spec keys)
   "Install enumeration metadata for RELATION-SPEC.
    RELATION-SPEC: RELATION symbol or (RELATION ?arg1 ?arg2 ...).
    KEYS: property list using DEFINE-BASE-RELATION keys."
@@ -1152,20 +1152,11 @@ from the product are appended."
      (mapcar (lambda (tuple) tuple) allowed-value-tuples))))
 
 
-(defun enum-make-symmetric-batch-action (rel sym-type objects value-tuples
-                                         &key (propagate t) (fixed-maps nil)
-                                         (max-unassigned-spec nil))
-  "Create a single enum action that assigns values to all symmetric OBJECTS at once.
-   Uses canonical (sorted) multiset assignments to avoid enumerating symmetric permutations.
-   REL is the relation being assigned.
-   SYM-TYPE is the symmetry group type name (for action naming).
-   OBJECTS is the list of symmetric objects.
-   VALUE-TUPLES is the list of possible fluent tuples.
-   When REL's :ALLOW-UNASSIGNED metadata applies, (:UNASSIGNED) is appended to the domain.
-   FIXED-MAPS: when provided, filters assignments to respect goal-fixed constraints.
-   Returns a single action with one instantiation per canonical assignment."
-  (let* ((name (intern (format nil "ENUM-~A-~AS" rel sym-type) *package*))
-         (allow-unassigned (some (lambda (obj)
+(defun enum-symmetric-batch-assignments (rel objects value-tuples fixed-maps
+                                         max-unassigned-spec)
+  "Compute canonical symmetric assignments for REL over OBJECTS.
+Applies :ALLOW-UNASSIGNED, :MAX-UNASSIGNED, and fixed-map filters."
+  (let* ((allow-unassigned (some (lambda (obj)
                                    (enum-key-allows-unassigned-p rel (list obj)))
                                  objects))
          (effective-domain (if allow-unassigned
@@ -1183,13 +1174,47 @@ from the product are appended."
                                               max-unassigned-cap))
                                         all-assignments)
                                        all-assignments))
-         (fixed (and fixed-maps (gethash rel fixed-maps)))
-         (assignments (if fixed
-                          (remove-if-not
-                           (lambda (asgn)
-                             (enum-assignment-respects-fixed-p asgn fixed))
-                           cap-filtered-assignments)
-                          cap-filtered-assignments))
+         (fixed (and fixed-maps (gethash rel fixed-maps))))
+    (if fixed
+        (remove-if-not
+         (lambda (asgn)
+           (enum-assignment-respects-fixed-p asgn fixed))
+         cap-filtered-assignments)
+        cap-filtered-assignments)))
+
+
+(defun enum-apply-symmetric-assignment! (s rel assignment on-assign)
+  "Apply one symmetric batch ASSIGNMENT to state S for REL."
+  (dolist (pair assignment)
+    (let ((obj (car pair))
+          (vals (cdr pair)))
+      (unless (equal vals '(:unassigned))
+        (update (problem-state.idb s)
+                (assemble-proposition rel (list obj) vals))
+        (when on-assign
+          (dolist (entry on-assign)
+            (let ((target-rel (first entry))
+                  (default-val (second entry)))
+              (when (not (fluent-bound-p s (list target-rel obj)))
+                (update (problem-state.idb s)
+                        (list target-rel obj default-val))))))))))
+
+
+(defun enum-make-symmetric-batch-action (rel sym-type objects value-tuples
+                                         &key (propagate t) (fixed-maps nil)
+                                         (max-unassigned-spec nil))
+  "Create a single enum action that assigns values to all symmetric OBJECTS at once.
+   Uses canonical (sorted) multiset assignments to avoid enumerating symmetric permutations.
+   REL is the relation being assigned.
+   SYM-TYPE is the symmetry group type name (for action naming).
+   OBJECTS is the list of symmetric objects.
+   VALUE-TUPLES is the list of possible fluent tuples.
+   When REL's :ALLOW-UNASSIGNED metadata applies, (:UNASSIGNED) is appended to the domain.
+   FIXED-MAPS: when provided, filters assignments to respect goal-fixed constraints.
+   Returns a single action with one instantiation per canonical assignment."
+  (let* ((name (intern (format nil "ENUM-~A-~AS" rel sym-type) *package*))
+         (assignments (enum-symmetric-batch-assignments
+                       rel objects value-tuples fixed-maps max-unassigned-spec))
          (on-assign (enum-on-assign rel)))
     (install-enum-action
      name
@@ -1203,19 +1228,7 @@ from the product are appended."
      ;; Effect: bind REL for each assigned object; skip (:UNASSIGNED)
      (lambda (state assignment)
        (let ((s (copy-state state)))
-         (dolist (pair assignment)
-           (let ((obj (car pair))
-                 (vals (cdr pair)))
-             (unless (equal vals '(:unassigned))
-               (update (problem-state.idb s)
-                       (assemble-proposition rel (list obj) vals))
-               (when on-assign
-                 (dolist (entry on-assign)
-                   (let ((target-rel (first entry))
-                         (default-val (second entry)))
-                     (when (not (fluent-bound-p s (list target-rel obj)))
-                       (update (problem-state.idb s)
-                               (list target-rel obj default-val)))))))))
+         (enum-apply-symmetric-assignment! s rel assignment on-assign)
          (when propagate
            (maybe-propagate-changes! s))
          (make-update-from s (list assignment))))
@@ -1360,6 +1373,47 @@ from the product are appended."
   (remove-if (lambda (p) (member p keys :test #'eq)) partner-set))
 
 
+(defun enum-residual-predecessor-for-key (state key predecessors-map fluent-relations)
+  "Return KEY's canonical residual predecessor, or NIL when none applies."
+  (let ((preds (and predecessors-map (gethash key predecessors-map))))
+    (and preds
+         fluent-relations
+         (enum-canonical-predecessor state key preds fluent-relations))))
+
+
+(defun enum-keys-share-loc-p (state key1 key2)
+  "Return T when KEY1 and KEY2 are both loc-bound to the same location."
+  (multiple-value-bind (loc1 bound1) (fluent-value state (list 'loc key1))
+    (multiple-value-bind (loc2 bound2) (fluent-value state (list 'loc key2))
+      (and bound1 bound2 (equal loc1 loc2)))))
+
+
+(defun enum-external-partner-set (state rel key partners keys &optional extra-partners)
+  "Return KEY's sorted external partner set for REL in STATE.
+EXTRA-PARTNERS are unioned before filtering/sorting."
+  (sort (copy-list
+         (enum-filter-group-members
+          (if extra-partners
+              (union (enum-key-partners state rel key partners)
+                     extra-partners
+                     :test #'eq)
+              (enum-key-partners state rel key partners))
+          keys))
+        #'string< :key #'symbol-name))
+
+
+(defun enum-residual-external-order-ok-p (state rel key chosen-set pred keys partners)
+  "Return T when KEY's external partner set preserves canonical residual order."
+  (let ((pred-ext (enum-external-partner-set state rel pred partners keys))
+        ;; KEY may already have partners introduced by earlier keys in symmetric
+        ;; subset relations; compare against KEY's complete post-action set.
+        (key-ext (enum-external-partner-set state rel key partners keys chosen-set)))
+    ;; When predecessor has no external partners after filtering, internal partner
+    ;; structure may still determine orientation; do not prune on external order.
+    (or (null pred-ext)
+        (enum-subset-lex<= pred-ext key-ext))))
+
+
 (defun enum-residual-symmetry-ok-p (state rel key chosen-set
                                     predecessors-map fluent-relations
                                     keys partners)
@@ -1368,41 +1422,15 @@ from the product are appended."
    partner set (group members removed) must be lexicographically >= the
    predecessor's external partner set."
   (or (null *enum-residual-symmetry-enabled*)
-      (let ((preds (and predecessors-map (gethash key predecessors-map))))
-        (or (null preds)
-            (null fluent-relations)
-            (let ((pred (enum-canonical-predecessor state key preds fluent-relations)))
-              (or (null pred)
-                  ;; Same-area connectors are not truly interchangeable due to
-                  ;; connectable constraint + fixed activation order in propagation.
-                  ;; Skip pruning when key and predecessor share the same loc.
-                  (multiple-value-bind (pred-loc pred-bound-p)
-                      (fluent-value state (list 'loc pred))
-                    (multiple-value-bind (key-loc key-bound-p)
-                        (fluent-value state (list 'loc key))
-                      (and pred-bound-p key-bound-p (equal pred-loc key-loc))))
-                  (let* ((pred-ext (sort (copy-list (enum-filter-group-members
-                                                     (enum-key-partners state rel pred partners)
-                                                     keys))
-                                         #'string< :key #'symbol-name))
-                         ;; KEY may already have partners introduced by earlier keys
-                         ;; in symmetric subset relations. Compare against KEY's
-                         ;; complete post-action external partner set.
-                         (key-ext (sort
-                                   (copy-list
-                                    (enum-filter-group-members
-                                     (union (enum-key-partners state rel key partners)
-                                            chosen-set
-                                            :test #'eq)
-                                     keys))
-                                   #'string< :key #'symbol-name))
-                         ;; When predecessor has no external partners after filtering,
-                         ;; internal partner structure (filtered out above) may still
-                         ;; determine canonical orientation.  In that case, do not
-                         ;; prune on external-lex order alone.
-                         (ok (or (null pred-ext)
-                                 (enum-subset-lex<= pred-ext key-ext))))
-                    ok)))))))
+      (let ((pred (enum-residual-predecessor-for-key
+                   state key predecessors-map fluent-relations)))
+        (or (null pred)
+            ;; Same-area connectors are not truly interchangeable due to
+            ;; connectable constraint + fixed activation order in propagation.
+            ;; Skip pruning when key and predecessor share the same loc.
+            (enum-keys-share-loc-p state pred key)
+            (enum-residual-external-order-ok-p
+             state rel key chosen-set pred keys partners)))))
 
 
 (defun enum-all-permutations (lst)
@@ -1696,6 +1724,63 @@ from the product are appended."
    (list nil)))
 
 
+(defun enum-split-fluent-keys (all-keys early-types sym-objects)
+  "Split ALL-KEYS into early and non-early key lists.
+Early keys must match EARLY-TYPES and must not include symmetric objects."
+  (let ((e-keys nil)
+        (o-keys nil))
+    (if early-types
+        (dolist (k all-keys)
+          (if (and (enum-key-matches-types-p k early-types)
+                   (not (some (lambda (obj)
+                                (member obj sym-objects :test #'eq))
+                              k)))
+              (push k e-keys)
+              (push k o-keys)))
+        (setf o-keys all-keys))
+    (values (nreverse e-keys) (nreverse o-keys))))
+
+
+(defun enum-generate-early-fluent-actions (rel e-keys fixed vtuples propagate)
+  "Build per-key early fluent actions for REL."
+  (let ((actions nil))
+    (dolist (k e-keys (nreverse actions))
+      (let* ((f (and fixed (gethash k fixed)))
+             (allowed (or (and f (list f)) vtuples)))
+        (push (enum-make-fluent-action rel k allowed :propagate propagate)
+              actions)))))
+
+
+(defun enum-generate-main-fluent-actions (rel o-keys vtuples propagate
+                                          fixed fixed-maps interchangeable-groups)
+  "Build main fluent actions for REL: symmetric batch actions plus individual keys."
+  (let ((actions nil)
+        (batch-objects (make-hash-table :test 'eq)))
+    ;; Symmetric batch for interchangeable groups.
+    (when *symmetry-pruning*
+      (dolist (group interchangeable-groups)
+        (let ((group-in-keys (remove-if-not
+                              (lambda (obj)
+                                (member (list obj) o-keys :test #'equal))
+                              group)))
+          (when (> (length group-in-keys) 1)
+            (let ((stype (or (find-group-type group) 'symmetric)))
+              (push (enum-make-symmetric-batch-action
+                     rel stype group-in-keys vtuples
+                     :propagate propagate
+                     :fixed-maps fixed-maps
+                     :max-unassigned-spec (enum-max-unassigned rel))
+                    actions)
+              (dolist (obj group-in-keys)
+                (setf (gethash obj batch-objects) t)))))))
+    ;; Individual key actions.
+    (dolist (k o-keys (nreverse actions))
+      (unless (gethash (first k) batch-objects)
+        (let ((allowed (enum-compute-allowed-values rel k fixed vtuples)))
+          (push (enum-make-fluent-action rel k allowed :propagate propagate)
+                actions))))))
+
+
 ;;;; ----------------------------------------------------------------------
 ;;;; Enum action generator
 ;;;; ----------------------------------------------------------------------
@@ -1723,58 +1808,23 @@ from the product are appended."
         (let* ((fixed (gethash r fixed-maps))
                (all-keys (enum-key-tuples-for r fixed focus-objs focus-set))
                (vtuples (enum-value-tuples-for r))
-               (early-spec (enum-early-keys r))
-               (early-types (and early-spec (cdr early-spec))))
+          (early-spec (enum-early-keys r))
+          (early-types (and early-spec (cdr early-spec))))
           (when vtuples
             (unless *enum-diag-printed*
               (format t "~&[fluent-actions] rel=~S keys=~S vtuples=~S~%" r all-keys vtuples))
-            ;; Split keys into early and non-early.
-            ;; Early keys exclude symmetric objects (handled in batch).
-            (let ((e-keys nil) (o-keys nil))
-              (if early-types
-                  (dolist (k all-keys)
-                    (if (and (enum-key-matches-types-p k early-types)
-                             (not (some (lambda (obj)
-                                          (member obj sym-objects :test #'eq))
-                                        k)))
-                        (push k e-keys)
-                        (push k o-keys)))
-                  (setf o-keys all-keys))
-              (setf e-keys (nreverse e-keys)
-                    o-keys (nreverse o-keys))
-              ;; Early-key actions (no unassigned sentinel)
-              (dolist (k e-keys)
-                (let* ((f (and fixed (gethash k fixed)))
-                       (allowed (or (and f (list f)) vtuples)))
-                  (push (enum-make-fluent-action r k allowed :propagate propagate)
-                        early-actions)))
-              ;; Main-key actions: symmetric batch + individual
-              (let ((batch-objects (make-hash-table :test 'eq)))
-                ;; Symmetric batch for interchangeable groups.
-                (when *symmetry-pruning*
-                  (dolist (group interchangeable-groups)
-                    (let ((group-in-keys (remove-if-not
-                                          (lambda (obj)
-                                            (member (list obj) o-keys :test #'equal))
-                                          group)))
-                      (when (> (length group-in-keys) 1)
-                        (let ((stype (or (find-group-type group) 'symmetric))
-                              (value-tuples vtuples))
-                          (push (enum-make-symmetric-batch-action
-                                 r stype group-in-keys value-tuples
-                                 :propagate propagate
-                                 :fixed-maps fixed-maps
-                                 :max-unassigned-spec (enum-max-unassigned r))
-                                main-actions)
-                          (dolist (obj group-in-keys)
-                            (setf (gethash obj batch-objects) t)))))))
-                ;; Individual key actions
-                (dolist (k o-keys)
-                  (unless (gethash (first k) batch-objects)
-                    (let ((allowed (enum-compute-allowed-values r k fixed vtuples)))
-                      (push (enum-make-fluent-action r k allowed :propagate propagate)
-                            main-actions))))))))))
-    (values (nreverse early-actions) (nreverse main-actions))))
+            (multiple-value-bind (e-keys o-keys)
+                (enum-split-fluent-keys all-keys early-types sym-objects)
+              (setf early-actions
+                    (nconc early-actions
+                           (enum-generate-early-fluent-actions
+                            r e-keys fixed vtuples propagate)))
+              (setf main-actions
+                    (nconc main-actions
+                           (enum-generate-main-fluent-actions
+                            r o-keys vtuples propagate
+                            fixed fixed-maps interchangeable-groups))))))))
+    (values early-actions main-actions)))
 
 
 (defun enum-compute-context (goal-form &key skip-fixed-maps)
