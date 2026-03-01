@@ -1622,14 +1622,6 @@
   :max-unassigned (:types cargo 1))  ;at most one cargo object may be unassigned/held
 
 
-(define-base-relation (paired ?connector ?terminus)
-    :max-per (?connector 3)
-    :requires (and (bind (loc ?connector $connector-area))
-                   (or (not (connector ?terminus))
-                       (and (bind (loc ?terminus $terminus-area))
-                            (different $connector-area $terminus-area)))))
-
-
 (define-base-relation (paired ?connector ?terminus)  ;specify for enumerator only
   ;Completeness-first profile: disable paired-domain pruning constraints.
   ;Re-enable the keys below for faster but potentially incomplete runs.
@@ -1649,6 +1641,17 @@
           (and (or (accessible0 ?area ?adj-area)
                    (bind (accessible1 ?area $zone ?adj-area)))
                (observable ?adj-area ?terminus)))))
+
+
+#+ignore (define-query state-feasible? ()
+  ;; Conservative agent accessibility: agent1's location must be
+  ;; reachable from initial position (area1) via accessible0/accessible1.
+  ;; 1-hop covers all 4 areas for Corner — no pruning, but establishes pattern.
+  (or (not (bind (loc agent1 $area)))          ;no location assigned: OK (partial state)
+      (loc agent1 area1)                        ;at start position: OK
+      (accessible0 area1 $area)                 ;1-hop via accessible0: OK
+      (exists (?zone (either gate blower))
+        (accessible1 area1 ?zone $area))))
 
 
 (define-base-filter filter-constraints  ;this is for the goal only

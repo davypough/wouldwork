@@ -141,7 +141,7 @@
 ;Reset certain user defined symbols, when defined on previous load.
 (eval-when (:load-toplevel :execute)
   (reset-user-syms '(goal-fn constraint-fn heuristic? min-steps-remaining?
-                     penultimate-state-feasible? prune-state? bounding-function?)))
+                     state-feasible? prune-state? bounding-function?)))
 
 
 (defun reset-global-hash-tables ()

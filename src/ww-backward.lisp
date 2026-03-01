@@ -395,7 +395,7 @@ If REQUIRED-PROPS is NIL, uses (BW-GOAL-REQUIRED-PROPS normalized-target)."
             for pred0 in (bw-regress target action-form)
             for pred = (copy-problem-state pred0) do
               (bw-normalize! pred :strip-relations strip-relations :normalizer normalizer)
-              (when (fps-state-enumeration-feasible-p pred)
+              (when (fps-state-feasible-p pred)
                 (multiple-value-bind (next-state ok failure-reason)
                     (apply-action-to-state action-form pred nil nil)
                   (cond
@@ -438,7 +438,7 @@ Returns a list of validated predecessor states."
           for pred0 in (bw-regress target action-form)
           for pred = (copy-problem-state pred0) do
             (bw-normalize! pred :strip-relations strip-relations :normalizer normalizer)
-            (when (fps-state-enumeration-feasible-p pred)
+            (when (fps-state-feasible-p pred)
               (multiple-value-bind (next-state ok failure-reason)
                   (apply-action-to-state action-form pred nil nil)
                 (cond
