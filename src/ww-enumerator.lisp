@@ -905,10 +905,16 @@
    each leaf by forward action application."
   (let ((csp-start (fps-build-csp-start-state frontier-state modified-rels))
         (layer-table (fps-layer-stats-layer-table stats))
-        (*actions* problem-actions))
+        (*actions* problem-actions)
+        (leaf-count 0))
     (fps-csp-search
      csp-start enum-actions
      (lambda (leaf)
+       (incf leaf-count)
+       (when (zerop (mod leaf-count 10000))
+         (format t "~&  [forward-csp]   ~S: ~:D leaves so far for this (state,action)...~%"
+                 (action.name action) leaf-count)
+         (finish-output))
        (bw-normalize! leaf :normalizer 'derive-holds!)
        (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
          (incf (fps-layer-stats-raw-count stats))
@@ -986,6 +992,15 @@
         (when enum-actions
           (push (list action modified-rels enum-actions) action-triples))))
     (setf action-triples (nreverse action-triples))
+    (dolist (triple action-triples)
+      (let ((a (first triple))
+            (mrels (second triple))
+            (eacts (third triple)))
+        (format t "~&  [forward-csp]   action ~S: ~D enum-actions, modified-rels=~S~%"
+                (action.name a) (length eacts) mrels)
+        (dolist (ea eacts)
+          (format t "~&  [forward-csp]     ~S: ~D pre-arg sets~%"
+                  (action.name ea) (length (action.precondition-args ea))))))
     (format t "~&  [forward-csp] ~D/~D actions modify base relations. ~
                Processing ~:D frontier states...~%"
             (length action-triples) (length selected-actions) frontier-count)
