@@ -1629,8 +1629,9 @@
   :requires (and (bind (loc ?connector $connector-area))  ;only generate non-held connectors
                  ;(potentially-selectable $connector-area ?terminus)  ;available but ineffective since all areas inter-selectable
                  (or (not (connector ?terminus))  ;only connector terminus relevant
-                     (and (bind (loc ?terminus $terminus-area))  ;connector must have a different location
-                          (different $connector-area $terminus-area)))))
+                     (and (bind (loc ?terminus $terminus-area))
+                          (different $connector-area $terminus-area)  ;connector must have a different location
+                          (not (paired ?terminus ?connector))))))  ;symmetric pairing cannot occur
 
 
 (define-query potentially-selectable (?area ?terminus)

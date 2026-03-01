@@ -1115,20 +1115,21 @@
                                                  (fps-layer-stats-op-success stats) 0))
                                   (let ((next-key (fps-idb-base-prop-key
                                                    changes base-relations)))
-                                    (when (string= next-key frontier-key)
-                                      (let* ((inst (update.instantiations upd))
-                                             (action-form (cons (action.name action)
-                                                                inst))
-                                             (target-entry (gethash frontier-key
-                                                                    reachable))
-                                             (target-path (cdr target-entry))
-                                             (new-path (cons action-form
-                                                             target-path))
-                                             (stored (copy-problem-state leaf)))
-                                        (incf (fps-layer-stats-validated-count stats))
-                                        (setf (gethash pred-key layer-table)
-                                              (cons stored new-path))
-                                        (return-from validate))))))))))))
+                                    (if (string= next-key frontier-key)
+                                        (let* ((inst (update.instantiations upd))
+                                               (action-form (cons (action.name action)
+                                                                  inst))
+                                               (target-entry (gethash frontier-key
+                                                                      reachable))
+                                               (target-path (cdr target-entry))
+                                               (new-path (cons action-form
+                                                               target-path))
+                                               (stored (copy-problem-state leaf)))
+                                          (incf (fps-layer-stats-validated-count stats))
+                                          (setf (gethash pred-key layer-table)
+                                                (cons stored new-path))
+                                          (return-from validate))
+                                        (incf (fps-layer-stats-key-mismatch-count stats))))))))))))
                 (error ()
                   (incf (fps-layer-stats-apply-fail-count stats))
                   (incf (gethash (action.name action)
@@ -1149,7 +1150,10 @@
         (frontier-count (length frontier))
         (frontier-idx 0)
         (last-report-time (get-internal-real-time))
-        (action-info nil))
+        (action-info nil)
+        (productive-count 0)          ;; ADDED: frontier productivity tracking
+        (first-productive-idx 0)      ;; ADDED
+        (last-productive-idx 0))
     ;; Phase 1: precompute per-action, per-key-object enum-action groups.
     (dolist (action selected-actions)
       (multiple-value-bind (enum-actions modified-rels)
@@ -1184,7 +1188,8 @@
       (when (= frontier-idx 1)
         (format t "~&  [forward-csp2] Starting frontier state 1/~:D...~%" frontier-count)
         (finish-output))
-      (let ((target-key (fps-state-base-prop-key target base-relations)))
+      (let ((target-key (fps-state-base-prop-key target base-relations))
+            (pre-validated (fps-layer-stats-validated-count stats)))  ;; ADDED
         (dolist (info action-info)
           (let ((action (first info))
                 (modified-rels (second info))
@@ -1195,12 +1200,17 @@
                 (fps-expand-one-state-forward-csp2
                  target target-key action reachable base-relations
                  problem-actions key-object object-enum-actions
-                 modified-rels stats))))))
+                 modified-rels stats)))))
+        (when (> (fps-layer-stats-validated-count stats) pre-validated)  ;; ADDED
+          (incf productive-count)
+          (when (zerop first-productive-idx)
+            (setf first-productive-idx frontier-idx))
+          (setf last-productive-idx frontier-idx)))
       (let ((now (get-internal-real-time)))
         (when (or (= frontier-idx 1)
                   (>= (- now last-report-time)
-                       (* 5 internal-time-units-per-second)))
-          (format t "~&  [forward-csp2] ~:D/~:D frontier states (~,1F%%), ~
+                       (* 10 internal-time-units-per-second)))
+          (format t "~&  [forward-csp2] ~:D/~:D frontier states (~,1F%), ~
                      raw=~:D, feasible=~:D, validated=~:D, found=~:D~%"
                   frontier-idx frontier-count
                   (* 100.0 (/ frontier-idx frontier-count))
@@ -1210,11 +1220,16 @@
                   (hash-table-count (fps-layer-stats-layer-table stats)))
           (finish-output)
           (setf last-report-time now))))
-    (values (fps-layer-stats-layer-table stats)
-            (fps-layer-stats-raw-count stats)
-            (fps-layer-stats-feasible-count stats)
-            (fps-layer-stats-validated-count stats)
-            (fps-build-layer-diagnostics stats))))
+    (let ((diag (fps-build-layer-diagnostics stats)))  ;; ADDED: append frontier productivity
+      (setf (getf diag :productive-frontier-count) productive-count
+            (getf diag :first-productive-frontier) first-productive-idx
+            (getf diag :last-productive-frontier) last-productive-idx
+            (getf diag :frontier-count) frontier-count)
+      (values (fps-layer-stats-layer-table stats)
+              (fps-layer-stats-raw-count stats)
+              (fps-layer-stats-feasible-count stats)
+              (fps-layer-stats-validated-count stats)
+              diag))))
 
 
 (defun fps-expand-predecessor-layer-forward-ondemand (frontier reachable
@@ -1457,7 +1472,15 @@
             (getf diagnostics :op-sample-failure))
     (format t "~&[find-predecessors ~S] Layer ~D diagnostics (sample details): ~S~%"
             direction layer
-            (getf diagnostics :op-sample-detail))))
+            (getf diagnostics :op-sample-detail))
+    (when (getf diagnostics :productive-frontier-count)  ;; ADDED: frontier productivity
+      (format t "~&[find-predecessors ~S] Layer ~D diagnostics (frontier productivity): ~
+                 ~:D of ~:D frontier states produced validations (first idx=~:D, last idx=~:D).~%"
+              direction layer
+              (getf diagnostics :productive-frontier-count)
+              (getf diagnostics :frontier-count)
+              (getf diagnostics :first-productive-frontier)
+              (getf diagnostics :last-productive-frontier)))))
 
 
 (defun fps-complete-layer (layer-table reachable start-time norm-direction layer
