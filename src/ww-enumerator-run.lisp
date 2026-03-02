@@ -99,6 +99,7 @@
               `(:direction ,(maybe-quote direction))
               '(:direction 'forward))))))
 
+
 (defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
                                       &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
@@ -115,12 +116,14 @@
                         :sort< sort<
                         :sort-key sort-key))
 
+
 (defun find-predecessors-fn (&key (action-families :auto)
                                   (direction 'forward))
   "Top-level API wrapper. Full implementation is defined below in
    %FIND-PREDECESSORS-FN to keep call flow top-down in this file."
   (%find-predecessors-fn :action-families action-families
                          :direction direction))
+
 
 (defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
                                        (default-max-per-key 4) (propagate t)
@@ -138,6 +141,7 @@
                     :goal-form goal-form
                     :skip-fixed-maps skip-fixed-maps
                     :canonical-dedupe canonical-dedupe))
+
 
 (defun enumerate-state-csp (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
                                            (default-max-per-key 4) (propagate t)
@@ -219,14 +223,14 @@
                                       prefilter))
              ;; Action-invariant prefilter: prune states violating goal literals
              ;; on base relations that no action can modify.
-             (modifiable-rels (actions-modifiable-base-relations *actions*))          ;; ADDED
-             (invariants (enum-action-invariant-literals                              ;; ADDED
-                          goal-form run-base-relations modifiable-rels))              ;; ADDED
-             (invariant-prefilter (make-goal-invariant-prefilter                      ;; ADDED
-                                   invariants 'find-goal-states))                    ;; ADDED
+             (modifiable-rels (actions-modifiable-base-relations *actions*))
+             (invariants (enum-action-invariant-literals
+                          goal-form run-base-relations modifiable-rels))
+             (invariant-prefilter (make-goal-invariant-prefilter
+                                   invariants 'find-goal-states))
              (feasibility-prefilter (when (fboundp 'state-feasible?)
                                       #'fps-state-feasible-p))
-             (combined-prefilter (compose-prefilters                                  ;; ADDED
+             (combined-prefilter (compose-prefilters
                                   (compose-prefilters
                                    effective-prefilter invariant-prefilter)
                                   feasibility-prefilter)))
@@ -352,6 +356,7 @@
           (when (and success-p (funcall goal-fn next-state))
             (push (list :action action-form :goal-state next-state) hits))))))
 
+
 (defun fps-state-feasible-p (state)
   "Unified state feasibility predicate for enumeration and predecessor expansion.
    When the user defines STATE-FEASIBLE? in the problem spec, calls it to test
@@ -382,6 +387,7 @@
                                   :include-move include-move
                                   :include-pickup include-pickup
                                   :include-connect include-connect)))))
+
 
 (defun enum-state-base-props (state base-relations)
   "Return sorted base-relation propositions from STATE."
@@ -559,6 +565,86 @@
   (fps-flatten-type-inst (action.precondition-type-inst action)))
 
 
+(defun fps-forward-key-objects-for-action (modified-rels domains action-objects)
+  "Collect candidate key-objects for MODIFIED-RELS, filtered by ACTION-OBJECTS."
+  (let ((key-objects nil))
+    (dolist (rel modified-rels)
+      (let ((domain (cdr (assoc rel domains :test #'eq))))
+        (dolist (obj (getf domain :key-objects))
+          (pushnew obj key-objects :test #'eq))))
+    (if action-objects
+        (intersection key-objects action-objects :test #'eq)
+        key-objects)))
+
+
+(defun fps-forward-validate-candidate (candidate pred-key frontier-key action
+                                       reachable base-relations layer-table stats)
+  "Validate CANDIDATE as a novel predecessor and store it when it reaches FRONTIER-KEY."
+  (handler-case
+      (block validate
+        (incf (fps-layer-stats-novel-validation-attempts stats))
+        (dolist (pre-args (get-precondition-args action candidate))
+          (let ((pre-result (apply (action.pre-defun-name action) candidate pre-args)))
+            (when pre-result
+              (let ((updated-dbs
+                      (if (eql pre-result t)
+                          (funcall (action.eff-defun-name action) candidate)
+                          (apply (action.eff-defun-name action) candidate pre-result))))
+                (dolist (update updated-dbs)
+                  (let ((changes (update.changes update)))
+                    (when (hash-table-p changes)
+                      (incf (fps-layer-stats-apply-success-count stats))
+                      (let ((next-key (fps-idb-base-prop-key changes base-relations)))
+                        (when (string= next-key frontier-key)
+                          (let* ((inst (update.instantiations update))
+                                 (action-form (cons (action.name action) inst))
+                                 (target-entry (gethash frontier-key reachable))
+                                 (target-path (cdr target-entry))
+                                 (new-path (cons action-form target-path))
+                                 (stored (copy-problem-state candidate)))
+                            (incf (fps-layer-stats-validated-count stats))
+                            (setf (gethash pred-key layer-table)
+                                  (cons stored new-path))
+                            (return-from validate t)))))))))))
+        nil)
+    (error ()
+      (incf (fps-layer-stats-apply-fail-count stats))
+      nil)))
+
+
+(defun fps-forward-process-object-combos (frontier-state frontier-key object
+                                          modified-rels action reachable
+                                          base-relations domains layer-table stats)
+  "Process all predecessor combinations for one OBJECT and update STATS/LAYER-TABLE."
+  (let ((combos (fps-object-prop-combos object modified-rels domains)))
+    (when combos
+      (let ((candidate (copy-problem-state frontier-state)))
+        (bw--delete-props-matching!
+         candidate (lambda (p) (and (member (car p) modified-rels :test #'eq)
+                                    (eql (second p) object))))
+        (dolist (combo combos)
+          (let* ((props (remove nil combo))
+                 (idb (problem-state.idb candidate)))
+            (dolist (prop props)
+              (add-proposition prop idb))
+            (let ((pred-key (fps-state-base-prop-key candidate base-relations)))
+              (incf (fps-layer-stats-raw-count stats))
+              (cond
+                ((string= pred-key frontier-key) nil)
+                ((gethash pred-key reachable)
+                 (incf (fps-layer-stats-collision-reachable-count stats)))
+                ((gethash pred-key layer-table)
+                 (incf (fps-layer-stats-collision-layer-count stats)))
+                (t
+                 (incf (fps-layer-stats-feasible-count stats))
+                 (bw-normalize! candidate)
+                 (fps-forward-validate-candidate
+                  candidate pred-key frontier-key action reachable
+                  base-relations layer-table stats))))
+            (dolist (prop props)
+              (delete-proposition prop idb))))))))
+
+
 (defun fps-expand-one-state-forward (frontier-state frontier-key action
                                      reachable base-relations
                                      domains problem-actions action-objects stats)
@@ -571,87 +657,14 @@
                                       base-relations :test #'eq)))
     (unless modified-rels
       (return-from fps-expand-one-state-forward nil))
-    (let ((key-objects nil))
-      ;; Collect all key-objects across modified relations.
-      (dolist (rel modified-rels)
-        (let ((domain (cdr (assoc rel domains :test #'eq))))
-          (dolist (obj (getf domain :key-objects))
-            (pushnew obj key-objects :test #'eq))))
-      ;; Filter key-objects by action's type instances (when available).
-      (when action-objects
-        (setf key-objects (intersection key-objects action-objects :test #'eq)))
-      ;; For each key-object: copy ONCE, enumerate combos via in-place mutation.
+    (let ((key-objects (fps-forward-key-objects-for-action
+                        modified-rels domains action-objects)))
       (let ((*actions* problem-actions)
             (layer-table (fps-layer-stats-layer-table stats)))
         (dolist (object key-objects)
-          (let ((combos (fps-object-prop-combos object modified-rels domains)))
-            (when combos
-              ;; Copy frontier state ONCE for this object.
-              (let ((candidate (copy-problem-state frontier-state)))
-                ;; Delete object's base propositions across all modified rels (once).
-                (bw--delete-props-matching!
-                 candidate (lambda (p) (and (member (car p) modified-rels :test #'eq)
-                                            (eql (second p) object))))
-                ;; Process each combination via in-place mutation.
-                (dolist (combo combos)
-                  (let* ((props (remove nil combo))
-                         (idb (problem-state.idb candidate)))
-                    ;; Add this combination's propositions.
-                    (dolist (prop props)
-                      (add-proposition prop idb))
-                    ;; Compute key; skip if identical to frontier or already seen.
-                    (let ((pred-key (fps-state-base-prop-key candidate base-relations)))
-                      (incf (fps-layer-stats-raw-count stats))
-                      (cond
-                        ((string= pred-key frontier-key) nil)
-                        ((gethash pred-key reachable)
-                         (incf (fps-layer-stats-collision-reachable-count stats)))
-                        ((gethash pred-key layer-table)
-                         (incf (fps-layer-stats-collision-layer-count stats)))
-                        (t
-                         (incf (fps-layer-stats-feasible-count stats))
-                         ;; CHANGED: full propagate-changes! (default), deferred to after dedup
-                         (bw-normalize! candidate)
-                         ;; Validate: precondition + effect, check successor key.
-                         (handler-case
-                             (block validate
-                               (incf (fps-layer-stats-novel-validation-attempts stats))
-                               (dolist (pre-args (get-precondition-args action candidate))
-                                 (let ((pre-result (apply (action.pre-defun-name action)
-                                                          candidate pre-args)))
-                                   (when pre-result
-                                     (let ((updated-dbs
-                                             (if (eql pre-result t)
-                                                 (funcall (action.eff-defun-name action)
-                                                          candidate)
-                                                 (apply (action.eff-defun-name action)
-                                                        candidate pre-result))))
-                                       (dolist (update updated-dbs)
-                                         (let ((changes (update.changes update)))
-                                           (when (hash-table-p changes)
-                                             (incf (fps-layer-stats-apply-success-count stats))
-                                             (let ((next-key (fps-idb-base-prop-key
-                                                              changes base-relations)))
-                                               (when (string= next-key frontier-key)
-                                                 (let* ((inst (update.instantiations update))
-                                                        (action-form (cons (action.name action)
-                                                                           inst))
-                                                        (target-entry (gethash frontier-key
-                                                                              reachable))
-                                                        (target-path (cdr target-entry))
-                                                        (new-path (cons action-form target-path))
-                                                        ;; Copy candidate for storage.
-                                                        (stored (copy-problem-state candidate)))
-                                                   (incf (fps-layer-stats-validated-count stats))
-                                                   (setf (gethash pred-key layer-table)
-                                                         (cons stored new-path))
-                                                   (return-from validate))))))))))))
-                           (error ()
-                             (incf (fps-layer-stats-apply-fail-count stats)))))))
-                    ;; Undo: remove this combo's propositions for the next iteration.
-                    (let ((idb (problem-state.idb candidate)))
-                      (dolist (prop props)
-                        (delete-proposition prop idb)))))))))))))
+          (fps-forward-process-object-combos
+           frontier-state frontier-key object modified-rels action reachable
+           base-relations domains layer-table stats))))))
 
 
 (defun fps-build-predecessor-enum-actions (action base-relations)
@@ -670,16 +683,6 @@
                                                   :prefilter nil
                                                   :skip-fixed-maps t)))
         (values (butlast enum-actions) modified-rels)))))
-
-
-(defun fps-build-csp-start-state (frontier-state modified-rels)
-  "Build a CSP start state from FRONTIER-STATE by removing propositions for
-   MODIFIED-RELS.  The resulting state has those fluent positions unbound,
-   so CSP enum-action preconditions (which check fluent-bound-p) correctly
-   enumerate values for them."
-  (let ((copy (copy-problem-state frontier-state)))
-    (dolist (rel modified-rels copy)
-      (bw--delete-props-by-relation! copy rel))))
 
 
 (defun fps-csp-search (state enum-actions callback)
@@ -706,137 +709,6 @@
                                     :idb changes
                                     :hidb (problem-state.hidb state))))
                         (fps-csp-search child remaining callback))))))))))))
-
-
-(defun fps-expand-one-state-forward-csp (frontier-state frontier-key action
-                                          reachable base-relations
-                                          problem-actions enum-actions
-                                          modified-rels stats)
-  "Expand predecessors of FRONTIER-STATE via ACTION using CSP enumeration.
-   Builds a CSP start state, runs DFS through ENUM-ACTIONS, and validates
-   each leaf by forward action application."
-  (let ((csp-start (fps-build-csp-start-state frontier-state modified-rels))
-        (layer-table (fps-layer-stats-layer-table stats))
-        (*actions* problem-actions))
-    (fps-csp-search
-     csp-start enum-actions
-     (lambda (leaf)
-       (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
-         (incf (fps-layer-stats-raw-count stats))
-         (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
-         (cond
-           ((string= pred-key frontier-key) nil)
-           ((gethash pred-key reachable)
-            (incf (fps-layer-stats-collision-reachable-count stats)))
-           ((gethash pred-key layer-table)
-            (incf (fps-layer-stats-collision-layer-count stats)))
-           (t
-            (incf (fps-layer-stats-feasible-count stats))
-            (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
-            (handler-case
-                (progn
-                  (bw-normalize! leaf)
-                  (block validate
-                    (incf (fps-layer-stats-novel-validation-attempts stats))
-                    (incf (gethash (action.name action)
-                                   (fps-layer-stats-op-attempts stats) 0))
-                    (dolist (pre-args (get-precondition-args action leaf))
-                      (let ((pre-result (apply (action.pre-defun-name action)
-                                              leaf pre-args)))
-                        (when pre-result
-                          (let ((updated-dbs
-                                  (if (eql pre-result t)
-                                      (funcall (action.eff-defun-name action) leaf)
-                                      (apply (action.eff-defun-name action)
-                                             leaf pre-result))))
-                            (dolist (upd updated-dbs)
-                              (let ((changes (update.changes upd)))
-                                (when (hash-table-p changes)
-                                  (incf (fps-layer-stats-apply-success-count stats))
-                                  (incf (gethash (action.name action)
-                                                 (fps-layer-stats-op-success stats) 0))
-                                  (let ((next-key (fps-idb-base-prop-key
-                                                   changes base-relations)))
-                                    (when (string= next-key frontier-key)
-                                      (let* ((inst (update.instantiations upd))
-                                             (action-form (cons (action.name action)
-                                                                inst))
-                                             (target-entry (gethash frontier-key
-                                                                    reachable))
-                                             (target-path (cdr target-entry))
-                                             (new-path (cons action-form
-                                                             target-path))
-                                             (stored (copy-problem-state leaf)))
-                                        (incf (fps-layer-stats-validated-count stats))
-                                        (incf (gethash (action.name action)
-                                                       (fps-layer-stats-op-success stats) 0))
-                                        (setf (gethash pred-key layer-table)
-                                              (cons stored new-path))
-                                        (return-from validate)))))))))))))
-              (error ()
-                (incf (fps-layer-stats-apply-fail-count stats))
-                (incf (gethash (action.name action)
-                               (fps-layer-stats-op-fail stats) 0)))))))))))
-
-
-(defun fps-expand-predecessor-layer-forward-csp (frontier reachable
-                                                  base-relations
-                                                  problem-actions
-                                                  selected-actions)
-  "Expand one predecessor layer using CSP-based forward candidate generation.
-   Phase 1: For each selected action, build CSP enum-actions (once per layer).
-   Phase 2: For each frontier state x action, run CSP DFS + forward validation.
-   Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
-  (let ((stats (make-fps-layer-stats))
-        (frontier-count (length frontier))
-        (frontier-idx 0)
-        (last-report-time (get-internal-real-time))
-        (action-triples nil))
-    ;; Phase 1: precompute enum-actions per planning action.
-    (dolist (action selected-actions)
-      (multiple-value-bind (enum-actions modified-rels)
-          (fps-build-predecessor-enum-actions action base-relations)
-        (when enum-actions
-          (push (list action modified-rels enum-actions) action-triples))))
-    (setf action-triples (nreverse action-triples))
-    (format t "~&  [forward-csp] ~D/~D actions modify base relations. ~
-               Processing ~:D frontier states...~%"
-            (length action-triples) (length selected-actions) frontier-count)
-    (finish-output)
-    ;; Phase 2: expand each frontier state.
-    (dolist (target frontier)
-      (incf frontier-idx)
-      (when (= frontier-idx 1)
-        (format t "~&  [forward-csp] Starting frontier state 1/~:D...~%" frontier-count)
-        (finish-output))
-      (let ((target-key (fps-state-base-prop-key target base-relations)))
-        (dolist (triple action-triples)
-          (let ((action (first triple))
-                (modified-rels (second triple))
-                (enum-actions (third triple)))
-            (fps-expand-one-state-forward-csp target target-key action
-                                               reachable base-relations
-                                               problem-actions enum-actions
-                                               modified-rels stats))))
-      (let ((now (get-internal-real-time)))
-        (when (or (= frontier-idx 1)
-                  (>= (- now last-report-time)
-                       (* 5 internal-time-units-per-second)))
-          (format t "~&  [forward-csp] ~:D/~:D frontier states (~,1F%%), ~
-                     raw=~:D, feasible=~:D, validated=~:D, found=~:D~%"
-                  frontier-idx frontier-count
-                  (* 100.0 (/ frontier-idx frontier-count))
-                  (fps-layer-stats-raw-count stats)
-                  (fps-layer-stats-feasible-count stats)
-                  (fps-layer-stats-validated-count stats)
-                  (hash-table-count (fps-layer-stats-layer-table stats)))
-          (finish-output)
-          (setf last-report-time now))))
-    (values (fps-layer-stats-layer-table stats)
-            (fps-layer-stats-raw-count stats)
-            (fps-layer-stats-feasible-count stats)
-            (fps-layer-stats-validated-count stats)
-            (fps-build-layer-diagnostics stats))))
 
 
 (defun fps-partition-enum-actions-by-key (enum-actions modified-rels)
@@ -876,7 +748,88 @@
     copy))
 
 
-(defun fps-expand-one-state-forward-csp2 (frontier-state frontier-key action
+(defun fps-forward-per-object-store-validated-predecessor (leaf pred-key frontier-key action
+                                                     upd reachable layer-table stats)
+  "Store validated predecessor LEAF and its action/path metadata for per-object CSP flow."
+  (let* ((inst (update.instantiations upd))
+         (action-form (cons (action.name action) inst))
+         (target-entry (gethash frontier-key reachable))
+         (target-path (cdr target-entry))
+         (new-path (cons action-form target-path))
+         (stored (copy-problem-state leaf)))
+    (incf (fps-layer-stats-validated-count stats))
+    (setf (gethash pred-key layer-table)
+          (cons stored new-path))))
+
+
+(defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key action
+                                            reachable base-relations layer-table stats)
+  "Process one update from per-object forward validation. Returns T when frontier is reached."
+  (let ((changes (update.changes upd)))
+    (when (hash-table-p changes)
+      (incf (fps-layer-stats-apply-success-count stats))
+      (incf (gethash (action.name action) (fps-layer-stats-op-success stats) 0))
+      (let ((next-key (fps-idb-base-prop-key changes base-relations)))
+        (if (string= next-key frontier-key)
+            (progn
+              (fps-forward-per-object-store-validated-predecessor
+               leaf pred-key frontier-key action upd reachable layer-table stats)
+              t)
+            (progn
+              (incf (fps-layer-stats-key-mismatch-count stats))
+              nil))))))
+
+
+(defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key action
+                                       reachable base-relations layer-table stats)
+  "Validate one novel per-object CSP leaf and store it when ACTION reaches FRONTIER-KEY."
+  (handler-case
+      (progn
+        (bw-normalize! leaf)
+        (when (fps-state-feasible-p leaf)
+          (block validate
+            (incf (fps-layer-stats-novel-validation-attempts stats))
+            (incf (gethash (action.name action) (fps-layer-stats-op-attempts stats) 0))
+            (dolist (pre-args (get-precondition-args action leaf))
+              (let ((pre-result (apply (action.pre-defun-name action) leaf pre-args)))
+                (when pre-result
+                  (let ((updated-dbs
+                          (if (eql pre-result t)
+                              (funcall (action.eff-defun-name action) leaf)
+                              (apply (action.eff-defun-name action) leaf pre-result))))
+                    (dolist (upd updated-dbs)
+                      (when (fps-forward-per-object-process-update
+                             upd leaf pred-key frontier-key action reachable
+                             base-relations layer-table stats)
+                        (return-from validate t)))))))))
+        nil)
+    (error ()
+      (incf (fps-layer-stats-apply-fail-count stats))
+      (incf (gethash (action.name action) (fps-layer-stats-op-fail stats) 0))
+      nil)))
+
+
+(defun fps-forward-per-object-handle-leaf (leaf frontier-key action reachable
+                                     base-relations layer-table stats)
+  "Handle one per-object CSP leaf: dedupe checks plus validation for novel candidates."
+  (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
+    (incf (fps-layer-stats-raw-count stats))
+    (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
+    (cond
+      ((string= pred-key frontier-key) nil)
+      ((gethash pred-key reachable)
+       (incf (fps-layer-stats-collision-reachable-count stats)))
+      ((gethash pred-key layer-table)
+       (incf (fps-layer-stats-collision-layer-count stats)))
+      (t
+       (incf (fps-layer-stats-feasible-count stats))
+       (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
+       (fps-forward-per-object-validate-leaf
+        leaf pred-key frontier-key action reachable
+        base-relations layer-table stats)))))
+
+
+(defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key action
                                            reachable base-relations
                                            problem-actions key-object
                                            object-enum-actions modified-rels
@@ -892,65 +845,12 @@
     (fps-csp-search
      csp-start object-enum-actions
      (lambda (leaf)
-       (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
-         (incf (fps-layer-stats-raw-count stats))
-         (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
-         (cond
-           ((string= pred-key frontier-key) nil)
-           ((gethash pred-key reachable)
-            (incf (fps-layer-stats-collision-reachable-count stats)))
-           ((gethash pred-key layer-table)
-            (incf (fps-layer-stats-collision-layer-count stats)))
-           (t
-            (incf (fps-layer-stats-feasible-count stats))
-            (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
-            (handler-case
-                (progn
-                  (bw-normalize! leaf)
-                  (when (fps-state-feasible-p leaf)
-                    (block validate
-                      (incf (fps-layer-stats-novel-validation-attempts stats))
-                      (incf (gethash (action.name action)
-                                     (fps-layer-stats-op-attempts stats) 0))
-                      (dolist (pre-args (get-precondition-args action leaf))
-                        (let ((pre-result (apply (action.pre-defun-name action)
-                                                leaf pre-args)))
-                          (when pre-result
-                            (let ((updated-dbs
-                                    (if (eql pre-result t)
-                                        (funcall (action.eff-defun-name action) leaf)
-                                        (apply (action.eff-defun-name action)
-                                               leaf pre-result))))
-                              (dolist (upd updated-dbs)
-                                (let ((changes (update.changes upd)))
-                                  (when (hash-table-p changes)
-                                    (incf (fps-layer-stats-apply-success-count stats))
-                                    (incf (gethash (action.name action)
-                                                   (fps-layer-stats-op-success stats) 0))
-                                    (let ((next-key (fps-idb-base-prop-key
-                                                     changes base-relations)))
-                                      (if (string= next-key frontier-key)
-                                          (let* ((inst (update.instantiations upd))
-                                                 (action-form (cons (action.name action)
-                                                                    inst))
-                                                 (target-entry (gethash frontier-key
-                                                                        reachable))
-                                                 (target-path (cdr target-entry))
-                                                 (new-path (cons action-form
-                                                                 target-path))
-                                                 (stored (copy-problem-state leaf)))
-                                            (incf (fps-layer-stats-validated-count stats))
-                                            (setf (gethash pred-key layer-table)
-                                                  (cons stored new-path))
-                                            (return-from validate))
-                                          (incf (fps-layer-stats-key-mismatch-count stats))))))))))))))
-              (error ()
-                (incf (fps-layer-stats-apply-fail-count stats))
-                (incf (gethash (action.name action)
-                               (fps-layer-stats-op-fail stats) 0)))))))))))
+       (fps-forward-per-object-handle-leaf
+        leaf frontier-key action reachable
+        base-relations layer-table stats)))))
 
 
-(defun fps-expand-predecessor-layer-forward-csp2 (frontier reachable
+(defun fps-expand-predecessor-layer-forward-per-object-csp (frontier reachable
                                                    base-relations
                                                    problem-actions
                                                    selected-actions)
@@ -986,13 +886,13 @@
             (when filtered-groups
               (push (list action modified-rels filtered-groups) action-info))))))
     (setf action-info (nreverse action-info))
-    (format t "~&  [forward-csp2] ~D/~D actions modify base relations. ~
+    (format t "~&  [forward] ~D/~D actions modify base relations. ~
                Processing ~:D frontier states...~%"
             (length action-info) (length selected-actions) frontier-count)
     (dolist (info action-info)
       (let ((a (first info))
             (groups (third info)))
-        (format t "~&  [forward-csp2]   ~S: ~D key-objects ~S~%"
+        (format t "~&  [forward]   ~S: ~D key-objects ~S~%"
                 (action.name a) (length groups)
                 (mapcar (lambda (g) (list (car g) (1- (length g))))
                         groups))))
@@ -1001,10 +901,10 @@
     (dolist (target frontier)
       (incf frontier-idx)
       (when (= frontier-idx 1)
-        (format t "~&  [forward-csp2] Starting frontier state 1/~:D...~%" frontier-count)
+        (format t "~&  [forward] Starting frontier state 1/~:D...~%" frontier-count)
         (finish-output))
       (let ((target-key (fps-state-base-prop-key target base-relations))
-            (pre-validated (fps-layer-stats-validated-count stats)))  ;; ADDED
+            (pre-validated (fps-layer-stats-validated-count stats)))
         (dolist (info action-info)
           (let ((action (first info))
                 (modified-rels (second info))
@@ -1012,11 +912,11 @@
             (dolist (group key-groups)
               (let ((key-object (car group))
                     (object-enum-actions (cdr group)))
-                (fps-expand-one-state-forward-csp2
+                (fps-expand-one-state-forward-per-object-csp
                  target target-key action reachable base-relations
                  problem-actions key-object object-enum-actions
                  modified-rels stats)))))
-        (when (> (fps-layer-stats-validated-count stats) pre-validated)  ;; ADDED
+        (when (> (fps-layer-stats-validated-count stats) pre-validated)
           (incf productive-count)
           (when (zerop first-productive-idx)
             (setf first-productive-idx frontier-idx))
@@ -1025,7 +925,7 @@
         (when (or (= frontier-idx 1)
                   (>= (- now last-report-time)
                        (* 30 internal-time-units-per-second)))
-          (format t "~&  [forward-csp2] ~:D/~:D frontier states (~,1F%), ~
+          (format t "~&  [forward] ~:D/~:D frontier states (~,1F%), ~
                      raw=~:D, feasible=~:D, validated=~:D, found=~:D~%"
                   frontier-idx frontier-count
                   (* 100.0 (/ frontier-idx frontier-count))
@@ -1397,7 +1297,7 @@
                  (fps-expand-predecessor-layer-backward frontier reachable base-relations
                                                         problem-actions selected-actions))
                 (:forward
-                 (fps-expand-predecessor-layer-forward-csp2 frontier reachable base-relations
+                 (fps-expand-predecessor-layer-forward-per-object-csp frontier reachable base-relations
                                                               problem-actions selected-actions))))
           (serious-condition (c)
             (setf interrupted t)
