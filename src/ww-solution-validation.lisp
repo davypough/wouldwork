@@ -150,9 +150,6 @@
               (setf first-passing-pre-result pre-result)
               (setf first-passing-pre-args pre-args))
             
-            (when verbose
-              (format t "  Precondition satisfied for: ~S~%" pre-args))
-            
             ;; Execute effect to get updated-dbs                 ; CHANGED
             (let ((updated-dbs (if (eql pre-result t)
                                    (funcall (action.eff-defun-name action) state)
@@ -163,6 +160,8 @@
                 (let ((inst (update.instantiations update)))
                   (push inst all-instantiations)
                   (when (instantiations-match-p action inst provided-args)
+                    (when verbose
+                      (format t "  Precondition satisfied for: ~S~%" inst))
                     ;; Found matching update - apply it
                     (let ((new-state (copy-problem-state state)))
                       (apply-update-to-state new-state update action)
@@ -306,6 +305,8 @@
                (revise (problem-state.idb state) forward-ops)))))))
   ;; Update state metadata
   (setf (problem-state.name state) (action.name action))
+  (setf (problem-state.instantiations state)
+        (copy-list (update.instantiations update)))
   (incf (problem-state.time state) (action.duration action))
   (setf (problem-state.value state) (update.value update)))
 

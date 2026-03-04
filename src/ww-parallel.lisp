@@ -72,6 +72,9 @@
               ;; Process each successor
               (dolist (succ-state succ-states)
                 (block process-succ
+                  (when (state-is-inconsistent succ-state)
+                    (incf *inconsistent-states-dropped*)
+                    (return-from process-succ))
                   ;; Goal check during task generation
                   (when (goal succ-state)
                     ;; Register solution immediately (serial, no locking needed)
@@ -261,6 +264,10 @@
     
     (dolist (succ-state succ-states)
       (block process-one
+        (when (state-is-inconsistent succ-state)
+          (ws-finalize-path stats succ-depth)
+          (increment-global *inconsistent-states-dropped* 1)
+          (return-from process-one))
         ;; Global invariant validation
         (when *global-invariants*
           (unless (validate-global-invariants current-node succ-state)

@@ -814,7 +814,7 @@
 
 (define-query collect-all-beam-intersections ()
   ; Use current endpoints (actual segments), not intended targets
-  ; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y t1 t2) ...)
+  ; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y) ...)
   (do 
       ;; Build coordinate cache for all beam sources
       (setq $coord-cache (make-hash-table :test 'eq))
@@ -831,31 +831,37 @@
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
             (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
                 (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
-                (setq $src1-coords (gethash $src1 $coord-cache))
-                (setq $src1-x (first $src1-coords))
-                (setq $src1-y (second $src1-coords))
-                (setq $tgt1-x $end1-x)
-                (setq $tgt1-y $end1-y)
-                (setq $src2-coords (gethash $src2 $coord-cache))
-                (setq $src2-x (first $src2-coords))
-                (setq $src2-y (second $src2-coords))
-                (setq $tgt2-x $end2-x)
-                (setq $tgt2-y $end2-y)
-                ;; Check intersection between current segments (not intended paths)
-                (mvsetq ($t1 $int-x $int-y)
-                  (beam-beam-intersection
-                    $src1-x $src1-y $tgt1-x $tgt1-y
-                    $src2-x $src2-y $tgt2-x $tgt2-y))
-                (if $t1
+                ;; Skip exact counter-propagating pairs only when both beams
+                ;; carry the same hue. Opposite-color reverse beams should
+                ;; interfere and truncate at their crossing.
+                (setq $reverse-pair (and (eql $src1 $tgt2)
+                                         (eql $tgt1 $src2)))
+                (setq $src1-hue (get-hue-if-source $src1))
+                (setq $src2-hue (get-hue-if-source $src2))
+                (setq $same-hue-reverse-pair
+                      (and $reverse-pair
+                           $src1-hue
+                           $src2-hue
+                           (eql $src1-hue $src2-hue)))
+                (if (not $same-hue-reverse-pair)
                   (do
-                    ;; Get t2 parameter by checking beam2 vs beam1
-                    (mvsetq ($t2 $int-x2 $int-y2)
+                    (setq $src1-coords (gethash $src1 $coord-cache))
+                    (setq $src1-x (first $src1-coords))
+                    (setq $src1-y (second $src1-coords))
+                    (setq $tgt1-x $end1-x)
+                    (setq $tgt1-y $end1-y)
+                    (setq $src2-coords (gethash $src2 $coord-cache))
+                    (setq $src2-x (first $src2-coords))
+                    (setq $src2-y (second $src2-coords))
+                    (setq $tgt2-x $end2-x)
+                    (setq $tgt2-y $end2-y)
+                    ;; Check intersection between current segments (not intended paths)
+                    (mvsetq ($t1 $int-x $int-y)
                       (beam-beam-intersection
-                        $src2-x $src2-y $tgt2-x $tgt2-y
-                        $src1-x $src1-y $tgt1-x $tgt1-y))
-                    ;; Only push if both intersections valid
-                    (if $t2
-                      (push (list ?b1 ?b2 $int-x $int-y $t1 $t2) $intersections))))))))
+                        $src1-x $src1-y $tgt1-x $tgt1-y
+                        $src2-x $src2-y $tgt2-x $tgt2-y))
+                    (if $t1
+                      (push (list ?b1 ?b2 $int-x $int-y) $intersections))))))))
       $intersections))
 
 
@@ -887,25 +893,6 @@
            (or (bind (chroma $source $source-hue))
                (bind (color $source $source-hue)))
            (eql $source-hue ?hue)))))
-
-
-(define-query relay-is-powered-by (?relay ?potential-source)
-  ;; Returns t if ?relay is currently receiving power from ?potential-source
-  ;; This prevents creating reciprocal beams back to the power source
-  (and (bind (color ?relay $conn-hue))  ; Relay must be active
-       ;; Check if a beam exists from ?potential-source to ?relay
-       (exists (?b (get-current-beams))
-         (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
-              (eql $src ?potential-source)
-              (eql $tgt ?relay)
-              ;; Verify beam actually reaches relay's coordinates
-              (mvsetq ($conn-x $conn-y $conn-z) (get-coordinates ?relay))
-              (= $end-x $conn-x)
-              (= $end-y $conn-y)
-              ;; Verify source has matching hue (confirming power flow)
-              (or (bind (chroma $src $src-hue))     ; Transmitter
-                  (bind (color $src $src-hue)))     ; Active relay
-              (eql $src-hue $conn-hue)))))
 
 
 (define-query collect-transmitter-powered-relays ()
@@ -1018,8 +1005,9 @@
 
 
 (define-update create-missing-beams! ()
-  ;; Creates beams for active sources paired with targets where no beam exists yet
-  ;; Returns t if any beams were created, nil otherwise
+  ;; Creates beams for all active sources paired with any terminus where no beam exists yet.
+  ;; A connector emits toward every paired terminus including transmitters and its power source.
+  ;; Returns t if any beams were created, nil otherwise.
   (do
     (doall (?src terminus)
       (doall (?tgt terminus)
@@ -1028,9 +1016,8 @@
           ;; Have a pairing - check if source can emit and beam should exist
           (do (setq $source-hue (get-hue-if-source ?src))
               (if (and $source-hue                              ; Source is active
-                       (target ?tgt)
-                       (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
-                       (not (relay-is-powered-by ?src ?tgt)))  ; ?tgt is not powering ?src
+                       (terminus ?tgt)                          ; Any paired terminus is a valid destination
+                       (not (beam-exists-p ?src ?tgt)))         ; Beam doesn't exist yet
                 ;; Create beam: source is transmitter (always active) or powered connector
                 (do (create-beam-segment-p! ?src ?tgt)
                     (setq $created-any t)))))))
@@ -1117,16 +1104,41 @@
             (ww-loop for $intersection in $all-intersections do
               (setq $beam1 (first $intersection))
               (setq $beam2 (second $intersection))
-              (setq $t1 (fifth $intersection))
-              (setq $t2 (sixth $intersection))
+              (setq $int-x (third $intersection))
+              (setq $int-y (fourth $intersection))
+              ;; Recompute full-path t parameters from intersection point so all
+              ;; comparisons are in the same parameter space even when beams were
+              ;; obstacle-truncated before interference resolution.
+              (setq $geom1 (gethash $beam1 $beam-geometry))
+              (setq $geom2 (gethash $beam2 $beam-geometry))
+              (setq $src1-x (first $geom1))
+              (setq $src1-y (second $geom1))
+              (setq $dx1 (third $geom1))
+              (setq $dy1 (fourth $geom1))
+              (setq $src2-x (first $geom2))
+              (setq $src2-y (second $geom2))
+              (setq $dx2 (third $geom2))
+              (setq $dy2 (fourth $geom2))
+              (setq $len1-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
+              (setq $len2-sq (+ (* $dx2 $dx2) (* $dy2 $dy2)))
+              (if (< $len1-sq 1e-20)
+                (setq $t1-full nil)
+                (do (setq $vx1 (- $int-x $src1-x))
+                    (setq $vy1 (- $int-y $src1-y))
+                    (setq $t1-full (/ (+ (* $vx1 $dx1) (* $vy1 $dy1)) $len1-sq))))
+              (if (< $len2-sq 1e-20)
+                (setq $t2-full nil)
+                (do (setq $vx2 (- $int-x $src2-x))
+                    (setq $vy2 (- $int-y $src2-y))
+                    (setq $t2-full (/ (+ (* $vx2 $dx2) (* $vy2 $dy2)) $len2-sq))))
               (if (eql ?b $beam1)
-                (do (setq $t-param $t1)
+                (do (setq $t-param $t1-full)
                     (setq $blocker $beam2)
-                    (setq $blocker-t $t2))
+                    (setq $blocker-t $t2-full))
                 (if (eql ?b $beam2)
-                  (do (setq $t-param $t2)
+                  (do (setq $t-param $t2-full)
                       (setq $blocker $beam1)
-                      (setq $blocker-t $t1))
+                      (setq $blocker-t $t1-full))
                   (setq $t-param nil)))
               ;; Valid only if blocker's effective endpoint reaches the crossing
               (if (and $t-param
@@ -1371,6 +1383,7 @@
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
        (not (and (connector ?t3) (loc ?t3 $area)))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2)
        (selectable ?agent $area ?t3))
@@ -1413,6 +1426,7 @@
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2))
   (?agent $cargo ?t1 ?t2 $area $place)
@@ -1450,6 +1464,7 @@
        (bind (loc ?agent $area))
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
+       (connectable $cargo $area)
        (selectable ?agent $area ?t1))
   (?agent $cargo ?t1 $area $place)
   (do ;; Can place on a box
@@ -1623,10 +1638,9 @@
 
 
 (define-base-relation (paired ?connector ?terminus)  ;specify for enumerator only
-  ;Completeness-first profile: disable paired-domain pruning constraints.
-  ;Re-enable the keys below for faster but potentially incomplete runs.
+  ;Prune states not satisfying the following constraints.
   :max-per (?connector 3)  ;max pairings allowed when pairing a connector
-  :requires (and (bind (loc ?connector $connector-area))  ;only generate non-held connectors
+  :requires (and (bind (loc ?connector $connector-area))  ;prune connector pairings that are also held
                  ;(potentially-selectable $connector-area ?terminus)  ;available but ineffective since all areas inter-selectable
                  (or (not (connector ?terminus))  ;only connector terminus relevant
                      (and (bind (loc ?terminus $terminus-area))

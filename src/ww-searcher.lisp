@@ -372,14 +372,22 @@
          #+:ww-debug (when (>= *debug* 3)
                        (format t "~&Auto-wait: Goal reached after waiting ~A time units~%" wait-duration))
          (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
-           (values :goal wait-state)))
+           (if (state-is-inconsistent wait-state)
+             (progn
+               (increment-global *inconsistent-states-dropped* 1)
+               (values :fail nil))
+             (values :goal wait-state))))
         
         ;; An action became applicable after waiting
         (:action
          #+:ww-debug (when (>= *debug* 3)
                        (format t "~&Auto-wait: Action became applicable after waiting ~A time units~%" wait-duration))
          (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
-           (values :continue wait-state)))
+           (if (state-is-inconsistent wait-state)
+             (progn
+               (increment-global *inconsistent-states-dropped* 1)
+               (values :fail nil))
+             (values :continue wait-state))))
         
         ;; Timeout - waited too long without progress
         (:timeout
@@ -429,6 +437,9 @@
                        (format t "~&Backtrack-wait: Goal reached after waiting ~A time units~%" wait-duration))
          (let* ((wait-state (create-auto-wait-state state sim-state wait-duration))
                 (succ-depth (1+ (node.depth current-node))))
+           (when (state-is-inconsistent wait-state)
+             (increment-global *inconsistent-states-dropped* 1)
+             (return-from handle-auto-wait-backtrack nil))
            ;; Check if we can improve on existing solutions
            (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
              (unless (f-value-better wait-state succ-depth)
@@ -450,6 +461,9 @@
          #+:ww-debug (when (>= *debug* 3)
                        (format t "~&Backtrack-wait: Action became applicable after waiting ~A time units~%" wait-duration))
          (let ((wait-state (create-auto-wait-state state sim-state wait-duration)))
+           (when (state-is-inconsistent wait-state)
+             (increment-global *inconsistent-states-dropped* 1)
+             (return-from handle-auto-wait-backtrack nil))
            #+:ww-debug (when (>= *debug* 1)
                          (update-search-tree wait-state (1+ (node.depth current-node)) "backtrack-wait->continue"))
            (update-max-depth-explored (1+ (node.depth current-node)))
@@ -566,6 +580,10 @@
    In hybrid mode, accumulates parent pointers for multi-path enumeration."
   (iter (with succ-depth = (1+ (node.depth current-node)))
         (for succ-state in succ-states)
+        (when (state-is-inconsistent succ-state)
+          (increment-global *inconsistent-states-dropped* 1)
+          (finalize-path-depth succ-depth)
+          (next-iteration))
         (when *global-invariants*
           (validate-global-invariants current-node succ-state))
         (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))

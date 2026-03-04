@@ -867,25 +867,6 @@
            (eql $source-hue ?hue)))))
 
 
-(define-query relay-is-powered-by (?relay ?potential-source)
-  ;; Returns t if ?relay is currently receiving power from ?potential-source
-  ;; This prevents creating reciprocal beams back to the power source
-  (and (bind (color ?relay $conn-hue))  ; Relay must be active
-       ;; Check if a beam exists from ?potential-source to ?relay
-       (exists (?b (get-current-beams))
-         (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
-              (eql $src ?potential-source)
-              (eql $tgt ?relay)
-              ;; Verify beam actually reaches relay's coordinates
-              (mvsetq ($conn-x $conn-y $conn-z) (get-coordinates ?relay))
-              (= $end-x $conn-x)
-              (= $end-y $conn-y)
-              ;; Verify source has matching hue (confirming power flow)
-              (or (bind (chroma $src $src-hue))     ; Transmitter
-                  (bind (color $src $src-hue)))     ; Active relay
-              (eql $src-hue $conn-hue)))))
-
-
 (define-query collect-transmitter-powered-relays ()
   ;; BFS from all transmitters, returning list of relays reachable via beam chains
   (do
@@ -1011,8 +992,9 @@
 
 
 (define-update create-missing-beams! ()
-  ;; Creates beams for active sources paired with targets where no beam exists yet
-  ;; Returns t if any beams were created, nil otherwise
+  ;; Creates beams for all active sources paired with any terminus where no beam exists yet.
+  ;; A connector emits toward every paired terminus including transmitters and its power source.
+  ;; Returns t if any beams were created, nil otherwise.
   (do
     (doall (?src terminus)
       (doall (?tgt terminus)
@@ -1021,9 +1003,8 @@
           ;; Have a pairing - check if source can emit and beam should exist
           (do (setq $source-hue (get-hue-if-source ?src))
               (if (and $source-hue                              ; Source is active
-                       (target ?tgt)
-                       (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
-                       (not (relay-is-powered-by ?src ?tgt)))  ; ?tgt is not powering ?src
+                       (terminus ?tgt)                          ; Any paired terminus is a valid destination
+                       (not (beam-exists-p ?src ?tgt)))         ; Beam doesn't exist yet
                 ;; Create beam: source is transmitter (always active) or powered connector
                 (do (create-beam-segment-p! ?src ?tgt)
                     (setq $created-any t)))))))

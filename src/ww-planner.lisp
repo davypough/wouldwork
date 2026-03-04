@@ -164,6 +164,14 @@
           (let ((child-states (case *algorithm*
                                 (depth-first (get-new-states state action updated-dbs))  ;return new states
                                 (backtracking updated-dbs))))  ;return update structures
+            ;; Defensive state-level filter: catches inconsistency added after update
+            ;; creation (eg, during happenings/followups processing).
+            (when (eql *algorithm* 'depth-first)
+              (let ((original-count (length child-states)))
+                (setf child-states (remove-if #'state-is-inconsistent child-states))
+                (when (< (length child-states) original-count)
+                  (increment-global *inconsistent-states-dropped*
+                                    (- original-count (length child-states))))))
             ;; Apply heuristics only for depth-first (complete states)
             (when (and (eql *algorithm* 'depth-first) (fboundp 'heuristic?))
               (dolist (child-state child-states)
@@ -186,12 +194,22 @@
        ;; Backtracking algorithm: changes now contains (forward-list inverse-list)
        ;; Check forward-list for inconsistent-state marker
        (let ((forward-list (first changes)))
-         (some (lambda (forward-op)
-                 (and forward-op
-                      (listp forward-op)
-                      (eql (car forward-op) 'inconsistent-state)
-                      (null (cdr forward-op))))
-               forward-list))))))
+               (some (lambda (forward-op)
+                       (and forward-op
+                            (listp forward-op)
+                            (eql (car forward-op) 'inconsistent-state)
+                            (null (cdr forward-op))))
+                     forward-list))))))
+
+
+(defun state-is-inconsistent (state)
+  "Returns T if STATE idb contains the inconsistent-state marker."
+  (declare (type problem-state state))
+  (let ((idb (problem-state.idb state)))
+    (or (nth-value 1
+                   (gethash (convert-to-integer-memoized '(inconsistent-state)) idb))
+        (nth-value 1
+                   (gethash 'inconsistent-state idb)))))
 
 
 (defun format-action-with-effect-order (action pre-result updated-db)

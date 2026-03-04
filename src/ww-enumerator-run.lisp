@@ -2,6 +2,20 @@
 
 (in-package :ww)
 
+(defparameter *find-predecessors-print-diagnostics* nil
+  "When non-NIL, FIND-PREDECESSORS prints per-layer diagnostics details.
+By default diagnostics are suppressed and only layer summary lines are printed.")
+
+(defparameter *solve-meeting-point-print-diagnostics* nil
+  "When non-NIL, SOLVE-MEETING-POINT prints per-solution expansion diagnostics.")
+
+(defparameter *solve-meeting-point-last-diagnostics* nil
+  "Diagnostics plist from the last SOLVE-MEETING-POINT run.")
+
+(defparameter *backward-reachable-max-witnesses-per-key* 8
+  "Maximum witness count stored per backward-reachable key.
+Set to NIL for no cap.")
+
 (defmacro find-goal-states (&rest raw-args)
   "User-facing macro wrapper for FIND-GOAL-STATES-FN.
    Automatically quotes goal-spec, relation symbols/lists, and algorithm/solution-type symbols.
@@ -343,27 +357,14 @@
                             (prin1-to-string y)))))))
 
 
-(defun enum-goal-reaching-last-actions (state goal-fn problem-actions selected-actions)
-  "Return plists for one-step actions from STATE that satisfy GOAL-FN.
-   Each plist has keys :ACTION and :GOAL-STATE."
-  (let ((*actions* problem-actions)
-        (hits nil))
-    (dolist (action-form (enum-applicable-action-forms state selected-actions)
-                         (nreverse hits))
-      (multiple-value-bind (next-state success-p failure-reason)
-          (apply-action-to-state action-form state nil nil)
-        (declare (ignore failure-reason))
-          (when (and success-p (funcall goal-fn next-state))
-            (push (list :action action-form :goal-state next-state) hits))))))
-
-
 (defun fps-state-feasible-p (state)
   "Unified state feasibility predicate for enumeration and predecessor expansion.
    When the user defines STATE-FEASIBLE? in the problem spec, calls it to test
    whether STATE is physically reachable (e.g., agent accessibility).
    Returns T when no hook is defined or when the hook returns non-NIL."
-  (or (not (fboundp 'state-feasible?))
-      (funcall (symbol-function 'state-feasible?) state)))
+  (and (not (state-is-inconsistent state))
+       (or (not (fboundp 'state-feasible?))
+           (funcall (symbol-function 'state-feasible?) state))))
 
 
 (defun fps-allowed-last-actions-from-state (state problem-actions selected-actions
@@ -405,6 +406,71 @@
   (prin1-to-string (enum-state-base-props state base-relations)))
 
 
+(defun fps-state-full-prop-key (state)
+  "Return canonical key over all propositions in STATE."
+  (prin1-to-string
+   (sort (list-database (problem-state.idb state))
+         (lambda (x y)
+           (string< (prin1-to-string x)
+                    (prin1-to-string y))))))
+
+
+(defun fps-make-witness-entry (state path)
+  "Build a reachable-set entry containing one witness (STATE . PATH)."
+  (list (cons state path)))
+
+
+(defun fps-normalize-witness-entry (entry)
+  "Normalize ENTRY to witness-list format: ((STATE . PATH) ...).
+   Supports legacy single-witness format (STATE . PATH)."
+  (cond
+    ((null entry) nil)
+    ((and (consp entry) (typep (car entry) 'problem-state))
+     (list (cons (car entry) (cdr entry))))
+    (t entry)))
+
+
+(defun fps-entry-primary-witness (entry)
+  "Return the primary witness pair (STATE . PATH) from ENTRY."
+  (first (fps-normalize-witness-entry entry)))
+
+
+(defun fps-entry-primary-state (entry)
+  "Return the primary witness state from ENTRY."
+  (car (fps-entry-primary-witness entry)))
+
+
+(defun fps-entry-primary-path (entry)
+  "Return the primary witness path from ENTRY."
+  (cdr (fps-entry-primary-witness entry)))
+
+
+(defun fps-entry-max-depth (entry)
+  "Return maximum stored backward depth across ENTRY witnesses."
+  (let ((norm (fps-normalize-witness-entry entry)))
+    (if (null norm)
+      0
+      (reduce #'max norm :key (lambda (w) (length (cdr w))) :initial-value 0))))
+
+
+(defun fps-entry-add-witness (entry state path)
+  "Add witness (STATE . PATH) to ENTRY, dedupe by PATH, and apply witness cap."
+  (let* ((existing (fps-normalize-witness-entry entry))
+         (already (find path existing :key #'cdr :test #'equal))
+         (updated (if already existing (cons (cons state path) existing)))
+         (cap *backward-reachable-max-witnesses-per-key*))
+    (if (and cap (integerp cap) (> (length updated) cap))
+        (subseq updated 0 cap)
+        updated)))
+
+
+(defun fps-merge-witness-entries (entry-a entry-b)
+  "Merge ENTRY-B witnesses into ENTRY-A and return merged entry."
+  (let ((merged (fps-normalize-witness-entry entry-a)))
+    (dolist (w (fps-normalize-witness-entry entry-b) merged)
+      (setf merged (fps-entry-add-witness merged (car w) (cdr w))))))
+
+
 (defun fps-idb-base-prop-key (idb base-relations)
   "Return canonical base-prop key computed directly from IDB hash-table.
    Avoids constructing a full problem-state for successor key checks."
@@ -424,24 +490,6 @@
     (prin1-to-string (enum-state-base-props state relations))))
 
 
-(defun fps-build-goal-signature-set (goal-states relations)
-  "Build hash-set of canonical projected keys for GOAL-STATES over RELATIONS.
-   Returns NIL when RELATIONS is NIL."
-  (when relations
-    (let ((set (make-hash-table :test 'equal)))
-      (dolist (gs goal-states set)
-        (setf (gethash (fps-state-relation-signature-key gs relations) set) t)))))
-
-
-(defun fps-goal-signature-compatible-p (state relations goal-signature-set)
-  "True iff STATE's RELATIONS projection is present in GOAL-SIGNATURE-SET.
-   When RELATIONS is NIL, always true."
-  (or (null relations)
-      (and goal-signature-set
-           (gethash (fps-state-relation-signature-key state relations)
-                    goal-signature-set))))
-
-
 (defun actions-modifiable-base-relations (actions)
   "Compute the set of base relation symbols modifiable by any action in ACTIONS.
    Intersects each action's EFFECT-ADDS with the current base-relation schema,
@@ -453,92 +501,6 @@
         (when (and (member rel base-rels :test #'eq)
                    (not (member rel result :test #'eq)))
           (push rel result))))))
-
-
-(defun fps-compute-base-relation-domains (base-relations)
-  "Precompute domain information for each relation in BASE-RELATIONS.
-   Returns an alist keyed by relation symbol.  Each entry is a plist:
-     :PATTERN           :FLUENT or :SUBSET
-     :KEY-OBJECTS        instances of the key (non-fluent) type(s)
-     :VALUES             (fluent only) instances of the fluent value type
-     :ALLOW-UNASSIGNED   types whose key instances may have no assignment
-     :PARTNERS           (subset only) all partner instances (before self-exclusion)
-     :MAX-PER-KEY        (subset only) cardinality cap from metadata"
-  (mapcar
-   (lambda (rel)
-     (let* ((pattern (enum-pattern rel))
-            (key-specs (relation-key-type-specs rel))
-            (key-objects (loop for s in key-specs
-                               append (copy-list (expand-type-spec-instances* s))))
-            (allow-raw (enum-allow-unassigned rel))
-            (allow-types (cond ((eq allow-raw t)
-                                (loop for s in key-specs
-                                      append (copy-list (expand-type-spec-instances* s))))
-                               ((and (consp allow-raw) (eql (car allow-raw) :types))
-                                (loop for s in (cdr allow-raw)
-                                      append (copy-list (expand-type-spec-instances* s))))
-                               (t nil))))
-       (cons rel
-             (ecase pattern
-               (:fluent
-                (let* ((val-specs (relation-fluent-type-specs rel))
-                       (values (loop for s in val-specs
-                                     append (copy-list (expand-type-spec-instances* s)))))
-                  (list :pattern :fluent
-                        :key-objects key-objects
-                        :values values
-                        :allow-unassigned allow-types)))
-               (:subset
-                (let* ((sig (relation-signature rel))
-                       (partners (loop for s in sig
-                                       append (copy-list (expand-type-spec-instances* s))))
-                       (max-k (enum-max-per-key rel)))
-                  (list :pattern :subset
-                        :key-objects key-objects
-                        :partners (remove-duplicates partners :test #'eq)
-                        :max-per-key (or max-k 3))))))))
-   base-relations))
-
-
-(defun fps-object-prop-combos (object modified-rels domains)
-  "Compute the cartesian product of base-proposition choices for OBJECT across
-   MODIFIED-RELS.  Returns a list of combos; each combo is a list of propositions
-   (NIL entries represent 'unassigned').  Returns NIL if OBJECT has no choices."
-  (let ((per-rel-choices nil))
-    (dolist (rel modified-rels)
-      (let* ((domain (cdr (assoc rel domains :test #'eq)))
-             (pattern (getf domain :pattern))
-             (key-objects (getf domain :key-objects)))
-        (when (member object key-objects :test #'eq)
-          (let ((choices nil))
-            (ecase pattern
-              (:fluent
-               (let ((values (getf domain :values))
-                     (allow-unassigned (getf domain :allow-unassigned)))
-                 (dolist (val values)
-                   (push (list (list rel object val)) choices))
-                 (when (member object allow-unassigned :test #'eq)
-                   (push nil choices))))
-              (:subset
-               (let* ((all-partners (getf domain :partners))
-                      (partners (remove object all-partners :test #'eq))
-                      (subsets (bw--pairing-subsets partners)))
-                 (dolist (subset subsets)
-                   (push (mapcar (lambda (partner) (list rel object partner))
-                                 subset)
-                         choices)))))
-            (when choices
-              (push (nreverse choices) per-rel-choices))))))
-    (unless per-rel-choices
-      (return-from fps-object-prop-combos nil))
-    (reduce (lambda (acc rel-choices)
-              (let ((result nil))
-                (dolist (existing acc)
-                  (dolist (choice rel-choices)
-                    (push (append existing choice) result)))
-                (nreverse result)))
-            (nreverse per-rel-choices)
-            :initial-value '(nil))))
 
 
 (defun fps-flatten-type-inst (type-inst)
@@ -563,108 +525,6 @@
   (when (action.dynamic action)
     (return-from fps-action-object-set nil))
   (fps-flatten-type-inst (action.precondition-type-inst action)))
-
-
-(defun fps-forward-key-objects-for-action (modified-rels domains action-objects)
-  "Collect candidate key-objects for MODIFIED-RELS, filtered by ACTION-OBJECTS."
-  (let ((key-objects nil))
-    (dolist (rel modified-rels)
-      (let ((domain (cdr (assoc rel domains :test #'eq))))
-        (dolist (obj (getf domain :key-objects))
-          (pushnew obj key-objects :test #'eq))))
-    (if action-objects
-        (intersection key-objects action-objects :test #'eq)
-        key-objects)))
-
-
-(defun fps-forward-validate-candidate (candidate pred-key frontier-key action
-                                       reachable base-relations layer-table stats)
-  "Validate CANDIDATE as a novel predecessor and store it when it reaches FRONTIER-KEY."
-  (handler-case
-      (block validate
-        (incf (fps-layer-stats-novel-validation-attempts stats))
-        (dolist (pre-args (get-precondition-args action candidate))
-          (let ((pre-result (apply (action.pre-defun-name action) candidate pre-args)))
-            (when pre-result
-              (let ((updated-dbs
-                      (if (eql pre-result t)
-                          (funcall (action.eff-defun-name action) candidate)
-                          (apply (action.eff-defun-name action) candidate pre-result))))
-                (dolist (update updated-dbs)
-                  (let ((changes (update.changes update)))
-                    (when (hash-table-p changes)
-                      (incf (fps-layer-stats-apply-success-count stats))
-                      (let ((next-key (fps-idb-base-prop-key changes base-relations)))
-                        (when (string= next-key frontier-key)
-                          (let* ((inst (update.instantiations update))
-                                 (action-form (cons (action.name action) inst))
-                                 (target-entry (gethash frontier-key reachable))
-                                 (target-path (cdr target-entry))
-                                 (new-path (cons action-form target-path))
-                                 (stored (copy-problem-state candidate)))
-                            (incf (fps-layer-stats-validated-count stats))
-                            (setf (gethash pred-key layer-table)
-                                  (cons stored new-path))
-                            (return-from validate t)))))))))))
-        nil)
-    (error ()
-      (incf (fps-layer-stats-apply-fail-count stats))
-      nil)))
-
-
-(defun fps-forward-process-object-combos (frontier-state frontier-key object
-                                          modified-rels action reachable
-                                          base-relations domains layer-table stats)
-  "Process all predecessor combinations for one OBJECT and update STATS/LAYER-TABLE."
-  (let ((combos (fps-object-prop-combos object modified-rels domains)))
-    (when combos
-      (let ((candidate (copy-problem-state frontier-state)))
-        (bw--delete-props-matching!
-         candidate (lambda (p) (and (member (car p) modified-rels :test #'eq)
-                                    (eql (second p) object))))
-        (dolist (combo combos)
-          (let* ((props (remove nil combo))
-                 (idb (problem-state.idb candidate)))
-            (dolist (prop props)
-              (add-proposition prop idb))
-            (let ((pred-key (fps-state-base-prop-key candidate base-relations)))
-              (incf (fps-layer-stats-raw-count stats))
-              (cond
-                ((string= pred-key frontier-key) nil)
-                ((gethash pred-key reachable)
-                 (incf (fps-layer-stats-collision-reachable-count stats)))
-                ((gethash pred-key layer-table)
-                 (incf (fps-layer-stats-collision-layer-count stats)))
-                (t
-                 (incf (fps-layer-stats-feasible-count stats))
-                 (bw-normalize! candidate)
-                 (fps-forward-validate-candidate
-                  candidate pred-key frontier-key action reachable
-                  base-relations layer-table stats))))
-            (dolist (prop props)
-              (delete-proposition prop idb))))))))
-
-
-(defun fps-expand-one-state-forward (frontier-state frontier-key action
-                                     reachable base-relations
-                                     domains problem-actions action-objects stats)
-  "Expand predecessors of FRONTIER-STATE via ACTION using on-demand variation.
-   Copies frontier state ONCE per key-object, then mutates in place for each
-   candidate combination.  Validates via single-pass precondition+effect.
-   ACTION-OBJECTS is a precomputed list of objects the action can bind (or NIL
-   to skip filtering)."
-  (let* ((modified-rels (intersection (action.effect-adds action)
-                                      base-relations :test #'eq)))
-    (unless modified-rels
-      (return-from fps-expand-one-state-forward nil))
-    (let ((key-objects (fps-forward-key-objects-for-action
-                        modified-rels domains action-objects)))
-      (let ((*actions* problem-actions)
-            (layer-table (fps-layer-stats-layer-table stats)))
-        (dolist (object key-objects)
-          (fps-forward-process-object-combos
-           frontier-state frontier-key object modified-rels action reachable
-           base-relations domains layer-table stats))))))
 
 
 (defun fps-build-predecessor-enum-actions (action base-relations)
@@ -754,18 +614,23 @@
   (let* ((inst (update.instantiations upd))
          (action-form (cons (action.name action) inst))
          (target-entry (gethash frontier-key reachable))
-         (target-path (cdr target-entry))
+         (target-path (fps-entry-primary-path target-entry))
          (new-path (cons action-form target-path))
-         (stored (copy-problem-state leaf)))
+         (stored (copy-problem-state leaf))
+         (existing (gethash pred-key layer-table)))
     (incf (fps-layer-stats-validated-count stats))
     (setf (gethash pred-key layer-table)
-          (cons stored new-path))))
+          (if existing
+              (fps-entry-add-witness existing stored new-path)
+              (fps-make-witness-entry stored new-path)))))
 
 
 (defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key action
                                             reachable base-relations layer-table stats)
   "Process one update from per-object forward validation. Returns T when frontier is reached."
-  (let ((changes (update.changes upd)))
+  (if (update-is-inconsistent upd)
+      nil
+      (let ((changes (update.changes upd)))
     (when (hash-table-p changes)
       (incf (fps-layer-stats-apply-success-count stats))
       (incf (gethash (action.name action) (fps-layer-stats-op-success stats) 0))
@@ -777,7 +642,7 @@
               t)
             (progn
               (incf (fps-layer-stats-key-mismatch-count stats))
-              nil))))))
+              nil)))))))
 
 
 (defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key action
@@ -947,57 +812,6 @@
               diag))))
 
 
-(defun fps-expand-predecessor-layer-forward-ondemand (frontier reachable
-                                                       base-relations
-                                                       problem-actions
-                                                       selected-actions)
-  "Expand one predecessor layer using on-demand forward candidate generation.
-   For each frontier state and each selected action, generates candidate
-   predecessors by varying only the base propositions the action can modify,
-   then validates each by forward application.
-   Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
-  (let ((stats (make-fps-layer-stats))
-        (domains (fps-compute-base-relation-domains base-relations))
-        (frontier-count (length frontier))
-        (frontier-idx 0)
-        (last-report-time (get-internal-real-time))
-        ;; Precompute per-action object sets for key-object filtering.
-        (action-object-sets (mapcar (lambda (a) (cons a (fps-action-object-set a)))
-                                    selected-actions)))
-    (format t "~&  [forward-ondemand] Domains computed. Processing ~:D frontier states x ~:D actions...~%"
-            frontier-count (length selected-actions))
-    (finish-output)
-    (dolist (target frontier)
-      (incf frontier-idx)
-      (when (= frontier-idx 1)
-        (format t "~&  [forward-ondemand] Starting frontier state 1/~:D...~%" frontier-count)
-        (finish-output))
-      (let ((target-key (fps-state-base-prop-key target base-relations)))
-        (dolist (action-entry action-object-sets)
-          (fps-expand-one-state-forward target target-key (car action-entry)
-                                        reachable base-relations domains
-                                        problem-actions (cdr action-entry) stats)))
-      (let ((now (get-internal-real-time)))
-        (when (or (= frontier-idx 1)
-                  (>= (- now last-report-time)
-                       (* 5 internal-time-units-per-second)))
-          (format t "~&  [forward-ondemand] ~:D/~:D frontier states (~,1F%%), ~
-                     raw=~:D, feasible=~:D, validated=~:D, found=~:D~%"
-                  frontier-idx frontier-count
-                  (* 100.0 (/ frontier-idx frontier-count))
-                  (fps-layer-stats-raw-count stats)
-                  (fps-layer-stats-feasible-count stats)
-                  (fps-layer-stats-validated-count stats)
-                  (hash-table-count (fps-layer-stats-layer-table stats)))
-          (finish-output)
-          (setf last-report-time now))))
-    (values (fps-layer-stats-layer-table stats)
-            (fps-layer-stats-raw-count stats)
-            (fps-layer-stats-feasible-count stats)
-            (fps-layer-stats-validated-count stats)
-            (fps-build-layer-diagnostics stats))))
-
-
 (defun enum-proposition-holds-p (state proposition)
   "True iff PROPOSITION holds in STATE's idb."
   (let ((fluent-indices (get-prop-fluent-indices proposition)))
@@ -1102,7 +916,7 @@
   (incf (gethash (car action-form) (fps-layer-stats-op-attempts stats) 0))
   (multiple-value-bind (next-state success-p failure-reason)
       (apply-action-to-state action-form pred nil nil)
-    (if success-p
+    (if (and success-p (not (state-is-inconsistent next-state)))
         (progn
           (incf (fps-layer-stats-apply-success-count stats))
           (incf (gethash (car action-form) (fps-layer-stats-op-success stats) 0))
@@ -1111,10 +925,13 @@
                 (progn
                   (incf (fps-layer-stats-validated-count stats))
                   (let* ((target-entry (gethash target-key reachable))
-                         (target-path (cdr target-entry))
-                         (new-path (cons action-form target-path)))
+                         (target-path (fps-entry-primary-path target-entry))
+                         (new-path (cons action-form target-path))
+                         (existing (gethash pred-key (fps-layer-stats-layer-table stats))))
                     (setf (gethash pred-key (fps-layer-stats-layer-table stats))
-                          (cons pred new-path))))
+                          (if existing
+                              (fps-entry-add-witness existing pred new-path)
+                              (fps-make-witness-entry pred new-path)))))
                 (incf (fps-layer-stats-key-mismatch-count stats)))))
         (progn
           (incf (fps-layer-stats-apply-fail-count stats))
@@ -1162,7 +979,7 @@
 
 (defun fps-print-layer-diagnostics (direction layer diagnostics)
   "Print layer diagnostic details when DIAGNOSTICS is non-nil."
-  (when diagnostics
+  (when (and *find-predecessors-print-diagnostics* diagnostics)
     (format t "~&[find-predecessors ~S] Layer ~D diagnostics: ~
                collisions reachable=~:D, collisions layer=~:D, ~
                novel validations=~:D, apply success=~:D, apply fail=~:D, key mismatch=~:D.~%"
@@ -1204,9 +1021,13 @@
    update *BACKWARD-REACHABLE-SET*.  Returns the count of newly added states."
   (let ((new-count 0))
     (maphash (lambda (key entry)
-               (unless (gethash key reachable)
-                 (setf (gethash key reachable) entry)
-                 (incf new-count)))
+               (let ((existing (gethash key reachable)))
+                 (if existing
+                     (setf (gethash key reachable)
+                           (fps-merge-witness-entries existing entry))
+                     (progn
+                       (setf (gethash key reachable) entry)
+                       (incf new-count)))))
              layer-table)
     (let ((elapsed (/ (- (get-internal-real-time) start-time)
                       internal-time-units-per-second)))
@@ -1223,8 +1044,9 @@
                                    (direction 'forward))
   "Interactive iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
    DIRECTION BACKWARD regresses from the current frontier.
-   DIRECTION FORWARD generates predecessor candidates on demand by varying
-   base propositions each action can modify, then validates by forward application.
+   DIRECTION FORWARD generates predecessors via per-object CSP enumeration
+   over action-modified base relations, then validates each candidate by
+   forward application.
    When no *BACKWARD-REACHABLE-SET* exists, :FORWARD auto-seeds from goal states.
    Prompts (y-or-n-p) after each layer. Ctrl-C safely reverts to the last
    completed layer."
@@ -1242,10 +1064,6 @@
                                        action-families))
          (families (enum-normalize-action-families resolved-action-families))
          (selected-actions (enum-select-actions-by-family problem-actions families))
-         (modifiable-rels (actions-modifiable-base-relations selected-actions))
-         (immutable-rels (set-difference base-relations modifiable-rels :test #'eq))
-         (goal-signature-set (fps-build-goal-signature-set *enumerated-goal-states*
-                                                           immutable-rels))
          (reachable (ecase norm-direction
                       (:backward (make-hash-table :test 'equal))
                       (:forward
@@ -1254,19 +1072,26 @@
                            (let ((ht (make-hash-table :test 'equal)))
                              (dolist (gs *enumerated-goal-states*)
                                (let ((key (fps-state-base-prop-key gs base-relations)))
-                                 (unless (gethash key ht)
-                                   (setf (gethash key ht) (cons gs nil)))))
+                                 (let ((existing (gethash key ht)))
+                                   (setf (gethash key ht)
+                                         (if existing
+                                             (fps-entry-add-witness existing gs nil)
+                                             (fps-make-witness-entry gs nil))))))
                              (setf *backward-reachable-set* ht)
                              ht)))))
          (frontier nil)
-         (layer 0))
+         (layer 0)
+         (completed-layers 0))
     (ecase norm-direction
       (:backward
        ;; Seed layer 0: goal states with empty action paths
        (dolist (gs *enumerated-goal-states*)
          (let ((key (fps-state-base-prop-key gs base-relations)))
-           (unless (gethash key reachable)
-             (setf (gethash key reachable) (cons gs nil)))))
+           (let ((existing (gethash key reachable)))
+             (setf (gethash key reachable)
+                   (if existing
+                       (fps-entry-add-witness existing gs nil)
+                       (fps-make-witness-entry gs nil))))))
        (setf *backward-reachable-set* reachable)
        (format t "~&[find-predecessors ~S] Layer 0 (goals): ~:D unique states seeded.~%"
                norm-direction
@@ -1277,7 +1102,7 @@
                (hash-table-count reachable))))
     ;; Seed frontier from reachable set (both directions use same pattern)
     (setf frontier (loop for entry being the hash-values of reachable
-                         collect (car entry)))
+                         collect (fps-entry-primary-state entry)))
     ;; Iterative expansion
     (loop
       (incf layer)
@@ -1313,73 +1138,422 @@
                                              norm-direction layer
                                              raw-count feasible-count validated-count
                                              diagnostics)))
+          (setf completed-layers layer)
           (when (zerop new-count)
             (format t "~&[find-predecessors ~S] Saturated - no new states at layer ~D.~%"
                     norm-direction layer)
             (return))
           (setf frontier (loop for entry being the hash-values of layer-table
-                               collect (car entry)))
+                               collect (fps-entry-primary-state entry)))
           (unless (y-or-n-p "Continue to layer ~D? " (1+ layer))
             (return)))))
     (format t "~&[find-predecessors ~S] Done. *backward-reachable-set* contains ~:D states.~%"
             norm-direction
             (hash-table-count *backward-reachable-set*))
+    (setf (get 'find-predecessors :last-report)
+          (list :direction norm-direction
+                :completed-layers completed-layers
+                :reachable-count (hash-table-count *backward-reachable-set*)))
     t))
 
 
 (defun fps-meeting-point-entry-for-state (state &optional
                                                 (reachable-set *backward-reachable-set*)
                                                 (base-relations (get-base-relations)))
-  "Return the reachable-set entry (STATE . ACTION-PATH) for STATE, or NIL."
-  (gethash (fps-state-base-prop-key state base-relations) reachable-set))
+  "Return the reachable-set witness entry list for STATE, or NIL."
+  (fps-normalize-witness-entry
+   (gethash (fps-state-base-prop-key state base-relations) reachable-set)))
+
+
+(defun fps-default-meeting-point-min-depth ()
+  "Default meeting-point depth from the last completed FIND-PREDECESSORS run."
+  (let ((report (get 'find-predecessors :last-report)))
+    (if (and (listp report)
+             (integerp (getf report :completed-layers))
+             (>= (getf report :completed-layers) 0))
+        (getf report :completed-layers)
+        0)))
+
+
+(defun fps-meeting-state-bridgeable-p (state reachable-set base-relations original-goal-fn
+                                      &optional bridge-cache)
+  "True when STATE can be concretely extended to ORIGINAL-GOAL-FN via REACHABLE-SET."
+  (let* ((cache-key (fps-state-full-prop-key state)))
+    (when (and bridge-cache (gethash cache-key bridge-cache))
+      (return-from fps-meeting-state-bridgeable-p
+        (gethash cache-key bridge-cache)))
+    (let* ((entry (fps-meeting-point-entry-for-state state reachable-set base-relations))
+           (start-depth (and entry (fps-entry-max-depth entry)))
+           (result nil))
+      (when (and entry start-depth)
+        ;; First try guided bridge reconstruction.
+        (multiple-value-bind (moves final-state nodes-expanded found-p)
+            (fps-guided-suffix-to-goal state start-depth reachable-set base-relations original-goal-fn)
+          (declare (ignore moves final-state nodes-expanded))
+          (setf result found-p))
+        ;; If guided search fails, try each stored witness replay.
+        (unless result
+          (dolist (witness entry)
+            (unless result
+              (let ((trial-state (copy-problem-state state))
+                    (trial-ok t))
+                (dolist (action-form (cdr witness))
+                  (when trial-ok
+                    (multiple-value-bind (next-state success-p failure-reason)
+                        (apply-action-to-state action-form trial-state nil nil)
+                      (declare (ignore failure-reason))
+                      (if success-p
+                          (setf trial-state next-state)
+                          (setf trial-ok nil)))))
+                (when (and trial-ok (funcall original-goal-fn trial-state))
+                  (setf result t)))))))
+      (when bridge-cache
+        (setf (gethash cache-key bridge-cache) result))
+      result)))
+
+
+(defun install-meeting-point (&key
+                                (reachable-set *backward-reachable-set*)
+                                (base-relations (get-base-relations))
+                                (min-backward-depth nil)
+                                (original-goal-fn nil))
+  "Install GOAL-FN as backward-reachable-set membership over base-prop keys.
+   MIN-BACKWARD-DEPTH defaults to the last completed FIND-PREDECESSORS layer."
+  (let ((resolved-min-depth (if (null min-backward-depth)
+                                (fps-default-meeting-point-min-depth)
+                                min-backward-depth)))
+    (unless (and reachable-set (> (hash-table-count reachable-set) 0))
+      (error "INSTALL-MEETING-POINT: *BACKWARD-REACHABLE-SET* is empty. Run FIND-PREDECESSORS first."))
+    (unless (and (integerp resolved-min-depth) (>= resolved-min-depth 0))
+      (error "INSTALL-MEETING-POINT: :MIN-BACKWARD-DEPTH must be a non-negative integer; got ~S."
+             resolved-min-depth))
+    (let ((captured-set reachable-set)
+          (captured-rels base-relations)
+          (captured-min-depth resolved-min-depth)
+          (captured-original-goal-fn original-goal-fn)
+          (bridge-cache (make-hash-table :test 'equal)))
+      (setf (symbol-function 'goal-fn)
+            (lambda (state)
+              (let ((entry (fps-meeting-point-entry-for-state state captured-set captured-rels)))
+                (and entry
+                     (>= (fps-entry-max-depth entry) captured-min-depth)
+                     (or (null captured-original-goal-fn)
+                         (fps-meeting-state-bridgeable-p state
+                                                         captured-set
+                                                         captured-rels
+                                                         captured-original-goal-fn
+                                                         bridge-cache))))))
+      (setf (get 'goal-fn :form)
+            (list 'meeting-point-goal
+                  :target-count (hash-table-count captured-set)
+                  :min-backward-depth captured-min-depth
+                  :requires-bridgeability (if captured-original-goal-fn t nil)
+                  :base-relations captured-rels))
+      t)))
 
 
 (defun install-meeting-point-goal (&key
                                      (reachable-set *backward-reachable-set*)
                                      (base-relations (get-base-relations))
-                                     (min-backward-depth 0))
-  "Install GOAL-FN as backward-reachable-set membership over base-prop keys."
-  (unless (and reachable-set (> (hash-table-count reachable-set) 0))
-    (error "INSTALL-MEETING-POINT-GOAL: *BACKWARD-REACHABLE-SET* is empty. Run FIND-PREDECESSORS first."))
-  (unless (and (integerp min-backward-depth) (>= min-backward-depth 0))
-    (error "INSTALL-MEETING-POINT-GOAL: :MIN-BACKWARD-DEPTH must be a non-negative integer; got ~S."
-           min-backward-depth))
-  (let ((captured-set reachable-set)
-        (captured-rels base-relations)
-        (captured-min-depth min-backward-depth))
-    (setf (symbol-function 'goal-fn)
-          (lambda (state)
-            (let ((entry (fps-meeting-point-entry-for-state state captured-set captured-rels)))
-              (and entry (>= (length (cdr entry)) captured-min-depth)))))
-    (setf (get 'goal-fn :form)
-          (list 'meeting-point-goal
-                :target-count (hash-table-count captured-set)
-                :min-backward-depth captured-min-depth
-                :base-relations captured-rels))
-    t))
+                                     (min-backward-depth nil)
+                                     (original-goal-fn nil))
+  "Backward-compatible wrapper for INSTALL-MEETING-POINT."
+  (install-meeting-point :reachable-set reachable-set
+                         :base-relations base-relations
+                         :min-backward-depth min-backward-depth
+                         :original-goal-fn original-goal-fn))
 
 
-(defun ww-solve-meeting-point (&key
+(defun fps-meeting-entry-depth (state reachable-set base-relations)
+  "Return backward depth (suffix length) of STATE in REACHABLE-SET, else NIL."
+  (let ((e (fps-meeting-point-entry-for-state state reachable-set base-relations)))
+    (and e (fps-entry-max-depth e))))
+
+
+(defun fps-guided-suffix-to-goal (meeting-state start-depth reachable-set base-relations goal-fn)
+  "Try to find a concrete suffix from MEETING-STATE to an original goal.
+   Returns (values suffix-moves final-state nodes-expanded found-p)."
+  (let ((stack (list (list (copy-problem-state meeting-state) start-depth nil)))
+        (visited (make-hash-table :test 'equal))
+        (nodes-expanded 0))
+    (loop while stack
+          do (let* ((frame (pop stack))
+                    (state (first frame))
+                    (depth (second frame))
+                    (path (third frame))
+                    (state-key (fps-state-base-prop-key state base-relations))
+                    (visit-key (cons state-key depth)))
+               (unless (gethash visit-key visited)
+                 (setf (gethash visit-key visited) t)
+                 (incf nodes-expanded)
+                 (if (zerop depth)
+                     (when (funcall goal-fn state)
+                       (return (values path state nodes-expanded t)))
+                     (dolist (action-form (enum-applicable-action-forms state *actions*))
+                       (multiple-value-bind (next-state success-p failure-reason)
+                           (apply-action-to-state action-form state nil nil)
+                         (declare (ignore failure-reason))
+                         (when (and success-p (not (state-is-inconsistent next-state)))
+                           (let ((next-depth (fps-meeting-entry-depth next-state reachable-set base-relations)))
+                             (when (and next-depth (< next-depth depth))
+                               (push (list next-state
+                                           next-depth
+                                           (append path (list (record-move next-state))))
+                                     stack)))))))))
+          finally (return (values nil nil nodes-expanded nil)))))
+
+
+(defun fps-extend-meeting-solution-to-goal (solution &optional
+                                                     (reachable-set *backward-reachable-set*)
+                                                     (base-relations (get-base-relations))
+                                                     (goal-fn nil))
+  "Convert one meeting-point SOLUTION into a full start-to-goal solution."
+  (let* ((meeting-state (solution.goal solution))
+         (meeting-key (fps-state-base-prop-key meeting-state base-relations))
+         (entry (fps-normalize-witness-entry
+                 (fps-meeting-point-entry-for-state meeting-state reachable-set base-relations)))
+         (start-depth nil)
+         (guided-found nil)
+         (guided-nodes-expanded 0)
+         (used-fallback-replay nil)
+         (current (copy-problem-state meeting-state))
+         (suffix-moves nil))
+    (unless entry
+      (format t "~&[solve-meeting-point] Warning: meeting state not found in reachable-set: ~S~%" meeting-key)
+      (return-from fps-extend-meeting-solution-to-goal (values nil nil)))
+    (setf start-depth (fps-entry-max-depth entry))
+    (when goal-fn
+      (multiple-value-bind (guided-moves guided-final nodes-expanded found-p)
+          (fps-guided-suffix-to-goal current start-depth reachable-set base-relations goal-fn)
+        (setf guided-nodes-expanded nodes-expanded
+              guided-found found-p)
+        (when found-p
+          (setf suffix-moves guided-moves
+                current guided-final))))
+    (unless guided-found
+      (setf used-fallback-replay t)
+      (let ((replay-success nil)
+            (last-failure nil))
+        (dolist (witness entry)
+          (unless replay-success
+            (let ((trial-state (copy-problem-state meeting-state))
+                  (trial-moves nil)
+                  (trial-ok t))
+              (dolist (action-form (cdr witness))
+                (when trial-ok
+                  (multiple-value-bind (next-state success-p failure-reason)
+                      (apply-action-to-state action-form trial-state nil nil)
+                    (if success-p
+                        (progn
+                          (push (record-move next-state) trial-moves)
+                          (setf trial-state next-state))
+                        (progn
+                          (setf trial-ok nil
+                                last-failure failure-reason))))))
+              (when trial-ok
+                (setf replay-success t
+                      current trial-state
+                      suffix-moves (nreverse trial-moves))))))
+        (unless replay-success
+          (format t "~&[solve-meeting-point] Warning: failed replaying all ~D witness suffix(es) from meeting state (~A).~%"
+                 (length entry) last-failure)
+          (return-from fps-extend-meeting-solution-to-goal (values nil nil)))))
+    (let* ((full-path (append (solution.path solution) suffix-moves))
+           (final-goal-satisfied (and goal-fn (funcall goal-fn current)))
+           (diag (list :meeting-key meeting-key
+                       :witness-count (length entry)
+                       :start-backward-depth start-depth
+                       :guided-search-attempted (not (null goal-fn))
+                       :guided-search-found guided-found
+                       :guided-nodes-expanded guided-nodes-expanded
+                       :fallback-replay-used used-fallback-replay
+                       :final-goal-satisfied final-goal-satisfied
+                       :final-key (fps-state-base-prop-key current base-relations))))
+      (values
+       (make-solution
+        :depth (length full-path)
+       :time (problem-state.time current)
+       :value (problem-state.value current)
+       :path full-path
+       :goal current)
+       diag))))
+
+
+(defun fps-rebuild-unique-solutions (solutions)
+  "Rebuild *UNIQUE-SOLUTIONS* semantics from SOLUTIONS using current SOLUTION-BETTER-P."
+  (let ((unique nil))
+    (dolist (sol solutions)
+      (let* ((goal-idb (problem-state.idb (solution.goal sol)))
+             (existing (find goal-idb unique
+                             :key (lambda (s) (problem-state.idb (solution.goal s)))
+                             :test #'equalp)))
+        (cond
+          ((null existing)
+           (push sol unique))
+          ((solution-better-p sol existing)
+           (setf unique (substitute sol existing unique))))))
+    (nreverse unique)))
+
+
+(defun fps-print-solve-meeting-point-diagnostics (diagnostics)
+  "Print SOLVE-MEETING-POINT expansion diagnostics."
+  (when *solve-meeting-point-print-diagnostics*
+    (let* ((total (length diagnostics))
+           (guided-found (count-if (lambda (d) (getf d :guided-search-found)) diagnostics))
+           (fallback-used (count-if (lambda (d) (getf d :fallback-replay-used)) diagnostics))
+           (goal-ok (count-if (lambda (d) (getf d :final-goal-satisfied)) diagnostics)))
+      (format t "~&[solve-meeting-point diagnostics] expanded=~:D guided-found=~:D fallback-used=~:D goal-satisfied=~:D~%"
+              total guided-found fallback-used goal-ok)
+      (loop for d in diagnostics
+            for i from 1
+            do (format t "~&[solve-meeting-point diagnostics] #~D depth=~D guided=~A fallback=~A goal=~A key=~S~%"
+                       i
+                       (or (getf d :start-backward-depth) 0)
+                       (if (getf d :guided-search-found) 'yes 'no)
+                       (if (getf d :fallback-replay-used) 'yes 'no)
+                       (if (getf d :final-goal-satisfied) 'yes 'no)
+                       (getf d :meeting-key))))))
+
+
+(defmacro solve-meeting-point (&rest raw-args)
+  "User-facing macro wrapper for SOLVE-MEETING-POINT-FN.
+   Auto-quotes literal symbol values for :SOLUTION-TYPE so calls like
+   (solve-meeting-point :depth-cutoff 10 :solution-type min-length) work."
+  (destructuring-bind (&key
+                       (depth-cutoff 12 depth-cutoff-supplied-p)
+                       (solution-type 'first solution-type-supplied-p)
+                       (min-backward-depth nil min-backward-depth-supplied-p))
+      raw-args
+    (flet ((literal-symbol-p (form)
+             (and (symbolp form)
+                  (not (keywordp form))
+                  (not (null form)))))
+      (labels ((maybe-quote-symbol (form)
+                 (cond
+                   ((and (consp form) (eq (car form) 'quote)) form)
+                   ((literal-symbol-p form) `',form)
+                   (t form))))
+        `(solve-meeting-point-fn
+          ,@(if depth-cutoff-supplied-p
+                `(:depth-cutoff ,depth-cutoff)
+                '(:depth-cutoff 12))
+          ,@(if solution-type-supplied-p
+                `(:solution-type ,(maybe-quote-symbol solution-type))
+                '(:solution-type 'first))
+          ,@(if min-backward-depth-supplied-p
+                `(:min-backward-depth ,min-backward-depth)
+                '(:min-backward-depth nil)))))))
+
+
+(defun solve-meeting-point-fn (&key
                                  (depth-cutoff 12)
                                  (solution-type 'first)
-                                 (min-backward-depth 0))
-  "Run WW-SOLVE with GOAL-FN set to backward-reachable-set membership."
+                                 (min-backward-depth nil))
+  "Run WW-SOLVE to a meeting point, then expand to full start-to-goal solutions."
   (let ((saved-depth-cutoff *depth-cutoff*)
         (saved-solution-type *solution-type*)
         (saved-goal-form (get 'goal-fn :form))
         (saved-goal-fn-def (and (fboundp 'goal-fn) (symbol-function 'goal-fn))))
     (unwind-protect
         (progn
-          (install-meeting-point-goal :min-backward-depth min-backward-depth)
+          (install-meeting-point :min-backward-depth min-backward-depth
+                                 :original-goal-fn nil)  ;; bridgeability deferred to post-processing
           (setf *depth-cutoff* depth-cutoff
                 *solution-type* solution-type)
           (ww-solve)
+          (let ((expanded-solutions nil)
+                (expansion-diagnostics nil)
+                (extension-failures 0))
+            (dolist (sol *solutions*)
+              (multiple-value-bind (expanded-sol diag)
+                  (fps-extend-meeting-solution-to-goal sol
+                                                       *backward-reachable-set*
+                                                       (get-base-relations)
+                                                       saved-goal-fn-def)
+                (if expanded-sol
+                    (progn
+                      (push expanded-sol expanded-solutions)
+                      (push diag expansion-diagnostics))
+                    (incf extension-failures))))
+            (when (> extension-failures 0)
+              (format t "~&[solve-meeting-point] ~:D meeting-point solution(s) could not be extended (skipped).~%"
+                      extension-failures))
+            (setf expanded-solutions (nreverse expanded-solutions)
+                  expansion-diagnostics (nreverse expansion-diagnostics))
+            (setf *solve-meeting-point-last-diagnostics*
+                  (list :expanded-count (length expanded-solutions)
+                        :details expansion-diagnostics))
+            (when *solve-meeting-point-print-diagnostics*
+              (let* ((total (length expansion-diagnostics))
+                     (guided-found (count-if (lambda (d) (getf d :guided-search-found))
+                                             expansion-diagnostics))
+                     (fallback-used (count-if (lambda (d) (getf d :fallback-replay-used))
+                                              expansion-diagnostics))
+                     (goal-ok (count-if (lambda (d) (getf d :final-goal-satisfied))
+                                        expansion-diagnostics)))
+                (format t "~&[solve-meeting-point diagnostics] expanded=~:D guided-found=~:D fallback-used=~:D goal-satisfied=~:D~%"
+                        total guided-found fallback-used goal-ok)
+                (loop for d in expansion-diagnostics
+                      for i from 1
+                      do (format t "~&[solve-meeting-point diagnostics] #~D depth=~D guided=~A fallback=~A goal=~A key=~S~%"
+                                 i
+                                 (or (getf d :start-backward-depth) 0)
+                                 (if (getf d :guided-search-found) 'yes 'no)
+                                 (if (getf d :fallback-replay-used) 'yes 'no)
+                                 (if (getf d :final-goal-satisfied) 'yes 'no)
+                                 (getf d :meeting-key)))))
+            (let ((discarded-count 0))
+              ;; Keep only expanded paths that satisfy the original (pre-meeting-point) goal.
+              (setf *solutions*
+                    (if saved-goal-fn-def
+                        (remove-if-not
+                         (lambda (sol)
+                           (let ((ok (funcall saved-goal-fn-def (solution.goal sol))))
+                             (unless ok
+                               (incf discarded-count))
+                             ok))
+                         expanded-solutions)
+                        expanded-solutions))
+              (when expanded-solutions
+                (format t "~&[solve-meeting-point] Expanded ~:D meeting-point solution(s) to full path(s).~%"
+                        (length expanded-solutions)))
+              (when (and saved-goal-fn-def (> discarded-count 0))
+                (format t "~&[solve-meeting-point] Discarded ~:D expanded solution(s) that do not satisfy the original goal.~%"
+                        discarded-count))))
+          (let ((unique nil))
+            (dolist (sol *solutions*)
+              (let* ((goal-idb (problem-state.idb (solution.goal sol)))
+                     (existing (find goal-idb unique
+                                     :key (lambda (s) (problem-state.idb (solution.goal s)))
+                                     :test #'equalp)))
+                (cond
+                  ((null existing)
+                   (push sol unique))
+                  ((solution-better-p sol existing)
+                   (setf unique (substitute sol existing unique))))))
+            (setf *unique-solutions* (nreverse unique)))
+          (when *solutions*
+            (format t "~&[solve-meeting-point] Expanded ~:D meeting-point solution(s) to full goal path(s).~%"
+                    (length *solutions*))
+            (format t "~&[solve-meeting-point] Example full solution path:~%")
+            (when (fboundp 'printout-solution)
+              (printout-solution (first *solutions*))))
           *solutions*)
       (setf *depth-cutoff* saved-depth-cutoff
             *solution-type* saved-solution-type)
       (setf (get 'goal-fn :form) saved-goal-form)
       (when saved-goal-fn-def
         (setf (symbol-function 'goal-fn) saved-goal-fn-def)))))
+
+
+(defun ww-solve-meeting-point (&key
+                                 (depth-cutoff 12)
+                                 (solution-type 'first)
+                                 (min-backward-depth nil))
+  "Backward-compatible wrapper for SOLVE-MEETING-POINT."
+  (solve-meeting-point-fn :depth-cutoff depth-cutoff
+                          :solution-type solution-type
+                          :min-backward-depth min-backward-depth))
 
 
 (defun fgs-normalize-solution-type (x)
@@ -1876,7 +2050,8 @@ If the user answers NO, returns immediately."
     (dolist (s states (nreverse goal-states))
       (incf checked)
       (maybe-propagate-changes! s)
-      (when (funcall goal-fn s)
+      (when (and (not (state-is-inconsistent s))
+                 (funcall goal-fn s))
         (push s goal-states))
       (when (zerop (mod checked 10000))
         (format t "~&[propagate-and-filter] ~D/~D states processed, ~D goals found~%"
