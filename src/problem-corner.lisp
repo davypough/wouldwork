@@ -15,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 10)
 
 (ww-set *symmetry-pruning* t)
 
@@ -1353,7 +1353,8 @@
     1
   (?agent agent ?connector connector)
   (and ;(same-type ?agent ?connector)
-       (not (bind (holds ?agent $held)))
+       (forall (?c connector)  ;no connector is held
+         (bind (loc ?c $any)))
        (bind (loc ?agent $area))
        (loc ?connector $area))
        ;(bind (elevation ?agent $agent-elevation))
@@ -1371,23 +1372,22 @@
 
 (define-action connect-to-3-terminus
     1
-  (?agent agent (combination (?t1 ?t2 ?t3) terminus))
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       ;(same-type ?agent $cargo)
-       (different $cargo ?t1)
-       (different $cargo ?t2)
-       (different $cargo ?t3)
+  (?agent agent ?connector connector (combination (?t1 ?t2 ?t3) terminus))
+  (and (not (bind (loc ?connector $any)))
+       ;(same-type ?agent ?connector)
+       (different ?connector ?t1)
+       (different ?connector ?t2)
+       (different ?connector ?t3)
        (bind (loc ?agent $area))
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
        (not (and (connector ?t3) (loc ?t3 $area)))
-       (connectable $cargo $area)
+       (connectable ?connector $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2)
        (selectable ?agent $area ?t3))
-  (?agent $cargo ?t1 ?t2 ?t3 $area $place)
+  (?agent ?connector ?t1 ?t2 ?t3 $area $place)
   (do ;; Can place on a box
       ;(doall (?box box)
       ;  (if (and (loc ?box $area)
@@ -1395,101 +1395,94 @@
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
       ;    (assert ;(not (holds ?agent $cargo))
-      ;            (loc $cargo $area)
-      ;            (on $cargo ?box)
-      ;            (elevation $cargo (1+ $box-elevation))
-      ;            (paired $cargo ?t1)
-      ;            (paired $cargo ?t2)
-      ;            (paired $cargo ?t3)
+      ;            (loc ?connector $area)
+      ;            (on ?connector ?box)
+      ;            (elevation ?connector (1+ $box-elevation))
+      ;            (paired ?connector ?t1)
+      ;            (paired ?connector ?t2)
+      ;            (paired ?connector ?t3)
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert ;(not (holds ?agent $cargo))
-              (loc $cargo $area)
-              ;(elevation $cargo 0)
-              (paired $cargo ?t1)
-              (paired $cargo ?t2)
-              (paired $cargo ?t3)
+      (assert (loc ?connector $area)
+              ;(elevation ?connector 0)
+              (paired ?connector ?t1)
+              (paired ?connector ?t2)
+              (paired ?connector ?t3)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
 
 
 (define-action connect-to-2-terminus
     1
-  (?agent agent (combination (?t1 ?t2) terminus))
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       ;(same-type ?agent $cargo)
-       (different $cargo ?t1)
-       (different $cargo ?t2)
+  (?agent agent ?connector connector (combination (?t1 ?t2) terminus))
+  (and (not (bind (loc ?connector $any)))
+       ;(same-type ?agent ?connector)
+       (different ?connector ?t1)
+       (different ?connector ?t2)
        (bind (loc ?agent $area))
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
-       (connectable $cargo $area)
+       (connectable ?connector $area)
        (selectable ?agent $area ?t1)
        (selectable ?agent $area ?t2))
-  (?agent $cargo ?t1 ?t2 $area $place)
+  (?agent ?connector ?t1 ?t2 $area $place)
   (do ;; Can place on a box
       ;(doall (?box box)
       ;  (if (and (loc ?box $area)
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert ;(not (holds ?agent $cargo))
-      ;            (loc $cargo $area)
-      ;            (on $cargo ?box)
-      ;            (elevation $cargo (1+ $box-elevation))
-      ;            (paired $cargo ?t1)
-      ;            (paired $cargo ?t2)
+      ;    (assert (loc ?connector $area)
+      ;            (on ?connector ?box)
+      ;            (elevation ?connector (1+ $box-elevation))
+      ;            (paired ?connector ?t1)
+      ;            (paired ?connector ?t2)
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert ;(not (holds ?agent $cargo))
-              (loc $cargo $area)
-              ;(elevation $cargo 0)
-              (paired $cargo ?t1)
-              (paired $cargo ?t2)
+      (assert (loc ?connector $area)
+              ;(elevation ?connector 0)
+              (paired ?connector ?t1)
+              (paired ?connector ?t2)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
 
 
 #+ignore (define-action connect-to-1-terminus
     1
-  (?agent agent ?t1 terminus)
-  (and (bind (holds ?agent $cargo))
-       (connector $cargo)
-       ;(same-type ?agent $cargo)
-       (different $cargo ?t1)
+  (?agent agent ?connector connector ?t1 terminus)
+  (and (not (bind (loc ?connector $any)))
+       ;(same-type ?agent ?connector)
+       (different ?connector ?t1)
        (bind (loc ?agent $area))
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
-       (connectable $cargo $area)
+       (connectable ?connector $area)
        (selectable ?agent $area ?t1))
-  (?agent $cargo ?t1 $area $place)
+  (?agent ?connector ?t1 $area $place)
   (do ;; Can place on a box
       ;(doall (?box box)
       ;  (if (and (loc ?box $area)
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert ;(not (holds ?agent $cargo))
-      ;            (loc $cargo $area)
-      ;            (on $cargo ?box)
-      ;            (elevation $cargo (1+ $box-elevation))
-      ;            (paired $cargo ?t1)
+      ;    (assert (loc ?connector $area)
+      ;            (on ?connector ?box)
+      ;            (elevation ?connector (1+ $box-elevation))
+      ;            (paired ?connector ?t1)
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
-      (assert ;(not (holds ?agent $cargo))
-              (loc $cargo $area)
-              ;(elevation $cargo 0)
-              (paired $cargo ?t1)
+      (assert (loc ?connector $area)
+              ;(elevation ?connector 0)
+              (paired ?connector ?t1)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
 
 
-(define-action put-cargo-on-place
+#+ignore (define-action put-cargo-on-place
   ;; Agent can place inactive cargo on a box, buzzer/mine (boxes only), or the ground.
   1
   (?agent agent)
@@ -1669,7 +1662,7 @@
         (accessible1 area1 ?zone $area))))
 
 
-(define-base-filter filter-constraints  ;this is for the goal only
+(define-goal-filter filter-constraints  ;this is for the goal only
   (and (loc agent1 area4)
        (exists ((?c-blue ?c-red ?c-other) connector)
          (and (loc ?c-blue area2)

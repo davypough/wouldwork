@@ -114,13 +114,14 @@ Set to NIL for no cap.")
               '(:direction 'forward))))))
 
 
-(defun find-goal-states-fn (&optional (goal-spec 'goal-fn)
+(defun find-goal-states-fn (&optional (goal-spec 'goal-fn) &rest args
                                       &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
                                         (prefilter :use-installed)
                                         sort< sort-key)
   "Top-level API wrapper. Full implementation is defined below in
    %FIND-GOAL-STATES-FN to keep call flow top-down in this file."
+  (declare (ignore args))
   (%find-goal-states-fn goal-spec
                         :algorithm algorithm
                         :solution-type solution-type
@@ -175,7 +176,7 @@ Set to NIL for no cap.")
                         :canonical-dedupe canonical-dedupe))
 
 
-(defun %find-goal-states-fn (&optional (goal-spec 'goal-fn)
+(defun %find-goal-states-fn (&optional (goal-spec 'goal-fn) &rest args
                                        &key (algorithm *algorithm*) (solution-type 'every)
                                          exclude-relations include-relations
                                          (prefilter :use-installed)
@@ -202,6 +203,7 @@ Set to NIL for no cap.")
               More efficient than :SORT< (Schwartzian transform: each key
               computed once).  Default NIL.  Mutually exclusive with :SORT<.
    Returns: T (the report plist is saved on (get 'find-goal-states :last-report))."
+  (declare (ignore args))
   (unless (get-base-relations)
     (error "FIND-GOAL-STATES: no base relations declared.  ~
             Declare relations with DEFINE-BASE-RELATION (or use DEFINE-BASE-RELATIONS)."))
@@ -454,9 +456,15 @@ Set to NIL for no cap.")
 
 
 (defun fps-entry-add-witness (entry state path)
-  "Add witness (STATE . PATH) to ENTRY, dedupe by PATH, and apply witness cap."
+  "Add witness (STATE . PATH) to ENTRY and apply witness cap.
+   Dedupes by exact (state-full-key, path) pair."
   (let* ((existing (fps-normalize-witness-entry entry))
-         (already (find path existing :key #'cdr :test #'equal))
+         (state-full-key (fps-state-full-prop-key state))
+         (already (find-if (lambda (w)
+                             (and (equal path (cdr w))
+                                  (string= state-full-key
+                                           (fps-state-full-prop-key (car w)))))
+                           existing))
          (updated (if already existing (cons (cons state path) existing)))
          (cap *backward-reachable-max-witnesses-per-key*))
     (if (and cap (integerp cap) (> (length updated) cap))
@@ -480,7 +488,80 @@ Set to NIL for no cap.")
                           (list-database idb))
            (lambda (x y)
              (string< (prin1-to-string x)
-                      (prin1-to-string y)))))))
+                     (prin1-to-string y)))))))
+
+
+(defun fps-idb-full-prop-key (idb)
+  "Return canonical full-prop key computed directly from IDB hash-table."
+  (prin1-to-string
+   (sort (list-database idb)
+         (lambda (x y)
+           (string< (prin1-to-string x)
+                    (prin1-to-string y))))))
+
+
+(defun fps-path-replayable-from-state-p (state path)
+  "Return T iff PATH can be replayed forward from STATE without failure."
+  (let ((trial-state (copy-problem-state state))
+        (ok t))
+    (dolist (action-form path ok)
+      (when ok
+        (multiple-value-bind (next-state success-p failure-reason)
+            (apply-action-to-state action-form trial-state nil nil)
+          (declare (ignore failure-reason))
+          (if (and success-p (not (state-is-inconsistent next-state)))
+              (setf trial-state next-state)
+              (setf ok nil)))))))
+
+
+(defun fps-entry-path-for-successor (entry &key successor-state successor-idb)
+  "Return matching witness pair (STATE . PATH) from ENTRY.
+   SUCCESSOR-STATE or SUCCESSOR-IDB must be provided.
+   Falls back to first witness whose PATH replay succeeds from SUCCESSOR-STATE.
+   Note: PATH may be NIL (valid for layer-0 goal witnesses)."
+  (let* ((norm (fps-normalize-witness-entry entry))
+         (successor-full-key (cond
+                               (successor-state
+                                (fps-state-full-prop-key successor-state))
+                               (successor-idb
+                                (fps-idb-full-prop-key successor-idb))
+                               (t nil))))
+    (when norm
+      (let ((match (and successor-full-key
+                        (find successor-full-key norm
+                              :test #'string=
+                              :key (lambda (w)
+                                     (fps-state-full-prop-key (car w)))))))
+        (or match
+            (and successor-state
+                 (loop for w in norm
+                       when (fps-path-replayable-from-state-p successor-state (cdr w))
+                         do (return w))))))))
+
+
+(defun fps-select-target-witness-for-successor (entry successor-state)
+  "Pick a witness from ENTRY for SUCCESSOR-STATE.
+   Prefers exact/replayable match; falls back to ENTRY primary witness
+   to preserve base-reachability completeness."
+  (or (fps-entry-path-for-successor entry :successor-state successor-state)
+      (fps-entry-primary-witness entry)))
+
+
+(defun fps-target-witness-paths-for-successor (entry successor-state)
+  "Return PATH list to propagate from ENTRY for SUCCESSOR-STATE.
+   Preference:
+   1) all replayable witness paths from SUCCESSOR-STATE
+   2) all witness paths in ENTRY (completeness fallback)."
+  (let* ((norm (fps-normalize-witness-entry entry))
+         (replayable (and successor-state
+                          (remove-if-not
+                           (lambda (w)
+                             (fps-path-replayable-from-state-p successor-state (cdr w)))
+                           norm)))
+         (chosen (if (and replayable (not (null replayable)))
+                     replayable
+                     norm)))
+    (mapcar #'cdr chosen)))
 
 
 (defun fps-state-relation-signature-key (state relations)
@@ -609,20 +690,24 @@ Set to NIL for no cap.")
 
 
 (defun fps-forward-per-object-store-validated-predecessor (leaf pred-key frontier-key action
-                                                     upd reachable layer-table stats)
-  "Store validated predecessor LEAF and its action/path metadata for per-object CSP flow."
+                                                     upd next-state reachable layer-table stats)
+  "Store validated predecessor LEAF and its action/path metadata for per-object CSP flow.
+   Uses successor-aware witness selection within FRONTIER-KEY bucket."
   (let* ((inst (update.instantiations upd))
          (action-form (cons (action.name action) inst))
          (target-entry (gethash frontier-key reachable))
-         (target-path (fps-entry-primary-path target-entry))
-         (new-path (cons action-form target-path))
-         (stored (copy-problem-state leaf))
-         (existing (gethash pred-key layer-table)))
-    (incf (fps-layer-stats-validated-count stats))
-    (setf (gethash pred-key layer-table)
-          (if existing
-              (fps-entry-add-witness existing stored new-path)
-              (fps-make-witness-entry stored new-path)))))
+         (target-paths (and target-entry
+                            (fps-target-witness-paths-for-successor target-entry
+                                                                    next-state))))
+    (when target-paths
+      (let* ((stored (copy-problem-state leaf))
+             (existing (gethash pred-key layer-table)))
+        (incf (fps-layer-stats-validated-count stats))
+        (dolist (target-path target-paths)
+          (setf existing
+                (fps-entry-add-witness existing stored (cons action-form target-path))))
+        (setf (gethash pred-key layer-table) existing)
+        t))))
 
 
 (defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key action
@@ -636,10 +721,13 @@ Set to NIL for no cap.")
       (incf (gethash (action.name action) (fps-layer-stats-op-success stats) 0))
       (let ((next-key (fps-idb-base-prop-key changes base-relations)))
         (if (string= next-key frontier-key)
-            (progn
-              (fps-forward-per-object-store-validated-predecessor
-               leaf pred-key frontier-key action upd reachable layer-table stats)
-              t)
+            (let ((next-state (make-problem-state :idb changes
+                                                  :hidb (problem-state.hidb leaf))))
+              (if (fps-forward-per-object-store-validated-predecessor
+                   leaf pred-key frontier-key action upd next-state
+                   reachable layer-table stats)
+                  t
+                  nil))
             (progn
               (incf (fps-layer-stats-key-mismatch-count stats))
               nil)))))))
@@ -652,6 +740,7 @@ Set to NIL for no cap.")
       (progn
         (bw-normalize! leaf)
         (when (fps-state-feasible-p leaf)
+          (maybe-propagate-changes! leaf)
           (block validate
             (incf (fps-layer-stats-novel-validation-attempts stats))
             (incf (gethash (action.name action) (fps-layer-stats-op-attempts stats) 0))
@@ -682,27 +771,28 @@ Set to NIL for no cap.")
     (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
     (cond
       ((string= pred-key frontier-key) nil)
-      ((gethash pred-key reachable)
-       (incf (fps-layer-stats-collision-reachable-count stats)))
-      ((gethash pred-key layer-table)
-       (incf (fps-layer-stats-collision-layer-count stats)))
       (t
+       (when (gethash pred-key reachable)
+         (incf (fps-layer-stats-collision-reachable-count stats)))
+       (when (gethash pred-key layer-table)
+         (incf (fps-layer-stats-collision-layer-count stats)))
        (incf (fps-layer-stats-feasible-count stats))
        (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
+       ;; Even on collisions, validate to accumulate additional witnesses.
        (fps-forward-per-object-validate-leaf
         leaf pred-key frontier-key action reachable
         base-relations layer-table stats)))))
 
 
-(defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key action
+(defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key actions
                                            reachable base-relations
                                            problem-actions key-object
                                            object-enum-actions modified-rels
                                            stats)
-  "Per-object CSP expansion of predecessors for FRONTIER-STATE via ACTION.
+  "Per-object CSP expansion of predecessors for FRONTIER-STATE via ACTIONS.
    Builds a start state with only KEY-OBJECT's MODIFIED-RELS propositions
    removed, runs CSP DFS through OBJECT-ENUM-ACTIONS, and validates each
-   leaf by forward action application."
+   leaf by forward application of every action in ACTIONS."
   (let ((csp-start (fps-build-per-object-csp-start-state
                     frontier-state key-object modified-rels))
         (layer-table (fps-layer-stats-layer-table stats))
@@ -710,9 +800,10 @@ Set to NIL for no cap.")
     (fps-csp-search
      csp-start object-enum-actions
      (lambda (leaf)
-       (fps-forward-per-object-handle-leaf
-        leaf frontier-key action reachable
-        base-relations layer-table stats)))))
+       (dolist (action actions)
+         (fps-forward-per-object-handle-leaf
+          leaf frontier-key action reachable
+          base-relations layer-table stats))))))
 
 
 (defun fps-expand-predecessor-layer-forward-per-object-csp (frontier reachable
@@ -720,47 +811,82 @@ Set to NIL for no cap.")
                                                    problem-actions
                                                    selected-actions)
   "Expand one predecessor layer using per-object CSP forward candidate generation.
-   Phase 1: For each selected action, build CSP enum-actions, partition by
-   key-object, and filter by action's type instances.
-   Phase 2: For each frontier state x action x key-object, run per-object CSP
-   DFS + forward validation.
+   Phase 1: Group selected actions by modified base-relations, build CSP
+   enum-actions once per group, partition by key-object, and filter by union
+   of action type instances.
+   Phase 2: For each frontier state x group x key-object, run per-object CSP
+   DFS once and validate each leaf against all applicable actions in the group.
    Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
   (let ((stats (make-fps-layer-stats))
         (frontier-count (length frontier))
         (frontier-idx 0)
         (last-report-time (get-internal-real-time))
-        (action-info nil)
-        (productive-count 0)          ;; ADDED: frontier productivity tracking
-        (first-productive-idx 0)      ;; ADDED
+        (rels-groups nil)
+        (productive-count 0)
+        (first-productive-idx 0)
         (last-productive-idx 0))
-    ;; Phase 1: precompute per-action, per-key-object enum-action groups.
+    ;; Phase 1: group actions by modified base-rels, build CSP enum-actions per group.
     (setf *enum-diag-printed* nil)
-    (dolist (action selected-actions)
-      (multiple-value-bind (enum-actions modified-rels)
-          (fps-build-predecessor-enum-actions action base-relations)
-        (when enum-actions
-          (let* ((key-groups (fps-partition-enum-actions-by-key
-                              enum-actions modified-rels))
-                 (action-objects (fps-action-object-set action))
-                 (filtered-groups (if action-objects
-                                      (remove-if-not
-                                       (lambda (g)
-                                         (member (car g) action-objects :test #'eq))
-                                       key-groups)
-                                      key-groups)))
-            (when filtered-groups
-              (push (list action modified-rels filtered-groups) action-info))))))
-    (setf action-info (nreverse action-info))
-    (format t "~&  [forward] ~D/~D actions modify base relations. ~
-               Processing ~:D frontier states...~%"
-            (length action-info) (length selected-actions) frontier-count)
-    (dolist (info action-info)
-      (let ((a (first info))
-            (groups (third info)))
-        (format t "~&  [forward]   ~S: ~D key-objects ~S~%"
-                (action.name a) (length groups)
+    (let ((rels-table (make-hash-table :test #'equal)))
+      ;; 1a. Group actions by sorted modified base-rels.
+      (dolist (action selected-actions)
+        (let ((modified-rels (intersection (action.effect-adds action)
+                                           base-relations :test #'eq)))
+          (when modified-rels
+            (let ((sorted-rels (sort (copy-list modified-rels) #'string<
+                                     :key #'symbol-name))
+                  (obj-set (fps-action-object-set action)))
+              (push (cons action obj-set)
+                    (gethash sorted-rels rels-table))))))
+      ;; 1b. For each group, generate CSP enum-actions once, partition by key, filter.
+      (maphash
+       (lambda (sorted-rels action-entries)
+         (setf action-entries (nreverse action-entries))
+         (let* ((representative (car (first action-entries)))
+                (enum-actions (fps-build-predecessor-enum-actions
+                               representative base-relations)))
+           (when enum-actions
+             (let* ((key-groups (fps-partition-enum-actions-by-key
+                                 enum-actions sorted-rels))
+                    (any-dynamic (some (lambda (ae) (null (cdr ae)))
+                                       action-entries))
+                    (union-objects
+                      (unless any-dynamic
+                        (let ((result nil))
+                          (dolist (ae action-entries result)
+                            (dolist (obj (cdr ae))
+                              (pushnew obj result :test #'eq))))))
+                    (filtered-groups
+                      (if union-objects
+                          (remove-if-not
+                           (lambda (g)
+                             (member (car g) union-objects :test #'eq))
+                           key-groups)
+                          key-groups)))
+               (when filtered-groups
+                 (push (list sorted-rels filtered-groups action-entries)
+                       rels-groups))))))
+       rels-table))
+    (setf rels-groups (sort rels-groups #'<
+                            :key (lambda (rg) (length (first rg)))))
+    ;; Report grouping results.
+    (let ((total-actions (loop for rg in rels-groups
+                               sum (length (third rg)))))
+      (format t "~&  [forward] ~D CSP group~:P from ~D/~D actions. ~
+                 Processing ~:D frontier states...~%"
+              (length rels-groups) total-actions (length selected-actions)
+              frontier-count))
+    (dolist (rg rels-groups)
+      (let ((modified-rels (first rg))
+            (key-groups (second rg))
+            (action-entries (third rg)))
+        (format t "~&  [forward]   ~S: ~D action~:P ~S, ~D key-object~:P ~S~%"
+                modified-rels
+                (length action-entries)
+                (mapcar (lambda (ae) (action.name (car ae))) action-entries)
+                (length key-groups)
                 (mapcar (lambda (g) (list (car g) (1- (length g))))
-                        groups))))
+                        key-groups))))
     (finish-output)
     ;; Phase 2: expand each frontier state.
     (dolist (target frontier)
@@ -770,17 +896,23 @@ Set to NIL for no cap.")
         (finish-output))
       (let ((target-key (fps-state-base-prop-key target base-relations))
             (pre-validated (fps-layer-stats-validated-count stats)))
-        (dolist (info action-info)
-          (let ((action (first info))
-                (modified-rels (second info))
-                (key-groups (third info)))
+        (dolist (rg rels-groups)
+          (let ((modified-rels (first rg))
+                (key-groups (second rg))
+                (action-entries (third rg)))
             (dolist (group key-groups)
-              (let ((key-object (car group))
-                    (object-enum-actions (cdr group)))
-                (fps-expand-one-state-forward-per-object-csp
-                 target target-key action reachable base-relations
-                 problem-actions key-object object-enum-actions
-                 modified-rels stats)))))
+              (let* ((key-object (car group))
+                     (object-enum-actions (cdr group))
+                     (applicable-actions
+                       (loop for (action . obj-set) in action-entries
+                             when (or (null obj-set)
+                                      (member key-object obj-set :test #'eq))
+                             collect action)))
+                (when applicable-actions
+                  (fps-expand-one-state-forward-per-object-csp
+                   target target-key applicable-actions reachable base-relations
+                   problem-actions key-object object-enum-actions
+                   modified-rels stats))))))
         (when (> (fps-layer-stats-validated-count stats) pre-validated)
           (incf productive-count)
           (when (zerop first-productive-idx)
@@ -800,7 +932,7 @@ Set to NIL for no cap.")
                   (hash-table-count (fps-layer-stats-layer-table stats)))
           (finish-output)
           (setf last-report-time now))))
-    (let ((diag (fps-build-layer-diagnostics stats)))  ;; ADDED: append frontier productivity
+    (let ((diag (fps-build-layer-diagnostics stats)))
       (setf (getf diag :productive-frontier-count) productive-count
             (getf diag :first-productive-frontier) first-productive-idx
             (getf diag :last-productive-frontier) last-productive-idx
@@ -891,20 +1023,19 @@ Set to NIL for no cap.")
               (incf (fps-layer-stats-feasible-count stats))
               (incf (gethash (car action-form) (fps-layer-stats-op-feasible stats) 0))
               (let ((pred-key (fps-state-base-prop-key pred base-relations)))
-                (cond
-                  ((gethash pred-key reachable)
-                   (incf (fps-layer-stats-collision-reachable-count stats)))
-                  ((gethash pred-key (fps-layer-stats-layer-table stats))
-                   (incf (fps-layer-stats-collision-layer-count stats)))
-                  (t
-                   (fps-validate-novel-predecessor
-                    stats pred pred-key action-form target-key
-                    base-relations reachable)))))))))
+                (when (gethash pred-key reachable)
+                  (incf (fps-layer-stats-collision-reachable-count stats)))
+                (when (gethash pred-key (fps-layer-stats-layer-table stats))
+                  (incf (fps-layer-stats-collision-layer-count stats)))
+                ;; Even on collisions, validate to accumulate additional witnesses.
+                (fps-validate-novel-predecessor
+                 stats pred pred-key action-form target-key
+                 base-relations reachable))))))))
     (values (fps-layer-stats-layer-table stats)
             (fps-layer-stats-raw-count stats)
             (fps-layer-stats-feasible-count stats)
             (fps-layer-stats-validated-count stats)
-            (fps-build-layer-diagnostics stats))))
+            (fps-build-layer-diagnostics stats)))
 
 
 (defun fps-validate-novel-predecessor (stats pred pred-key action-form target-key
@@ -923,16 +1054,21 @@ Set to NIL for no cap.")
           (let ((next-key (fps-state-base-prop-key next-state base-relations)))
             (if (string= next-key target-key)
                 (progn
-                  (incf (fps-layer-stats-validated-count stats))
                   (let* ((target-entry (gethash target-key reachable))
-                         (target-path (fps-entry-primary-path target-entry))
-                         (new-path (cons action-form target-path))
-                         (existing (gethash pred-key (fps-layer-stats-layer-table stats))))
-                    (setf (gethash pred-key (fps-layer-stats-layer-table stats))
-                          (if existing
-                              (fps-entry-add-witness existing pred new-path)
-                              (fps-make-witness-entry pred new-path)))))
-                (incf (fps-layer-stats-key-mismatch-count stats)))))
+                         (target-paths (and target-entry
+                                            (fps-target-witness-paths-for-successor
+                                             target-entry next-state))))
+                    (if target-paths
+                        (let ((existing (gethash pred-key (fps-layer-stats-layer-table stats))))
+                          (incf (fps-layer-stats-validated-count stats))
+                          (dolist (target-path target-paths)
+                            (setf existing
+                                  (fps-entry-add-witness existing pred
+                                                         (cons action-form target-path))))
+                          (setf (gethash pred-key (fps-layer-stats-layer-table stats))
+                                existing))
+                        nil))
+                (incf (fps-layer-stats-key-mismatch-count stats))))))
         (progn
           (incf (fps-layer-stats-apply-fail-count stats))
           (fps-record-apply-failure stats action-form pred failure-reason
@@ -1318,6 +1454,18 @@ Set to NIL for no cap.")
          (used-fallback-replay nil)
          (current (copy-problem-state meeting-state))
          (suffix-moves nil))
+    (when *solve-meeting-point-print-diagnostics*
+      (let* ((witness-state (car (first entry)))
+             (meeting-non-base (set-difference 
+                                 (list-database (problem-state.idb meeting-state))
+                                 (enum-state-base-props meeting-state base-relations)
+                                 :test #'equal))
+             (witness-non-base (set-difference
+                                 (list-database (problem-state.idb witness-state))
+                                 (enum-state-base-props witness-state base-relations)
+                                 :test #'equal)))
+        (format t "~&[diag] Meeting state non-base props: ~S~%" meeting-non-base)
+        (format t "~&[diag] Witness state non-base props: ~S~%" witness-non-base)))
     (unless entry
       (format t "~&[solve-meeting-point] Warning: meeting state not found in reachable-set: ~S~%" meeting-key)
       (return-from fps-extend-meeting-solution-to-goal (values nil nil)))
@@ -1453,17 +1601,20 @@ Set to NIL for no cap.")
   (let ((saved-depth-cutoff *depth-cutoff*)
         (saved-solution-type *solution-type*)
         (saved-goal-form (get 'goal-fn :form))
-        (saved-goal-fn-def (and (fboundp 'goal-fn) (symbol-function 'goal-fn))))
+        (saved-goal-fn-def (and (fboundp 'goal-fn) (symbol-function 'goal-fn)))
+        (requested-solution-type solution-type))
     (unwind-protect
         (progn
           (install-meeting-point :min-backward-depth min-backward-depth
-                                 :original-goal-fn nil)  ;; bridgeability deferred to post-processing
+                                 :original-goal-fn nil)
           (setf *depth-cutoff* depth-cutoff
-                *solution-type* solution-type)
+                *solution-type* 'every)
           (ww-solve)
+          (setf *solution-type* requested-solution-type)
           (let ((expanded-solutions nil)
                 (expansion-diagnostics nil)
-                (extension-failures 0))
+                (extension-failures 0)
+                (goal-hit-found nil))
             (dolist (sol *solutions*)
               (multiple-value-bind (expanded-sol diag)
                   (fps-extend-meeting-solution-to-goal sol
@@ -1473,8 +1624,14 @@ Set to NIL for no cap.")
                 (if expanded-sol
                     (progn
                       (push expanded-sol expanded-solutions)
-                      (push diag expansion-diagnostics))
-                    (incf extension-failures))))
+                      (push diag expansion-diagnostics)
+                      (when (and (eq requested-solution-type 'first)
+                                 (or (null saved-goal-fn-def)
+                                     (getf diag :final-goal-satisfied)))
+                        (setf goal-hit-found t)))
+                    (incf extension-failures)))
+              (when goal-hit-found
+                (return)))
             (when (> extension-failures 0)
               (format t "~&[solve-meeting-point] ~:D meeting-point solution(s) could not be extended (skipped).~%"
                       extension-failures))
@@ -1502,9 +1659,10 @@ Set to NIL for no cap.")
                                  (if (getf d :fallback-replay-used) 'yes 'no)
                                  (if (getf d :final-goal-satisfied) 'yes 'no)
                                  (getf d :meeting-key)))))
-            (let ((discarded-count 0))
+            (let ((discarded-count 0)
+                  (filtered-solutions nil))
               ;; Keep only expanded paths that satisfy the original (pre-meeting-point) goal.
-              (setf *solutions*
+              (setf filtered-solutions
                     (if saved-goal-fn-def
                         (remove-if-not
                          (lambda (sol)
@@ -1514,6 +1672,41 @@ Set to NIL for no cap.")
                              ok))
                          expanded-solutions)
                         expanded-solutions))
+              ;; Apply requested SOLUTION-TYPE on expanded full-goal solutions.
+              (setf *solutions*
+                    (case requested-solution-type
+                      (first
+                       (if filtered-solutions
+                           (list (first filtered-solutions))
+                           nil))
+                      (every
+                       filtered-solutions)
+                      (min-length
+                       (if filtered-solutions
+                           (list (reduce (lambda (a b)
+                                           (if (< (solution.depth a) (solution.depth b)) a b))
+                                         filtered-solutions))
+                           nil))
+                      (min-time
+                       (if filtered-solutions
+                           (list (reduce (lambda (a b)
+                                           (if (< (solution.time a) (solution.time b)) a b))
+                                         filtered-solutions))
+                           nil))
+                      (min-value
+                       (if filtered-solutions
+                           (list (reduce (lambda (a b)
+                                           (if (< (solution.value a) (solution.value b)) a b))
+                                         filtered-solutions))
+                           nil))
+                      (max-value
+                       (if filtered-solutions
+                           (list (reduce (lambda (a b)
+                                           (if (> (solution.value a) (solution.value b)) a b))
+                                         filtered-solutions))
+                           nil))
+                      (otherwise
+                       filtered-solutions)))
               (when expanded-solutions
                 (format t "~&[solve-meeting-point] Expanded ~:D meeting-point solution(s) to full path(s).~%"
                         (length expanded-solutions)))

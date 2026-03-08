@@ -10,7 +10,7 @@
 ;;;      max-per, requires) to drive generic action generation.
 ;;;   3) Auto-detection of symmetric (undirected) relations and interchangeable
 ;;;      object groups from relation metadata and static-relation signatures.
-;;;   4) DEFINE-BASE-FILTER — problem-spec hook to prune base states before
+;;;   4) DEFINE-GOAL-FILTER — problem-spec hook to prune base states before
 ;;;      propagation.
 ;;;   5) FIND-GOAL-STATES — user-facing entry point for goal-state enumeration.
 ;;;   6) GENERATE-ENUM-ACTIONS — data-driven generator that creates a CSP
@@ -89,17 +89,17 @@
 
 
 (defparameter *enumerator-prefilter* nil
-  "Compiled prefilter function for enumeration, set via DEFINE-BASE-FILTER.
+  "Compiled prefilter function for enumeration, set via DEFINE-GOAL-FILTER.
    When non-nil, applied at ENUM-FINALIZE to prune states before propagation.")
 
 
 (defparameter *enumerator-base-filter-form* nil
-  "Lambda form for a base filter defined via DEFINE-BASE-FILTER.
+  "Lambda form for a goal filter defined via DEFINE-GOAL-FILTER.
    Stored at install time, compiled later by COMPILE-ALL-FUNCTIONS.")
 
 
 (defparameter *enumerator-base-filter-name* nil
-  "Name of the base filter defined via DEFINE-BASE-FILTER.")
+  "Name of the goal filter defined via DEFINE-GOAL-FILTER.")
 
 
 (defparameter *enum-relation-metadata* (make-hash-table :test 'eq)
@@ -166,30 +166,30 @@
 ;;;; ----------------------------------------------------------------------
 
 
-(defmacro define-base-filter (name body)
-  "Problem-spec macro: define a base-state filter using WouldWork's logic DSL.
+(defmacro define-goal-filter (name body)
+  "Problem-spec macro: define a goal-state filter using WouldWork's logic DSL.
    The body uses the same syntax as query functions:
    EXISTS, FORALL, AND, OR, NOT, BIND, relation lookups, etc.
    NAME: symbol naming the filter (for documentation/debugging)
    BODY: a WouldWork expression returning non-NIL to keep the state, NIL to prune
    Example:
-     (define-base-filter connectors-in-areas2&3
+     (define-goal-filter connectors-in-areas2&3
        (and (exists ((?c1 ?c2) connector)
               (and (loc ?c1 area2) (loc ?c2 area3)))))"
-  `(install-base-filter ',name ',body))
+  `(install-goal-filter ',name ',body))
 
 
-(defun install-base-filter (name body)
+(defun install-goal-filter (name body)
   "Translate BODY using the WouldWork translator and store the resulting
    lambda form for deferred compilation by COMPILE-ALL-FUNCTIONS.
    The compiled function is later installed as the enumeration prefilter."
-  (format t "~&Installing base filter ~S...~%" name)
+  (format t "~&Installing goal filter ~S...~%" name)
   (let ((new-$vars (delete-duplicates
                      (get-all-nonspecial-vars #'$varp body))))
     (setf *enumerator-base-filter-name* name)
     (setf (symbol-value name)
       `(lambda (state)
-         ,(format nil "~A base-filter" name)
+         ,(format nil "~A goal-filter" name)
          (declare (ignorable state))
          (block ,name
            (let (,@new-$vars)

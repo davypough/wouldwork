@@ -1,0 +1,16 @@
+ENUMERATOR ORGANIZATION
+
+Phase 1 & 2 (find-goal-states), (find-predecessors)
+
+1. Build CSP enum-actions from define-base-relation metadata (fluent actions, subset actions, finalize action).
+2. Enumerate candidate base states by running ww-solve over the CSP action tree from an empty start state.
+3. At each complete base-state assignment (the enum-finalize action), apply the combined prefilter (before propagation):
+   (a) the define-goal-filter, if specified
+   (b) the goal-invariant prefilter (auto-derived from unmodifiable goal literals)
+   (c) fps-state-feasible-p (checks state-is-inconsistent and state-feasible?)
+4. For surviving states, apply propagate-changes! to add derived propositions.
+5. Run actions (preconditions and effects) to update states
+6. Run propagate-changes! again to update states again
+7. Test the propagated state against the goal condition; collect those that satisfy it.
+8. Deduplicate collected goal states by canonical base key.
+

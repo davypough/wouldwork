@@ -566,6 +566,7 @@
          (when raw-body
            (extract-effect-walk raw-body modified visited)))))
     ((and (consp form) (eq (car form) 'quote)) nil)
+    ((and (consp form) (eq (car form) 'finally)) nil)
     ((consp form)
      (extract-effect-walk (car form) modified visited)
      (extract-effect-walk (cdr form) modified visited))))
