@@ -831,19 +831,21 @@
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
             (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
                 (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
-                ;; Skip exact counter-propagating pairs only when both beams
-                ;; carry the same hue. Opposite-color reverse beams should
-                ;; interfere and truncate at their crossing.
+                ;; Skip counter-propagating pairs when:
+                ;; 1. Both beams carry the same hue (no conflict), OR
+                ;; 2. Either endpoint is a transmitter (transmitter beams are
+                ;;    primary and must not be blocked by a relay's back-beam,
+                ;;    which may carry a stale color during propagation).
                 (setq $reverse-pair (and (eql $src1 $tgt2)
                                          (eql $tgt1 $src2)))
                 (setq $src1-hue (get-hue-if-source $src1))
                 (setq $src2-hue (get-hue-if-source $src2))
-                (setq $same-hue-reverse-pair
+                (setq $skip-pair
                       (and $reverse-pair
-                           $src1-hue
-                           $src2-hue
-                           (eql $src1-hue $src2-hue)))
-                (if (not $same-hue-reverse-pair)
+                           (or (and $src1-hue $src2-hue (eql $src1-hue $src2-hue))
+                               (transmitter $src1)
+                               (transmitter $src2))))
+                (if (not $skip-pair)
                   (do
                     (setq $src1-coords (gethash $src1 $coord-cache))
                     (setq $src1-x (first $src1-coords))
@@ -1353,8 +1355,7 @@
     1
   (?agent agent ?connector connector)
   (and ;(same-type ?agent ?connector)
-       (forall (?c connector)  ;no connector is held
-         (bind (loc ?c $any)))
+       (not (bind (holds ?agent $held)))
        (bind (loc ?agent $area))
        (loc ?connector $area))
        ;(bind (elevation ?agent $agent-elevation))

@@ -114,14 +114,12 @@ Set to NIL for no cap.")
               '(:direction 'forward))))))
 
 
-(defun find-goal-states-fn (&optional (goal-spec 'goal-fn) &rest args
-                                      &key (algorithm *algorithm*) (solution-type 'every)
+(defun find-goal-states-fn (goal-spec &key (algorithm *algorithm*) (solution-type 'every)
                                         exclude-relations include-relations
                                         (prefilter :use-installed)
                                         sort< sort-key)
   "Top-level API wrapper. Full implementation is defined below in
    %FIND-GOAL-STATES-FN to keep call flow top-down in this file."
-  (declare (ignore args))
   (%find-goal-states-fn goal-spec
                         :algorithm algorithm
                         :solution-type solution-type
@@ -176,8 +174,7 @@ Set to NIL for no cap.")
                         :canonical-dedupe canonical-dedupe))
 
 
-(defun %find-goal-states-fn (&optional (goal-spec 'goal-fn) &rest args
-                                       &key (algorithm *algorithm*) (solution-type 'every)
+(defun %find-goal-states-fn (goal-spec &key (algorithm *algorithm*) (solution-type 'every)
                                          exclude-relations include-relations
                                          (prefilter :use-installed)
                                          sort< sort-key)
@@ -203,7 +200,6 @@ Set to NIL for no cap.")
               More efficient than :SORT< (Schwartzian transform: each key
               computed once).  Default NIL.  Mutually exclusive with :SORT<.
    Returns: T (the report plist is saved on (get 'find-goal-states :last-report))."
-  (declare (ignore args))
   (unless (get-base-relations)
     (error "FIND-GOAL-STATES: no base relations declared.  ~
             Declare relations with DEFINE-BASE-RELATION (or use DEFINE-BASE-RELATIONS)."))
@@ -1030,12 +1026,12 @@ Set to NIL for no cap.")
                 ;; Even on collisions, validate to accumulate additional witnesses.
                 (fps-validate-novel-predecessor
                  stats pred pred-key action-form target-key
-                 base-relations reachable))))))))
+                 base-relations reachable)))))))
     (values (fps-layer-stats-layer-table stats)
             (fps-layer-stats-raw-count stats)
             (fps-layer-stats-feasible-count stats)
             (fps-layer-stats-validated-count stats)
-            (fps-build-layer-diagnostics stats)))
+            (fps-build-layer-diagnostics stats))))
 
 
 (defun fps-validate-novel-predecessor (stats pred pred-key action-form target-key
