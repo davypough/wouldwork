@@ -1,0 +1,344 @@
+LAYER 1 — STRUCTURAL TOPOLOGY
+Source: Layer 0 (coordinate table, geometry segments, los table)
+
+Purpose: Derive static geometric facts that hold regardless of mutable state.
+These are properties of the physical layout — beam path crossings, domain
+partitioning, and line-of-sight constraints — that constrain all possible
+configurations. Pure geometry; no reasoning about what the goal requires.
+
+Inputs: Layer 0 §2 (coordinates), §5 (geometry segments), §6 (los table)
+
+Outputs: Domain partition description, exhaustive beam path crossing catalog,
+combined chain interference tables.
+
+
+========================================================================
+1. DOMAIN PARTITION
+========================================================================
+
+The vertical barrier at x=8 divides the domain into two sections:
+
+  East section (x >= 8): area1, area2, area3, transmitter1, transmitter2,
+                          receiver1
+  West section (x < 8):  area4, receiver2, receiver3
+
+Barrier composition (south to north):
+  wall2    x=8, y=0 to y=3    always blocks
+  gate1    x=8, y=3 to y=7    blocks when closed
+  wall1    x=8, y=7 to y=8    always blocks
+  window1  x=8, y=8 to y=11   transparent to beams, blocks movement
+
+Consequences:
+  - Beams can cross the barrier above y=8 through window1 at any time.
+  - Beams can cross between y=3 and y=7 only when gate1 is open.
+  - Agent movement between sections requires gate1 open (wall1 and window1
+    are impassable; wall2 is south of all areas).
+  - Both transmitters are in the east section and cannot beam directly to
+    area4 when gate1 is closed.
+
+
+========================================================================
+2. TRANSMITTER-TO-AREA BEAM PATH CROSSINGS (T-end)
+========================================================================
+
+For each pair of areas (X, Y), does the segment transmitter1→areaX cross
+the segment transmitter2→areaY? Computed via parametric intersection of
+line segments using coordinates from Layer 0 §2.
+
+Notation: YES(t,s) means segments cross at parameter t along the first
+segment and s along the second. NO means no interior intersection.
+
+transmitter1→areaX  vs  transmitter2→areaY:
+
+  X\Y       area1       area2          area3          area4
+  area1     shared      YES(0.53,0.06) YES(0.50,0.05) YES(0.60,0.07)
+            endpoint
+  area2     NO          —              YES(0.50,0.44) NO
+  area3     NO          NO             —              NO
+  area4     NO          YES(0.33,0.33) YES(0.25,0.22) —
+
+Reading: transmitter1→area1 crosses transmitter2's beam to every area
+except area1 (shared endpoint). transmitter1→area3 crosses NO transmitter2
+beams. transmitter1→area4 crosses transmitter2→area2 and transmitter2→area3.
+
+
+========================================================================
+3. AREA-TO-RECEIVER BEAM PATH CROSSINGS (R-end)
+========================================================================
+
+For connectors serving different receivers, does the segment areaX→receiverA
+cross the segment areaY→receiverB? Only geometrically valid paths are
+considered (area must have los to receiver per Layer 0 §6).
+
+Blocked paths (no los, excluded from analysis):
+  area1 → receiver2, area1 → receiver3, area4 → receiver1
+
+3a. Crossings between beams serving receiver2 vs receiver3:
+
+  serving R2 \ serving R3    from area2    from area3    from area4
+  from area2                  same area     YES(0.49,0.22) NO
+  from area3                  NO            same area       NO
+  from area4                  YES(0.25,0.25) YES(0.56,0.33) same area
+
+Computations for non-trivial cells:
+
+  (area2→R2, area3→R3): (9,8)→(7,10.9) vs (10,9)→(1,10.9).
+    2t-9s = -1, 2.9t-1.9s = 1. s = 0.220, t = 0.489.
+    Both in (0,1). YES(0.49, 0.22).
+
+  (area3→R2, area2→R3): (10,9)→(7,10.9) vs (9,8)→(1,10.9).
+    3t-8s = 1, 1.9t-2.9s = -1. s = -0.754.
+    Outside segment. NO.
+
+  (area2→R2, area4→R3): (9,8)→(7,10.9) vs (7,8)→(1,10.9).
+    t-3s = 1, 2.9t = 2.9s → t = s. s-3s = 1 → s = -0.5.
+    Outside segment. NO.
+
+  (area3→R2, area4→R3): (10,9)→(7,10.9) vs (7,8)→(1,10.9).
+    t-2s = 1, 1.9t-2.9s = -1. s = -3.22.
+    Outside segment. NO.
+
+  (area4→R2, area2→R3): (7,8)→(7,10.9) vs (9,8)→(1,10.9).
+    area4→R2 is vertical (x=7). area2→R3 reaches x=7 at s = 0.25.
+    y at s=0.25: 8+2.9(0.25) = 8.725. area4→R2 at y=8.725: t=0.25.
+    Both in (0,1). YES(0.25, 0.25).
+
+  (area4→R2, area3→R3): (7,8)→(7,10.9) vs (10,9)→(1,10.9).
+    area4→R2 is vertical (x=7). area3→R3 reaches x=7 at s = 1/3.
+    y at s=1/3: 9+1.9/3 = 9.633. area4→R2 at y=9.633: t=0.563.
+    Both in (0,1). YES(0.56, 0.33).
+
+Reading: a beam from area2→receiver2 crosses a beam from area3→receiver3.
+A beam from area4→receiver2 crosses beams from both area2 and area3 to
+receiver3. Beams from area3→receiver2 do not cross any beam to receiver3.
+
+3b. Crossings between beams serving receiver1 vs receiver3:
+
+  serving R1 \ serving R3    from area2    from area3    from area4
+  from area1                  NO            NO            NO
+  from area2                  same area     NO            NO
+  from area3                  NO            same area     NO
+
+All area→receiver1 vs area→receiver3 pairs yield NO intersection. The
+receiver1-bound beams run roughly south (toward y=1) while receiver3-bound
+beams run northwest (toward x=1, y=10.9), so the segments never cross.
+
+
+========================================================================
+3c. CROSS-TERM BEAM PATH CROSSINGS
+========================================================================
+
+Two 1-hop chains of different color each have a transmitter segment and a
+receiver segment. Beyond the T-end crossings (§2) and R-end crossings (§3),
+the transmitter segment of one chain can also cross the receiver segment
+of the other. These cross-term checks are required for a complete
+interference analysis.
+
+Cross-type 1: transmitter1→areaX vs areaY→receiverJ
+  (Red chain's transmitter beam vs blue chain's receiver beam)
+
+  All combinations checked exhaustively — every valid (areaX, areaY,
+  receiverJ) triple yields NO. The transmitter1 beams radiate northeast-
+  to-north from (11, 0.1), while the receiver2 and receiver3 beams
+  converge toward the northwest. These directions diverge sufficiently
+  that no interior crossings occur.
+
+  Representative computations:
+    transmitter1→area2 vs area4→receiver3: s = -0.38, outside segment. NO.
+    transmitter1→area3 vs area2→receiver3: s = -0.14, outside segment. NO.
+    transmitter1→area3 vs area4→receiver3: s = -0.55, outside segment. NO.
+    transmitter1→area4 vs area2→receiver3: t = 1.11, outside segment. NO.
+    transmitter1→area4 vs area3→receiver3: t = 1.23, outside segment. NO.
+    (All remaining pairs also NO; full table omitted for brevity.)
+
+Cross-type 2: areaX→receiverI vs transmitter2→areaY
+  (Red chain's receiver beam vs blue chain's transmitter beam)
+
+  Results depend on which red receiver is being served:
+
+  For receiverI = receiver2:
+    All combinations yield NO. The area→receiver2 beams aim northwest
+    toward (7, 10.9), roughly parallel to the transmitter2 beams which
+    radiate northward from (10, 0.1). No interior crossings.
+
+    Representative computations:
+      area2→receiver2 vs transmitter2→area4: t = 2.23, outside segment. NO.
+      area3→receiver2 vs transmitter2→area2: s = 1.22, outside segment. NO.
+      area3→receiver2 vs transmitter2→area4: t = 1.48, outside segment. NO.
+      area4→receiver2 vs transmitter2→area2: s = 3.0, outside segment. NO.
+      (All remaining pairs also NO.)
+
+  For receiverI = receiver1:
+    Three crossings exist. The area→receiver1 beams aim south toward
+    (8.1, 1), cutting across the transmitter2 beams that radiate
+    northward.
+
+    areaX(R1)  vs transmitter2→areaY     t       s       VERDICT
+    ────────────────────────────────────────────────────────────────
+    area1      vs transmitter2→area2     —       —       NO (t<0)
+    area1      vs transmitter2→area3     —       —       NO (t<0)
+    area1      vs transmitter2→area4     —       —       NO (t<0)
+    area2      vs transmitter2→area3     —       —       NO (t<0)
+    area2      vs transmitter2→area4     0.56    0.50    YES
+    area3      vs transmitter2→area2     0.39    0.74    YES
+    area3      vs transmitter2→area4     0.68    0.43    YES
+
+  Summary: Cross-term crossings exist ONLY for area→receiver1 beams
+  vs transmitter2 beams. No cross-term crossings involve receiver2 or
+  receiver3 beams. This means cross terms affect only R1+R3 chain
+  interference (§4b), not R2+R3 chain interference (§4a).
+
+
+========================================================================
+4. COMBINED 1-HOP CHAIN INTERFERENCE TABLES
+========================================================================
+
+A 1-hop chain from transmitter T through a connector at areaX to receiver R
+uses two beam segments: T→areaX and areaX→R. Two chains of different color
+interfere if ANY segment of one crosses ANY segment of the other.
+
+Complete interference requires checking four crossing types:
+  T-end:   transmitter1→areaX vs transmitter2→areaY          (§2)
+  R-end:   areaX→receiverA vs areaY→receiverB                (§3)
+  Cross-1: transmitter1→areaX vs areaY→receiverB             (§3c)
+  Cross-2: areaX→receiverA vs transmitter2→areaY             (§3c)
+
+4a. Red chain to receiver2 vs Blue chain to receiver3:
+
+  Red chain:  transmitter1 → areaX → receiver2
+  Blue chain: transmitter2 → areaY → receiver3
+
+  Note: area1 excluded (no los to receiver2 or receiver3).
+
+  From §3c: all Cross-1 and Cross-2 terms involving receiver2 and
+  receiver3 are NO. Therefore interference is determined entirely by
+  T-end (§2) and R-end (§3a).
+
+  Red at \ Blue at    area2              area3              area4
+  area2               T:YES              T:YES              T:NO,R:NO
+                      INTERFERES         INTERFERES         X1:NO,X2:NO
+                                                            CLEAR
+  area3               T:NO,R:NO          —                  T:NO,R:NO
+                      X1:NO,X2:NO        same area          X1:NO,X2:NO
+                      CLEAR                                 CLEAR
+  area4               T:YES,R:YES        T:YES,R:YES        —
+                      INTERFERES         INTERFERES         same area
+
+  Non-interfering configurations (verified against all 4 crossing types):
+    (a) Red in area2, Blue in area4         CLEAR ✓
+    (b) Red in area3, Blue in area2         CLEAR ✓
+    (c) Red in area3, Blue in area4         CLEAR ✓
+
+  Interfering configurations:
+    Red in area2, Blue in area2             same area
+    Red in area2, Blue in area3             T-end crossing + R-end crossing
+    Red in area3, Blue in area3             same area
+    Red in area4, Blue in area2             T-end + R-end crossing
+    Red in area4, Blue in area3             T-end + R-end crossing
+    Red in area4, Blue in area4             same area
+
+4b. Red chain to receiver1 vs Blue chain to receiver3:
+
+  Red chain:  transmitter1 → areaX → receiver1
+  Blue chain: transmitter2 → areaY → receiver3
+
+  Note: area4 excluded from R1 column (no los to receiver1).
+        area1 excluded from R3 column (no los to receiver3).
+
+  From §3c: Cross-1 is always NO, but Cross-2 has three crossings
+  (area→receiver1 vs transmitter2→area). These must be checked for
+  configurations that pass the T-end and R-end tests.
+
+  Red at \ Blue at    area2              area3              area4
+  area1               T:YES              T:YES              T:YES
+                      INTERFERES         INTERFERES         INTERFERES
+  area2               —                  T:YES              T:NO,R:NO
+                      same area          INTERFERES         X1:NO,X2:YES(0.56,0.50)
+                                                            INTERFERES
+  area3               T:NO,R:NO          —                  T:NO,R:NO
+                      X1:NO,X2:YES       same area          X1:NO,X2:YES(0.68,0.43)
+                      (0.39,0.74)                           INTERFERES
+                      INTERFERES
+
+  Non-interfering configurations: NONE.
+
+  Every possible placement of a red connector serving receiver1 interferes
+  with every possible placement of a blue connector serving receiver3:
+
+    area1 in any blue area:  T-end crossings (§2)
+    area2, blue in area3:    T-end crossing (§2)
+    area2, blue in area4:    Cross-2 (area2→R1 vs T2→area4, §3c)
+    area3, blue in area2:    Cross-2 (area3→R1 vs T2→area2, §3c)
+    area3, blue in area4:    Cross-2 (area3→R1 vs T2→area4, §3c)
+
+
+========================================================================
+5. TRANSMITTER CO-VISIBILITY CONSTRAINTS
+========================================================================
+
+When a connector at areaX must pair with transmitter1, and a connector at
+areaY must pair with transmitter2, the transmitter beams must not cross
+(since they carry different colors). From §2:
+
+Area pairs where both transmitters can serve without crossing:
+  {area2, area4} — but note area4 requires gate1 open for transmitter los
+  {area3, any}   — transmitter1→area3 crosses no transmitter2 beam
+  {area1, area2} — but area1 has limited receiver los (only receiver1)
+
+Area pairs where transmitter beams cross:
+  {area1, area2} through {area1, area4} — area1 red beam crosses all
+                                           non-area1 blue beams
+  {area2, area3} — transmitter1→area2 crosses transmitter2→area3
+  {area4, area2} and {area4, area3} — transmitter1→area4 crosses these
+
+
+========================================================================
+6. OUTPUT PROPOSITIONS
+========================================================================
+
+The following propositions are established by this layer and available
+to all subsequent layers:
+
+P1.1  The domain is partitioned into east (x>=8) and west (x<8) sections
+      by a continuous barrier at x=8.
+
+P1.2  Agent movement between east and west requires gate1 open.
+
+P1.3  Beams from either transmitter to area4 require gate1 open.
+
+P1.4  Beams can pass between east and west through window1 (y=8 to y=11)
+      regardless of gate1 state.
+
+P1.5  area1 has no line of sight to receiver2 or receiver3 under any
+      gate configuration. Therefore no connector in area1 can serve
+      receiver2 or receiver3.
+
+P1.6  area4 has no line of sight to receiver1 under any gate configuration.
+      Therefore no connector in area4 can serve receiver1.
+
+P1.7  A beam from transmitter1 to area1 crosses transmitter2's beam to
+      every other area (area2, area3, area4).
+
+P1.8  A beam from transmitter1 to area3 crosses no transmitter2 beam.
+
+P1.9  A beam from area4 to receiver2 crosses any beam from area2 or area3
+      to receiver3.
+
+P1.10 No area→receiver1 beam crosses any area→receiver3 beam (§3b).
+      No transmitter beam crosses any area→receiver2 or area→receiver3
+      beam (§3c). Cross-term interference exists only between
+      area→receiver1 beams and transmitter2 beams (§3c).
+
+P1.11 The only 1-hop chain configurations that can simultaneously serve
+      receiver2 (red) and receiver3 (blue) without interference are
+      (verified against all four crossing types — T-end, R-end,
+      Cross-1, Cross-2):
+        (a) red connector in area2, blue connector in area4
+        (b) red connector in area3, blue connector in area2
+        (c) red connector in area3, blue connector in area4
+
+P1.12 No 1-hop chain configuration can simultaneously serve receiver1
+      (red) and receiver3 (blue) without interference. Every valid
+      area pair has at least one crossing among the four types:
+      area1 pairs fail on T-end; area2 and area3 pairs that pass
+      T-end fail on Cross-2 (area→receiver1 vs transmitter2→area).

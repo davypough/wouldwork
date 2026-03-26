@@ -213,8 +213,9 @@
                                        arg))
                                   (cdr form)))))
     ;; Enhanced validation with robust update function detection
+    ;; Allow update calls in 'eff (action effects) and 'pre (goal validation) contexts
     (when (and (update-function-p function-name)
-               (not (eq flag 'eff)))
+               (not (member flag '(eff pre))))
       (error "Update function ~A cannot be called in ~A context" 
              function-name flag))
     `,fn-call))
