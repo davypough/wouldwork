@@ -826,7 +826,11 @@
             (if (not (gethash $src $coord-cache))
               (do (mvsetq ($x $y $z) (get-coordinates $src))
                   (setf (gethash $src $coord-cache) (list $x $y))))))
-      ;; Detect intersections using cached coordinates
+      ;; Detect intersections using cached coordinates.
+      ;; Note: nested doalls are more efficient than (doall (combination (?b1 ?b2) ...)
+      ;; for dynamic query types like (get-current-beams), because combination/standard
+      ;; headers perform runtime product/filter/dedup on every call, whereas nested
+      ;; doalls just iterate with a simple guard.
       (doall (?b1 (get-current-beams))
         (doall (?b2 (get-current-beams))
           (if (and (different ?b1 ?b2)

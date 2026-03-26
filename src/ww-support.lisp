@@ -442,7 +442,9 @@
                    (appending (make-list (length prior-item) :initial-element item) into types)))  ;multiple prior ?variables
               ((and (listp item)
                     (member (first item) *query-names*))  ;call to a query
-                 (collecting item into types))
+                 (if (symbolp prior-item)  ;single prior ?variable
+                   (collecting item into types)
+                   (appending (make-list (length prior-item) :initial-element item) into types)))
               ((eql (first item) 'either)  ;combo type
                  (let* ((new-type (intern (ut::interleave+ (ut::sort-symbols (cdr item)))))
                         (type-instances (mapcar (lambda (type) (gethash type *types*)) (cdr item)))
