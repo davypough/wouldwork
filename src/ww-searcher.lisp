@@ -1308,6 +1308,11 @@
             (new-state (copy-problem-state state)))
         (incf (problem-state.time new-state) wait-duration)
         (setf (problem-state.name new-state) 'wait)
+        ;; Process happenings so exogenous events advance during the wait
+        (when *happening-names*
+          (let ((net-state (amend-happenings state new-state)))
+            (when net-state
+              (setf new-state net-state))))
         (return-from replay-action-to-state new-state)))
     
     (unless action
