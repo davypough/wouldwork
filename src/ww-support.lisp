@@ -29,10 +29,13 @@
 
 
 (defun profile ()
-  "Deterministically profiles Wouldwork."
+  "Deterministically profiles Wouldwork. Press Ctrl-C during the solve
+   to abort early and still see a report of data gathered so far."
   (sb-profile:reset)
   (sb-profile:profile "WOULDWORK")
-  (ww-solve)
+  (handler-case (ww-solve)
+    (sb-sys:interactive-interrupt ()
+      (format t "~2%Profiling interrupted by user -- reporting data gathered so far.~%")))
   (sb-profile:report))
 
 
