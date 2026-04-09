@@ -1,4 +1,4 @@
-;;; Filename: problem-match3a.lisp
+;;; Filename: problem-match3.lisp
 
 ;;; Match-3 puzzle: swap adjacent tiles on a grid to create lines of 3+ matching
 ;;; symbols. Matched tiles are removed, gravity pulls remaining tiles down, and
@@ -17,7 +17,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* match3a)
+(ww-set *problem-name* match3)
 
 (ww-set *problem-type* planning)
 
@@ -25,16 +25,16 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 20)
 
 
 (define-types
-  row (0 1 2 3 4)
-  col (0 1 2 3))
+  row (0 1 2 3 4 5 6 7)
+  col (0 1 2 3 4 5 6 7 8))
 
 
 (define-dynamic-relations
-  (cell row col $fixnum))   ; (cell row col symbol-value)
+  (cell row col $symbol))  ; (cell row col symbol)
 
 
 (define-static-relations
@@ -49,21 +49,15 @@
 
 (define-update propagate-changes! ()
   ;; Match->remove->gravity cascade loop.
-  ;; First pass must find matches (enforces swap legality).
-  ;; Subsequent passes handle cascading matches after gravity.
-  ;; Returns T on convergence, NIL on failure (asserts inconsistent-state).
-  (do
-    (setq $first-pass t)
-    (ww-loop for $iteration from 1 to 20 do
-      (setq $matches (find-all-matches))
-      (if (not $matches)
-        (if $first-pass
-          (do (inconsistent-state) (return nil))
-          (return t)))
-      (remove-matched-cells! $matches)
-      (apply-gravity!)
-      (setq $first-pass nil)
-    finally (return t))))
+  ;; Preconditions guarantee at least one match exists on the first pass.
+  ;; Loop handles cascading matches after gravity until stable.
+  (ww-loop for $iteration from 1 to 20 do
+    (setq $matches (find-all-matches))
+    (if (not $matches)
+      (return t))
+    (remove-matched-cells! $matches)
+    (apply-gravity!)
+  finally (return t)))
 
 
 (define-update remove-matched-cells! (?matches)
@@ -111,6 +105,42 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
+(define-query count-run (?r ?c ?dr ?dc ?sym)
+  ;; Count consecutive cells matching ?sym starting one step from (?r,?c)
+  ;; in direction (?dr,?dc). Returns 0, 1, or 2 (capped — sufficient for
+  ;; detecting runs of 3).
+  (do
+    (bind (max-row $max-row))
+    (bind (max-col $max-col))
+    (setq $r1 (+ ?r ?dr))
+    (setq $c1 (+ ?c ?dc))
+    (if (or (< $r1 0) (> $r1 $max-row) (< $c1 0) (> $c1 $max-col))
+      (return-from count-run 0))
+    (if (not (bind (cell $r1 $c1 $s1)))
+      (return-from count-run 0))
+    (if (not (eql $s1 ?sym))
+      (return-from count-run 0))
+    (setq $r2 (+ $r1 ?dr))
+    (setq $c2 (+ $c1 ?dc))
+    (if (or (< $r2 0) (> $r2 $max-row) (< $c2 0) (> $c2 $max-col))
+      (return-from count-run 1))
+    (if (not (bind (cell $r2 $c2 $s2)))
+      (return-from count-run 1))
+    (if (eql $s2 ?sym) 2 1)))
+
+
+(define-query position-matches? (?r ?c ?sym ?away-dr ?away-dc ?perp-dr ?perp-dc)
+  ;; Does placing ?sym at (?r,?c) create a run of 3+?
+  ;; Check parallel (away) direction, then perpendicular (both directions).
+  (do
+    (setq $away-count (count-run ?r ?c ?away-dr ?away-dc ?sym))
+    (if (>= $away-count 2)
+      (return-from position-matches? t))
+    (setq $perp-pos (count-run ?r ?c ?perp-dr ?perp-dc ?sym))
+    (setq $perp-neg (count-run ?r ?c (- ?perp-dr) (- ?perp-dc) ?sym))
+    (>= (+ $perp-pos $perp-neg) 2)))
+
+
 (define-query find-all-matches ()
   ;; Scan all rows for horizontal runs and all columns for vertical runs
   ;; of 3+ same symbol. Returns deduplicated list of (row . col) positions
@@ -121,26 +151,27 @@
     (doall (?r row)
       (do
         (setq $run-len 0)
-        (setq $run-sym -1)
+        (setq $run-sym nil)
         (setq $run-start-col 0)
         (setq $prev-col -2)
         (doall (?c col)
           (if (bind (cell ?r ?c $sym))
-            (if (and (= $sym $run-sym) (= ?c (1+ $prev-col)))
-              (do (incf $run-len)
-                  (setq $prev-col ?c))
-              (do (if (>= $run-len 3)
-                    (ww-loop for $k from $run-start-col to $prev-col do
-                      (pushnew (cons ?r $k) $to-remove :test #'equal)))
-                  (setq $run-len 1)
-                  (setq $run-sym $sym)
-                  (setq $run-start-col ?c)
-                  (setq $prev-col ?c)))
+            (do
+              (if (and (eql $sym $run-sym) (= ?c (1+ $prev-col)))
+                (do (incf $run-len)
+                    (setq $prev-col ?c))
+                (do (if (>= $run-len 3)
+                      (ww-loop for $k from $run-start-col to $prev-col do
+                        (pushnew (cons ?r $k) $to-remove :test #'equal)))
+                    (setq $run-len 1)
+                    (setq $run-sym $sym)
+                    (setq $run-start-col ?c)
+                    (setq $prev-col ?c))))
             (do (if (>= $run-len 3)
                   (ww-loop for $k from $run-start-col to $prev-col do
                     (pushnew (cons ?r $k) $to-remove :test #'equal)))
                 (setq $run-len 0)
-                (setq $run-sym -1)
+                (setq $run-sym nil)
                 (setq $prev-col -2))))
         ;; Close final run in this row
         (if (>= $run-len 3)
@@ -150,26 +181,27 @@
     (doall (?c col)
       (do
         (setq $run-len 0)
-        (setq $run-sym -1)
+        (setq $run-sym nil)
         (setq $run-start-row 0)
         (setq $prev-row -2)
         (doall (?r row)
           (if (bind (cell ?r ?c $sym))
-            (if (and (= $sym $run-sym) (= ?r (1+ $prev-row)))
-              (do (incf $run-len)
-                  (setq $prev-row ?r))
-              (do (if (>= $run-len 3)
-                    (ww-loop for $k from $run-start-row to $prev-row do
-                      (pushnew (cons $k ?c) $to-remove :test #'equal)))
-                  (setq $run-len 1)
-                  (setq $run-sym $sym)
-                  (setq $run-start-row ?r)
-                  (setq $prev-row ?r)))
+            (do
+              (if (and (eql $sym $run-sym) (= ?r (1+ $prev-row)))
+                (do (incf $run-len)
+                    (setq $prev-row ?r))
+                (do (if (>= $run-len 3)
+                      (ww-loop for $k from $run-start-row to $prev-row do
+                        (pushnew (cons $k ?c) $to-remove :test #'equal)))
+                    (setq $run-len 1)
+                    (setq $run-sym $sym)
+                    (setq $run-start-row ?r)
+                    (setq $prev-row ?r))))
             (do (if (>= $run-len 3)
                   (ww-loop for $k from $run-start-row to $prev-row do
                     (pushnew (cons $k ?c) $to-remove :test #'equal)))
                 (setq $run-len 0)
-                (setq $run-sym -1)
+                (setq $run-sym nil)
                 (setq $prev-row -2))))
         ;; Close final run in this column
         (if (>= $run-len 3)
@@ -183,14 +215,19 @@
 
 (define-action swap-right
     1
-  (?row row ?col col)
+  (product ?row row ?col col)
   (and (bind (max-col $max-col))
        (< ?col $max-col)
        (setq $next-col (1+ ?col))
        (not (fixed ?row ?col))
        (not (fixed ?row $next-col))
        (bind (cell ?row ?col $sym1))
-       (bind (cell ?row $next-col $sym2)))
+       (bind (cell ?row $next-col $sym2))
+       (not (eql $sym1 $sym2))
+       ;; sym2 placed at (?row,?col): away=left(0,-1), perp=vertical(1,0)
+       ;; sym1 placed at (?row,$next-col): away=right(0,1), perp=vertical(1,0)
+       (or (position-matches? ?row ?col $sym2 0 -1 1 0)
+           (position-matches? ?row $next-col $sym1 0 1 1 0)))
   (?row ?col)
   (assert (cell ?row ?col $sym2)
           (cell ?row $next-col $sym1)
@@ -199,14 +236,19 @@
 
 (define-action swap-down
     1
-  (?row row ?col col)
+  (product ?row row ?col col)
   (and (bind (max-row $max-row))
        (< ?row $max-row)
        (setq $next-row (1+ ?row))
        (not (fixed ?row ?col))
        (not (fixed $next-row ?col))
        (bind (cell ?row ?col $sym1))
-       (bind (cell $next-row ?col $sym2)))
+       (bind (cell $next-row ?col $sym2))
+       (not (eql $sym1 $sym2))
+       ;; sym2 placed at (?row,?col): away=up(-1,0), perp=horizontal(0,1)
+       ;; sym1 placed at ($next-row,?col): away=down(1,0), perp=horizontal(0,1)
+       (or (position-matches? ?row ?col $sym2 -1 0 0 1)
+           (position-matches? $next-row ?col $sym1 1 0 0 1)))
   (?row ?col)
   (assert (cell ?row ?col $sym2)
           (cell $next-row ?col $sym1)
@@ -236,11 +278,14 @@
 
 
 (define-init
-  (board ((- - - -)
-          (0 0 1 1)
-          (2 2 3 3)
-          (3 1 0 0)
-          (1 2 1 1))))
+  (board ((- A B - - - C C -)
+          (- D D E - B C C -)
+          (C C F C - G F D D)
+          (D A A G - D E B E)
+          (- B E H - A G E -)
+          (- E B G H B A G -)
+          (- A H G D A C C -)
+          (- - - D F D - - -))))
 
 
 ;;;; GOAL ;;;;
