@@ -1,13 +1,31 @@
-;;; Filename: problem-corner.lisp
+;;; Filename: problem-corner-relaxed-macro1.lisp
 
 ;;; Talos Principle problem 'Around the Corner' in Purgatory workshop 3.
-;;; Represents coords as 3D, but uses only 2D for beam calculations.
+;;; Can represent coords as 3D, but needs only 2D for beam calculations.
+;;;
+;;; RELAXED + MACRO SEARCH VARIANT: merges two orthogonal efficiency approaches.
+;;;
+;;;   Relaxed (from problem-corner-relaxed.lisp):
+;;;     Search uses base relations only; derived relations (open, active, color,
+;;;     holds, beams) are NOT propagated during the search.  (open gate1) is
+;;;     replaced by gate1-open-relaxed, a structural pairing-chain check over
+;;;     loc/paired + static LOS.  Candidate plans are post-validated at goal
+;;;     by invoking propagate-changes! and checking derived relations.
+;;;
+;;;   Macro (from problem-corner-macro.lisp):
+;;;     Primitive pickup/move/connect are folded into macro actions
+;;;     (grab-and-connect, acquire, connect-with) so one search step
+;;;     covers what previously required multiple steps.
+;;;
+;;; The approaches are orthogonal: relaxation skips propagation per step,
+;;; macros reduce step count per plan.  Combined, each search step is cheap
+;;; AND there are far fewer steps to evaluate.
 
 
 (in-package :ww)
 
 
-(ww-set *problem-name* corner)
+(ww-set *problem-name* corner-relaxed-macro1)
 
 (ww-set *problem-type* planning)
 
@@ -15,7 +33,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *depth-cutoff* 6)
 
 (ww-set *symmetry-pruning* t)
 
@@ -93,309 +111,67 @@
 )
 
 
-;;;; HEURISTIC FUNCTIONS ;;;;
-
-#|
-;;; The heuristic? function for this problem estimates the remaining "cost"
-;;; to reach the goal from the current state. It combines multiple component
-;;; heuristics using weighted summation, where higher weights indicate more
-;;; important factors. Note that heuristics are not recommended for this problem,
-;;; because intermediate good states must be undone to find a solution. No steady progress.
-;;;
-;;; Component Design Principles:
-;;;   - Each component returns a non-negative integer
-;;;   - Return 0 when the condition is satisfied (no penalty)
-;;;   - Return positive values proportional to "distance" from satisfaction
-;;;   - Weights encode relative importance and help break ties
-;;;
-;;; For this problem, the goal is:
-;;;   (and (active receiver2) (active receiver3) (loc agent1 area4))
-;;; Note that using heuristic guidance for this problem is counterproductive
-;;;   since progress must often be undone
-
-
-(define-query heuristic? ()
-   ;Combines weighted heuristic components to estimate cost to goal.
-   ;Components ordered by priority:
-   ;  h-color-path-deficit (200): Missing ACTIVE transmitter→receiver paths
-   ;  h-unpowered-placed-connectors (100): Placed but inactive connectors
-   ;  h-color-mismatch (80): Powered connectors with wrong color for targets
-   ;  h-goal-receivers-inactive (50): Goal receivers still needing activation  
-   ;  h-gate1-blocks-goal (30): Gate1 must open for agent to reach area4
-   ;  h-useless-pairings (20): Receiver-only pairings (can never activate)
-   ;  h-agent-goal-distance (10): Agent must end in area4
-   ;Returns: Non-negative integer estimate of remaining cost"
-  (do (combine-heuristics            ;combine-heuristics function in ww-support.lisp
-        state
-        '((200  . h-color-path-deficit)
-          (100  . h-unpowered-placed-connectors)
-          (80   . h-color-mismatch)
-          (50   . h-goal-receivers-inactive)
-          (30   . h-gate1-blocks-goal)
-          (20   . h-useless-pairings)
-          (10   . h-agent-goal-distance))
-        :combiner :weighted-sum)))
-
-
-(define-query h-color-path-deficit ()
-  ;; Counts receivers that need power but have no viable ACTIVE path from transmitter.
-  ;; A viable path requires actual beam connectivity, not just structural potential.
-  ;; Returns: 0-3 (deficit count)
-  (do (setq $deficit 0)
-      ;; receiver1 (red) - needed to open gate1
-      (if (and (not (active receiver1))
-               (not (active-path-to-receiver-p transmitter1 receiver1 red)))
-        (incf $deficit))
-      ;; receiver2 (red) - goal
-      (if (and (not (active receiver2))
-               (not (active-path-to-receiver-p transmitter1 receiver2 red)))
-        (incf $deficit))
-      ;; receiver3 (blue) - goal  
-      (if (and (not (active receiver3))
-               (not (active-path-to-receiver-p transmitter2 receiver3 blue)))
-        (incf $deficit))
-      $deficit))
-
-
-(define-query active-path-to-receiver-p (?transmitter ?receiver ?hue)
-  ;; Returns t only if an ACTUALLY POWERED connector provides a path to receiver
-  ;; AND that path originates from the specified transmitter.
-  ;; Requires connector to have correct color (be actually receiving power).
-  ;; This is stricter than checking structural potential.
-  (or
-    ;; 1-hop: connector MUST be powered with correct color, paired with BOTH transmitter and receiver
-    (exists (?c connector)
-      (and (bind (loc ?c $c-area))
-           (bind (color ?c $c-hue))           ; MUST be powered
-           (eql $c-hue ?hue)                   ; with correct color
-           (paired ?c ?transmitter)            ; paired with the specific transmitter
-           (paired ?c ?receiver)
-           (los agent1 $c-area ?receiver)))
-    ;; 2-hop: c1 paired with transmitter and powered, c2 powered and paired with receiver
-    (exists (?c1 connector)
-      (and (bind (loc ?c1 $c1-area))
-           (bind (color ?c1 $c1-hue))          ; c1 MUST be powered
-           (eql $c1-hue ?hue)                   ; with correct color
-           (paired ?c1 ?transmitter)            ; c1 paired with the specific transmitter
-           (exists (?c2 connector)
-             (and (different ?c1 ?c2)
-                  (bind (loc ?c2 $c2-area))
-                  (bind (color ?c2 $c2-hue))    ; c2 MUST be powered
-                  (eql $c2-hue ?hue)             ; with correct color
-                  (or (paired ?c1 ?c2) (paired ?c2 ?c1))
-                  (paired ?c2 ?receiver)
-                  (visible agent1 $c1-area $c2-area)
-                  (los agent1 $c2-area ?receiver)))))))
-
-
-(define-query h-unpowered-placed-connectors ()
-  ;; Counts placed connectors that are not powered (no color).
-  ;; A placed connector without power represents wasted work - it's not
-  ;; contributing to any beam network yet.
-  ;; Returns: 0-3 (count of unpowered placed connectors)
-  (do (setq $count 0)
-      (doall (?c connector)
-        (if (and (bind (loc ?c $area))           ; connector is placed
-                 (not (bind (color ?c $hue))))   ; but not powered
-          (incf $count)))
-      $count))
-
-
-(define-query h-color-mismatch ()
-  ;; Counts powered connectors paired with receivers of WRONG color.
-  ;; Example: connector has color=blue but paired with receiver2 (red).
-  ;; This is actively harmful - the connector is working but can never help.
-  ;; Returns: count of mismatched pairings
-  (do (setq $count 0)
-      (doall (?c connector)
-        (if (bind (color ?c $c-hue))  ; connector is powered
-          (doall (?r receiver)
-            (if (and (paired ?c ?r)
-                     (bind (chroma ?r $r-hue))
-                     (not (eql $c-hue $r-hue)))  ; colors don't match
-              (incf $count)))))
-      $count))
-
-
-(define-query h-goal-receivers-inactive ()
-  ;Counts how many goal receivers still need activation.
-  ;The goal requires both receiver2 and receiver3 to be active.
-  ; Each inactive receiver contributes 1 to the heuristic.
-  ; This is the most direct measure of goal distance since activating
-  ; receivers is the primary objective.
-  ; Returns: 0 (both active) to 2 (neither active)
-  (do (setq $n 0)
-      (if (not (active receiver2)) (incf $n))
-      (if (not (active receiver3)) (incf $n))
-      $n))
-
-
-(define-query h-gate1-blocks-goal ()
-  ;Penalty for gate1 being closed.
-  ;Gate1 separates areas 1-3 from area4. Since the goal requires
-  ;the agent to be in area4, gate1 must eventually open.
-  ;Gate1 is controlled by receiver1, which requires a red beam.
-  ;Returns: 0 (gate open) or 1 (gate closed)
-  (if (open gate1) 0 1))
-
-
-(define-query h-agent-goal-distance ()
-  ;Penalty for agent not being in the goal area.
-  ;The goal requires (loc agent1 area4). This component provides
-  ;a small incentive to move toward area4 once other conditions
-  ;allow it.
-  ;Lower weight than gate1-closed because reaching area4 is only
-  ;possible after gate1 opens.
-  ;Returns: 0 (in area4) or 1 (elsewhere)
-  (do (bind (loc agent1 $area))
-      (if (eql $area 'area4) 0 1)))
-
-
-(define-query h-useless-pairings ()  ;remove because pairings can always become useful
-  ;; Penalizes placed connectors with pairings that cannot carry beams.
-  ;; A pairing is useless if it connects two receivers (neither emits).
-  ;; Returns: count of useless pairings
-  (do (setq $useless 0)
-      (doall (?c connector)
-        (if (bind (loc ?c $area))  ; only placed connectors
-          (doall (?t1 terminus)
-            (if (paired ?c ?t1)
-              (doall (?t2 terminus)
-                (if (and (different ?t1 ?t2)
-                         (paired ?c ?t2)
-                         (receiver ?t1)
-                         (receiver ?t2))
-                  ;; Both paired targets are receivers - useless
-                  (incf $useless)))))))
-      ;; Divide by 2 since we count each pair twice
-      (floor $useless 2)))
-|#
-
-
 ;;;; LOWER BOUND FUNCTION ;;;;
 
 
 (define-query min-steps-remaining? ()
-  ;; Admissible lower bound on minimum remaining actions to reach any goal state.
-  ;; Decomposes into four independent cost components that can be safely summed:
-  ;;   1. Pairing establishment — pickup/connect actions for missing transmitter→receiver chains
-  ;;   2. Connector acquisition move — move to reach a connector when none is local
-  ;;   3. Placement viability move — move to an area with LOS to both transmitter and receiver
-  ;;   4. Reach goal area — move agent to area4, possibly opening gate1 first
+  ;; Admissible lower bound on minimum remaining MACRO actions to reach goal.
+  ;; Decomposes into two independent cost components that can be safely summed:
+  ;;   1. Pairing establishment — grab-and-connect macro per missing chain
+  ;;   2. Reach goal area — macro/move actions to get agent to area4
   ;;
-  ;; Independence argument: pickup and connect are manipulation actions (not moves),
-  ;; so pairing costs and move costs use disjoint action types and sum validly.
-  ;; The placement viability move is independent of cost2 (only charged when cost2=0)
-  ;; and of cost4 (only charged when gate1 is closed, blocking the area4 move).
+  ;; Independence argument: cost1 counts grab-and-connect actions for goal
+  ;; receiver chains (receiver2, receiver3), while cost4 counts actions to
+  ;; open gate1 (via receiver1) and reach area4.  These operate on disjoint
+  ;; receivers and disjoint connector resources, so they sum validly.
   ;;
-  ;; Initial state estimate: 2 + 2 + 0 + 1 + 1 = 6 (no pairings, not holding,
-  ;; no local connector, not in area4). With cutoff 15, pruning begins at depth 10.
+  ;; RELAXED: no (active ?r) checks (derived relation unavailable during
+  ;; relaxed search); gate state is approximated by gate1-open-relaxed.
+  ;;
+  ;; Initial state estimate: 2 + 1 = 3 (no pairings, not in area4).
   (do (bind (loc agent1 $agent-area))
-      (setq $holding (bind (holds agent1 $cargo)))
       (setq $chains-needed (count-receivers-needing-chains))
-      (setq $cost1 (pairing-establishment-cost $chains-needed $holding))
-      (setq $cost2 (connector-acquisition-move-cost $chains-needed $holding $agent-area))
-      (setq $cost3 (placement-viability-move-cost $chains-needed $holding $agent-area))
-      (setq $cost4 (reach-goal-area-cost $chains-needed $holding $agent-area))
-      (+ $cost1 $cost2 $cost3 $cost4)))
+      (setq $cost1 (pairing-establishment-cost $chains-needed))
+      (setq $cost4 (reach-goal-area-cost $chains-needed $agent-area))
+      (+ $cost1 $cost4)))
 
 
 (define-query count-receivers-needing-chains ()
   ;; How many goal receivers still lack a pairing chain from their transmitter?
   ;; A "chain" is a path of paired connectors linking transmitter to receiver.
-  ;; Receivers already active are satisfied regardless of pairings.
-  ;; Returns: 0 (both connected or active), 1, or 2 (neither).
+  ;; Returns: 0, 1, or 2.
+  ;; RELAXED: (active receiverN) is never set, so only check pairing chains.
   (do (setq $count 0)
-      (if (and (not (active receiver2))
-               (not (pairing-chain-exists? transmitter1 receiver2)))
+      (if (not (pairing-chain-exists? transmitter1 receiver2))
         (incf $count))
-      (if (and (not (active receiver3))
-               (not (pairing-chain-exists? transmitter2 receiver3)))
+      (if (not (pairing-chain-exists? transmitter2 receiver3))
         (incf $count))
       $count))
 
 
-(define-query pairing-establishment-cost (?chains-needed ?holding)
-  ;; Minimum pickup/connect actions to establish missing pairing chains.
-  ;; Each new chain requires: pickup a connector (1) + connect with pairings (1) = 2.
-  ;; If agent already holds a connector, one pickup is saved.
-  ;; Returns: 0, 1, 2, 3, or 4.
-  (if (> ?chains-needed 0)
-    (if ?holding
-      (1+ (* 2 (1- ?chains-needed)))       ;held connector serves one; rest need pickup+connect
-      (* 2 ?chains-needed))                 ;each needs pickup+connect
-    0))
+(define-query pairing-establishment-cost (?chains-needed)
+  ;; Minimum macro actions to establish missing pairing chains.
+  ;; Each chain costs 1 step: grab-and-connect-with-N folds acquire+connect.
+  ;; Returns: 0, 1, or 2.
+  (progn ?chains-needed))
 
 
-(define-query connector-acquisition-move-cost (?chains-needed ?holding ?agent-area)
-  ;; When agent needs a connector but none is in the current area, one extra move
-  ;; is required to reach one. This move is independent of the move-to-area4 when
-  ;; either: (a) gate1 is closed (can't reach area4 yet), or
-  ;;         (b) no connector is in area4 (going to area4 wouldn't help acquire one).
-  ;; Returns: 0 or 1.
-  (if (and (> ?chains-needed 0)
-           (not ?holding)
-           (not (exists (?c connector) (loc ?c ?agent-area)))
-           (or (not (open gate1))
-               (not (exists (?c connector) (loc ?c area4)))))
-    1
-    0))
-
-
-(define-query placement-viability-move-cost (?chains-needed ?holding ?agent-area)
-  ;; When chains are needed but the agent's current area cannot support a 1-hop
-  ;; chain for any needed receiver (no observable LOS to both transmitter and
-  ;; receiver), one extra move is required to reach a viable placement area.
-  ;; Only charged when: (a) no connector-acquisition move to piggyback on
-  ;; (holding or connector locally available), and (b) gate1 is closed so the
-  ;; move to area4 cannot serve as the placement move.
-  ;; Returns: 0 or 1.
-  (if (and (> ?chains-needed 0)
-           (not (open gate1))
-           (or ?holding
-               (exists (?c connector) (loc ?c ?agent-area)))
-           (not (area-viable-for-any-needed-chain? ?agent-area)))
-    1
-    0))
-
-
-(define-query area-viable-for-any-needed-chain? (?area)
-  ;; Returns t if ?area has observable (static potential) LOS to both the
-  ;; transmitter and receiver for at least one goal receiver still needing
-  ;; a pairing chain.  Uses observable (ignores gate state and occupancy)
-  ;; to check whether a 1-hop chain is geometrically possible from ?area.
-  (or (and (not (active receiver2))
-           (not (pairing-chain-exists? transmitter1 receiver2))
-           (observable ?area transmitter1)
-           (observable ?area receiver2))
-      (and (not (active receiver3))
-           (not (pairing-chain-exists? transmitter2 receiver3))
-           (observable ?area transmitter2)
-           (observable ?area receiver3))))
-
-
-(define-query reach-goal-area-cost (?chains-needed ?holding ?agent-area)
-  ;; Minimum moves to get agent to area4, accounting for gate1 state.
+(define-query reach-goal-area-cost (?chains-needed ?agent-area)
+  ;; Minimum macro actions to get agent to area4, accounting for gate1 state.
   ;;
   ;; Already in area4: 0.
   ;;
-  ;; Chains still needed OR gate1 already open:
-  ;;   1 move — either the move is subsumed by connector-acquisition movement,
-  ;;   or the gate is open and only a simple move remains.
+  ;; Chains still needed OR gate1 already (relaxed) open:
+  ;;   1 move — either subsumed by a future macro action's optional move,
+  ;;   or gate is open and only a simple move remains.
   ;;
   ;; All chains done but gate1 still closed (must open gate1 via receiver1):
-  ;;   Holding a connector:              connect (piggyback receiver1 pairing) + move = 2
-  ;;   Connector in current area:        pickup + connect + move = 3
-  ;;   No connector locally available:   move-to-connector + pickup + connect + move = 4
+  ;;   grab-and-connect-with-N (piggybacks receiver1) + move = 2.
   (if (eql ?agent-area 'area4)
     0
-    (if (or (> ?chains-needed 0) (open gate1))
+    (if (or (> ?chains-needed 0) (gate1-open-relaxed))
       1
-      (if ?holding
-        2
-        (if (exists (?c connector) (loc ?c ?agent-area))
-          3
-          4)))))
+      2)))
 
 
 (define-query pairing-chain-exists? (?transmitter ?receiver)
@@ -521,28 +297,60 @@
 
 
 (define-query selectable (?agent ?area ?terminus)
-  ;; Agent can select terminus if observable from ?area or accessible adjacent area
+  ;; Agent can select terminus if observable from ?area or passable to adjacent area
   (or (observable ?area ?terminus)
       (exists (?adj-area area)
-        (and (accessible ?agent ?area ?adj-area)
+        (and (passable ?agent ?area ?adj-area)
              (observable ?adj-area ?terminus)))))
 
 
+(define-query gate1-open-relaxed ()
+  ;; Relaxed base-relation approximation of (open gate1).
+  ;; Gate1 opens when receiver1 is activated by a red beam from transmitter1.
+  ;; Checks for a pairing chain from transmitter1 to receiver1 using only
+  ;; loc/paired + static LOS, ignoring beam occlusion, interference, and
+  ;; gate occlusion of beams.
+  ;; 1-hop: connector in any area paired with both transmitter1 and receiver1
+  (or (exists (?c connector)
+        (and (bind (loc ?c $area))
+             (paired ?c transmitter1)
+             (paired ?c receiver1)))
+      ;; 2-hop: connector in area3 paired with transmitter1, linked to
+      ;; connector in area2 paired with receiver1 (only viable direction;
+      ;; reverse direction area2->area3 crosses beams causing interference)
+      (exists ((?c1 ?c2) connector)
+        (and (loc ?c1 area3)
+             (loc ?c2 area2)
+             (paired ?c1 transmitter1)
+             (or (paired ?c1 ?c2) (paired ?c2 ?c1))
+             (paired ?c2 receiver1)))))
+
+
 (define-query accessible (?agent ?area1 ?area2)
-  ;; For real agent: respects gate and blower environmental states
-  ;; For ghost: respects states it caused (recording phase),
-  ;;            ignores states caused by real agent (playback phase)
+  ;; BASELINE (non-relaxed): checks (open ?g) against a propagated copy
+  ;; of the current state.  Because we are working only with base relations,
+  ;; we must propagate a fresh copy per call to obtain the
+  ;; true gate-open status. Expensive but semantically exact.
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
              (or (ghost-agent ?agent)
-                 (open ?g))))
-      ;(exists (?b blower)
-      ;  (and (accessible1 ?area1 ?b ?area2)
-      ;       (or (not (active ?b))                              ;blower off: anyone can pass
-      ;           (and (ghost-agent ?agent)                      ;blower on + ghost:
-      ;                (not (blower-activated-by-ghost ?b))))))  ;only if ghost didn't cause it
-))
+                 (do (setq $copy (copy-problem-state state))  ;don't mutate the state in a query
+                     (funcall #'propagate-changes! $copy)  ;mutate the copy
+                     (let ((state $copy))  ;use the copy for the following test
+                       (open ?g))))))))  ;accessible only if the gate is open
+
+
+(define-query passable (?agent ?area1 ?area2)  ;relaxed version of accessible
+  ;; RELAXED: uses gate1-open-relaxed instead of a propagated (open ?g).
+  ;; Structural pairing-chain approximation; admits a superset of the
+  ;; true reachable states. Candidate solutions must be post-validated
+  ;; with full propagation at goal check.
+  (or (accessible0 ?area1 ?area2)
+      (exists (?g gate)
+        (and (accessible1 ?area1 ?g ?area2)
+             (or (ghost-agent ?agent)
+                 (gate1-open-relaxed))))))
 
 
 (define-query connectable (?connector ?area)
@@ -984,17 +792,17 @@
   ;; All functions must execute in order; returns t if any change occurred
   (some #'identity
         (mapcar (lambda (fn) (funcall fn state))
-                (list #'derive-holds!  ;simple base relation consequences first, always returns nil
+                (list #'derive-holds!                   ;always returns nil
                       ;#'update-plate-controlled-devices!
                       ;#'blow-objects-if-active!
-                      #'create-missing-beams!  ;new objects next
-                      #'remove-orphaned-beams!  ;next remove old objects
-                      #'recalculate-all-beams!  ;independent calculations first, always returns nil
-                      #'update-beams-if-interference!   ;update if interference, always returns nil
-                      #'deactivate-conflicted-relays!  ;removals first
+                      #'create-missing-beams!
+                      #'remove-orphaned-beams!
+                      #'recalculate-all-beams!          ;always returns nil
+                      #'update-beams-if-interference!   ;always returns nil
+                      #'deactivate-conflicted-relays!
                       #'deactivate-receivers-that-lost-power!
                       #'deactivate-unpowered-relays!
-                      #'activate-receivers-that-gained-power!  ;then adds
+                      #'activate-receivers-that-gained-power!
                       #'activate-reachable-relays!))))
 
 
@@ -1030,7 +838,6 @@
               (do (create-beam-segment-p! ?src ?tgt)
                   (setq $created-any t))))))
     $created-any))
-
 
 
 (define-update remove-orphaned-beams! ()
@@ -1355,199 +1162,169 @@
 
 ;;;; ACTIONS ;;;;
 
+;;; Macro actions in relaxed discipline:
+;;;   * "no cargo held" → (not (exists (?c cargo) (not (bind (loc ?c $any)))))
+;;;   * held connector identified by a connector parameter with no loc,
+;;;     not by (bind (holds ?agent $connector))
+;;;   * no (finally (propagate-changes!)) — propagation is deferred to goal
+;;;   * accessible used for agent movement (exact, matches relaxed `move`);
+;;;     selectable internally uses passable (relaxed adjacency)
 
-(define-action pickup-connector
+
+(define-action grab-and-connect-with-1-terminus
+  ;; Move to unpaired connector (optional) + pickup + move to dest + place with 1 terminus.
+  ;; Folds acquire + connect into one macro step.
     1
-  (?agent agent ?connector connector)
-  (and ;(same-type ?agent ?connector)
-       (not (bind (holds ?agent $held)))
-       (bind (loc ?agent $area))
-       (loc ?connector $area))
-       ;(bind (elevation ?agent $agent-elevation))
-       ;(bind (elevation ?connector $connector-elevation))
-       ;(<= (abs (- $connector-elevation $agent-elevation)) 1))          ; within reach
-  (?agent ?connector $area)
-  (assert ;(holds ?agent ?connector)
-          (not (loc ?connector $area))
-          ;(not (elevation ?connector $connector-elevation))
-          ;(if (bind (on ?connector $box))
-          ;  (not (on ?connector $box)))
-          (disconnect-connector! ?connector)
-          (finally (propagate-changes!))))
+  (?agent agent ?connector connector ?t1 terminus ?dest-area area)
+  (and (not (exists (?t terminus) (paired ?connector ?t)))
+       (not (exists (?c connector) (paired ?c ?connector)))
+       (not (exists (?c cargo) (not (bind (loc ?c $any)))))  ;base-relation equiv of no holds
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (or (eql $agent-area $connector-area)
+           (accessible ?agent $agent-area $connector-area))
+       (or (eql $connector-area ?dest-area)
+           (accessible ?agent $connector-area ?dest-area))
+       (different ?connector ?t1)
+       (not (and (connector ?t1) (loc ?t1 ?dest-area)))
+       (selectable ?agent ?dest-area ?t1))
+  (?agent ?connector ?t1 $connector-area ?dest-area)
+  (assert (loc ?agent ?dest-area)
+          (loc ?connector ?dest-area)
+          (paired ?connector ?t1)))
 
 
-(define-action connect-to-3-terminus
+(define-action grab-and-connect-with-3-terminus
+  ;; Move to unpaired connector (optional) + pickup + move to dest + place with 3 termini.
+  ;; Folds acquire + connect into one macro step.
     1
-  (?agent agent ?connector connector (combination (?t1 ?t2 ?t3) terminus))
-  (and (not (bind (loc ?connector $any)))
-       ;(same-type ?agent ?connector)
+  (?agent agent ?connector connector (combination (?t1 ?t2 ?t3) terminus) ?dest-area area)
+  (and (not (exists (?t terminus) (paired ?connector ?t)))
+       (not (exists (?c connector) (paired ?c ?connector)))
+       (not (exists (?c cargo) (not (bind (loc ?c $any)))))  ;base-relation equiv of no holds
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (or (eql $agent-area $connector-area)
+           (accessible ?agent $agent-area $connector-area))
+       (or (eql $connector-area ?dest-area)
+           (accessible ?agent $connector-area ?dest-area))
        (different ?connector ?t1)
        (different ?connector ?t2)
        (different ?connector ?t3)
-       (bind (loc ?agent $area))
-       ;(bind (elevation ?agent $agent-elevation))
-       (not (and (connector ?t1) (loc ?t1 $area)))
-       (not (and (connector ?t2) (loc ?t2 $area)))
-       (not (and (connector ?t3) (loc ?t3 $area)))
-       (connectable ?connector $area)
-       (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2)
-       (selectable ?agent $area ?t3))
-  (?agent ?connector ?t1 ?t2 ?t3 $area $place)
-  (do ;; Can place on a box
-      ;(doall (?box box)
-      ;  (if (and (loc ?box $area)
-      ;           (cleartop ?box)
-      ;           (bind (elevation ?box $box-elevation))
-      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert ;(not (holds ?agent $cargo))
-      ;            (loc ?connector $area)
-      ;            (on ?connector ?box)
-      ;            (elevation ?connector (1+ $box-elevation))
-      ;            (paired ?connector ?t1)
-      ;            (paired ?connector ?t2)
-      ;            (paired ?connector ?t3)
-      ;            (setq $place ?box)
-      ;            (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (loc ?connector $area)
-              ;(elevation ?connector 0)
-              (paired ?connector ?t1)
-              (paired ?connector ?t2)
-              (paired ?connector ?t3)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
+       (not (and (connector ?t1) (loc ?t1 ?dest-area)))
+       (not (and (connector ?t2) (loc ?t2 ?dest-area)))
+       (not (and (connector ?t3) (loc ?t3 ?dest-area)))
+       (selectable ?agent ?dest-area ?t1)
+       (selectable ?agent ?dest-area ?t2)
+       (selectable ?agent ?dest-area ?t3))
+  (?agent ?connector ?t1 ?t2 ?t3 $connector-area ?dest-area)
+  (assert (loc ?agent ?dest-area)
+          (loc ?connector ?dest-area)
+          (paired ?connector ?t1)
+          (paired ?connector ?t2)
+          (paired ?connector ?t3)))
 
 
-(define-action connect-to-2-terminus
+(define-action acquire-unpaired-connector
+  ;; Move to unpaired connector (optional) + pickup.
+  ;; Listed before acquire-paired to prefer non-disruptive pickups first.
     1
-  (?agent agent ?connector connector (combination (?t1 ?t2) terminus))
-  (and (not (bind (loc ?connector $any)))
-       ;(same-type ?agent ?connector)
+  (?agent agent ?connector connector)
+  (and (not (exists (?t terminus)
+              (paired ?connector ?t)))
+       (not (exists (?c connector)
+              (paired ?c ?connector)))
+       (not (exists (?c cargo) (not (bind (loc ?c $any)))))  ;base-relation equiv of no holds
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (or (eql $agent-area $connector-area)
+           (accessible ?agent $agent-area $connector-area)))
+  (?agent ?connector $connector-area)
+  (assert (loc ?agent $connector-area)
+          (not (loc ?connector $connector-area))))
+
+
+(define-action acquire-paired-connector
+  ;; Move to paired connector (optional) + pickup + disconnect.
+  ;; Listed after acquire-unpaired since this disrupts existing beam networks.
+    1
+  (?agent agent ?connector connector)
+  (and (or (exists (?t terminus)
+             (paired ?connector ?t))
+           (exists (?c connector)
+             (paired ?c ?connector)))
+       (not (exists (?c cargo) (not (bind (loc ?c $any)))))  ;base-relation equiv of no holds
+       (bind (loc ?agent $agent-area))
+       (bind (loc ?connector $connector-area))
+       (or (eql $agent-area $connector-area)
+           (accessible ?agent $agent-area $connector-area)))
+  (?agent ?connector $connector-area)
+  (assert (loc ?agent $connector-area)
+          (not (loc ?connector $connector-area))
+          (disconnect-connector! ?connector)))
+
+
+(define-action connect-with-1-terminus
+  ;; Move to destination (optional) + place held connector paired with 1 terminus.
+  ;; Held connector identified via base relations: a connector with no loc.
+    1
+  (?agent agent ?connector connector ?t1 terminus ?area2 area)
+  (and (not (bind (loc ?connector $any)))  ;base-relation equiv of (holds ?agent ?connector)
+       (different ?connector ?t1)
+       (not (and (connector ?t1) (loc ?t1 ?area2)))
+       (selectable ?agent ?area2 ?t1)
+       (bind (loc ?agent $area1))
+       (or (eql $area1 ?area2)
+           (accessible ?agent $area1 ?area2)))
+  (?agent ?connector ?t1 ?area2)
+  (assert (loc ?agent ?area2)
+          (loc ?connector ?area2)
+          (paired ?connector ?t1)))
+
+
+(define-action connect-with-3-terminus
+  ;; Move to destination (optional) + place held connector paired with 3 termini.
+  ;; Held connector identified via base relations: a connector with no loc.
+    1
+  (?agent agent ?connector connector (combination (?t1 ?t2 ?t3) terminus) ?area2 area)
+  (and (not (bind (loc ?connector $any)))  ;base-relation equiv of (holds ?agent ?connector)
        (different ?connector ?t1)
        (different ?connector ?t2)
-       (bind (loc ?agent $area))
-       ;(bind (elevation ?agent $agent-elevation))
-       (not (and (connector ?t1) (loc ?t1 $area)))
-       (not (and (connector ?t2) (loc ?t2 $area)))
-       (connectable ?connector $area)
-       (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2))
-  (?agent ?connector ?t1 ?t2 $area $place)
-  (do ;; Can place on a box
-      ;(doall (?box box)
-      ;  (if (and (loc ?box $area)
-      ;           (cleartop ?box)
-      ;           (bind (elevation ?box $box-elevation))
-      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (loc ?connector $area)
-      ;            (on ?connector ?box)
-      ;            (elevation ?connector (1+ $box-elevation))
-      ;            (paired ?connector ?t1)
-      ;            (paired ?connector ?t2)
-      ;            (setq $place ?box)
-      ;            (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (loc ?connector $area)
-              ;(elevation ?connector 0)
-              (paired ?connector ?t1)
-              (paired ?connector ?t2)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-#+ignore (define-action connect-to-1-terminus
-    1
-  (?agent agent ?connector connector ?t1 terminus)
-  (and (not (bind (loc ?connector $any)))
-       ;(same-type ?agent ?connector)
-       (different ?connector ?t1)
-       (bind (loc ?agent $area))
-       ;(bind (elevation ?agent $agent-elevation))
-       (not (and (connector ?t1) (loc ?t1 $area)))
-       (connectable ?connector $area)
-       (selectable ?agent $area ?t1))
-  (?agent ?connector ?t1 $area $place)
-  (do ;; Can place on a box
-      ;(doall (?box box)
-      ;  (if (and (loc ?box $area)
-      ;           (cleartop ?box)
-      ;           (bind (elevation ?box $box-elevation))
-      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (loc ?connector $area)
-      ;            (on ?connector ?box)
-      ;            (elevation ?connector (1+ $box-elevation))
-      ;            (paired ?connector ?t1)
-      ;            (setq $place ?box)
-      ;            (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (loc ?connector $area)
-              ;(elevation ?connector 0)
-              (paired ?connector ?t1)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-#+ignore (define-action put-cargo-on-place
-  ;; Agent can place inactive cargo on a box, buzzer/mine (boxes only), or the ground.
-  1
-  (?agent agent)
-  (and (bind (holds ?agent $cargo))
-       (bind (loc ?agent $area)))
-       ;(bind (elevation ?agent $agent-elevation)))
-  (?agent $cargo $place $area)
-  (do ;; Box-only: can put box on a buzzer or mine
-      ;(if (box $cargo)
-      ;  (doall (?rover (either buzzer mine))
-      ;    (if (and (loc ?rover $area)
-      ;             (cleartop ?rover)
-      ;             (>= $agent-elevation 1))  ;must be above buzzer/mine
-      ;      (assert ;(not (holds ?agent $cargo))
-      ;              (loc $cargo $area)
-      ;              (supports ?rover $cargo)
-      ;              (elevation $cargo 1)
-      ;              (setq $place ?rover)
-      ;              (finally (propagate-changes!))))))
-      ;; All cargo: can put on a box
-      ;(doall (?box box)
-      ;  (if (and (loc ?box $area)
-      ;           (cleartop ?box)
-      ;           (bind (elevation ?box $box-elevation))
-      ;           (setq $delta (- $box-elevation $agent-elevation))
-      ;           (< $delta 1))  ;within reach +1 up or any level down
-      ;    (assert ;(not (holds ?agent $cargo))
-      ;            (loc $cargo $area)
-      ;            (on $cargo ?box)
-      ;            (elevation $cargo (1+ $box-elevation))
-      ;            (setq $place ?box)
-      ;            (finally (propagate-changes!)))))
-      ;; All cargo: can put on ground
-      (assert ;(not (holds ?agent $cargo))
-              (loc $cargo $area)
-              ;(elevation $cargo 0)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
+       (different ?connector ?t3)
+       (not (and (connector ?t1) (loc ?t1 ?area2)))
+       (not (and (connector ?t2) (loc ?t2 ?area2)))
+       (not (and (connector ?t3) (loc ?t3 ?area2)))
+       (selectable ?agent ?area2 ?t1)
+       (selectable ?agent ?area2 ?t2)
+       (selectable ?agent ?area2 ?t3)
+       (bind (loc ?agent $area1))
+       (or (eql $area1 ?area2)
+           (accessible ?agent $area1 ?area2)))
+  (?agent ?connector ?t1 ?t2 ?t3 ?area2)
+  (assert (loc ?agent ?area2)
+          (loc ?connector ?area2)
+          (paired ?connector ?t1)
+          (paired ?connector ?t2)
+          (paired ?connector ?t3)))
 
 
 (define-action move
+  ;; Standalone move (no cargo manipulation). Needed for final move to goal area
+  ;; or repositioning when no macro action applies.
     1
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       ;(bind (elevation ?agent $agent-elevation))
-       ;(= $agent-elevation 0)                          ; must be on ground
-       ;(safe ?area2)
        (accessible ?agent $area1 ?area2))
   (?agent $area1 ?area2)
-  (assert (loc ?agent ?area2)
-          (finally (propagate-changes!))))
+  (assert (loc ?agent ?area2)))
 
 
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
-  ;; Dynamic state (agent-manipulable or derived)
+  ;; Dynamic state (base relations only)
   (loc agent1 area1)
   (loc connector1 area1)
   (loc connector2 area2)
@@ -1556,7 +1333,7 @@
   ;(elevation connector1 0)
   ;(elevation connector2 0)
   ;(elevation connector3 0)
-  (current-beams ())  ; Empty - can be populated by init-action, if exist initially
+  ;(current-beams ())  ; not a base relation, initialized in propagate-changes!
 
   ;; Static spatial configuration
   (coords area1 9 1 0)
@@ -1620,64 +1397,20 @@
 
 
 (define-goal
-  (and (loc agent1 area4)
-       (active receiver2)
-       (active receiver3)))
-
-
-;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
-
-
-(define-base-relation loc  ;specify for enumerator only
-  ;While enumerating locations, let cargo objects be allowed to have no
-  ;location assigned (representing being held). Also, at most one cargo item
-  ;can be unassigned a location (ie, held).
-  :allow-unassigned (:types cargo)  ;allows cargo to have an unassigned location (ie, held)
-  :max-unassigned (:types cargo 1))  ;at most one cargo object may be unassigned/held
-
-
-(define-base-relation (paired ?connector ?terminus)  ;specify for enumerator only
-  ;Prune states not satisfying the following constraints.
-  :max-per (?connector 3)  ;max pairings allowed when pairing a connector
-  :requires (and (bind (loc ?connector $connector-area))  ;prune connector pairings that are also held
-                 ;(potentially-selectable $connector-area ?terminus)  ;available but ineffective since all areas inter-selectable
-                 (or (not (connector ?terminus))  ;only connector terminus relevant
-                     (and (bind (loc ?terminus $terminus-area))
-                          (different $connector-area $terminus-area)  ;connector must have a different location
-                          (not (paired ?terminus ?connector))))))  ;symmetric pairing cannot occur
-
-
-(define-query potentially-selectable (?area ?terminus)
-    ;; Conservative over-approximation of (selectable ?agent ?area ?terminus):
-    ;; if selectable is true in any concrete state, this must be true.
-    (or (observable ?area ?terminus)
-        (exists (?adj-area area)
-          (and (or (accessible0 ?area ?adj-area)
-                   (bind (accessible1 ?area $zone ?adj-area)))
-               (observable ?adj-area ?terminus)))))
-
-
-#+ignore (define-query state-feasible? ()
-  ;; Conservative agent accessibility: agent1's location must be
-  ;; reachable from initial position (area1) via accessible0/accessible1.
-  ;; 1-hop covers all 4 areas for Corner — no pruning, but establishes pattern.
-  (or (not (bind (loc agent1 $area)))          ;no location assigned: OK (partial state)
-      (loc agent1 area1)                        ;at start position: OK
-      (accessible0 area1 $area)                 ;1-hop via accessible0: OK
-      (exists (?zone (either gate blower))
-        (accessible1 area1 ?zone $area))))
-
-
-(define-goal-filter filter-constraints  ;this is for the goal only
-  (and (loc agent1 area4)
+  (and ;; First check base relations
+       (loc agent1 area4)
        (exists ((?c-blue ?c-red ?c-other) connector)
          (and (loc ?c-blue area2)
               (loc ?c-red area3)
-              (not (bind (loc ?c-other $anywhere)))  ;held
+              (not (bind (loc ?c-other $anywhere)))
               (paired ?c-blue transmitter2)
               (paired ?c-blue receiver3)
               (paired ?c-red transmitter1)
-              (paired ?c-red receiver2)))))
+              (paired ?c-red receiver2)))
+       ;; If base satisfied then propagate in place and check derived relations
+       (propagate-changes!)
+       (active receiver2)
+       (active receiver3)))
 
 
 (defparameter *known-goal-state*

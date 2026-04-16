@@ -1,16 +1,16 @@
 ;;; Filename: problem-corner-relaxed.lisp
 
 ;;; Talos Principle problem 'Around the Corner' in Purgatory workshop 3.
-;;; Represents coords as 3D, but uses only 2D for beam calculations.
+;;; Can represent coords as 3D, but needs only 2D for beam calculations.
 ;;;
-;;; RELAXED SEARCH VARIANT:
-;;; This version explores replacing derived-relation checks (open, active, color, etc.)
+;;; BASE + RELAXED SEARCH VARIANT:  solution found in ~400 sec
+;;; This version explores replacing derived-relation checks (open, active, color, holds, etc.)
 ;;; with base-relation approximations (loc, paired) to avoid expensive propagate-changes!
-;;; calls during search.  The relaxed preconditions admit a superset of the exact
-;;; reachable states, so candidate solutions must be post-validated with full propagation.
+;;; calls during search.  The relaxed preconditions (ignore open/closed gate restriction) admit a superset of the exact
+;;; accessible states, so candidate solutions must be post-validated with full propagation at goal check.
 ;;;
 ;;; Current relaxations:
-;;;   - (open gate1) in accessible replaced by gate1-open-relaxed, which checks for
+;;;   - (open gate1) in new accessible/passable replaced by gate1-open-relaxed, which checks for
 ;;;     a pairing chain from transmitter1 to receiver1 using only loc/paired + static LOS.
 ;;;     Ignores beam occlusion, beam-beam interference, and gate occlusion of beams.
 ;;;     The only viable 2-hop direction is area3 -> area2 (reverse crosses beams).
@@ -352,10 +352,10 @@
 
 
 (define-query selectable (?agent ?area ?terminus)
-  ;; Agent can select terminus if observable from ?area or accessible adjacent area
+  ;; Agent can select terminus if observable from ?area or passable to adjacent area
   (or (observable ?area ?terminus)
       (exists (?adj-area area)
-        (and (accessible ?agent ?area ?adj-area)
+        (and (passable ?agent ?area ?adj-area)
              (observable ?adj-area ?terminus)))))
 
 
@@ -382,9 +382,25 @@
 
 
 (define-query accessible (?agent ?area1 ?area2)
-  ;; RELAXED VERSION: uses gate1-open-relaxed instead of (open ?g)
-  ;; For real agent: checks relaxed gate-open condition based on pairing chains
-  ;; For ghost: ignores gate state as before
+  ;; BASELINE (non-relaxed): checks (open ?g) against a propagated copy
+  ;; of the current state.  Because we are working only with base relations,
+  ;; we must propagate a fresh copy per call to obtain the
+  ;; true gate-open status. Expensive but semantically exact.
+  (or (accessible0 ?area1 ?area2)
+      (exists (?g gate)
+        (and (accessible1 ?area1 ?g ?area2)
+             (or (ghost-agent ?agent)
+                 (do (setq $copy (copy-problem-state state))  ;don't mutate the state in a query
+                     (funcall #'propagate-changes! $copy)  ;mutate the copy
+                     (let ((state $copy))  ;use the copy for the following test
+                       (open ?g))))))))  ;accessible only if the gate is open
+
+
+(define-query passable (?agent ?area1 ?area2)  ;relaxed version of accessible
+  ;; RELAXED: uses gate1-open-relaxed instead of a propagated (open ?g).
+  ;; Structural pairing-chain approximation; admits a superset of the
+  ;; true reachable states. Candidate solutions must be post-validated
+  ;; with full propagation at goal check.
   (or (accessible0 ?area1 ?area2)
       (exists (?g gate)
         (and (accessible1 ?area1 ?g ?area2)
@@ -1372,18 +1388,7 @@
   (?agent agent ?area2 area)
   (and (bind (loc ?agent $area1))
        (different $area1 ?area2)
-       ;(bind (elevation ?agent $agent-elevation))
-       ;(= $agent-elevation 0)                          ; must be on ground
-       ;(safe ?area2)
-       ;; RELAXED: non-gated moves use fast path; gated moves (to/from area4)
-       ;; propagate a copy to check if the gate is actually open.
-       (or (accessible0 $area1 ?area2)
-           (and (bind (accessible1 $area1 $gate ?area2))
-                (or (ghost-agent ?agent)
-                    (do (setq $copy (copy-problem-state state))
-                        (funcall #'propagate-changes! $copy)
-                        (let ((state $copy))
-                          (open $gate)))))))
+       (accessible ?agent $area1 ?area2))
   (?agent $area1 ?area2)
   (assert (loc ?agent ?area2)))
 
