@@ -12,19 +12,19 @@
 
 
 (defvar *undo-checkpoint* nil
-  "Saved state from most recent ww-continue, or nil if none.")
+  "Saved state from most recent set-subgoal, or nil if none.")
 
 
 ;; ============================================================
 
 
-(defmacro ww-continue (goal-form)
+(defmacro set-subgoal (goal-form)
   "Continue search from the final state of the previous solution.
    Installs GOAL-FORM as the new goal and updates *start-state*.
    
    Usage:
      (solve)                          ; Solve initial goal
-     (ww-continue (loc agent area))   ; Set up continuation with new goal
+     (set-subgoal (loc agent area))   ; Set up continuation with new goal
      (solve)                          ; Solve for new goal
    
    Updates only the starting conditions:
@@ -38,6 +38,34 @@
 
 
 (defun continue-from-solution (goal-form)
+  (if (and (boundp '*solutions*) *solutions*)  ;is this a subsequent continutation
+      ;; EXISTING behavior (true continuation)
+      (progn
+        (validate-continuation-preconditions)
+        (let ((goal-state (extract-goal-state-from-solution)))
+          (update-start-state-from-goal goal-state)
+          (install-goal goal-form)
+          (when (boundp 'goal-fn)
+            (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+          (save-undo-checkpoint)
+          ;; Re-apply heuristic to new start state if defined
+          (when (fboundp 'heuristic?)
+            (setf (problem-state.heuristic *start-state*)
+              (funcall (symbol-function 'heuristic?) *start-state*))
+            (format t "~&Heuristic applied to continuation state: ~A~%" 
+                      (problem-state.heuristic *start-state*)))
+          (format t "~&Ready to (solve) toward subgoal.~%")))
+      ;; NEW behavior (pre-solve subgoal override) this is the first continuation
+      (progn
+        ;; DO NOT modify *start-state*
+        ;; Just override the goal
+        (install-goal goal-form)
+        (when (boundp 'goal-fn)
+          (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+        (format t "~&Ready to (solve) toward subgoal.~%"))))
+
+
+#+ignore (defun continue-from-solution (goal-form)
   "Internal implementation of ww-continue.
    Updates *start-state* and goal, then lets normal (solve) flow handle the rest."
   ;; Validate preconditions
@@ -70,10 +98,10 @@
   "Verify system state allows continuation."
   (when (> *threads* 0)
     (error "Goal chaining requires single-threaded mode. ~
-            Set (ww-set *threads* 0) before using ww-continue."))
+            Set (ww-set *threads* 0) before using set-subgoal."))
   (unless (and (boundp '*solutions*) *solutions*)
     (error "No solution exists to continue from. ~
-            First run (solve) successfully, then use (ww-continue <new-goal>)."))
+            First run (solve) successfully, then use (set-subgoal <new-goal>)."))
   (unless (boundp 'goal-fn)
     (error "No goal function currently defined.")))
 
@@ -146,7 +174,7 @@
 
 
 (defun save-undo-checkpoint ()
-  "Save current state after ww-continue completes modifications.
+  "Save current state after set-subgoal completes modifications.
    Captures continuation *start-state* and *goal* for potential undo."
   (setf *undo-checkpoint*
         (make-undo-checkpoint
@@ -155,12 +183,12 @@
 
 
 (defun ww-undo ()
-  "Restore state from most recent ww-continue.
+  "Restore state from most recent set-subgoal.
    Allows user to adjust parameters and retry from the same point.
    Can be called multiple times to retry different approaches."
   (unless *undo-checkpoint*
-    (format t "No ww-continue to undo. ~
-               Use ww-undo only after ww-continue has been called.")
+    (format t "No set-subgoal to undo. ~
+               Use ww-undo only after set-subgoal has been called.")
     (return-from ww-undo nil))
   ;; Restore start-state (full deep copy to avoid aliasing)
   (setf *start-state* 
@@ -171,7 +199,7 @@
   (when (boundp 'goal-fn)
     (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
   ;; Display restoration status
-  (format t "~2%Undone ww-continue.")
+  (format t "~2%Undone set-subgoal.")
   (format t "~%  Restored goal: ~A" *goal*)
   (format t "~%  State time: ~A" (problem-state.time *start-state*))
   (format t "~%  State value: ~A" (problem-state.value *start-state*))

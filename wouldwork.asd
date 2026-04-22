@@ -113,6 +113,7 @@
                                         (funcall thunk)))
                              (:file "ww-action-trace")
                              (:file "ww-goal-chaining")
+                             (:file "ww-advisor")
                              (:file "ww-solution-validation")
                              (:file "ww-backward")
 		                     (:file "ww-planner")
