@@ -12,29 +12,27 @@
 
 
 (defvar *undo-checkpoint* nil
-  "Saved state from most recent set-subgoal, or nil if none.")
+  "Saved state from most recent solve-subgoal, or nil if none.")
 
 
 ;; ============================================================
 
 
-(defmacro set-subgoal (goal-form)
+(defmacro solve-subgoal (goal-form)
   "Continue search from the final state of the previous solution.
    Installs GOAL-FORM as the new goal and updates *start-state*.
    
    Usage:
-     (solve)                          ; Solve initial goal
-     (set-subgoal (loc agent area))   ; Set up continuation with new goal
-     (solve)                          ; Solve for new goal
+     (solve-subgoal (loc agent area))   ; Set up continuation with new goal
    
    Updates only the starting conditions:
    - Previous goal state becomes new *start-state*
    - New goal installed and compiled
    - Heuristic re-applied to new start state
-   
-   The next (solve) call will automatically reset all search counters
-   and initialize data structures as usual."
-  `(continue-from-solution ',goal-form))
+   - Reset all search counters and initialize data structures as usual."
+  `(progn
+     (continue-from-solution ',goal-form)
+     (ww-solve)))
 
 
 (defun continue-from-solution (goal-form)
@@ -54,7 +52,7 @@
               (funcall (symbol-function 'heuristic?) *start-state*))
             (format t "~&Heuristic applied to continuation state: ~A~%" 
                       (problem-state.heuristic *start-state*)))
-          (format t "~&Ready to (solve) toward subgoal.~%")))
+          (format t "~&Ready to solve subgoal.~%")))
       ;; NEW behavior (pre-solve subgoal override) this is the first continuation
       (progn
         ;; DO NOT modify *start-state*
@@ -62,46 +60,17 @@
         (install-goal goal-form)
         (when (boundp 'goal-fn)
           (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
-        (format t "~&Ready to (solve) toward subgoal.~%"))))
-
-
-#+ignore (defun continue-from-solution (goal-form)
-  "Internal implementation of ww-continue.
-   Updates *start-state* and goal, then lets normal (solve) flow handle the rest."
-  ;; Validate preconditions
-  (validate-continuation-preconditions)
-  ;; Extract goal state from most recent solution
-  (let ((goal-state (extract-goal-state-from-solution)))
-    ;; Update *start-state* with goal state data
-    (update-start-state-from-goal goal-state)
-    ;; Install and compile new goal (uses existing infrastructure)
-    (terpri)
-    (install-goal goal-form)
-    (when (boundp 'goal-fn)
-      (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
-    ;; Save undo checkpoint AFTER modifications complete
-    (save-undo-checkpoint)
-    ;; Re-apply heuristic to new start state if defined
-    (when (fboundp 'heuristic?)
-      (setf (problem-state.heuristic *start-state*)
-            (funcall (symbol-function 'heuristic?) *start-state*))
-      (format t "~&Heuristic applied to continuation state: ~A~%" 
-              (problem-state.heuristic *start-state*)))
-    ;; Display continuation status
-    (format t "~&Continuation time: ~A" (problem-state.time *start-state*))
-    (format t "~&Continuation value: ~A" (problem-state.value *start-state*))
-    (format t "~%~%Ready to (solve) for new goal from continuation state.~2%")
-    t))
+        (format t "~&Ready to solve subgoal.~%"))))
 
 
 (defun validate-continuation-preconditions ()
   "Verify system state allows continuation."
   (when (> *threads* 0)
     (error "Goal chaining requires single-threaded mode. ~
-            Set (ww-set *threads* 0) before using set-subgoal."))
-  (unless (and (boundp '*solutions*) *solutions*)
-    (error "No solution exists to continue from. ~
-            First run (solve) successfully, then use (set-subgoal <new-goal>)."))
+            Set (ww-set *threads* 0) before using solve-subgoal."))
+  ;(unless (and (boundp '*solutions*) *solutions*)
+  ;  (error "No solution exists to continue from. ~
+  ;          First run (solve) successfully, then use (solve-subgoal <new-goal>)."))
   (unless (boundp 'goal-fn)
     (error "No goal function currently defined.")))
 
@@ -174,7 +143,7 @@
 
 
 (defun save-undo-checkpoint ()
-  "Save current state after set-subgoal completes modifications.
+  "Save current state after solve-subgoal completes modifications.
    Captures continuation *start-state* and *goal* for potential undo."
   (setf *undo-checkpoint*
         (make-undo-checkpoint
@@ -183,12 +152,12 @@
 
 
 (defun ww-undo ()
-  "Restore state from most recent set-subgoal.
+  "Restore state from most recent solve-subgoal.
    Allows user to adjust parameters and retry from the same point.
    Can be called multiple times to retry different approaches."
   (unless *undo-checkpoint*
-    (format t "No set-subgoal to undo. ~
-               Use ww-undo only after set-subgoal has been called.")
+    (format t "No solve-subgoal to undo. ~
+               Use ww-undo only after solve-subgoal has been called.")
     (return-from ww-undo nil))
   ;; Restore start-state (full deep copy to avoid aliasing)
   (setf *start-state* 
@@ -199,9 +168,8 @@
   (when (boundp 'goal-fn)
     (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
   ;; Display restoration status
-  (format t "~2%Undone set-subgoal.")
   (format t "~%  Restored goal: ~A" *goal*)
   (format t "~%  State time: ~A" (problem-state.time *start-state*))
   (format t "~%  State value: ~A" (problem-state.value *start-state*))
-  (format t "~%~%Ready to adjust parameters and (solve) again.~2%")
+  (format t "~%~%Ready to adjust parameters and solve-subgoal again.~2%")
   t)

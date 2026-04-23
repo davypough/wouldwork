@@ -34,7 +34,7 @@
   "Registry of named strategies, keyed by strategy name.")
 
 
-(defmacro ww-advise (&optional (goal-form nil goal-form-supplied-p))
+(defmacro solve-via-strategy (&optional (goal-form nil goal-form-supplied-p))
   "Invoke a registered strategy from the REPL.
    If GOAL-FORM is supplied, it is installed as the overall goal first
    (analogous to ww-continue).  If omitted, the currently installed goal
@@ -47,9 +47,13 @@
 
 
 (defun run-advisor (goal-form goal-form-supplied-p)
-  "Top-level entry point for ww-advise.  Picks a strategy, optionally
-   installs an overall goal, disables the heuristic, and runs the
-   strategy's phases end-to-end under unwind-protect."
+  "Top-level entry point for solve-via-strategy.  If GOAL-FORM-SUPPLIED-P,
+   install GOAL-FORM as the overall goal and ask the user whether to
+   proceed with strategy investigation; cancellation returns nil.
+   Otherwise pick a strategy, disable the heuristic, match
+   applicability, and attempt each binding's phase sequence under
+   unwind-protect until one succeeds or all bindings are exhausted.
+   The heuristic is restored on completion or abort."
   (when goal-form-supplied-p
     (install-or-continue-overall-goal goal-form))
   (let ((strategy (select-strategy)))
@@ -58,15 +62,18 @@
       (return-from run-advisor nil))
     (format t "~%Running strategy ~A (~D phase~:P)...~%"
             (strategy-name strategy) (length (strategy-phases strategy)))
-    (let ((saved-heuristic (and (fboundp 'heuristic?) (symbol-function 'heuristic?))))
+    (let ((saved-heuristic (and (fboundp 'heuristic?) (symbol-function 'heuristic?)))
+          (saved-start-state (copy-problem-state *start-state*))
+          (saved-solutions (and (boundp '*solutions*) *solutions*)))
       (when saved-heuristic
         (fmakunbound 'heuristic?)
         (format t "~&Heuristic temporarily disabled for strategic search.~%"))
       (unwind-protect
-          (execute-strategy-phases strategy)
+          (try-strategy-bindings strategy saved-start-state saved-solutions)
         (when saved-heuristic
           (setf (symbol-function 'heuristic?) saved-heuristic)
-          (format t "~&Heuristic restored.~%"))))))
+          (format t "~&Heuristic restored.~%")))
+      t)))
 
 
 (defun install-or-continue-overall-goal (goal-form)
@@ -82,13 +89,51 @@
            (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn)))))))
 
 
-(defun execute-strategy-phases (strategy)
-  "Iterate through STRATEGY's phases, running each as a separate solve.
-   Between phases, the solution's final state becomes the new start state
-   via the standard continuation mechanism.  The last phase's final state
-   is the strategy's end state, from which normal search can resume."
-  (let ((total (length (strategy-phases strategy))))
-    (iter (for phase-goal in (strategy-phases strategy))
+(defun try-strategy-bindings (strategy saved-start-state saved-solutions)
+  "Enumerate admissible bindings for STRATEGY and attempt each in turn.
+   Before each binding's attempt, restore *start-state* and *solutions*
+   from the saved pre-advisor snapshots so bindings start from the
+   same initial conditions.  Returns the successful binding (projected)
+   on success; nil if no binding's phase sequence completes."
+  (let ((bindings (match-applicability strategy *start-state*)))
+    (cond ((null bindings)
+           (format t "~%No admissible bindings for strategy ~A; aborting.~%"
+                   (strategy-name strategy))
+           nil)
+          (t
+           (format t "~%Matcher produced ~D binding~:P to try.~%" (length bindings))
+           (iter (for raw-binding in bindings)
+                 (for attempt from 1)
+                 (for projected = (project-binding raw-binding (strategy-parameters strategy)))
+                 (format t "~2%--- Binding attempt ~D of ~D: ~S ---~%"
+                         attempt (length bindings) projected)
+                 (restore-advisor-state saved-start-state saved-solutions)
+                 (when (execute-strategy-phases strategy (instantiate-phases strategy projected))
+                   (format t "~2%Strategy ~A succeeded with binding ~S.~%"
+                           (strategy-name strategy) projected)
+                   (return-from try-strategy-bindings projected)))
+           (format t "~2%All bindings exhausted; strategy ~A failed.~%"
+                   (strategy-name strategy))
+           nil))))
+
+
+(defun restore-advisor-state (saved-start-state saved-solutions)
+  "Restore *start-state* and *solutions* from snapshots taken before
+   binding enumeration.  Called before each binding attempt so every
+   binding starts from the same pre-advisor initial conditions."
+  (setf *start-state* (copy-problem-state saved-start-state))
+  (setf *solutions* (copy-list saved-solutions)))
+
+
+(defun execute-strategy-phases (strategy instantiated-phases)
+  "Iterate through INSTANTIATED-PHASES, running each as a separate
+   solve.  Between phases, the solution's final state becomes the new
+   start state via the standard continuation mechanism.  The last
+   phase's final state is the strategy's end state, from which normal
+   search can resume.  Returns t on success, nil on failure of any
+   phase."
+  (let ((total (length instantiated-phases)))
+    (iter (for phase-goal in instantiated-phases)
           (for phase-number from 1)
           (format t "~2%===== Strategy ~A phase ~D of ~D =====~%"
                   (strategy-name strategy) phase-number total)
@@ -298,6 +343,27 @@
     (if pair (cdr pair) item)))
 
 
+(defun project-binding (binding parameters)
+  "Return BINDING restricted to just the ?-variables listed in
+   PARAMETERS, preserving their order as declared.  Pairs for any
+   variables not in PARAMETERS are dropped; variables in PARAMETERS
+   not bound by the matcher are omitted silently (which can happen
+   only if a parameter is declared but never constrained, a
+   strategy-authoring error that will surface when phase substitution
+   leaves the variable unsubstituted)."
+  (iter (for p in parameters)
+        (for pair = (assoc p binding))
+        (when pair (collect pair))))
+
+
+(defun instantiate-phases (strategy binding)
+  "Return STRATEGY's phase goal-forms with BINDING substituted.
+   BINDING is a projected alist of (?-var . value) pairs suitable for
+   sublis.  A ground strategy (empty binding) returns the phases
+   unchanged."
+  (sublis binding (strategy-phases strategy)))
+
+
 (defmacro define-strategy (name &key parameters applicability phases notes)
   "Register a named strategy.  PARAMETERS is a list of ?-prefixed logical
    variables used in PHASES and APPLICABILITY.  APPLICABILITY is a list
@@ -332,43 +398,92 @@
 ;;; ============================================================
 
 
-;; First draft strategy, specific to problem-smallspace5.lisp.
-;; Implements the chain-build-then-flip pattern described in
-;; advisor/library/talos-strategies.md for the goal of moving agent1
-;; into area3 (which requires opening gate2).
+;; Parameterized chain-then-flip-color strategy.  Generalizes the
+;; smallspace5 pattern described in advisor/library/talos-strategies.md
+;; to any Talos-family problem where:
+;;   - two transmitters of different hues exist (?source-a and ?source-b),
+;;   - two connectors exist (?connector-a and ?connector-b),
+;;   - a blocking gate (?gate) sits between ?head-area and ?goal-area,
+;;     opened by a receiver (?receiver-b) of the phase-2 hue,
+;;   - a same-hue receiver (?receiver-a) is visible from ?end-area and
+;;     provides useful intermediate activation under the phase-1 hue,
+;;   - ?head-area has LOS to both transmitters, ?end-area has LOS to
+;;     both receivers, and ?end-area is visible to ?head-area.
 ;;
-;; Phase 1: place connector2 in area2 paired with transmitter1, with
-;; connector2 colored blue.  The color conjunct prevents BFS from
-;; establishing a conflicting-hue co-source (e.g. also pairing with
-;; transmitter2), because hue-conflict blocks the derived color.
-;; Agent ends in area2.
+;; Phase 1: place ?connector-a in ?head-area paired with ?source-a,
+;; with ?connector-a taking color ?hue-a.  The color conjunct prevents
+;; BFS from establishing a conflicting-hue co-source, because
+;; hue-conflict blocks the derived color.  Agent ends in ?head-area.
 ;;
-;; Phase 2: place connector1 in area1 paired with connector2,
-;; receiver1, and receiver2, with connector1 colored blue.  Connector2
-;; is the blue power source; connector1 acts as the chain end-connector,
-;; lighting receiver1 and arming receiver2 per the connector-color-switch
-;; pattern.  The color conjunct again rules out conflicting co-sources.
-;; Agent ends in area1.
+;; Phase 2: place ?connector-b in ?end-area paired with ?connector-a,
+;; ?receiver-a, and ?receiver-b, with ?connector-b also taking color
+;; ?hue-a.  ?Connector-a is the phase-1 hue power source; ?connector-b
+;; acts as the chain end-connector, lighting ?receiver-a and arming
+;; ?receiver-b per the connector-color-switch pattern.  Agent ends in
+;; ?end-area.
 ;;
-;; Phase 3: flip the chain source by repairing connector2 with
-;; transmitter2 and connector1, forcing both connectors to red via
-;; the color conjuncts.  Receiver2 activates and gate2 opens (both
-;; derived), and the agent moves into area3.  Agent ends in area3.
+;; Phase 3: flip the chain source by repairing ?connector-a with
+;; ?source-b and ?connector-b, forcing both connectors to ?hue-b via
+;; the color conjuncts.  ?Receiver-b activates and ?gate opens (both
+;; derived), and the agent moves into ?goal-area.
+;;
+;; Notes on the current applicability:
+;;   - The (chroma ?source-X ?hue-X) clauses effectively narrow
+;;     ?source-a and ?source-b to transmitters, since chroma is
+;;     asserted only on fixtures (connectors carry color, not
+;;     chroma).  Generalizing to powered-connector sources would
+;;     require an additional color-or-chroma applicability pattern.
+;;   - LOS clauses use los0 only (unconditional).  los1-mediated LOS
+;;     (open gate required) is a future extension.
+;;   - The matcher produces multiple admissible bindings in
+;;     problems with multiple gate-controlled paths.  The advisor's
+;;     enumerate-and-try loop walks them in order until one succeeds.
 
-(define-strategy chain-build-then-flip-to-reach-area3
-  :notes "Smallspace5 to reach area3: build blue chain via connector2 (area2) and connector1 (area1), then flip connector2 source to transmitter2 to re-hue red, opening gate2."
-  :phases ((and (loc connector2 area2)
-                (paired connector2 transmitter1)
-                (color connector2 blue)
-                (loc agent1 area2))
-           (and (loc connector1 area1)
-                (paired connector1 connector2)
-                (paired connector1 receiver1)
-                (paired connector1 receiver2)
-                (color connector1 blue)
-                (loc agent1 area1))
-           (and (paired connector2 transmitter2)
-                (paired connector2 connector1)
-                (color connector2 red)
-                (color connector1 red)
-                (loc agent1 area3))))
+(define-strategy chain-then-flip-color
+  :parameters (?agent ?connector-a ?connector-b ?source-a ?source-b
+               ?hue-a ?hue-b ?receiver-a ?receiver-b
+               ?gate ?head-area ?end-area ?goal-area)
+  :applicability
+    ((type-guard (agent ?agent))
+     (type-guard (connector ?connector-a))
+     (type-guard (connector ?connector-b))
+     (type-guard (source ?source-a))
+     (type-guard (source ?source-b))
+     (type-guard (receiver ?receiver-a))
+     (type-guard (receiver ?receiver-b))
+     (known-true (chroma ?source-a ?hue-a))
+     (known-true (chroma ?source-b ?hue-b))
+     (known-true (chroma ?receiver-a ?hue-a))
+     (known-true (chroma ?receiver-b ?hue-b))
+     (known-true (controls ?receiver-b ?gate))
+     (known-true (accessible1 ?head-area ?gate ?goal-area))
+     (known-true (loc ?connector-a ?head-area))
+     (known-true (loc ?connector-b ?end-area))
+     (known-true (los0 ?head-area ?source-a))
+     (known-true (los0 ?head-area ?source-b))
+     (known-true (los0 ?end-area ?receiver-a))
+     (known-true (los0 ?end-area ?receiver-b))
+     (known-true (visible0 ?end-area ?head-area))
+     (parametric (different ?connector-a ?connector-b))
+     (parametric (different ?source-a ?source-b))
+     (parametric (different ?hue-a ?hue-b))
+     (parametric (different ?receiver-a ?receiver-b))
+     (parametric (different ?head-area ?end-area))
+     (parametric (different ?head-area ?goal-area))
+     (parametric (different ?end-area ?goal-area)))
+  :phases ((and (loc ?connector-a ?head-area)
+                (paired ?connector-a ?source-a)
+                (color ?connector-a ?hue-a)
+                (loc ?agent ?head-area))
+           (and (loc ?connector-b ?end-area)
+                (paired ?connector-b ?connector-a)
+                (paired ?connector-b ?receiver-a)
+                (paired ?connector-b ?receiver-b)
+                (color ?connector-b ?hue-a)
+                (loc ?agent ?end-area))
+           (and (paired ?connector-a ?source-b)
+                (paired ?connector-a ?connector-b)
+                (color ?connector-a ?hue-b)
+                (color ?connector-b ?hue-b)
+                (loc ?agent ?goal-area)))
+  :notes "Build a chain under one hue via ?connector-a and ?connector-b lighting ?receiver-a; then re-source ?connector-a from ?source-b to flip the chain's hue and activate ?receiver-b, opening ?gate onto ?goal-area.")
