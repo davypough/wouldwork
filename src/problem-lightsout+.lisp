@@ -18,6 +18,8 @@
 
 (ww-set *depth-cutoff* 10)
 
+(ww-set *progress-reporting-interval* 1000000)
+
 
 (define-types
   me          (me1)

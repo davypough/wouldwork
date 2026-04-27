@@ -138,7 +138,7 @@
   (and (if (recording)
          (setq $me me2)
          (setq $me me1))
-       (not (bind (holding $me $connector))
+       (not (bind (holding $me $connector)))
        (bind (loc $me $area))
        (loc ?connector $area))
   (?connector)
@@ -156,12 +156,10 @@
             (if (connecting ?connector $t)
               (and (not connecting ?connector ?t)
                    (if (connector ?t)
-
-
-            (chain-deactivate! ?connector $hue))
-          (doall (?t terminus)
-            (if (connecting ?connector ?t)
-              (not (connecting ?connector ?t))))))
+                     (chain-deactivate! ?connector $hue))
+                   (doall (?t terminus)
+                     (if (connecting ?connector ?t)
+                       (not (connecting ?connector ?t)))))))))
 
 
 

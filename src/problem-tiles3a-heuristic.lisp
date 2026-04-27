@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 100)
+(ww-set *depth-cutoff* 50)
 
 (ww-set *progress-reporting-interval* 1000000)
 

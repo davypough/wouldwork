@@ -15,6 +15,12 @@
   "Saved state from most recent solve-subgoal, or nil if none.")
 
 
+(defvar *final-goal* nil
+  "Snapshot of the originally installed goal, captured on first solve-subgoal
+   call so that (solve) can reinstate it after a chain of subgoals.
+   Cleared on refresh.")
+
+
 ;; ============================================================
 
 
@@ -36,6 +42,8 @@
 
 
 (defun continue-from-solution (goal-form)
+  (unless *final-goal*  ;snapshot original goal once per chain          ;; ADDED
+    (setf *final-goal* *goal*))                                          ;; ADDED
   (if (and (boundp '*solutions*) *solutions*)  ;is this a subsequent continutation
       ;; EXISTING behavior (true continuation)
       (progn

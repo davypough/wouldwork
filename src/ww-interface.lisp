@@ -224,10 +224,11 @@ any such settings appearing in the problem specification file.
    Preserves REPL-set parameters not overridden in the problem file."
   (save-globals)
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (setf *goal* nil)
+  (setf *goal* nil
+        *final-goal* nil)                                                  ;; CHANGED
   (when *undo-checkpoint*
     (format t "~%Note: Refresh invalidates the current goal-chaining session.~%~
-               Use (ww-continue <new-goal>) to restart goal chaining after refresh completes.~%")
+               Use (solve-subgoal <new-goal>) to restart goal chaining after refresh completes.~%")
     (setf *undo-checkpoint* nil))
   (setf *refreshing* t)
   (unwind-protect
@@ -412,7 +413,10 @@ any such settings appearing in the problem specification file.
 
 
 (defun solve ()
-  (ww-solve))
+  (cond (*final-goal*  ;mid-chain: continue toward original goal           ;; CHANGED
+         (continue-from-solution *final-goal*)
+         (ww-solve))
+        (t (ww-solve))))
 
 
 (defun list-all-problems (&optional (prettyp nil))

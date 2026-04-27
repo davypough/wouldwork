@@ -63,6 +63,7 @@
                             (symbol-value problem-name-sym)))
          (goal-sym (and ww-pkg (find-symbol "*GOAL*" ww-pkg)))
          (undo-sym (and ww-pkg (find-symbol "*UNDO-CHECKPOINT*" ww-pkg)))
+         (final-goal-sym (and ww-pkg (find-symbol "*FINAL-GOAL*" ww-pkg)))  ;; ADDED
          (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
     ;; Check we have a problem to refresh
     (unless (and problem-name (not (eq problem-name 'ww::unspecified)))
@@ -72,10 +73,13 @@
     ;; Clear goal if bound
     (when (and goal-sym (boundp goal-sym))
       (setf (symbol-value goal-sym) nil))
+    ;; Clear final-goal if bound                                              ;; CHANGED
+    (when (and final-goal-sym (boundp final-goal-sym))                        ;; CHANGED
+      (setf (symbol-value final-goal-sym) nil))                               ;; CHANGED
     ;; Warn about undo checkpoint if set
     (when (and undo-sym (boundp undo-sym) (symbol-value undo-sym))
       (format t "~%Note: Refresh invalidates the current goal-chaining session.~%~
-                 Use (ww-continue <new-goal>) to restart goal chaining after refresh completes.~%")
+                 Use (solve-subgoal <new-goal>) to restart goal chaining after refresh completes.~%")
       (setf (symbol-value undo-sym) nil))
     ;; Set refreshing flag to preserve REPL-set parameters
     (when (and refreshing-sym (boundp refreshing-sym))

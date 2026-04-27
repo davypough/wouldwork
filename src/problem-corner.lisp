@@ -1376,6 +1376,75 @@
           (finally (propagate-changes!))))
 
 
+(define-action connect-to-1-terminus
+    1
+  (?agent agent ?connector connector ?t1 terminus)
+  (and (not (bind (loc ?connector $any)))
+       ;(same-type ?agent ?connector)
+       (different ?connector ?t1)
+       (bind (loc ?agent $area))
+       ;(bind (elevation ?agent $agent-elevation))
+       (not (and (connector ?t1) (loc ?t1 $area)))
+       (connectable ?connector $area)
+       (selectable ?agent $area ?t1))
+  (?agent ?connector ?t1 $area $place)
+  (do ;; Can place on a box
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
+      ;    (assert (loc ?connector $area)
+      ;            (on ?connector ?box)
+      ;            (elevation ?connector (1+ $box-elevation))
+      ;            (paired ?connector ?t1)
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
+      ;; Can place on ground
+      (assert (loc ?connector $area)
+              ;(elevation ?connector 0)
+              (paired ?connector ?t1)
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
+
+
+(define-action connect-to-2-terminus
+    1
+  (?agent agent ?connector connector (combination (?t1 ?t2) terminus))
+  (and (not (bind (loc ?connector $any)))
+       ;(same-type ?agent ?connector)
+       (different ?connector ?t1)
+       (different ?connector ?t2)
+       (bind (loc ?agent $area))
+       ;(bind (elevation ?agent $agent-elevation))
+       (not (and (connector ?t1) (loc ?t1 $area)))
+       (not (and (connector ?t2) (loc ?t2 $area)))
+       (connectable ?connector $area)
+       (selectable ?agent $area ?t1)
+       (selectable ?agent $area ?t2))
+  (?agent ?connector ?t1 ?t2 $area $place)
+  (do ;; Can place on a box
+      ;(doall (?box box)
+      ;  (if (and (loc ?box $area)
+      ;           (cleartop ?box)
+      ;           (bind (elevation ?box $box-elevation))
+      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
+      ;    (assert (loc ?connector $area)
+      ;            (on ?connector ?box)
+      ;            (elevation ?connector (1+ $box-elevation))
+      ;            (paired ?connector ?t1)
+      ;            (paired ?connector ?t2)
+      ;            (setq $place ?box)
+      ;            (finally (propagate-changes!)))))
+      ;; Can place on ground
+      (assert (loc ?connector $area)
+              ;(elevation ?connector 0)
+              (paired ?connector ?t1)
+              (paired ?connector ?t2)
+              (setq $place 'ground)
+              (finally (propagate-changes!)))))
+
+
 (define-action connect-to-3-terminus
     1
   (?agent agent ?connector connector (combination (?t1 ?t2 ?t3) terminus))
@@ -1419,32 +1488,41 @@
               (finally (propagate-changes!)))))
 
 
-(define-action connect-to-2-terminus
+#+ignore (define-action connect-to-4-terminus
     1
-  (?agent agent ?connector connector (combination (?t1 ?t2) terminus))
+  (?agent agent ?connector connector (combination (?t1 ?t2 ?t3 ?t4) terminus))
   (and (not (bind (loc ?connector $any)))
        ;(same-type ?agent ?connector)
        (different ?connector ?t1)
        (different ?connector ?t2)
+       (different ?connector ?t3)
+       (different ?connector ?t4)
        (bind (loc ?agent $area))
        ;(bind (elevation ?agent $agent-elevation))
        (not (and (connector ?t1) (loc ?t1 $area)))
        (not (and (connector ?t2) (loc ?t2 $area)))
+       (not (and (connector ?t3) (loc ?t3 $area)))
+       (not (and (connector ?t4) (loc ?t4 $area)))
        (connectable ?connector $area)
        (selectable ?agent $area ?t1)
-       (selectable ?agent $area ?t2))
-  (?agent ?connector ?t1 ?t2 $area $place)
+       (selectable ?agent $area ?t2)
+       (selectable ?agent $area ?t3)
+       (selectable ?agent $area ?t4))
+  (?agent ?connector ?t1 ?t2 ?t3 ?t4 $area $place)
   (do ;; Can place on a box
       ;(doall (?box box)
       ;  (if (and (loc ?box $area)
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
       ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (loc ?connector $area)
+      ;    (assert ;(not (holds ?agent $cargo))
+      ;            (loc ?connector $area)
       ;            (on ?connector ?box)
       ;            (elevation ?connector (1+ $box-elevation))
       ;            (paired ?connector ?t1)
       ;            (paired ?connector ?t2)
+      ;            (paired ?connector ?t3)
+      ;            (paired ?connector ?t4)
       ;            (setq $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
@@ -1452,38 +1530,8 @@
               ;(elevation ?connector 0)
               (paired ?connector ?t1)
               (paired ?connector ?t2)
-              (setq $place 'ground)
-              (finally (propagate-changes!)))))
-
-
-#+ignore (define-action connect-to-1-terminus
-    1
-  (?agent agent ?connector connector ?t1 terminus)
-  (and (not (bind (loc ?connector $any)))
-       ;(same-type ?agent ?connector)
-       (different ?connector ?t1)
-       (bind (loc ?agent $area))
-       ;(bind (elevation ?agent $agent-elevation))
-       (not (and (connector ?t1) (loc ?t1 $area)))
-       (connectable ?connector $area)
-       (selectable ?agent $area ?t1))
-  (?agent ?connector ?t1 $area $place)
-  (do ;; Can place on a box
-      ;(doall (?box box)
-      ;  (if (and (loc ?box $area)
-      ;           (cleartop ?box)
-      ;           (bind (elevation ?box $box-elevation))
-      ;           (< (- $box-elevation $agent-elevation) 1))               ; within reach
-      ;    (assert (loc ?connector $area)
-      ;            (on ?connector ?box)
-      ;            (elevation ?connector (1+ $box-elevation))
-      ;            (paired ?connector ?t1)
-      ;            (setq $place ?box)
-      ;            (finally (propagate-changes!)))))
-      ;; Can place on ground
-      (assert (loc ?connector $area)
-              ;(elevation ?connector 0)
-              (paired ?connector ?t1)
+              (paired ?connector ?t3)
+              (paired ?connector ?t4)
               (setq $place 'ground)
               (finally (propagate-changes!)))))
 
@@ -1622,7 +1670,35 @@
 (define-goal
   (and (loc agent1 area4)
        (active receiver2)
-       (active receiver3)))
+       (active receiver3))
+  ;(and (not (loc agent1 area4))
+  ;     (loc connector1 area2)
+  ;     (loc connector3 area3)
+  ;     (paired connector3 transmitter1)
+  ;     (paired connector3 receiver3)
+  ;     (paired connector1 transmitter2)
+  ;     (paired connector1 receiver3)
+  ;     (color connector3 red)
+  ;     (active receiver2))
+)
+
+#|
+;;;;;; EXAMPLE SOLUTION ;;;;;;;;;
+
+(1.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 AREA1))
+(2.0 (MOVE AGENT1 AREA1 AREA2))
+(3.0 (CONNECT-TO-3-TERMINUS AGENT1 CONNECTOR1 RECEIVER3 RECEIVER1 TRANSMITTER2 AREA2 GROUND))
+(4.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR2 AREA2))
+(5.0 (MOVE AGENT1 AREA2 AREA3))
+(6.0 (CONNECT-TO-3-TERMINUS AGENT1 CONNECTOR2 CONNECTOR1 RECEIVER1 TRANSMITTER1 AREA3 GROUND))
+(7.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR3 AREA3))
+(8.0 (MOVE AGENT1 AREA3 AREA4))
+(9.0 (CONNECT-TO-2-TERMINUS AGENT1 CONNECTOR3 RECEIVER3 TRANSMITTER1 AREA4 GROUND))
+(10.0 (MOVE AGENT1 AREA4 AREA3))
+(11.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR2 AREA3))
+(12.0 (CONNECT-TO-3-TERMINUS AGENT1 CONNECTOR2 CONNECTOR1 RECEIVER2 TRANSMITTER1 AREA3 GROUND))
+(13.0 (MOVE AGENT1 AREA3 AREA4))
+(14.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR3 AREA4)))
 
 
 ;;;;;;;;;;;; ENUMERATOR SPECS ;;;;;;;;;;;;;;;;;;;
@@ -1704,3 +1780,4 @@
     (PAIRED CONNECTOR3 CONNECTOR1)
     (PAIRED CONNECTOR3 RECEIVER2)
     (PAIRED CONNECTOR3 TRANSMITTER1)))
+|#

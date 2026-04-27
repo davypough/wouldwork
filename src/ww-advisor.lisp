@@ -3,7 +3,7 @@
 ;;; Strategy advisor for heuristic-void subgoals.
 ;;; Runs a named strategy as a sequence of phase goals, each solved in turn,
 ;;; with the heuristic disabled throughout.  Builds on the same continuation
-;;; machinery as ww-continue in ww-goal-chaining.lisp.
+;;; machinery as solve-subgoal in ww-goal-chaining.lisp.
 
 
 (in-package :ww)
@@ -37,7 +37,7 @@
 (defmacro solve-via-strategy (&optional (goal-form nil goal-form-supplied-p))
   "Invoke a registered strategy from the REPL.
    If GOAL-FORM is supplied, it is installed as the overall goal first
-   (analogous to ww-continue).  If omitted, the currently installed goal
+   (analogous to solve-subgoal).  If omitted, the currently installed goal
    is kept unchanged.
    The heuristic is disabled for the duration of the strategy's phases
    and restored on completion or abort."
@@ -78,7 +78,7 @@
 
 (defun install-or-continue-overall-goal (goal-form)
   "Install GOAL-FORM as the overall goal.
-   If a prior solution exists, continue from it (mirroring ww-continue);
+   If a prior solution exists, continue from it (mirroring solve-subgoal);
    otherwise install the goal on the current start state."
   (cond ((and (boundp '*solutions*) *solutions*)
          (continue-from-solution goal-form))
