@@ -226,10 +226,6 @@ any such settings appearing in the problem specification file.
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (setf *goal* nil
         *final-goal* nil)                                                  ;; CHANGED
-  (when *undo-checkpoint*
-    (format t "~%Note: Refresh invalidates the current goal-chaining session.~%~
-               Use (solve-subgoal <new-goal>) to restart goal chaining after refresh completes.~%")
-    (setf *undo-checkpoint* nil))
   (setf *refreshing* t)
   (unwind-protect
       (with-silenced-compilation
