@@ -36,6 +36,9 @@
   (iter (for (type instances) on types&instances by #'cddr)
         (check-type type symbol)
         (check-type instances list)
+        (when (eql (char (format nil "~S" instances) 0) #\`)  ;eval backquoted form once at install
+          (setf instances (eval instances))
+          (check-type instances list))
         (when (eql (car instances) 'either)
           (setf instances (or (remove-if #'null (remove-duplicates (apply #'either (cdr instances))))
                               '(nil))))
@@ -626,6 +629,8 @@
   (format t "~&Creating initial propositional database...")
   (check-type literals cons)
   (dolist (literal literals)
+    (when (eql (char (format nil "~S" literal) 0) #\`)  ;eval backquoted literal once at install
+      (setf literal (eval literal)))
     (if (eql (car literal) 'not)
       (check-proposition (second literal))
       (check-proposition literal))
@@ -645,6 +650,8 @@
 (defun install-goal (form)
   (format t "~&Installing goal...")
   (check-type form list)
+  (when (eql (char (format nil "~S" form) 0) #\`)  ;eval backquoted form once at install
+    (setf form (eval form)))
   (when (and (null form)
              (not (eql *solution-type* 'min-value))
              (not (eql *solution-type* 'max-value)))
