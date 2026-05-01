@@ -38,7 +38,7 @@
      (unwind-protect
          (progn
            ;; ---- RUN SOLVER ----
-           (solve)
+           (ww-solve)  ;direct solver call; solve's *final-goal* wrapper would re-install the original goal
            ;; Mark success only if we actually got solutions
            (when *solutions*
              (setf *solutions-valid* t))
@@ -58,14 +58,10 @@
     (setf *final-goal* *goal*))
   ;; Save undo checkpoint BEFORE any mutation
   (save-undo-checkpoint)
-  ;; Any new attempt invalidates prior solutions unless proven otherwise
-  (setf *solutions-valid* nil)
   (if (and *solutions-valid* *solutions*)
       ;; --- Continuation branch ---
       (progn
-        ;; NOTE: If update-start-state-from-goal expects a problem-state,
-        ;; you may need (solution-goal (car *solutions*)) instead.
-        (update-start-state-from-goal (car *solutions*))
+        (update-start-state-from-goal (extract-goal-state-from-solution))
         (install-goal goal-form)
         (when (boundp 'goal-fn)
           (compile 'goal-fn
@@ -78,7 +74,10 @@
         (when (boundp 'goal-fn)
           (compile 'goal-fn
                    (subst-int-code (symbol-value 'goal-fn))))
-        (format t "~&Ready to solve subgoal.~%"))))
+        (format t "~&Ready to solve subgoal.~%")))
+  ;; Prior solutions are now consumed (continuation) or were absent (fresh);
+  ;; either way invalidate so the next call doesn't reuse stale state.
+  (setf *solutions-valid* nil))
 
 
 (defun validate-continuation-preconditions ()
