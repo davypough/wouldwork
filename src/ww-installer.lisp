@@ -288,7 +288,8 @@
           (coerce (getf plist :events) 'simple-vector)))
   (when (getf plist :repeat)
     (setf (get object :repeat) (getf plist :repeat)))
-  (push object *happening-names*)
+  ;; Happening name is registered in *happening-names* by the asdf
+  ;; pre-scan in wouldwork.asd; do not push here.
   (when (getf plist :interrupt)
     (setf (get object :interrupt) (getf plist :interrupt)))
   (ut::if-it (getf plist :interrupt)

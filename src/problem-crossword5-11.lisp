@@ -5,6 +5,7 @@
 ;;; Generates instantiations dynamically with get-remaining-fields? and
 ;;; get-remaining-words?
 ;;; Requires hashtable instead of list for set representation in relations.
+;;; But using hashtable as a fluent is inefficient.
 ;;; Adds trie structure for dictionary lookup.
 ;;; Adds bounding function.
 ;;; Adds post-processing fill options with dictionary words

@@ -186,8 +186,8 @@
       ;; Store patroller-specific properties for Phase 2 rebound support
       (setf (get object :patroller-path) path)
       (setf (get object :patroller-mode) mode)
-      ;; Register as happening for compile-all-functions
-      (push object *happening-names*)
+      ;; Patroller name is registered in *happening-names* by the asdf
+      ;; pre-scan in wouldwork.asd; do not push here.
       ;; Handle interrupt (same pattern as define-happening)
       (when interrupt
         (setf (get object :interrupt) interrupt)

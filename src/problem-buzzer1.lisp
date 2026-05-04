@@ -1,6 +1,6 @@
 ;;;; Filename: problem-buzzer1.lisp
 
-;;;; Modeling a buzzer object in Talos Principle.
+;;;; Experimental modeling a buzzer object in Talos Principle.
 ;;;; A buzzer moves along a path defined by define-patroller.
 ;;;; Enhanced for 3D environments with stacking support.
 ;;;;
@@ -64,7 +64,10 @@
 (define-patroller buzzer1
   path (area1 area2 area3 area4 area5)
   mode :reverse
-  rebound (exists (?c cargo)  ;buzzer just pushes agent aside in an area and continues on (no rebound or kill)
+  ;; Agent collision: buzzer pushes agent aside in an area and continues on
+  ;; (no rebound or kill on agent contact). Cargo collision: buzzer rebounds,
+  ;; reversing direction at any area containing a box.
+  rebound (exists (?c cargo)
             (and (bind (loc buzzer1 $area))
                  (loc ?c $area)))
   aftereffect (if (and (bind (supports buzzer1 $box))
@@ -195,21 +198,21 @@
                   (cond ((bind (supports $rover ?box))
                            ;; Box was on buzzer or mine - remove supports, transfer cargo to buzzer
                            (not (supports $rover ?box))
-                           (if (bind (on $cargo ?box))
-                             (do (not (on $cargo ?box))
-                                 (if (box $cargo)
-                                   (supports $rover $cargo)
-                                   (elevation $cargo 0)))))  ;any cargo not a box falls to ground
+                           (if (bind (on $above-cargo ?box))
+                             (do (not (on $above-cargo ?box))
+                                 (if (box $above-cargo)
+                                   (supports $rover $above-cargo)
+                                   (elevation $above-cargo 0)))))  ;any cargo not a box falls to ground
                         ((bind (on ?box $under-box))
                            ;; Box was on another box - remove on, transfer cargo to under-box
                            (not (on ?box $under-box))
-                           (if (bind (on $cargo ?box))
-                             (do (not (on $cargo ?box))
-                                 (on $cargo $under-box))))
+                           (if (bind (on $above-cargo ?box))
+                             (do (not (on $above-cargo ?box))
+                                 (on $above-cargo $under-box))))
                         (t
                            ;; Box was on ground - just remove on relationship for cargo
-                           (if (bind (on $cargo ?box))
-                             (not (on $cargo ?box))))))))
+                           (if (bind (on $above-cargo ?box))
+                             (not (on $above-cargo ?box))))))))
       (finally (propagate-changes!))))
 
 

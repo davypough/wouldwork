@@ -3,6 +3,7 @@
 
 ;;; Basic problem specification for finding a path thru an array of allowed & disallowed points,
 ;;; not visiting any point more than once.
+;;; This particular grid has no solution.
 
 
 (in-package :ww)  ;required
@@ -16,14 +17,14 @@
 (ww-set *solution-type* min-length)
 
 
-#.(defparameter *grid* (make-array '(5 5)
+(defparameter *grid* (make-array '(5 5)
                       :initial-contents '((0 1 1 1 0)
                                           (1 1 1 1 1)
                                           (1 1 1 1 1)
                                           (1 1 1 1 1)
                                           (1 1 1 1 0))))
 
-#.(defparameter *start* '(0 1))
+(defparameter *start* '(0 1))
 
 
 (define-types
@@ -103,9 +104,9 @@
 
 (define-init
   (num-visits 1)
-  (loc #.(first *start*) #.(second *start*))
-  (visited #.(first *start*) #.(second *start*))
-  (total #.(loop for row from 0 below (array-dimension *grid* 0)
+  `(loc ,(first *start*) ,(second *start*))
+  `(visited ,(first *start*) ,(second *start*))
+  `(total ,(loop for row from 0 below (array-dimension *grid* 0)
                  sum (loop for col from 0 below (array-dimension *grid* 1)
                            count (= 1 (aref *grid* row col))))))
 

@@ -37,7 +37,7 @@
 
 (defparameter *size* (/ (* *N* (1+ *N*)) 2))  ;total number of positions
 
-#.(defparameter *final-peg-count* 8)  ;depth-cutoff + 1
+(defparameter *final-peg-count* 8)  ;depth-cutoff + 1
 ;(defparameter *final-peg-count* (1- *size*))  ;use if full search backward to start state
 
 (defparameter *reversed-pegs* nil)  ;list of pegs in reverse order
@@ -207,7 +207,7 @@
 
 
 (define-goal  ;pegs remaining
-  (peg-count #.*final-peg-count*))
+  `(peg-count ,*final-peg-count*))
   ;(not (contents> 1 1 6 $any-peg))))  ;use only if searching all the way to initial state
      
      

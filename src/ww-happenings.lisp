@@ -126,7 +126,7 @@
 (defun apply-rebound (following-happening)
   "Compute mirror index for rebound. For :reverse mode patrollers,
    reverses direction by jumping to the mirror event in the events array.
-   Mirror formula: for events array of length N, mirror of index I is (N - I)."
+   Mirror formula: for events array of length N, mirror of index I is (N - 1 - I)."
   (let* ((object (first following-happening))
          (params (second following-happening))
          (following-index (first params))
@@ -134,7 +134,7 @@
          (direction (third params))
          (events (get object :events))
          (n-events (length events))
-         (mirror-index (mod (- n-events following-index) n-events)))
+         (mirror-index (mod (- n-events following-index 1) n-events)))
     (if (eq (get object :patroller-mode) :reverse)
         `(,object (,mirror-index ,following-time ,(- direction)))
         following-happening)))

@@ -1,10 +1,11 @@
 ;;; Filename: problem-balancing.lisp
 
 
-;;; Enhanced problem specification in the Talos Principle game
-;;; for the Balancing Act problem in The Lost Prisoner.
+;;; Incomplete problem specification in the Talos Principle game
+;;; for the Balancing Act problem in The Last Prisoner.
 ;;; Deals with beams that can be occluded or intersecting.
 ;;; Requires explicit object coordinates and obstructions like walls.
+;;; Experimenting with representing 3D objects like gates, elevations, etc
 
 
 (in-package :ww)  ;required
@@ -116,10 +117,11 @@
            $hue)
       (and (connector ?terminus)
            (bind (color ?terminus $hue))
-           $hue)
-      (and (repeater ?terminus)
-           (bind (color ?terminus $hue))
            $hue)))
+      ;(and (repeater ?terminus)
+      ;     (bind (color ?terminus $hue))
+      ;     $hue)))
+
 
 
 (define-query get-fixed-coordinates (?area/fixture)

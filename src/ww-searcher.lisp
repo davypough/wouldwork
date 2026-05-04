@@ -1265,26 +1265,49 @@
 
 (defun printout-solution-with-states (soln)
   "Print solution path with database state after each action.
-   Used when *debug* >= 2 to show state progression."
+   Used when *debug* >= 2 to show state progression.
+   On replay failure, prints a diagnostic and returns immediately;
+   subsequent steps cannot be displayed once state reconstruction
+   has lost synchronization with the recorded plan."                      ;; CHANGED: docstring
   (declare (type solution soln))
   (let ((path (solution.path soln))
-        (current-state (copy-problem-state *start-state*)))
+        (current-state (copy-problem-state *start-state*))
+        (step 0))                                                          ;; ADDED
     (write (list (problem-state.time *start-state*) '(START-STATE)) :pretty t)   ;; CHANGED: was hardcoded '(0.0 (START-STATE))
     (terpri)
     (format t "~A~%" (list-database (problem-state.idb current-state)))
     (terpri)
     (dolist (item path)
+      (incf step)                                                          ;; ADDED
       (let* ((action-form (second item))
              (new-state (replay-action-to-state action-form current-state)))
         (write item :pretty t)
         (terpri)
-        (if new-state
-            (progn
-              (setf current-state new-state)
-              (format t "~A~%" (list-database (problem-state.idb current-state)))
-              (terpri))
-            (format t "[Action replay failed]~%"))))
+        (cond (new-state                                                   ;; CHANGED: if -> cond
+               (setf current-state new-state)
+               (format t "~A~%" (list-database (problem-state.idb current-state)))
+               (terpri))
+              (t                                                           ;; CHANGED
+               (report-replay-failure step action-form current-state)      ;; CHANGED
+               (return-from printout-solution-with-states)))))             ;; CHANGED
     (terpri)))
+
+
+(defun report-replay-failure (step action-form last-good-state)            ;; ADDED (entire function)
+  "Print a diagnostic for replay failure in printout-solution-with-states.
+   Replay failure is a system invariant violation: the recorded action
+   did not reproduce when re-applied to its predecessor state. Likely
+   cause is a bug in the action's precondition or effect form."
+  (format t "~%============================================================~%")
+  (format t "REPLAY FAILURE at step ~D~%" step)
+  (format t "Action: ~S~%" action-form)
+  (format t "Last consistent state (time ~A):~%" (problem-state.time last-good-state))
+  (format t "  ~A~%" (list-database (problem-state.idb last-good-state)))
+  (format t "The recorded action did not reproduce when re-applied to~%")
+  (format t "this state. This indicates a system invariant violation,~%")
+  (format t "likely a bug in the action's precondition or effect form.~%")
+  (format t "Display halted; subsequent steps cannot be reconstructed.~%")
+  (format t "============================================================~%"))
 
 
 (defun replay-action-to-state (action-form state)

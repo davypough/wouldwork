@@ -2,6 +2,7 @@
 
 ;;; Problem specification (in Talos Principle)
 ;;; for the (second) Nexus-2 crater problem in Road to Gehenna.
+;;; Uses early problem specs; updated for later Talos problems.
 
 
 (in-package :ww)  ;required
