@@ -218,6 +218,138 @@
     (error "Expecting only variables with a ? or $ prefix in an effect parameter list: ~A" eff-parameter-list)))
 
 
+;;; ====================================================================
+;;; Fluent-variable shadowing detection
+;;;
+;;; Walks an action's effect body looking for `bind` forms that overwrite
+;;; a $-variable whose value came from the precondition or from an earlier
+;;; setq/mvsetq in the same lexical scope. Such overwrites are usually a
+;;; bug: the original value is silently lost. Reuse of $-variables across
+;;; separate `bind` statements is a permitted idiom and is not flagged.
+;;; ====================================================================
+
+(defun walk-effect-shadow (action-name form owned)
+  "Recursive walker over effect-body subforms. OWNED is the set of $-vars
+   already written by the precondition or by a prior setq/mvsetq in the
+   current lexical scope. A bind that targets a $-var in OWNED produces
+   a shadowing warning. Bind itself does not extend OWNED, since reuse
+   of $-variables across separate binds is permitted. Returns the updated
+   OWNED set after walking FORM."
+  (cond ((atom form) owned)
+        ((eq (first form) 'quote) owned)
+        ((eq (first form) 'bind)
+         (process-shadow-bind action-name form owned))
+        ((eq (first form) 'setq)
+         (process-shadow-setq action-name form owned))
+        ((member (first form) '(mvsetq multiple-value-setq))
+         (process-shadow-mvsetq action-name form owned))
+        ((eq (first form) 'let)
+         (process-shadow-let action-name form owned))
+        ((eq (first form) 'ww-loop)
+         (process-shadow-ww-loop action-name form owned))
+        (t (walk-shadow-sequence action-name form owned))))
+
+
+(defun walk-shadow-sequence (action-name forms owned)
+  "Walks each element of FORMS in source order, threading OWNED through
+   each call. Used both for sequential bodies (do, progn, assert) and as
+   the fallback for unspecialized list forms."
+  (let ((current owned))
+    (dolist (sub forms)
+      (setf current (walk-effect-shadow action-name sub current)))
+    current))
+
+
+(defun process-shadow-bind (action-name form owned)
+  "Inspects bind FORM. Warns once for each fluent-position $-variable
+   target that is already in OWNED. Returns OWNED unchanged: bind writes
+   do not extend OWNED."
+  (let* ((proposition (second form))
+         (relation (and (consp proposition) (first proposition)))
+         (fluent-positions (and relation (get-prop-fluent-indices proposition))))
+    (when fluent-positions
+      (iter (for arg in (cdr proposition))
+            (for pos from 1)
+            (when (and (member pos fluent-positions)
+                       ($varp arg)
+                       (member arg owned))
+              (terpri *error-output*)
+              (warn "Fluent-variable overwrite in action ~A:~% ~
+                     ~S writes to ~A,~% ~
+                     which was already set by the precondition or an earlier setq/mvsetq.~% ~
+                     Unless the overwrite is intentional, delete this bind statement.~%"
+                    action-name form arg arg))))
+    owned))
+
+
+(defun process-shadow-setq (action-name form owned)
+  "Walks setq's value sub-form, then adds the target $-variable to OWNED
+   so subsequent bind statements can detect a shadow against it. setq
+   itself does not warn."
+  (let ((var (second form))
+        (val (third form)))
+    (let ((after-val (walk-effect-shadow action-name val owned)))
+      (if (and (symbolp var) ($varp var))
+          (adjoin var after-val)
+          after-val))))
+
+
+(defun process-shadow-mvsetq (action-name form owned)
+  "Walks mvsetq's value sub-form, then adds all $-variable targets to
+   OWNED so subsequent bind statements can detect a shadow against them.
+   mvsetq itself does not warn."
+  (let* ((vars (second form))
+         (val (third form))
+         (after-val (walk-effect-shadow action-name val owned))
+         ($vars (remove-if-not #'$varp vars)))
+    (union $vars after-val)))
+
+
+(defun process-shadow-let (action-name form owned)
+  "Handles let scoping. Each binding's value sub-form is walked in the
+   outer scope; the body is walked with let-bound $-variables hidden from
+   OWNED. On let exit, writes inside the body to let-bound $-variables
+   are discarded and the outer-scope ownership of those names is restored."
+  (let* ((bindings (second form))
+         (let-vars (mapcar (lambda (b) (if (consp b) (first b) b)) bindings))
+         (let-$vars (remove-if-not #'$varp let-vars))
+         (after-bindings owned))
+    (dolist (b bindings)
+      (when (and (consp b) (cdr b))
+        (setf after-bindings
+              (walk-effect-shadow action-name (second b) after-bindings))))
+    (let* ((inner (set-difference after-bindings let-$vars))
+           (after-body (walk-shadow-sequence action-name (cddr form) inner)))
+      (union (set-difference after-body let-$vars)
+             (intersection after-bindings let-$vars)))))
+
+
+(defun process-shadow-ww-loop (action-name form owned)
+  "Handles ww-loop scoping. Iteration $-variables introduced by 'for'
+   clauses are removed from OWNED inside the loop body and restored on
+   exit, so a bind targeting a loop-iteration $-variable is not flagged
+   on the basis of any outer-scope value of the same name."
+  (let* ((iter-$vars (collect-ww-loop-iter-$vars form))
+         (inner (set-difference owned iter-$vars))
+         (after-body (walk-shadow-sequence action-name (cdr form) inner)))
+    (union (set-difference after-body iter-$vars)
+           (intersection owned iter-$vars))))
+
+
+(defun collect-ww-loop-iter-$vars (form)
+  "Returns the list of $-variables introduced as iteration variables by
+   'for' clauses inside a ww-loop FORM."
+  (let (vars)
+    (loop for tail on (cdr form)
+          while tail
+          do (when (eq (first tail) 'for)
+               (let ((spec (second tail)))
+                 (typecase spec
+                   (symbol (push spec vars))
+                   (list (dolist (v spec) (push v vars)))))))
+    (remove-if-not #'$varp vars)))
+
+
 (defun check-action-parameter-instantiability (action-name pre-param-types)
   "Checks if all static parameter types have at least one instance.
    Returns a list of uninstantiable type names, or NIL if all types are instantiable.

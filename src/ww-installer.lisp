@@ -481,6 +481,7 @@
         ;         eff-extra-?vars eff-extra-$vars eff-missing-vars)
         (check-variable-names name (append flat-pre-param-?vars pre-bound-?vars eff-bound-?vars)
                               precondition effect (append pre-$vars eff-$vars pre-?vars eff-?vars))
+        (walk-effect-shadow name effect (append pre-$vars pre-special-$vars))   ;; NEW: fluent-shadowing check
         (cond (init-action
                  (setq *objective-value-p* nil))  ;this is an init-action, disable $objective-value
               ((or (member '$objective-value pre-$vars)  ;used in translate-assert

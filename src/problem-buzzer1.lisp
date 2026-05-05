@@ -227,7 +227,6 @@
       (doall (?box box)
         (if (and (cleartop ?box)
                  (loc ?box $area)  ;agent and box must be in same area
-                 (bind (elevation ?agent $h-agent))
                  (bind (elevation ?box $h-box))
                  (setq $h-delta (- $h-box $h-agent))
                  (< $h-delta 1))  ;agent can only reach box at same level or below;

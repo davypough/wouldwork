@@ -157,31 +157,46 @@
   (let ((int-db (eql (hash-table-test db) 'eql)))
     (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
       (if fluent-indices
-      ;do if proposition has fluents
-      (let ((fluent-values (or precomputed-values
-                               (get-prop-fluents proposition fluent-indices))))
-        (if int-db
-          (setf (gethash (or precomputed-key
-                             (convert-fluentless-prop-to-integer proposition fluent-indices))
-                         db)
-                fluent-values)
-          (setf (gethash (get-fluentless-prop proposition fluent-indices) db) fluent-values))
-        ;handle complement with fluents if it exists
-        (when (gethash (car proposition) *complements*)
-          (let ((complement-prop (get-complement-prop proposition)))
-            (if int-db
-              (remhash (convert-to-integer complement-prop) db)
-              (remhash complement-prop db)))))
-      ;do for non-fluent propositions
-      (progn
-        (if int-db
-          (setf (gethash (convert-to-integer proposition) db) t)  
-          (setf (gethash proposition db) t))
-        ;handle complement without fluents
-        (when (gethash (car proposition) *complements*)
+        ;do if proposition has fluents
+        (let ((fluent-values (or precomputed-values
+                                 (get-prop-fluents proposition fluent-indices))))
           (if int-db
-            (remhash (convert-to-integer (get-complement-prop proposition)) db)
-            (remhash (get-complement-prop proposition) db))))))))
+            (setf (gethash (or precomputed-key
+                               (convert-fluentless-prop-to-integer proposition fluent-indices))
+                           db)
+                  fluent-values)
+            (setf (gethash (get-fluentless-prop proposition fluent-indices) db) fluent-values))
+          ;handle complement, dispatching on whether the complement itself has fluents
+          (when (gethash (car proposition) *complements*)
+            (let* ((complement-prop (get-complement-prop proposition))
+                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
+              (if complement-fluent-indices
+                ;fluent complement: remove the fluentless complement key
+                (if int-db
+                  (remhash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
+                  (remhash (get-fluentless-prop complement-prop complement-fluent-indices) db))
+                ;non-fluent complement: remove the full complement key
+                (if int-db
+                  (remhash (convert-to-integer complement-prop) db)
+                  (remhash complement-prop db))))))
+        ;do for non-fluent propositions
+        (progn
+          (if int-db
+            (setf (gethash (convert-to-integer proposition) db) t)
+            (setf (gethash proposition db) t))
+          ;handle complement, dispatching on whether the complement itself has fluents
+          (when (gethash (car proposition) *complements*)
+            (let* ((complement-prop (get-complement-prop proposition))
+                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
+              (if complement-fluent-indices
+                ;fluent complement: remove the fluentless complement key
+                (if int-db
+                  (remhash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
+                  (remhash (get-fluentless-prop complement-prop complement-fluent-indices) db))
+                ;non-fluent complement: remove the full complement key
+                (if int-db
+                  (remhash (convert-to-integer complement-prop) db)
+                  (remhash complement-prop db))))))))))
 
 
 (defun del-prop (proposition db)
@@ -190,28 +205,41 @@
   (let ((int-db (eql (hash-table-test db) 'eql)))
     (let ((fluent-indices (get-prop-fluent-indices proposition)))
       (if fluent-indices
-      ;do if proposition has fluents
-      (progn
-        (if int-db
-          (remhash (convert-fluentless-prop-to-integer proposition fluent-indices) db)
-          (remhash (get-fluentless-prop proposition fluent-indices) db))
-        ;handle complement with fluents if it exists
-        (when (gethash (car proposition) *complements*)
-          (let ((complement-prop (get-complement-prop proposition))
-                (fluent-values (get-prop-fluents proposition fluent-indices)))
-            (if int-db
-              (setf (gethash (convert-to-integer complement-prop) db) fluent-values)
-              (setf (gethash complement-prop db) fluent-values)))))
-      ;do for non-fluent propositions
-      (progn
-        (if int-db
-          (remhash (convert-to-integer proposition) db)
-          (remhash proposition db))
-        ;handle complement without fluents
-        (when (gethash (car proposition) *complements*)
+        ;do if proposition has fluents
+        (progn
           (if int-db
-            (setf (gethash (convert-to-integer (get-complement-prop proposition)) db) t)
-            (setf (gethash (get-complement-prop proposition) db) t))))))))
+            (remhash (convert-fluentless-prop-to-integer proposition fluent-indices) db)
+            (remhash (get-fluentless-prop proposition fluent-indices) db))
+          ;handle complement, dispatching on whether the complement itself has fluents
+          (when (gethash (car proposition) *complements*)
+            (let* ((complement-prop (get-complement-prop proposition))
+                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
+              (if complement-fluent-indices
+                ;fluent complement: store its fluent values at the fluentless complement key
+                (let ((complement-fluent-values
+                        (get-prop-fluents complement-prop complement-fluent-indices)))
+                  (if int-db
+                    (setf (gethash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
+                          complement-fluent-values)
+                    (setf (gethash (get-fluentless-prop complement-prop complement-fluent-indices) db)
+                          complement-fluent-values)))
+                ;non-fluent complement: store T at the full complement key
+                (if int-db
+                  (setf (gethash (convert-to-integer complement-prop) db) t)
+                  (setf (gethash complement-prop db) t))))))
+        ;do for non-fluent propositions
+        (progn
+          (if int-db
+            (remhash (convert-to-integer proposition) db)
+            (remhash proposition db))
+          ;handle complement; skip if complement is fluent (no value to restore)
+          (when (gethash (car proposition) *complements*)
+            (let* ((complement-prop (get-complement-prop proposition))
+                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
+              (unless complement-fluent-indices
+                (if int-db
+                  (setf (gethash (convert-to-integer complement-prop) db) t)
+                  (setf (gethash complement-prop db) t))))))))))
 
 
 (defun bijective-index-propositions (proposition)
