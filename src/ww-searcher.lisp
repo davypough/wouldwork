@@ -687,6 +687,25 @@
                  nodes)))))
 
 
+(defun deep-sxhash (obj)
+  "Computes an sxhash that descends through conses, simple-vectors, and general arrays.
+   Other types delegate to sxhash. Used by compute-idb-hash so that fluent values
+   containing vectors contribute their contents to the state hash."
+  (cond ((consp obj)
+         (sxhash (cons (deep-sxhash (car obj)) (deep-sxhash (cdr obj)))))
+        ((simple-vector-p obj)
+         (let ((h (sxhash 'simple-vector)))
+           (loop for elt across obj
+                 do (setf h (sxhash (cons h (deep-sxhash elt)))))
+           h))
+        ((arrayp obj)
+         (let ((h (sxhash (cons 'array (array-dimensions obj)))))
+           (loop for i from 0 below (array-total-size obj)
+                 do (setf h (sxhash (cons h (deep-sxhash (row-major-aref obj i))))))
+           h))
+        (t (sxhash obj))))
+
+
 (defun compute-idb-hash (idb-hash-table)
   "Computes a fixnum hash from an idb hash table.
    Uses XOR of sxhash values for deterministic hashing."
@@ -694,7 +713,7 @@
   (let ((hash 0))
     (declare (type fixnum hash))
     (maphash (lambda (k v)
-               (setf hash (logxor hash (sxhash (cons k v)))))  ; hash the pair as a unit
+               (setf hash (logxor hash (deep-sxhash (cons k v)))))  ; CHANGED: sxhash -> deep-sxhash
              idb-hash-table)
     hash))
 
