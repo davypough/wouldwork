@@ -531,7 +531,7 @@
                           (canon-val (canonicalize-value val canonical-map)))
                      ;; keep your existing combiner here (whatever you currently use)
                      (setf hash (ldb (byte 62 0)
-                                     (+ hash (sxhash (cons canon-key canon-val)))))))
+                                     (+ hash (deep-sxhash (cons canon-key canon-val)))))))  ; CHANGED: sxhash -> deep-sxhash
                  idb)
         hash))))
 

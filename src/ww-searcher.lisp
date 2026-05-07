@@ -94,6 +94,23 @@
         hash)))
 
 
+#|
+  ;; LEGACY DEAD CODE -- commented out (not deleted) on 2026-05-07.
+  ;;
+  ;; The six forms below form a closed dependency island with no callers anywhere
+  ;; in src/ or in any problem-*.lisp file:
+  ;;   - choose-ht-value-test     called only once, to initialize *fixed-ht-values-fn*
+  ;;   - *fixed-ht-values-fn*     read only inside fixed-keys-ht-equal
+  ;;   - fixed-keys-ht-equal      referenced only in the define-hash-table-test below
+  ;;   - fixed-keys-ht-hash       referenced only in the define-hash-table-test below
+  ;;   - the define-hash-table-test registration was never used: dfs creates *closed*
+  ;;     with :test 'eql (or 'equal in hybrid mode), never 'fixed-keys-ht-equal
+  ;;   - fixedp                   has no callers at all
+  ;;
+  ;; If this cluster is ever revived, fixed-keys-ht-hash would have the same
+  ;; sxhash-on-simple-vectors blind spot that compute-idb-hash had; route its
+  ;; per-value hash through deep-sxhash to fix it.
+
 (defun choose-ht-value-test (relations)
   "Chooses either #'equal or #'equalp as a test for *closed* ht (idb) keys."
   (let (lisp-$types)  ;eg, $list, $hash-table, $fixnum, $real
@@ -146,6 +163,7 @@
                (return-from fixedp nil)))
            relations)
   t)
+|#
 
 
 (defun solution-count-reached-p ()
@@ -220,11 +238,8 @@
     (let ((closed-table (if (> *threads* 0)
                             (closed-shard *start-state*)
                             *closed*)))
-      (setf (gethash (closed-key *start-state* 0) closed-table)
-        (list (problem-state.idb *start-state*)
-              0
-              (problem-state.time *start-state*)
-              (problem-state.value *start-state*)))))
+      (closed-bucket-insert (make-closed-entry *start-state* 0)        ; CHANGED: was raw setf gethash with inline 4-element list
+                            *start-state* 0 closed-table)))             ; CHANGED
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
   (setf *total-states-processed* 1)  ;start state is first
@@ -632,15 +647,15 @@
                        (next-iteration))
                       ((better-than-closed closed-values succ-state succ-depth)
                        (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                       (remhash (closed-key succ-state succ-depth) *closed*))
+                       (closed-bucket-remove succ-state succ-depth *closed*))      ; CHANGED: was (remhash (closed-key …) *closed*)
                       (t
                        (narrate "Dropping this previously closed state" succ-state succ-depth)
                        (finalize-path-depth succ-depth)
                        (next-iteration)))))
             ;; State is new or reopened - reserve immediately
             (let ((succ-node (generate-new-node current-node succ-state)))
-              (setf (gethash (closed-key succ-state succ-depth) *closed*)
-                    (make-closed-entry succ-state succ-depth succ-node))
+              (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; CHANGED: was (setf (gethash …) …)
+                                    succ-state succ-depth *closed*)                       ; CHANGED
               (collecting succ-node))))
         ;; Tree search path - generate node without closed tracking
         (when (eql *tree-or-graph* 'tree)
@@ -688,9 +703,10 @@
 
 
 (defun deep-sxhash (obj)
-  "Computes an sxhash that descends through conses, simple-vectors, and general arrays.
-   Other types delegate to sxhash. Used by compute-idb-hash so that fluent values
-   containing vectors contribute their contents to the state hash."
+  "Computes an sxhash that descends through conses, simple-vectors, hash tables,
+   and general arrays (including strings). Other types delegate to sxhash. Used by
+   compute-idb-hash so that fluent values containing vectors, hash tables, or other
+   composite objects contribute their contents to the state hash."
   (cond ((consp obj)
          (sxhash (cons (deep-sxhash (car obj)) (deep-sxhash (cdr obj)))))
         ((simple-vector-p obj)
@@ -698,6 +714,16 @@
            (loop for elt across obj
                  do (setf h (sxhash (cons h (deep-sxhash elt)))))
            h))
+        ((hash-table-p obj)                                                                ;; ADDED clause
+         (let ((h (sxhash (cons 'hash-table                                                  ;; ADDED
+                                (cons (hash-table-test obj)                                  ;; ADDED
+                                      (hash-table-count obj))))))                           ;; ADDED
+           (maphash (lambda (k v)                                                            ;; ADDED
+                      (setf h (logxor h                                                       ;; ADDED
+                                      (sxhash (cons (deep-sxhash k)                          ;; ADDED
+                                                    (deep-sxhash v))))))                     ;; ADDED
+                    obj)                                                                     ;; ADDED
+           h))                                                                               ;; ADDED
         ((arrayp obj)
          (let ((h (sxhash (cons 'array (array-dimensions obj)))))
            (loop for i from 0 below (array-total-size obj)
@@ -772,6 +798,54 @@
                       (prin1-to-string k2))))))
 
 
+(defun closed-bucket-find (state depth table)
+  "Return the entry in TABLE for STATE at DEPTH, or NIL if absent.
+   Walks the bucket at (closed-key state depth) and verifies state identity
+   with equalp on idb. In canonical-symmetry mode, falls back to canonical-form
+   comparison on equalp miss, lazily caching the canonical form on the entry.
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (let ((bucket (gethash (closed-key state depth) table)))
+    (when bucket
+      (let ((succ-idb (problem-state.idb state))
+            (canonical-mode (use-canonical-symmetry-p)))
+        (find-if (lambda (entry)
+                   (let ((closed-idb (first entry)))
+                     (cond ((equalp closed-idb succ-idb) t)
+                           ((not canonical-mode) nil)
+                           (t (let ((closed-canon (fifth entry)))
+                                (unless closed-canon
+                                  (setf (fifth entry) (build-canonical-idb-form closed-idb))
+                                  (setf closed-canon (fifth entry)))
+                                (when (equal (build-canonical-idb-form succ-idb) closed-canon)
+                                  (increment-global *symmetric-duplicates-pruned*)
+                                  t))))))
+                 bucket)))))
+
+
+(defun closed-bucket-insert (entry state depth table)
+  "Push ENTRY into the bucket for STATE at DEPTH in TABLE.
+   Caller is responsible for ensuring no equivalent entry already exists
+   (typically via a prior closed-bucket-find under the same lock).
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (push entry (gethash (closed-key state depth) table))
+  entry)
+
+
+(defun closed-bucket-remove (state depth table)
+  "Remove the entry for STATE at DEPTH from TABLE, if present.
+   When removal empties the bucket, removes the hash key entirely.
+   Returns the removed entry, or NIL if none matched.
+   CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
+  (let ((entry (closed-bucket-find state depth table)))
+    (when entry
+      (let* ((key (closed-key state depth))
+             (new-bucket (delete entry (gethash key table) :test #'eq)))
+        (if new-bucket
+            (setf (gethash key table) new-bucket)
+            (remhash key table))
+        entry))))
+
+
 (defun make-closed-entry (state depth &optional node)
   "Build the value stored in *closed* for STATE at DEPTH.
    PH3A: adds a CANON-FORM slot (initially NIL) for lazy canonical-form caching."
@@ -790,48 +864,25 @@
 
 
 (defun get-closed-values (state depth)
-  "Retrieve the closed values for a state.
-   When canonical symmetry is active, verifies canonical equality to prevent
-   false positives from hash collisions.
+  "Retrieve the closed entry for STATE at DEPTH from *closed* (or its shard
+   in parallel mode). Returns the entry list or NIL.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (let ((closed-values (gethash (closed-key state depth)
-                                (if (> *threads* 0)
-                                    (closed-shard state)
-                                    *closed*))))
-    (when closed-values
-      (if (use-canonical-symmetry-p)
-          (let ((succ-idb (problem-state.idb state))
-                (closed-idb (first closed-values)))
-            (cond
-              ((equalp closed-idb succ-idb)
-               ;; Exact duplicate
-               closed-values)
-              (t
-               ;; lazy-cache canonical form for CLOSED entry
-               (let ((closed-canon (fifth closed-values)))
-                 (unless closed-canon
-                   (setf (fifth closed-values)
-                         (build-canonical-idb-form closed-idb))
-                   (setf closed-canon (fifth closed-values)))
-                 (if (equal (build-canonical-idb-form succ-idb) closed-canon)
-                     (progn
-                       (increment-global *symmetric-duplicates-pruned*)
-                       closed-values)
-                     ;; Hash collision - different states
-                     nil)))))
-          ;; Standard mode: hash match is sufficient
-          closed-values))))
+  (closed-bucket-find state depth                                    ; CHANGED: delegates to bucket accessor
+                      (if (> *threads* 0)                            ; CHANGED
+                          (closed-shard state)                       ; CHANGED
+                          *closed*)))                                ; CHANGED
 
 
 (defun get-closed-node (state depth)
   "Retrieve the node stored in *closed* for hybrid mode.
+   Returns the node from STATE's closed entry, or NIL if absent.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (let ((values (gethash (closed-key state depth)
-                         (if (> *threads* 0)
-                             (closed-shard state)
-                             *closed*))))
-    (when values
-      (sixth values))))  ; node moved from 5th -> 6th
+  (let ((entry (closed-bucket-find state depth                      ; CHANGED: delegates to bucket accessor
+                                   (if (> *threads* 0)              ; CHANGED
+                                       (closed-shard state)         ; CHANGED
+                                       *closed*))))                 ; CHANGED
+    (when entry
+      (sixth entry))))
 
 
 (defun goal (state)
@@ -1412,12 +1463,12 @@
       (if (> *threads* 0)
           ;; Parallel mode: sum counts across all shards
           (format t "~%ht count: ~:D    ht size: ~:D (across ~D shards)"
-                  (loop for shard across *closed-shards* sum (hash-table-count shard))
+                  (closed-shards-total-count)                                                    ; CHANGED: was inline loop summing hash-table-count
                   (loop for shard across *closed-shards* sum (hash-table-size shard))
                   *num-closed-shards*)
           ;; Serial mode: single hash table
           (format t "~%ht count: ~:D    ht size: ~:D"
-                  (hash-table-count *closed*)
+                  (loop for bucket being the hash-values of *closed* sum (length bucket))        ; CHANGED: was (hash-table-count *closed*)
                   (hash-table-size *closed*)))
       (format t "~%repeated states = ~:D (~,1F% of total states)"
                 *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))

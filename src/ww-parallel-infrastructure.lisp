@@ -486,10 +486,12 @@
 ;;; Closed table statistics (for debugging/monitoring)
 
 (defun closed-shards-total-count ()
-  "Return total entry count across all closed shards."
+  "Return total entry count across all closed shards.
+   Counts stored entries (states), not bucket count."
   (if *closed-shards*
       (loop for shard across *closed-shards*
-            sum (hash-table-count shard))
+            sum (loop for bucket being the hash-values of shard         ; CHANGED: was (hash-table-count shard)
+                      sum (length bucket)))                             ; CHANGED
       0))
 
 
@@ -503,10 +505,13 @@
 
 (defun closed-shards-distribution ()
   "Return list of (shard-index . count) for non-empty shards.
+   Counts stored entries (states), not bucket count.
    Useful for checking distribution quality."
   (when *closed-shards*
     (loop for i from 0 below *num-closed-shards*
-          for count = (hash-table-count (svref *closed-shards* i))
+          for shard = (svref *closed-shards* i)                                  ; CHANGED: factored out for readability
+          for count = (loop for bucket being the hash-values of shard            ; CHANGED: was (hash-table-count (svref ...))
+                            sum (length bucket))                                 ; CHANGED
           when (> count 0)
             collect (cons i count))))
 

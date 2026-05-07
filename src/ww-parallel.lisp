@@ -96,24 +96,20 @@
                     (ensure-idb-hash succ-state)
                     (let* ((succ-depth (1+ (node.depth node)))
                            (shard (closed-shard succ-state))
-                           (key (closed-key succ-state succ-depth))
-                           (closed-values (gethash key shard)))
+                           (closed-entry (closed-bucket-find succ-state succ-depth shard)))   ; CHANGED: bucket lookup with verification
                       (cond
                         ;; Already visited - check if better
-                        (closed-values
+                        (closed-entry
                          (incf *repeated-states*)
-                         (unless (better-than-closed closed-values succ-state succ-depth)
+                         (unless (better-than-closed closed-entry succ-state succ-depth)
                            (return-from process-succ))
                          ;; Better path - remove old entry
-                         (remhash key shard))
+                         (closed-bucket-remove succ-state succ-depth shard))                  ; CHANGED: was (remhash key shard)
                         ;; New state - will insert below
                         (t nil))
                       ;; Insert/update in closed
-                      (setf (gethash key shard)
-                            (list (problem-state.idb succ-state)
-                                  succ-depth
-                                  (problem-state.time succ-state)
-                                  (problem-state.value succ-state)))))
+                      (closed-bucket-insert (make-closed-entry succ-state succ-depth)         ; CHANGED: was inline 4-element list
+                                            succ-state succ-depth shard)))                    ; CHANGED
                   
                   ;; Create successor node for next frontier
                   (let ((succ-node (make-node 
@@ -313,40 +309,30 @@
           ;; Atomic check+update under shard lock
           (with-closed-shard-lock (succ-state)
             (let* ((shard (closed-shard succ-state))
-                   (key (closed-key succ-state succ-depth))
-                   (closed-values (gethash key shard)))
+                   (closed-entry (closed-bucket-find succ-state succ-depth shard)))   ; CHANGED: bucket lookup with verification
               
               (cond
                 ;; State already in closed
-                (closed-values
+                (closed-entry
                  (ws-inc-repeated stats)
                  (cond
                    ;; Hybrid mode: accumulate parent pointer
                    (*hybrid-mode*
-                    (let ((closed-node (fifth closed-values)))
+                    (let ((closed-node (sixth closed-entry)))                          ; CHANGED: was (fifth closed-values) — node lives at position 6 in hybrid entries
                       (when closed-node
                         (add-parent-to-node closed-node current-node
                                             (record-move succ-state))))
                     (ws-finalize-path stats succ-depth))
                    
                    ;; Check if new path is better - reopen if so
-                   ((better-than-closed closed-values succ-state succ-depth)
+                   ((better-than-closed closed-entry succ-state succ-depth)
                     ;; Remove old entry and insert new one
-                    (remhash key shard)
+                    (closed-bucket-remove succ-state succ-depth shard)                 ; CHANGED: was (remhash key shard)
                     (let ((succ-node (make-node :state succ-state
                                                 :depth succ-depth
                                                 :parent current-node)))
-                      (setf (gethash key shard)
-                            (if *hybrid-mode*
-                                (list (problem-state.idb succ-state)
-                                      succ-depth
-                                      (problem-state.time succ-state)
-                                      (problem-state.value succ-state)
-                                      succ-node)
-                                (list (problem-state.idb succ-state)
-                                      succ-depth
-                                      (problem-state.time succ-state)
-                                      (problem-state.value succ-state))))
+                      (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; CHANGED: was inline list
+                                            succ-state succ-depth shard)               ; CHANGED
                       (push succ-node succ-nodes)))
                    
                    ;; Not better - drop this successor
@@ -358,17 +344,8 @@
                  (let ((succ-node (make-node :state succ-state
                                              :depth succ-depth
                                              :parent current-node)))
-                   (setf (gethash key shard)
-                         (if *hybrid-mode*
-                             (list (problem-state.idb succ-state)
-                                   succ-depth
-                                   (problem-state.time succ-state)
-                                   (problem-state.value succ-state)
-                                   succ-node)
-                             (list (problem-state.idb succ-state)
-                                   succ-depth
-                                   (problem-state.time succ-state)
-                                   (problem-state.value succ-state))))
+                   (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)     ; CHANGED: was inline list
+                                         succ-state succ-depth shard)                  ; CHANGED
                    (push succ-node succ-nodes)))))))))
     
     (nreverse succ-nodes)))
