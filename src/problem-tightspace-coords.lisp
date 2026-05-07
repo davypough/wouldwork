@@ -921,6 +921,7 @@
 
 ;;;; GOAL ;;;;
 
-(define-goal  ;always put this last
+
+(define-goal
   (and (active receiver2)
        (active receiver3)))

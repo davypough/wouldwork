@@ -15,7 +15,7 @@
 
 (ww-set *solution-type* first)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 16)
 
 
 (define-types

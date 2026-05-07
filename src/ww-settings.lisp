@@ -22,8 +22,9 @@
 (defun display-current-parameters ()
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
-           *depth-cutoff* *progress-reporting-interval*
+           *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
+  (format t "~&  PROGRESS-REPORTING-INTERVAL => ~:D" *progress-reporting-interval*)
   (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))

@@ -30,8 +30,10 @@
 
 
 (defun merge-into-vector (pair pairs)
-  "Lexicographically merges a vector pair into a vector of vector pairs."
-  (merge 'vector (vector pair) pairs
+  "Lexicographically merges a simple-vector pair into a simple-vector of simple-vector pairs."
+  (merge 'simple-vector 
+         (vector pair) 
+         pairs
          (lambda (a b)
            (or (< (svref a 0) (svref b 0))
                (and (= (svref a 0) (svref b 0))
@@ -70,13 +72,13 @@
 
 
 (define-init
-  `(loc SQ ,(vectorize '((3 2))))  ;initial locations of all parts of a tile
-  `(loc HOR ,(vectorize '((1 2) (1 3))))
-  `(loc VER ,(vectorize '((2 3) (3 3))))
-  `(loc L1 ,(vectorize '((0 1) (1 0) (1 1))))
-  `(loc L2 ,(vectorize '((2 1) (3 0) (3 1))))
-  `(empty ,(vectorize '((0 0) (0 2) (0 3) (2 0) (2 2)))))
+  (loc SQ #(#(3 2)))  ;initial locations of all parts of a tile
+  (loc HOR #(#(1 2) #(1 3)))
+  (loc VER #(#(2 3) #(3 3)))
+  (loc L1 #(#(0 1) #(1 0) #(1 1)))
+  (loc L2 #(#(2 1) #(3 0) #(3 1)))
+  (empty #(#(0 0) #(0 2) #(0 3) #(2 0) #(2 2))))
 
 
 (define-goal
-  `(loc L2 ,(vectorize '((0 3) (1 2) (1 3)))))
+  (loc L2 #(#(0 3) #(1 2) #(1 3))))

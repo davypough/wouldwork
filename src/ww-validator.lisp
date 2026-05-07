@@ -72,17 +72,29 @@
 
 (defun check-proposition (proposition)
   "Detects an error in a proposition--eg, (height block1 3)
-   or (loc ?queen $row (1+ $col))."
+   or (loc ?queen $row (1+ $col)).
+   Tolerates fluentless atoms (used internally as db lookup keys) by filtering
+   type-defs at fluent positions when the arg count is short of the relation-def."
   (check-type proposition cons)
   (when (eql (first proposition) 'not)
     (setf proposition (second proposition)))
   (check-predicate proposition)
   ;(check-fluent-consistency proposition)
-  (let ((relation-def (or (gethash (first proposition) *relations*)
-                          (gethash (first proposition) *static-relations*))))
-    (when (listp relation-def)
+  (let* ((relation-def (or (gethash (first proposition) *relations*)
+                           (gethash (first proposition) *static-relations*)))
+         (fluent-indices (get-prop-fluent-indices proposition))
+         (fluentless-p (and fluent-indices
+                            (listp relation-def)
+                            (< (length (cdr proposition)) (length relation-def))))
+         (effective-relation-def (if fluentless-p
+                                   (loop for type-def in relation-def
+                                         for i from 1
+                                         unless (member i fluent-indices)
+                                           collect type-def)
+                                   relation-def)))
+    (when (listp effective-relation-def)
       (iter (for arg in (cdr proposition))
-            (for type-def in relation-def)
+            (for type-def in effective-relation-def)
             (for position from 1)  ; Add position tracking
             (or (?varp arg)  ;arg is a ?var
                 ($varp arg)  ;arg is a $var

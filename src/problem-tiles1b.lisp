@@ -2,7 +2,7 @@
 
 
 ;;; Problem specification for a blue/yellow tile shuffle in Islands of Insight.
-;;; Hash table for tile & empty sets (slow)
+;;; Hash table for tile & empty sets (slow); too inefficient
 
 (in-package :ww)  ;required
 

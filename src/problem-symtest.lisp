@@ -8,23 +8,29 @@
 
 (in-package :ww)
 
+
 (ww-set *problem-name* symtest)
 (ww-set *problem-type* planning)
 (ww-set *solution-type* every)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 4)
+(ww-set *symmetry-pruning* t)
+
 
 (define-types
   block (A B C D)
   table (T)
   support (either block table))
 
+
 (define-dynamic-relations
   (on block $support))
+
 
 (define-query cleartop? (?block)
   (not (exists (?b block)
          (on ?b ?block))))
+
 
 (define-action put
     1
@@ -37,11 +43,13 @@
   (?block ?target)
   (assert (on ?block ?target)))
 
+
 (define-init
   (on A T)
   (on B T)
   (on C T)
   (on D T))
+
 
 ;; Goal: just need any two-block stack - no specific blocks named
 (define-goal

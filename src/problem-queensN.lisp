@@ -1,4 +1,4 @@
-;;;; Filename: problem-queensN.lisp
+;;;; Filename: problem-queensN-csp.lisp
 
 
 ;;; Problem specification for N-queens.
@@ -10,7 +10,7 @@
 (defparameter *N* 20)
 
 
-(ww-set *problem-name* queensN)
+(ww-set *problem-name* queensN-csp)
 (ww-set *problem-type* csp)
 (ww-set *solution-type* first)
 (ww-set *tree-or-graph* tree)
