@@ -2,7 +2,7 @@
 
 ;;; Shifting Mosaic from Islands of Insight (most NW corner island)
 ;;; Large tiles
-;;; Excessive analysis time
+;;; Excessive run time
 
 
 (in-package :ww)

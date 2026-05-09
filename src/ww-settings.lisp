@@ -24,10 +24,10 @@
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
-  (format t "~&  PROGRESS-REPORTING-INTERVAL => ~:D" *progress-reporting-interval*)
-  (format t "~&  BRANCH TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
+  (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
+  (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
-  (format t "~&  EXOGENOUS HAPPENINGS => ~A" (when *happening-names* 'YES))
+  (format t "~&  EXOGENOUS HAPPENINGS => ~A" *happening-names*)
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
   (format t "~&  MIN STEPS REMAINING? => ~A" (when (fboundp 'min-steps-remaining?) 'YES))
   (when (> *threads* 0)
@@ -77,6 +77,35 @@
 
 (define-global *prior-total-states-processed* 0
   "Count of states produced since last progress printing (shared).")
+
+(define-global *prior-program-cycles* 0
+  "Program cycles at last progress printing (shared).")
+(declaim (type fixnum *prior-program-cycles*))
+
+(define-global *last-improvement-states* 0
+  "Value of *total-states-processed* at the most recent solution registration
+   (or hybrid-goal deferral). Used by the progress printout to measure
+   'states since last improvement' for plateau detection.")
+(declaim (type fixnum *last-improvement-states*))
+
+(define-global *bound-pruned* 0
+  "Count of successor states dropped because their f-value could not improve
+   the best solution found so far (the f-value-better check in process-successors).")
+(declaim (type fixnum *bound-pruned*))
+
+(define-global *max-backtrack-distance* 0
+  "Largest single-step decrease in expansion depth observed during search.
+   Each time df-bnb1 pops a node whose depth is less than the previous
+   node's depth, the difference is a candidate; the running maximum is
+   retained. Diagnostic: large values indicate deep thrashing (early variable
+   choices are wrong); small values indicate local repair (variable ordering
+   is sound).")
+(declaim (type fixnum *max-backtrack-distance*))
+
+(define-global *prev-expansion-depth* 0
+  "Depth of the most recently expanded node, used to compute the per-step
+   backtrack distance in df-bnb1.")
+(declaim (type fixnum *prev-expansion-depth*))
 
 (define-global *prior-time* 0
   "Time since last progress printing (shared).")

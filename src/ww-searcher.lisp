@@ -244,6 +244,11 @@
   (setf *average-branching-factor* 0.0)
   (setf *total-states-processed* 1)  ;start state is first
   (setf *prior-total-states-processed* 0)
+  (setf *prior-program-cycles* 0)
+  (setf *last-improvement-states* 0)
+  (setf *bound-pruned* 0)
+  (setf *max-backtrack-distance* 0)
+  (setf *prev-expansion-depth* 0)
   (setf *rem-init-successors* nil)  ;branch nodes from start state
   (setf *num-init-successors* 0)
   (setf *max-depth-explored* 0)
@@ -501,6 +506,12 @@
    new successor nodes, (first), or nil if no new nodes generated."
   (declare (type hs::hstack open))
   (let ((current-node (get-next-node-for-expansion open)))  ;pop next node
+   (when current-node
+     (let* ((current-depth (node.depth current-node))
+            (backtrack-distance (- *prev-expansion-depth* current-depth)))
+       (when (> backtrack-distance *max-backtrack-distance*)
+         (setf *max-backtrack-distance* backtrack-distance))
+       (setf *prev-expansion-depth* current-depth)))
    (when *probe*
      (apply #'probe current-node *probe*))
    (iter
@@ -603,6 +614,7 @@
           (validate-global-invariants current-node succ-state))
         (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
+            (increment-global *bound-pruned* 1)
             (next-iteration)))  ;throw out state if can't better best solution so far
         (when (goal succ-state)
           (if *hybrid-mode*
@@ -998,6 +1010,30 @@
   (coerce (/ (1- *total-states-processed*) *program-cycles*) 'single-float))
 
 
+(defun compute-effective-branching-factor (n d)
+  "Returns the effective branching factor b* > 1 such that a uniform tree of
+   depth D with branching factor b* would contain N nodes total
+   (1 + b* + b*^2 + ... + b*^D = N). Computed via Newton's method on
+   f(b) = b^(d+1) - N*b + (N - 1), starting from b_0 = N^(1/d).
+   Returns 1.0 when the search has not generated enough states for a
+   meaningful estimate (N <= d+1)."
+  (declare (type fixnum n d))
+  (when (or (<= d 0) (<= n (1+ d)))
+    (return-from compute-effective-branching-factor 1.0))
+  (let* ((n-fp (coerce n 'double-float))
+         (d+1 (1+ d))
+         (b (expt n-fp (/ 1.0d0 d))))
+    (iter (repeat 30)
+          (for f = (- (expt b d+1) (* n-fp b) (- 1.0d0 n-fp)))
+          (for f-prime = (- (* d+1 (expt b d)) n-fp))
+          (when (or (zerop f-prime) (< (abs f) 1.0d-9))
+            (leave))
+          (setf b (- b (/ f f-prime)))
+          (when (< b 1.001d0)
+            (setf b 1.001d0)))
+    (coerce b 'single-float)))
+
+
 (defun on-current-path (succ-state current-node)
   "Determines if a successor is already on the current path from the start state.
    Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."  ; CHANGED: Updated docstring
@@ -1297,6 +1333,7 @@
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solutions*)
+    (setf *last-improvement-states* *total-states-processed*)
     ;; Replace existing unique solution if new one is better
     (with-search-structures-lock
       (let* ((new-idb (problem-state.idb (solution.goal solution)))
@@ -1453,52 +1490,61 @@
 
 
 (defun printout-search-progress ()
-  "Printout of nodes expanded so far during search modulo reporting interval."
-  (when (<= (- *progress-reporting-interval* 
+  "Printout of search progress modulo reporting interval. Metrics are grouped
+   into diagnostic categories - Execution, Search Space, Search Dynamics,
+   Progress, Optimization, Parallel - each gated by relevant search context
+   (*problem-type*, *tree-or-graph*, *threads*, *solution-type*, etc.).
+   Empty sections produce no output."
+  (when (<= (- *progress-reporting-interval*
                (- *total-states-processed* *prior-total-states-processed*))
             0)
-    (format t "~2%program cycles = ~:D" *program-cycles*)
-    (format t "~%total states processed so far = ~:D" *total-states-processed*)
-    (when (eql *tree-or-graph* 'graph)
-      (if (> *threads* 0)
-          ;; Parallel mode: sum counts across all shards
-          (format t "~%ht count: ~:D    ht size: ~:D (across ~D shards)"
-                  (closed-shards-total-count)                                                    ; CHANGED: was inline loop summing hash-table-count
-                  (loop for shard across *closed-shards* sum (hash-table-size shard))
-                  *num-closed-shards*)
-          ;; Serial mode: single hash table
-          (format t "~%ht count: ~:D    ht size: ~:D"
-                  (loop for bucket being the hash-values of *closed* sum (length bucket))        ; CHANGED: was (hash-table-count *closed*)
-                  (hash-table-size *closed*)))
-      (format t "~%repeated states = ~:D (~,1F% of total states)"
-                *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))
-    (format t "~%frontier nodes: ~:D"
-            (if (> *threads* 0)
-                (total-parallel-frontier)
-                (ecase *algorithm*
-                  (depth-first (hs::length-hstack *open*))
-                  (backtracking (length *choice-stack*)))))
+    ;; ===== Execution =====
+    (format t "~2%total states processed so far = ~:D" *total-states-processed*)
+    (format t "~%current average processing speed = ~:D states/sec"
+            (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
+                      (/ (- (get-internal-real-time) *prior-time*)
+                         internal-time-units-per-second))))
+    ;; ===== Search Space =====
     (unless (eql *problem-type* 'csp)
-      (format t "~%net average branching factor = ~:D" (round *average-branching-factor*)))
-    (when (zerop *threads*)
-      (iter (while (and *rem-init-successors*
-                        (not (idb-in-open (node.state (first *rem-init-successors*))
-                                          *open*
-                                          (node.depth (first *rem-init-successors*))))))
-            (pop-global *rem-init-successors*))
-      (format t "~%current progress: in #~:D of ~:D initial branches"
-              (the fixnum (- *num-init-successors*
-                             (length *rem-init-successors*)))
-              *num-init-successors*))
-    (unless (eql *problem-type* 'csp)
+      (format t "~%net average branching factor = ~,1F (recent: ~,1F)"
+              *average-branching-factor*
+              (coerce (/ (- *total-states-processed* *prior-total-states-processed*)
+                         (- *program-cycles* *prior-program-cycles*))
+                      'single-float))
+      (format t "~%average search depth = ~A"
+              (if (> *num-paths* 0)
+                  (round (/ *accumulated-depths* *num-paths*))
+                  'pending))
+      (when (> *max-depth-explored* 0)
+        (format t "~%effective branching factor (b*) = ~,2F"
+                (compute-effective-branching-factor *total-states-processed*
+                                                    *max-depth-explored*))))
+    (when (eql *problem-type* 'csp)
       (format t "~%average search depth = ~A"
               (if (> *num-paths* 0)
                   (round (/ *accumulated-depths* *num-paths*))
                   'pending)))
-    (format t "~%current average processing speed = ~:D states/sec" 
-            (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
-                      (/ (- (get-internal-real-time) *prior-time*)
-                         internal-time-units-per-second))))
+    ;; ===== Search Dynamics =====
+    (unless (eql *problem-type* 'csp)
+      (format t "~%frontier nodes: ~:D"
+              (if (> *threads* 0)
+                  (total-parallel-frontier)
+                  (ecase *algorithm*
+                    (depth-first (hs::length-hstack *open*))
+                    (backtracking (length *choice-stack*))))))
+    (when (eql *tree-or-graph* 'graph)
+      (if (> *threads* 0)
+          ;; Parallel mode: sum counts across all shards
+          (format t "~%ht count: ~:D    ht size: ~:D (across ~D shards)"
+                  (closed-shards-total-count)
+                  (loop for shard across *closed-shards* sum (hash-table-size shard))
+                  *num-closed-shards*)
+          ;; Serial mode: single hash table
+          (format t "~%ht count: ~:D    ht size: ~:D"
+                  (loop for bucket being the hash-values of *closed* sum (length bucket))
+                  (hash-table-size *closed*)))
+      (format t "~%repeated states = ~:D (~,1F% of total states)"
+                *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))
     (when (and *symmetry-pruning* *symmetry-groups*)
       (if (use-canonical-symmetry-p)
         (when (> *symmetric-duplicates-pruned* 0)
@@ -1514,11 +1560,91 @@
       (format t "~%min-steps-remaining? pruned = ~:D (~,1F% of total states)"
               *lower-bound-pruned*
               (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
-    (format t "~%elapsed time = ~:D sec~2%" (round (/ (- (get-internal-real-time) *start-time*)
-                                                     internal-time-units-per-second)))
+    (when (> *max-backtrack-distance* 0)
+      (format t "~%max backtrack distance = ~D levels" *max-backtrack-distance*))
+    ;; ===== Progress / Coverage =====
+    (when (and (zerop *threads*) (not (eql *problem-type* 'csp)))
+      (iter (while (and *rem-init-successors*
+                        (not (idb-in-open (node.state (first *rem-init-successors*))
+                                          *open*
+                                          (node.depth (first *rem-init-successors*))))))
+            (pop-global *rem-init-successors*))
+      (format t "~%current progress: in #~:D of ~:D initial branches"
+              (the fixnum (- *num-init-successors*
+                             (length *rem-init-successors*)))
+              *num-init-successors*))
+    ;; ===== Optimization =====
+    (when (or *hybrid-goals* *solutions*)
+      (format-best-solution-line (- *total-states-processed* *last-improvement-states*))
+      (when (and (member *solution-type* '(min-length min-time min-value max-value))
+                 (> *bound-pruned* 0))
+        (format t "~%bound-based pruning = ~:D (~,1F% of total states)"
+                *bound-pruned*
+                (* 100.0 (/ *bound-pruned* *total-states-processed*))))
+      (when (and (member *solution-type* '(min-value max-value))
+                 *solutions*
+                 (< *upper-bound* 1000000))
+        (let* ((best-val (solution.value (first *solutions*)))
+               (gap (abs (- *upper-bound* best-val))))
+          (unless (zerop gap)
+            (format t "~%anytime gap = ~A (best = ~A, upper bound = ~A)"
+                    gap best-val *upper-bound*)))))
+    ;; ===== Parallel =====
+    (when (> *threads* 0)
+      (format t "~%threads currently idle: ~D of ~D"
+              *num-idle-threads* *threads*)
+      (when (and (eql *tree-or-graph* 'graph) *closed-shards*)
+        (let* ((shard-counts (loop for shard across *closed-shards*
+                                   collect (hash-table-count shard)))
+               (max-count (reduce #'max shard-counts))
+               (min-count (reduce #'min shard-counts))
+               (skew (if (zerop min-count)
+                         'infinite
+                         (coerce (/ max-count min-count) 'single-float))))
+          (format t "~%closed-shard load: max=~:D  min=~:D  skew=~A"
+                  max-count min-count
+                  (if (numberp skew) (format nil "~,1Fx" skew) skew)))))
+    ;; ===== Closing =====
+    (let* ((total-secs (round (/ (- (get-internal-real-time) *start-time*)
+                                 internal-time-units-per-second)))
+           (hrs (floor total-secs 3600))
+           (mins (floor (mod total-secs 3600) 60))
+           (secs (mod total-secs 60)))
+      (format t "~%elapsed time = ~Dh ~Dm ~Ds" hrs mins secs))
+    (format t "~2%")
     (finish-output)
     (setf *prior-time* (get-internal-real-time))
-    (setf *prior-total-states-processed* *total-states-processed*)))
+    (setf *prior-total-states-processed* *total-states-processed*)
+    (setf *prior-program-cycles* *program-cycles*)))
+
+
+(defun format-best-solution-line (states-since)
+  "Print the headline best-solution line for the Optimization section,
+   dispatching on *hybrid-mode* and *solution-type*. Caller is responsible
+   for verifying that *solutions* or *hybrid-goals* is non-nil."
+  (declare (type fixnum states-since))
+  (cond
+    (*hybrid-mode*
+     (format t "~%hybrid goals deferred = ~:D (~:D states since last)"
+             (length *hybrid-goals*) states-since))
+    ((member *solution-type* '(first min-length))
+     (let ((best (first *solutions*)))
+       (format t "~%best solution depth = ~:D (~:D states since last improvement)"
+               (solution.depth best) states-since)))
+    ((eql *solution-type* 'min-time)
+     (let ((best (first *solutions*)))
+       (format t "~%best solution time = ~A (depth ~:D, ~:D states since last improvement)"
+               (solution.time best) (solution.depth best) states-since)))
+    ((member *solution-type* '(min-value max-value))
+     (let ((best (first *solutions*)))
+       (format t "~%best solution value = ~A (depth ~:D, ~:D states since last improvement)"
+               (solution.value best) (solution.depth best) states-since)))
+    ((eql *solution-type* 'every)
+     (format t "~%solutions found = ~:D unique (~:D states since last new)"
+             (length *unique-solutions*) states-since))
+    ((typep *solution-type* 'fixnum)
+     (format t "~%solutions found = ~:D of ~D (~:D states since last new)"
+             (length *unique-solutions*) *solution-type* states-since))))
 
 
 (defun ww-solve ()
@@ -1553,7 +1679,8 @@
           (increment-global *repeated-states*)
           (return-from defer-hybrid-goal))))
     (narrate "Solution found (hybrid mode) ***" goal-state goal-depth)
-    (push-global (cons current-node goal-state) *hybrid-goals*)))
+    (push-global (cons current-node goal-state) *hybrid-goals*)
+    (setf *last-improvement-states* *total-states-processed*)))
 
 
 (defun finalize-hybrid-solutions ()
