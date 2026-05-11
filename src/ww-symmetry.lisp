@@ -114,6 +114,8 @@
             (setf (gethash object *object-to-symmetry-group*) group)))
         ;; Step 6: Identify which action parameters have symmetric types
         (identify-symmetric-action-parameters)
+        ;; Step 7: Drop groups that no kept parameter references
+        (prune-inoperative-symmetry-groups)
         *symmetry-groups*))))
 
 
@@ -301,8 +303,62 @@
     objects))
 
 
+(defparameter *permutation-breaking-operators*
+  '(+ - * / mod rem 1+ 1- abs floor ceiling truncate round
+    expt log exp sqrt sin cos tan gcd lcm
+    < > <= >= min max
+    ash logand logior logxor lognot logbitp
+    nth aref elt svref char schar subseq
+    gethash getf assoc)
+  "Operators whose semantics are not invariant under permutation of object
+   identifiers. A parameter that appears (transitively) as an argument of any
+   of these operators in an action's precondition cannot be soundly pruned by
+   symmetry, because the action's truth value depends on the parameter's
+   identity, not just on its role.")
+
+
+(defun var-in-breaking-context-p (form var-name in-breaking &optional visited)
+  "Walk FORM looking for VAR-NAME under a breaking-operator ancestor.
+   IN-BREAKING is T when FORM itself is already inside such an operator.
+   VISITED is a list of user-function names already entered, to prevent
+   infinite recursion through self- or mutual-recursive calls.
+   Returns T as soon as one breaking occurrence of VAR-NAME is found."
+  (cond ((eq form var-name) in-breaking)
+        ((atom form) nil)
+        ((eq (car form) 'quote) nil)
+        ;; Interprocedural step: descend into body of a known user function
+        ;; if it receives VAR-NAME positionally and we haven't entered it yet.
+        ((and (symbolp (car form))
+              (or (member (car form) *update-names* :test #'eq)
+                  (member (car form) *query-names*  :test #'eq))
+              (not (member (car form) visited :test #'eq))
+              (let ((formals (get (car form) :raw-args))
+                    (body    (get (car form) :raw-body))
+                    (actuals (cdr form)))
+                (and formals body
+                     (loop for actual in actuals
+                           for formal in formals
+                           thereis (and (eq actual var-name)
+                                        (var-in-breaking-context-p
+                                          body formal nil
+                                          (cons (car form) visited)))))))
+         t)
+        (t (some (lambda (sub)
+                   (var-in-breaking-context-p sub var-name
+                                              (or in-breaking
+                                                  (and (symbolp (car form))
+                                                       (member (car form)
+                                                               *permutation-breaking-operators*
+                                                               :test #'eq)))
+                                              visited))
+                 (cdr form)))))
+
+
 (defun identify-symmetric-action-parameters ()
   "Identify which actions have parameters of symmetric types.
+   Excludes parameters that appear inside permutation-breaking operators
+   (arithmetic, ordering, indexing) in the precondition or effect, since those
+   parameters' identities affect action semantics and cannot be soundly pruned.
    Populates *symmetric-type-parameters*."
   ;; Build set of types that have symmetry groups
   (let ((symmetric-types (make-hash-table :test #'eq)))
@@ -318,17 +374,71 @@
     (dolist (action *actions*)
       (let ((param-indices nil)
             (param-types (action.precondition-types action))
+            (param-vars (action.precondition-variables action))
+            (pre-form (action.precondition-form action))
+            (eff-form (action.effect-form action))
             (inst-idx 0))  ; Index into instantiation (excludes headers)
         (dolist (ptype param-types)
           (cond ((member ptype *parameter-headers*)
                  nil)  ; Skip headers - don't increment inst-idx
                 (t
-                 (when (type-has-symmetric-objects-p ptype symmetric-types)
+                 (when (and (type-has-symmetric-objects-p ptype symmetric-types)
+                            (not (var-in-breaking-context-p pre-form
+                                                            (nth inst-idx param-vars)
+                                                            nil))
+                            (not (var-in-breaking-context-p eff-form
+                                                            (nth inst-idx param-vars)
+                                                            nil)))
                    (push inst-idx param-indices))
                  (incf inst-idx))))
         (when param-indices
           (setf (gethash (action.name action) *symmetric-type-parameters*)
                 (nreverse param-indices)))))))
+
+
+(defun prune-inoperative-symmetry-groups ()
+  "Remove groups that no kept action parameter references.
+   A group is inoperative when, for every action, none of the kept parameter
+   indices in *symmetric-type-parameters* corresponds to a type whose instances
+   intersect the group. Such groups do no pruning work and would unsoundly
+   participate in canonical hashing for graph search; dropping them is both a
+   cleanup and a soundness fix.
+   Rebuilds *object-to-symmetry-group* to match the pruned group list."
+  (setf *symmetry-groups*
+        (remove-if-not (lambda (group)
+                         (some (lambda (action)
+                                 (action-uses-group-soundly-p action group))
+                               *actions*))
+                       *symmetry-groups*))
+  (clrhash *object-to-symmetry-group*)
+  (dolist (group *symmetry-groups*)
+    (dolist (object group)
+      (setf (gethash object *object-to-symmetry-group*) group))))
+
+
+(defun action-uses-group-soundly-p (action group)
+  "Returns T if ACTION has at least one kept (sound-for-pruning) parameter
+   whose declared type includes some object in GROUP."
+  (let ((kept-indices (gethash (action.name action) *symmetric-type-parameters*))
+        (non-header-types (remove-if (lambda (ptype)
+                                       (member ptype *parameter-headers*))
+                                     (action.precondition-types action))))
+    (some (lambda (idx)
+            (type-includes-group-member-p (nth idx non-header-types) group))
+          kept-indices)))
+
+
+(defun type-includes-group-member-p (type-spec group)
+  "Returns T if any object in GROUP is an instance of TYPE-SPEC.
+   TYPE-SPEC may be a simple type name or an (either ...) form."
+  (cond ((atom type-spec)
+         (let ((objects (gethash type-spec *types*)))
+           (and (listp objects)
+                (some (lambda (obj) (member obj group)) objects))))
+        ((and (consp type-spec) (eq (car type-spec) 'either))
+         (some (lambda (sub) (type-includes-group-member-p sub group))
+               (cdr type-spec)))
+        (t nil)))
 
 
 (defun type-has-symmetric-objects-p (type-spec symmetric-types)

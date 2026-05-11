@@ -253,7 +253,7 @@
 (define-global *update-names* nil
   "List of all user-defined update functions.")
 
-(define-global *actions* nil
+(defparameter *actions* nil  ;don't use define-global
   "List of all potential actions.")
 
 (define-global *init-actions* nil
@@ -326,6 +326,12 @@
 (define-global *prop-key-cache* 
   (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
+
+(define-global *inconsistent-state-key* nil
+  "Pre-computed integer code for the (inconsistent-state) proposition.
+   Set in init() after do-integer-conversion. Read on the worker hot
+   path in state-is-inconsistent and update-is-inconsistent to avoid
+   mutex acquisitions on the synchronized *prop-key-cache* table.")
 
 (define-global *bijective-relations* (make-hash-table :test #'eq)
   "Maps canonical relation name to (index1-name index2-name).")

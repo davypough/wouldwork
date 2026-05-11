@@ -339,6 +339,8 @@
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)
   (push name *query-names*)
+  (setf (get name :raw-body) body)  ;store for interprocedural symmetry walk
+  (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
   (let ((new-$vars (delete-duplicates 
                      (set-difference (get-all-nonspecial-vars #'$varp body) args))))
     (setf (symbol-value name)
@@ -371,6 +373,7 @@
   (check-query/update-function name args body)
   (push name *update-names*)
   (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
+  (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
   (let ((new-$vars (delete-duplicates
                      (set-difference
                        (get-all-nonspecial-vars #'$varp body) args))))
@@ -496,6 +499,7 @@
                        :eff-defun-name (ut::intern-symbol name '-EFF-FN)
                        :duration duration
                        :precondition-form precondition  ;user's specified precondition
+                       :effect-form effect              ;user's specified effect
                        :precondition-params pre-params
                        :precondition-variables (append flat-pre-param-?vars pre-$vars)
                        :precondition-types pre-param-types

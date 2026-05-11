@@ -517,7 +517,7 @@
       ;; === Final Report ===
       (bt:with-lock-held (*lock*)
         (format t "~%========================================~%")
-        (format t "Parallel Search Results~%")
+        (format t "Parallel Search Results with ~D threads~%" *threads*)
         (format t "========================================~%")
         (format t "  States processed: ~:D~%" *total-states-processed*)
         (format t "  Repeated states:  ~:D~%" *repeated-states*)

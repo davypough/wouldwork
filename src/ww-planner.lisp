@@ -103,81 +103,82 @@
                   action
         #+:ww-debug (when (>= *debug* 4)
                       (format t "~%~A" name))
-        (when dynamic  ;holds the insts with query calls
-          (unless (setf precondition-args  ;overrides previous arguments list if dynamic
-                    (remove-if (lambda (sublist)
-                                 (or (null sublist) (member nil sublist)))
-                               (eval-instantiated-spec dynamic state)))
-            (next-iteration)))
-        ;; Filter symmetric instantiations if symmetry pruning enabled
-        (when *symmetry-pruning*
-          (setf precondition-args 
-                (filter-symmetric-instantiations action precondition-args state)))
-        (let (pre-results updated-dbs)
-          (setf pre-results  ;process this action, collecting all ? and $ vars
-            (remove-if #'null (mapcar (lambda (pinsts)  ;nil = failed precondition
-                                        (apply pre-defun-name  ;iprecondition
-                                               state pinsts))
-                                      precondition-args)))
-          #+:ww-debug (when (>= *debug* 5)
-                               (let ((*package* (find-package :ww)))
-                                 (ut::prt precondition-variables precondition-args pre-results)))
-          (when (null pre-results)
+        (let ((precondition-args precondition-args))                    ;; CHANGED: shadow slot alias
+          (when dynamic  ;holds the insts with query calls
+            (unless (setf precondition-args  ;overrides previous arguments list if dynamic
+                      (remove-if (lambda (sublist)
+                                   (or (null sublist) (member nil sublist)))
+                                 (eval-instantiated-spec dynamic state)))
+              (next-iteration)))
+          ;; Filter symmetric instantiations if symmetry pruning enabled
+          (when *symmetry-pruning*
+            (setf precondition-args
+                  (filter-symmetric-instantiations action precondition-args state)))
+          (let (pre-results updated-dbs)
+            (setf pre-results  ;process this action, collecting all ? and $ vars
+              (remove-if #'null (mapcar (lambda (pinsts)  ;nil = failed precondition
+                                          (apply pre-defun-name  ;iprecondition
+                                                 state pinsts))
+                                        precondition-args)))
             #+:ww-debug (when (>= *debug* 5)
-                          (terpri))
-            (next-iteration))
-          #+:ww-debug (when (and *trace-action-name* (eq name *trace-action-name*))
-                        (handle-trace-interception state action pre-results precondition-variables))
-          (setf updated-dbs
-            (mapcan (lambda (pre-result)
-                      (nreverse   ;reverse the list of multiple asserts in an action
-                       (if (eql pre-result t)
-                         (funcall eff-defun-name state)
-                         (apply eff-defun-name state pre-result))))
-                    pre-results))
-          #+:ww-debug (when (>= *debug* 4)
-                        (let ((*package* (find-package :ww)))
-                          (format t "  UPDATED-DBS/~D =>~%" (length updated-dbs))
-                          (iter (for updated-db in updated-dbs)
-                                (for pre-result in pre-results)
-                                (format t "~A~%~A,~A~2%"
-                                        (format-action-with-effect-order action pre-result updated-db)
-                                        ;; For backtracking, update.changes is now (forward-list inverse-list), not a hash-table
-                                        (or (etypecase (update.changes updated-db)
-                                              (hash-table (list-database (update.changes updated-db)))
-                                              (list (first (update.changes updated-db))))  ; Show forward operations
-                                            nil)
-                                        ;(or (list-database (update.changes updated-db)) nil)  ;old
-                                        (update.value updated-db)))
-                          (terpri)))
-          ;; Filter out inconsistent updates before creating states
-          (let ((original-count (length updated-dbs)))
-            (setf updated-dbs (remove-if #'update-is-inconsistent updated-dbs))
-            (when (< (length updated-dbs) original-count)
-              (increment-global *inconsistent-states-dropped* (- original-count (length updated-dbs)))))
-          ;; If all updates were inconsistent, skip to next action
-          (when (null updated-dbs)
+                                 (let ((*package* (find-package :ww)))
+                                   (ut::prt precondition-variables precondition-args pre-results)))
+            (when (null pre-results)
+              #+:ww-debug (when (>= *debug* 5)
+                            (terpri))
+              (next-iteration))
+            #+:ww-debug (when (and *trace-action-name* (eq name *trace-action-name*))
+                          (handle-trace-interception state action pre-results precondition-variables))
+            (setf updated-dbs
+              (mapcan (lambda (pre-result)
+                        (nreverse   ;reverse the list of multiple asserts in an action
+                         (if (eql pre-result t)
+                           (funcall eff-defun-name state)
+                           (apply eff-defun-name state pre-result))))
+                      pre-results))
             #+:ww-debug (when (>= *debug* 4)
-                          (next-iteration)))
-          (when *troubleshoot-current-node*  ;signaled in process-ieffect below
-             (return-from generate-children))
-          (let ((child-states (case *algorithm*
-                                (depth-first (get-new-states state action updated-dbs))  ;return new states
-                                (backtracking updated-dbs))))  ;return update structures
-            ;; Defensive state-level filter: catches inconsistency added after update
-            ;; creation (eg, during happenings/followups processing).
-            (when (eql *algorithm* 'depth-first)
-              (let ((original-count (length child-states)))
-                (setf child-states (remove-if #'state-is-inconsistent child-states))
-                (when (< (length child-states) original-count)
-                  (increment-global *inconsistent-states-dropped*
-                                    (- original-count (length child-states))))))
-            ;; Apply heuristics only for depth-first (complete states)
-            (when (and (eql *algorithm* 'depth-first) (fboundp 'heuristic?))
-              (dolist (child-state child-states)
-                (setf (problem-state.heuristic child-state)
-                (funcall (symbol-function 'heuristic?) child-state))))
-            (alexandria:appendf children child-states)))))
+                          (let ((*package* (find-package :ww)))
+                            (format t "  UPDATED-DBS/~D =>~%" (length updated-dbs))
+                            (iter (for updated-db in updated-dbs)
+                                  (for pre-result in pre-results)
+                                  (format t "~A~%~A,~A~2%"
+                                          (format-action-with-effect-order action pre-result updated-db)
+                                          ;; For backtracking, update.changes is now (forward-list inverse-list), not a hash-table
+                                          (or (etypecase (update.changes updated-db)
+                                                (hash-table (list-database (update.changes updated-db)))
+                                                (list (first (update.changes updated-db))))  ; Show forward operations
+                                              nil)
+                                          ;(or (list-database (update.changes updated-db)) nil)  ;old
+                                          (update.value updated-db)))
+                            (terpri)))
+            ;; Filter out inconsistent updates before creating states
+            (let ((original-count (length updated-dbs)))
+              (setf updated-dbs (remove-if #'update-is-inconsistent updated-dbs))
+              (when (< (length updated-dbs) original-count)
+                (increment-global *inconsistent-states-dropped* (- original-count (length updated-dbs)))))
+            ;; If all updates were inconsistent, skip to next action
+            (when (null updated-dbs)
+              #+:ww-debug (when (>= *debug* 4)
+                            (next-iteration)))
+            (when *troubleshoot-current-node*  ;signaled in process-ieffect below
+               (return-from generate-children))
+            (let ((child-states (case *algorithm*
+                                  (depth-first (get-new-states state action updated-dbs))  ;return new states
+                                  (backtracking updated-dbs))))  ;return update structures
+              ;; Defensive state-level filter: catches inconsistency added after update
+              ;; creation (eg, during happenings/followups processing).
+              (when (eql *algorithm* 'depth-first)
+                (let ((original-count (length child-states)))
+                  (setf child-states (remove-if #'state-is-inconsistent child-states))
+                  (when (< (length child-states) original-count)
+                    (increment-global *inconsistent-states-dropped*
+                                      (- original-count (length child-states))))))
+              ;; Apply heuristics only for depth-first (complete states)
+              (when (and (eql *algorithm* 'depth-first) (fboundp 'heuristic?))
+                (dolist (child-state child-states)
+                  (setf (problem-state.heuristic child-state)
+                  (funcall (symbol-function 'heuristic?) child-state))))
+              (alexandria:appendf children child-states))))))
     (nreverse children)))  ;put first action child states first
 
 
@@ -189,7 +190,7 @@
     (etypecase changes
       (hash-table
        ;; Depth-first algorithm: changes contains integer keys → values
-       (gethash (convert-to-integer-memoized '(inconsistent-state)) changes))
+       (gethash *inconsistent-state-key* changes))
       (list
        ;; Backtracking algorithm: changes now contains (forward-list inverse-list)
        ;; Check forward-list for inconsistent-state marker
@@ -207,7 +208,7 @@
   (declare (type problem-state state))
   (let ((idb (problem-state.idb state)))
     (or (nth-value 1
-                   (gethash (convert-to-integer-memoized '(inconsistent-state)) idb))
+                   (gethash *inconsistent-state-key* idb))
         (nth-value 1
                    (gethash 'inconsistent-state idb)))))
 

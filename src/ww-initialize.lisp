@@ -36,6 +36,8 @@
   (do-init-action-updates *start-state*)       ; Add init action propositions
   (convert-databases-to-integers)              ; Only convert new propositions, no recompilation
   (validate-start-state-consistency)
+  (setf *inconsistent-state-key*
+        (convert-to-integer-memoized '(inconsistent-state)))
   (if *actions*
     (setf *min-action-duration* (reduce #'min *actions* :key #'action.duration))
     (format t "~%NOTE: There are no defined actions.~%"))

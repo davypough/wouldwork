@@ -626,8 +626,12 @@
 
 (defun register-parallel-solution (current-node goal-state worker-id)
   "Thread-safe solution registration during parallel search.
-   Updates *solutions*, *unique-solutions*, and *best-bound* as needed."
-  (declare (type node current-node) 
+   Pushes onto *solutions* under *best-solution-lock*; deduplication of
+   *unique-solutions* is deferred to finalize-parallel-search-results.
+   Per-solution console output is gated to *solution-type* = first or
+   *debug* >= 1, to avoid serializing workers on stdout I/O when many
+   solutions are found."                                                ;; CHANGED: docstring extended
+  (declare (type node current-node)
            (type problem-state goal-state)
            (type fixnum worker-id))
   (let* ((state-depth (1+ (node.depth current-node)))
@@ -639,53 +643,40 @@
             :path (append (record-solution-path current-node)
                           (list (record-move goal-state)))
             :goal goal-state)))
-    
-    ;; Thread-safe solution list update
+    ;; Thread-safe push onto *solutions*. The in-search *unique-solutions*
+    ;; maintenance was an O(N^2) scan under this lock and produced a result
+    ;; that finalize-parallel-search-results discards and rebuilds; removed.
     (sb-thread:with-mutex (*best-solution-lock*)
-      (push solution *solutions*)
-      ;; Update unique solutions
-      (let* ((new-idb (problem-state.idb (solution.goal solution)))
-             (existing (find new-idb *unique-solutions*
-                             :key (lambda (soln)
-                                    (problem-state.idb (solution.goal soln)))
-                             :test #'equalp)))
-        (cond (existing
-               (when (solution-better-p solution existing)
-                 (setf *unique-solutions*
-                       (substitute solution existing *unique-solutions*))))
-              (t
-               (push solution *unique-solutions*)))))
-    
+      (push solution *solutions*))
     ;; Update best bound for optimization solution types
     (when (member *solution-type* '(min-length min-time min-value max-value))
       (let ((new-bound (compute-state-bound-value goal-state state-depth)))
         (sb-thread:with-mutex (*best-bound-lock*)
           (when (state-bound-better-p new-bound *best-bound*)
             (setf *best-bound* new-bound)
-            ;; Log bound improvement
             (bt:with-lock-held (*lock*)
-              (format t "~&[Worker ~D] New best bound: ~A~%" worker-id 
+              (format t "~&[Worker ~D] New best bound: ~A~%" worker-id
                       (if (eql *solution-type* 'max-value)
-                          (- new-bound)  ; Display un-negated for max-value
+                          (- new-bound)
                           new-bound))
               (finish-output))))))
-    
     ;; Signal first solution found
     (when (eql *solution-type* 'first)
       (setf *first-solution-found* t))
-    
-    ;; Console output (with lock to prevent garbled output)
-    (bt:with-lock-held (*lock*)
-      (format t "~&[Worker ~D] Solution found at depth ~D~%" worker-id state-depth)
-      (when (member *solution-type* '(min-time))
-        (format t "  Time = ~A~%" (solution.time solution)))
-      (when (member *solution-type* '(min-value max-value))
-        (format t "  Objective value = ~A~%" (solution.value solution)))
-      (finish-output))
-    
+    ;; Per-solution console output. Gated to avoid serializing workers on
+    ;; stdout I/O when many solutions are found (every, fixnum). *first*
+    ;; prints one line. Optimization types log interesting events via the
+    ;; "New best bound" print above; raise *debug* to see every match.
+    (when (or (eql *solution-type* 'first) (>= *debug* 1))               ;; CHANGED: gated
+      (bt:with-lock-held (*lock*)
+        (format t "~&[Worker ~D] Solution found at depth ~D~%" worker-id state-depth)
+        (when (member *solution-type* '(min-time))
+          (format t "  Time = ~A~%" (solution.time solution)))
+        (when (member *solution-type* '(min-value max-value))
+          (format t "  Objective value = ~A~%" (solution.value solution)))
+        (finish-output)))
     ;; Update worker stats
     (ws-inc-solutions (get-worker-stats worker-id))
-    
     solution))
 
 

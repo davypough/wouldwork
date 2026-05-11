@@ -7,14 +7,14 @@
 (in-package :ww)  ;required
 
 
-(defparameter *N* 20)
+(defparameter *N* 12)  ;20)
 
 
 (ww-set *problem-name* queensN-csp)
 (ww-set *problem-type* csp)
-(ww-set *solution-type* first)
+(ww-set *solution-type* every)  ;first)
 (ww-set *tree-or-graph* tree)
-(ww-set *depth-cutoff* 20)
+(ww-set *depth-cutoff* 12)  ;20)
 
 
 (define-types
