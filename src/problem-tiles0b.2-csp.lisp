@@ -110,7 +110,7 @@
  (bind (empty-cells $empty-coords))
  (?tile $ref-coord)
  (ww-loop for $ref-coord in (cdr (assoc ?tile *tile-anchors*))
-          do (setq $tile-coords (mapcar (lambda (offset)
+          do (assign $tile-coords (mapcar (lambda (offset)
                                           (cons (+ (car offset) (car $ref-coord))
                                                 (+ (cdr offset) (cdr $ref-coord))))
                                         (cdr (assoc ?tile *tile-shapes*))))

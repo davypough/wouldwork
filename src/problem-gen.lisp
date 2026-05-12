@@ -80,27 +80,27 @@
 #+ignore (define-query heuristic? ()
   ;; Goal-based heuristic: count unsatisfied goal conditions and add area distance penalties
   ;; Lower values indicate more promising states
-  (do (setq $h-value 0)
+  (do (assign $h-value 0)
       ;; Primary component: Unsatisfied goal conditions (weighted by importance)
       (if (not (loc me1 area2))
-        (setq $h-value (+ $h-value 10)))
+        (assign $h-value (+ $h-value 10)))
       (if (not (loc connector2 area3))
-        (setq $h-value (+ $h-value 8)))
+        (assign $h-value (+ $h-value 8)))
       (if (not (connected connector2 connector1))
-        (setq $h-value (+ $h-value 6)))
+        (assign $h-value (+ $h-value 6)))
       (if (not (connected connector2 transmitter1))
-        (setq $h-value (+ $h-value 6)))
+        (assign $h-value (+ $h-value 6)))
       (if (not (color connector1 blue))
-        (setq $h-value (+ $h-value 4)))
+        (assign $h-value (+ $h-value 4)))
       ;; Secondary component: Area distance penalties for misplaced objects
       (bind (loc me1 $me-area))
       (bind (loc connector2 $conn2-area))
       ;; Add distance penalty for me1 not in target area
       (if (not (eql $me-area 'area2))
-        (setq $h-value (+ $h-value (area-distance-penalty $me-area 'area2))))
+        (assign $h-value (+ $h-value (area-distance-penalty $me-area 'area2))))
       ;; Add distance penalty for connector2 not in target area  
       (if (not (eql $conn2-area 'area3))
-        (setq $h-value (+ $h-value (* 2 (area-distance-penalty $conn2-area 'area3)))))
+        (assign $h-value (+ $h-value (* 2 (area-distance-penalty $conn2-area 'area3)))))
       ;; Return the computed heuristic value
       $h-value))
 
@@ -198,24 +198,24 @@
 
 (define-query compatible-transmitters? (?termini-list)
   ;; Returns hue from transmitters, nil if conflict or no transmitters
-  (do (setq $compatible-hue nil)
+  (do (assign $compatible-hue nil)
       (ww-loop for $terminus in ?termini-list do
         (if (transmitter $terminus)
-          (do (setq $candidate-hue (valid-transmitter-hue? $terminus $compatible-hue))
+          (do (assign $candidate-hue (valid-transmitter-hue? $terminus $compatible-hue))
               (if $candidate-hue
-                (setq $compatible-hue $candidate-hue)
+                (assign $compatible-hue $candidate-hue)
                 (return nil)))))  ;; Immediate return on conflict
       $compatible-hue))
 
 
 (define-query compatible-connectors? (?termini-list ?transmitter-hue)
   ;; Returns compatible hue after processing connectors, nil if conflict  
-  (do (setq $compatible-hue ?transmitter-hue)
+  (do (assign $compatible-hue ?transmitter-hue)
       (ww-loop for $terminus in ?termini-list do
         (if (connector $terminus)
-          (do (setq $candidate-hue (valid-connector-hue? $terminus $compatible-hue))
+          (do (assign $candidate-hue (valid-connector-hue? $terminus $compatible-hue))
               (if $candidate-hue
-                (setq $compatible-hue $candidate-hue)
+                (assign $compatible-hue $candidate-hue)
                 (return nil)))))  ;; Immediate return on conflict
       $compatible-hue))
 
@@ -294,7 +294,7 @@
 
 (define-update propagate-connect-to-1-terminus! (?cargo ?terminus)
   ; Propagates a source to a connector (?cargo)
-  (do (setq $hue (hue-if-source? ?terminus))
+  (do (assign $hue (hue-if-source? ?terminus))
       (if $hue
         (color ?cargo $hue))))
 
@@ -303,11 +303,11 @@
   ; Propagates sources to a connector (?cargo)
   (do 
     ;; Create terminus list for uniform processing
-    (setq $termini-list (list ?terminus1 ?terminus2))
+    (assign $termini-list (list ?terminus1 ?terminus2))
     ;; Process transmitters with built-in conflict detection
-    (setq $transmitter-hue (compatible-transmitters? $termini-list))
+    (assign $transmitter-hue (compatible-transmitters? $termini-list))
     ;; Process connectors, maintaining transmitter hue or detecting conflicts
-    (setq $final-hue (compatible-connectors? $termini-list $transmitter-hue))
+    (assign $final-hue (compatible-connectors? $termini-list $transmitter-hue))
     ;; Color cargo if we have a valid hue (no conflicts detected)
     (if $final-hue
         (color ?cargo $final-hue))
@@ -322,11 +322,11 @@
   ; Propagates source terminus to a connector (?cargo)
   (do 
     ;; Create terminus list for uniform processing
-    (setq $termini-list (list ?terminus1 ?terminus2 ?terminus3))
+    (assign $termini-list (list ?terminus1 ?terminus2 ?terminus3))
     ;; Process transmitters with built-in conflict detection
-    (setq $transmitter-hue (compatible-transmitters? $termini-list))
+    (assign $transmitter-hue (compatible-transmitters? $termini-list))
     ;; Process connectors, maintaining transmitter hue or detecting conflicts
-    (setq $final-hue (compatible-connectors? $termini-list $transmitter-hue))
+    (assign $final-hue (compatible-connectors? $termini-list $transmitter-hue))
     ;; Color cargo if we have a valid hue (no conflicts detected)
     (if $final-hue
         (color ?cargo $final-hue))
@@ -408,7 +408,7 @@
                   (loc $cargo $area)
                   (connected $cargo ?terminus)
                   (on $cargo ?plate)
-                  (setq $plate ?plate)
+                  (assign $plate ?plate)
                   (activate-plate! ?plate)
                   (propagate-connect-to-1-terminus! $cargo ?terminus))))))
 
@@ -438,7 +438,7 @@
                   (connected $cargo ?terminus1)
                   (connected $cargo ?terminus2)
                   (on $cargo ?plate)
-                  (setq $plate ?plate)
+                  (assign $plate ?plate)
                   (activate-plate! ?plate)
                   (propagate-connect-to-2-terminus! $cargo ?terminus1 ?terminus2 $area))))))
     
@@ -471,7 +471,7 @@
                   (connected $cargo ?terminus2)
                   (connected $cargo ?terminus3)
                   (on $cargo ?plate)
-                  (setq $plate ?plate)
+                  (assign $plate ?plate)
                   (activate-plate! ?plate)
                   (propagate-connect-to-3-terminus! $cargo ?terminus1 ?terminus2 ?terminus3 $area))))))
 
@@ -804,20 +804,20 @@
     ;; For each active connector, verify it has a valid transmitter source
     (doall (?c connector)
       (if (bind (color ?c $col))
-        (do (setq $visited nil)           ; Track visited connectors
-            (setq $source-found nil)      ; Flag if transmitter found
-            (setq $stack nil)             ; DFS stack
-            (setq $current ?c)            ; Current connector being examined
-            (setq $color nil)             ; Color we're tracing
+        (do (assign $visited nil)           ; Track visited connectors
+            (assign $source-found nil)      ; Flag if transmitter found
+            (assign $stack nil)             ; DFS stack
+            (assign $current ?c)            ; Current connector being examined
+            (assign $color nil)             ; Color we're tracing
             ;; Get the color of this connector
             ;(bind (color ?c $col))
-            (setq $color $col)
+            (assign $color $col)
             ;; Initialize stack with current connector
             (push $current $stack)
             ;; Perform depth-first search to find transmitter or detect cycle
             (ww-loop while $stack do
               ;; Pop current connector from stack
-              (setq $current (pop $stack))
+              (assign $current (pop $stack))
               ;; Only process this connector if we haven't seen it before
               (unless (member $current $visited)
                 ;; Mark as visited
@@ -826,7 +826,7 @@
                 (if (exists (?t transmitter)
                       (and (connected $current ?t)
                            (chroma ?t $color)))
-                  (setq $source-found t)
+                  (assign $source-found t)
                   ;; Otherwise, add connected connectors of same color to stack
                   (doall (?other connector)
                     (if (and (different ?other $current)
@@ -836,6 +836,6 @@
             ;; If we've explored all paths and never found a transmitter source,
             ;; this connector has no valid source (either disconnected or in a cycle)
             (if (not $source-found)
-              (setq $valid-source nil)))))
+              (assign $valid-source nil)))))
     ;; Return result
     $valid-source))

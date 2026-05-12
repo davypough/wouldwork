@@ -1,11 +1,11 @@
-;;; Filename: problem-tiles3c-heuristic.lisp
+;;; Filename: problem-tiles4a-heuristic.lisp
 
 ;;; List problem specification for a blue/yellow tile shuffle in Islands of Insight.
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tiles3c-heuristic)
+(ww-set *problem-name* tiles4a-heuristic)
 
 (ww-set *problem-type* planning)
 
@@ -59,7 +59,7 @@
   (standard ?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
   (and (bind (loc ?tile $tile-coords))
        (bind (empty $empty-coords))
-       (setf $new-empty-coords (copy-list $empty-coords))
+       (assign $new-empty-coords (copy-list $empty-coords))
        (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
              (if (member new-tile-coord $empty-coords :test #'equal)
@@ -75,7 +75,7 @@
                                                                   (+ (cdr tile-coord) ?d-col)))))
                       (return t))))
   (?tile $direction)
-  (do (setf $direction (cond ((= ?d-col 1) 'right)
+  (do (assign $direction (cond ((= ?d-col 1) 'right)
                              ((= ?d-row 1) 'down)
                              ((= ?d-col -1) 'left)
                              ((= ?d-row -1) 'up)

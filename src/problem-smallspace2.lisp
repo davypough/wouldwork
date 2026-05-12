@@ -204,7 +204,7 @@
   (assert (not (holds agent1 $cargo))
           (loc $cargo $area)
           (connected $cargo ?terminus)
-          (setq $hue (get-hue-if-source ?terminus))
+          (assign $hue (get-hue-if-source ?terminus))
           (if $hue
             (color $cargo $hue)))
 )
@@ -223,10 +223,10 @@
           (loc $cargo $area)
           (connected $cargo ?terminus1)
           (connected $cargo ?terminus2)
-          (setq $hue1 (get-hue-if-source ?terminus1))
-          (setq $hue2 (get-hue-if-source ?terminus2))
+          (assign $hue1 (get-hue-if-source ?terminus1))
+          (assign $hue2 (get-hue-if-source ?terminus2))
           (unless (and $hue1 $hue2 (not (eq $hue1 $hue2)))
-            (setq $hue (or $hue1 $hue2)))
+            (assign $hue (or $hue1 $hue2)))
           (if $hue
             (chain-activate! $cargo $hue)))
 )
@@ -247,13 +247,13 @@
           (connected $cargo ?terminus1)
           (connected $cargo ?terminus2)
           (connected $cargo ?terminus3)
-          (setq $hue1 (get-hue-if-source ?terminus1))
-          (setq $hue2 (get-hue-if-source ?terminus2))
-          (setq $hue3 (get-hue-if-source ?terminus3))
+          (assign $hue1 (get-hue-if-source ?terminus1))
+          (assign $hue2 (get-hue-if-source ?terminus2))
+          (assign $hue3 (get-hue-if-source ?terminus3))
           (unless (or (and $hue1 $hue2 (not (eql $hue1 $hue2)))  ; hue1 vs hue2 conflict
                       (and $hue1 $hue3 (not (eql $hue1 $hue3)))  ; hue1 vs hue3 conflict  
                       (and $hue2 $hue3 (not (eql $hue2 $hue3))))  ; hue2 vs hue3 conflict
-            (setq $hue (or $hue1 $hue2 $hue3)))
+            (assign $hue (or $hue1 $hue2 $hue3)))
           (if $hue
             (chain-activate! $cargo $hue)))
 )

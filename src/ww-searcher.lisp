@@ -726,16 +726,17 @@
            (loop for elt across obj
                  do (setf h (sxhash (cons h (deep-sxhash elt)))))
            h))
-        ((hash-table-p obj)                                                                ;; ADDED clause
-         (let ((h (sxhash (cons 'hash-table                                                  ;; ADDED
-                                (cons (hash-table-test obj)                                  ;; ADDED
-                                      (hash-table-count obj))))))                           ;; ADDED
-           (maphash (lambda (k v)                                                            ;; ADDED
-                      (setf h (logxor h                                                       ;; ADDED
-                                      (sxhash (cons (deep-sxhash k)                          ;; ADDED
-                                                    (deep-sxhash v))))))                     ;; ADDED
-                    obj)                                                                     ;; ADDED
-           h))                                                                               ;; ADDED
+        ((hash-table-p obj)
+         (let ((h (sxhash (cons 'hash-table
+                                (cons (hash-table-test obj)
+                                      (hash-table-count obj))))))
+           (maphash (lambda (k v)
+                      (setf h (logxor h
+                                      (sxhash (cons (deep-sxhash k)
+                                                    (deep-sxhash v))))))
+                    obj)
+           h))
+        ((simple-bit-vector-p obj) (sxhash obj))
         ((arrayp obj)
          (let ((h (sxhash (cons 'array (array-dimensions obj)))))
            (loop for i from 0 below (array-total-size obj)

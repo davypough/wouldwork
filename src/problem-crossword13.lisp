@@ -34,7 +34,7 @@
 
 (define-query compatible? (?word ?field)
    (and (bind (contents ?field $field-string))
-        (setq $word-string (string ?word))
+        (assign $word-string (string ?word))
         (= (length $word-string) (length $field-string))
         (every (lambda (char1 char2)
                   (or (char= char1 char2)
@@ -46,11 +46,11 @@
    (let ()
        (declare (special $counter))
        (bind (contents ?cross-fld $cross-str))
-       (setq $new-cross-str   ;replace one letter from word-string into cross-str
+       (assign $new-cross-str   ;replace one letter from word-string into cross-str
              (replace (copy-seq $cross-str) ?word-string 
                       :start1 ?cross-idx :start2 ?wrd-idx :end2 (1+ ?wrd-idx)))
        (contents ?cross-fld $new-cross-str)
-       (setq $new-cross-word (intern $new-cross-str))
+       (assign $new-cross-word (intern $new-cross-str))
        (if (and (notany (lambda (char) (char= char #\Space)) $new-cross-str)
                 (exists (?word word)
                    (and (eql $new-cross-word ?word)
@@ -64,7 +64,7 @@
    (let (($counter 0))
        (declare (special $counter))
        (bind (contents ?field $field-string))
-       (setq $word-string (string ?word))
+       (assign $word-string (string ?word))
        (contents ?field $word-string)
        (used ?word)
        (filled ?field)

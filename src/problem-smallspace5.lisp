@@ -69,7 +69,7 @@
   ;; Lower values indicate states closer to goal or with more open gates
   (do (bind (loc agent1 $area))
       ;; Base distance: how many areas away from area5
-      (setq $base-distance
+      (assign $base-distance
         (cond ((eql $area 'area5) 0)    ; At goal
               ((eql $area 'area4) 1)    ; One area away
               ((eql $area 'area3) 2)    ; Two areas away
@@ -77,24 +77,24 @@
               ((eql $area 'area1) 4)    ; Four areas away
               (t 10)))                   ; Should not occur
       ;; Penalty for closed gates on the path forward
-      (setq $penalty 0)
+      (assign $penalty 0)
       ;; From area1, all gates ahead matter
       (if (or (eql $area 'area1) (eql $area 'area2) 
               (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate1))
-          (setq $penalty (+ $penalty 0.5))))
+          (assign $penalty (+ $penalty 0.5))))
       ;; From area2 forward, gate2-4 matter
       (if (or (eql $area 'area2) (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate2))
-          (setq $penalty (+ $penalty 0.5))))
+          (assign $penalty (+ $penalty 0.5))))
       ;; From area3 forward, gate3-4 matter
       (if (or (eql $area 'area3) (eql $area 'area4))
         (if (not (open gate3))
-          (setq $penalty (+ $penalty 0.5))))
+          (assign $penalty (+ $penalty 0.5))))
       ;; From area4, only gate4 matters
       (if (eql $area 'area4)
         (if (not (open gate4))
-          (setq $penalty (+ $penalty 0.5))))
+          (assign $penalty (+ $penalty 0.5))))
       ;; Return total heuristic value
       (+ $base-distance $penalty)))
 
@@ -143,7 +143,7 @@
 
 (define-query beam-reaches-target (?source ?target)
   ; Returns t if a beam from ?source to ?target reaches ?target's coordinates
-  (do (mvsetq ($target-x $target-y) (get-coordinates ?target))
+  (do (mvassign ($target-x $target-y) (get-coordinates ?target))
       (exists (?b (get-current-beams))
         (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
              (eql $src ?source)
@@ -186,7 +186,7 @@
 
 (define-query resolve-consensus-hue (?hue-list)
   ; Returns consensus hue from list of available hues, nil if no consensus
-  (do (setq $unique-hues (remove-duplicates (remove nil ?hue-list)))
+  (do (assign $unique-hues (remove-duplicates (remove nil ?hue-list)))
       (if (= (length $unique-hues) 1)
         (first $unique-hues)  ; Single unique hue (consensus achieved)
         nil)))               ; Multiple different hues or no hues (no consensus)
@@ -197,28 +197,28 @@
   ; Determines if a cross segment (beam, gate, etc) interferes with the main beam-segment
   ; Returns the interference endpoint, or nil
   ; Step 1: Calculate direction vectors and displacement
-  (do (setq $dx1 (- ?end-x ?source-x))    ; Beam direction x
-      (setq $dy1 (- ?end-y ?source-y))    ; Beam direction y
-      (setq $dx2 (- ?cross-x2 ?cross-x1)) ; Obstacle direction x
-      (setq $dy2 (- ?cross-y2 ?cross-y1)) ; Obstacle direction y
-      (setq $dx3 (- ?cross-x1 ?source-x)) ; Displacement x
-      (setq $dy3 (- ?cross-y1 ?source-y)) ; Displacement y
+  (do (assign $dx1 (- ?end-x ?source-x))    ; Beam direction x
+      (assign $dy1 (- ?end-y ?source-y))    ; Beam direction y
+      (assign $dx2 (- ?cross-x2 ?cross-x1)) ; Obstacle direction x
+      (assign $dy2 (- ?cross-y2 ?cross-y1)) ; Obstacle direction y
+      (assign $dx3 (- ?cross-x1 ?source-x)) ; Displacement x
+      (assign $dy3 (- ?cross-y1 ?source-y)) ; Displacement y
       ;; Step 2: Calculate determinant for parallel line detection
-      (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
+      (assign $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
       ;; Step 3: Handle parallel lines case
       (if (< (abs $det) 1e-10)
         (values nil nil nil)
         ;; Step 4: Solve for intersection parameters using Cramer's rule
-        (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
-            (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
+        (do (assign $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
+            (assign $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
             ;; Treat hits within 2% of either endpoint as "at the endpoint" => no interference
-            (setq $eps 2e-2)  ; parameter-space epsilon (2%)
+            (assign $eps 2e-2)  ; parameter-space epsilon (2%)
             ;; Step 5: Validate intersection lies well inside both segments
             (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; main beam interior only
                      (> $s $eps) (< $s (- 1.0 $eps)))     ; cross segment interior only
               ;; Step 6: Calculate and return intersection coordinates
-              (do (setq $int-x (+ ?source-x (* $t $dx1)))
-                  (setq $int-y (+ ?source-y (* $t $dy1)))
+              (do (assign $int-x (+ ?source-x (* $t $dx1)))
+                  (assign $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
               ;; No valid intersection within (epsilon-trimmed) interiors
               (values nil nil nil))))))
@@ -227,9 +227,9 @@
 (define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
   ; Determines if an object in an area at (?px,?py) occludes a beam-segment with tolerance < 1.0
   ; Step 1: Calculate beam direction and length
-  (do (setq $dx (- ?end-x ?source-x))
-      (setq $dy (- ?end-y ?source-y))
-      (setq $length-squared (+ (* $dx $dx) (* $dy $dy)))
+  (do (assign $dx (- ?end-x ?source-x))
+      (assign $dy (- ?end-y ?source-y))
+      (assign $length-squared (+ (* $dx $dx) (* $dy $dy)))
       ;; Step 2: Handle degenerate case (zero-length beam)
       (if (< $length-squared 1e-10)
         ;; Check if point coincides with source/target
@@ -238,19 +238,19 @@
           (values 0.0 ?source-x ?source-y)      ; Point at source
           (values nil nil nil))     ; Point not at degenerate beam
         ;; Step 3: Calculate projection parameter
-        (do (setq $vx (- ?px ?source-x))   ; Vector from source to point
-            (setq $vy (- ?py ?source-y))
-            (setq $dot-product (+ (* $vx $dx) (* $vy $dy)))
-            (setq $t (/ $dot-product $length-squared))
+        (do (assign $vx (- ?px ?source-x))   ; Vector from source to point
+            (assign $vy (- ?py ?source-y))
+            (assign $dot-product (+ (* $vx $dx) (* $vy $dy)))
+            (assign $t (/ $dot-product $length-squared))
             ;; Step 4: Validate parameter within segment bounds
             (if (and (> $t 0.0) (< $t 1.0))
               ;; Step 5: Calculate closest point on beam to given point
-              (do (setq $closest-x (+ ?source-x (* $t $dx)))
-                  (setq $closest-y (+ ?source-y (* $t $dy)))
+              (do (assign $closest-x (+ ?source-x (* $t $dx)))
+                  (assign $closest-y (+ ?source-y (* $t $dy)))
                   ;; Step 6: Calculate distance from point to beam
-                  (setq $dist-x (- ?px $closest-x))
-                  (setq $dist-y (- ?py $closest-y))
-                  (setq $distance (sqrt (+ (* $dist-x $dist-x) 
+                  (assign $dist-x (- ?px $closest-x))
+                  (assign $dist-y (- ?py $closest-y))
+                  (assign $distance (sqrt (+ (* $dist-x $dist-x) 
                                           (* $dist-y $dist-y))))
                   ;; Step 7: Check if point is within intersection tolerance
                   (if (< $distance (+ 0.25d0 1d-6))  ; Tolerance for blocking the beam with epsilon
@@ -265,9 +265,9 @@
   ; Returns the endpoint coordinates where the beam terminates and what blocks it
   (do
     ;; Initialize closest intersection tracking
-    (setq $closest-t 1.0)  ; Default to target if no intersections
-    (setq $result-x ?target-x)   
-    (setq $result-y ?target-y)
+    (assign $closest-t 1.0)  ; Default to target if no intersections
+    (assign $result-x ?target-x)   
+    (assign $result-y ?target-y)
     ;; Check static obstacles only - exclude beams
     (doall (?obj occluder)
       (if (and ;; Type-specific coordinate binding and conditions
@@ -277,23 +277,23 @@
                    (and (or (cargo ?obj) (agent ?obj))
                         (bind (loc ?obj $area))
                         (bind (coords $area $x1 $y1))
-                        (setq $x2 $x1) (setq $y2 $y1)))
+                        (assign $x2 $x1) (assign $y2 $y1)))
                ;; Endpoint exclusion logic for all obstacle types
                (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
                         (and (= $x2 ?source-x) (= $y2 ?source-y))
                         (and (= $x1 ?target-x) (= $y1 ?target-y))
                         (and (= $x2 ?target-x) (= $y2 ?target-y)))))
         ;; Calculate intersection with obstacle
-        (do (mvsetq ($int-t $int-x $int-y)
+        (do (mvassign ($int-t $int-x $int-y)
               (if (and (= $x1 $x2) (= $y1 $y2))
                 ;; Point occlusion (cargo)
                 (beam-segment-occlusion ?source-x ?source-y ?target-x ?target-y $x1 $y1)
                 ;; Line segment interference (gates)
                 (beam-segment-interference ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2)))
             (if (and $int-t (< $int-t $closest-t))
-              (do (setq $closest-t $int-t)
-                  (setq $result-x $int-x)
-                  (setq $result-y $int-y))))))
+              (do (assign $closest-t $int-t)
+                  (assign $result-x $int-x)
+                  (assign $result-y $int-y))))))
     ;; Return closest intersection coordinates
     (values $result-x $result-y)))
 
@@ -303,12 +303,12 @@
   ; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y t1 t2) ...)
   (do 
       ;; Build coordinate cache for all beam sources
-      (setq $coord-cache (make-hash-table :test 'eq))
+      (assign $coord-cache (make-hash-table :test 'eq))
       (doall (?b (get-current-beams))
         (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
             ;; Cache source coordinates if not already cached
             (if (not (gethash $src $coord-cache))
-              (do (mvsetq ($x $y) (get-coordinates $src))
+              (do (mvassign ($x $y) (get-coordinates $src))
                   (setf (gethash $src $coord-cache) (list $x $y))))))
       ;; Detect intersections using cached coordinates
       (doall (?b1 (get-current-beams))
@@ -317,25 +317,25 @@
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
             (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
                 (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
-                (setq $src1-coords (gethash $src1 $coord-cache))
-                (setq $src1-x (first $src1-coords))
-                (setq $src1-y (second $src1-coords))
-                (setq $tgt1-x $end1-x)
-                (setq $tgt1-y $end1-y)
-                (setq $src2-coords (gethash $src2 $coord-cache))
-                (setq $src2-x (first $src2-coords))
-                (setq $src2-y (second $src2-coords))
-                (setq $tgt2-x $end2-x)
-                (setq $tgt2-y $end2-y)
+                (assign $src1-coords (gethash $src1 $coord-cache))
+                (assign $src1-x (first $src1-coords))
+                (assign $src1-y (second $src1-coords))
+                (assign $tgt1-x $end1-x)
+                (assign $tgt1-y $end1-y)
+                (assign $src2-coords (gethash $src2 $coord-cache))
+                (assign $src2-x (first $src2-coords))
+                (assign $src2-y (second $src2-coords))
+                (assign $tgt2-x $end2-x)
+                (assign $tgt2-y $end2-y)
                 ;; Check intersection between current segments (not intended paths)
-                (mvsetq ($t1 $int-x $int-y)
+                (mvassign ($t1 $int-x $int-y)
                   (beam-segment-interference
                     $src1-x $src1-y $tgt1-x $tgt1-y
                     $src2-x $src2-y $tgt2-x $tgt2-y))
                 (if $t1
                   (do
                     ;; Get t2 parameter by checking beam2 vs beam1
-                    (mvsetq ($t2 $int-x2 $int-y2)
+                    (mvassign ($t2 $int-x2 $int-y2)
                       (beam-segment-interference
                         $src2-x $src2-y $tgt2-x $tgt2-y
                         $src1-x $src1-y $tgt1-x $tgt1-y))
@@ -351,9 +351,9 @@
     (and (fixture ?terminus)
          (los ?area ?terminus)
          ;; Additional validation: verify geometric beam path is clear
-         (mvsetq ($source-x $source-y) (get-fixed-coordinates ?area))
-         (mvsetq ($target-x $target-y) (get-coordinates ?terminus))
-         (mvsetq ($end-x $end-y)
+         (mvassign ($source-x $source-y) (get-fixed-coordinates ?area))
+         (mvassign ($target-x $target-y) (get-coordinates ?terminus))
+         (mvassign ($end-x $end-y)
            (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
          ;; Verify beam reaches fixture
          (= $end-x $target-x)
@@ -366,11 +366,11 @@
                 ;; Verify areas are gate-visible
                 (visible ?area ?target-area)
                 ;; Get source coordinates
-                (mvsetq ($source-x $source-y) (get-fixed-coordinates ?area))
+                (mvassign ($source-x $source-y) (get-fixed-coordinates ?area))
                 ;; Get target connector coordinates
-                (mvsetq ($target-x $target-y) (get-coordinates ?terminus))
+                (mvassign ($target-x $target-y) (get-coordinates ?terminus))
                 ;; Calculate where beam actually terminates
-                (mvsetq ($end-x $end-y)
+                (mvassign ($end-x $end-y)
                   (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
                 ;; Verify beam reaches target
                 (= $end-x $target-x)
@@ -380,7 +380,7 @@
 (define-query receiver-beam-reaches (?receiver)
   ; Returns t if a color-matching beam reaches the receiver
   (do
-    (mvsetq ($r-x $r-y) (get-fixed-coordinates ?receiver))
+    (mvassign ($r-x $r-y) (get-fixed-coordinates ?receiver))
     (bind (chroma ?receiver $required-hue))
     (exists (?b (get-current-beams))
       (and (bind (beam-segment ?b $source $target $end-x $end-y))
@@ -395,7 +395,7 @@
 (define-query connector-has-beam-power (?connector ?hue)
   ; Returns t if a beam with matching hue reaches the connector at its current coordinates
   (do
-    (mvsetq ($c-x $c-y) (get-coordinates ?connector))
+    (mvassign ($c-x $c-y) (get-coordinates ?connector))
     (exists (?b (get-current-beams))
       (and (bind (beam-segment ?b $source $target $end-x $end-y))
            (eql $target ?connector)  ; Beam must target this connector
@@ -418,7 +418,7 @@
               (eql $src ?potential-source)
               (eql $tgt ?connector)
               ;; Verify beam actually reaches connector's coordinates
-              (mvsetq ($conn-x $conn-y) (get-coordinates ?connector))
+              (mvassign ($conn-x $conn-y) (get-coordinates ?connector))
               (= $end-x $conn-x)
               (= $end-y $conn-y)
               ;; Verify source has matching hue (confirming power flow)
@@ -441,28 +441,28 @@
   ;; Returns t if any connector was activated, nil otherwise
   ;; Now uses consensus logic: connector only activates if ALL reaching beams have same hue
   (do
-    (setq $activated-any nil)
+    (assign $activated-any nil)
     (doall (?c connector)
       (if (not (bind (color ?c $existing-hue)))
         (do
           ;; Collect all hues from beams that reach this connector
-          (setq $reaching-hues nil)
+          (assign $reaching-hues nil)
           ;; Check all paired termini that could be sources
           (doall (?src terminus)
             (if (or (paired ?c ?src) (paired ?src ?c))  ; Pairing exists (bidirectional)
               (do
                 ;; Get source hue if it's an active source (transmitter or powered connector)
-                (setq $src-hue (get-hue-if-source ?src))
+                (assign $src-hue (get-hue-if-source ?src))
                 ;; If source has hue AND beam reaches connector, collect hue
                 (if (and $src-hue
                          (beam-reaches-target ?src ?c))
                   (push $src-hue $reaching-hues)))))
           ;; Check for consensus among all reaching hues
-          (setq $consensus-hue (resolve-consensus-hue $reaching-hues))
+          (assign $consensus-hue (resolve-consensus-hue $reaching-hues))
           ;; Only activate if consensus achieved (all hues identical)
           (if $consensus-hue
             (do (color ?c $consensus-hue)
-                (setq $activated-any t))))))
+                (assign $activated-any t))))))
     $activated-any))
 
 
@@ -470,7 +470,7 @@
   ;; Returns t if any connector was deactivated, nil otherwise
   ;; Beam removal now handled by Phase 0 Part B in next iteration
   (do
-    (setq $deactivated-any nil)
+    (assign $deactivated-any nil)
     (doall (?c connector)
       (if (bind (color ?c $c-hue))
         ;; Connector is currently active - verify it still has power
@@ -478,7 +478,7 @@
           ;; Lost power - deactivate (beams removed by Phase 0 next iteration)
           (do
             (not (color ?c $c-hue))
-            (setq $deactivated-any t)))))
+            (assign $deactivated-any t)))))
     $deactivated-any))
 
 
@@ -486,11 +486,11 @@
   (do (doall (?b (get-current-beams))
         (do (bind (beam-segment ?b $source $target $old-end-x $old-end-y))
             ;; Get source coordinates
-            (mvsetq ($source-x $source-y) (get-coordinates $source))
+            (mvassign ($source-x $source-y) (get-coordinates $source))
             ;; Get target coordinates  
-            (mvsetq ($target-x $target-y) (get-coordinates $target))
+            (mvassign ($target-x $target-y) (get-coordinates $target))
             ;; Recalculate endpoint using current gate/beam states
-            (mvsetq ($new-end-x $new-end-y)
+            (mvassign ($new-end-x $new-end-y)
                     (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
             ;; Update beam segment if endpoint changed
             (if (or (/= $new-end-x $old-end-x)
@@ -506,39 +506,39 @@
     ;; Phase 1: For each beam, determine its closest intersection point
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y) (get-coordinates $tgt))
+          (mvassign ($src-x $src-y) (get-coordinates $src))
+          (mvassign ($tgt-x $tgt-y) (get-coordinates $tgt))
           ;; Calculate t-parameter for current endpoint position
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (setq $curr-dx (- $old-end-x $src-x))
-          (setq $curr-dy (- $old-end-y $src-y))
-          (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (setq $closest-t (/ $dot $length-sq))
-          (setq $new-end-x $old-end-x)
-          (setq $new-end-y $old-end-y)
+          (assign $dx (- $tgt-x $src-x))
+          (assign $dy (- $tgt-y $src-y))
+          (assign $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (assign $curr-dx (- $old-end-x $src-x))
+          (assign $curr-dy (- $old-end-y $src-y))
+          (assign $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+          (assign $closest-t (/ $dot $length-sq))
+          (assign $new-end-x $old-end-x)
+          (assign $new-end-y $old-end-y)
           ;; Check all intersections involving this beam
           (ww-loop for $intersection in (collect-all-beam-intersections) do
-                (setq $beam1 (first $intersection))
-                (setq $beam2 (second $intersection))
-                (setq $int-x (third $intersection))
-                (setq $int-y (fourth $intersection))
-                (setq $t1 (fifth $intersection))
-                (setq $t2 (sixth $intersection))
+                (assign $beam1 (first $intersection))
+                (assign $beam2 (second $intersection))
+                (assign $int-x (third $intersection))
+                (assign $int-y (fourth $intersection))
+                (assign $t1 (fifth $intersection))
+                (assign $t2 (sixth $intersection))
                 ;; Determine which t-parameter applies to this beam and identify blocking beam
                 (if (eql ?b $beam1)
-                  (do (setq $t-param $t1)
-                      (setq $blocking-beam $beam2))
+                  (do (assign $t-param $t1)
+                      (assign $blocking-beam $beam2))
                   (if (eql ?b $beam2)
-                    (do (setq $t-param $t2)
-                        (setq $blocking-beam $beam1))
-                    (setq $t-param nil)))
+                    (do (assign $t-param $t2)
+                        (assign $blocking-beam $beam1))
+                    (assign $t-param nil)))
                 ;; Update closest intersection if this one is closer
                 (if (and $t-param (< $t-param $closest-t))
-                  (do (setq $closest-t $t-param)
-                      (setq $new-end-x $int-x)
-                      (setq $new-end-y $int-y))))
+                  (do (assign $closest-t $t-param)
+                      (assign $new-end-x $int-x)
+                      (assign $new-end-y $int-y))))
           ;; Phase 2: Atomically update beam segment if endpoint changed
           (if (or (/= $new-end-x $old-end-x) 
                   (/= $new-end-y $old-end-y))
@@ -550,20 +550,20 @@
   ;; Creates beams for active sources paired with targets where no beam exists yet
   ;; Returns t if any beams were created, nil otherwise
   (do
-    (setq $created-any nil)
+    (assign $created-any nil)
     (doall (?src terminus)
       (doall (?tgt terminus)
         (if (and (different ?src ?tgt)
                  (or (paired ?src ?tgt) (paired ?tgt ?src)))  ; Pairing exists (bidirectional)
           ;; Have a pairing - check if source can emit and beam should exist
-          (do (setq $source-hue (get-hue-if-source ?src))
+          (do (assign $source-hue (get-hue-if-source ?src))
               (if (and $source-hue                              ; Source is active
                        (target ?tgt)
                        (not (beam-exists-p ?src ?tgt))          ; Beam doesn't exist yet
                        (not (connector-is-powered-by ?src ?tgt))) ; ?tgt is not powering ?src
                 ;; Create beam: source is transmitter (always active) or powered connector
                 (do (create-beam-segment-p! ?src ?tgt)
-                    (setq $created-any t)))))))
+                    (assign $created-any t)))))))
     $created-any))
 
 
@@ -571,22 +571,22 @@
   ;; Removes beams whose pairing no longer exists or whose source lost power
   ;; Returns t if any beams were removed, nil otherwise
   (do
-    (setq $removed-any nil)
+    (assign $removed-any nil)
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
           ;; Determine if beam should be removed
-          (setq $should-remove nil)
+          (assign $should-remove nil)
           ;; Reason 1: Pairing no longer exists (check bidirectional)
           (if (not (or (paired $src $tgt) (paired $tgt $src)))
-            (setq $should-remove t))
+            (assign $should-remove t))
           ;; Reason 2: Source is connector that lost power (no color binding)
           (if (and (connector $src)
                    (not (bind (color $src $hue))))
-            (setq $should-remove t))
+            (assign $should-remove t))
           ;; Execute removal if needed
           (if $should-remove
             (do (remove-beam-segment-p! ?b)
-                (setq $removed-any t)))))
+                (assign $removed-any t)))))
     $removed-any))
 
 
@@ -597,7 +597,7 @@
       (if (and (active ?r)
                (not (receiver-beam-reaches ?r)))
         (do (deactivate-receiver! ?r)
-            (setq $any-deactivated t))))
+            (assign $any-deactivated t))))
     $any-deactivated))
 
 
@@ -611,7 +611,7 @@
             (doall (?g gate)
               (if (controls ?r ?g)
                 (open ?g)))
-            (setq $any-activated t))))
+            (assign $any-activated t))))
     $any-activated))
 
 
@@ -641,13 +641,13 @@
   (do
     ;; Generate new beam entity with next available index
     (bind (current-beams $current-beams))
-    (setq $next-index (1+ (length $current-beams)))
-    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
+    (assign $next-index (1+ (length $current-beams)))
+    (assign $new-beam (intern (format nil "BEAM~D" $next-index)))
     (register-dynamic-object $new-beam 'beam)
     ;; Calculate beam path and intersection
-    (mvsetq ($source-x $source-y) (get-coordinates ?source))
-    (mvsetq ($target-x $target-y) (get-coordinates ?target))
-    (mvsetq ($end-x $end-y) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+    (mvassign ($source-x $source-y) (get-coordinates ?source))
+    (mvassign ($target-x $target-y) (get-coordinates ?target))
+    (mvassign ($end-x $end-y) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
     ;; Create beam relations
     (beam-segment $new-beam ?source ?target $end-x $end-y)
     (current-beams (cons $new-beam $current-beams))

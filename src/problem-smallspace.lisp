@@ -313,16 +313,16 @@
           ;; Extract source colors systematically
           (if (source? ?terminus1)
             (bind (color ?terminus1 $hue1))
-            (setq $hue1 nil))
+            (assign $hue1 nil))
           (if (source? ?terminus2)
             (bind (color ?terminus2 $hue2))
-            (setq $hue2 nil))
+            (assign $hue2 nil))
           ;; Determine activation color based on source consensus
           (if (and $hue1 $hue2)  ; both sources active
             (if (eql $hue1 $hue2)  ; same color
-              (setq $hue $hue1))  ; activate with consensus color
+              (assign $hue $hue1))  ; activate with consensus color
             (if (or $hue1 $hue2)  ; exactly one source active
-              (setq $hue (or $hue1 $hue2))))  ; activate with available color
+              (assign $hue (or $hue1 $hue2))))  ; activate with available color
           (if $hue
             (chain-activate! $cargo $hue))))
 
@@ -346,28 +346,28 @@
           ;; Extract source colors systematically
           (if (source? ?terminus1)
             (bind (color ?terminus1 $hue1))
-            (setq $hue1 nil))
+            (assign $hue1 nil))
           (if (source? ?terminus2)
             (bind (color ?terminus2 $hue2))
-            (setq $hue2 nil))
+            (assign $hue2 nil))
           (if (source? ?terminus3)
             (bind (color ?terminus3 $hue3))
-            (setq $hue3 nil))
+            (assign $hue3 nil))
           ;; Systematic consensus determination
           (if (and $hue1 $hue2 $hue3)  ; all three sources active
             (if (and (eql $hue1 $hue2) (eql $hue2 $hue3))  ; universal consensus
-              (setq $hue $hue1))
+              (assign $hue $hue1))
             (if (and $hue1 $hue2)  ; exactly two sources: 1 and 2
               (if (eql $hue1 $hue2)  ; consensus between active pair
-                (setq $hue $hue1))
+                (assign $hue $hue1))
               (if (and $hue1 $hue3)  ; exactly two sources: 1 and 3
                 (if (eql $hue1 $hue3)  ; consensus between active pair
-                  (setq $hue $hue1))
+                  (assign $hue $hue1))
                 (if (and $hue2 $hue3)  ; exactly two sources: 2 and 3
                   (if (eql $hue2 $hue3)  ; consensus between active pair
-                    (setq $hue $hue2))
+                    (assign $hue $hue2))
                   ;; exactly one source active
-                  (setq $hue (or $hue1 $hue2 $hue3))))))
+                  (assign $hue (or $hue1 $hue2 $hue3))))))
           (if $hue
             (chain-activate! $cargo $hue))))
 
@@ -608,20 +608,20 @@
     ;; For each active connector, verify it has a valid transmitter source
     (doall (?c connector)
       (if (active ?c)
-        (do (setq $visited nil)           ; Track visited connectors
-            (setq $source-found nil)      ; Flag if transmitter found
-            (setq $stack nil)             ; DFS stack
-            (setq $current ?c)            ; Current connector being examined
-            (setq $color nil)             ; Color we're tracing
+        (do (assign $visited nil)           ; Track visited connectors
+            (assign $source-found nil)      ; Flag if transmitter found
+            (assign $stack nil)             ; DFS stack
+            (assign $current ?c)            ; Current connector being examined
+            (assign $color nil)             ; Color we're tracing
             ;; Get the color of this connector
             (bind (color ?c $col))
-            (setq $color $col)
+            (assign $color $col)
             ;; Initialize stack with current connector
             (push $current $stack)
             ;; Perform depth-first search to find transmitter or detect cycle
             (ww-loop while $stack do
               ;; Pop current connector from stack
-              (setq $current (pop $stack))
+              (assign $current (pop $stack))
               ;; Only process this connector if we haven't seen it before
               (unless (member $current $visited)
                 ;; Mark as visited
@@ -631,7 +631,7 @@
                       (and (connects $current ?t)
                            (bind (color ?t $t-color))
                            (eql $t-color $color)))
-                  (setq $source-found t)
+                  (assign $source-found t)
                   ;; Otherwise, add connected connectors of same color to stack
                   (doall (?other connector)
                     (if (and (different ?other $current)
@@ -643,7 +643,7 @@
             ;; If we've explored all paths and never found a transmitter source,
             ;; this connector has no valid source (either disconnected or in a cycle)
             (if (not $source-found)
-              (setq $valid-source nil)))))
+              (assign $valid-source nil)))))
     ;; Return result
     $valid-source))
 

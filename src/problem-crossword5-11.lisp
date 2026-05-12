@@ -293,7 +293,7 @@
       (setf $used-field-ids (sort-field-ids $used-field-ids-ht))  ;(ut::prt $used-field-ids)
       (if (successors-p $used-field-ids)
         (if (= *cost* *upper* 0)
-          (do (multiple-value-setq (*cost* *upper*)
+          (do (mv-assign (*cost* *upper*)
                                    (compute-bounds? $used-field-ids))
                  (values *cost* *upper*))
           (values *cost* *upper*))
@@ -375,7 +375,7 @@
             (used-fields $new-used-fields)
             (used-field-ids-ht $new-used-field-ids-ht)
             (net-word-lengths $net-word-lengths)
-            (setq $objective-value (hash-table-count $new-used-fields))))
+            (assign $objective-value (hash-table-count $new-used-fields))))
 
 
 ;------------------ initializations ----------------

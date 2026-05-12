@@ -95,7 +95,7 @@
                    (do (incf $wt $item-weight)  ;(ut::prt $wt)
                        (incf $cost $item-value)
                        (incf $upper $item-value))
-                   (do (setq $fraction (/ (- $capacity $wt) $item-weight))
+                   (do (assign $fraction (/ (- $capacity $wt) $item-weight))
                        (incf $cost (* $fraction $item-value))  ;(ut::prt $fraction (- $cost) (- $upper))  (break)
                        (return-from compute-bounds? (values (- $cost) (- $upper))))))))  ;(ut::prt (- $cost) (- $upper)) (break)
       (return-from compute-bounds? (values (- $cost) (- $upper)))))
@@ -113,7 +113,7 @@
   (do (bind (contents $item-ids))
       (if (successors-p $item-ids)
         (if (= *cost* *upper* 0)
-          (do (multiple-value-setq (*cost* *upper*)
+          (do (mv-assign (*cost* *upper*)
                                    (compute-bounds? $item-ids))
                  (values *cost* *upper*))
           (values *cost* *upper*))
@@ -127,21 +127,21 @@
   (and (not (in ?item-id))
        (bind (weight ?item-id $item-weight))
        (bind (load $load))
-       (setq $new-load (+ $load $item-weight))
+       (assign $new-load (+ $load $item-weight))
        (bind (capacity $capacity))
        (<= $new-load $capacity))
   (?item-id)
   (assert (in ?item-id)
           (bind (contents $item-ids))
-          (setq $new-item-ids
+          (assign $new-item-ids
             (merge 'list (list ?item-id) (copy-list $item-ids) #'<))
           (contents $new-item-ids)
           (load $new-load)
           (bind (worth $worth))
           (bind (value ?item-id $item-value))
-          (setq $new-worth (+ $worth $item-value))
+          (assign $new-worth (+ $worth $item-value))
           (worth $new-worth)
-          (setq $objective-value $new-worth)))
+          (assign $objective-value $new-worth)))
 
 
 (define-init-action init-item-weights&values

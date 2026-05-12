@@ -303,9 +303,9 @@
           (bind (color ?terminus2 $hue2))
           (if (or $hue1 $hue2)    ;at least one active
             (if (eql $hue1 $hue2)  ;both active and the same color
-              (setq $hue $hue1)
+              (assign $hue $hue1)
               (if (not (and $hue1 $hue2))  ;both are not active (with different colors)
-                (setq $hue (or $hue1 $hue2)))))
+                (assign $hue (or $hue1 $hue2)))))
           (if $hue
             (chain-activate! $cargo $hue))))
 
@@ -330,14 +330,14 @@
           (bind (color ?terminus3 $hue3))
           (if (or $hue1 $hue2 $hue3)    ;at least one active
             (if (eql* $hue1 $hue2 $hue3)  ;exactly three active and the same color
-              (setq $hue $hue1)
+              (assign $hue $hue1)
               (if (or (eql $hue1 $hue2)  ;exactly two active and the same color
                       (eql $hue1 $hue3))
-                (setq $hue $hue1)
+                (assign $hue $hue1)
                 (if (eql $hue2 $hue3)
-                  (setq $hue $hue2)
+                  (assign $hue $hue2)
                   (if (not (and $hue1 $hue2 $hue3))  ;all are not active (with different colors)
-                    (setq $hue (or $hue1 $hue2 $hue3)))))))
+                    (assign $hue (or $hue1 $hue2 $hue3)))))))
           (if $hue
             (chain-activate! $cargo $hue))))
 

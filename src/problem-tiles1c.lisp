@@ -45,7 +45,7 @@
   (standard ?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
   (and (bind (loc ?tile $tile-coords))
        (bind (empty $empty-coords))
-       (setf $new-empty-coords $empty-coords)
+       (assign $new-empty-coords $empty-coords)
        (iter (for tile-coord in-vector $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (vector (+ (svref tile-coord 0) ?d-row) (+ (svref tile-coord 1) ?d-col)))
              (if (find new-tile-coord $empty-coords :test #'equalp)
@@ -62,7 +62,7 @@
                                                             result-type 'simple-vector)))
                       (return t))))
   (?tile ?d-row ?d-col)  ; $direction fluent)
-  (do ;(setf $direction (cond ((= ?d-col 1) 'right)
+  (do ;(assign $direction (cond ((= ?d-col 1) 'right)
       ;                       ((= ?d-row 1) 'down)
       ;                       ((= ?d-col -1) 'left)
       ;                       ((= ?d-row -1) 'up)

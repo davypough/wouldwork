@@ -52,7 +52,7 @@
   ;; Preconditions guarantee at least one match exists on the first pass.
   ;; Loop handles cascading matches after gravity until stable.
   (ww-loop for $iteration from 1 to 20 do
-    (setq $matches (find-all-matches))
+    (assign $matches (find-all-matches))
     (if (not $matches)
       (return t))
     (remove-matched-cells! $matches)
@@ -63,8 +63,8 @@
 (define-update remove-matched-cells! (?matches)
   ;; Retract all cell assertions at matched positions.
   (ww-loop for $pos in ?matches do
-    (setq $r (car $pos))
-    (setq $c (cdr $pos))
+    (assign $r (car $pos))
+    (assign $c (cdr $pos))
     (bind (cell $r $c $sym))
     (not (cell $r $c $sym))))
 
@@ -73,12 +73,12 @@
   ;; Compact tiles downward within a single column segment [?from..?to].
   ;; Segment boundaries are defined by fixed cells or board edges.
   (do
-    (setq $symbols nil)
+    (assign $symbols nil)
     (ww-loop for $r from ?from to ?to do
       (if (bind (cell $r ?col $sym))
         (do (push $sym $symbols)
             (not (cell $r ?col $sym)))))
-    (setq $target-row ?to)
+    (assign $target-row ?to)
     (ww-loop for $sym in $symbols do
       (cell $target-row ?col $sym)
       (decf $target-row))))
@@ -91,13 +91,13 @@
     (bind (max-row $max-row))
     (doall (?c col)
       (do
-        (setq $seg-start 0)
+        (assign $seg-start 0)
         (doall (?r row)
           (if (fixed ?r ?c)
             (do
               (if (< $seg-start ?r)
                 (gravity-segment! ?c $seg-start (1- ?r)))
-              (setq $seg-start (1+ ?r)))))
+              (assign $seg-start (1+ ?r)))))
         (if (<= $seg-start $max-row)
           (gravity-segment! ?c $seg-start $max-row))))))
 
@@ -112,16 +112,16 @@
   (do
     (bind (max-row $max-row))
     (bind (max-col $max-col))
-    (setq $r1 (+ ?r ?dr))
-    (setq $c1 (+ ?c ?dc))
+    (assign $r1 (+ ?r ?dr))
+    (assign $c1 (+ ?c ?dc))
     (if (or (< $r1 0) (> $r1 $max-row) (< $c1 0) (> $c1 $max-col))
       (return-from count-run 0))
     (if (not (bind (cell $r1 $c1 $s1)))
       (return-from count-run 0))
     (if (not (eql $s1 ?sym))
       (return-from count-run 0))
-    (setq $r2 (+ $r1 ?dr))
-    (setq $c2 (+ $c1 ?dc))
+    (assign $r2 (+ $r1 ?dr))
+    (assign $c2 (+ $c1 ?dc))
     (if (or (< $r2 0) (> $r2 $max-row) (< $c2 0) (> $c2 $max-col))
       (return-from count-run 1))
     (if (not (bind (cell $r2 $c2 $s2)))
@@ -133,11 +133,11 @@
   ;; Does placing ?sym at (?r,?c) create a run of 3+?
   ;; Check parallel (away) direction, then perpendicular (both directions).
   (do
-    (setq $away-count (count-run ?r ?c ?away-dr ?away-dc ?sym))
+    (assign $away-count (count-run ?r ?c ?away-dr ?away-dc ?sym))
     (if (>= $away-count 2)
       (return-from position-matches? t))
-    (setq $perp-pos (count-run ?r ?c ?perp-dr ?perp-dc ?sym))
-    (setq $perp-neg (count-run ?r ?c (- ?perp-dr) (- ?perp-dc) ?sym))
+    (assign $perp-pos (count-run ?r ?c ?perp-dr ?perp-dc ?sym))
+    (assign $perp-neg (count-run ?r ?c (- ?perp-dr) (- ?perp-dc) ?sym))
     (>= (+ $perp-pos $perp-neg) 2)))
 
 
@@ -146,33 +146,33 @@
   ;; of 3+ same symbol. Returns deduplicated list of (row . col) positions
   ;; to remove, or NIL if no matches found.
   (do
-    (setq $to-remove nil)
+    (assign $to-remove nil)
     ;; --- Horizontal runs ---
     (doall (?r row)
       (do
-        (setq $run-len 0)
-        (setq $run-sym nil)
-        (setq $run-start-col 0)
-        (setq $prev-col -2)
+        (assign $run-len 0)
+        (assign $run-sym nil)
+        (assign $run-start-col 0)
+        (assign $prev-col -2)
         (doall (?c col)
           (if (bind (cell ?r ?c $sym))
             (do
               (if (and (eql $sym $run-sym) (= ?c (1+ $prev-col)))
                 (do (incf $run-len)
-                    (setq $prev-col ?c))
+                    (assign $prev-col ?c))
                 (do (if (>= $run-len 3)
                       (ww-loop for $k from $run-start-col to $prev-col do
                         (pushnew (cons ?r $k) $to-remove :test #'equal)))
-                    (setq $run-len 1)
-                    (setq $run-sym $sym)
-                    (setq $run-start-col ?c)
-                    (setq $prev-col ?c))))
+                    (assign $run-len 1)
+                    (assign $run-sym $sym)
+                    (assign $run-start-col ?c)
+                    (assign $prev-col ?c))))
             (do (if (>= $run-len 3)
                   (ww-loop for $k from $run-start-col to $prev-col do
                     (pushnew (cons ?r $k) $to-remove :test #'equal)))
-                (setq $run-len 0)
-                (setq $run-sym nil)
-                (setq $prev-col -2))))
+                (assign $run-len 0)
+                (assign $run-sym nil)
+                (assign $prev-col -2))))
         ;; Close final run in this row
         (if (>= $run-len 3)
           (ww-loop for $k from $run-start-col to $prev-col do
@@ -180,29 +180,29 @@
     ;; --- Vertical runs ---
     (doall (?c col)
       (do
-        (setq $run-len 0)
-        (setq $run-sym nil)
-        (setq $run-start-row 0)
-        (setq $prev-row -2)
+        (assign $run-len 0)
+        (assign $run-sym nil)
+        (assign $run-start-row 0)
+        (assign $prev-row -2)
         (doall (?r row)
           (if (bind (cell ?r ?c $sym))
             (do
               (if (and (eql $sym $run-sym) (= ?r (1+ $prev-row)))
                 (do (incf $run-len)
-                    (setq $prev-row ?r))
+                    (assign $prev-row ?r))
                 (do (if (>= $run-len 3)
                       (ww-loop for $k from $run-start-row to $prev-row do
                         (pushnew (cons $k ?c) $to-remove :test #'equal)))
-                    (setq $run-len 1)
-                    (setq $run-sym $sym)
-                    (setq $run-start-row ?r)
-                    (setq $prev-row ?r))))
+                    (assign $run-len 1)
+                    (assign $run-sym $sym)
+                    (assign $run-start-row ?r)
+                    (assign $prev-row ?r))))
             (do (if (>= $run-len 3)
                   (ww-loop for $k from $run-start-row to $prev-row do
                     (pushnew (cons $k ?c) $to-remove :test #'equal)))
-                (setq $run-len 0)
-                (setq $run-sym nil)
-                (setq $prev-row -2))))
+                (assign $run-len 0)
+                (assign $run-sym nil)
+                (assign $prev-row -2))))
         ;; Close final run in this column
         (if (>= $run-len 3)
           (ww-loop for $k from $run-start-row to $prev-row do
@@ -218,7 +218,7 @@
   (product ?row row ?col col)
   (and (bind (max-col $max-col))
        (< ?col $max-col)
-       (setq $next-col (1+ ?col))
+       (assign $next-col (1+ ?col))
        (not (fixed ?row ?col))
        (not (fixed ?row $next-col))
        (bind (cell ?row ?col $sym1))
@@ -239,7 +239,7 @@
   (product ?row row ?col col)
   (and (bind (max-row $max-row))
        (< ?row $max-row)
-       (setq $next-row (1+ ?row))
+       (assign $next-row (1+ ?row))
        (not (fixed ?row ?col))
        (not (fixed $next-row ?col))
        (bind (cell ?row ?col $sym1))
@@ -264,8 +264,8 @@
   (bind (board $grid))
   ()
   (assert
-    (setq $max-row (1- (length $grid)))
-    (setq $max-col (1- (length (car $grid))))
+    (assign $max-row (1- (length $grid)))
+    (assign $max-col (1- (length (car $grid))))
     (max-row $max-row)
     (max-col $max-col)
     (ww-loop for $row-data in $grid

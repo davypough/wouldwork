@@ -186,7 +186,8 @@
               :key (lambda (item)
                      (when (consp item)
                        (case (first item)
-                         ((setq setf) (when (symbolp (second item)) (push (second item) valid-vars)))
+                         ((setq setf assign ww-assign)  ;CHANGED: added assign, ww-assign
+                          (when (symbolp (second item)) (push (second item) valid-vars)))
                          (mvsetq      (alexandria:appendf valid-vars
                                         (remove-if-not #'varp (second item))))
                          (ww-loop     (when (eq (second item) 'for)

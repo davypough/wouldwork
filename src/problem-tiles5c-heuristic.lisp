@@ -8,7 +8,7 @@
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tiles5c)
+(ww-set *problem-name* tiles5c-heuristic)
 
 (ww-set *problem-type* planning)
 
@@ -64,21 +64,23 @@
   (?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
   (and (bind (loc ?tile $tile-coords))
        (bind (empty $empty-coords))
-       (setf $new-empty-coords (copy-list $empty-coords))
+       (assign $new-empty-coords (copy-list $empty-coords))
+       (assign $new-tile-coords nil)
        (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
+             (for opposite-coord = (cons (- (car tile-coord) ?d-row) (- (cdr tile-coord) ?d-col)))
              (push new-tile-coord $new-tile-coords)
              (if (member new-tile-coord $empty-coords :test #'equal)
-               (setf $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
+               (setf $new-empty-coords
+                    (delete new-tile-coord $new-empty-coords :test #'equal))
                (unless (member new-tile-coord $tile-coords :test #'equal)  ;tile coord can move into spot vacated by other tile coord
                  (return nil)))  ;can't make this move
-             (for opposite-coord = (cons (- (car tile-coord) ?d-row) (- (cdr tile-coord) ?d-col)))
              (when (or (member opposite-coord $empty-coords :test #'equal)  ;check before next
                        (not (member opposite-coord $tile-coords :test #'equal)))
                (push tile-coord $new-empty-coords))
              (finally (return t))))
   (?tile $direction)
-  (do (setf $direction (cond ((= ?d-col 1) 'right)
+  (do (assign $direction (cond ((= ?d-col 1) 'right)
                              ((= ?d-row 1) 'down)
                              ((= ?d-col -1) 'left)
                              ((= ?d-row -1) 'up)
@@ -99,9 +101,9 @@
   (loc U1 ((6 . 1) (7 . 0) (7 . 1) (7 . 2)))
   (loc U2 ((6 . 5) (7 . 4) (7 . 5) (7 . 6)))
   (loc Y1 ((0 . 4) (0 . 5) (1 . 3) (1 . 4)))
-  (empty #.(loop for row from 2 to 5 append
-                 (loop for col from 2 to 4 collect
-                   (cons row col))))
+  `(empty ,(loop for row from 2 to 5 append
+             (loop for col from 2 to 4
+                   collect (cons row col))))
   (Y1-goal-coord (6 . 2)))
 
 

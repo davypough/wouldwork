@@ -35,7 +35,7 @@
   (standard ?tile tile (dot-product ?d-row delta-row ?d-col delta-col))
   (and (bind (loc ?tile $tile-coords))  ;list of (row col) coordinates of a tile
        (bind (empty $empty-coords))
-       (setf $new-empty-coords (copy-ht-set $empty-coords))
+       (assign $new-empty-coords (copy-ht-set $empty-coords))
        (iter (for (tile-coord nil) in-hashtable $tile-coords)
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row)
                                          (+ (cdr tile-coord) ?d-col)))
@@ -56,7 +56,7 @@
                                     t))
                       (return t))))
   (?tile ?d-row ?d-col)
-  (do ;(setf $direction (cond ((and (= ?d-row 0) (= ?d-col 1)) 'right)
+  (do ;(assign $direction (cond ((and (= ?d-row 0) (= ?d-col 1)) 'right)
       ;                       ((and (= ?d-row 1) (= ?d-col 0)) 'down)
       ;                       ((and (= ?d-row 0) (= ?d-col -1)) 'left)
       ;                       ((and (= ?d-row -1) (= ?d-col 0)) 'up)

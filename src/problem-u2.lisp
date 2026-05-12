@@ -55,7 +55,7 @@
        (on lite ?side1)
        (bind (walk-time ?person1 $walk-time1))
        (bind (walk-time ?person2 $walk-time2))
-       (setq $walk-time (max $walk-time1 $walk-time2))
+       (assign $walk-time (max $walk-time1 $walk-time2))
        (bind (current-time $current-time))
        (<= (+ $current-time $walk-time) 17))
   (?person1 ?person2 ?side1 ?side2 $walk-time $current-time)

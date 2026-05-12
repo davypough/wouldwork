@@ -147,13 +147,13 @@
                        (cleartop ?box)
                        (bind (elevation ?box $h-box))
                        (bind (elevation ?agent $h-agent))
-                       (setq $h-delta (- $h-box $h-agent))
+                       (assign $h-delta (- $h-box $h-agent))
                        (< $h-delta 1))  ;within reach +1 up or any level down
                 (assert (not (holds ?agent $cargo))
                         (loc $cargo $area)
                         (on $cargo ?box)
                         (elevation $cargo (1+ $h-box))
-                        (setq $place ?box))))
+                        (assign $place ?box))))
             ;; Can put cargo=box on a buzzer or mine
             (doall (?rover (either buzzer mine))
               (if (and (box $cargo)
@@ -165,12 +165,12 @@
                         (loc $cargo $area)
                         (supports ?rover $cargo)
                         (elevation $cargo 1)  ;box on buzzer = elevation 1
-                        (setq $place ?rover))))
+                        (assign $place ?rover))))
             ;; Can put cargo=box on the ground
             (assert (not (holds ?agent $cargo))
                     (loc $cargo $area)
                     (elevation $cargo 0)
-                    (setq $place 'ground))))
+                    (assign $place 'ground))))
       (finally (propagate-changes!))))
 
 
@@ -188,7 +188,7 @@
                  (loc ?box $area)
                  (bind (elevation ?box $h-box))
                  (<= (abs (- $h-box $h-agent)) 1))  ;within reach (+1,0,-1)
-          (assert (setq $cargo ?box)
+          (assert (assign $cargo ?box)
                   (holds ?agent ?box)
                   (not (elevation ?box $h-box))
                   (not (loc ?box $area))
@@ -228,19 +228,19 @@
         (if (and (cleartop ?box)
                  (loc ?box $area)  ;agent and box must be in same area
                  (bind (elevation ?box $h-box))
-                 (setq $h-delta (- $h-box $h-agent))
+                 (assign $h-delta (- $h-box $h-agent))
                  (< $h-delta 1))  ;agent can only reach box at same level or below;
           (assert (if (bind (on ?agent $old-box))
                     (not (on ?agent $old-box)))
                   (on ?agent ?box)
                   (elevation ?agent (1+ $h-box))  ;standing on a box sets agent elevation to box_elevation + 1
-                  (setq $place ?box))))
+                  (assign $place ?box))))
       ;; Can jump to the ground
       (if (> $h-agent 0)
         (assert (elevation ?agent 0)
                 (if (bind (on ?agent $box))
                   (not (on ?agent $box)))
-                (setq $place 'ground)))
+                (assign $place 'ground)))
       (finally (propagate-changes!))))
 
 

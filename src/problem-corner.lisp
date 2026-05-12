@@ -141,7 +141,7 @@
   ;; Counts receivers that need power but have no viable ACTIVE path from transmitter.
   ;; A viable path requires actual beam connectivity, not just structural potential.
   ;; Returns: 0-3 (deficit count)
-  (do (setq $deficit 0)
+  (do (assign $deficit 0)
       ;; receiver1 (red) - needed to open gate1
       (if (and (not (active receiver1))
                (not (active-path-to-receiver-p transmitter1 receiver1 red)))
@@ -193,7 +193,7 @@
   ;; A placed connector without power represents wasted work - it's not
   ;; contributing to any beam network yet.
   ;; Returns: 0-3 (count of unpowered placed connectors)
-  (do (setq $count 0)
+  (do (assign $count 0)
       (doall (?c connector)
         (if (and (bind (loc ?c $area))           ; connector is placed
                  (not (bind (color ?c $hue))))   ; but not powered
@@ -206,7 +206,7 @@
   ;; Example: connector has color=blue but paired with receiver2 (red).
   ;; This is actively harmful - the connector is working but can never help.
   ;; Returns: count of mismatched pairings
-  (do (setq $count 0)
+  (do (assign $count 0)
       (doall (?c connector)
         (if (bind (color ?c $c-hue))  ; connector is powered
           (doall (?r receiver)
@@ -224,7 +224,7 @@
   ; This is the most direct measure of goal distance since activating
   ; receivers is the primary objective.
   ; Returns: 0 (both active) to 2 (neither active)
-  (do (setq $n 0)
+  (do (assign $n 0)
       (if (not (active receiver2)) (incf $n))
       (if (not (active receiver3)) (incf $n))
       $n))
@@ -255,7 +255,7 @@
   ;; Penalizes placed connectors with pairings that cannot carry beams.
   ;; A pairing is useless if it connects two receivers (neither emits).
   ;; Returns: count of useless pairings
-  (do (setq $useless 0)
+  (do (assign $useless 0)
       (doall (?c connector)
         (if (bind (loc ?c $area))  ; only placed connectors
           (doall (?t1 terminus)
@@ -291,12 +291,12 @@
   ;; Initial state estimate: 2 + 2 + 0 + 1 + 1 = 6 (no pairings, not holding,
   ;; no local connector, not in area4). With cutoff 15, pruning begins at depth 10.
   (do (bind (loc agent1 $agent-area))
-      (setq $holding (bind (holds agent1 $cargo)))
-      (setq $chains-needed (count-receivers-needing-chains))
-      (setq $cost1 (pairing-establishment-cost $chains-needed $holding))
-      (setq $cost2 (connector-acquisition-move-cost $chains-needed $holding $agent-area))
-      (setq $cost3 (placement-viability-move-cost $chains-needed $holding $agent-area))
-      (setq $cost4 (reach-goal-area-cost $chains-needed $holding $agent-area))
+      (assign $holding (bind (holds agent1 $cargo)))
+      (assign $chains-needed (count-receivers-needing-chains))
+      (assign $cost1 (pairing-establishment-cost $chains-needed $holding))
+      (assign $cost2 (connector-acquisition-move-cost $chains-needed $holding $agent-area))
+      (assign $cost3 (placement-viability-move-cost $chains-needed $holding $agent-area))
+      (assign $cost4 (reach-goal-area-cost $chains-needed $holding $agent-area))
       (+ $cost1 $cost2 $cost3 $cost4)))
 
 
@@ -305,7 +305,7 @@
   ;; A "chain" is a path of paired connectors linking transmitter to receiver.
   ;; Receivers already active are satisfied regardless of pairings.
   ;; Returns: 0 (both connected or active), 1, or 2 (neither).
-  (do (setq $count 0)
+  (do (assign $count 0)
       (if (and (not (active receiver2))
                (not (pairing-chain-exists? transmitter1 receiver2)))
         (incf $count))
@@ -402,10 +402,10 @@
   ;; BFS from ?transmitter through paired connectors to ?receiver.
   ;; Returns t if a chain of connector pairings links transmitter to receiver.
   ;; With only 3 connectors, BFS terminates in at most 3 iterations.
-  (do (setq $frontier (list ?transmitter))
-      (setq $visited nil)
+  (do (assign $frontier (list ?transmitter))
+      (assign $visited nil)
       (ww-loop while $frontier do
-        (setq $next-frontier nil)
+        (assign $next-frontier nil)
         (ww-loop for $current in $frontier do
           (push $current $visited)
           (doall (?c connector)
@@ -416,7 +416,7 @@
                 (return-from pairing-chain-exists? t)
                 (if (not (member ?c $next-frontier))
                   (push ?c $next-frontier))))))
-        (setq $frontier $next-frontier))
+        (assign $frontier $next-frontier))
       nil))
 
 
@@ -470,7 +470,7 @@
 
 (define-query beam-reaches-target (?source ?target)
   ; Returns t if a beam from ?source to ?target reaches ?target's coordinates
-  (do (mvsetq ($target-x $target-y $target-z) (get-coordinates ?target))
+  (do (mv-assign ($target-x $target-y $target-z) (get-coordinates ?target))
       (exists (?b (get-current-beams))
         (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
              (eql $src ?source)
@@ -565,25 +565,25 @@
     (if (null ?hue-distance-pairs)
       (return-from resolve-hue-by-distance nil))
     ;; Find minimum distance for each unique hue
-    (setq $hue-min-dist (make-hash-table :test 'eq))
+    (assign $hue-min-dist (make-hash-table :test 'eq))
     (ww-loop for $pair in ?hue-distance-pairs do
-      (setq $hue (car $pair))
-      (setq $dist (cdr $pair))
-      (setq $existing (gethash $hue $hue-min-dist))
+      (assign $hue (car $pair))
+      (assign $dist (cdr $pair))
+      (assign $existing (gethash $hue $hue-min-dist))
       (if (or (null $existing)
               (< $dist $existing))
         (setf (gethash $hue $hue-min-dist) $dist)))
     ;; Find the globally minimum distance and which hue(s) achieve it
-    (setq $min-dist most-positive-fixnum)
-    (setq $winning-hue nil)
-    (setq $tie nil)
+    (assign $min-dist most-positive-fixnum)
+    (assign $winning-hue nil)
+    (assign $tie nil)
     (maphash (lambda ($h $d)
                (cond ((< $d $min-dist)
-                      (setq $min-dist $d)
-                      (setq $winning-hue $h)
-                      (setq $tie nil))
+                      (assign $min-dist $d)
+                      (assign $winning-hue $h)
+                      (assign $tie nil))
                      ((= $d $min-dist)
-                      (setq $tie t))))
+                      (assign $tie t))))
              $hue-min-dist)
     ;; Return winner only if no tie at minimum distance
     (if $tie
@@ -597,26 +597,26 @@
   ;; Uses strict bounds - no epsilon tolerance since obstacles have no topological
   ;; relationship with beams. Explicit endpoint exclusion is handled by caller.
   ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
-  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam direction x
-      (setq $dy1 (- ?end-y ?source-y))      ; Beam direction y
-      (setq $dx2 (- ?obs-x2 ?obs-x1))       ; Obstacle direction x
-      (setq $dy2 (- ?obs-y2 ?obs-y1))       ; Obstacle direction y
-      (setq $dx3 (- ?obs-x1 ?source-x))     ; Displacement x
-      (setq $dy3 (- ?obs-y1 ?source-y))     ; Displacement y
+  (do (assign $dx1 (- ?end-x ?source-x))      ; Beam direction x
+      (assign $dy1 (- ?end-y ?source-y))      ; Beam direction y
+      (assign $dx2 (- ?obs-x2 ?obs-x1))       ; Obstacle direction x
+      (assign $dy2 (- ?obs-y2 ?obs-y1))       ; Obstacle direction y
+      (assign $dx3 (- ?obs-x1 ?source-x))     ; Displacement x
+      (assign $dy3 (- ?obs-y1 ?source-y))     ; Displacement y
       ;; Calculate determinant for parallel line detection
-      (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
+      (assign $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
       ;; Handle parallel lines case
       (if (< (abs $det) 1e-10)
         (values nil nil nil)
         ;; Solve for intersection parameters using Cramer's rule
-        (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
-            (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
+        (do (assign $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
+            (assign $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
             ;; Strict bounds: intersection must be in interior of both segments
             (if (and (> $t 0.0) (< $t 1.0)      ; beam interior
                      (> $s 0.0) (< $s 1.0))     ; obstacle interior  ; <-- CHANGED: no epsilon
               ;; Calculate and return intersection coordinates
-              (do (setq $int-x (+ ?source-x (* $t $dx1)))
-                  (setq $int-y (+ ?source-y (* $t $dy1)))
+              (do (assign $int-x (+ ?source-x (* $t $dx1)))
+                  (assign $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
               ;; No valid intersection
               (values nil nil nil))))))
@@ -628,82 +628,82 @@
   ;; shared endpoints (beams from same connector) and chained beams (relay points).
   ;; Also handles collinear beams traveling toward each other (head-on collision).
   ;; Returns (values $t $int-x $int-y) or (values nil nil nil).
-  (do (setq $dx1 (- ?end-x ?source-x))      ; Beam 1 direction x
-      (setq $dy1 (- ?end-y ?source-y))      ; Beam 1 direction y
-      (setq $dx2 (- ?cross-x2 ?cross-x1))   ; Beam 2 direction x
-      (setq $dy2 (- ?cross-y2 ?cross-y1))   ; Beam 2 direction y
-      (setq $dx3 (- ?cross-x1 ?source-x))   ; Displacement x
-      (setq $dy3 (- ?cross-y1 ?source-y))   ; Displacement y
+  (do (assign $dx1 (- ?end-x ?source-x))      ; Beam 1 direction x
+      (assign $dy1 (- ?end-y ?source-y))      ; Beam 1 direction y
+      (assign $dx2 (- ?cross-x2 ?cross-x1))   ; Beam 2 direction x
+      (assign $dy2 (- ?cross-y2 ?cross-y1))   ; Beam 2 direction y
+      (assign $dx3 (- ?cross-x1 ?source-x))   ; Displacement x
+      (assign $dy3 (- ?cross-y1 ?source-y))   ; Displacement y
       ;; Calculate determinant for parallel line detection
-      (setq $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
-      (setq $eps 2e-2)
+      (assign $det (- (* $dy1 $dx2) (* $dx1 $dy2)))
+      (assign $eps 2e-2)
       ;; Handle parallel/collinear lines case
       (if (< (abs $det) 1e-10)
         ;; Lines are parallel - check if collinear
-        (do (setq $cross-disp (- (* $dx1 $dy3) (* $dy1 $dx3)))
+        (do (assign $cross-disp (- (* $dx1 $dy3) (* $dy1 $dx3)))
             (if (>= (abs $cross-disp) 1e-10)
               ;; Parallel but not collinear - no intersection
               (values nil nil nil)
               ;; Collinear - check for overlap
-              (do (setq $len-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
+              (do (assign $len-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
                   (if (< $len-sq 1e-10)
                     ;; Degenerate beam1
                     (values nil nil nil)
                     ;; Project beam2 endpoints onto beam1's parameterization
-                    (do (setq $t-start (/ (+ (* $dx3 $dx1) (* $dy3 $dy1)) $len-sq))
-                        (setq $vx4 (- ?cross-x2 ?source-x))
-                        (setq $vy4 (- ?cross-y2 ?source-y))
-                        (setq $t-end (/ (+ (* $vx4 $dx1) (* $vy4 $dy1)) $len-sq))
+                    (do (assign $t-start (/ (+ (* $dx3 $dx1) (* $dy3 $dy1)) $len-sq))
+                        (assign $vx4 (- ?cross-x2 ?source-x))
+                        (assign $vy4 (- ?cross-y2 ?source-y))
+                        (assign $t-end (/ (+ (* $vx4 $dx1) (* $vy4 $dy1)) $len-sq))
                         ;; Determine overlap with beam1's valid range [0,1]
-                        (setq $proj-min (min $t-start $t-end))
-                        (setq $proj-max (max $t-start $t-end))
-                        (setq $overlap-min (max 0.0 $proj-min))
-                        (setq $overlap-max (min 1.0 $proj-max))
+                        (assign $proj-min (min $t-start $t-end))
+                        (assign $proj-max (max $t-start $t-end))
+                        (assign $overlap-min (max 0.0 $proj-min))
+                        (assign $overlap-max (min 1.0 $proj-max))
                         ;; Check if there's meaningful overlap
                         (if (<= $overlap-max $overlap-min)
                           ;; No overlap
                           (values nil nil nil)
                           ;; Have overlap - check if it's in interior of both beams
                           (do ;; Interior of beam1: (eps, 1-eps)
-                              (setq $int-min (max $overlap-min $eps))
-                              (setq $int-max (min $overlap-max (- 1.0 $eps)))
+                              (assign $int-min (max $overlap-min $eps))
+                              (assign $int-max (min $overlap-max (- 1.0 $eps)))
                               (if (>= $int-min $int-max)
                                 ;; Overlap doesn't include interior
                                 (values nil nil nil)
                                 ;; Also check interior of beam2
-                                (do (setq $t-range (- $t-end $t-start))
+                                (do (assign $t-range (- $t-end $t-start))
                                     (if (< (abs $t-range) 1e-10)
                                       ;; Degenerate beam2
                                       (values nil nil nil)
                                       ;; Find t range where s ∈ (eps, 1-eps)
                                       (do (if (> $t-range 0)
-                                            (do (setq $s-valid-min (+ $t-start (* $eps $t-range)))
-                                                (setq $s-valid-max (+ $t-start (* (- 1.0 $eps) $t-range))))
-                                            (do (setq $s-valid-min (+ $t-start (* (- 1.0 $eps) $t-range)))
-                                                (setq $s-valid-max (+ $t-start (* $eps $t-range)))))
+                                            (do (assign $s-valid-min (+ $t-start (* $eps $t-range)))
+                                                (assign $s-valid-max (+ $t-start (* (- 1.0 $eps) $t-range))))
+                                            (do (assign $s-valid-min (+ $t-start (* (- 1.0 $eps) $t-range)))
+                                                (assign $s-valid-max (+ $t-start (* $eps $t-range)))))
                                           ;; Intersect with beam1's interior range
-                                          (setq $final-min (max $int-min $s-valid-min))
-                                          (setq $final-max (min $int-max $s-valid-max))
+                                          (assign $final-min (max $int-min $s-valid-min))
+                                          (assign $final-max (min $int-max $s-valid-max))
                                           (if (>= $final-min $final-max)
                                             ;; No valid overlap in both interiors
                                             (values nil nil nil)
                                             ;; Return midpoint of overlap using RATIONAL arithmetic
                                             ;; Use original rational bounds, not epsilon-adjusted floats
-                                            (do (setq $rational-min (max 0 $proj-min))  ; <-- CHANGED: 0 not 0.0
-                                                (setq $rational-max (min 1 $proj-max))  ; <-- CHANGED: 1 not 1.0
-                                                (setq $t (/ (+ $rational-min $rational-max) 2))  ; <-- CHANGED: 2 not 2.0
-                                                (setq $int-x (+ ?source-x (* $t $dx1)))
-                                                (setq $int-y (+ ?source-y (* $t $dy1)))
+                                            (do (assign $rational-min (max 0 $proj-min))  ; <-- CHANGED: 0 not 0.0
+                                                (assign $rational-max (min 1 $proj-max))  ; <-- CHANGED: 1 not 1.0
+                                                (assign $t (/ (+ $rational-min $rational-max) 2))  ; <-- CHANGED: 2 not 2.0
+                                                (assign $int-x (+ ?source-x (* $t $dx1)))
+                                                (assign $int-y (+ ?source-y (* $t $dy1)))
                                                 (values $t $int-x $int-y))))))))))))))  ; <-- ADDED: collinear handling
         ;; Non-parallel case: Solve for intersection parameters using Cramer's rule
-        (do (setq $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
-            (setq $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
+        (do (assign $t (/ (- (* $dy3 $dx2) (* $dx3 $dy2)) $det))
+            (assign $s (/ (- (* $dx1 $dy3) (* $dy1 $dx3)) $det))
             ;; Epsilon bounds: avoid false intersections at shared endpoints
             (if (and (> $t $eps) (< $t (- 1.0 $eps))      ; beam 1 interior
                      (> $s $eps) (< $s (- 1.0 $eps)))     ; beam 2 interior
               ;; Calculate and return intersection coordinates
-              (do (setq $int-x (+ ?source-x (* $t $dx1)))
-                  (setq $int-y (+ ?source-y (* $t $dy1)))
+              (do (assign $int-x (+ ?source-x (* $t $dx1)))
+                  (assign $int-y (+ ?source-y (* $t $dy1)))
                   (values $t $int-x $int-y))
               ;; No valid intersection
               (values nil nil nil))))))
@@ -712,9 +712,9 @@
 (define-query beam-segment-occlusion (?source-x ?source-y ?end-x ?end-y ?px ?py)
   ; Determines if an object in an area at (?px,?py) occludes a beam-segment with tolerance < 1.0
   ; Step 1: Calculate beam direction and length
-  (do (setq $dx (- ?end-x ?source-x))
-      (setq $dy (- ?end-y ?source-y))
-      (setq $length-squared (+ (* $dx $dx) (* $dy $dy)))
+  (do (assign $dx (- ?end-x ?source-x))
+      (assign $dy (- ?end-y ?source-y))
+      (assign $length-squared (+ (* $dx $dx) (* $dy $dy)))
       ;; Step 2: Handle degenerate case (zero-length beam)
       (if (< $length-squared 1e-10)
         ;; Check if point coincides with source/target
@@ -723,19 +723,19 @@
           (values 0.0 ?source-x ?source-y)      ; Point at source
           (values nil nil nil))     ; Point not at degenerate beam
         ;; Step 3: Calculate projection parameter
-        (do (setq $vx (- ?px ?source-x))   ; Vector from source to point
-            (setq $vy (- ?py ?source-y))
-            (setq $dot-product (+ (* $vx $dx) (* $vy $dy)))
-            (setq $t (/ $dot-product $length-squared))
+        (do (assign $vx (- ?px ?source-x))   ; Vector from source to point
+            (assign $vy (- ?py ?source-y))
+            (assign $dot-product (+ (* $vx $dx) (* $vy $dy)))
+            (assign $t (/ $dot-product $length-squared))
             ;; Step 4: Validate parameter within segment bounds
             (if (and (> $t 0.0) (< $t 1.0))
               ;; Step 5: Calculate closest point on beam to given point
-              (do (setq $closest-x (+ ?source-x (* $t $dx)))
-                  (setq $closest-y (+ ?source-y (* $t $dy)))
+              (do (assign $closest-x (+ ?source-x (* $t $dx)))
+                  (assign $closest-y (+ ?source-y (* $t $dy)))
                   ;; Step 6: Calculate distance from point to beam
-                  (setq $dist-x (- ?px $closest-x))
-                  (setq $dist-y (- ?py $closest-y))
-                  (setq $distance (sqrt (+ (* $dist-x $dist-x) 
+                  (assign $dist-x (- ?px $closest-x))
+                  (assign $dist-y (- ?py $closest-y))
+                  (assign $distance (sqrt (+ (* $dist-x $dist-x) 
                                           (* $dist-y $dist-y))))
                   ;; Step 7: Check if point is within intersection tolerance
                   (if (< $distance (+ 0.25d0 1d-6))  ; Tolerance for blocking the beam with epsilon
@@ -750,9 +750,9 @@
   ;; Returns the endpoint coordinates where the beam terminates
   (do
     ;; Initialize closest intersection tracking
-    (setq $closest-t 1.0)  ; Default to target if no intersections
-    (setq $result-x ?target-x)   
-    (setq $result-y ?target-y)
+    (assign $closest-t 1.0)  ; Default to target if no intersections
+    (assign $result-x ?target-x)   
+    (assign $result-y ?target-y)
     
     ;; Bind cached geometry lists once
     (bind (wall-segments $walls))
@@ -760,41 +760,41 @@
     
     ;; Loop 1: Check walls (always block)
     (ww-loop for $entry in $walls do
-      (setq $x1 (second $entry))
-      (setq $y1 (third $entry))
-      (setq $x2 (fourth $entry))
-      (setq $y2 (fifth $entry))
+      (assign $x1 (second $entry))
+      (assign $y1 (third $entry))
+      (assign $x2 (fourth $entry))
+      (assign $y2 (fifth $entry))
       ;; Endpoint exclusion
       (if (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
                    (and (= $x2 ?source-x) (= $y2 ?source-y))
                    (and (= $x1 ?target-x) (= $y1 ?target-y))
                    (and (= $x2 ?target-x) (= $y2 ?target-y))))
-        (do (mvsetq ($int-t $int-x $int-y)
+        (do (mv-assign ($int-t $int-x $int-y)
               (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
             (if (and $int-t (< $int-t $closest-t))
-              (do (setq $closest-t $int-t)
-                  (setq $result-x $int-x)
-                  (setq $result-y $int-y))))))
+              (do (assign $closest-t $int-t)
+                  (assign $result-x $int-x)
+                  (assign $result-y $int-y))))))
     
     ;; Loop 2: Check gates (only if closed)
     (ww-loop for $entry in $gates do
-      (setq $gate (first $entry))
+      (assign $gate (first $entry))
       (if (not (open $gate))
-        (do (setq $x1 (second $entry))
-            (setq $y1 (third $entry))
-            (setq $x2 (fourth $entry))
-            (setq $y2 (fifth $entry))
+        (do (assign $x1 (second $entry))
+            (assign $y1 (third $entry))
+            (assign $x2 (fourth $entry))
+            (assign $y2 (fifth $entry))
             ;; Endpoint exclusion
             (if (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
                          (and (= $x2 ?source-x) (= $y2 ?source-y))
                          (and (= $x1 ?target-x) (= $y1 ?target-y))
                          (and (= $x2 ?target-x) (= $y2 ?target-y))))
-              (do (mvsetq ($int-t $int-x $int-y)
+              (do (mv-assign ($int-t $int-x $int-y)
                     (beam-obstacle-intersection ?source-x ?source-y ?target-x ?target-y $x1 $y1 $x2 $y2))
                   (if (and $int-t (< $int-t $closest-t))
-                    (do (setq $closest-t $int-t)
-                        (setq $result-x $int-x)
-                        (setq $result-y $int-y))))))))
+                    (do (assign $closest-t $int-t)
+                        (assign $result-x $int-x)
+                        (assign $result-y $int-y))))))))
     
     ;; Loop 3: Check cargo and agents (dynamic positions)
     (doall (?obj (either cargo agent))
@@ -803,12 +803,12 @@
                ;; Endpoint exclusion
                (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
                         (and (= $x1 ?target-x) (= $y1 ?target-y)))))
-        (do (mvsetq ($int-t $int-x $int-y)
+        (do (mv-assign ($int-t $int-x $int-y)
               (beam-segment-occlusion ?source-x ?source-y ?target-x ?target-y $x1 $y1))
             (if (and $int-t (< $int-t $closest-t))
-              (do (setq $closest-t $int-t)
-                  (setq $result-x $int-x)
-                  (setq $result-y $int-y))))))
+              (do (assign $closest-t $int-t)
+                  (assign $result-x $int-x)
+                  (assign $result-y $int-y))))))
     
     ;; Return closest intersection coordinates
     (values $result-x $result-y)))
@@ -819,12 +819,12 @@
   ; Returns list of intersection records: ((beam1 beam2 intersection-x intersection-y) ...)
   (do 
       ;; Build coordinate cache for all beam sources
-      (setq $coord-cache (make-hash-table :test 'eq))
+      (assign $coord-cache (make-hash-table :test 'eq))
       (doall (?b (get-current-beams))
         (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
             ;; Cache source coordinates if not already cached
             (if (not (gethash $src $coord-cache))
-              (do (mvsetq ($x $y $z) (get-coordinates $src))
+              (do (mv-assign ($x $y $z) (get-coordinates $src))
                   (setf (gethash $src $coord-cache) (list $x $y))))))
       ;; Detect intersections using cached coordinates.
       ;; Note: nested doalls are more efficient than (doall (combination (?b1 ?b2) ...)
@@ -842,29 +842,29 @@
                 ;; 2. Either endpoint is a transmitter (transmitter beams are
                 ;;    primary and must not be blocked by a relay's back-beam,
                 ;;    which may carry a stale color during propagation).
-                (setq $reverse-pair (and (eql $src1 $tgt2)
+                (assign $reverse-pair (and (eql $src1 $tgt2)
                                          (eql $tgt1 $src2)))
-                (setq $src1-hue (get-hue-if-source $src1))
-                (setq $src2-hue (get-hue-if-source $src2))
-                (setq $skip-pair
+                (assign $src1-hue (get-hue-if-source $src1))
+                (assign $src2-hue (get-hue-if-source $src2))
+                (assign $skip-pair
                       (and $reverse-pair
                            (or (and $src1-hue $src2-hue (eql $src1-hue $src2-hue))
                                (transmitter $src1)
                                (transmitter $src2))))
                 (if (not $skip-pair)
                   (do
-                    (setq $src1-coords (gethash $src1 $coord-cache))
-                    (setq $src1-x (first $src1-coords))
-                    (setq $src1-y (second $src1-coords))
-                    (setq $tgt1-x $end1-x)
-                    (setq $tgt1-y $end1-y)
-                    (setq $src2-coords (gethash $src2 $coord-cache))
-                    (setq $src2-x (first $src2-coords))
-                    (setq $src2-y (second $src2-coords))
-                    (setq $tgt2-x $end2-x)
-                    (setq $tgt2-y $end2-y)
+                    (assign $src1-coords (gethash $src1 $coord-cache))
+                    (assign $src1-x (first $src1-coords))
+                    (assign $src1-y (second $src1-coords))
+                    (assign $tgt1-x $end1-x)
+                    (assign $tgt1-y $end1-y)
+                    (assign $src2-coords (gethash $src2 $coord-cache))
+                    (assign $src2-x (first $src2-coords))
+                    (assign $src2-y (second $src2-coords))
+                    (assign $tgt2-x $end2-x)
+                    (assign $tgt2-y $end2-y)
                     ;; Check intersection between current segments (not intended paths)
-                    (mvsetq ($t1 $int-x $int-y)
+                    (mv-assign ($t1 $int-x $int-y)
                       (beam-beam-intersection
                         $src1-x $src1-y $tgt1-x $tgt1-y
                         $src2-x $src2-y $tgt2-x $tgt2-y))
@@ -876,7 +876,7 @@
 (define-query beam-reaches-receiver (?receiver)
   ; Returns t if a color-matching beam reaches the receiver
   (do
-    (mvsetq ($r-x $r-y) (get-fixed-coordinates ?receiver))
+    (mv-assign ($r-x $r-y) (get-fixed-coordinates ?receiver))
     (bind (chroma ?receiver $required-hue))
     (exists (?b (get-current-beams))
       (and (bind (beam-segment ?b $source $target $end-x $end-y))
@@ -892,7 +892,7 @@
 (define-query connector-has-beam-power (?connector ?hue)
   ; Returns t if a beam with matching hue reaches the connector at its current coordinates
   (do
-    (mvsetq ($c-x $c-y $c-z) (get-coordinates ?connector))
+    (mv-assign ($c-x $c-y $c-z) (get-coordinates ?connector))
     (exists (?b (get-current-beams))
       (and (bind (beam-segment ?b $source $target $end-x $end-y))
            (eql $target ?connector)  ; Beam must target this connector
@@ -908,14 +908,14 @@
   ;; BFS from all transmitters, returning list of relays reachable via beam chains
   (do
     ;; Initialize frontier with all transmitters
-    (setq $frontier nil)
+    (assign $frontier nil)
     (doall (?t transmitter)
       (push ?t $frontier))
     ;; Initialize result set
-    (setq $powered-relays nil)
+    (assign $powered-relays nil)
     ;; BFS loop - continue while frontier has sources to process
     (ww-loop while $frontier do
-      (setq $next-frontier nil)
+      (assign $next-frontier nil)
       ;; Process each source in current frontier
       (ww-loop for $source in $frontier do
         ;; Check all beams originating from this source
@@ -925,7 +925,7 @@
                 ;; Beam originates from current source - check if target is a relay
                 (if (relay $tgt)
                   ;; Verify beam actually reaches target coordinates
-                  (do (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+                  (do (mv-assign ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
                       (if (and (= $end-x $tgt-x)
                                (= $end-y $tgt-y)
                                (not (member $tgt $powered-relays)))
@@ -933,7 +933,7 @@
                         (do (push $tgt $powered-relays)
                             (push $tgt $next-frontier)))))))))
       ;; Advance to next frontier
-      (setq $frontier $next-frontier))
+      (assign $frontier $next-frontier))
     $powered-relays))
 
 
@@ -942,16 +942,16 @@
   ;; Distance represents hop count from nearest transmitter
   (do
     ;; Initialize distance table - transmitters are at distance 0
-    (setq $distances (make-hash-table :test 'eq))
-    (setq $frontier nil)
+    (assign $distances (make-hash-table :test 'eq))
+    (assign $frontier nil)
     (doall (?t transmitter)
       (do (setf (gethash ?t $distances) 0)
           (push ?t $frontier)))
     ;; BFS loop
     (ww-loop while $frontier do
-      (setq $next-frontier nil)
+      (assign $next-frontier nil)
       (ww-loop for $source in $frontier do
-        (setq $source-dist (gethash $source $distances))
+        (assign $source-dist (gethash $source $distances))
         ;; Check all beams originating from this source
         (doall (?b (get-current-beams))
           (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
@@ -959,14 +959,14 @@
                 ;; Beam originates from current source - check if target is a relay
                 (if (relay $tgt)
                   ;; Verify beam actually reaches target coordinates
-                  (do (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+                  (do (mv-assign ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
                       (if (and (= $end-x $tgt-x)
                                (= $end-y $tgt-y))
                         ;; Beam reaches target - record distance if not yet visited
                         (if (not (gethash $tgt $distances))
                           (do (setf (gethash $tgt $distances) (1+ $source-dist))
                               (push $tgt $next-frontier))))))))))
-      (setq $frontier $next-frontier))
+      (assign $frontier $next-frontier))
     $distances))
 
 
@@ -1006,7 +1006,7 @@
     (doall (?agent agent)
       (if (exists (?cargo cargo)
             (and (not (bind (loc ?cargo $any-loc)))
-                 (setq $held ?cargo)))
+                 (assign $held ?cargo)))
         (holds ?agent $held)
         (do (bind (holds ?agent $any-cargo))
             (not (holds ?agent $any-cargo)))))
@@ -1023,12 +1023,12 @@
     (doall ((?src ?tgt) terminus)
       (if (or (paired ?src ?tgt) (paired ?tgt ?src))  ; Pairing exists (bidirectional)
         ;; Have a pairing - check if source can emit and beam should exist
-        (do (setq $source-hue (get-hue-if-source ?src))
+        (do (assign $source-hue (get-hue-if-source ?src))
             (if (and $source-hue                              ; Source is active
                      (not (beam-exists-p ?src ?tgt)))         ; Beam doesn't exist yet
               ;; Create beam: source is transmitter (always active) or powered connector
               (do (create-beam-segment-p! ?src ?tgt)
-                  (setq $created-any t))))))
+                  (assign $created-any t))))))
     $created-any))
 
 
@@ -1040,18 +1040,18 @@
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
           ;; Determine if beam should be removed
-          (setq $should-remove nil)
+          (assign $should-remove nil)
           ;; Reason 1: Pairing no longer exists (check bidirectional)
           (if (not (or (paired $src $tgt) (paired $tgt $src)))
-            (setq $should-remove t))
+            (assign $should-remove t))
           ;; Reason 2: Source is a relay that lost power (no color binding)
           (if (and (relay $src)
                    (not (bind (color $src $hue))))
-            (setq $should-remove t))
+            (assign $should-remove t))
           ;; Execute removal if needed
           (if $should-remove
             (do (remove-beam-segment-p! ?b)
-                (setq $removed-any t)))))
+                (assign $removed-any t)))))
     $removed-any))
 
 
@@ -1059,11 +1059,11 @@
   (do (doall (?b (get-current-beams))
         (do (bind (beam-segment ?b $source $target $old-end-x $old-end-y))
             ;; Get source coordinates
-            (mvsetq ($source-x $source-y $source-z) (get-coordinates $source))
+            (mv-assign ($source-x $source-y $source-z) (get-coordinates $source))
             ;; Get target coordinates  
-            (mvsetq ($target-x $target-y $target-z) (get-coordinates $target))
+            (mv-assign ($target-x $target-y $target-z) (get-coordinates $target))
             ;; Recalculate endpoint using current gate/beam states
-            (mvsetq ($new-end-x $new-end-y)
+            (mv-assign ($new-end-x $new-end-y)
                     (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
             ;; Update beam segment if endpoint changed
             (if (or (/= $new-end-x $old-end-x)
@@ -1082,81 +1082,81 @@
   ;; taking element-wise min of the two alternating states.
   (do
     ;; Phase 1: Collect all geometric intersections
-    (setq $all-intersections (collect-all-beam-intersections))
+    (assign $all-intersections (collect-all-beam-intersections))
     ;; Phase 2: Build per-beam geometry cache and obstacle-only t parameters
-    (setq $obstacle-t (make-hash-table :test 'eq))
-    (setq $effective-t (make-hash-table :test 'eq))
-    (setq $beam-geometry (make-hash-table :test 'eq))  ;beam -> (src-x src-y dx dy)
+    (assign $obstacle-t (make-hash-table :test 'eq))
+    (assign $effective-t (make-hash-table :test 'eq))
+    (assign $beam-geometry (make-hash-table :test 'eq))  ;beam -> (src-x src-y dx dy)
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (mvsetq ($src-x $src-y $src-z) (get-coordinates $src))
-          (mvsetq ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
-          (setq $dx (- $tgt-x $src-x))
-          (setq $dy (- $tgt-y $src-y))
+          (mv-assign ($src-x $src-y $src-z) (get-coordinates $src))
+          (mv-assign ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
+          (assign $dx (- $tgt-x $src-x))
+          (assign $dy (- $tgt-y $src-y))
           (setf (gethash ?b $beam-geometry) (list $src-x $src-y $dx $dy))
-          (setq $length-sq (+ (* $dx $dx) (* $dy $dy)))
+          (assign $length-sq (+ (* $dx $dx) (* $dy $dy)))
           (if (< $length-sq 1e-20)
-            (setq $t0 0)
-            (do (setq $curr-dx (- $old-end-x $src-x))
-                (setq $curr-dy (- $old-end-y $src-y))
-                (setq $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-                (setq $t0 (/ $dot $length-sq))))
+            (assign $t0 0)
+            (do (assign $curr-dx (- $old-end-x $src-x))
+                (assign $curr-dy (- $old-end-y $src-y))
+                (assign $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+                (assign $t0 (/ $dot $length-sq))))
           (setf (gethash ?b $obstacle-t) $t0)
           (setf (gethash ?b $effective-t) $t0)))
     ;; Phase 3: Iterative fixed-point resolution of beam-beam interference
-    (setq $prev1-t (make-hash-table :test 'eq))  ;values from 1 iteration ago
-    (setq $prev2-t (make-hash-table :test 'eq))  ;values from 2 iterations ago
+    (assign $prev1-t (make-hash-table :test 'eq))  ;values from 1 iteration ago
+    (assign $prev2-t (make-hash-table :test 'eq))  ;values from 2 iterations ago
     (ww-loop for $iteration from 1 to 10 do  ;bounded; converges in <= num-beams iterations
-      (setq $changed nil)
+      (assign $changed nil)
       (doall (?b (get-current-beams))
-        (do (setq $new-t (gethash ?b $obstacle-t))  ;start from obstacle upper bound
+        (do (assign $new-t (gethash ?b $obstacle-t))  ;start from obstacle upper bound
             (ww-loop for $intersection in $all-intersections do
-              (setq $beam1 (first $intersection))
-              (setq $beam2 (second $intersection))
-              (setq $int-x (third $intersection))
-              (setq $int-y (fourth $intersection))
+              (assign $beam1 (first $intersection))
+              (assign $beam2 (second $intersection))
+              (assign $int-x (third $intersection))
+              (assign $int-y (fourth $intersection))
               ;; Recompute full-path t parameters from intersection point so all
               ;; comparisons are in the same parameter space even when beams were
               ;; obstacle-truncated before interference resolution.
-              (setq $geom1 (gethash $beam1 $beam-geometry))
-              (setq $geom2 (gethash $beam2 $beam-geometry))
-              (setq $src1-x (first $geom1))
-              (setq $src1-y (second $geom1))
-              (setq $dx1 (third $geom1))
-              (setq $dy1 (fourth $geom1))
-              (setq $src2-x (first $geom2))
-              (setq $src2-y (second $geom2))
-              (setq $dx2 (third $geom2))
-              (setq $dy2 (fourth $geom2))
-              (setq $len1-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
-              (setq $len2-sq (+ (* $dx2 $dx2) (* $dy2 $dy2)))
+              (assign $geom1 (gethash $beam1 $beam-geometry))
+              (assign $geom2 (gethash $beam2 $beam-geometry))
+              (assign $src1-x (first $geom1))
+              (assign $src1-y (second $geom1))
+              (assign $dx1 (third $geom1))
+              (assign $dy1 (fourth $geom1))
+              (assign $src2-x (first $geom2))
+              (assign $src2-y (second $geom2))
+              (assign $dx2 (third $geom2))
+              (assign $dy2 (fourth $geom2))
+              (assign $len1-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
+              (assign $len2-sq (+ (* $dx2 $dx2) (* $dy2 $dy2)))
               (if (< $len1-sq 1e-20)
-                (setq $t1-full nil)
-                (do (setq $vx1 (- $int-x $src1-x))
-                    (setq $vy1 (- $int-y $src1-y))
-                    (setq $t1-full (/ (+ (* $vx1 $dx1) (* $vy1 $dy1)) $len1-sq))))
+                (assign $t1-full nil)
+                (do (assign $vx1 (- $int-x $src1-x))
+                    (assign $vy1 (- $int-y $src1-y))
+                    (assign $t1-full (/ (+ (* $vx1 $dx1) (* $vy1 $dy1)) $len1-sq))))
               (if (< $len2-sq 1e-20)
-                (setq $t2-full nil)
-                (do (setq $vx2 (- $int-x $src2-x))
-                    (setq $vy2 (- $int-y $src2-y))
-                    (setq $t2-full (/ (+ (* $vx2 $dx2) (* $vy2 $dy2)) $len2-sq))))
+                (assign $t2-full nil)
+                (do (assign $vx2 (- $int-x $src2-x))
+                    (assign $vy2 (- $int-y $src2-y))
+                    (assign $t2-full (/ (+ (* $vx2 $dx2) (* $vy2 $dy2)) $len2-sq))))
               (if (eql ?b $beam1)
-                (do (setq $t-param $t1-full)
-                    (setq $blocker $beam2)
-                    (setq $blocker-t $t2-full))
+                (do (assign $t-param $t1-full)
+                    (assign $blocker $beam2)
+                    (assign $blocker-t $t2-full))
                 (if (eql ?b $beam2)
-                  (do (setq $t-param $t2-full)
-                      (setq $blocker $beam1)
-                      (setq $blocker-t $t1-full))
-                  (setq $t-param nil)))
+                  (do (assign $t-param $t2-full)
+                      (assign $blocker $beam1)
+                      (assign $blocker-t $t1-full))
+                  (assign $t-param nil)))
               ;; Valid only if blocker's effective endpoint reaches the crossing
               (if (and $t-param
                        (>= (gethash $blocker $effective-t) $blocker-t)
                        (< $t-param $new-t))
-                (setq $new-t $t-param)))
+                (assign $new-t $t-param)))
             (if (/= $new-t (gethash ?b $effective-t))
               (do (setf (gethash ?b $effective-t) $new-t)
-                  (setq $changed t)))))
+                  (assign $changed t)))))
       (if (not $changed)
         (return))
       ;; Detect period-2 oscillation: current state matches state from 2 iterations ago
@@ -1168,7 +1168,7 @@
         ;; states (current = state A, prev1-t = state B).  Crossing beams that
         ;; appear truncated in either state are truly intersecting, so min is correct.
         (do (doall (?b (get-current-beams))
-              (do (setq $alt-val (gethash ?b $prev1-t))
+              (do (assign $alt-val (gethash ?b $prev1-t))
                   (if (< $alt-val (gethash ?b $effective-t))
                     (setf (gethash ?b $effective-t) $alt-val))))
             (return)))
@@ -1179,13 +1179,13 @@
     ;; Phase 4: Apply converged effective-t values to update beam endpoints
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (setq $geom (gethash ?b $beam-geometry))
-          (setq $src-x (first $geom))
-          (setq $src-y (second $geom))
-          (setq $dx (third $geom))
-          (setq $dy (fourth $geom))
-          (setq $new-end-x (+ $src-x (* (gethash ?b $effective-t) $dx)))
-          (setq $new-end-y (+ $src-y (* (gethash ?b $effective-t) $dy)))
+          (assign $geom (gethash ?b $beam-geometry))
+          (assign $src-x (first $geom))
+          (assign $src-y (second $geom))
+          (assign $dx (third $geom))
+          (assign $dy (fourth $geom))
+          (assign $new-end-x (+ $src-x (* (gethash ?b $effective-t) $dx)))
+          (assign $new-end-y (+ $src-y (* (gethash ?b $effective-t) $dy)))
           (if (or (/= $new-end-x $old-end-x)
                   (/= $new-end-y $old-end-y))
             (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
@@ -1199,7 +1199,7 @@
       (if (and (active ?r)
                (not (beam-reaches-receiver ?r)))
         (do (deactivate-receiver! ?r)
-            (setq $any-deactivated t))))
+            (assign $any-deactivated t))))
     $any-deactivated))
 
 
@@ -1208,7 +1208,7 @@
   ;; Uses forward reachability from transmitters to detect true power
   (do
     ;; Get set of relays with valid transmitter power
-    (setq $powered-relays (collect-transmitter-powered-relays))
+    (assign $powered-relays (collect-transmitter-powered-relays))
     (doall (?r relay)
       (if (bind (color ?r $c-hue))
         ;; Relay is currently active - verify it has transmitter power
@@ -1216,7 +1216,7 @@
           ;; No path to transmitter - deactivate
           (do
             (not (color ?r $c-hue))
-            (setq $deactivated-any t)))))
+            (assign $deactivated-any t)))))
     $deactivated-any))
 
 
@@ -1226,31 +1226,31 @@
   ;; Returns t if any relay was deactivated, nil otherwise
   (do
     ;; Compute distance table once for all relays
-    (setq $distances (compute-relay-distances))
+    (assign $distances (compute-relay-distances))
     (doall (?r relay)
       (if (bind (color ?r $existing-hue))
         ;; Relay is active - check for conflicts using distance priority
         (do
           ;; Collect all (hue . distance) pairs from beams that reach this relay
-          (setq $reaching-pairs nil)
+          (assign $reaching-pairs nil)
           (doall (?src terminus)
             (if (or (paired ?r ?src) (paired ?src ?r))
               (do
-                (setq $src-hue (get-hue-if-source ?src))
+                (assign $src-hue (get-hue-if-source ?src))
                 (if (and $src-hue
                          (beam-reaches-target ?src ?r))
                   ;; Compute distance and collect pair
-                  (do (setq $src-dist (gethash ?src $distances))
+                  (do (assign $src-dist (gethash ?src $distances))
                       (if $src-dist
                         (push (cons $src-hue (1+ $src-dist)) $reaching-pairs)))))))
           ;; Resolve using distance priority
-          (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
+          (assign $winning-hue (resolve-hue-by-distance $reaching-pairs))
           ;; Deactivate if true conflict (nil) or winner differs from current
           (if (and $reaching-pairs
                    (or (null $winning-hue)
                        (not (eql $winning-hue $existing-hue))))
             (do (not (color ?r $existing-hue))
-                (setq $deactivated-any t))))))
+                (assign $deactivated-any t))))))
     $deactivated-any))
 
 
@@ -1264,7 +1264,7 @@
             (doall (?g gate)
               (if (controls ?r ?g)
                 (open ?g)))
-            (setq $any-activated t))))
+            (assign $any-activated t))))
     $any-activated))
 
 
@@ -1274,27 +1274,27 @@
   ;; For connectors: enforces single-active-connector-per-area constraint
   (do
     ;; Compute distance table once for all relays
-    (setq $distances (compute-relay-distances))
+    (assign $distances (compute-relay-distances))
     (doall (?r relay)
       (if (not (bind (color ?r $existing-hue)))
         (do
           ;; Collect all (hue . distance) pairs from beams that reach this relay
-          (setq $reaching-pairs nil)
+          (assign $reaching-pairs nil)
           ;; Check all paired termini that could be sources
           (doall (?src terminus)
             (if (or (paired ?r ?src) (paired ?src ?r))  ; Pairing exists (bidirectional)
               (do
                 ;; Get source hue if it's an active source (transmitter or powered relay)
-                (setq $src-hue (get-hue-if-source ?src))
+                (assign $src-hue (get-hue-if-source ?src))
                 ;; If source has hue AND beam reaches relay, collect pair with distance
                 (if (and $src-hue
                          (beam-reaches-target ?src ?r))
                   ;; Compute distance and collect pair
-                  (do (setq $src-dist (gethash ?src $distances))
+                  (do (assign $src-dist (gethash ?src $distances))
                       (if $src-dist
                         (push (cons $src-hue (1+ $src-dist)) $reaching-pairs)))))))
           ;; Resolve using distance priority instead of consensus
-          (setq $winning-hue (resolve-hue-by-distance $reaching-pairs))
+          (assign $winning-hue (resolve-hue-by-distance $reaching-pairs))
           ;; Only activate if there's a clear winner (not a tie)
           ;; For connectors: also verify no other active connector in same area
           (if (and $winning-hue
@@ -1303,7 +1303,7 @@
                             (bind (loc ?r $relay-area))
                             (connectable ?r $relay-area))))
             (do (color ?r $winning-hue)
-                (setq $activated-any t))))))
+                (assign $activated-any t))))))
     $activated-any))
 
 
@@ -1331,13 +1331,13 @@
   (do
     ;; Generate new beam entity with next available index
     (bind (current-beams $current-beams))
-    (setq $next-index (1+ (length $current-beams)))
-    (setq $new-beam (intern (format nil "BEAM~D" $next-index)))
+    (assign $next-index (1+ (length $current-beams)))
+    (assign $new-beam (intern (format nil "BEAM~D" $next-index)))
     (register-dynamic-object $new-beam 'beam)
     ;; Calculate beam path and intersection
-    (mvsetq ($source-x $source-y $source-z) (get-coordinates ?source))
-    (mvsetq ($target-x $target-y $target-z) (get-coordinates ?target))
-    (mvsetq ($end-x $end-y) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
+    (mv-assign ($source-x $source-y $source-z) (get-coordinates ?source))
+    (mv-assign ($target-x $target-y $target-z) (get-coordinates ?target))
+    (mv-assign ($end-x $end-y) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
     ;; Create beam relations
     (beam-segment $new-beam ?source ?target $end-x $end-y)
     (current-beams (cons $new-beam $current-beams))
@@ -1398,13 +1398,13 @@
       ;            (on ?connector ?box)
       ;            (elevation ?connector (1+ $box-elevation))
       ;            (paired ?connector ?t1)
-      ;            (setq $place ?box)
+      ;            (assign $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (loc ?connector $area)
               ;(elevation ?connector 0)
               (paired ?connector ?t1)
-              (setq $place 'ground)
+              (assign $place 'ground)
               (finally (propagate-changes!)))))
 
 
@@ -1434,14 +1434,14 @@
       ;            (elevation ?connector (1+ $box-elevation))
       ;            (paired ?connector ?t1)
       ;            (paired ?connector ?t2)
-      ;            (setq $place ?box)
+      ;            (assign $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (loc ?connector $area)
               ;(elevation ?connector 0)
               (paired ?connector ?t1)
               (paired ?connector ?t2)
-              (setq $place 'ground)
+              (assign $place 'ground)
               (finally (propagate-changes!)))))
 
 
@@ -1476,7 +1476,7 @@
       ;            (paired ?connector ?t1)
       ;            (paired ?connector ?t2)
       ;            (paired ?connector ?t3)
-      ;            (setq $place ?box)
+      ;            (assign $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (loc ?connector $area)
@@ -1484,7 +1484,7 @@
               (paired ?connector ?t1)
               (paired ?connector ?t2)
               (paired ?connector ?t3)
-              (setq $place 'ground)
+              (assign $place 'ground)
               (finally (propagate-changes!)))))
 
 
@@ -1523,7 +1523,7 @@
       ;            (paired ?connector ?t2)
       ;            (paired ?connector ?t3)
       ;            (paired ?connector ?t4)
-      ;            (setq $place ?box)
+      ;            (assign $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; Can place on ground
       (assert (loc ?connector $area)
@@ -1532,7 +1532,7 @@
               (paired ?connector ?t2)
               (paired ?connector ?t3)
               (paired ?connector ?t4)
-              (setq $place 'ground)
+              (assign $place 'ground)
               (finally (propagate-changes!)))))
 
 
@@ -1554,26 +1554,26 @@
       ;              (loc $cargo $area)
       ;              (supports ?rover $cargo)
       ;              (elevation $cargo 1)
-      ;              (setq $place ?rover)
+      ;              (assign $place ?rover)
       ;              (finally (propagate-changes!))))))
       ;; All cargo: can put on a box
       ;(doall (?box box)
       ;  (if (and (loc ?box $area)
       ;           (cleartop ?box)
       ;           (bind (elevation ?box $box-elevation))
-      ;           (setq $delta (- $box-elevation $agent-elevation))
+      ;           (assign $delta (- $box-elevation $agent-elevation))
       ;           (< $delta 1))  ;within reach +1 up or any level down
       ;    (assert ;(not (holds ?agent $cargo))
       ;            (loc $cargo $area)
       ;            (on $cargo ?box)
       ;            (elevation $cargo (1+ $box-elevation))
-      ;            (setq $place ?box)
+      ;            (assign $place ?box)
       ;            (finally (propagate-changes!)))))
       ;; All cargo: can put on ground
       (assert ;(not (holds ?agent $cargo))
               (loc $cargo $area)
               ;(elevation $cargo 0)
-              (setq $place 'ground)
+              (assign $place 'ground)
               (finally (propagate-changes!)))))
 
 

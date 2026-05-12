@@ -62,14 +62,14 @@
   (and (bind (loc ?tile $tile-coords))
        (bind (empty $empty-coords))
        (bind (blocked $blocked-coords))
-       (setq $new-empty-coords (copy-list $empty-coords))
+       (assign $new-empty-coords (copy-list $empty-coords))
        (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
              (when (or (not (in-bounds new-tile-coord))
                        (member new-tile-coord $blocked-coords :test #'equal))  ;added for blocked coords
                (return nil))
              (if (member new-tile-coord $empty-coords :test #'equal)
-               (setq $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
+               (assign $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
                (when (not (member new-tile-coord $tile-coords :test #'equal))
                  (return nil)))  ;blocked by some other tile
              (push new-tile-coord $new-tile-coords)
@@ -78,7 +78,7 @@
                (push tile-coord $new-empty-coords))
           (finally (return t))))
   (?tile $direction)
-  (do (setq $direction (cond ((= ?d-col 1) 'right)
+  (do (assign $direction (cond ((= ?d-col 1) 'right)
                              ((= ?d-row 1) 'down)
                              ((= ?d-col -1) 'left)
                              ((= ?d-row -1) 'up)

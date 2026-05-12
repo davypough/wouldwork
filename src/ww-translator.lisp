@@ -616,14 +616,14 @@
              (collect (translate statement flag)))))
 
 
-(defun translate-mvsetq (form flag)
-  "Translates a multiple-value-setq clause."
-  `(multiple-value-setq ,(second form) ,(translate (third form) flag)))
+(defun translate-mv-assign (form flag)
+  "Translates an mv-assign statement, always returning t as a conjunct."
+  `(progn (multiple-value-setq ,(second form) ,(translate (third form) flag)) t))
 
 
-(defun translate-setq (form flag)
-  "Translates a setq statement. Used to assign a variable the value of a function."
-  `(setq ,(second form) ,(translate (third form) flag)))
+(defun translate-assign (form flag)
+  "Translates an assign statement, always returning t as a conjunct."
+  `(progn (setq ,(second form) ,(translate (third form) flag)) t))
 
 
 (defun translate-case (form flag)
@@ -744,11 +744,11 @@
         ((eql (car form) 'equivalent) (translate-equivalent form flag))
         ((eql (car form) 'bind) (translate-bind form flag))
         ((eql (car form) 'ww-loop) (translate-ww-loop form flag))
-        ((eql (car form) 'setq) (translate-setq form flag))
+        ((eql (car form) 'assign) (translate-assign form flag))
         ((eql (car form) 'let) (translate-let form flag))
         ((eql (car form) 'case) (translate-case form flag))
         ((eql (car form) 'cond) (translate-cond form flag))
-        ((member (car form) '(mvsetq multiple-value-setq)) (translate-mvsetq form flag))
+        ((eql (car form) 'mv-assign) (translate-mv-assign form flag))
         ((eql (car form) 'declare) form)
         ((eql (car form) 'print) (translate-print form flag))
         ((eql (car form) 'simulate-happenings-until-true)

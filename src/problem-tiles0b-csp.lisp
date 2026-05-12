@@ -52,7 +52,7 @@
   1
   (?ref-coord (get-remaining A))  ;process all remaining possible places that A can be put
   (and (bind (rel-coords A $rel-tile-coords))  ;relative tile coords of A
-       (setq $tile-coords (mapcar (lambda (pair)  ;current coords of the tile A
+       (assign $tile-coords (mapcar (lambda (pair)  ;current coords of the tile A
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))  ;current empty coords
@@ -68,7 +68,7 @@
   1
   (?ref-coord (get-remaining B))
   (and (bind (rel-coords B $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -84,7 +84,7 @@
   1
   (?ref-coord (get-remaining C))
   (and (bind (rel-coords C $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -100,7 +100,7 @@
   1
   (?ref-coord (get-remaining D))
   (and (bind (rel-coords D $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -116,7 +116,7 @@
   1
   (?ref-coord (get-remaining E))
   (and (bind (rel-coords E $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -132,7 +132,7 @@
   1
   (?ref-coord (get-remaining F))
   (and (bind (rel-coords F $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -148,7 +148,7 @@
   1
   (?ref-coord (get-remaining G))
   (and (bind (rel-coords G $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -164,7 +164,7 @@
   1
   (?ref-coord (get-remaining H))
   (and (bind (rel-coords H $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))
@@ -180,7 +180,7 @@
   1
   (?ref-coord (get-remaining I))
   (and (bind (rel-coords I $rel-tile-coords))
-       (setq $tile-coords (mapcar (lambda (pair)
+       (assign $tile-coords (mapcar (lambda (pair)
                                     (cons (+ (car pair) (car ?ref-coord)) (+ (cdr pair) (cdr ?ref-coord))))
                                   $rel-tile-coords))
        (bind (remaining EMPTY $empty-coords))

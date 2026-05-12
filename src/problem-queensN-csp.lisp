@@ -56,7 +56,7 @@
   (?col column)
   (and (bind (next-row $current-row))
        (<= $current-row *N*)
-       (setq $remaining-columns (get-remaining-columns? $current-row))
+       (assign $remaining-columns (get-remaining-columns? $current-row))
        (member ?col $remaining-columns)
        (not (conflict-with? $current-row ?col)))
   (?col)
