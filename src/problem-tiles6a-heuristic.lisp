@@ -35,12 +35,12 @@
   (Y-goal-coord $cons))  ;the ref coord of the goal location
 
 
-;(define-query heuristic? ()
-;  ;Get the manhattan distance from first coord of Y tile to the goal coord. Lower is better.
-;  (do (bind (loc Y $Y-coords))
-;      (bind (Y-goal-coord $Y-goal-coord))
-;      (+ (abs (- (caar $Y-coords) (car $Y-goal-coord)))  ;compare first coord
-;         (abs (- (cdar $Y-coords) (cdr $Y-goal-coord))))))
+(define-query heuristic? ()
+  ;Get the manhattan distance from first coord of Y tile to the goal coord. Lower is better.
+  (do (bind (loc Y $Y-coords))
+      (bind (Y-goal-coord $Y-goal-coord))
+      (+ (abs (- (caar $Y-coords) (car $Y-goal-coord)))  ;compare first coord
+         (abs (- (cdar $Y-coords) (cdr $Y-goal-coord))))))
 
 
 (defun in-bounds (coord)
@@ -63,13 +63,14 @@
        (bind (empty $empty-coords))
        (bind (blocked $blocked-coords))
        (assign $new-empty-coords (copy-list $empty-coords))
+       (assign $new-tile-coords nil)
        (iter (for tile-coord in $tile-coords)  ;starting empty coords subsequently updated
              (for new-tile-coord = (cons (+ (car tile-coord) ?d-row) (+ (cdr tile-coord) ?d-col)))
              (when (or (not (in-bounds new-tile-coord))
                        (member new-tile-coord $blocked-coords :test #'equal))  ;added for blocked coords
                (return nil))
              (if (member new-tile-coord $empty-coords :test #'equal)
-               (assign $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
+               (setf $new-empty-coords (delete new-tile-coord $new-empty-coords :test #'equal))
                (when (not (member new-tile-coord $tile-coords :test #'equal))
                  (return nil)))  ;blocked by some other tile
              (push new-tile-coord $new-tile-coords)

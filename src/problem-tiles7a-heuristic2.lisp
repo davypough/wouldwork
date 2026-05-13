@@ -3,6 +3,7 @@
 ;;; List problem specification for a blue/yellow tile shuffle in Islands of Insight.
 ;;; Basic search using (row . col) for coordinates (fastest)
 ;;; Using pre-post-emptys move empty coords for a tile
+;;; Requires extra memory
 
 (in-package :ww)  ;required
 
@@ -14,7 +15,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 20)  ;50)
+(ww-set *depth-cutoff* 50)
 
 (ww-set *progress-reporting-interval* 10000000)
 
