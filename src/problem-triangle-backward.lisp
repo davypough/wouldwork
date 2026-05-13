@@ -42,7 +42,7 @@
 
 (defparameter *reversed-pegs* nil)  ;list of pegs in reverse order
 
-(assign *depth-cutoff* 7)  ;add when searching bidirectional to partial depth
+(defparameter *depth-cutoff* 7)  ;add when searching bidirectional to partial depth
                           ;DepthBackward + DepthForward = DepthTotal
                           ;remove if full search backward to start state
 
@@ -195,7 +195,7 @@
     ;*db* is the name of the initial database
     ;update is the function that asserts a proposition
     ;into the database
-    initially (assign *reversed-pegs* (reverse pegs))
+    initially (setf *reversed-pegs* (reverse pegs))
               (update *db* `(peg-count 1))
               (update *db* `(loc ,(first *reversed-pegs*) 3 3 2))  ;set first peg
               (update *db* `(contents> 3 3 2 ,(first *reversed-pegs*)))
@@ -221,7 +221,7 @@
           (when (eql (first prop) 'loc)  ;only locations of pegs are important
             (let ((row (1- (third prop)))
                   (col (1- (fourth prop))))
-              (assign int (set-int-bit 1 int row col))))
+              (setf int (set-int-bit 1 int row col))))
           (finally (return int)))))
           
           

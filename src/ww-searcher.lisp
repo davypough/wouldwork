@@ -1376,32 +1376,32 @@
    Used when *debug* >= 2 to show state progression.
    On replay failure, prints a diagnostic and returns immediately;
    subsequent steps cannot be displayed once state reconstruction
-   has lost synchronization with the recorded plan."                      ;; CHANGED: docstring
+   has lost synchronization with the recorded plan."
   (declare (type solution soln))
   (let ((path (solution.path soln))
         (current-state (copy-problem-state *start-state*))
-        (step 0))                                                          ;; ADDED
-    (write (list (problem-state.time *start-state*) '(START-STATE)) :pretty t)   ;; CHANGED: was hardcoded '(0.0 (START-STATE))
+        (step 0))
+    (write (list (problem-state.time *start-state*) '(START-STATE)) :pretty t)
     (terpri)
     (format t "~A~%" (list-database (problem-state.idb current-state)))
     (terpri)
     (dolist (item path)
-      (incf step)                                                          ;; ADDED
+      (incf step)
       (let* ((action-form (second item))
              (new-state (replay-action-to-state action-form current-state)))
         (write item :pretty t)
         (terpri)
-        (cond (new-state                                                   ;; CHANGED: if -> cond
+        (cond (new-state
                (setf current-state new-state)
                (format t "~A~%" (list-database (problem-state.idb current-state)))
                (terpri))
-              (t                                                           ;; CHANGED
-               (report-replay-failure step action-form current-state)      ;; CHANGED
-               (return-from printout-solution-with-states)))))             ;; CHANGED
+              (t
+               (report-replay-failure step action-form current-state)
+               (return-from printout-solution-with-states)))))
     (terpri)))
 
 
-(defun report-replay-failure (step action-form last-good-state)            ;; ADDED (entire function)
+(defun report-replay-failure (step action-form last-good-state)
   "Print a diagnostic for replay failure in printout-solution-with-states.
    Replay failure is a system invariant violation: the recorded action
    did not reproduce when re-applied to its predecessor state. Likely
@@ -1421,16 +1421,13 @@
 (defun replay-action-to-state (action-form state)
   "Replay a single action from a solution path to state.
    Returns the new state, or NIL if replay fails.
-   
    ACTION-FORM is (action-name arg1 arg2 ...) from solution path.
    STATE is the current problem-state.
-   
    Unlike apply-action-to-state, this trusts the solution is valid and
    selects the correct effect by matching update.instantiations."
   (let* ((action-name (first action-form))
          (provided-args (rest action-form))
          (action (find action-name *actions* :key #'action.name)))
-    
     ;; Handle WAIT action: duration is informational, not an effect variable
     (when (eql action-name 'wait)
       (let ((wait-duration (first provided-args))
@@ -1443,15 +1440,12 @@
             (when net-state
               (setf new-state net-state))))
         (return-from replay-action-to-state new-state)))
-    
     (unless action
       (return-from replay-action-to-state nil))
-    
     ;; Get precondition argument combinations
     (let ((precondition-args (if (action.dynamic action)
                                   (eval-instantiated-spec (action.precondition-type-inst action) state)
                                   (action.precondition-args action))))
-      
       ;; Find any passing precondition and execute effect
       (dolist (pre-args precondition-args)
         ;; Effects can mutate the state while generating updates, so probe each
@@ -1460,10 +1454,9 @@
                (pre-result (apply (action.pre-defun-name action) trial-state pre-args)))
           (when pre-result
             ;; Execute effect to get all possible updates
-            (let ((updated-dbs (if (eql pre-result t)
-                                   (funcall (action.eff-defun-name action) trial-state)
-                                   (apply (action.eff-defun-name action) trial-state pre-result))))
-              
+            (let ((updated-dbs (nreverse (if (eql pre-result t)
+                                           (funcall (action.eff-defun-name action) trial-state)
+                                           (apply (action.eff-defun-name action) trial-state pre-result)))))
               ;; Find update with matching instantiations
               (dolist (update updated-dbs)
                 (when (equal (update.instantiations update) provided-args)
@@ -1479,7 +1472,6 @@
                         (when net-state
                           (setf new-state net-state))))
                     (return-from replay-action-to-state new-state))))))))
-      
       ;; No matching update found
       nil)))
 
