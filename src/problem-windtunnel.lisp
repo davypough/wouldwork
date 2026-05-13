@@ -670,47 +670,120 @@
 
 
 (define-update update-beams-if-interference! ()
-  ;; Simultaneously resolves all beam-beam intersections by truncating interfering beams
-  ;; at their intersection points, eliminating sequential processing dependencies
+  ;; Resolves all beam-beam intersections using iterative fixed-point computation.
+  ;; Each iteration validates intersections against current effective endpoints,
+  ;; converging when no beam's effective endpoint changes.  This avoids the
+  ;; cascading phantom problem where a single-pass approach uses an invalid
+  ;; (phantom) intersection to deflate a beam's effective-t.
+  ;; Detects period-2 oscillation (mutual blocking cycles) and resolves by
+  ;; taking element-wise min of the two alternating states.
   (do
-    ;; Phase 1: For each beam, determine its closest intersection point
+    ;; Phase 1: Collect all geometric intersections
+    (assign $all-intersections (collect-all-beam-intersections))
+    ;; Phase 2: Build per-beam geometry cache and obstacle-only t parameters
+    (assign $obstacle-t (make-hash-table :test 'eq))
+    (assign $effective-t (make-hash-table :test 'eq))
+    (assign $beam-geometry (make-hash-table :test 'eq))  ;beam -> (src-x src-y dx dy)
     (doall (?b (get-current-beams))
       (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
-          (mv-assign ($src-x $src-y) (get-coordinates $src))
-          (mv-assign ($tgt-x $tgt-y) (get-coordinates $tgt))
-          ;; Calculate t-parameter for current endpoint position
+          (mv-assign ($src-x $src-y $src-z) (get-coordinates $src))
+          (mv-assign ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
           (assign $dx (- $tgt-x $src-x))
           (assign $dy (- $tgt-y $src-y))
+          (setf (gethash ?b $beam-geometry) (list $src-x $src-y $dx $dy))
           (assign $length-sq (+ (* $dx $dx) (* $dy $dy)))
-          (assign $curr-dx (- $old-end-x $src-x))
-          (assign $curr-dy (- $old-end-y $src-y))
-          (assign $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
-          (assign $closest-t (/ $dot $length-sq))
-          (assign $new-end-x $old-end-x)
-          (assign $new-end-y $old-end-y)
-          ;; Check all intersections involving this beam
-          (ww-loop for $intersection in (collect-all-beam-intersections) do
-                (assign $beam1 (first $intersection))
-                (assign $beam2 (second $intersection))
-                (assign $int-x (third $intersection))
-                (assign $int-y (fourth $intersection))
-                (assign $t1 (fifth $intersection))
-                (assign $t2 (sixth $intersection))
-                ;; Determine which t-parameter applies to this beam and identify blocking beam
-                (if (eql ?b $beam1)
-                  (do (assign $t-param $t1)
-                      (assign $blocking-beam $beam2))
-                  (if (eql ?b $beam2)
-                    (do (assign $t-param $t2)
-                        (assign $blocking-beam $beam1))
-                    (assign $t-param nil)))
-                ;; Update closest intersection if this one is closer
-                (if (and $t-param (< $t-param $closest-t))
-                  (do (assign $closest-t $t-param)
-                      (assign $new-end-x $int-x)
-                      (assign $new-end-y $int-y))))
-          ;; Phase 2: Atomically update beam segment if endpoint changed
-          (if (or (/= $new-end-x $old-end-x) 
+          (if (< $length-sq 1e-20)
+            (assign $t0 0)
+            (do (assign $curr-dx (- $old-end-x $src-x))
+                (assign $curr-dy (- $old-end-y $src-y))
+                (assign $dot (+ (* $curr-dx $dx) (* $curr-dy $dy)))
+                (assign $t0 (/ $dot $length-sq))))
+          (setf (gethash ?b $obstacle-t) $t0)
+          (setf (gethash ?b $effective-t) $t0)))
+    ;; Phase 3: Iterative fixed-point resolution of beam-beam interference
+    (assign $prev1-t (make-hash-table :test 'eq))  ;values from 1 iteration ago
+    (assign $prev2-t (make-hash-table :test 'eq))  ;values from 2 iterations ago
+    (ww-loop for $iteration from 1 to 10 do  ;bounded; converges in <= num-beams iterations
+      (assign $changed nil)
+      (doall (?b (get-current-beams))
+        (do (assign $new-t (gethash ?b $obstacle-t))  ;start from obstacle upper bound
+            (ww-loop for $intersection in $all-intersections do
+              (assign $beam1 (first $intersection))
+              (assign $beam2 (second $intersection))
+              (assign $int-x (third $intersection))
+              (assign $int-y (fourth $intersection))
+              ;; Recompute full-path t parameters from intersection point so all
+              ;; comparisons are in the same parameter space even when beams were
+              ;; obstacle-truncated before interference resolution.
+              (assign $geom1 (gethash $beam1 $beam-geometry))
+              (assign $geom2 (gethash $beam2 $beam-geometry))
+              (assign $src1-x (first $geom1))
+              (assign $src1-y (second $geom1))
+              (assign $dx1 (third $geom1))
+              (assign $dy1 (fourth $geom1))
+              (assign $src2-x (first $geom2))
+              (assign $src2-y (second $geom2))
+              (assign $dx2 (third $geom2))
+              (assign $dy2 (fourth $geom2))
+              (assign $len1-sq (+ (* $dx1 $dx1) (* $dy1 $dy1)))
+              (assign $len2-sq (+ (* $dx2 $dx2) (* $dy2 $dy2)))
+              (if (< $len1-sq 1e-20)
+                (assign $t1-full nil)
+                (do (assign $vx1 (- $int-x $src1-x))
+                    (assign $vy1 (- $int-y $src1-y))
+                    (assign $t1-full (/ (+ (* $vx1 $dx1) (* $vy1 $dy1)) $len1-sq))))
+              (if (< $len2-sq 1e-20)
+                (assign $t2-full nil)
+                (do (assign $vx2 (- $int-x $src2-x))
+                    (assign $vy2 (- $int-y $src2-y))
+                    (assign $t2-full (/ (+ (* $vx2 $dx2) (* $vy2 $dy2)) $len2-sq))))
+              (if (eql ?b $beam1)
+                (do (assign $t-param $t1-full)
+                    (assign $blocker $beam2)
+                    (assign $blocker-t $t2-full))
+                (if (eql ?b $beam2)
+                  (do (assign $t-param $t2-full)
+                      (assign $blocker $beam1)
+                      (assign $blocker-t $t1-full))
+                  (assign $t-param nil)))
+              ;; Valid only if blocker's effective endpoint reaches the crossing
+              (if (and $t-param
+                       (>= (gethash $blocker $effective-t) $blocker-t)
+                       (< $t-param $new-t))
+                (assign $new-t $t-param)))
+            (if (/= $new-t (gethash ?b $effective-t))
+              (do (setf (gethash ?b $effective-t) $new-t)
+                  (assign $changed t)))))
+      (if (not $changed)
+        (return))
+      ;; Detect period-2 oscillation: current state matches state from 2 iterations ago
+      (if (and (> $iteration 2)
+               (not (exists (?b (get-current-beams))
+                      (/= (gethash ?b $effective-t)
+                          (gethash ?b $prev2-t -1)))))
+        ;; Oscillation detected: resolve by element-wise min of the two alternating
+        ;; states (current = state A, prev1-t = state B).  Crossing beams that
+        ;; appear truncated in either state are truly intersecting, so min is correct.
+        (do (doall (?b (get-current-beams))
+              (do (assign $alt-val (gethash ?b $prev1-t))
+                  (if (< $alt-val (gethash ?b $effective-t))
+                    (setf (gethash ?b $effective-t) $alt-val))))
+            (return)))
+      ;; Rotate saved states: prev2 <- prev1, prev1 <- current
+      (doall (?b (get-current-beams))
+        (do (setf (gethash ?b $prev2-t) (gethash ?b $prev1-t))
+            (setf (gethash ?b $prev1-t) (gethash ?b $effective-t)))))
+    ;; Phase 4: Apply converged effective-t values to update beam endpoints
+    (doall (?b (get-current-beams))
+      (do (bind (beam-segment ?b $src $tgt $old-end-x $old-end-y))
+          (assign $geom (gethash ?b $beam-geometry))
+          (assign $src-x (first $geom))
+          (assign $src-y (second $geom))
+          (assign $dx (third $geom))
+          (assign $dy (fourth $geom))
+          (assign $new-end-x (+ $src-x (* (gethash ?b $effective-t) $dx)))
+          (assign $new-end-y (+ $src-y (* (gethash ?b $effective-t) $dy)))
+          (if (or (/= $new-end-x $old-end-x)
                   (/= $new-end-y $old-end-y))
             (beam-segment ?b $src $tgt $new-end-x $new-end-y))))
     nil))  ;must return nil
