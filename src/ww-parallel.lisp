@@ -484,15 +484,19 @@
                      :name (format nil "ww-worker-~D" worker-id))
                     threads)))
           
-          ;; Wait for all workers; on any non-local exit (Ctrl-C, etc.) signal shutdown
-          (unwind-protect                                              ; ADDED
-              (dolist (thread threads)
-                (bt:join-thread thread))
-            (setf *shutdown-requested* t)                             ; ADDED
-            (sb-thread:condition-broadcast (tq-waitqueue task-queue)) ; ADDED
-            (dolist (thread threads)                                  ; ADDED
-              (when (sb-thread:thread-alive-p thread)                 ; ADDED
-                (sb-thread:join-thread thread :default nil)))))       ; ADDED
+          ;; Wait for all workers; on abnormal exit only, signal shutdown
+          (let ((completed-normally nil))
+            (unwind-protect
+                (progn
+                  (dolist (thread threads)
+                    (bt:join-thread thread))
+                  (setf completed-normally t))
+              (unless completed-normally
+                (setf *shutdown-requested* t)
+                (sb-thread:condition-broadcast (tq-waitqueue task-queue))
+                (dolist (thread threads)
+                  (when (sb-thread:thread-alive-p thread)
+                    (sb-thread:join-thread thread :default nil))))))
         
         ;; Record worker search time
         (setf (pt-worker-search-ms *parallel-timing*)
@@ -518,60 +522,7 @@
                               internal-time-units-per-second))))
       
       ;; Cleanup
-      (setf *parallel-search-active* nil)
-      
-      ;; === Final Report ===
-      (bt:with-lock-held (*lock*)
-        (format t "~%========================================~%")
-        (format t "Parallel Search Results with ~D threads~%" *threads*)
-        (format t "========================================~%")
-        (format t "  States processed: ~:D~%" *total-states-processed*)
-        (format t "  Repeated states:  ~:D~%" *repeated-states*)
-        (format t "  Program cycles:   ~:D~%" *program-cycles*)
-        (format t "  Max depth:        ~D~%" *max-depth-explored*)
-        (format t "  Solutions:        ~D~%" (length *solutions*))
-        
-        (when (and (member *solution-type* '(min-length min-time min-value max-value))
-                   *solutions*)
-          (format t "  Best bound:       ~A~%" 
-                  (if (eql *solution-type* 'max-value)
-                      (- *best-bound*)
-                      *best-bound*)))
-        
-        (when (and (eql *tree-or-graph* 'graph) *closed-shards*)
-          (format t "  Closed entries:   ~:D (across ~D shards)~%"
-                  (closed-shards-total-count) *num-closed-shards*))
-        
-        ;; Donation statistics
-        (when *enable-work-donation*
-          (multiple-value-bind (total-donated total-events)
-              (compute-donation-totals)
-            (when (> total-events 0)
-              (format t "  Work donated:     ~:D nodes (~D events)~%"
-                      total-donated total-events))))
-        
-        ;; Timing breakdown
-        (format t "~%  Timing:~%")
-        (format t "    Task generation: ~A~%" 
-                (format-timing (pt-task-generation-ms *parallel-timing*)))
-        (format t "    Worker search:   ~A~%" 
-                (format-timing (pt-worker-search-ms *parallel-timing*)))
-        (format t "    Finalization:    ~A~%" 
-                (format-timing (pt-finalization-ms *parallel-timing*)))
-        (format t "    Total:           ~A~%" 
-                (format-timing (pt-total-ms *parallel-timing*)))
-        
-        ;; Performance metrics
-        (let ((search-ms (pt-worker-search-ms *parallel-timing*)))
-          (when (> search-ms 0)
-            (format t "~%  Performance:~%")
-            (format t "    States/sec:      ~:D~%" 
-                    (round (* 1000 (/ *total-states-processed* search-ms))))
-            (format t "    Search efficiency: ~,1F%~%"
-                    (* 100.0 (/ search-ms (max 1 (pt-total-ms *parallel-timing*)))))))
-        
-        (format t "========================================~%")
-        (finish-output)))))
+      (setf *parallel-search-active* nil)))))
 
 
 ;;; ============================================================
