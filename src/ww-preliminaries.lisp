@@ -6,10 +6,8 @@
 (in-package :ww)
 
 
-;Note: It is necessary to close & reopen the lisp environment after
-;      changing here from nonparallel to parallel, or parallel to nonparallel.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *threads* 0
+  (defvar *threads* 0
     "The number of parallel threads to use.
       0 means no parallelism (ie, serial processing)
       1 means use one parallel thread
@@ -94,10 +92,7 @@
 
 
 (defmacro define-global (var-name val-form &optional doc-string)
-  `(progn
-     ,(if (> *threads* 0)
-          `(sb-ext:defglobal ,var-name ,val-form ,doc-string)
-          `(defparameter ,var-name ,val-form ,doc-string))))
+  `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
 
 
 (defmacro increment-global (var-name &optional (delta-form 1))
@@ -146,15 +141,12 @@
 
 (defun reset-global-hash-tables ()
   "Clear all global hash tables and reset global lists between problem loads.
-   Critical for parallel mode where sb-ext:defglobal prevents reinitialization.
-   In parallel mode (*threads* > 0), define-global uses sb-ext:defglobal which
-   only evaluates initialization forms ONCE. On subsequent ASDF reloads, the
-   variables remain bound to their previous values, causing state contamination
-   between sequential problem loads.
+   define-global always uses sb-ext:defglobal, which only evaluates initialization
+   forms ONCE per image session. On subsequent ASDF reloads the variables remain
+   bound to their previous values, causing state contamination between problem loads.
    This function must execute at top-level in ww-preliminaries.lisp so it runs
-   on every system reload, before problem files populate the hash tables with
-   new data."
-  (when (> *threads* 0)  ; Only needed when using sb-ext:defglobal
+   on every system reload, before problem files populate the hash tables."
+  (when t  ;CHANGED: always run (sb-ext:defglobal never auto-reinits regardless of *threads*)
     ;; Hash tables for type system and object mappings
     (when (and (boundp '*types*) (hash-table-p *types*))
       (clrhash *types*))
@@ -216,14 +208,15 @@
 
 (defun read-init-vals (vals-file)
   "Load critical initialization parameters from vals.lisp if it exists.
-   Sets *problem-name*, *algorithm*, and *debug* for proper loading.
+   Sets *problem-name*, *algorithm*, *debug*, and *threads* for proper loading.
    Returns the problem-name string for eval-when path construction, or nil if file absent."
   (when (probe-file vals-file)
     (with-open-file (stream vals-file :direction :input)
       (let ((parameters (read stream)))
         (setf *problem-name* (first parameters)      ; position 0
               *algorithm* (third parameters)         ; position 2  
-              *debug* (nth 11 parameters))           ; position 11
+              *debug* (nth 11 parameters)            ; position 11
+              *threads* (or (nth 13 parameters) 2))  ; position 13
         ;; Handle debug feature flag based on loaded value
         (if (> *debug* 0)
             (pushnew :ww-debug *features*)

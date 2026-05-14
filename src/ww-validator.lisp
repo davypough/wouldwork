@@ -461,9 +461,9 @@
                      (format t "~%It's normally inefficient to enable *auto-wait* without exogenous happenings.~%~
                                 Define patrollers or other happening objects first.~2%"))))
     (*symmetry-pruning* nil)
-    (*threads* (error "Cannot set *threads* in the REPL or in a problem specification.
-                       Specify the number of *threads* in ww-settings.lisp instead (but only if running SBCL),
-                       then exit SBCL, and reload."))
+    (*threads*
+      (unless (and (typep val 'fixnum) (>= val 0))
+        (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))
     (otherwise (error "~S is not a valid parameter name in (ww-set ~S ~S)." param param val))))
 
 

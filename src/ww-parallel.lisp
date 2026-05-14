@@ -484,9 +484,15 @@
                      :name (format nil "ww-worker-~D" worker-id))
                     threads)))
           
-          ;; Wait for all workers to complete
-          (dolist (thread threads)
-            (bt:join-thread thread)))
+          ;; Wait for all workers; on any non-local exit (Ctrl-C, etc.) signal shutdown
+          (unwind-protect                                              ; ADDED
+              (dolist (thread threads)
+                (bt:join-thread thread))
+            (setf *shutdown-requested* t)                             ; ADDED
+            (sb-thread:condition-broadcast (tq-waitqueue task-queue)) ; ADDED
+            (dolist (thread threads)                                  ; ADDED
+              (when (sb-thread:thread-alive-p thread)                 ; ADDED
+                (sb-thread:join-thread thread :default nil)))))       ; ADDED
         
         ;; Record worker search time
         (setf (pt-worker-search-ms *parallel-timing*)
@@ -573,21 +579,33 @@
 ;;; ============================================================
 
 (defun finalize-parallel-search-results ()
-  "Post-process parallel search results for interface consistency."
-  ;; Remove duplicate solutions
-  (setf *unique-solutions*
-        (remove-duplicates *solutions*
-                           :test #'solution-equivalent-p))
+  "Post-process parallel search results for interface consistency.
+   Builds *unique-solutions* in O(N) using a hash-table keyed on goal
+   idb-hash, replacing the prior O(N^2) remove-duplicates scan.
+   Buckets handle hash collisions via equalp fallback (vanishingly rare).
+   When duplicate goal states are found, retains the better solution
+   per solution-better-p."
+  (let ((seen (make-hash-table :test #'eql :size (max 1024 (length *solutions*)))))
+    (dolist (solution *solutions*)
+      (let* ((goal-state (solution.goal solution))
+             (goal-idb (problem-state.idb goal-state))
+             (hash (ensure-idb-hash goal-state))
+             (bucket (gethash hash seen))
+             (match (find goal-idb bucket
+                          :key (lambda (s) (problem-state.idb (solution.goal s)))
+                          :test #'equalp)))
+        (cond (match
+               (when (solution-better-p solution match)
+                 (setf (gethash hash seen)
+                       (cons solution (delete match bucket :test #'eq)))))
+              (t
+               (setf (gethash hash seen) (cons solution bucket))))))
+    (setf *unique-solutions*
+          (loop for bucket being the hash-values of seen
+                append bucket)))
   (when (>= *debug* 1)
     (format t "~&Parallel search: ~D solutions, ~D unique~%"
             (length *solutions*) (length *unique-solutions*))))
-
-
-(defun solution-equivalent-p (sol1 sol2)
-  "Compare solutions for equivalence by goal state."
-  (and sol1 sol2
-       (equalp (problem-state.idb (solution.goal sol1))
-               (problem-state.idb (solution.goal sol2)))))
 
 
 ;;; ============================================================

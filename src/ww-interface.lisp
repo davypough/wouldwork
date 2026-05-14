@@ -19,7 +19,8 @@
     nil              ; *probe*
     0                ; *debug*
     nil              ; *symmetry-pruning*
-    nil)             ; *goal* 
+    nil              ; *goal*
+    0)               ; *threads*                                       ;; CHANGED
   "Default parameter values in save/read order")
 
 
@@ -238,7 +239,8 @@ any such settings appearing in the problem specification file.
   (destructuring-bind 
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
         default-problem-type default-solution-type default-progress-reporting-interval 
-        default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal)
+        default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal
+        default-threads)                                               ;; CHANGED
       *default-parameters*
     (setf *problem-name* default-problem-name
           *depth-cutoff* default-depth-cutoff  
@@ -252,7 +254,8 @@ any such settings appearing in the problem specification file.
           *probe* default-probe
           *symmetry-pruning* default-symmetry-pruning
           *debug* default-debug
-          *goal* default-goal))
+          *goal* default-goal
+          *threads* default-threads))                                  ;; CHANGED
   (setf *features* (remove :ww-debug *features*)))
 
 
@@ -260,16 +263,22 @@ any such settings appearing in the problem specification file.
   "Save the values of the globals in the vals.lisp file."
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
                       *solution-type* *progress-reporting-interval* *randomize-search* 
-                      *branch* *probe* *symmetry-pruning* *debug* *goal*)
+                      *branch* *probe* *symmetry-pruning* *debug* *goal*
+                      *threads*)                                       ;; CHANGED
                 *globals-file*))
 
 
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (destructuring-bind 
-       (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
-        progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal)
-      (read-from-file *globals-file* *default-parameters*)
+  (let* ((params (read-from-file *globals-file* *default-parameters*))
+         (padded (if (< (length params) 14)                            ;; CHANGED: backwards compatible with old vals.lisp
+                     (append params (list 2))                          ;; CHANGED: pad missing *threads* with default
+                     params)))                                         ;; CHANGED
+    (destructuring-bind 
+         (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
+          progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal
+          threads)                                                      ;; CHANGED
+        padded
       (setf *problem-name* problem-name
             *depth-cutoff* depth-cutoff
             *algorithm* algorithm
@@ -282,7 +291,8 @@ any such settings appearing in the problem specification file.
             *probe* probe
             *symmetry-pruning* symmetry-pruning
             *debug* debug
-            *goal* goal)))
+            *goal* goal
+            *threads* threads))))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;

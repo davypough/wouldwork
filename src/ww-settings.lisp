@@ -205,8 +205,14 @@
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry groups and prune symmetric action instantiations.")
 
-(define-global *types* (make-hash-table :test #'eq :synchronized (> *threads* 0))
-  "Table of all types.")
+(define-global *types*
+  (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  "Table of all types.
+   Written only during init(); strictly read-only during search.
+   Pre-allocated to 256 (well above any realistic type count)
+   with rehash-threshold 1.0 so the table never resizes.
+   Not :synchronized - lock-free reads on the worker hot path
+   (precondition expansion reads here ~59M times/run in queensN-csp profile).")
 
 (define-global *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
@@ -217,11 +223,23 @@
 (define-global *connectives* '(and or not)
   "Logical connectives.")
 
-(define-global *symmetrics* (make-hash-table :test #'eq :synchronized (> *threads* 0))
-  "Symmetric relations.")
+(define-global *symmetrics*
+  (make-hash-table :test #'eq :size 64 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  "Symmetric relations.
+   Written only during init(); strictly read-only during search.
+   Pre-allocated to 64 (well above any realistic symmetric-relation count)
+   with rehash-threshold 1.0 so the table never resizes.
+   Not :synchronized - lock-free reads on the worker hot path
+   (add-proposition calls gethash here ~70M times/run in queensN-csp profile).")
 
-(define-global *complements* (make-hash-table :test #'eq :synchronized (> *threads* 0))
-  "Table of complement relations.")
+(define-global *complements*
+  (make-hash-table :test #'eq :size 128 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  "Table of complement relations.
+   Written only during init(); strictly read-only during search.
+   Pre-allocated to 128 (well above any realistic complement count)
+   with rehash-threshold 1.0 so the table never resizes.
+   Not :synchronized - lock-free reads on the worker hot path
+   (add-prop calls gethash here ~70M times/run in queensN-csp profile).")
 
 (define-global *fluent-relation-indices* (make-hash-table :test #'eq)
   "List of fluent argument indices for a relation.")
@@ -238,8 +256,15 @@
 (define-global *hidb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of dynamic hidb propositions.")
 
-(define-global *constant-integers* (make-hash-table :synchronized (> *threads* 0))
-  "Integer codes for the problem's object constants.")
+(define-global *constant-integers*
+  (make-hash-table :size 2003 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  "Integer codes for the problem's object constants.
+   Pre-allocated to capacity 2003 (above the 999-object design limit
+   in convert-to-integer/register-dynamic-object) with rehash-threshold
+   1.0 so the table never resizes during search. Not :synchronized -
+   reads on the worker hot path (convert-fluentless-prop-to-integer,
+   ~12M calls/run in queensN-csp profile) are lock-free; the rare
+   write path is already serialized by *integer-lock*.")
 
 (define-global *integer-constants* (make-hash-table :synchronized (> *threads* 0))
   "Translating codes back to constants for printout.")

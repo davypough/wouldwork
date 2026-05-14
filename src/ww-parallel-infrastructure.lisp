@@ -153,6 +153,8 @@
     (let ((got-item-p nil))
       (unwind-protect
           (loop
+            (when *shutdown-requested*                              ; ADDED: wake on Ctrl-C shutdown
+              (return nil))
             (unless (tq-empty-p queue)
               (let* ((buffer (tq-buffer queue))
                      (head (tq-head queue))
@@ -162,13 +164,11 @@
                 (decf (tq-count queue))
                 (setf got-item-p t)
                 (return item)))
-
             (when (and (tq-done-p queue)
                        (tq-empty-p queue)
                        (zerop (tq-active-workers queue)))
               (sb-thread:condition-broadcast (tq-waitqueue queue))
               (return nil))
-
             (sb-thread:condition-wait (tq-waitqueue queue) (tq-mutex queue)))
         ;; Only restore "active" if we actually got work.
         (when got-item-p

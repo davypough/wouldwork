@@ -67,4 +67,15 @@
        ((*problem-name* *problem-type*)
           (if *ww-loading*
             (setf ,param ',val)
-            (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param))))))
+            (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param)))
+       (*threads*
+          (let ((crossing-boundary (or (and (zerop *threads*) (> ',val 0))
+                                       (and (zerop ',val) (> *threads* 0)))))
+            (setf ,param ',val)
+            (save-globals)
+            (if crossing-boundary
+                (format t "~%*threads* set to ~D and saved.~%~
+                           Switching between 0 and non-zero requires a fresh SBCL session.~%~
+                           Please exit SBCL, restart, and reload:~%~
+                             (progn (ql:quickload :wouldwork) (in-package :ww))~%" ',val)
+                (display-current-parameters)))))))
