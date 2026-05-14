@@ -31,17 +31,17 @@
    Used to detect when an object has been distinguished by state changes.")
 
 
-(define-global *symmetry-pruning-count* 0
+(sb-ext:defglobal *symmetry-pruning-count* 0
   "Count of action instantiations pruned due to symmetry during search.")
 (declaim (type fixnum *symmetry-pruning-count*))
 
 
-(define-global *symmetry-check-count* 0
+(sb-ext:defglobal *symmetry-check-count* 0
   "Count of symmetry checks performed during search.")
 (declaim (type fixnum *symmetry-check-count*))
 
 
-(define-global *symmetric-duplicates-pruned* 0
+(sb-ext:defglobal *symmetric-duplicates-pruned* 0
   "Count of states pruned as symmetric duplicates in canonical mode (global strategy).")
 (declaim (type fixnum *symmetric-duplicates-pruned*))
 

@@ -55,7 +55,7 @@
 (declaim (hs::hstack *open*))
 
 
-(define-global *closed* (make-hash-table :synchronized (> *threads* 0))  ;initialized in dfs
+(sb-ext:defglobal *closed* (make-hash-table :synchronized (> *threads* 0))  ;initialized in dfs
   "Contains the set of closed state idbs for graph search, idb -> (depth time value).")
 
 

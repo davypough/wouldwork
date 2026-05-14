@@ -55,45 +55,45 @@
 ;;;;;;;;;;;;;;;;;;;; Global Parameters ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(define-global *troubleshoot-current-node* nil
+(sb-ext:defglobal *troubleshoot-current-node* nil
   "A flag telling wouldwork to redo the current node for debugging.")
 
-(define-global *counter* 1
+(sb-ext:defglobal *counter* 1
   "For misc debugging with probe function")
 
-(define-global *-* '---------------------------------------------------------
+(sb-ext:defglobal *-* '---------------------------------------------------------
   "Division marker for debugging printout convenience.")
 
-(define-global *solution-count* 0
+(sb-ext:defglobal *solution-count* 0
   "Holds the total number of solutions found following search.")
 
-(define-global *num-idle-threads* 0
+(sb-ext:defglobal *num-idle-threads* 0
   "Holds the number of currently idle threads (shared).")
 (declaim (type fixnum *num-idle-threads*))
 
-(define-global *total-states-processed* 0
+(sb-ext:defglobal *total-states-processed* 0
   "Count of states either newly generated, updated, or regenerated while searching (shared).")
 (declaim (type fixnum *total-states-processed*))
 
-(define-global *prior-total-states-processed* 0
+(sb-ext:defglobal *prior-total-states-processed* 0
   "Count of states produced since last progress printing (shared).")
 
-(define-global *prior-program-cycles* 0
+(sb-ext:defglobal *prior-program-cycles* 0
   "Program cycles at last progress printing (shared).")
 (declaim (type fixnum *prior-program-cycles*))
 
-(define-global *last-improvement-states* 0
+(sb-ext:defglobal *last-improvement-states* 0
   "Value of *total-states-processed* at the most recent solution registration
    (or hybrid-goal deferral). Used by the progress printout to measure
    'states since last improvement' for plateau detection.")
 (declaim (type fixnum *last-improvement-states*))
 
-(define-global *bound-pruned* 0
+(sb-ext:defglobal *bound-pruned* 0
   "Count of successor states dropped because their f-value could not improve
    the best solution found so far (the f-value-better check in process-successors).")
 (declaim (type fixnum *bound-pruned*))
 
-(define-global *max-backtrack-distance* 0
+(sb-ext:defglobal *max-backtrack-distance* 0
   "Largest single-step decrease in expansion depth observed during search.
    Each time df-bnb1 pops a node whose depth is less than the previous
    node's depth, the difference is a candidate; the running maximum is
@@ -102,60 +102,60 @@
    is sound).")
 (declaim (type fixnum *max-backtrack-distance*))
 
-(define-global *prev-expansion-depth* 0
+(sb-ext:defglobal *prev-expansion-depth* 0
   "Depth of the most recently expanded node, used to compute the per-step
    backtrack distance in df-bnb1.")
 (declaim (type fixnum *prev-expansion-depth*))
 
-(define-global *prior-time* 0
+(sb-ext:defglobal *prior-time* 0
   "Time since last progress printing (shared).")
 
-(define-global *best-states* nil
+(sb-ext:defglobal *best-states* nil
   "Holds the best states encountered during a graph search.")
 
-(define-global *repeated-states* 0
+(sb-ext:defglobal *repeated-states* 0
   "Count of the repeated states during a graph search.")
 (declaim (type fixnum *repeated-states*))
 
-(define-global *program-cycles* 0
+(sb-ext:defglobal *program-cycles* 0
  "Count of complete cycles of searching (shared).")
 (declaim (type fixnum *program-cycles*))
 
-(define-global *max-depth-explored* 0
+(sb-ext:defglobal *max-depth-explored* 0
   "Keeps track of the maximum depth reached so far during the search (shared).")
 (declaim (type fixnum *max-depth-explored*))
 
-(define-global *accumulated-depths* 0
+(sb-ext:defglobal *accumulated-depths* 0
   "Sums the final depths of all terminated paths so far.")
 (declaim (type fixnum *accumulated-depths*))
 
-(define-global *num-paths* 0
+(sb-ext:defglobal *num-paths* 0
   "Tracks the total number of paths explored so far.")
 (declaim (type fixnum *num-paths*))
 
-(define-global *num-init-successors* 0
+(sb-ext:defglobal *num-init-successors* 0
   "The number of branches completed so far from the start state.")
 
-(define-global *rem-init-successors* nil
+(sb-ext:defglobal *rem-init-successors* nil
   "Holds the remaining initial branch nodes from the start state.")
 
-(define-global *solutions* nil
+(sb-ext:defglobal *solutions* nil
   "Holds the solutions found during search.")
 
-(define-global *average-branching-factor* 0.0
+(sb-ext:defglobal *average-branching-factor* 0.0
   "Average branching factor so far during search (shared).")
 
-(define-global *search-tree* nil
+(sb-ext:defglobal *search-tree* nil
   "DFS search tree for debugging (serial processing only).")
 
-(define-global *hybrid-mode* nil
+(sb-ext:defglobal *hybrid-mode* nil
   "When T, hybrid graph search is active for enumerating all solutions at *depth-cutoff*.")
 
-(define-global *hybrid-goals* nil
+(sb-ext:defglobal *hybrid-goals* nil
   "In hybrid mode, stores (current-node . goal-state) pairs for deferred enumeration.")
 (declaim (type list *hybrid-goals*))
 
-(define-global *start-time* 0
+(sb-ext:defglobal *start-time* 0
   "Stores time at beginning of the search.")
 
 (defvar *problem-name* 'unspecified  ;default name
@@ -205,7 +205,7 @@
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry groups and prune symmetric action instantiations.")
 
-(define-global *types*
+(sb-ext:defglobal *types*
   (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
   "Table of all types.
    Written only during init(); strictly read-only during search.
@@ -214,16 +214,16 @@
    Not :synchronized - lock-free reads on the worker hot path
    (precondition expansion reads here ~59M times/run in queensN-csp profile).")
 
-(define-global *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
+(sb-ext:defglobal *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
 
-(define-global *static-relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
+(sb-ext:defglobal *static-relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Static relations.")
 
-(define-global *connectives* '(and or not)
+(sb-ext:defglobal *connectives* '(and or not)
   "Logical connectives.")
 
-(define-global *symmetrics*
+(sb-ext:defglobal *symmetrics*
   (make-hash-table :test #'eq :size 64 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
   "Symmetric relations.
    Written only during init(); strictly read-only during search.
@@ -232,7 +232,7 @@
    Not :synchronized - lock-free reads on the worker hot path
    (add-proposition calls gethash here ~70M times/run in queensN-csp profile).")
 
-(define-global *complements*
+(sb-ext:defglobal *complements*
   (make-hash-table :test #'eq :size 128 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
   "Table of complement relations.
    Written only during init(); strictly read-only during search.
@@ -241,22 +241,22 @@
    Not :synchronized - lock-free reads on the worker hot path
    (add-prop calls gethash here ~70M times/run in queensN-csp profile).")
 
-(define-global *fluent-relation-indices* (make-hash-table :test #'eq)
+(sb-ext:defglobal *fluent-relation-indices* (make-hash-table :test #'eq)
   "List of fluent argument indices for a relation.")
 
-(define-global *db* (make-hash-table :test #'equal :synchronized (> *threads* 0))
+(sb-ext:defglobal *db* (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Initial database of dynamic db relations.")
 
-(define-global *hdb* (make-hash-table :test #'equal :synchronized (> *threads* 0))
+(sb-ext:defglobal *hdb* (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Initial database of dynamic hdb relations.")
 
-(define-global *idb* (make-hash-table :synchronized (> *threads* 0))
+(sb-ext:defglobal *idb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of dynamic idb propositions.")
 
-(define-global *hidb* (make-hash-table :synchronized (> *threads* 0))
+(sb-ext:defglobal *hidb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of dynamic hidb propositions.")
 
-(define-global *constant-integers*
+(sb-ext:defglobal *constant-integers*
   (make-hash-table :size 2003 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
   "Integer codes for the problem's object constants.
    Pre-allocated to capacity 2003 (above the 999-object design limit
@@ -266,62 +266,62 @@
    ~12M calls/run in queensN-csp profile) are lock-free; the rare
    write path is already serialized by *integer-lock*.")
 
-(define-global *integer-constants* (make-hash-table :synchronized (> *threads* 0))
+(sb-ext:defglobal *integer-constants* (make-hash-table :synchronized (> *threads* 0))
   "Translating codes back to constants for printout.")
 
-(define-global *min-action-duration* 0.0
+(sb-ext:defglobal *min-action-duration* 0.0
   "The least action duration among all actions.")
 
-(define-global *query-names* nil
+(sb-ext:defglobal *query-names* nil
   "List of all user-defined query functions.")
 
-(define-global *update-names* nil
+(sb-ext:defglobal *update-names* nil
   "List of all user-defined update functions.")
 
 (defparameter *actions* nil  ;don't use define-global
   "List of all potential actions.")
 
-(define-global *init-actions* nil
+(sb-ext:defglobal *init-actions* nil
   "List of all initialization actions.")
 
-(define-global *happening-names* nil
+(sb-ext:defglobal *happening-names* nil
   "The list of objects having exogenous events.")
 
-(define-global *static-db* (make-hash-table :test #'equal)
+(sb-ext:defglobal *static-db* (make-hash-table :test #'equal)
   "Initial database of static propositions.")
 
-(define-global *static-idb* (make-hash-table :synchronized (> *threads* 0))
+(sb-ext:defglobal *static-idb* (make-hash-table :synchronized (> *threads* 0))
   "Initial integer database of static propositions.")
 
-(define-global *hap-db* (make-hash-table :test #'equal)
+(sb-ext:defglobal *hap-db* (make-hash-table :test #'equal)
   "Initial database of happenings propositions.")
 
-(define-global *hap-idb* (make-hash-table)
+(sb-ext:defglobal *hap-idb* (make-hash-table)
   "Initial integer database of happenings propositions.")
 
-(define-global *last-object-index* 0
+(sb-ext:defglobal *last-object-index* 0
   "Last index of object constants seen so far in propositions.")
 (declaim (type (integer 0 999) *last-object-index*))
 
-(define-global *objective-value-p* nil
+(sb-ext:defglobal *objective-value-p* nil
   "Does the variable $objective-value appear in an action rule.")
 
-(define-global *eff-param-vars* nil
+(sb-ext:defglobal *eff-param-vars* nil
   "Make eff-param-vars available in translate-assert.")
 
-(define-global *has-sim-state* nil
+(sb-ext:defglobal *has-sim-state* nil
   "True when $sim-state appears in precondition variables.")
 
-(define-global *unique-solutions* nil)
+(sb-ext:defglobal *unique-solutions* nil)
   ;The culled list of unique solutions.
 
-(define-global *upper-bound* 1000000.0)
+(sb-ext:defglobal *upper-bound* 1000000.0)
   ;The current upper bound if bounds are being calculated.
 
-(define-global *cost* 0.0)
+(sb-ext:defglobal *cost* 0.0)
   ;The memoized cost bound for left search tree expansions. 
 
-(define-global *upper* 0.0)
+(sb-ext:defglobal *upper* 0.0)
   ;The memoized upper bound for left search tree expansions.
 
 (defvar *state-codes* (make-hash-table)
@@ -330,38 +330,38 @@
 (defvar *choice-stack* nil
   "Stack of choices for backtracking search. Defined here to avoid forward reference warnings.")
 
-(define-global *parameter-headers* '(standard product combination dot-product)
+(sb-ext:defglobal *parameter-headers* '(standard product combination dot-product)
   "The different ways values can be combined in a pre-parameter list.")
 
-(define-global *print-updates* nil
+(sb-ext:defglobal *print-updates* nil
   "Print each database update while T")
 
-(define-global *global-invariants* nil
+(sb-ext:defglobal *global-invariants* nil
   "List of invariant query functions to check on every state.")
 
-(define-global *inconsistent-states-dropped* 0
+(sb-ext:defglobal *inconsistent-states-dropped* 0
   "Count of successor states dropped due to convergence failure.")
 (declaim (type fixnum *inconsistent-states-dropped*))
 
 
-(define-global *lower-bound-pruned* 0
+(sb-ext:defglobal *lower-bound-pruned* 0
   "Count of nodes pruned by user-defined min-steps-remaining? function.")
 (declaim (type fixnum *lower-bound-pruned*))
 
-(define-global *prop-key-cache* 
+(sb-ext:defglobal *prop-key-cache* 
   (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
 
-(define-global *inconsistent-state-key* nil
+(sb-ext:defglobal *inconsistent-state-key* nil
   "Pre-computed integer code for the (inconsistent-state) proposition.
    Set in init() after do-integer-conversion. Read on the worker hot
    path in state-is-inconsistent and update-is-inconsistent to avoid
    mutex acquisitions on the synchronized *prop-key-cache* table.")
 
-(define-global *bijective-relations* (make-hash-table :test #'eq)
+(sb-ext:defglobal *bijective-relations* (make-hash-table :test #'eq)
   "Maps canonical relation name to (index1-name index2-name).")
 
-(define-global *bijective-canonical* (make-hash-table :test #'eq)
+(sb-ext:defglobal *bijective-canonical* (make-hash-table :test #'eq)
   "Maps internal index name to (canonical-name . key-position).")
 
 

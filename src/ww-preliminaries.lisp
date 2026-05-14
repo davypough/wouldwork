@@ -91,10 +91,6 @@
 (setq *print-right-margin* 140) ;Allows non-wrap printing of *search-tree* for deep trees.
 
 
-(defmacro define-global (var-name val-form &optional doc-string)
-  `(sb-ext:defglobal ,var-name ,val-form ,doc-string))
-
-
 (defmacro increment-global (var-name &optional (delta-form 1))
   `(progn
      (declaim (type fixnum ,var-name))
@@ -141,64 +137,63 @@
 
 (defun reset-global-hash-tables ()
   "Clear all global hash tables and reset global lists between problem loads.
-   define-global always uses sb-ext:defglobal, which only evaluates initialization
-   forms ONCE per image session. On subsequent ASDF reloads the variables remain
-   bound to their previous values, causing state contamination between problem loads.
-   This function must execute at top-level in ww-preliminaries.lisp so it runs
-   on every system reload, before problem files populate the hash tables."
-  (when t  ;CHANGED: always run (sb-ext:defglobal never auto-reinits regardless of *threads*)
-    ;; Hash tables for type system and object mappings
-    (when (and (boundp '*types*) (hash-table-p *types*))
-      (clrhash *types*))
-    (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
-      (clrhash *constant-integers*))
-    (when (and (boundp '*integer-constants*) (hash-table-p *integer-constants*))
-      (clrhash *integer-constants*))
-    ;; Hash tables for relations
-    (when (and (boundp '*relations*) (hash-table-p *relations*))
-      (clrhash *relations*))
-    (when (and (boundp '*static-relations*) (hash-table-p *static-relations*))
-      (clrhash *static-relations*))
-    (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
-      (clrhash *symmetrics*))
-    (when (and (boundp '*complements*) (hash-table-p *complements*))
-      (clrhash *complements*))
-    (when (and (boundp '*fluent-relation-indices*) (hash-table-p *fluent-relation-indices*))
-      (clrhash *fluent-relation-indices*))
-    ;; Hash tables for databases
-    (when (and (boundp '*db*) (hash-table-p *db*))
-      (clrhash *db*))
-    (when (and (boundp '*hdb*) (hash-table-p *hdb*))
-      (clrhash *hdb*))
-    (when (and (boundp '*idb*) (hash-table-p *idb*))
-      (clrhash *idb*))
-    (when (and (boundp '*hidb*) (hash-table-p *hidb*))
-      (clrhash *hidb*))
-    (when (and (boundp '*static-db*) (hash-table-p *static-db*))
-      (clrhash *static-db*))
-    (when (and (boundp '*static-idb*) (hash-table-p *static-idb*))
-      (clrhash *static-idb*))
-    (when (and (boundp '*hap-db*) (hash-table-p *hap-db*))
-      (clrhash *hap-db*))
-    (when (and (boundp '*hap-idb*) (hash-table-p *hap-idb*))
-      (clrhash *hap-idb*))
-    ;; Cache for proposition key conversions
-    (when (and (boundp '*prop-key-cache*) (hash-table-p *prop-key-cache*))
-      (clrhash *prop-key-cache*))
-    ;; Reset lists that accumulate problem definitions
-    (when (and (boundp '*query-names*) (listp *query-names*))
-      (setf *query-names* nil))
-    (when (and (boundp '*update-names*) (listp *update-names*))
-      (setf *update-names* nil))
-    (when (and (boundp '*actions*) (listp *actions*))
-      (setf *actions* nil))
-    (when (and (boundp '*init-actions*) (listp *init-actions*))
-      (setf *init-actions* nil))
-    (when (and (boundp '*happening-names*) (listp *happening-names*))
-      (setf *happening-names* nil))
-    ;; Reset object index counter
-    (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
-      (setf *last-object-index* 0))))
+   sb-ext:defglobal only evaluates initialization forms ONCE per image session.
+   On subsequent ASDF reloads the variables remain bound to their previous values,
+   causing state contamination between problem loads. This function must execute
+   at top-level so it runs on every system reload, before problem files populate
+   the hash tables."
+  ;; Hash tables for type system and object mappings
+  (when (and (boundp '*types*) (hash-table-p *types*))
+    (clrhash *types*))
+  (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
+    (clrhash *constant-integers*))
+  (when (and (boundp '*integer-constants*) (hash-table-p *integer-constants*))
+    (clrhash *integer-constants*))
+  ;; Hash tables for relations
+  (when (and (boundp '*relations*) (hash-table-p *relations*))
+    (clrhash *relations*))
+  (when (and (boundp '*static-relations*) (hash-table-p *static-relations*))
+    (clrhash *static-relations*))
+  (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
+    (clrhash *symmetrics*))
+  (when (and (boundp '*complements*) (hash-table-p *complements*))
+    (clrhash *complements*))
+  (when (and (boundp '*fluent-relation-indices*) (hash-table-p *fluent-relation-indices*))
+    (clrhash *fluent-relation-indices*))
+  ;; Hash tables for databases
+  (when (and (boundp '*db*) (hash-table-p *db*))
+    (clrhash *db*))
+  (when (and (boundp '*hdb*) (hash-table-p *hdb*))
+    (clrhash *hdb*))
+  (when (and (boundp '*idb*) (hash-table-p *idb*))
+    (clrhash *idb*))
+  (when (and (boundp '*hidb*) (hash-table-p *hidb*))
+    (clrhash *hidb*))
+  (when (and (boundp '*static-db*) (hash-table-p *static-db*))
+    (clrhash *static-db*))
+  (when (and (boundp '*static-idb*) (hash-table-p *static-idb*))
+    (clrhash *static-idb*))
+  (when (and (boundp '*hap-db*) (hash-table-p *hap-db*))
+    (clrhash *hap-db*))
+  (when (and (boundp '*hap-idb*) (hash-table-p *hap-idb*))
+    (clrhash *hap-idb*))
+  ;; Cache for proposition key conversions
+  (when (and (boundp '*prop-key-cache*) (hash-table-p *prop-key-cache*))
+    (clrhash *prop-key-cache*))
+  ;; Reset lists that accumulate problem definitions
+  (when (and (boundp '*query-names*) (listp *query-names*))
+    (setf *query-names* nil))
+  (when (and (boundp '*update-names*) (listp *update-names*))
+    (setf *update-names* nil))
+  (when (and (boundp '*actions*) (listp *actions*))
+    (setf *actions* nil))
+  (when (and (boundp '*init-actions*) (listp *init-actions*))
+    (setf *init-actions* nil))
+  (when (and (boundp '*happening-names*) (listp *happening-names*))
+    (setf *happening-names* nil))
+  ;; Reset object index counter
+  (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
+    (setf *last-object-index* 0)))
 
 
 ;; Call at top-level so it executes on every ASDF reload
