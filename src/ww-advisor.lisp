@@ -64,7 +64,7 @@
             (strategy-name strategy) (length (strategy-phases strategy)))
     (let ((saved-heuristic (and (fboundp 'heuristic?) (symbol-function 'heuristic?)))
           (saved-start-state (copy-problem-state *start-state*))
-          (saved-solutions (and (boundp '*solutions*) *solutions*)))
+          (saved-solutions (and (boundp '*solution-paths*) *solution-paths*)))
       (when saved-heuristic
         (fmakunbound 'heuristic?)
         (format t "~&Heuristic temporarily disabled for strategic search.~%"))
@@ -80,7 +80,7 @@
   "Install GOAL-FORM as the overall goal.
    If a prior solution exists, continue from it (mirroring solve-subgoal);
    otherwise install the goal on the current start state."
-  (cond ((and (boundp '*solutions*) *solutions*)
+  (cond ((and (boundp '*solution-paths*) *solution-paths*)
          (continue-from-solution goal-form))
         (t
          (terpri)
@@ -91,7 +91,7 @@
 
 (defun try-strategy-bindings (strategy saved-start-state saved-solutions)
   "Enumerate admissible bindings for STRATEGY and attempt each in turn.
-   Before each binding's attempt, restore *start-state* and *solutions*
+   Before each binding's attempt, restore *start-state* and *solution-paths*
    from the saved pre-advisor snapshots so bindings start from the
    same initial conditions.  Returns the successful binding (projected)
    on success; nil if no binding's phase sequence completes."
@@ -118,11 +118,11 @@
 
 
 (defun restore-advisor-state (saved-start-state saved-solutions)
-  "Restore *start-state* and *solutions* from snapshots taken before
+  "Restore *start-state* and *solution-paths* from snapshots taken before
    binding enumeration.  Called before each binding attempt so every
    binding starts from the same pre-advisor initial conditions."
   (setf *start-state* (copy-problem-state saved-start-state))
-  (setf *solutions* (copy-list saved-solutions)))
+  (setf *solution-paths* (copy-list saved-solutions)))
 
 
 (defun execute-strategy-phases (strategy instantiated-phases)
@@ -145,7 +145,7 @@
                      (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn)))))
             (continue-from-solution phase-goal))
           (ww-solve)
-          (unless (and (boundp '*solutions*) *solutions*)
+          (unless (and (boundp '*solution-paths*) *solution-paths*)
             (format t "~%Strategy aborted: phase ~D produced no solution.~%" phase-number)
             (return-from execute-strategy-phases nil)))
     (format t "~2%===== Strategy ~A completed all ~D phase~:P =====~%"

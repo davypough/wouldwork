@@ -74,8 +74,6 @@
             (setf ,param ',val)
             (save-globals)
             (if crossing-boundary
-                (format t "~%*threads* set to ~D and saved.~%~
-                           Switching between 0 and non-zero requires a fresh SBCL session.~%~
-                           Please exit SBCL, restart, and reload:~%~
-                             (progn (ql:quickload :wouldwork) (in-package :ww))~%" ',val)
-                (display-current-parameters)))))))
+              (with-silenced-compilation
+                (asdf:load-system :wouldwork :force t))
+              (display-current-parameters)))))))

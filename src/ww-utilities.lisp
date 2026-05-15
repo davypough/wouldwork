@@ -389,7 +389,7 @@
            (setf first-p nil)))
 
 
-(defun print-optimal-solutions (&optional (solutions ww::*solutions*))
+(defun print-optimal-solutions (&optional (solutions ww::*solution-paths*))
   "Prints optimal solutions from SOLUTIONS list.
    Optimal solutions: (1) begin with unstarred agent, (2) minimize agent switches.
    Requires all solutions to have the same depth."

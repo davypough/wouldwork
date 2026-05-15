@@ -115,7 +115,9 @@
                   (let ((succ-node (make-node 
                                     :state succ-state
                                     :depth (1+ (node.depth node))
-                                    :parent node)))
+                                    :parent (if *hybrid-mode*                            ; CHANGED: hybrid format vs plain node
+                                                (list (cons node (record-move succ-state)))
+                                                node))))
                     (push succ-node next-frontier)))))))
         
         ;; Update globals for states processed during task generation
@@ -270,14 +272,16 @@
             (return-from process-one)))
         
         ;; Optimization bound check
-        (when (and *solutions*
+        (when (and *solution-paths*
                    (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (return-from process-one)))
         
         ;; Goal check (before duplicate detection - goals always processed)
         (when (goal succ-state)
-          (register-parallel-solution current-node succ-state worker-id)
+          (if *hybrid-mode*                                                ; CHANGED: hybrid defers for path enumeration
+              (defer-hybrid-goal current-node succ-state)                 ; CHANGED
+              (register-parallel-solution current-node succ-state worker-id))
           (ws-finalize-path stats succ-depth)
           (when (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
             (return-from worker-process-successors-phase1 'first-found))
@@ -330,7 +334,9 @@
                     (closed-bucket-remove succ-state succ-depth shard)                 ; CHANGED: was (remhash key shard)
                     (let ((succ-node (make-node :state succ-state
                                                 :depth succ-depth
-                                                :parent current-node)))
+                                                :parent (if *hybrid-mode*              ; CHANGED: hybrid format vs plain node
+                                                            (list (cons current-node (record-move succ-state)))
+                                                            current-node))))
                       (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; CHANGED: was inline list
                                             succ-state succ-depth shard)               ; CHANGED
                       (push succ-node succ-nodes)))
@@ -343,7 +349,9 @@
                 (t
                  (let ((succ-node (make-node :state succ-state
                                              :depth succ-depth
-                                             :parent current-node)))
+                                             :parent (if *hybrid-mode*                 ; CHANGED: hybrid format vs plain node
+                                                         (list (cons current-node (record-move succ-state)))
+                                                         current-node))))
                    (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)     ; CHANGED: was inline list
                                          succ-state succ-depth shard)                  ; CHANGED
                    (push succ-node succ-nodes)))))))))
@@ -454,7 +462,7 @@
         
         ;; Check if we found solution during task generation
         (when (or (null tasks) 
-                  (and (eql *solution-type* 'first) *solutions*))
+                  (and (eql *solution-type* 'first) *solution-paths*))
           (format t "~&Search completed during task generation~%")
           (setf (pt-total-ms *parallel-timing*)
                 (round (* 1000 (/ (- (get-internal-real-time) total-start)
@@ -531,13 +539,13 @@
 
 (defun finalize-parallel-search-results ()
   "Post-process parallel search results for interface consistency.
-   Builds *unique-solutions* in O(N) using a hash-table keyed on goal
+   Builds *unique-solution-states* in O(N) using a hash-table keyed on goal
    idb-hash, replacing the prior O(N^2) remove-duplicates scan.
    Buckets handle hash collisions via equalp fallback (vanishingly rare).
    When duplicate goal states are found, retains the better solution
    per solution-better-p."
-  (let ((seen (make-hash-table :test #'eql :size (max 1024 (length *solutions*)))))
-    (dolist (solution *solutions*)
+  (let ((seen (make-hash-table :test #'eql :size (max 1024 (length *solution-paths*)))))
+    (dolist (solution *solution-paths*)
       (let* ((goal-state (solution.goal solution))
              (goal-idb (problem-state.idb goal-state))
              (hash (ensure-idb-hash goal-state))
@@ -551,12 +559,12 @@
                        (cons solution (delete match bucket :test #'eq)))))
               (t
                (setf (gethash hash seen) (cons solution bucket))))))
-    (setf *unique-solutions*
+    (setf *unique-solution-states*
           (loop for bucket being the hash-values of seen
                 append bucket)))
   (when (>= *debug* 1)
     (format t "~&Parallel search: ~D solutions, ~D unique~%"
-            (length *solutions*) (length *unique-solutions*))))
+            (length *solution-paths*) (length *unique-solution-states*))))
 
 
 ;;; ============================================================

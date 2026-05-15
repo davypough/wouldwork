@@ -528,7 +528,7 @@
 
 (defparameter *best-solution-lock* 
   (sb-thread:make-mutex :name "best-solution-lock")
-  "Protects updates to *solutions* and *unique-solutions* during parallel search.")
+  "Protects updates to *solution-paths* and *unique-solution-states* during parallel search.")
 
 (defparameter *best-bound* most-positive-fixnum
   "Current best solution bound for pruning. 
@@ -626,8 +626,8 @@
 
 (defun register-parallel-solution (current-node goal-state worker-id)
   "Thread-safe solution registration during parallel search.
-   Pushes onto *solutions* under *best-solution-lock*; deduplication of
-   *unique-solutions* is deferred to finalize-parallel-search-results.
+   Pushes onto *solution-paths* under *best-solution-lock*; deduplication of
+   *unique-solution-states* is deferred to finalize-parallel-search-results.
    Per-solution console output is gated to *solution-type* = first or
    *debug* >= 1, to avoid serializing workers on stdout I/O when many
    solutions are found."                                                ;; CHANGED: docstring extended
@@ -643,11 +643,11 @@
             :path (append (record-solution-path current-node)
                           (list (record-move goal-state)))
             :goal goal-state)))
-    ;; Thread-safe push onto *solutions*. The in-search *unique-solutions*
+    ;; Thread-safe push onto *solution-paths*. The in-search *unique-solution-states*
     ;; maintenance was an O(N^2) scan under this lock and produced a result
     ;; that finalize-parallel-search-results discards and rebuilds; removed.
     (sb-thread:with-mutex (*best-solution-lock*)
-      (push solution *solutions*))
+      (push solution *solution-paths*))
     ;; Update best bound for optimization solution types
     (when (member *solution-type* '(min-length min-time min-value max-value))
       (let ((new-bound (compute-state-bound-value goal-state state-depth)))
@@ -729,7 +729,7 @@
       (format t "  Total states processed: ~:D~%" (+ *total-states-processed* total-states))
       (format t "  Program cycles: ~:D~%" (+ *program-cycles* total-cycles))
       (format t "  Max depth explored: ~D~%" (max *max-depth-explored* max-depth))
-      (format t "  Solutions found so far: ~D~%" (+ (length *solutions*) total-solutions))
+      (format t "  Solutions found so far: ~D~%" (+ (length *solution-paths*) total-solutions))
       (when (member *solution-type* '(min-length min-time min-value max-value))
         (let ((bound *best-bound*))
           (unless (= bound most-positive-fixnum)
@@ -920,6 +920,45 @@
                    (ws-solutions-found stats)
                    (ws-nodes-donated stats)))
   (terpri))
+
+
+;;; ============================================================
+;;; CLOSED SHARD DIAGNOSTICS
+;;; ============================================================
+
+(defun display-closed-shard-stats ()
+  "Display closed-table shard distribution statistics after a parallel graph search.
+   Reports total entries, per-shard min/max/mean, skew ratio, and the five most
+   loaded shards -- enough to diagnose hash distribution quality."
+  (unless (and *closed-shards* (eql *tree-or-graph* 'graph))
+    (return-from display-closed-shard-stats))
+  (let* ((counts (map 'vector
+                      (lambda (shard)
+                        (loop for bucket being the hash-values of shard
+                              sum (length bucket)))
+                      *closed-shards*))
+         (total   (loop for c across counts sum c))
+         (max-c   (loop for c across counts maximize c))
+         (min-c   (loop for c across counts minimize c))
+         (mean    (if (zerop *num-closed-shards*)
+                      0.0
+                      (coerce (/ total *num-closed-shards*) 'single-float)))
+         (skew    (if (zerop min-c)
+                      'infinite
+                      (coerce (/ max-c min-c) 'single-float)))
+         (indexed (loop for i from 0 below *num-closed-shards*
+                        collect (cons i (svref counts i))))
+         (top5    (subseq (sort indexed #'> :key #'cdr) 0 (min 5 *num-closed-shards*))))
+    (format t "~%Closed Shard Distribution (~D shards):~%" *num-closed-shards*)
+    (format t "  Total entries : ~:D~%" total)
+    (format t "  Mean / shard  : ~,1F~%" mean)
+    (format t "  Max / shard   : ~:D~%" max-c)
+    (format t "  Min / shard   : ~:D~%" min-c)
+    (format t "  Skew (max/min): ~A~%"
+            (if (numberp skew) (format nil "~,2Fx" skew) skew))
+    (format t "  Top-5 shards  : ~{#~D(~:D)~^ ~}~%"
+            (loop for (idx . cnt) in top5 append (list idx cnt)))
+    (terpri)))
 
 
 ;;; ============================================================

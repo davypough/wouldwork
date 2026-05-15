@@ -91,8 +91,8 @@
   (setf *program-cycles* 0)
   (setf *total-states-processed* 0)
   (setf *max-depth-explored* 0)
-  (setf *solutions* nil)
-  (setf *unique-solutions* nil)
+  (setf *solution-paths* nil)
+  (setf *unique-solution-states* nil)
   (setf *solution-count* 0)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-total-states-processed* 0)
@@ -428,11 +428,11 @@
     (format t "~%New path to goal found at depth = ~:D" solution-depth)
     (when (eql *solution-type* 'min-time)
       (format t "Time = ~:A~%" (solution.time solution)))
-    (push solution *solutions*)
-    (when (not (member (problem-state.idb (solution.goal solution)) *unique-solutions* 
+    (push solution *solution-paths*)
+    (when (not (member (problem-state.idb (solution.goal solution)) *unique-solution-states* 
                        :key (lambda (soln) (problem-state.idb (solution.goal soln)))
                        :test #'equalp))
-      (push solution *unique-solutions*))))
+      (push solution *unique-solution-states*))))
 
 
 (defun detect-path-cycle (new-choice)

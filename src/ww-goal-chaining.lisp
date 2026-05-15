@@ -16,7 +16,7 @@
 
 
 (defparameter *solutions-valid* nil
-  "Indicates whether *solutions* contains a completed, valid solution set.")
+  "Indicates whether *solution-paths* contains a completed, valid solution set.")
 
 
 (defvar *final-goal* nil
@@ -33,19 +33,19 @@
      ;; Prepare planning state (push undo, install goal, etc.)
      (continue-from-solution ',goal-form)
      ;; Clear any prior solutions before solving
-     (setf *solutions* nil
+     (setf *solution-paths* nil
            *solutions-valid* nil)
      (unwind-protect
          (progn
            ;; ---- RUN SOLVER ----
            (ww-solve)  ;direct solver call; solve's *final-goal* wrapper would re-install the original goal
            ;; Mark success only if we actually got solutions
-           (when *solutions*
+           (when *solution-paths*
              (setf *solutions-valid* t))
            (setf completed t))
        ;; ---- CLEANUP (runs on Ctrl-C or error) ----
        (unless completed
-         (setf *solutions* nil
+         (setf *solution-paths* nil
                *solutions-valid* nil)
          (format t "~&Solve interrupted. Use (ww-undo) to revert.~%")))))
 
@@ -58,7 +58,7 @@
     (setf *final-goal* *goal*))
   ;; Save undo checkpoint BEFORE any mutation
   (save-undo-checkpoint)
-  (if (and *solutions-valid* *solutions*)
+  (if (and *solutions-valid* *solution-paths*)
       ;; --- Continuation branch ---
       (progn
         (update-start-state-from-goal (extract-goal-state-from-solution))
@@ -85,7 +85,7 @@
   (when (> *threads* 0)
     (error "Goal chaining requires single-threaded mode. ~
             Set (ww-set *threads* 0) before using solve-subgoal."))
-  ;(unless (and (boundp '*solutions*) *solutions*)
+  ;(unless (and (boundp '*solution-paths*) *solution-paths*)
   ;  (error "No solution exists to continue from. ~
   ;          First run (solve) successfully, then use (solve-subgoal <new-goal>)."))
   (unless (boundp 'goal-fn)
@@ -99,32 +99,32 @@
                      ;; Find minimum depth solution
                      (reduce (lambda (s1 s2)
                                (if (< (solution.depth s1) (solution.depth s2)) s1 s2))
-                             *solutions*))
+                             *solution-paths*))
                     (min-time
                      ;; Find minimum time solution
                      (reduce (lambda (s1 s2)
                                (if (< (solution.time s1) (solution.time s2)) s1 s2))
-                             *solutions*))
+                             *solution-paths*))
                     (min-value
                      ;; Find minimum value solution
                      (reduce (lambda (s1 s2)
                                (if (< (solution.value s1) (solution.value s2)) s1 s2))
-                             *solutions*))
+                             *solution-paths*))
                     (max-value
                      ;; Find maximum value solution
                      (reduce (lambda (s1 s2)
                                (if (> (solution.value s1) (solution.value s2)) s1 s2))
-                             *solutions*))
+                             *solution-paths*))
                     (every
                      ;; For 'every', use minimum depth as canonical choice
                      (reduce (lambda (s1 s2)
                                (if (< (solution.depth s1) (solution.depth s2)) s1 s2))
-                             *solutions*))
+                             *solution-paths*))
                     (t 
                      ;; Default: first solution in list
-                     (first *solutions*)))))
+                     (first *solution-paths*)))))
     (unless solution
-      (error "Could not extract solution from *solutions*."))
+      (error "Could not extract solution from *solution-paths*."))
     (let ((goal-state (solution.goal solution)))
       ;; Validate state consistency before using
       (when (gethash 'inconsistent-state (problem-state.idb goal-state))
@@ -176,8 +176,8 @@
         (setf *goal*        (getf checkpoint :goal))
         (setf *final-goal*  (getf checkpoint :final-goal))
         ;; Clear solver artifacts
-        (when (boundp '*solutions*)
-          (setf *solutions* nil))
+        (when (boundp '*solution-paths*)
+          (setf *solution-paths* nil))
         (setf *solutions-valid* nil)
         (format t "~&Reverted to previous state.~2%")
         (format t "Current State: ~%~A~%" *start-state*)

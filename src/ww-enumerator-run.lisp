@@ -1524,7 +1524,7 @@ Set to NIL for no cap.")
 
 
 (defun fps-rebuild-unique-solutions (solutions)
-  "Rebuild *UNIQUE-SOLUTIONS* semantics from SOLUTIONS using current SOLUTION-BETTER-P."
+  "Rebuild *unique-solution-states* semantics from SOLUTIONS using current SOLUTION-BETTER-P."
   (let ((unique nil))
     (dolist (sol solutions)
       (let* ((goal-idb (problem-state.idb (solution.goal sol)))
@@ -1611,7 +1611,7 @@ Set to NIL for no cap.")
                 (expansion-diagnostics nil)
                 (extension-failures 0)
                 (goal-hit-found nil))
-            (dolist (sol *solutions*)
+            (dolist (sol *solution-paths*)
               (multiple-value-bind (expanded-sol diag)
                   (fps-extend-meeting-solution-to-goal sol
                                                        *backward-reachable-set*
@@ -1669,7 +1669,7 @@ Set to NIL for no cap.")
                          expanded-solutions)
                         expanded-solutions))
               ;; Apply requested SOLUTION-TYPE on expanded full-goal solutions.
-              (setf *solutions*
+              (setf *solution-paths*
                     (case requested-solution-type
                       (first
                        (if filtered-solutions
@@ -1710,7 +1710,7 @@ Set to NIL for no cap.")
                 (format t "~&[solve-meeting-point] Discarded ~:D expanded solution(s) that do not satisfy the original goal.~%"
                         discarded-count))))
           (let ((unique nil))
-            (dolist (sol *solutions*)
+            (dolist (sol *solution-paths*)
               (let* ((goal-idb (problem-state.idb (solution.goal sol)))
                      (existing (find goal-idb unique
                                      :key (lambda (s) (problem-state.idb (solution.goal s)))
@@ -1720,14 +1720,14 @@ Set to NIL for no cap.")
                    (push sol unique))
                   ((solution-better-p sol existing)
                    (setf unique (substitute sol existing unique))))))
-            (setf *unique-solutions* (nreverse unique)))
-          (when *solutions*
+            (setf *unique-solution-states* (nreverse unique)))
+          (when *solution-paths*
             (format t "~&[solve-meeting-point] Expanded ~:D meeting-point solution(s) to full goal path(s).~%"
-                    (length *solutions*))
+                    (length *solution-paths*))
             (format t "~&[solve-meeting-point] Example full solution path:~%")
             (when (fboundp 'printout-solution)
-              (printout-solution (first *solutions*))))
-          *solutions*)
+              (printout-solution (first *solution-paths*))))
+          *solution-paths*)
       (setf *depth-cutoff* saved-depth-cutoff
             *solution-type* saved-solution-type)
       (setf (get 'goal-fn :form) saved-goal-form)
@@ -1917,11 +1917,11 @@ Set to NIL for no cap.")
                    :name 'start :time 0 :value 0
                    :idb (make-hash-table :test 'eql)
                    :idb-hash nil))
-            (setf *solutions* nil
-                  *unique-solutions* nil)
+            (setf *solution-paths* nil
+                  *unique-solution-states* nil)
             (ww-solve)
             ;; Truncate if user requested N (kept for backward compatibility).
-            (let* ((uniq *unique-solutions*)
+            (let* ((uniq *unique-solution-states*)
                    (uniq2 (if (integerp requested-solution-type)
                               (last uniq requested-solution-type)
                               uniq)))

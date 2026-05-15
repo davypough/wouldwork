@@ -171,17 +171,28 @@
    Handles both *solution-type* = 'first and *solution-type* = <positive-fixnum>."
   (or (eql *solution-type* 'first)
       (and (typep *solution-type* 'fixnum)
-           (>= (length *unique-solutions*) *solution-type*))))
+           (>= (length *unique-solution-states*) *solution-type*))))
 
 
 (defun initialize-hybrid-mode ()
-  "Checks constraints for hybrid graph search mode.
-   Returns T if hybrid mode should activate, NIL otherwise.
-   Prints diagnostic messages when *solution-type* is EVERY but constraints prevent hybrid mode."
+  "Reserved for a future *solution-type* = ALL-PATHS mode.
+   Currently always returns NIL: *solution-type* = EVERY uses standard graph
+   semantics (one representative path per unique goal state) for both serial
+   and parallel search, via register-solution / *unique-solution-states*.
+   To re-enable hybrid mode for ALL-PATHS, restore the constraint checks
+   in the commented block below and change the guard to check ALL-PATHS."
+  nil)                                                                      ; CHANGED
+
+#|
+  ;; RESERVED FOR ALL-PATHS MODE -- do not delete.
+  ;; Original hybrid-mode activation logic follows.
   ;; Only consider hybrid mode when seeking all solutions
   (unless (eql *solution-type* 'every)
     (return-from initialize-hybrid-mode nil))
-  ;; Check remaining constraints with diagnostics
+  ;; Parallel search: use standard graph semantics instead.
+  (when (> *threads* 0)
+    (return-from initialize-hybrid-mode nil))
+  ;; Check remaining constraints
   (let ((constraints-met t))
     (unless (eql *algorithm* 'depth-first)
       (setf constraints-met nil))
@@ -189,11 +200,10 @@
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (setf constraints-met nil))
-    ;(unless constraints-met
-    ;  (format t "~&Note: Hybrid mode not activated: requires *solution-type* = EVERY, *algorithm* = DEPTH-FIRST, *tree-or-graph* = ;             GRAPH, and *depth-cutoff* > 0. Continuing with non-hybrid search.~%"))
     (when constraints-met
       (format t "~&Hybrid graph search mode active: finding all goal states (not paths) at depth ~D.~%" *depth-cutoff*))
-    constraints-met))
+    constraints-met)
+|#
 
 
 ;;; Search Functions
@@ -256,9 +266,9 @@
   (setf *accumulated-depths* 0)
   (setf *repeated-states* 0)
   (setf *num-paths* 0)
-  (setf *solutions* nil)
+  (setf *solution-paths* nil)
   (setf *hybrid-goals* nil)
-  (setf *unique-solutions* nil)
+  (setf *unique-solution-states* nil)
   (setf *best-states* (list *start-state*))
   (setf *solution-count* 0)
   (setf *upper-bound* 1000000)
@@ -273,7 +283,10 @@
       (error "Parallel processing not supported with backtracking algorithm")
       (progn
         (process-partitioned-parallel)
-        (finalize-parallel-search-results)))
+        (finalize-parallel-search-results)
+        (display-parallel-timing)       ; ADDED: timing breakdown
+        (display-worker-stats)          ; ADDED: per-worker load balance
+        (display-closed-shard-stats)))  ; ADDED: shard distribution / skew
     (ecase *algorithm*
       (depth-first (search-serial))
       (backtracking (search-backtracking))))
@@ -461,7 +474,7 @@
              (increment-global *inconsistent-states-dropped* 1)
              (return-from handle-auto-wait-backtrack nil))
            ;; Check if we can improve on existing solutions
-           (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+           (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
              (unless (f-value-better wait-state succ-depth)
                ;; Can't improve, continue backtracking
                (return-from handle-auto-wait-backtrack nil)))
@@ -528,9 +541,9 @@
             (depth (node.depth current-node)))                                            ;; ADDED
         (when (or (and (> *depth-cutoff* 0)                                               ;; ADDED
                        (> (+ depth lb) *depth-cutoff*))                                   ;; ADDED
-                  (and *solutions*                                                        ;; ADDED
+                  (and *solution-paths*                                                   ;; ADDED
                        (member *solution-type* '(min-length first))                       ;; ADDED
-                       (>= (+ depth lb) (solution.depth (first *solutions*)))))           ;; ADDED
+                       (>= (+ depth lb) (solution.depth (first *solution-paths*)))))      ;; ADDED
           (increment-global *lower-bound-pruned* 1)                                      ;; ADDED
           (narrate "State pruned by lower bound" (node.state current-node) depth)        ;; ADDED
           (return-from df-bnb1 nil))))                                                   ;; ADDED
@@ -559,7 +572,7 @@
                  #+:ww-debug (when (>= *debug* 1)
                                (update-search-tree wait-state (node.depth current-node) "auto-wait->goal"))
                  ;; Check if we can improve on existing solutions
-                 (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+                 (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
                    (unless (f-value-better wait-state succ-depth)
                      ;; Can't improve, treat as dead end
                      (update-max-depth-explored (node.depth current-node))
@@ -612,7 +625,7 @@
           (next-iteration))
         (when *global-invariants*
           (validate-global-invariants current-node succ-state))
-        (when (and *solutions* (member *solution-type* '(min-length min-time min-value max-value)))
+        (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (increment-global *bound-pruned* 1)
             (next-iteration)))  ;throw out state if can't better best solution so far
@@ -926,7 +939,7 @@
  
 (defun f-value-better (succ-state succ-depth)
   "Computes f-value of current-node to see if it's better than best solution so far."
-  (let ((best-solution (first *solutions*)))
+  (let ((best-solution (first *solution-paths*)))
     (case *solution-type*
       ((min-length first)
         (< succ-depth (solution.depth best-solution)))
@@ -1164,10 +1177,10 @@
             *tree-or-graph* *solution-type*)
   (ecase condition
     (first
-      (when *solutions*
+      (when *solution-paths*
         (if (typep *solution-type* 'fixnum)
             (format t "~2%Search ended after finding ~D solution~:P (as requested)." 
-                    (length *solutions*))
+                    (length *solution-paths*))
             (format t "~2%Search ended with first solution found."))))
     (exhausted
       (format t "~2%~A search process completed normally." *algorithm*)
@@ -1203,16 +1216,16 @@
                                 (get 'goal-fn :form)))  ;(symbol-value 'goal-fn)
   (when (and (eql *solution-type* 'count)) (> *solution-count* 0)
     (format t "~%Total solution paths found = ~:D ~2%" *solution-count*))
-  (when *solutions*  ;ie, recorded solutions
-    (let* ((shallowest-depth (reduce #'min *solutions* :key #'solution.depth))
-           (shallowest-depth-solution (find shallowest-depth *solutions* :key #'solution.depth))
-           (minimum-time (reduce #'min *solutions* :key #'solution.time))
-           (minimum-time-solution (find minimum-time *solutions* :key #'solution.time))
-           (min-max-value-solution (first *solutions*))
+  (when *solution-paths*  ;ie, recorded solution paths
+    (let* ((shallowest-depth (reduce #'min *solution-paths* :key #'solution.depth))
+           (shallowest-depth-solution (find shallowest-depth *solution-paths* :key #'solution.depth))
+           (minimum-time (reduce #'min *solution-paths* :key #'solution.time))
+           (minimum-time-solution (find minimum-time *solution-paths* :key #'solution.time))
+           (min-max-value-solution (first *solution-paths*))
            (min-max-value (solution.value min-max-value-solution)))
       (format t "~2%Total solution paths recorded = ~:D, of which ~:D is/are unique solution paths" 
-                (length *solutions*) (length *unique-solutions*))
-      (format t "~%Check *solutions* and *unique-solutions* for solution records.")
+                (length *solution-paths*) (length *unique-solution-states*))
+      (format t "~%Check *solution-paths* and *unique-solution-states* for solution records.")
       (case *solution-type*
         (first
           (format t "~2%Number of steps in first solution found: = ~:D" shallowest-depth)
@@ -1248,7 +1261,7 @@
                      (printout-solution minimum-time-solution))))))))
   (if (boundp 'goal-fn)
     (when (or (and (eql *solution-type* 'count) (= *solution-count* 0))
-              (and (not (eql *solution-type* 'count)) (null *solutions*)))
+              (and (not (eql *solution-type* 'count)) (null *solution-paths*)))
       (format t "~&No solutions found.~%"))
     (format t "~&No goal specified, but best results follow:"))
   (unless (boundp 'goal-fn)
@@ -1299,7 +1312,7 @@
 
  
 (defun register-solution (current-node goal-state)
-  "Inserts a new solution on the list of *solutions*."
+  "Inserts a new solution onto *solution-paths*."
   (declare (type node current-node) (type problem-state goal-state))
   (let* ((state-depth (1+ (node.depth current-node)))
          (solution
@@ -1333,22 +1346,22 @@
                (format t "Time = ~:A~%" (solution.time solution)))))
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
-    (push-global solution *solutions*)
+    (push-global solution *solution-paths*)
     (setf *last-improvement-states* *total-states-processed*)
     ;; Replace existing unique solution if new one is better
     (with-search-structures-lock
       (let* ((new-idb (problem-state.idb (solution.goal solution)))
-             (existing (find new-idb *unique-solutions*
+             (existing (find new-idb *unique-solution-states*
                              :key (lambda (soln)
                                     (problem-state.idb (solution.goal soln)))
                              :test #'equalp)))
         (cond (existing
                ;; Replace if new solution is better
                (when (solution-better-p solution existing)
-                 (setf *unique-solutions*
-                       (substitute solution existing *unique-solutions*))))
+                 (setf *unique-solution-states*
+                       (substitute solution existing *unique-solution-states*))))
               (t
-               (push-global solution *unique-solutions*)))))))
+               (push-global solution *unique-solution-states*)))))))
 
 
 (defun solution-better-p (new-soln old-soln)
@@ -1567,7 +1580,7 @@
                              (length *rem-init-successors*)))
               *num-init-successors*))
     ;; ===== Optimization =====
-    (when (or *hybrid-goals* *solutions*)
+    (when (or *hybrid-goals* *solution-paths*)
       (format-best-solution-line (- *total-states-processed* *last-improvement-states*))
       (when (and (member *solution-type* '(min-length min-time min-value max-value))
                  (> *bound-pruned* 0))
@@ -1575,9 +1588,9 @@
                 *bound-pruned*
                 (* 100.0 (/ *bound-pruned* *total-states-processed*))))
       (when (and (member *solution-type* '(min-value max-value))
-                 *solutions*
+                 *solution-paths*
                  (< *upper-bound* 1000000))
-        (let* ((best-val (solution.value (first *solutions*)))
+        (let* ((best-val (solution.value (first *solution-paths*)))
                (gap (abs (- *upper-bound* best-val))))
           (unless (zerop gap)
             (format t "~%anytime gap = ~A (best = ~A, upper bound = ~A)"
@@ -1614,30 +1627,30 @@
 (defun format-best-solution-line (states-since)
   "Print the headline best-solution line for the Optimization section,
    dispatching on *hybrid-mode* and *solution-type*. Caller is responsible
-   for verifying that *solutions* or *hybrid-goals* is non-nil."
+   for verifying that *solution-paths* or *hybrid-goals* is non-nil."
   (declare (type fixnum states-since))
   (cond
     (*hybrid-mode*
      (format t "~%hybrid goals deferred = ~:D (~:D states since last)"
              (length *hybrid-goals*) states-since))
     ((member *solution-type* '(first min-length))
-     (let ((best (first *solutions*)))
+     (let ((best (first *solution-paths*)))
        (format t "~%best solution depth = ~:D (~:D states since last improvement)"
                (solution.depth best) states-since)))
     ((eql *solution-type* 'min-time)
-     (let ((best (first *solutions*)))
+     (let ((best (first *solution-paths*)))
        (format t "~%best solution time = ~A (depth ~:D, ~:D states since last improvement)"
                (solution.time best) (solution.depth best) states-since)))
     ((member *solution-type* '(min-value max-value))
-     (let ((best (first *solutions*)))
+     (let ((best (first *solution-paths*)))
        (format t "~%best solution value = ~A (depth ~:D, ~:D states since last improvement)"
                (solution.value best) (solution.depth best) states-since)))
     ((eql *solution-type* 'every)
      (format t "~%solutions found = ~:D unique (~:D states since last new)"
-             (length *unique-solutions*) states-since))
+             (length *unique-solution-states*) states-since))
     ((typep *solution-type* 'fixnum)
      (format t "~%solutions found = ~:D of ~D (~:D states since last new)"
-             (length *unique-solutions*) *solution-type* states-since))))
+             (length *unique-solution-states*) *solution-type* states-since))))
 
 
 (defun ww-solve ()
@@ -1696,17 +1709,17 @@
                            :value (problem-state.value goal-state)
                            :path full-path
                            :goal goal-state)))
-          (push-global solution *solutions*)
+          (push-global solution *solution-paths*)
           (with-search-structures-lock
             (let ((existing
-                    (find goal-idb *unique-solutions*
+                    (find goal-idb *unique-solution-states*
                           :key (lambda (soln)
                                  (problem-state.idb (solution.goal soln)))
                           :test #'equalp)))
               (cond (existing
                     ;; Replace if new solution is better
                      (when (solution-better-p solution existing)
-                       (setf *unique-solutions*
-                             (substitute solution existing *unique-solutions*))))
+                       (setf *unique-solution-states*
+                             (substitute solution existing *unique-solution-states*))))
                     (t
-                     (push-global solution *unique-solutions*))))))))))
+                     (push-global solution *unique-solution-states*))))))))))

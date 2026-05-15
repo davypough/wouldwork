@@ -1,6 +1,6 @@
 ;;; Filename: ww-frequencies.lisp
 
-;;; Computes the frequencies of action macro sequences in *solutions*.
+;;; Computes the frequencies of action macro sequences in *solution-paths*.
 ;;; Eg, (freq 1 2 3) will compute the frequencies of all macro sequences
 ;;; of length 1, 2, and 3 appearing in the solutions to a problem.
 ;;; Use on a small problem to develop macros to apply to a larger problem.
@@ -12,7 +12,7 @@
 (defun freq (&rest run-lengths)
   "Return the alist of sequences with their respective counts, max first."
   (clrhash *freq-ht*)
-  (iter (for solution in *solutions*)
+  (iter (for solution in *solution-paths*)
         (iter (for len in run-lengths)
               (process-solution solution len)))
   (let ((alist (alexandria:hash-table-alist *freq-ht*)))

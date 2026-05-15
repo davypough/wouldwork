@@ -136,50 +136,53 @@
 
 
 (defun reset-global-hash-tables ()
-  "Clear all global hash tables and reset global lists between problem loads.
+  "Reinitialize all global hash tables and reset global lists between problem loads.
    sb-ext:defglobal only evaluates initialization forms ONCE per image session.
    On subsequent ASDF reloads the variables remain bound to their previous values,
    causing state contamination between problem loads. This function must execute
-   at top-level so it runs on every system reload, before problem files populate
-   the hash tables."
-  ;; Hash tables for type system and object mappings
+   at top-level so it runs on every system reload.
+   Two classes of table are handled differently:
+     RECREATED  -- tables whose defglobal init form includes :synchronized (> *threads* 0);
+                   setf'd to a fresh hash table so the flag reflects the current *threads*.
+     CLEARED    -- tables with a fixed or absent :synchronized flag; clrhash suffices.
+   This function executes AFTER read-init-vals has restored *threads* from
+   vals.lisp, so that the recreated tables carry the correct :synchronized value."
+  ;; CLEARED: fixed-size tables, write-only during init, lock-free during search
   (when (and (boundp '*types*) (hash-table-p *types*))
     (clrhash *types*))
   (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
     (clrhash *constant-integers*))
-  (when (and (boundp '*integer-constants*) (hash-table-p *integer-constants*))
-    (clrhash *integer-constants*))
-  ;; Hash tables for relations
-  (when (and (boundp '*relations*) (hash-table-p *relations*))
-    (clrhash *relations*))
-  (when (and (boundp '*static-relations*) (hash-table-p *static-relations*))
-    (clrhash *static-relations*))
   (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
     (clrhash *symmetrics*))
   (when (and (boundp '*complements*) (hash-table-p *complements*))
     (clrhash *complements*))
   (when (and (boundp '*fluent-relation-indices*) (hash-table-p *fluent-relation-indices*))
     (clrhash *fluent-relation-indices*))
-  ;; Hash tables for databases
-  (when (and (boundp '*db*) (hash-table-p *db*))
-    (clrhash *db*))
-  (when (and (boundp '*hdb*) (hash-table-p *hdb*))
-    (clrhash *hdb*))
-  (when (and (boundp '*idb*) (hash-table-p *idb*))
-    (clrhash *idb*))
-  (when (and (boundp '*hidb*) (hash-table-p *hidb*))
-    (clrhash *hidb*))
   (when (and (boundp '*static-db*) (hash-table-p *static-db*))
     (clrhash *static-db*))
-  (when (and (boundp '*static-idb*) (hash-table-p *static-idb*))
-    (clrhash *static-idb*))
   (when (and (boundp '*hap-db*) (hash-table-p *hap-db*))
     (clrhash *hap-db*))
   (when (and (boundp '*hap-idb*) (hash-table-p *hap-idb*))
     (clrhash *hap-idb*))
-  ;; Cache for proposition key conversions
-  (when (and (boundp '*prop-key-cache*) (hash-table-p *prop-key-cache*))
-    (clrhash *prop-key-cache*))
+  ;; RECREATED: tables whose :synchronized flag must reflect the current *threads* value
+  (when (boundp '*relations*)
+    (setf *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))))
+  (when (boundp '*static-relations*)
+    (setf *static-relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))))
+  (when (boundp '*db*)
+    (setf *db* (make-hash-table :test #'equal :synchronized (> *threads* 0))))
+  (when (boundp '*hdb*)
+    (setf *hdb* (make-hash-table :test #'equal :synchronized (> *threads* 0))))
+  (when (boundp '*idb*)
+    (setf *idb* (make-hash-table :synchronized (> *threads* 0))))
+  (when (boundp '*hidb*)
+    (setf *hidb* (make-hash-table :synchronized (> *threads* 0))))
+  (when (boundp '*integer-constants*)
+    (setf *integer-constants* (make-hash-table :synchronized (> *threads* 0))))
+  (when (boundp '*static-idb*)
+    (setf *static-idb* (make-hash-table :synchronized (> *threads* 0))))
+  (when (boundp '*prop-key-cache*)
+    (setf *prop-key-cache* (make-hash-table :test #'equal :synchronized (> *threads* 0))))
   ;; Reset lists that accumulate problem definitions
   (when (and (boundp '*query-names*) (listp *query-names*))
     (setf *query-names* nil))
@@ -194,11 +197,6 @@
   ;; Reset object index counter
   (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
     (setf *last-object-index* 0)))
-
-
-;; Call at top-level so it executes on every ASDF reload
-(eval-when (:load-toplevel :execute)
-  (reset-global-hash-tables))
 
 
 (defun read-init-vals (vals-file)
@@ -235,4 +233,9 @@
              (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
                (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
                (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
-   
+
+
+;; Call AFTER read-init-vals has restored *threads* from vals.lisp, so that
+;; recreated :synchronized tables reflect the correct value for this session.
+(eval-when (:load-toplevel :execute)
+  (reset-global-hash-tables))

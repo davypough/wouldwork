@@ -62,10 +62,10 @@
 
 
 (defun get-state-codes ()
-  "User calls this after finding backwards *solutions*."
+  "User calls this after finding backwards *solution-paths*."
   (format t "~%Working ...~%")
   (clrhash *state-codes*)
-  (iter (for soln in *solutions*)
+  (iter (for soln in *solution-paths*)
         (for path = (solution.path soln))
         (for db-props = (list-database (problem-state.idb (solution.goal soln))))
         (setf (gethash (funcall (symbol-function 'encode-state) db-props) *state-codes*) path))

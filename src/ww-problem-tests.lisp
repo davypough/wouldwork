@@ -139,7 +139,7 @@
 
 (defun collect-solution-data ()
   "Collect best solution and state from current problem results"
-  (let ((best-solution (ut::if-it (first *solutions*) (solution.path ut::it)))
+  (let ((best-solution (ut::if-it (first *solution-paths*) (solution.path ut::it)))
         (best-state (when *best-states*
                       (alexandria:hash-table-alist (problem-state.idb (first *best-states*))))))
     (list best-solution best-state)))
@@ -406,8 +406,8 @@
                          :cycles *program-cycles*
                          :states *total-states-processed*
                          :max-depth *max-depth-explored*
-                         :solutions (length *solutions*)
-                         :unique-solutions (length *unique-solutions*))))
+                         :solutions (length *solution-paths*)
+                         :unique-solutions (length *unique-solution-states*))))
           (push row results)
           (format t "~%~A: elapsed=~,6F s cycles=~D states=~D max-depth=~D solutions=~D unique=~D type=~A~%"
                   algorithm

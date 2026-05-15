@@ -139,8 +139,8 @@
 (sb-ext:defglobal *rem-init-successors* nil
   "Holds the remaining initial branch nodes from the start state.")
 
-(sb-ext:defglobal *solutions* nil
-  "Holds the solutions found during search.")
+(sb-ext:defglobal *solution-paths* nil
+  "Holds all solution paths found during search.")
 
 (sb-ext:defglobal *average-branching-factor* 0.0
   "Average branching factor so far during search (shared).")
@@ -312,7 +312,7 @@
 (sb-ext:defglobal *has-sim-state* nil
   "True when $sim-state appears in precondition variables.")
 
-(sb-ext:defglobal *unique-solutions* nil)
+(sb-ext:defglobal *unique-solution-states* nil)
   ;The culled list of unique solutions.
 
 (sb-ext:defglobal *upper-bound* 1000000.0)
