@@ -175,24 +175,18 @@
 
 
 (defun initialize-hybrid-mode ()
-  "Reserved for a future *solution-type* = ALL-PATHS mode.
-   Currently always returns NIL: *solution-type* = EVERY uses standard graph
-   semantics (one representative path per unique goal state) for both serial
-   and parallel search, via register-solution / *unique-solution-states*.
-   To re-enable hybrid mode for ALL-PATHS, restore the constraint checks
-   in the commented block below and change the guard to check ALL-PATHS."
-  nil)                                                                      ; CHANGED
-
-#|
-  ;; RESERVED FOR ALL-PATHS MODE -- do not delete.
-  ;; Original hybrid-mode activation logic follows.
-  ;; Only consider hybrid mode when seeking all solutions
-  (unless (eql *solution-type* 'every)
+  "Activates hybrid graph search mode for *solution-type* = ALL-PATHS.
+   ALL-PATHS finds every distinct path to every goal state (combinatorially
+   explosive; requires depth-first + graph + depth-cutoff > 0).
+   Returns T when all constraints are met; NIL otherwise, in which case
+   ALL-PATHS falls back to standard EVERY semantics (one path per unique
+   goal state).  Parallel search always uses the EVERY fallback."
+  (unless (eql *solution-type* 'all-paths)                               ; CHANGED
     (return-from initialize-hybrid-mode nil))
-  ;; Parallel search: use standard graph semantics instead.
   (when (> *threads* 0)
+    (format t "~&Note: ALL-PATHS with parallel search falls back to EVERY semantics ~
+               (one path per unique goal state).~%")
     (return-from initialize-hybrid-mode nil))
-  ;; Check remaining constraints
   (let ((constraints-met t))
     (unless (eql *algorithm* 'depth-first)
       (setf constraints-met nil))
@@ -200,10 +194,12 @@
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (setf constraints-met nil))
-    (when constraints-met
-      (format t "~&Hybrid graph search mode active: finding all goal states (not paths) at depth ~D.~%" *depth-cutoff*))
-    constraints-met)
-|#
+    (if constraints-met                                                    ; CHANGED
+        (format t "~&ALL-PATHS mode active: enumerating all paths to all goal states ~
+                   at depth ~D.~%" *depth-cutoff*)
+        (format t "~&Note: ALL-PATHS requires depth-first + graph + depth-cutoff > 0. ~
+                   Falling back to EVERY semantics.~%"))                  ; CHANGED
+    constraints-met))
 
 
 ;;; Search Functions
@@ -359,7 +355,9 @@
       (setf (node.wait-tried current-node) t)
       (hs::push-hstack current-node *open* :new-only nil))  ; Push underneath successors
     (iter (for succ-node in succ-nodes)
-          (hs::push-hstack succ-node *open* :new-only (eq *tree-or-graph* 'graph)))  ;push lowest heuristic value last
+          (hs::push-hstack succ-node *open*
+                         :new-only (and (eq *tree-or-graph* 'graph)   ; CHANGED
+                                        (not *hybrid-mode*))))         ; CHANGED: hybrid allows same-idb nodes at different depths
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
     (print-search-progress)  ;#nodes expanded so far
@@ -955,7 +953,7 @@
   "Determines if f-value of successor is better than open state, and updates it."
   (let ((open-state (node.state open-node)))
     (ecase *solution-type*
-      ((min-length first every)
+      ((min-length first every all-paths)                                 ; CHANGED
          nil)  ;in depth first search succ depth is never better than open
       (min-time
          (when (< (problem-state.time succ-state) (problem-state.time open-state))
@@ -976,7 +974,7 @@
         (closed-time (third closed-values))
         (closed-value (fourth closed-values)))
     (case *solution-type*
-      ((first every min-length)
+      ((first every all-paths min-length)                                 ; CHANGED
        (< succ-depth closed-depth))
       (min-time
        (< (problem-state.time succ-state) closed-time))
@@ -1172,9 +1170,12 @@
 (defun summarize-search-results (condition)
   (declare (type symbol condition))
   (format t "~2%In problem ~A, performed ~A~A search for ~A solution."
-            *problem-name* 
+            *problem-name*
             (if *hybrid-mode* "hybrid " "")
-            *tree-or-graph* *solution-type*)
+            *tree-or-graph*
+            (if (and (eql *solution-type* 'all-paths) (not *hybrid-mode*)) ; CHANGED
+                'every                                                      ; CHANGED: fell back
+                *solution-type*))
   (ecase condition
     (first
       (when *solution-paths*
@@ -1191,7 +1192,12 @@
               ((and (eql *tree-or-graph* 'tree) (eql *symmetry-pruning* nil))
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
               (t
-               (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches)."))))))
+               (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches)."))))
+      (when (eql *solution-type* 'all-paths)                              ; CHANGED
+        (if *hybrid-mode*                                                  ; CHANGED
+            (format t "~2%ALL-PATHS enumerated all paths to all goal states at depth ~D."  ; CHANGED
+                    *depth-cutoff*)                                        ; CHANGED
+            (format t "~2%ALL-PATHS fell back to EVERY semantics: one representative path per unique goal state.")))))  ; CHANGED
   (format t "~2%Depth cutoff = ~:D" *depth-cutoff*)
   (format t "~2%Maximum depth explored = ~:D" *max-depth-explored*)
   (format t "~2%Program cycles = ~:D" *program-cycles*)
@@ -1258,7 +1264,13 @@
                 (t (unless (eq *problem-type* 'csp)
                      (format t "~2%Duration of a minimum time solution = ~:D" minimum-time)
                      (format t "~2%A minimum time solution path from start state to goal state:~%")
-                     (printout-solution minimum-time-solution))))))))
+                     (printout-solution minimum-time-solution)))))
+        (all-paths                                                         ; CHANGED
+          (format t "~2%Total paths enumerated = ~:D across ~:D unique goal state~:P."  ; CHANGED
+                  (length *solution-paths*) (length *unique-solution-states*))  ; CHANGED
+          (format t "~2%Number of steps in a minimum path length solution = ~:D" shallowest-depth)  ; CHANGED
+          (format t "~2%A minimum length solution path from start state to goal state:~%")  ; CHANGED
+          (printout-solution shallowest-depth-solution)))))                ; CHANGED
   (if (boundp 'goal-fn)
     (when (or (and (eql *solution-type* 'count) (= *solution-count* 0))
               (and (not (eql *solution-type* 'count)) (null *solution-paths*)))
@@ -1339,7 +1351,7 @@
                    (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
                            state-depth (solution.value solution))
                    (format t ctrl-str state-depth)))))
-          (t (format t "~%New path to goal found at depth = ~:D~%" state-depth)
+          (t (format t "~%New path to goal found at depth = ~:D" state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                (format t "Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)
@@ -1367,7 +1379,7 @@
 (defun solution-better-p (new-soln old-soln)
   "Returns T if NEW-SOLN is better than OLD-SOLN based on *solution-type*."
   (case *solution-type*  ; CHANGED: ecase -> case to allow otherwise clause
-    ((min-length first every)
+    ((min-length first every all-paths)                                   ; CHANGED
      (< (solution.depth new-soln) (solution.depth old-soln)))
     (min-time
      (< (solution.time new-soln) (solution.time old-soln)))
@@ -1645,7 +1657,7 @@
      (let ((best (first *solution-paths*)))
        (format t "~%best solution value = ~A (depth ~:D, ~:D states since last improvement)"
                (solution.value best) (solution.depth best) states-since)))
-    ((eql *solution-type* 'every)
+    ((member *solution-type* '(every all-paths))                          ; CHANGED
      (format t "~%solutions found = ~:D unique (~:D states since last new)"
              (length *unique-solution-states*) states-since))
     ((typep *solution-type* 'fixnum)
