@@ -11,7 +11,8 @@
 ;;; ============================================================
 ;;; TASK GENERATION (Serial Root Partitioning)
 ;;; ============================================================
-;;; Expand from start state until we have enough tasks or hit split-depth-max.
+;;; Expand from start state until the task-count target is met or the
+;;; frontier is exhausted. *split-depth-max* is a safety cap only.
 ;;; This runs serially before workers start.
 
 (defun compute-target-tasks ()
@@ -20,11 +21,10 @@
 
 
 (defun generate-root-tasks (start-node)
-  "Generate initial task pool by expanding from START-NODE up to *split-depth-max*.
+  "Generate initial task pool by expanding from START-NODE.
+   Continues until the task-count target is reached, the frontier is
+   exhausted, or *split-depth-max* (safety cap) is hit.
    Returns list of nodes (tasks) at the split frontier.
-   
-   Strategy: BFS-style expansion until we have enough tasks or hit depth limit.
-   Each task is a node that a worker will DFS from.
    
    For graph search: tracks visited states in *closed* shards during generation."
   (declare (type node start-node))
@@ -33,14 +33,14 @@
         (tasks nil)                    ; Completed tasks (won't expand further)
         (current-depth 0))
     
-    (format t "~&Generating tasks: target=~D, split-depth-max=~D~%" 
+    (format t "~&Generating tasks: target=~D, safety-cap-depth=~D~%"
             target *split-depth-max*)
     
     (loop
-      ;; Termination: enough tasks, or hit depth limit, or frontier exhausted
+      ;; Termination: task-count target met, frontier exhausted, or safety cap hit  ; CHANGED
       (when (or (>= (+ (length tasks) (length frontier)) target)
-                (>= current-depth *split-depth-max*)
-                (null frontier))
+                (null frontier)
+                (>= current-depth *split-depth-max*))  ; CHANGED: safety cap last
         ;; All remaining frontier nodes become tasks
         (setf tasks (nconc tasks frontier))
         (format t "~&Generated ~D tasks at depths 0-~D~%" (length tasks) current-depth)

@@ -12,9 +12,11 @@
 ;;; PARALLEL SEARCH PARAMETERS
 ;;; ============================================================
 
-(defparameter *split-depth-max* 4
-  "Maximum depth for task generation. With branching factor 4, 
-   depth 4 yields up to 256 tasks.")
+(defparameter *split-depth-max* 20
+  "Safety cap on serial task-generation depth. Expansion continues until
+   the task-count target (* *tasks-per-thread* *threads*) is met or the
+   frontier is exhausted; this cap only fires on problems with very large
+   branching factors where unlimited expansion would be expensive.")
 
 (defparameter *tasks-per-thread* 8
   "Target multiplier: aim for (* *tasks-per-thread* *threads*) tasks minimum.")
@@ -434,7 +436,12 @@
 (defun initialize-closed-shards (hash-test)
   "Initialize the sharded closed table infrastructure.
    HASH-TEST is 'equal (hybrid mode) or 'eql (standard mode).
-   Creates N independent hash tables and N mutexes."
+   Creates N independent hash tables and N mutexes.
+   Recomputes *closed-shard-mask* from *num-closed-shards* to ensure
+   the two are always in sync regardless of how *num-closed-shards* was set."
+  ;; Recompute mask from current *num-closed-shards* -- guards against
+  ;; direct setf of *num-closed-shards* bypassing ww-set.  ; ADDED
+  (setf *closed-shard-mask* (1- *num-closed-shards*))      ; ADDED
   ;; Create shard locks
   (initialize-closed-shard-locks)
   ;; Create hash table shards

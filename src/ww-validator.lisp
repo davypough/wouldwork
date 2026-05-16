@@ -464,6 +464,16 @@
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))
+    ((*num-closed-shards* *split-depth-max* *tasks-per-thread* *min-tasks*  ; ADDED
+      *bound-refresh-interval* *donation-check-interval* *donation-threshold*)  ; ADDED
+     (unless (and (typep val 'fixnum) (> val 0))                               ; ADDED
+       (error "Can't set ~S to ~S. Must be a positive integer." param val)))  ; ADDED
+    ((*donation-fraction*)                                                      ; ADDED
+     (unless (and (realp val) (>= val 0.0) (<= val 1.0))                       ; ADDED
+       (error "Can't set *donation-fraction* to ~S. Must be a real between 0.0 and 1.0." val)))  ; ADDED
+    ((*enable-work-donation*)                                                   ; ADDED
+     (unless (typep val 'boolean)                                               ; ADDED
+       (error "Can't set *enable-work-donation* to ~S. Must be T or NIL." val)))  ; ADDED
     (otherwise (error "~S is not a valid parameter name in (ww-set ~S ~S)." param param val))))
 
 

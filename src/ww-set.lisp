@@ -11,11 +11,19 @@
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
        ((*depth-cutoff* *solution-type* *progress-reporting-interval* *randomize-search*
-         *branch* *auto-wait*)
+         *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
+         *bound-refresh-interval* *donation-check-interval* *donation-threshold*
+         *donation-fraction* *enable-work-donation*)
           (setf ,param ',val)
           (unless *ww-loading*
             (save-globals)
             (display-current-parameters)))
+       (*num-closed-shards*                                         ; ADDED
+         (setf *num-closed-shards* ',val                           ; ADDED
+               *closed-shard-mask* (1- ',val))                     ; ADDED: keep mask in sync
+         (unless *ww-loading*                                      ; ADDED
+           (save-globals)                                          ; ADDED
+           (display-current-parameters)))
        (*tree-or-graph*
          (if (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
            (format t "~2%When *algorithm* is backtracking, *tree-or-graph* must be set to tree.~2%")
