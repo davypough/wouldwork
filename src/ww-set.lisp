@@ -10,7 +10,7 @@
   `(progn
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
-       ((*depth-cutoff* *solution-type* *progress-reporting-interval* *randomize-search*
+       ((*depth-cutoff* *progress-reporting-interval* *randomize-search*  ;changed: *solution-type* removed
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
          *donation-fraction* *enable-work-donation*)
@@ -18,6 +18,14 @@
           (unless *ww-loading*
             (save-globals)
             (display-current-parameters)))
+       (*solution-type*  ;NEW: separated to allow compatibility check
+         (when (and (eq *algorithm* 'backtracking)  ;NEW
+                    (member ',val '(min-length min-time min-value max-value)))  ;NEW
+           (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" ',val))  ;NEW
+         (setf ,param ',val)  ;NEW
+         (unless *ww-loading*  ;NEW
+           (save-globals)  ;NEW
+           (display-current-parameters)))  ;NEW
        (*num-closed-shards*                                         ; ADDED
          (setf *num-closed-shards* ',val                           ; ADDED
                *closed-shard-mask* (1- ',val))                     ; ADDED: keep mask in sync
@@ -72,7 +80,15 @@
             (save-globals)
             (with-silenced-compilation
               (asdf:load-system :wouldwork :force t))))
-       ((*problem-name* *problem-type*)
+       (*problem-type*  ;changed: separated from *problem-name* to allow REPL setting with reload
+         (if *ww-loading*
+           (setf ,param ',val)
+           (progn
+             (setf ,param ',val)
+             (save-globals)
+             (with-silenced-compilation
+               (asdf:load-system :wouldwork :force t)))))
+       (*problem-name*  ;unchanged: must be set in problem specification file
           (if *ww-loading*
             (setf ,param ',val)
             (format t "~%Please set the parameter ~A in the problem specification file, not in the REPL.~%" ',param)))

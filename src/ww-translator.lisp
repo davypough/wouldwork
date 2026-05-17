@@ -577,7 +577,7 @@
                       (cdr form))
             ;; Create update structure with BOTH forward and inverse operations
             (push (make-update :changes (list (nreverse forward-list)    ; Forward ops
-                                             (nreverse inverse-list))   ; Inverse ops
+                                             inverse-list)              ; Inverse ops
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0) 

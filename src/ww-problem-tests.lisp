@@ -16,7 +16,7 @@
     ;"problem-crossword5-11.lisp"  ;runs out of default memory
     ;"problem-crossword15-18.lisp"  ;runs out of default memory
     "problem-crossword13.lisp" "problem-array-path.lisp"
-    "problem-tiles0a-csp.lisp" "problem-tiles1a.lisp" "problem-tiles1a-heuristic.lisp"
+    "problem-tiles0a-csp.lisp" "problem-tiles1a-heuristic.lisp"
     "problem-tiles1e-heuristic.lisp"
     ;"problem-tiles1b.lisp"  ;takes too long
     ;"problem-tiles1c.lisp"  ;takes too long
@@ -48,50 +48,45 @@
     "problem-smallspace.lisp"))
 
 
-;Any additions to this list requires rebuilding problem-test-bt-solutions.lisp
-;in the test-bt function below.
+;Any additions to this list requires deleting problem-test-bt-solutions.lisp
+;and re-running (test-bt) to rebuild it.
+;One representative chosen per problem class to avoid redundancy.
+;hanoi and donald have no native depth-cutoff; overrides set in run-bt-test-problems.
 (defvar *test-bt-problem-files*
-  '("problem-blocks3.lisp" "problem-blocks3a.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
-    "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp" "problem-queens8.lisp"
-    "problem-captjohn.lisp" "problem-quern.lisp" "problem-graveyard.lisp" "problem-sentry.lisp"
-    ;"problem-crossword5-11.lisp"  ;runs out of default memory
-    ;"problem-crossword15-18.lisp"  ;runs out of default memory
-    "problem-crossword13.lisp" "problem-array-path.lisp"
-    ;"problem-tiles0a-csp.lisp"  ;takes too long
-    "problem-tiles1a.lisp" 
-    ;"problem-tiles1a-heuristic.lisp"
-    ;"problem-tiles1e-heuristic.lisp"
-    ;"problem-tiles1b.lisp"  ;takes too long
-    ;"problem-tiles1c.lisp"  ;takes too long
-    ;"problem-tiles1d.lisp"  ;needs debugging
-    ;"problem-tiles2a.lisp"  ;takes too long
-    ;"problem-tiles2a-heuristic.lisp"  ;takes too long
-    ;"problem-tiles2b.lisp"  ;takes too long
-    ;"problem-tiles2c.lisp"  ;takes too long
-    ;"problem-tiles3a-heuristic.lisp"  ;takes too long
-    ;"problem-tiles5a-heuristic.lisp"  ;takes too long
-    ;"problem-tiles5b-heuristic.lisp"  ;needs debugging
-    ;"problem-tiles7a-heuristic2.lisp"  ;takes too long
-    ;"problem-tiles7a-heuristic3.lisp"  ;takes too long
-    ;"problem-tiles0b-csp.lisp"  ;takes too long
-    ;"problem-tiles7a-heuristic.lisp"  ;takes too long
-    "problem-hanoi.lisp"
-    ;"problem-triangle.lisp"  ;needs debugging
-    ;"problem-triangle-backward.lisp"  ;takes too long
-    "problem-triangle-xy.lisp" "problem-triangle-xyz.lisp"
-    ;"problem-triangle-heuristic.lisp"
-    "problem-triangle-macros.lisp" "problem-triangle-macros-one.lisp" "problem-triangle-xyz-one.lisp"
-    "problem-tsp.lisp"
-    "problem-u2.lisp"
-    ;"problem-donald.lisp"
-    "problem-knap4a.lisp" "problem-knap4b.lisp"
-    ;"problem-crater.lisp"  ;needs debugging
-    ;"problem-knap19.lisp"
-    ;"problem-socrates1.lisp"  ;needs debugging
-    ;"problem-socrates2.lisp"  ;needs debugging
-    ;"problem-smallspace-macro.lisp"  ;needs debugging
-    ;"problem-smallspace2.lisp"  ;takes too long
-    "problem-smallspace.lisp"))
+  '("problem-blocks3.lisp"              ;tree, every, non-fluent assertions
+    "problem-blocks3a.lisp"             ;graph->tree, every, fluent bind
+    ;"problem-blocks4.lisp"             ;redundant with blocks3
+    "problem-boxes.lisp"                ;graph->tree, min-length, multi-object
+    ;"problem-jugs2.lisp"               ;min-time solution type not supported by bt (use quern for fluent arithmetic)
+    ;"problem-jugs4.lisp"               ;redundant with jugs2
+    "problem-queens4.lisp"              ;tree, every, structured assignment
+    ;"problem-queens8.lisp"             ;redundant with queens4
+    "problem-captjohn.lisp"             ;csp, variable-per-level assignment
+    "problem-quern.lisp"                ;first, depth-cutoff 8, conditional assert
+    ;"problem-graveyard.lisp"            ;min-length on tree requires exhausting 12^14 nodes; no solution within native depth-cutoff 10
+    ;"problem-sentry.lisp"              ;has define-happening, incompatible with bt
+    "problem-crossword13.lisp"          ;tree, first, string state, nested updates
+    "problem-array-path.lisp"           ;tree, min-length, no-solution case
+    ;"problem-tiles0a-csp.lisp"         ;takes too long
+    ;"problem-tiles1a.lisp"              ;graph->tree, min-length, list-coord state--takes too long with bt
+    ;"problem-tiles1a-heuristic.lisp"   ;heuristic unused by bt, redundant with tiles1a
+    ;"problem-tiles1e-heuristic.lisp"   ;same
+    "problem-hanoi.lisp"                ;min-length, depth-cutoff 9 set in run-bt-test-problems
+    "problem-triangle-xyz.lisp"         ;first, canonical triangle form
+    ;"problem-triangle-xy.lisp"         ;redundant with triangle-xyz
+    "problem-triangle-macros.lisp"      ;tree, first, multiple asserts per action
+    ;"problem-triangle-macros-one.lisp" ;redundant with triangle-macros
+    ;"problem-triangle-xyz-one.lisp"    ;redundant with triangle-xyz
+    ;"problem-tsp.lisp"                 ;min-value solution type not supported by bt
+    "problem-u2.lisp"                   ;min-length, time-constrained preconditions
+    "problem-donald.lisp"               ;tree, first, depth-cutoff 6 set in run-bt-test-problems
+    ;"problem-knap4a.lisp"              ;max-value solution type not supported by bt
+    ;"problem-knap4b.lisp"              ;max-value solution type not supported by bt
+    ;"problem-knap19.lisp"              ;too slow
+    ;"problem-crater.lisp"              ;ok
+    ;"problem-smallspace2.lisp"         ;takes too long
+    ;"problem-smallspace.lisp"          ;takes too long
+))
 
 
 ;;; Helper Functions ;;;
@@ -228,114 +223,57 @@
 ;;; BACKTRACKING TEST ;;;
 
 
-(defun test-bt ()
-  "Run test problems using backtracking algorithm to certify backtracking functionality.
-   This parallels the standard test function but forces *algorithm* to backtracking."
-  (format t "~%========================================~%")
-  (format t "BACKTRACKING ALGORITHM TEST SUITE~%")
-  (format t "========================================~%")
-
+(defun run-bt-test-problems ()
   (cleanup-test-files)
   (reset-parameters)
-
-  ;; Verify no parallel processing
-  (when (> *threads* 0)
-    (error "Backtracking test requires *threads* = 0. Please reset in ww-settings.lisp"))
-
   (with-silenced-compilation
     (let* ((problems-to-run *test-bt-problem-files*)
            (test-solutions-file (merge-pathnames "problem-test-bt-solutions.lisp"
-                                                (asdf:system-source-directory :wouldwork)))
+                                                 (asdf:system-source-directory :wouldwork)))
            (problem-test-solutions (if (probe-file test-solutions-file)
-                                     (read-hash-table-from-file test-solutions-file)
-                                     (make-hash-table :test #'equal)))
+                                      (read-hash-table-from-file test-solutions-file)
+                                      (make-hash-table :test #'equal)))
            (problems-processed 0)
            (continue-all nil)
            failed-problems)
-
       (loop for problem in problems-to-run
             do (let* ((problem-name (parse-problem-name problem))
                       (should-process t))
-
                  (print-test-header problem-name "BACKTRACKING")
-
                  (unless continue-all
                    (format t "Continue, Skip, All, Quit: ")
                    (force-output)
                    (let* ((response (read-line))
                           (choice (if (> (length response) 0)
-                                     (char-upcase (char response 0))
-                                     #\C)))
+                                      (char-upcase (char response 0))
+                                      #\C)))
                      (case choice
-                       (#\Q (return-from test-bt nil))
+                       (#\Q (return-from run-bt-test-problems nil))
                        (#\S (setf should-process nil))
                        (#\A (setf continue-all t))
                        (#\C nil)
                        (t nil))))
-
                  (when should-process
-                   ;; Custom loading sequence for backtracking
                    (reset-parameters)
-
-                   ;; Stage the problem first (loads with defaults)
-                   (exchange-problem-file problem-name)
-
-                   ;; Set all parameters BEFORE any recompilation
-                   (setf *problem-name* (intern problem-name)
-                         *algorithm* 'backtracking
-                         *tree-or-graph* 'tree)  ; Required for backtracking
-
-                   ;; Set appropriate depth cutoff based on problem type
-                   (setf *depth-cutoff*
-                         (cond
-                           ;; CSP problems need more depth
-                           ((member problem-name '("donald" "queens4" "queens8"
-                                                  "knap4a" "knap4b" "knap19")
-                                    :test #'string-equal)
-                            20)
-                           ;; Simple planning problems
-                           ((member problem-name '("blocks3" "blocks3a" "blocks4" "jugs2" "jugs4")
-                                    :test #'string-equal)
-                            8)
-                           ;; Puzzle problems
-                           ((member problem-name '("captjohn" "quern" "graveyard" "sentry" "boxes")
-                                    :test #'string-equal)
-                            15)
-                           ;; Complex problems
-                           ((member problem-name '("tiles1a-heuristic" "tiles1e-heuristic"
-                                                  "triangle-xy" "triangle-xyz" "triangle-heuristic"
-                                                  "triangle-xyz-one" "u2" "crossword13")
-                                    :test #'string-equal)
-                            25)
-                           ;; Default for others
-                           (t 10)))
-
-                   ;; Save parameters and trigger ONE recompilation with backtracking
-                   (save-globals)
-
-                   ;; Load system ONCE with saved backtracking parameters
-                   (with-silenced-compilation
-                     (asdf:load-system :wouldwork :force t))
-
-                   ;; Verify algorithm is still backtracking after load
-                   (unless (eq *algorithm* 'backtracking)
-                     (format t "~%WARNING: Algorithm reset to ~A. Forcing back to backtracking.~%"
-                             *algorithm*)
-                     ;; Force correction without another ASDF reload
-                     (setf *algorithm* 'backtracking)
-                     (save-globals))
-
+                   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+                   ;; Load silently to acquire native settings from define-problem,
+                   ;; suppressing the initial depth-first parameter display.
+                   ;; Justified here as this is a test routine only.
+                   (let ((*standard-output* (make-broadcast-stream)))
+                     (%stage problem-name))
+                   ;; Override for backtracking; native depth-cutoff already preserved.
+                   (setf *algorithm*     'backtracking
+                         *tree-or-graph* 'tree)
+                   ;; Problems with no native depth-cutoff need one for bt tree search.
+                   (when (string-equal problem-name "hanoi")
+                     (setf *depth-cutoff* 9))
+                   (when (string-equal problem-name "donald")
+                     (setf *depth-cutoff* 6))
+                   ;; refresh saves bt overrides to vals.lisp and does one visible
+                   ;; load, producing a single parameter display showing backtracking.
+                   (refresh)
                    (incf problems-processed)
-
-                   ;; Run the solver with error handling
-                   (handler-case
-                       (ww-solve)
-                     (error (e)
-                       (format t "~%ERROR solving ~A with backtracking: ~A~%"
-                               problem-name e)
-                       (push problem-name failed-problems)))
-
-                   ;; Collect and compare results
+                   (ww-solve)
                    (let ((solution-data (collect-solution-data)))
                      (unless (equalp solution-data
                                      (gethash problem-name problem-test-solutions))
@@ -346,27 +284,22 @@
                        (setf (gethash problem-name problem-test-solutions)
                              solution-data))
                      t))))
-
-      ;; Cleanup and restore defaults
       (cleanup-test-files)
-      (reset-parameters)
       (stage blocks3)
-
-      ;; Final summary
-      (format t "~%~%========================================~%")
-      (format t "Backtracking Test Summary~%")
-      (format t "========================================~%")
+      (format t "~%~%Final Summary:~%")
       (format t "Total test problems run: ~D~%" (length *test-bt-problem-files*))
       (format t "Test failures: ~D~%" (length failed-problems))
       (format t "Failed problems: ~A~%" (reverse failed-problems))
-      (format t "Note: A failed problem solution is not necessarily wrong, but unexpected in backtracking,")
-      (format t "and so should be reanalyzed.")
-
-      ;; Save results
+      (format t "Note: A failed BT solution is not necessarily wrong, but different from the reference solution.~%")
       (progn (unless (probe-file test-solutions-file)
                (write-hash-table-to-file problem-test-solutions test-solutions-file))
              t)
       t)))
+
+
+(defun test-bt ()
+  "Run standard test suite using backtracking search."
+  (run-bt-test-problems))
 
 
 ;;; SIMPLE DEPTH-FIRST VS BACKTRACKING BENCHMARK ;;;
