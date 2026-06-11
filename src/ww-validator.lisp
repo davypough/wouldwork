@@ -161,6 +161,31 @@
                (format-relation-with-fluents relation-name))))))
                          
 
+(defun check-bind-relation-has-fluent (proposition)
+  "Validates that a bound relation declares at least one fluent to extract.
+   A bind reads a fluent value out of the database; if the relation has no
+   fluent position there is nothing to bind, and every $variable in the bind
+   silently degrades into a literal lookup-key component (defaulting to NIL),
+   so the generated probe is keyed wrong and never matches. Such a relation
+   must be declared with a fluent, or tested with a plain proposition."
+  (let* ((relation-name (car proposition))
+         (relation-def (or (gethash relation-name *relations*)
+                           (gethash relation-name *static-relations*))))
+    (unless (get-prop-fluent-indices proposition)
+      (error "~%Bind statement references a relation with no fluent to bind.~%~
+                Statement: ~S~%~
+                Relation:  ~S~%~
+                Error: ~A declares no fluent ($-prefixed) argument, so bind has~%~
+                  nothing to extract; the bound $variable becomes part of the~%~
+                  lookup key (defaulting to NIL).~%~
+                Fix: mark the looked-up argument as fluent in the relation~%~
+                  declaration (eg, $gate), or use a plain proposition for an~%~
+                  existence test instead of bind."
+             (list 'bind proposition)
+             (cons relation-name (if (listp relation-def) relation-def nil))
+             relation-name))))
+
+
 (defun check-query/update-call (fn-call)
   "Checks the validity of a call to a query or update function
    during translation--eg, (cleartop? ?block)"

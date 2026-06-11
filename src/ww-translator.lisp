@@ -260,6 +260,7 @@
                (consp (second form)))
     (error "Invalid bind form structure: ~A" form))
   (check-proposition (second form))
+  (check-bind-relation-has-fluent (second form))    ;; ADDED: bind on a fluentless relation is an error
   (check-bind-fluent-consistency (second form)))
 
 
