@@ -206,7 +206,7 @@
   "When T, detect symmetry groups and prune symmetric action instantiations.")
 
 (sb-ext:defglobal *types*
-  (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
   "Table of all types.
    Written only during init(); strictly read-only during search.
    Pre-allocated to 256 (well above any realistic type count)
@@ -224,7 +224,7 @@
   "Logical connectives.")
 
 (sb-ext:defglobal *symmetrics*
-  (make-hash-table :test #'eq :size 64 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  (make-hash-table :test #'eq :size 64 :rehash-threshold 1.0)
   "Symmetric relations.
    Written only during init(); strictly read-only during search.
    Pre-allocated to 64 (well above any realistic symmetric-relation count)
@@ -233,7 +233,7 @@
    (add-proposition calls gethash here ~70M times/run in queensN-csp profile).")
 
 (sb-ext:defglobal *complements*
-  (make-hash-table :test #'eq :size 128 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  (make-hash-table :test #'eq :size 128 :rehash-threshold 1.0)
   "Table of complement relations.
    Written only during init(); strictly read-only during search.
    Pre-allocated to 128 (well above any realistic complement count)
@@ -257,7 +257,7 @@
   "Initial integer database of dynamic hidb propositions.")
 
 (sb-ext:defglobal *constant-integers*
-  (make-hash-table :size 2003 :rehash-threshold 1.0)  ;; CHANGED: was :synchronized (> *threads* 0)
+  (make-hash-table :size 2003 :rehash-threshold 1.0)
   "Integer codes for the problem's object constants.
    Pre-allocated to capacity 2003 (above the 999-object design limit
    in convert-to-integer/register-dynamic-object) with rehash-threshold
@@ -335,6 +335,17 @@
 
 (sb-ext:defglobal *print-updates* nil
   "Print each database update while T")
+
+(defvar *detect-propagated-changes* nil
+  "Gate for automatic change detection in add-prop/del-prop. When T, those setters
+   set *propagated-state-changed* on any write that actually changes stored state.
+   A problem's propagate-changes! binds this to T around its fixpoint loop; default
+   NIL leaves the search hot path untouched.")
+
+(defvar *propagated-state-changed* nil
+  "Dirty flag set by add-prop/del-prop (when *detect-propagated-changes* is T) on a
+   real database mutation. A propagation pass binds it to NIL, runs its derivations,
+   and returns it to signal whether another convergence pass is needed.")
 
 (sb-ext:defglobal *global-invariants* nil
   "List of invariant query functions to check on every state.")

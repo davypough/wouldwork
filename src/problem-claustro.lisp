@@ -1,9 +1,10 @@
 ;;; Filename: problem-claustro.lisp
 
-;;; Talos Principle problem 'Claustrophobia' in Escape from the Pit Reawakened.
+;;; Talos Principle problem 'Claustrophobia' in Escape from the Pit Reawakened
 ;;; Full topological representation baseline; no coordinate calculations
-;;; Assumes only one agent (because holding is a derived relation based on all cargo locations)
-
+;;; Floating-point fluents disallowed (use $rational instead)
+;;; List fluents are OK as long as they remain ordered for comparison with #'equal
+;;; Propagate-changes! handles derived relation updates; action rules handle base relation updates
 
 (in-package :ww)
 
@@ -23,10 +24,9 @@
   agent (agent1)
   gate  (gate1 gate2 gate3 gate4 gate5)
   screen (screen1)
-  location (location1 location2 location3 location4 location5
-            location6 location7 location8)
+  location (location1 location2 location3 location4 location5 location6 location7 location8)
   area (area1 area2 area3)
-  los-group (south north corridor corner)
+  los-group (los-group1 los-group2 los-group3 los-group4)  ;each group has los to the same objects
   box (box1)
   jammer (jammer1)
   transmitter (transmitter1)
@@ -39,7 +39,7 @@
 
 
 (define-dynamic-relations
-  (holding agent $cargo)  ;derived from location: a cargo without a location is held (see derive-holding!)
+  (holding agent $cargo)  ;explicitly stored per agent; set by pickup-cargo, cleared by put-cargo/jam-gate
   (location (either agent cargo) $location)
   (open gate)
   (active receiver)
@@ -65,30 +65,30 @@
 
 
 (define-query accessible (?agent ?location1 ?location2)
-  ;; Reachability: ?location2 is accessible from ?location1 iff some currently-passable
+  ;; ?location2 is accessible from ?location1 iff some currently-passable
   ;; route connects them.  A route composes single hops (see one-step-accessible): free
   ;; intra-area moves, inter-area interfaces whose obstacles are passable for ?agent, and
-  ;; passable one-way edges.  Relaxes a reached set to fixpoint over the locations, so
+  ;; passable one-way edges.  Relaxes a visited set to fixpoint over the locations, so
   ;; cycles and alternate routes are handled automatically.  Max granularity: one move
   ;; may traverse an entire open route.
-  (do (assign $reached (list ?location1))
+  (do (assign $visited (list ?location1))
       (ww-loop for $pass from 1 to 99
                do (assign $changed nil)
                   (doall (?loc location)
-                    (if (member ?loc $reached)
+                    (if (member ?loc $visited)
                       (doall (?next location)
-                        (if (and (not (member ?next $reached))
+                        (if (and (not (member ?next $visited))
                                  (one-step-accessible ?agent ?loc ?next))
-                          (do (assign $reached (cons ?next $reached))
+                          (do (assign $visited (cons ?next $visited))
                               (assign $changed t))))))
                   (if (not $changed)
                     (return t)))
-      (and (member ?location2 $reached)
+      (and (member ?location2 $visited)
            t)))
 
 
 (define-query one-step-accessible (?agent ?from ?to)
-  ;; True iff ?agent can move ?from -> ?to in a single connectivity hop.  Determines the
+  ;; True iff ?agent can move ?from -> ?to in a single hop.  Determines the
   ;; hop's guarding obstacle list -- none for an intra-area move, the interface's obstacles
   ;; for an inter-area move, or the one-way edge's obstacles -- then requires every
   ;; obstacle passable for ?agent.  No matching hop means not directly accessible.
@@ -132,7 +132,7 @@
            (not (bind (holding ?agent $any-cargo))))))
 
 
-(define-query los (?location ?target)
+(define-query visible (?location ?target)
   ;; Sightline must exist; clear only if every occluder is transparent.
   ;; Empty occluder list means a direct, always-clear sightline.
   ;; Agent-independent: transparency here depends only on world state.
@@ -148,12 +148,12 @@
                (bind (los-via $group ?target $occluders)))
         (do (assign $all-clear t)
             (ww-loop for $o in $occluders
-                     do (if (not (los-clear $o))
+                     do (if (not (visible-clear $o))
                           (assign $all-clear nil)))))
       $all-clear))
 
 
-(define-query los-clear (?occluder)
+(define-query visible-clear (?occluder)
   ;; Per-kind transparency for one occluder on a sightline. Claustro's sightlines
   ;; pass only through gates; the intervening-occupied-location branch is the
   ;; documented extension.
@@ -164,7 +164,7 @@
 (define-query reachable (?location1 ?location2)
   ;; Two locations are within reach for placing/picking iff they are the same
   ;; location, or a reach edge joins them with every barrier gate open.
-  ;; Agent-independent; reachable-via is symmetric (auto-symmetrized like accessible-via).
+  ;; Agent-independent; reachable-via is symmetric (auto-symmetrized like interface).
   (do (assign $within-reach nil)
       (if (eql ?location1 ?location2)
         (assign $within-reach t)
@@ -179,7 +179,7 @@
 (define-query reachable-clear (?barrier)
   ;; A reach barrier is clear only when it is an open gate. Closed gates block, and
   ;; so does any non-gate barrier (eg a screen) -- no reaching through either.
-  ;; Separate from los-clear so sight and reach can diverge later.
+  ;; Separate from visible-clear so sight and reach can diverge later.
   (and (gate ?barrier)
        (open ?barrier)))
 
@@ -221,83 +221,59 @@
 
 
 (define-update propagate-changes! ()
-  (ww-loop for $iteration from 1 to 5
-           do (if (not (propagate-consequences!))
-                (return t))
-           finally (inconsistent-state) (return nil)))
+  ;; Binds the change-detection gate so add-prop/del-prop flag *propagated-state-changed*
+  ;; on real derived-fact mutations during the fixpoint; the gate is off everywhere else,
+  ;; leaving the search hot path unaffected.  Each pass runs to convergence (no change) or,
+  ;; failing that, the cap declares the state inconsistent.
+  (let ((*detect-propagated-changes* t))
+    (ww-loop for $iteration from 1 to 5
+             do (if (not (propagate-consequences!))
+                  (return t))
+             finally (inconsistent-state) (return nil))))
 
 
 (define-update propagate-consequences! ()
-  ;; One propagation pass; returns t if any update changed state. Topological
-  ;; cascade: derive holding (leaf) -> receiver activation -> following control,
-  ;; iterated to fixpoint.
-  (some #'identity
-        (mapcar (lambda (fn) (funcall fn state))
-                (list #'derive-holding!
-                      #'update-receiver-activation!
-                      #'apply-following-control!))))
+  ;; One propagation pass.  Binds the per-pass dirty flag to nil, runs the topological
+  ;; cascade -- active receivers -> open gates -- for effect, then returns the
+  ;; flag: t iff some derivation actually changed stored state, which tells
+  ;; propagate-changes! to run another pass.  add-prop/del-prop set the flag automatically,
+  ;; so the cascade functions no longer track changes themselves.
+  (let ((*propagated-state-changed* nil))
+    (update-receiver-status!)
+    (update-gate-status!)
+    *propagated-state-changed*))
 
 
-(define-update derive-holding! ()
-  ;; Derives holding from location: a cargo with no location is being held; if every cargo
-  ;; has a location, nothing is held.  Location is the single source of truth, so holding
-  ;; cannot desync from it and the manipulation actions assert only location.  Returns nil:
-  ;; nothing downstream of holding is derived, so it never extends the fixpoint loop.
-  ;; Assumes a single holder (the one unlocated cargo is assigned to every agent); a
-  ;; multi-agent problem would track the holder explicitly instead.
-  (do (doall (?agent agent)
-        (if (exists (?cargo cargo)
-              (and (not (bind (location ?cargo $any-location)))
-                   (assign $held ?cargo)))
-          (holding ?agent $held)
-          (do (bind (holding ?agent $any-cargo))
-              (not (holding ?agent $any-cargo)))))
-      nil))
-
-
-(define-update update-receiver-activation! ()
+(define-update update-receiver-status! ()
   ;; A receiver is active iff a chroma-matching beam reaches it (corridor clear).
-  ;; Sets and clears (active ?rc) accordingly; gate state is left to
-  ;; apply-following-control!.  Returns t iff any receiver's activation changed.
-  (do (doall (?rc receiver)
-        (if (beam-reaches-receiver ?rc)
-          (if (not (active ?rc))
-            (do (active ?rc)
-                (assign $changed t)))
-          (if (active ?rc)
-            (do (not (active ?rc))
-                (assign $changed t)))))
-      $changed))
+  ;; Sets or clears (active ?rc) to match; gate state is left to update-gate-status!.
+  ;; Asserts the derived truth unconditionally -- change detection is automatic, so an
+  ;; unchanged re-assert is silent and does not extend the fixpoint.
+  (doall (?rc receiver)
+    (if (beam-reaches-receiver ?rc)
+      (active ?rc)
+      (not (active ?rc)))))
 
 
-(define-update apply-following-control! ()
+(define-update update-gate-status! ()
   ;; Per-gate combine rule:  open  <=>  jammed?  OR  control-on?
   ;; control-on? by mode: normal = energized controller; inverted = not energized.
   ;; Jamming overrides the inverted force-close (jammed is the leading disjunct).
   ;; Uncontrolled gates reduce to: open <=> jammed?.  Iterates every gate so that
-  ;; jam-driven opening of an uncontrolled gate (eg gate1) is realized here.
-  ;; Returns t iff any gate's open state changed.
-  (do (doall (?gate gate)
-        (do (assign $should-be-open nil)
-            (if (exists (?j jammer) (jamming ?j ?gate))
-              (assign $should-be-open t))
-            (doall (?rc receiver)
-              (if (bind (controls ?rc ?gate $mode))
-                (cond ((eql $mode 'normal)
-                       (if (energized ?rc)
-                         (assign $should-be-open t)))
-                      ((eql $mode 'inverted)
-                       (if (not (energized ?rc))
-                         (assign $should-be-open t)))
-                      (t (error "Unsupported control mode ~A on gate ~A~%" $mode ?gate)))))
-            (if $should-be-open
-              (if (not (open ?gate))
-                (do (open ?gate)
-                    (assign $changed t)))
-              (if (open ?gate)
-                (do (not (open ?gate))
-                    (assign $changed t))))))
-      $changed))
+  ;; jam-driven opening of an uncontrolled gate (eg gate1) is realized here.  Asserts
+  ;; the derived open-state unconditionally -- change detection is automatic, so an
+  ;; unchanged re-assert is silent.  Only normal and inverted modes are recognized.
+  (doall (?gate gate)
+    (if (or (exists (?j jammer)
+              (jamming ?j ?gate))
+            (exists (?rc receiver)
+              (and (bind (controls ?rc ?gate $mode))
+                   (or (and (eql $mode 'normal)
+                            (energized ?rc))
+                       (and (eql $mode 'inverted)
+                            (not (energized ?rc)))))))
+      (open ?gate)
+      (not (open ?gate)))))
 
 
 ;;;; ACTIONS ;;;;
@@ -311,7 +287,8 @@
        (bind (location ?cargo $c-location))
        (reachable $c-location $a-location))
   (?agent ?cargo $a-location)
-  (assert (not (location ?cargo $c-location))
+  (assert (holding ?agent ?cargo)
+          (not (location ?cargo $c-location))
           (if (bind (jamming ?cargo $any-target))
             (not (jamming ?cargo $any-target)))
           (finally (propagate-changes!))))
@@ -324,9 +301,10 @@
        (jammer $any-jammer)
        (bind (location ?agent $a-location))
        (reachable ?location $a-location)
-       (los ?location ?gate))
+       (visible ?location ?gate))
   (?agent $any-jammer ?gate ?location)
-  (assert (jamming $any-jammer ?gate)
+  (assert (not (holding ?agent $any-jammer))
+          (jamming $any-jammer ?gate)
           (location $any-jammer ?location)
           (finally (propagate-changes!))))
 
@@ -339,7 +317,8 @@
        (bind (location ?agent $a-location))
        (reachable ?location $a-location))
   (?agent $cargo ?location)
-  (assert (location $cargo ?location)
+  (assert (not (holding ?agent $cargo))
+          (location $cargo ?location)
           (finally (propagate-changes!))))
          
 
@@ -374,34 +353,34 @@
   ;; Beam geometry
   (beam-via transmitter1 receiver1 (gate1 location2))  ;corridor: gate1 open, location2 unoccupied
   
-  ;; Each location's sightline-equivalence group (south=P1, north=P2, corridor=P3, corner=P4)
-  (in-los-group south (location1 location7))
-  (in-los-group north (location3 location4 location5 location6))
-  (in-los-group corridor (location2))
-  (in-los-group corner (location8))
+  ;; Visibility. Each location's sightline-equivalence named group
+  (in-los-group los-group1 (location1 location7))  ;locations can see the same targets
+  (in-los-group los-group2 (location3 location4 location5 location6))
+  (in-los-group los-group3 (location2))
+  (in-los-group los-group4 (location8))
 
   ;; Line-of-sight per group (group to target gate); list = occluder gates that must be open
-  (los-via south gate1 ())
-  (los-via south gate2 ())
-  (los-via south gate4 ())
-  (los-via south gate3 (gate2))
-  (los-via south gate5 (gate2 gate3))
+  (los-via los-group1 gate1 ())
+  (los-via los-group1 gate2 ())
+  (los-via los-group1 gate4 ())
+  (los-via los-group1 gate3 (gate2))
+  (los-via los-group1 gate5 (gate2 gate3))
 
-  (los-via north gate3 ())
-  (los-via north gate4 ())
-  (los-via north gate5 ())
-  (los-via north gate2 (gate3))
-  (los-via north gate1 (gate3 gate2))
+  (los-via los-group2 gate3 ())
+  (los-via los-group2 gate4 ())
+  (los-via los-group2 gate5 ())
+  (los-via los-group2 gate2 (gate3))
+  (los-via los-group2 gate1 (gate3 gate2))
 
-  (los-via corridor gate1 ())
-  (los-via corridor gate2 ())
-  (los-via corridor gate3 (gate2))
-  (los-via corridor gate5 (gate2 gate3))
+  (los-via los-group3 gate1 ())
+  (los-via los-group3 gate2 ())
+  (los-via los-group3 gate3 (gate2))
+  (los-via los-group3 gate5 (gate2 gate3))
 
-  (los-via corner gate4 ())
-  (los-via corner gate5 (gate4))
+  (los-via los-group4 gate4 ())
+  (los-via los-group4 gate5 (gate4))
   
-  ;; Connectivity (move location to location).  Each location's area (areas are
+  ;; Accessibility (move location to location).  Each location's area (areas are
   ;; free-access cliques); inter-area interfaces carry the guarding obstacles, which
   ;; the accessible query relaxes into full reachability.
   (in-area area1 (location1 location2))
@@ -412,7 +391,7 @@
   (interface area2 area3 (gate4 screen1))
   (traversable> location7 location1 (ladder1))   ;one-way via ladder
 
-  ;; Reachability (place/pick at a nearby location); symmetric like accessible-via.
+  ;; Reachability (put/pickup at a nearby location within reach); symmetric like accessible.
   ;; $list = barrier that must be open to reach across.
   (reachable-via location1 location7 ())  ;wall opening between L1 and L7; reach only, not movement
   (reachable-via location2 location3 (gate2 gate3))

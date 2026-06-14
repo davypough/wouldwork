@@ -161,10 +161,11 @@
         (let ((fluent-values (or precomputed-values
                                  (get-prop-fluents proposition fluent-indices))))
           (if int-db
-            (setf (gethash (or precomputed-key
-                               (convert-fluentless-prop-to-integer proposition fluent-indices))
-                           db)
-                  fluent-values)
+            (let ((key (or precomputed-key
+                           (convert-fluentless-prop-to-integer proposition fluent-indices))))
+              (when *detect-propagated-changes*
+                (note-add-change db key fluent-values))
+              (setf (gethash key db) fluent-values))
             (setf (gethash (get-fluentless-prop proposition fluent-indices) db) fluent-values))
           ;handle complement, dispatching on whether the complement itself has fluents
           (when (gethash (car proposition) *complements*)
@@ -182,7 +183,10 @@
         ;do for non-fluent propositions
         (progn
           (if int-db
-            (setf (gethash (convert-to-integer proposition) db) t)
+            (let ((key (convert-to-integer proposition)))
+              (when *detect-propagated-changes*
+                (note-add-change db key t))
+              (setf (gethash key db) t))
             (setf (gethash proposition db) t))
           ;handle complement, dispatching on whether the complement itself has fluents
           (when (gethash (car proposition) *complements*)
@@ -208,7 +212,10 @@
         ;do if proposition has fluents
         (progn
           (if int-db
-            (remhash (convert-fluentless-prop-to-integer proposition fluent-indices) db)
+            (let ((key (convert-fluentless-prop-to-integer proposition fluent-indices)))
+              (when *detect-propagated-changes*
+                (note-del-change db key))
+              (remhash key db))
             (remhash (get-fluentless-prop proposition fluent-indices) db))
           ;handle complement, dispatching on whether the complement itself has fluents
           (when (gethash (car proposition) *complements*)
@@ -230,7 +237,10 @@
         ;do for non-fluent propositions
         (progn
           (if int-db
-            (remhash (convert-to-integer proposition) db)
+            (let ((key (convert-to-integer proposition)))
+              (when *detect-propagated-changes*
+                (note-del-change db key))
+              (remhash key db))
             (remhash proposition db))
           ;handle complement; skip if complement is fluent (no value to restore)
           (when (gethash (car proposition) *complements*)
@@ -240,6 +250,23 @@
                 (if int-db
                   (setf (gethash (convert-to-integer complement-prop) db) t)
                   (setf (gethash complement-prop db) t))))))))))
+
+
+(defun note-add-change (db key new-value)
+  "Sets *propagated-state-changed* when storing NEW-VALUE at KEY would change DB --
+   KEY is absent, or its current value differs.  Called from add-prop only while
+   *detect-propagated-changes* is in effect, just before the store."
+  (multiple-value-bind (old-value present) (gethash key db)
+    (when (or (not present)
+              (not (equal old-value new-value)))
+      (setf *propagated-state-changed* t))))
+
+
+(defun note-del-change (db key)
+  "Sets *propagated-state-changed* when KEY is present in DB and is about to be
+   removed.  Called from del-prop only while *detect-propagated-changes* is in effect."
+  (when (nth-value 1 (gethash key db))
+    (setf *propagated-state-changed* t)))
 
 
 (defun bijective-index-propositions (proposition)
