@@ -1413,8 +1413,11 @@
     (dolist (item path)
       (incf step)
       (let* ((action-form (second item))
-             (new-state (replay-action-to-state action-form current-state)))
-        (write item :pretty t)
+             (display-form (cons (car action-form)                               ;; ADDED
+                                 (merge-effect-format (car action-form)          ;; ADDED
+                                                      (cdr action-form))))       ;; ADDED
+             (new-state (replay-action-to-state action-form current-state)))     ;replay uses pure action-form
+        (write (list (first item) display-form) :pretty t :escape nil)           ;; CHANGED: connectives, unquoted
         (terpri)
         (cond (new-state
                (setf current-state new-state)
@@ -1424,6 +1427,23 @@
                (report-replay-failure step action-form current-state)
                (return-from printout-solution-with-states)))))
     (terpri)))
+
+
+(defun merge-effect-format (action-name instantiations)
+  "Interleaves the string connectives from ACTION-NAME's effect-format template with the
+   pure INSTANTIATIONS values, producing a human-readable move for display. Each string in
+   the template is emitted verbatim; each non-string slot consumes the next instantiation
+   value, in order. Returns INSTANTIATIONS unchanged when the action is unknown (eg wait,
+   start-state) or its template carries no string connectives."
+  (let ((action (find action-name *actions* :key #'action.name)))
+    (if (and action (some #'stringp (action.effect-format action)))
+      (let ((values instantiations))
+        (mapcar (lambda (slot)
+                  (if (stringp slot)
+                    slot
+                    (pop values)))
+                (action.effect-format action)))
+      instantiations)))
 
 
 (defun report-replay-failure (step action-form last-good-state)

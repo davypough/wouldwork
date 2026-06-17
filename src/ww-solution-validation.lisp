@@ -123,6 +123,10 @@
       (setf wait-duration (first provided-args))
       (setf provided-args nil))
     
+    ;; Strip any display connectives from a path pasted off annotated solution output,    ;; CHANGED
+    ;; so the count check and matching see the pure value list.                            ;; CHANGED
+    (setf provided-args (strip-display-connectives action provided-args))                  ;; CHANGED
+    
     ;; Check argument count matches effect variables
     (let ((expected-count (length (action.effect-variables action)))
           (provided-count (length provided-args)))
@@ -197,6 +201,21 @@
           (values nil nil (cons :state-mismatch (first all-instantiations)))
           ;; No precondition passed at all
           (values nil nil :precondition-failure)))))
+
+
+(defun strip-display-connectives (action provided-args)
+  "Returns PROVIDED-ARGS with any display connectives removed, yielding the pure value
+   list used for matching and diagnostics. When ACTION's effect-format template carries
+   string connectives and PROVIDED-ARGS matches the template length (ie, it was pasted
+   from annotated solution output), drops the args at the template's string positions.
+   Otherwise returns PROVIDED-ARGS unchanged (un-annotated action, or already-pure form)."
+  (let ((template (action.effect-format action)))
+    (if (and (some #'stringp template)
+             (= (length provided-args) (length template)))
+      (loop for slot in template
+            for arg in provided-args
+            unless (stringp slot) collect arg)
+      provided-args)))
 
 
 (defun get-precondition-args (action state)
@@ -388,13 +407,17 @@
        (format t "~%Reason: Precondition not satisfied~%")
        (when action
          (format t "~%Precondition: ~S~%" (action.precondition-form action))
-         (diagnose-precondition-failure action (rest action-form) state)))
+         (diagnose-precondition-failure action
+                                        (strip-display-connectives action (rest action-form))  ;; CHANGED
+                                        state)))
       
       ;; State mismatch - precondition passed but bindings differ
       ((and (consp reason) (eq (car reason) :state-mismatch))
        (format t "~%Reason: State mismatch - Loss of synchronization with expected trajectory~%")
        (when action
-         (report-state-mismatch action (rest action-form) (cdr reason))))
+         (report-state-mismatch action
+                                (strip-display-connectives action (rest action-form))  ;; CHANGED
+                                (cdr reason))))
       
       ;; Other failure reasons (strings)
       (t

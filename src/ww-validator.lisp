@@ -250,10 +250,12 @@
 
 
 (defun check-effect-parameters (eff-parameter-list)
-  "Checks a user action effect."
+  "Checks a user action effect parameter list. Each element must be a ? or $
+   variable, or a string connective (a display-only filler, eg \"from\")."          ;; CHANGED
   (check-type eff-parameter-list list)
-  (unless (every #'varp eff-parameter-list)
-    (error "Expecting only variables with a ? or $ prefix in an effect parameter list: ~A" eff-parameter-list)))
+  (unless (every (lambda (item) (or (varp item) (stringp item))) eff-parameter-list) ;; CHANGED
+    (error "Expecting only ?/$ variables or string connectives in an effect parameter list: ~A"
+           eff-parameter-list)))                                                     ;; CHANGED
 
 
 ;;; ====================================================================

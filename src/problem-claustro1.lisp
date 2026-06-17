@@ -1,4 +1,4 @@
-;;; Filename: problem-claustro.lisp
+;;; Filename: problem-claustro1.lisp
 
 ;;; Talos Principle problem 'Claustrophobia' in Escape from the Pit Reawakened
 ;;; Full topological representation baseline; no coordinate calculations
@@ -9,7 +9,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* claustro)
+(ww-set *problem-name* claustro1)
 
 (ww-set *problem-type* planning)
 
@@ -17,7 +17,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 31)
+(ww-set *depth-cutoff* 30)
 
 
 (define-types
@@ -43,7 +43,7 @@
 (define-dynamic-relations
   (holding agent $cargo)
   (location (either agent cargo) $location)
-  (on cargo $plate)  ;the plate a cargo rests on (absent if none)
+  (on (either agent cargo) $plate)  ;the plate an agent or cargo rests on (absent if none)
   (depressed plate)
   (open gate)
   (active receiver)
@@ -262,13 +262,13 @@
 
 
 (define-update update-plate-status! ()
-  ;; A plate is depressed iff some cargo is currently resting on it.
+  ;; A plate is depressed iff some agent or cargo is currently resting on it.
   ;; Sets or clears (depressed ?p) to match; gate state is left to
   ;; update-gate-status!.  Asserts the derived truth unconditionally -- change detection
   ;; is automatic, so an unchanged re-assert is silent and does not extend the fixpoint.
   (doall (?p plate)
-    (if (exists (?c cargo)
-          (on ?c ?p))
+    (if (exists (?x (either agent cargo))
+          (on ?x ?p))
       (depressed ?p)
       (not (depressed ?p)))))
 
@@ -376,27 +376,61 @@
 
 (define-action move
   1
-  (?agent agent ?location location)
+  (?agent agent ?to-location location)
   (and (bind (location ?agent $a-location))
-       (different $a-location ?location)
-       (accessible ?agent $a-location ?location))
-  (?agent $a-location ?location)
-  (assert (location ?agent ?location)
+       (different $a-location ?to-location)
+       (accessible ?agent $a-location ?to-location))
+  (?agent $a-location ?to-location)
+  (assert (location ?agent ?to-location)
+          (if (bind (on ?agent $old))
+            (not (on ?agent $old)))
           (finally (propagate-changes!))))
 
 
-(define-action traverse
-  ;; Cross a one-way edge (ladder, spring, ...) in one explicit step, naming the means so
-  ;; the trace records the mechanism.  The edge's means list carries both the usability rule
-  ;; (via accessible-clear) and the implement identity (for display).
+(define-action jump-onto-place
+  ;; Agent jumps onto a reachable place and lands on a new surface, leaving its prior one.
+  ;; Onto a free plate -> depresses it (agent now resting on it).  Onto a ladder at the
+  ;; target -> rides the one-way edge to its far location, landing on the ground there
+  ;; (subsuming traverse for the ladder case).  Onto the ground in place -> a pure dismount.
+  ;; propagate-changes! recomputes plate/gate state after the surface change.
   1
-  (?agent agent ?location location)
+  (?agent agent ?to-location location)
   (and (bind (location ?agent $a-location))
-       (bind (traversable> $a-location $means ?location))
-       (one-way-clear ?agent $means))
-  (?agent $a-location ?location $means)
-  (assert (location ?agent ?location)
-          (finally (propagate-changes!))))
+       (reachable $a-location ?to-location))
+  (?agent $a-location $via $place $dest)
+  (do ;; onto a free plate at the target -> depress it, land there
+      (doall (?plate plate)
+        (if (and (position ?plate ?to-location)
+                 (not (exists (?x (either agent cargo))
+                        (on ?x ?plate))))
+          (assert (if (bind (on ?agent $old))
+                    (not (on ?agent $old)))
+                  (location ?agent ?to-location)
+                  (on ?agent ?plate)
+                  (assign $via 'jump)
+                  (assign $dest ?to-location)
+                  (assign $place ?plate)
+                  (finally (propagate-changes!)))))
+      ;; onto a ladder at the target -> ride its one-way edge to $dest, land on ground
+      (doall (?l ladder)
+        (if (and (position ?l ?to-location)
+                 (bind (traversable> $a-location $means $dest))
+                 (member ?l $means)
+                 (one-way-clear ?agent $means))
+          (assert (if (bind (on ?agent $old))
+                    (not (on ?agent $old)))
+                  (location ?agent $dest)
+                  (assign $via ?l)
+                  (assign $place 'ground)
+                  (finally (propagate-changes!)))))
+      ;; onto the ground in place -> dismount: leave current surface, recompute
+      (if (and (eql ?to-location $a-location)
+               (bind (on ?agent $old)))
+        (assert (not (on ?agent $old))
+                (assign $via 'jump)
+                (assign $dest ?to-location)
+                (assign $place 'ground)
+                (finally (propagate-changes!))))))
 
 
 ;;;; INITIALIZATION ;;;;

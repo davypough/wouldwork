@@ -460,7 +460,7 @@
   (unless (member (first pre-params) *parameter-headers*)
     (push 'standard pre-params))
   (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params pre-params)
-    (let ((eff-param-vars eff-params))
+    (let ((eff-param-vars (remove-if #'stringp eff-params)))  ;pure var list, connectives stripped  ;; CHANGED
       (let* ((flat-pre-param-?vars (alexandria:flatten pre-param-?vars))
              (pre-?vars (delete-duplicates (get-all-nonspecial-vars #'?varp precondition) :from-end t))
              (pre-$vars (delete-duplicates (get-all-nonspecial-vars #'$varp precondition) :from-end t))
@@ -528,7 +528,8 @@
                                                          ,(if eff-args
                                                             `(list ,@eff-args)
                                                             `t))))))
-                       :effect-variables eff-param-vars  ;user listed parameter variables
+                       :effect-variables eff-param-vars  ;pure var list, connectives stripped  ;; CHANGED
+                       :effect-format eff-params  ;annotated list w/ connectives, display only  ;; ADDED
                        :effect-lambda `(lambda (state ,@eff-args)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
