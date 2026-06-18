@@ -17,7 +17,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 30)
+(ww-set *depth-cutoff* 33)
 
 
 (define-types
@@ -59,6 +59,7 @@
   (in-los-group los-group $list)  ;each sightline-equivalence group's clique of locations
   (los-via los-group $list gate)  ;occluders on an otherwise-clear sightline: () (gate2) (gate2 gate3) ...
   (in-area area $list)   ;each area's free-access clique of locations
+  (area-of location $area)   ;reverse index of in-area: a location's containing area, built at init
   (interface area $list area)   ;inter-area interface; symmetric (same-type area args); $list = guarding obstacles
   (traversable> location $list location)  ;one-way (> suppresses symmetry); eg ladders
   (reachable-via location $list location)    ;reach edges (place/pick); $list = barrier gates that must be open
@@ -69,46 +70,42 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
-(define-query accessible (?agent ?location1 ?location2)
-  ;; ?location2 is accessible from ?location1 iff some currently-passable route connects
-  ;; them.  A route composes single hops (see one-step-accessible): free intra-area moves
-  ;; and inter-area interfaces whose obstacles are passable for ?agent.  One-way edges (eg
-  ;; ladders) are not part of accessibility -- they are explicit traverse actions.  Relaxes
-  ;; a visited set to fixpoint over the locations, so cycles and alternate routes are
-  ;; handled automatically.
-  (do (assign $visited (list ?location1))
+(define-query accessible (?agent ?from)
+  ;; Returns the set (list) of locations ?agent can reach from ?from via currently-passable
+  ;; hops (see one-step-accessible), including ?from itself.  One of the three capability
+  ;; queries (accessible / visible / reachable); a boolean "is X reachable" is recovered by
+  ;; membership in the returned set, which is how move consumes it -- derived once per node,
+  ;; then a successor branched per destination.  One-way edges (eg ladders) are not part of
+  ;; accessibility; they are explicit fixture actions.  Breadth-first relaxation: each pass
+  ;; expands only the frontier (nodes first reached on the prior pass), so every node is
+  ;; expanded once; empties the frontier at the reachable-set boundary.
+  (do (assign $visited (list ?from))
+      (assign $frontier (list ?from))
       (ww-loop for $pass from 1 to 99
-               do (assign $changed nil)
-                  (doall (?loc location)
-                    (if (member ?loc $visited)
-                      (doall (?next location)
-                        (if (and (not (member ?next $visited))
-                                 (one-step-accessible ?agent ?loc ?next))
-                          (do (assign $visited (cons ?next $visited))
-                              (assign $changed t))))))
-                  (if (not $changed)
+               do (assign $next-frontier nil)
+                  (ww-loop for $loc in $frontier
+                           do (doall (?next location)
+                                (if (and (not (member ?next $visited))
+                                         (one-step-accessible ?agent $loc ?next))
+                                  (do (assign $visited (cons ?next $visited))
+                                      (assign $next-frontier (cons ?next $next-frontier))))))
+                  (assign $frontier $next-frontier)
+                  (if (not $frontier)
                     (return t)))
-      (and (member ?location2 $visited)
-           t)))
+      $visited))
 
 
 (define-query one-step-accessible (?agent ?from ?to)
   ;; True iff ?agent can move ?from -> ?to in a single intra-area or inter-area hop.
-  ;; Determines the hop's guarding obstacle list -- none for an intra-area move, or the
-  ;; interface's obstacles for an inter-area move -- then requires every obstacle passable
-  ;; for ?agent.  One-way edges are not routed here; they are explicit traverse actions.
-  ;; No matching hop means not directly accessible.
+  ;; Resolves each endpoint's area via the area-of reverse index, then determines the
+  ;; hop's guarding obstacle list -- none for an intra-area move, or the interface's
+  ;; obstacles for an inter-area move -- and requires every obstacle passable for ?agent.
+  ;; One-way edges are not routed here; they are explicit fixture actions.  No matching
+  ;; hop means not directly accessible.
   (do (assign $hop nil)
       (assign $obstacles nil)
-      (assign $area-from nil)
-      (assign $area-to nil)
-      (doall (?area area)
-        (if (bind (in-area ?area $members))
-          (do (if (member ?from $members)
-                (assign $area-from ?area))
-              (if (member ?to $members)
-                (assign $area-to ?area)))))
-      (if (and $area-from $area-to)
+      (if (and (bind (area-of ?from $area-from))
+               (bind (area-of ?to $area-to)))
         (if (eql $area-from $area-to)
           (assign $hop t)
           (if (bind (interface $area-from $interface-obstacles $area-to))
@@ -124,7 +121,7 @@
 (define-query one-way-clear (?agent ?means)
   ;; Every implement (means) enabling a one-way edge must be usable by ?agent.  Aggregates
   ;; the per-implement accessible-clear test over the edge's means list (eg (ladder1)), so
-  ;; the traverse action can guard the hop without re-deriving passability inline.
+  ;; use-ladder can guard the hop without re-deriving passability inline.
   (ww-loop for $m in ?means
            always (accessible-clear ?agent $m)))
 
@@ -311,7 +308,7 @@
        (bind (location ?agent $a-location))
        (bind (location ?cargo $c-location))
        (reachable $c-location $a-location))
-  (?agent ?cargo $a-location)
+  (":" ?agent "picks up" ?cargo "at" $a-location)
   (assert (holding ?agent ?cargo)
           (not (location ?cargo $c-location))
           (if (bind (jamming ?cargo $any-target))
@@ -329,7 +326,7 @@
        (bind (location ?agent $a-location))
        (reachable ?location $a-location)
        (visible ?location ?gate))
-  (?agent $any-jammer ?gate ?location $place)
+  (":" ?agent "jams" ?gate "with" $any-jammer "at" ?location "on" $place)
   (do ;; If a plate is at the drop location, one outcome rests the jammer on it (depressing it)
       (doall (?plate plate)
         (if (and (position ?plate ?location)
@@ -356,7 +353,7 @@
   (and (bind (holding ?agent $cargo))
        (bind (location ?agent $a-location))
        (reachable ?location $a-location))
-  (?agent $cargo ?location $place)
+  (":" ?agent "puts" $cargo "at" ?location "on" $place)
   (do ;; If a plate is at the drop location, one outcome rests the cargo on it (depressing it)
       (doall (?plate plate)
         (if (and (position ?plate ?location)
@@ -375,62 +372,69 @@
          
 
 (define-action move
+  ;; Walk from ground at the current location to ground at any other accessible location.
+  ;; The reachable set from the agent's current location is derived once in the precondition
+  ;; (accessible), then the effect branches one successor per reachable destination, rather
+  ;; than re-deriving accessibility separately for each candidate.  Support changes are
+  ;; explicit separate actions: the agent must step off any plate before moving, so
+  ;; accessibility is evaluated after the plate's effects are gone.
   1
-  (?agent agent ?to-location location)
+  (?agent agent)
   (and (bind (location ?agent $a-location))
-       (different $a-location ?to-location)
-       (accessible ?agent $a-location ?to-location))
-  (?agent $a-location ?to-location)
-  (assert (location ?agent ?to-location)
-          (if (bind (on ?agent $old))
-            (not (on ?agent $old)))
+       (not (bind (on ?agent $anyplace)))
+       (assign $reachable (accessible ?agent $a-location)))
+  (":" ?agent "moves from" $a-location "to" $dest)
+  (doall (?to-location location)
+    (if (and (member ?to-location $reachable)
+             (different $a-location ?to-location))
+      (assert (location ?agent ?to-location)
+              (assign $dest ?to-location)
+              (finally (propagate-changes!))))))
+
+
+(define-action step-onto-plate
+  ;; Step from ground onto a free reachable plate.  This is a support change; it may also
+  ;; move the agent to the plate's location when the plate is reachable from nearby.
+  1
+  (?agent agent ?plate plate)
+  (and (bind (location ?agent $a-location))
+       (not (bind (on ?agent $anyplace)))
+       (bind (position ?plate $plate-location))
+       (reachable $a-location $plate-location)
+       (not (exists (?x (either agent cargo))
+              (on ?x ?plate))))
+  (":" ?agent "at" $a-location "steps on" ?plate "at" $plate-location)
+  (assert (location ?agent $plate-location)
+          (on ?agent ?plate)
           (finally (propagate-changes!))))
 
 
-(define-action jump-onto-place
-  ;; Agent jumps onto a reachable place and lands on a new surface, leaving its prior one.
-  ;; Onto a free plate -> depresses it (agent now resting on it).  Onto a ladder at the
-  ;; target -> rides the one-way edge to its far location, landing on the ground there
-  ;; (subsuming traverse for the ladder case).  Onto the ground in place -> a pure dismount.
-  ;; propagate-changes! recomputes plate/gate state after the surface change.
+(define-action step-off-plate
+  ;; Step from a plate back onto the ground at the same location.
   1
-  (?agent agent ?to-location location)
+  (?agent agent)
+  (bind (on ?agent $plate))
+  (":" ?agent "steps off" $plate)
+  (assert (not (on ?agent $plate))
+          (finally (propagate-changes!))))
+
+
+(define-action use-ladder
+  ;; Use a one-way ladder-like fixture from ground.  The agent lands on ground at the
+  ;; traversal destination.  The one-way edge starts at the agent's current location;
+  ;; the ladder fixture must be reachable from there.
+  1
+  (?agent agent ?ladder ladder)
   (and (bind (location ?agent $a-location))
-       (reachable $a-location ?to-location))
-  (?agent $a-location $via $place $dest)
-  (do ;; onto a free plate at the target -> depress it, land there
-      (doall (?plate plate)
-        (if (and (position ?plate ?to-location)
-                 (not (exists (?x (either agent cargo))
-                        (on ?x ?plate))))
-          (assert (if (bind (on ?agent $old))
-                    (not (on ?agent $old)))
-                  (location ?agent ?to-location)
-                  (on ?agent ?plate)
-                  (assign $via 'jump)
-                  (assign $dest ?to-location)
-                  (assign $place ?plate)
-                  (finally (propagate-changes!)))))
-      ;; onto a ladder at the target -> ride its one-way edge to $dest, land on ground
-      (doall (?l ladder)
-        (if (and (position ?l ?to-location)
-                 (bind (traversable> $a-location $means $dest))
-                 (member ?l $means)
-                 (one-way-clear ?agent $means))
-          (assert (if (bind (on ?agent $old))
-                    (not (on ?agent $old)))
-                  (location ?agent $dest)
-                  (assign $via ?l)
-                  (assign $place 'ground)
-                  (finally (propagate-changes!)))))
-      ;; onto the ground in place -> dismount: leave current surface, recompute
-      (if (and (eql ?to-location $a-location)
-               (bind (on ?agent $old)))
-        (assert (not (on ?agent $old))
-                (assign $via 'jump)
-                (assign $dest ?to-location)
-                (assign $place 'ground)
-                (finally (propagate-changes!))))))
+       (not (bind (on ?agent $anyplace)))
+       (bind (position ?ladder $ladder-location))
+       (reachable $a-location $ladder-location)
+       (bind (traversable> $a-location $means $dest))
+       (member ?ladder $means)
+       (one-way-clear ?agent $means))
+  (":" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
+  (assert (location ?agent $dest)
+          (finally (propagate-changes!))))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -569,6 +573,23 @@
   (always-true)
   ()
   (assert (propagate-changes!)))
+
+
+(define-init-action initialize-area-index
+  ;; Builds the area-of reverse index (each location -> its containing area) once at
+  ;; init from the in-area cliques, so one-step-accessible can resolve an endpoint's area
+  ;; with a single bind instead of scanning every area.  area-of is static, so the asserted
+  ;; tuples are written into the static database and persist for the whole run.  Depends only
+  ;; on the in-area facts define-init has already established; order vs initialize-derived-state
+  ;; is irrelevant since propagation never consults accessibility.
+  0
+  ()
+  (always-true)
+  ()
+  (assert (doall (?area area)
+            (if (bind (in-area ?area $members))
+              (ww-loop for $location in $members
+                       do (area-of $location ?area))))))
 
 
 (define-goal

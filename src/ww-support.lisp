@@ -151,105 +151,70 @@
 ;;;;;;;;;;;;;;;;; Program Support Functions ;;;;;;;;;;;;;;;;
 
 
-(defun add-prop (proposition db &optional indices precomputed-key precomputed-values)
-  "Effectively adds an atomic proposition to the database."
-  (declare (type hash-table db))
-  (let ((int-db (eql (hash-table-test db) 'eql)))
-    (let ((fluent-indices (or indices (get-prop-fluent-indices proposition))))
-      (if fluent-indices
-        ;do if proposition has fluents
-        (let ((fluent-values (or precomputed-values
-                                 (get-prop-fluents proposition fluent-indices))))
-          (if int-db
-            (let ((key (or precomputed-key
-                           (convert-fluentless-prop-to-integer proposition fluent-indices))))
-              (when *detect-propagated-changes*
-                (note-add-change db key fluent-values))
-              (setf (gethash key db) fluent-values))
-            (setf (gethash (get-fluentless-prop proposition fluent-indices) db) fluent-values))
-          ;handle complement, dispatching on whether the complement itself has fluents
-          (when (gethash (car proposition) *complements*)
-            (let* ((complement-prop (get-complement-prop proposition))
-                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
-              (if complement-fluent-indices
-                ;fluent complement: remove the fluentless complement key
-                (if int-db
-                  (remhash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
-                  (remhash (get-fluentless-prop complement-prop complement-fluent-indices) db))
-                ;non-fluent complement: remove the full complement key
-                (if int-db
-                  (remhash (convert-to-integer complement-prop) db)
-                  (remhash complement-prop db))))))
-        ;do for non-fluent propositions
-        (progn
-          (if int-db
-            (let ((key (convert-to-integer proposition)))
-              (when *detect-propagated-changes*
-                (note-add-change db key t))
-              (setf (gethash key db) t))
-            (setf (gethash proposition db) t))
-          ;handle complement, dispatching on whether the complement itself has fluents
-          (when (gethash (car proposition) *complements*)
-            (let* ((complement-prop (get-complement-prop proposition))
-                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
-              (if complement-fluent-indices
-                ;fluent complement: remove the fluentless complement key
-                (if int-db
-                  (remhash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
-                  (remhash (get-fluentless-prop complement-prop complement-fluent-indices) db))
-                ;non-fluent complement: remove the full complement key
-                (if int-db
-                  (remhash (convert-to-integer complement-prop) db)
-                  (remhash complement-prop db))))))))))
+;(declaim (inline add-prop del-prop))
 
 
-(defun del-prop (proposition db)
-  "Effectively removes an atomic proposition from the database."
+(defun add-prop (proposition db int-db
+                 &optional indices precomputed-key precomputed-values)
+  "Add one proposition, without expanding bijective or symmetric relations.
+   INT-DB says whether DB uses integer proposition keys."
   (declare (type hash-table db))
-  (let ((int-db (eql (hash-table-test db) 'eql)))
-    (let ((fluent-indices (get-prop-fluent-indices proposition)))
-      (if fluent-indices
-        ;do if proposition has fluents
-        (progn
-          (if int-db
-            (let ((key (convert-fluentless-prop-to-integer proposition fluent-indices)))
-              (when *detect-propagated-changes*
-                (note-del-change db key))
-              (remhash key db))
-            (remhash (get-fluentless-prop proposition fluent-indices) db))
-          ;handle complement, dispatching on whether the complement itself has fluents
-          (when (gethash (car proposition) *complements*)
-            (let* ((complement-prop (get-complement-prop proposition))
-                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
-              (if complement-fluent-indices
-                ;fluent complement: store its fluent values at the fluentless complement key
-                (let ((complement-fluent-values
-                        (get-prop-fluents complement-prop complement-fluent-indices)))
+  (let* ((fluent-indices (or indices (get-prop-fluent-indices proposition)))
+         (value (if fluent-indices
+                    (or precomputed-values
+                        (get-prop-fluents proposition fluent-indices))
+                    t))
+         (key (if int-db
+                  (or precomputed-key
+                      (convert-fluentless-prop-to-integer proposition fluent-indices))
+                  (if fluent-indices
+                      (get-fluentless-prop proposition fluent-indices)
+                      proposition))))
+    (when (and int-db *detect-propagated-changes*)
+      (note-add-change db key value))
+    (setf (gethash key db) value)
+    (when (gethash (car proposition) *complements*)
+      (let* ((complement (get-complement-prop proposition))
+             (complement-indices (get-prop-fluent-indices complement))
+             (complement-key
+               (if int-db
+                   (convert-fluentless-prop-to-integer complement complement-indices)
+                   (if complement-indices
+                       (get-fluentless-prop complement complement-indices)
+                       complement))))
+        (remhash complement-key db)))))
+
+
+(defun del-prop (proposition db int-db)
+  "Delete one proposition, without expanding bijective or symmetric relations.
+   INT-DB says whether DB uses integer proposition keys."
+  (declare (type hash-table db))
+  (let* ((fluent-indices (get-prop-fluent-indices proposition))
+         (key (if int-db
+                  (convert-fluentless-prop-to-integer proposition fluent-indices)
+                  (if fluent-indices
+                      (get-fluentless-prop proposition fluent-indices)
+                      proposition))))
+    (when (and int-db *detect-propagated-changes*)
+      (note-del-change db key))
+    (remhash key db)
+    (when (gethash (car proposition) *complements*)
+      (let* ((complement (get-complement-prop proposition))
+             (complement-indices (get-prop-fluent-indices complement)))
+        ;; A deleted fluent supplies the values needed to restore either kind of
+        ;; complement. A deleted non-fluent cannot restore a fluent complement.
+        (when (or fluent-indices (null complement-indices))
+          (let ((complement-key
                   (if int-db
-                    (setf (gethash (convert-fluentless-prop-to-integer complement-prop complement-fluent-indices) db)
-                          complement-fluent-values)
-                    (setf (gethash (get-fluentless-prop complement-prop complement-fluent-indices) db)
-                          complement-fluent-values)))
-                ;non-fluent complement: store T at the full complement key
-                (if int-db
-                  (setf (gethash (convert-to-integer complement-prop) db) t)
-                  (setf (gethash complement-prop db) t))))))
-        ;do for non-fluent propositions
-        (progn
-          (if int-db
-            (let ((key (convert-to-integer proposition)))
-              (when *detect-propagated-changes*
-                (note-del-change db key))
-              (remhash key db))
-            (remhash proposition db))
-          ;handle complement; skip if complement is fluent (no value to restore)
-          (when (gethash (car proposition) *complements*)
-            (let* ((complement-prop (get-complement-prop proposition))
-                   (complement-fluent-indices (get-prop-fluent-indices complement-prop)))
-              (unless complement-fluent-indices
-                (if int-db
-                  (setf (gethash (convert-to-integer complement-prop) db) t)
-                  (setf (gethash complement-prop db) t))))))))))
+                      (convert-fluentless-prop-to-integer complement complement-indices)
+                      (if complement-indices
+                          (get-fluentless-prop complement complement-indices)
+                          complement)))
+                (complement-value
+                  (if complement-indices
+                      (get-prop-fluents complement complement-indices)
+                      t)))
+            (setf (gethash complement-key db) complement-value)))))))
 
 
 (defun note-add-change (db key new-value)
@@ -285,17 +250,18 @@
   "Adds an atomic proposition and all its symmetries to the database.
    For bijective relations, adds both internal index propositions."
   (declare (type hash-table db))
-  (let* ((relation-name (car proposition))
+  (let* ((int-db (eql (hash-table-test db) 'eql))
+         (relation-name (car proposition))
          (args (cdr proposition))
          (index-names (gethash relation-name *bijective-relations*)))
     (if index-names
         ;; Handle bijective relation directly (avoids building an intermediate list)
         (dolist (index-name index-names)
-          (add-prop (cons index-name args) db))
+          (add-prop (cons index-name args) db int-db))
         ;; Handle normal relation (existing logic)
         (let ((symmetric-indexes (gethash relation-name *symmetrics*)))
           (if (null symmetric-indexes)
-            (add-prop proposition db indices precomputed-key precomputed-values)
+            (add-prop proposition db int-db indices precomputed-key precomputed-values)
             (let ((symmetric-variables
                      (loop for indexes in symmetric-indexes
                            collect (loop for index in indexes
@@ -305,24 +271,25 @@
                     for idxs in symmetric-indexes do
                     (setf props (generate-new-propositions vars props idxs)))
               (loop for prop in props do
-                    (add-prop prop db))))))))
+                    (add-prop prop db int-db))))))))
 
               
 (defun delete-proposition (proposition db)
   "Deletes an atomic proposition and all its symmetries from the database.
    For bijective relations, deletes both internal index propositions."
   (declare (type hash-table db))
-  (let* ((relation-name (car proposition))
+  (let* ((int-db (eql (hash-table-test db) 'eql))
+         (relation-name (car proposition))
          (args (cdr proposition))
          (index-names (gethash relation-name *bijective-relations*)))
     (if index-names
         ;; Handle bijective relation directly (avoids building an intermediate list)
         (dolist (index-name index-names)
-          (del-prop (cons index-name args) db))
+          (del-prop (cons index-name args) db int-db))
         ;; Handle normal relation (existing logic)
         (let ((symmetric-indexes (gethash relation-name *symmetrics*)))
           (if (null symmetric-indexes)
-            (del-prop proposition db)
+            (del-prop proposition db int-db)
             (let ((symmetric-variables
                      (loop for indexes in symmetric-indexes
                            collect (loop for index in indexes
@@ -332,7 +299,7 @@
                     for idxs in symmetric-indexes do
                     (setf props (generate-new-propositions vars props idxs)))
               (loop for prop in props do
-                    (del-prop prop db))))))))
+                    (del-prop prop db int-db))))))))
 
 
 (defun generate-new-propositions (vars propositions idxs)
