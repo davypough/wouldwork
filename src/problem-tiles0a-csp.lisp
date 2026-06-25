@@ -204,7 +204,7 @@
 
 (define-init  ;possible coords of most-upper most-left corner of a tile
   `(remaining SQ1  ,(loop for row from 0 to 4 append (loop for col from 0 to 4 collect (list row col))))
-  `(remaining SQ1  ,(loop for row from 0 to 4 append (loop for col from 0 to 4 collect (list row col))))
+  `(remaining SQ2  ,(loop for row from 0 to 4 append (loop for col from 0 to 4 collect (list row col))))
   `(remaining VERT ,(loop for row from 0 to 3 append (loop for col from 0 to 4 collect (list row col))))
   `(remaining L    ,(loop for row from 0 to 3 append (loop for col from 0 to 3 collect (list row col))))
   `(remaining GUN1 ,(loop for row from 0 to 3 append (loop for col from 0 to 3 collect (list row col))))

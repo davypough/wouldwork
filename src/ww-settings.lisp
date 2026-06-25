@@ -205,6 +205,9 @@
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry groups and prune symmetric action instantiations.")
 
+(defvar *max-pairings* 0
+  "Default maximum initial pairings per connector. Problem files can override this.")
+
 (sb-ext:defglobal *types*
   (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
   "Table of all types.

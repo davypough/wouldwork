@@ -63,6 +63,7 @@
 		                     (:file "ww-support")
 		                     (:file "ww-happenings")
 		                     (:file "ww-translator")
+		                     (:file "ww-init-validator")
 		                     (:file "ww-installer")
                              (:file "ww-patroller-installer")
                              (:file "ww-interface")

@@ -357,18 +357,42 @@ any such settings appearing in the problem specification file.
 (setf (fdefinition 'probs) #'list-problem-names)
 
 
+(defun project-relative-problem-p (problem-name-str)
+  "Whether PROBLEM-NAME-STR names a file below the Wouldwork root."
+  (or (find #\/ problem-name-str)
+      (find #\\ problem-name-str)))
+
+
+(defun project-relative-problem-file (problem-name-str)
+  "Resolve a project-relative problem path, adding the Lisp extension if absent."
+  (let* ((portable-name (substitute #\/ #\\ problem-name-str))
+         (relative-path (pathname portable-name))
+         (lisp-path (if (pathname-type relative-path)
+                      relative-path
+                      (make-pathname :type "lisp" :defaults relative-path)))
+         (root (asdf:system-source-directory :wouldwork)))
+    (probe-file (merge-pathnames lisp-path root))))
+
+
+(defun resolve-problem-file (problem-name-str)
+  "Resolve either a registered problem name or a path below the Wouldwork root."
+  (if (project-relative-problem-p problem-name-str)
+    (project-relative-problem-file problem-name-str)
+    (lookup problem-name-str (list-problem-files-plist))))
+
+
 (defun exchange-problem-file (problem-name-str)
-  "Copies problem file to src/problem.lisp so it will be compiled by asdf."
-  (let* ((plist (list-problem-files-plist))
-	     (problem-file (lookup problem-name-str plist)))
-    (copy-file-content problem-file (in-src "problem.lisp"))))
+  "Copy a named or project-relative problem file to src/problem.lisp."
+  (let ((problem-file (resolve-problem-file problem-name-str)))
+    (when problem-file
+      (copy-file-content problem-file (in-src "problem.lisp")))
+    problem-file))
 
 
 (defun load-problem (problem-name-str)
-  "Given a problem-name, replace the content of the problem.lisp file by
-   the content of the correponsing problem file, and then reload everything."
-  (exchange-problem-file problem-name-str)
-  (asdf:load-system :wouldwork :force t))
+  "Stage a named or project-relative problem file, then reload Wouldwork."
+  (when (exchange-problem-file problem-name-str)
+    (asdf:load-system :wouldwork :force t)))
 
 
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp
@@ -376,7 +400,9 @@ any such settings appearing in the problem specification file.
 
 (defmacro run (problem-name)
   "Stages and solves a user specified problem."
-  `(%run ,(string problem-name)))
+  `(%run ,(if (stringp problem-name)
+            problem-name
+            (string-downcase (string problem-name)))))
 
 
 (defun %run (problem-name-str)
@@ -389,34 +415,36 @@ any such settings appearing in the problem specification file.
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
-  `(%stage ,(string problem-name)))
+  `(%stage ,(if (stringp problem-name)
+              problem-name
+              (string-downcase (string problem-name)))))
 
 
 (defun %stage (problem-name-str)
   "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
    specification, and check the current parameters, without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
-  (unless (member problem-name-str (list-problem-names) :test #'string-equal)
+  (let ((problem-file (resolve-problem-file problem-name-str)))
+    (unless problem-file
     (format t "The problem ~A was not found." problem-name-str)
     (format t "~&Enter (list-all-problems) for a complete list of problems." )
-    (return-from %stage))
-  (uiop:delete-file-if-exists *globals-file*)
-  (exchange-problem-file problem-name-str)  ;copy problem-<problem-name-str>.lisp to problem.lisp
-  (setf *problem-name* (intern problem-name-str)  ;reset to defaults
-        *depth-cutoff* 0
-        *algorithm* 'depth-first
-        *probe* nil
-        *progress-reporting-interval* 100000
-        *problem-type* 'planning
-        *solution-type* 'first
-        *tree-or-graph* 'graph
-        *debug* 0
-        *branch* -1
-        *randomize-search* nil
-        *symmetry-pruning* nil
-        *features* (remove :ww-debug *features*))
-  (with-silenced-compilation
-    (load-problem problem-name-str)))
+      (return-from %stage))
+    (uiop:delete-file-if-exists *globals-file*)
+    (setf *problem-name* (intern (string-upcase (pathname-name problem-file)))
+          *depth-cutoff* 0
+          *algorithm* 'depth-first
+          *probe* nil
+          *progress-reporting-interval* 100000
+          *problem-type* 'planning
+          *solution-type* 'first
+          *tree-or-graph* 'graph
+          *debug* 0
+          *branch* -1
+          *randomize-search* nil
+          *symmetry-pruning* nil
+          *features* (remove :ww-debug *features*))
+    (with-silenced-compilation
+      (load-problem problem-name-str))))
 
 
 (defun solve ()

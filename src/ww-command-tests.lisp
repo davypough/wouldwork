@@ -62,6 +62,7 @@
   (command-test-3)
   (command-test-4)
   (command-test-5)
+  (command-test-6)
   (format t "~%All command tests completed. Check printout to verify details.")
   t)
 
@@ -108,6 +109,17 @@ Enter (list-all-problems) for a complete list of problems."
     (unless (string-equal output expected)
       (format t "Incorrect notification of non-existent problem:~%~S" output)))
   (format t "COMMAND-TEST-3 completed successfully.~2%")
+  t)
+
+
+(defun command-test-6 ()
+  "Verify project-relative problem paths resolve with or without a Lisp extension."
+  (format t "~%COMMAND-TEST-6: resolving a project-relative problem path...~2%")
+  (let ((without-extension (resolve-problem-file "tech/jammer-tech"))
+        (with-extension (resolve-problem-file "tech/jammer-tech.lisp")))
+    (assert without-extension)
+    (assert (equal without-extension with-extension)))
+  (format t "COMMAND-TEST-6 completed successfully.~2%")
   t)
 
 

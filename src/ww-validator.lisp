@@ -10,6 +10,11 @@
   "Checks for errors in a user-defined relation--eg, (height ?obj $fixnum)."
   (check-type relation cons)
   (check-type (car relation) symbol)
+  (let ((non-fluent-count (count-if-not #'fluent-spec-p (cdr relation))))
+    (when (> non-fluent-count 5)
+      (error "Design Limit Error: Relation ~A has ~D non-fluent arguments; the maximum is 5. ~
+              $-typed fluent arguments are stored as proposition values and do not count toward this limit."
+             (car relation) non-fluent-count)))
   (iter (for arg in (cdr relation))
         (check-type arg (or symbol cons))
         (or (nth-value 1 (gethash arg *types*))  ;a user type
