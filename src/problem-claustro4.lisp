@@ -5,8 +5,9 @@
 ;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
 ;;; expands in place; this file holds only the glue: types, the shared movable-object
 ;;; relations, the cross-cutting clear-support-top query, the master propagation driver,
-;;; and the init/goal.  Connector/crossing optics are omitted (not needed here): the
-;;; optics is a direct transmitter -> receiver beam.
+;;; and the init/goal.  Optics is supplied by beam-tech, the full transmitter/receiver/
+;;; connector/crossing bundle; connector and crossing instances are empty in this baseline,
+;;; so the beam is effectively a direct transmitter -> receiver line.
 ;;;
 ;;; NOTE: requires the include-tech splice in exchange-problem-file.  Until the named
 ;;; tech files exist, each (include-tech ...) is skipped with a comment and the load
@@ -41,14 +42,19 @@
   plate (plate1 plate2 plate3)
   box (box1)
   jammer (jammer1 jammer2)
+  connector ()  ;none in the baseline; beam-tech requires the type declared
   transmitter (transmitter1)
   receiver (receiver1)
   ladder (ladder1)
   hue (blue)
   mode (normal inverted toggle)  ;controller mode
-  cargo (either box jammer)  ;what an agent can hold and carry
+  cargo (either box jammer connector)  ;what an agent can hold and carry
   target (either gate)  ;what a jammer can jam
+  relay (either connector)  ;what can relay a beam
+  terminus (either transmitter receiver connector)  ;what a connector can pair/connect to
   support (either plate box)  ;what a movable object can rest on
+  crossing ()  ;authored beam-crossing points; none in the baseline
+  beam-endpoint (either transmitter receiver location)  ;a fixture or a connector's location
 )
 
 
@@ -60,8 +66,8 @@
 
 (define-dynamic-relations
   (holding agent $cargo)
-  (located (either agent box jammer) $location)
-  (on (either agent box jammer) $support)  ;support a movable object rests on (absent if ground)
+  (located (either agent box jammer connector) $location)
+  (on (either agent box jammer connector) $support)  ;support a movable object rests on (absent if ground)
   (open gate)  ;read by accessibility/visibility/reachability/optics clear-predicates
 )
 
@@ -74,13 +80,13 @@
 ;;;; TECHNOLOGY INCLUDES ;;;;
 ;;;; Self-contained capability files, spliced at stage time.  Ordered so each tech's own
 ;;;; relations are declared before any later tech that reads them: plate (depressed),
-;;;; transmitter-receiver (active), and jammer (jamming) precede gate, whose energized and
+;;;; beam (active), and jammer (jamming) precede gate, whose energized and
 ;;;; update-gate-status! read all three.  Queries/updates may forward-reference freely --
 ;;;; the pre-scan registers their names across the fully-spliced file.
 
 
 (include-tech plate)                 ;depressed; update-plate-status!
-(include-tech transmitter-receiver)  ;coupled chroma active beam-via; beam-reaches-receiver beam-clear; update-receiver-status!
+(include-tech beam)                  ;FULL optics bundle: +connector/crossing relations, relay branch, connector actions; replaces transmitter-receiver
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech box)                   ;pickup-box put-box
@@ -96,7 +102,7 @@
 (define-query clear-support-top (?support)
   ;; Nothing can step onto or remain supported by an occupied top.  Cross-cutting over the
   ;; full movable-object roster, so it lives with the glue rather than any single tech.
-  (not (exists (?x (either agent box jammer))
+  (not (exists (?x (either agent box jammer connector))
          (on ?x ?support))))
 
 
@@ -117,10 +123,14 @@
 
 (define-update propagate-consequences! ()
   ;; One propagation pass.  Assembled here from exactly the loaded technologies' update
-  ;; functions: receivers light, plates depress, gates combine.  No connector/crossing
-  ;; stage in claustro4's direct-beam optics.  Returns t iff some derivation changed stored
-  ;; state, telling propagate-changes! to run another pass.
+  ;; functions, in dependency order: crossings settle, then connector colors, then receivers
+  ;; light, then plates depress, then gates combine.  The crossing/connector stages iterate
+  ;; empty in this baseline (no connector/crossing instances) but keep the driver correct for
+  ;; any beam-tech domain.  Returns t iff some derivation changed stored state, telling
+  ;; propagate-changes! to run another pass.
   (let ((*propagated-state-changed* nil))
+    (update-crossing-status!)
+    (update-connector-status!)
     (update-receiver-status!)
     (update-plate-status!)
     (update-gate-status!)
