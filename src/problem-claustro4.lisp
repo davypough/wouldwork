@@ -4,8 +4,8 @@
 ;;; Same objects, initializations, and goal as claustro3.  Behavior is supplied by
 ;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
 ;;; expands in place; this file holds only the glue: types, the shared movable-object
-;;; relations, the cross-cutting clear-support-top query, the master propagation driver,
-;;; and the init/goal.  Optics is supplied by beam-tech, the full transmitter/receiver/
+;;; relations, the master propagation driver, and the init/goal.  Optics is supplied
+;;; by beam-tech, the full transmitter/receiver/
 ;;; connector/crossing bundle; connector and crossing instances are empty in this baseline,
 ;;; so the beam is effectively a direct transmitter -> receiver line.
 ;;;
@@ -26,6 +26,8 @@
 (ww-set *tree-or-graph* graph)
 
 (ww-set *depth-cutoff* 33)
+
+(defparameter *max-pairings* 2)  ;max termini a connector may pair in one connect; caps connect's branching to a domain's port count
 
 
 ;;;; TYPES ;;;;
@@ -49,6 +51,7 @@
   hue (blue)
   mode (normal inverted toggle)  ;controller mode
   cargo (either box jammer connector)  ;what an agent can hold and carry
+  support-occupant (either agent cargo)  ;what can occupy the top of a support
   target (either gate)  ;what a jammer can jam
   relay (either connector)  ;what can relay a beam
   terminus (either transmitter receiver connector)  ;what a connector can pair/connect to
@@ -60,50 +63,41 @@
 
 ;;;; GLUE RELATIONS ;;;;
 ;;;; The shared movable-object substrate (holding, located, on) plus the two relations
-;;;; nearly every technology reads -- (open ...) and (position ...) -- hoisted here so a
-;;;; single dependency-ordered include list keeps the tech files self-contained.
+;;;; nearly every technology reads -- (open ...) and (position ...) -- hoisted here so
+;;;; the tech files stay focused on reusable behavior.
 
 
 (define-dynamic-relations
   (holding agent $cargo)
   (located (either agent box jammer connector) $location)
-  (on (either agent box jammer connector) $support)  ;support a movable object rests on (absent if ground)
+  (on support-occupant $support)  ;support an occupant rests on (absent if ground)
   (open gate)  ;read by accessibility/visibility/reachability/optics clear-predicates
 )
 
 
 (define-static-relations
-  (position (either plate ladder) $location)  ;fixed location; read by plate, ladder, and box/jammer placement
+  (position (either plate ladder) $location)  ;fixed location; read by plate, ladder, and placement techs
 )
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
-;;;; Self-contained capability files, spliced at stage time.  Ordered so each tech's own
-;;;; relations are declared before any later tech that reads them: plate (depressed),
-;;;; beam (active), and jammer (jamming) precede gate, whose energized and
-;;;; update-gate-status! read all three.  Queries/updates may forward-reference freely --
-;;;; the pre-scan registers their names across the fully-spliced file.
+;;;; Self-contained capability files, spliced at stage time.  Include order is chosen for
+;;;; readability: the loader pre-scans the fully-spliced file for type names, relation
+;;;; signatures, and query/update names before translation, so techs may refer to relations
+;;;; supplied by later includes.  The causal update order still lives explicitly in this
+;;;; problem's propagate-consequences! definition.
 
 
+(include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech plate)                 ;depressed; update-plate-status!
+(include-tech support-occupancy)     ;clear-support-top
 (include-tech beam)                  ;FULL optics bundle: +connector/crossing relations, relay branch, connector actions; replaces transmitter-receiver
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target
-(include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech box)                   ;pickup-box put-box
 (include-tech accessibility)         ;walk-via; accessible one-step-accessible one-way-clear accessible-clear; move
 (include-tech visibility)            ;los-to-fixture los-to-location; visible visible-clear
 (include-tech reachability)          ;reachable-via; reachable reachable-clear
 (include-tech ladder)                ;traversable>; one-way-clear; use-ladder (kept #+ignore, matching claustro3)
-
-
-;;;; GLUE QUERIES ;;;;
-
-
-(define-query clear-support-top (?support)
-  ;; Nothing can step onto or remain supported by an occupied top.  Cross-cutting over the
-  ;; full movable-object roster, so it lives with the glue rather than any single tech.
-  (not (exists (?x (either agent box jammer connector))
-         (on ?x ?support))))
 
 
 ;;;; MASTER PROPAGATION DRIVER ;;;;
@@ -154,7 +148,7 @@
   (on box1 plate1)
 
   ;; Ladder (fixed fixture, positioned like a plate); boards at location7, descends to location1
-  ;(position ladder1 location7)
+  (position ladder1 location7)
 
   ;; Static environment follows
   ;; Gate controllers in DNF: ((c11 c12...) (c21...)) means (c11 AND c12...) OR (c21...)

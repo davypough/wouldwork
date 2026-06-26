@@ -30,6 +30,13 @@
   `(install-types ',types&values))
 
 
+(defun predeclare-type-names (types&instances)
+  "Register type names before problem translation; real INSTALL-TYPES installs instances."
+  (loop for (type) on types&instances by #'cddr
+        do (check-type type symbol)
+           (setf (gethash type *types*) nil)))
+
+
 (defun install-types (types&instances)
   (format t "~&Installing object types...")
   (check-type types&instances cons)
@@ -153,6 +160,53 @@
   `(install-dynamic-relations ',relations))
 
 
+(defun relation-signature-value (relation empty-value)
+  (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
+    (if normalized-args
+      (sort-either-types normalized-args)
+      empty-value)))
+
+
+(defun relation-signature-fluent-indices (relation)
+  (iter (for arg in (cdr relation))
+        (for i from 1)
+        (when (fluent-spec-p arg)
+          (collect i))))
+
+
+(defun register-dynamic-relation-signature (raw-relation)
+  (multiple-value-bind (relation bijectivep)
+      (bijective-relation-p raw-relation)
+    (check-relation relation)
+    (if bijectivep
+      (progn
+        (check-bijective-relation relation)
+        (create-bijective-indices relation))
+      (progn
+        (setf (gethash (car relation) *relations*)
+              (relation-signature-value relation t))
+        (ut::if-it (relation-signature-fluent-indices relation)
+          (setf (gethash (car relation) *fluent-relation-indices*) ut::it))))))
+
+
+(defun register-static-relation-signature (relation)
+  (check-relation relation)
+  (setf (gethash (car relation) *static-relations*)
+        (relation-signature-value relation nil))
+  (ut::if-it (relation-signature-fluent-indices relation)
+    (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))
+
+
+(defun register-complementary-relation-signatures (positives->negatives)
+  (iter (for (positive nil negative) on positives->negatives by #'cdddr)
+        (check-relation positive)
+        (check-relation (second negative))
+        (let ((ordered-pos (sort-either-types positive))
+              (ordered-neg (list 'not (sort-either-types (second negative)))))
+          (setf (gethash (car positive) *complements*)
+                (list ordered-pos ordered-neg)))))
+
+
 (defun generate-fluent-instances (args-list)
   "Generate all combinations of instances for a relation signature, 
    where nil values represent fluent positions."
@@ -183,29 +237,7 @@
 (defun install-dynamic-relations (relations)
   (format t "~&Installing dynamic relations...")
   (iter (for raw-relation in relations)
-        (multiple-value-bind (relation bijectivep)
-            (bijective-relation-p raw-relation)
-          (check-relation relation)
-          (if bijectivep
-              ;; Handle bijective relation
-              (progn
-                (check-bijective-relation relation)
-                (create-bijective-indices relation))
-              ;; Handle normal relation (existing logic)
-              (progn
-                ;; Normalize fluent specs before storing
-                (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
-                  (setf (gethash (car relation) *relations*)
-                        (ut::if-it normalized-args
-                          (sort-either-types ut::it)
-                          t)))
-                ;; Detect fluent positions using fluent-spec-p
-                (ut::if-it (iter (for arg in (cdr relation))
-                                 (for i from 1)
-                                 (when (fluent-spec-p arg)
-                                   (collect i)))
-                  (setf (gethash (car relation) *fluent-relation-indices*)
-                        ut::it)))))
+        (register-dynamic-relation-signature raw-relation)
         (finally (maphash (lambda (key val)  ;install implied unary relations
                             (declare (ignore val))
                             (setf (gethash key *static-relations*) '(something)))
@@ -231,19 +263,7 @@
 (defun install-static-relations (relations)
   (format t "~&Installing static relations...")
   (iter (for relation in relations)
-        (check-relation relation)
-        ;; Normalize fluent specs before storing
-        (let ((normalized-args (mapcar #'normalize-fluent-spec (cdr relation))))
-          (setf (gethash (car relation) *static-relations*)
-                (ut::if-it normalized-args
-                  (sort-either-types ut::it)
-                  nil)))
-        ;; Detect fluent positions using fluent-spec-p
-        (ut::if-it (iter (for arg in (cdr relation))
-                         (for i from 1)
-                         (when (fluent-spec-p arg)
-                           (collect i)))
-          (setf (gethash (car relation) *fluent-relation-indices*) ut::it))
+        (register-static-relation-signature relation)
         (finally (maphash #'(lambda (key val)  ;install implied unary relations
                               (declare (ignore val))
                               (setf (gethash key *static-relations*) '(everything)))
@@ -264,13 +284,67 @@
 
 (defun install-complementary-relations (positives->negatives)
   (format t "~&Installing complementary relations...")
-  (iter (for (positive nil negative) on positives->negatives by #'cdddr)
-        (check-relation positive)
-        (check-relation (second negative))
-        (let ((ordered-pos (sort-either-types positive))
-              (ordered-neg (list 'not (sort-either-types (second negative)))))
-          (setf (gethash (car positive) *complements*)
-          (list ordered-pos ordered-neg)))))
+  (register-complementary-relation-signatures positives->negatives))
+
+
+(defun read-problem-forms (problem-path)
+  (with-open-file (stream problem-path :direction :input)
+    (loop for form = (read stream nil nil)
+          while form
+          collect form)))
+
+
+(defun prescan-problem-function-names (forms)
+  (let ((defun-names nil))
+    (dolist (form forms)
+      (when (and (consp form)
+                 (symbolp (car form)))
+        (case (car form)
+          (define-query
+            (push (second form) *query-names*))
+          (define-update
+            (push (second form) *update-names*))
+          ((define-happening define-patroller)
+            (push (second form) *happening-names*))
+          (defun
+            (push (second form) defun-names)))))
+    (dolist (name defun-names)
+      (unless (fboundp name)
+        (let ((stub-name name))
+          (setf (fdefinition name)
+                (lambda (&rest args)
+                  (declare (ignore args))
+                  (error "Stub for ~A was called before real definition loaded" stub-name))))))))
+
+
+(defun prescan-problem-type-names (forms)
+  (dolist (form forms)
+    (when (and (consp form)
+               (eql (car form) 'define-types))
+      (predeclare-type-names (cdr form)))))
+
+
+(defun prescan-problem-relation-signatures (forms)
+  (dolist (form forms)
+    (when (consp form)
+      (case (car form)
+        (define-dynamic-relations
+          (dolist (relation (cdr form))
+            (register-dynamic-relation-signature relation)))
+        (define-static-relations
+          (dolist (relation (cdr form))
+            (register-static-relation-signature relation)))
+        (define-complementary-relations
+          (register-complementary-relation-signatures (cdr form)))))))
+
+
+(defun prescan-problem-file (problem-path)
+  "Register forward-reference metadata needed before loading a problem file."
+  (let ((*package* (find-package :ww)))
+    (let ((forms (read-problem-forms problem-path)))
+      (prescan-problem-function-names forms)
+      (prescan-problem-type-names forms)
+      (prescan-problem-relation-signatures forms))))
 
         
 (defmacro define-happening (object &rest plist)
@@ -288,8 +362,8 @@
           (coerce (getf plist :events) 'simple-vector)))
   (when (getf plist :repeat)
     (setf (get object :repeat) (getf plist :repeat)))
-  ;; Happening name is registered in *happening-names* by the asdf
-  ;; pre-scan in wouldwork.asd; do not push here.
+  ;; Happening name is registered in *happening-names* by the problem pre-scan;
+  ;; do not push here.
   (when (getf plist :interrupt)
     (setf (get object :interrupt) (getf plist :interrupt)))
   (ut::if-it (getf plist :interrupt)

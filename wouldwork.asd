@@ -75,42 +75,9 @@
 		                     (always-compile-file "problem" :around-compile 
                                       (lambda (thunk)
                                         (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t)
-                                        ;; Pre-scan problem.lisp before compilation
-                                        (let ((query-names (find-symbol "*QUERY-NAMES*" "WOULDWORK"))
-                                              (update-names (find-symbol "*UPDATE-NAMES*" "WOULDWORK"))
-                                              (happening-names (find-symbol "*HAPPENING-NAMES*" "WOULDWORK"))
-                                              (problem-path (asdf:system-relative-pathname :wouldwork "src/problem.lisp"))
-                                              (*package* (find-package "WOULDWORK"))
-                                              (defun-names '()))
-                                          (with-open-file (stream problem-path :direction :input)
-                                            (loop for form = (read stream nil nil)
-                                                  while form
-                                                  do (when (and (consp form)
-                                                                (symbolp (car form)))
-                                                       (let ((form-name (symbol-name (car form))))
-                                                         ;; Handle queries and updates (2nd element is function name)
-                                                         (when (member form-name 
-                                                                       '("DEFINE-QUERY" "DEFINE-UPDATE")
-                                                                       :test #'string=)
-                                                           (let ((fn-name (second form))
-                                                                 (is-query (string= form-name "DEFINE-QUERY")))
-                                                             (push fn-name
-                                                                   (symbol-value (if is-query query-names update-names)))))
-                                                         ;; Handle happenings and patrollers (2nd element is object name)
-                                                         (when (member form-name
-                                                                       '("DEFINE-HAPPENING" "DEFINE-PATROLLER")
-                                                                       :test #'string=)
-                                                           (push (second form) (symbol-value happening-names)))
-                                                         ;; Collect defun names for forward-reference stubs
-                                                         (when (string= form-name "DEFUN")
-                                                           (push (second form) defun-names))))))
-                                          ;; Create stub definitions for forward-referenced defuns
-                                          (dolist (name defun-names)
-                                            (unless (fboundp name)
-                                              (setf (fdefinition name)
-                                                    (lambda (&rest args)
-                                                      (declare (ignore args))
-                                                      (error "Stub for ~A was called before real definition loaded" name))))))
+                                        (funcall (symbol-function
+                                                   (find-symbol "PRESCAN-PROBLEM-FILE" "WOULDWORK"))
+                                                 (asdf:system-relative-pathname :wouldwork "src/problem.lisp"))
                                         (funcall thunk)))
                              (:file "ww-action-trace")
                              (:file "ww-goal-chaining")
