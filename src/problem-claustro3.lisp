@@ -41,6 +41,7 @@
   hue (blue)
   mode (normal inverted toggle)  ;controller mode
   cargo (either box jammer connector)
+  target (either gate)  ;what a jammer can jam
   relay (either connector)
   terminus (either transmitter receiver connector)  ;what a connector can pair/connect to
   support (either plate box)
@@ -51,12 +52,12 @@
 
 (define-dynamic-relations
   (holding agent $cargo)
-  (location (either agent box jammer connector) $location)
+  (located (either agent box jammer connector) $location)
   (on (either agent box jammer connector) $support)  ;support an agent or movable object rests on (absent if ground)
   (depressed plate)
   (open gate)
   (active (either crossing receiver))
-  (jamming jammer $gate)
+  (jamming jammer $target)
   (paired connector terminus)  ;agent-established connection: a connector to a terminus
   (color connector $hue)  ;a connector's lit hue when a chroma-matching beam reaches it; absent if unlit
 )
@@ -207,7 +208,7 @@
                  (bind (color ?c $c-hue))
                  (bind (chroma ?receiver $required-hue))
                  (eql $c-hue $required-hue)
-                 (bind (location ?c $c-loc))
+                 (bind (located ?c $c-loc))
                  (visible $c-loc ?receiver)
                  (not (beam-cut $c-loc ?receiver)))
           (assign $reaches t)))
@@ -327,7 +328,7 @@
       (if (transmitter ?from)
         (assign $distance 0)
         (doall (?c connector)
-          (if (location ?c ?from)
+          (if (located ?c ?from)
             (do (assign $record (assoc ?c ?lighting))
                 (if $record
                   (assign $distance (third $record)))))))
@@ -361,15 +362,15 @@
                     always (beam-clear $o)))
       (and (transmitter ?from)
            (exists (?c connector)
-             (and (location ?c ?to)
+             (and (located ?c ?to)
                   (paired ?c ?from))))
       (exists (?c connector)
-        (and (location ?c ?from)
+        (and (located ?c ?from)
              (assoc ?c ?lighting)  ;lit in the candidate-set lighting snapshot, not committed color
              (or (and (receiver ?to)
                       (paired ?c ?to))
                  (exists (?c2 connector)
-                   (and (location ?c2 ?to)
+                   (and (located ?c2 ?to)
                         (different ?c2 ?c)
                         (or (paired ?c2 ?c) (paired ?c ?c2)))))))))  ;beam exists for either pairing direction
 
@@ -420,7 +421,7 @@
                do (assign $next-frontier nil)
                   (doall (?c connector)
                     (if (and (not (member ?c $visited))
-                             (bind (location ?c $c-loc)))
+                             (bind (located ?c $c-loc)))
                       (do (assign $hues nil)
                           (assign $reach-hue nil)
                           (assign $reach-dist nil)
@@ -469,7 +470,7 @@
   (if (gate ?obstacle)
     (open ?obstacle)
     (not (exists (?obj (either agent box jammer connector))
-           (location ?obj ?obstacle)))))
+           (located ?obj ?obstacle)))))
 
 
 (define-query clear-support-top (?support)
@@ -482,15 +483,15 @@
   ;; A connector can be connected at a location only if no other connector there is active.
   (not (exists (?other connector)
          (and (different ?other ?connector)
-              (location ?other ?location)
+              (located ?other ?location)
               (bind (color ?other $hue))))))
 
 
 (define-query connectable-terminus (?location ?connector ?terminus)
   ;; True iff a connector being placed at ?location may pair to ?terminus.  A transmitter
-  ;; or receiver qualifies when visible from ?location (location-to-fixture sightline).
+  ;; or receiver qualifies when visible from ?location (located-to-fixture sightline).
   ;; Another connector qualifies when it is placed (has a location), is not ?connector
-  ;; itself, sits elsewhere, and its location is visible from ?location (location-to-
+  ;; itself, sits elsewhere, and its location is visible from ?location (located-to-
   ;; location sightline) -- visibility to a connector must route through its location,
   ;; since a connector is neither a fixture nor a location target.
   (or (and (or (transmitter ?terminus)
@@ -498,7 +499,7 @@
            (visible ?location ?terminus))
       (and (connector ?terminus)
            (different ?terminus ?connector)
-           (bind (location ?terminus $t-loc))
+           (bind (located ?terminus $t-loc))
            (different ?location $t-loc)
            (visible ?location $t-loc))))
 
@@ -671,13 +672,13 @@
   1
   (?agent agent ?box box)
   (and (not (bind (holding ?agent $any-held-object)))
-       (bind (location ?agent $a-location))
-       (bind (location ?box $box-location))
+       (bind (located ?agent $a-location))
+       (bind (located ?box $box-location))
        (clear-support-top ?box)
        (reachable $box-location $a-location))
   (":" ?agent "picks up" ?box "at" $a-location)
   (assert (holding ?agent ?box)
-          (not (location ?box $box-location))
+          (not (located ?box $box-location))
           (if (bind (on ?box $support))
             (not (on ?box $support)))
           (finally (propagate-changes!))))
@@ -687,12 +688,12 @@
   1
   (?agent agent ?jammer jammer)
   (and (not (bind (holding ?agent $any-held-object)))
-       (bind (location ?agent $a-location))
-       (bind (location ?jammer $jammer-location))
+       (bind (located ?agent $a-location))
+       (bind (located ?jammer $jammer-location))
        (reachable $jammer-location $a-location))
   (":" ?agent "picks up" ?jammer "at" $a-location)
   (assert (holding ?agent ?jammer)
-          (not (location ?jammer $jammer-location))
+          (not (located ?jammer $jammer-location))
           (if (bind (jamming ?jammer $any-target))
             (not (jamming ?jammer $any-target)))
           (if (bind (on ?jammer $support))
@@ -704,12 +705,12 @@
   1
   (?agent agent ?connector connector)
   (and (not (bind (holding ?agent $any-held-object)))
-       (bind (location ?agent $a-location))
-       (bind (location ?connector $connector-location))
+       (bind (located ?agent $a-location))
+       (bind (located ?connector $connector-location))
        (reachable $connector-location $a-location))
   (":" ?agent "picks up" ?connector "at" $a-location)
   (assert (holding ?agent ?connector)
-          (not (location ?connector $connector-location))
+          (not (located ?connector $connector-location))
           (do (doall (?t terminus)  ;outgoing: this connector's pairings to its termini
                 (if (paired ?connector ?t)
                   (not (paired ?connector ?t))))
@@ -726,7 +727,7 @@
   (?agent agent ?gate gate ?location location)
   (and (bind (holding ?agent $any-jammer))
        (jammer $any-jammer)
-       (bind (location ?agent $a-location))
+       (bind (located ?agent $a-location))
        (reachable ?location $a-location)
        (visible ?location ?gate)
        (not (jam-disallowed> $a-location ?location ?gate)))
@@ -737,24 +738,24 @@
                  (clear-support-top ?plate))
           (assert (not (holding ?agent $any-jammer))
                   (jamming $any-jammer ?gate)
-                  (location $any-jammer ?location)
+                  (located $any-jammer ?location)
                   (on $any-jammer ?plate)
                   (assign $place ?plate)
                   (finally (propagate-changes!)))))
       ;; If a box is at the drop location, one outcome rests the jammer on its clear top
       (doall (?box box)
-        (if (and (location ?box ?location)
+        (if (and (located ?box ?location)
                  (clear-support-top ?box))
           (assert (not (holding ?agent $any-jammer))
                   (jamming $any-jammer ?gate)
-                  (location $any-jammer ?location)
+                  (located $any-jammer ?location)
                   (on $any-jammer ?box)
                   (assign $place ?box)
                   (finally (propagate-changes!)))))
       ;; And always an outcome that rests the jammer on the ground
       (assert (not (holding ?agent $any-jammer))
               (jamming $any-jammer ?gate)
-              (location $any-jammer ?location)
+              (located $any-jammer ?location)
               (assign $place 'ground)
               (finally (propagate-changes!)))))
 
@@ -774,7 +775,7 @@
   (?agent agent ?location location)
   (and (bind (holding ?agent $connector))
        (connector $connector)
-       (bind (location ?agent $a-location))
+       (bind (located ?agent $a-location))
        (reachable ?location $a-location)
        (connectable-location $connector ?location)
        (exists (?t terminus)
@@ -786,7 +787,7 @@
           (assign $connectable (cons ?target $connectable))))
       (ww-loop for $targets in (rest (subsets-up-to $connectable *max-pairings*))
                do (assert (not (holding ?agent $connector))
-                          (location $connector ?location)
+                          (located $connector ?location)
                           (ww-loop for $target in $targets
                                    do (paired $connector $target))
                           (finally (propagate-changes!))))))
@@ -798,7 +799,7 @@
   1
   (?agent agent ?box box ?location location)
   (and (holding ?agent ?box)
-       (bind (location ?agent $a-location))
+       (bind (located ?agent $a-location))
        (reachable ?location $a-location))
   (":" ?agent "puts" ?box "at" ?location "on" $place)
   (do ;; If a plate is at the drop location, one outcome rests the box on it (depressing it)
@@ -806,23 +807,23 @@
         (if (and (position ?plate ?location)
                  (clear-support-top ?plate))
           (assert (not (holding ?agent ?box))
-                  (location ?box ?location)
+                  (located ?box ?location)
                   (on ?box ?plate)
                   (assign $place ?plate)
                   (finally (propagate-changes!)))))
       ;; If another box is at the drop location, one outcome rests the held box on its clear top
       (doall (?support-box box)
         (if (and (different ?support-box ?box)
-                 (location ?support-box ?location)
+                 (located ?support-box ?location)
                  (clear-support-top ?support-box))
           (assert (not (holding ?agent ?box))
-                  (location ?box ?location)
+                  (located ?box ?location)
                   (on ?box ?support-box)
                   (assign $place ?support-box)
                   (finally (propagate-changes!)))))
       ;; And always an outcome that rests the box on the ground
       (assert (not (holding ?agent ?box))
-              (location ?box ?location)
+              (located ?box ?location)
               (assign $place 'ground)
               (finally (propagate-changes!)))))
          
@@ -836,14 +837,14 @@
   ;; accessibility is evaluated after the plate's effects are gone.
   1
   (?agent agent)
-  (and (bind (location ?agent $a-location))
+  (and (bind (located ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (assign $reachable (accessible ?agent $a-location)))
   (":" ?agent "moves from" $a-location "to" $dest)
   (doall (?to-location location)
     (if (and (member ?to-location $reachable)
              (different $a-location ?to-location))
-      (assert (location ?agent ?to-location)
+      (assert (located ?agent ?to-location)
               (assign $dest ?to-location)
               (finally (propagate-changes!))))))
 
@@ -853,13 +854,13 @@
   ;; move the agent to the plate's location when the plate is reachable from nearby.
   1
   (?agent agent ?plate plate)
-  (and (bind (location ?agent $a-location))
+  (and (bind (located ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (bind (position ?plate $plate-location))
        (reachable $a-location $plate-location)
        (clear-support-top ?plate))
   (":" ?agent "at" $a-location "steps on" ?plate "at" $plate-location)
-  (assert (location ?agent $plate-location)
+  (assert (located ?agent $plate-location)
           (on ?agent ?plate)
           (finally (propagate-changes!))))
 
@@ -880,13 +881,13 @@
   ;; when the problem gains explicit elevation state.
   1
   (?agent agent ?box box)
-  (and (bind (location ?agent $a-location))
+  (and (bind (located ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
-       (bind (location ?box $box-location))
+       (bind (located ?box $box-location))
        (reachable $a-location $box-location)
        (clear-support-top ?box))
   (":" ?agent "at" $a-location "jumps onto" ?box "at" $box-location)
-  (assert (location ?agent $box-location)
+  (assert (located ?agent $box-location)
           (on ?agent ?box)
           (finally (propagate-changes!))))
 
@@ -907,7 +908,7 @@
   ;; the ladder fixture must be reachable from there.
   1
   (?agent agent ?ladder ladder)
-  (and (bind (location ?agent $a-location))
+  (and (bind (located ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (bind (position ?ladder $ladder-location))
        (reachable $a-location $ladder-location)
@@ -915,7 +916,7 @@
        (member ?ladder $means)
        (one-way-clear ?agent $means))
   (":" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
-  (assert (location ?agent $dest)
+  (assert (located ?agent $dest)
           (finally (propagate-changes!))))
 
 
@@ -924,12 +925,12 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (location agent1 location1)
-  (location jammer1 location1)
-  (location jammer2 location9)
-  (location box1 location4)
-  ;(location connector1 location1)
-  ;(location connector2 location2)
+  (located agent1 location1)
+  (located jammer1 location1)
+  (located jammer2 location9)
+  (located box1 location4)
+  ;(located connector1 location1)
+  ;(located connector2 location2)
 
   ;; Plates (fixed positions); box1 starts on plate1, so plate1 begins depressed
   (position plate1 location4)
@@ -1148,4 +1149,4 @@
 
 (define-goal
   ;; Claustrophobia planning goal: agent1 reaches location3.
-  (location agent1 location11))
+  (located agent1 location11))
