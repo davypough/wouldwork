@@ -17,10 +17,10 @@
     nil              ; *randomize-search*
     -1               ; *branch*
     nil              ; *probe*
-    0                ; *debug*
     nil              ; *symmetry-pruning*
+    0                ; *debug*
     nil              ; *goal*
-    0)               ; *threads*                                       ;; CHANGED
+    0)               ; *threads*
   "Default parameter values in save/read order")
 
 
@@ -33,7 +33,7 @@
 
 
 (defvar *refreshing* nil
-  "Flag to skip read-globals during refresh, preserving REPL-set parameters.")
+  "Flag indicating refresh is reloading definitions while preserving current settings.")
 
 
 (defun help ()  ;;; text which appears if user enters (help)
@@ -55,7 +55,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (stage <problem-name>) eg, (stage \"blocks3\") or (stage blocks3)
   -- loads a problem into wouldwork in preparation for solving or debugging,
-     without attempting to solve it
+     reinitializing settings from the problem specification without attempting
+     to solve it
 
 (solve)
   -- attempts to solve the currently staged problem
@@ -71,10 +72,11 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
    -- displays all parameters associated with the currently staged problem
 
 (refresh)
-  -- refreshes (ie, reloads) the current problem specification file after editing it
+  -- reloads the current problem specification file after editing it, while
+     preserving the current parameter settings
 
 (ww-reset)
-  -- if Wouldwork throws an error, it can be reinitialized and maybe enable continuing
+  -- discards generated problem and saved settings, then reloads the default problem
 
 
 (ww-set <problem-parameter> <new-value>)
@@ -101,7 +103,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
               see ww-settings.lisp and User Manual for probe format examples
 
 Note that setting problem parameters at the REPL with ww-set will override
-any such settings appearing in the problem specification file.
+any such settings appearing in the problem specification file until the problem
+is staged again.
 "))
 
 
@@ -223,7 +226,7 @@ any such settings appearing in the problem specification file.
 
 (defun refresh ()
   "Refreshes the current problem.lisp file--eg, after editing it.
-   Preserves REPL-set parameters not overridden in the problem file."
+   Preserves the current parameter settings instead of reapplying problem-file settings."
   (save-globals)
   (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (setf *goal* nil
@@ -272,9 +275,9 @@ any such settings appearing in the problem specification file.
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
   (let* ((params (read-from-file *globals-file* *default-parameters*))
-         (padded (if (< (length params) 14)                            ;; CHANGED: backwards compatible with old vals.lisp
-                     (append params (list 2))                          ;; CHANGED: pad missing *threads* with default
-                     params)))                                         ;; CHANGED
+         (padded (if (< (length params) (length *default-parameters*))
+                   (append params (nthcdr (length params) *default-parameters*))
+                   params)))
     (destructuring-bind 
          (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
           progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal
@@ -468,8 +471,9 @@ any such settings appearing in the problem specification file.
 
 
 (defmacro stage (problem-name)
-  "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
-   specification, and check the current parameters, without asking wouldwork to solve it as run does.
+  "Loads a specified problem to be subsequently solved, reinitializing settings from its problem spec.
+   This allows the user to verify/debug their problem specification, and check the current parameters,
+   without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
   `(%stage ,(if (stringp problem-name)
               problem-name
@@ -477,8 +481,9 @@ any such settings appearing in the problem specification file.
 
 
 (defun %stage (problem-name-str)
-  "Loads a specified problem to be subsequently solved. This allows the user to verify/debug their problem
-   specification, and check the current parameters, without asking wouldwork to solve it as run does.
+  "Loads a specified problem to be subsequently solved, reinitializing settings from its problem spec.
+   This allows the user to verify/debug their problem specification, and check the current parameters,
+   without asking wouldwork to solve it as run does.
    Once the problem loads correctly, it can then be solved with a follow-up (solve) command."
   (let ((problem-file (resolve-problem-file problem-name-str)))
     (unless problem-file
@@ -498,6 +503,7 @@ any such settings appearing in the problem specification file.
           *branch* -1
           *randomize-search* nil
           *symmetry-pruning* nil
+          *threads* 0
           *features* (remove :ww-debug *features*))
     (with-silenced-compilation
       (load-problem problem-name-str))))

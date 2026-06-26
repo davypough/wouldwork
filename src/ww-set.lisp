@@ -6,8 +6,9 @@
 
 
 (defmacro ww-set (param val)
-  "Allows resetting of user parameters during and after loading."
-  `(progn
+  "Set a problem parameter. During refresh, problem-file ww-set forms are ignored
+   so current parameter settings are preserved."
+  `(unless (and *refreshing* *ww-loading*)
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
        ((*depth-cutoff* *progress-reporting-interval* *randomize-search*  ;changed: *solution-type* removed

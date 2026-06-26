@@ -52,12 +52,18 @@
 
 
 (defun ww-reset ()
-  "Delete problem.lisp, then reload wouldwork with default problem.
+  "Discard generated problem and saved settings, then reload the default problem.
    Allows recovery if wouldwork loading fails with error in problem file."
   (format t "~%Loading wouldwork defaults...~2%")
   (let* ((root (asdf:system-source-directory :wouldwork))
-         (problem-file (merge-pathnames "src/problem.lisp" root)))
-    (when (probe-file problem-file) (delete-file problem-file)))
+         (problem-file (merge-pathnames "src/problem.lisp" root))
+         (vals-file (merge-pathnames "vals.lisp" root))
+         (ww-pkg (find-package :ww))
+         (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
+    (when (and refreshing-sym (boundp refreshing-sym))
+      (setf (symbol-value refreshing-sym) nil))
+    (when (probe-file problem-file) (delete-file problem-file))
+    (when (probe-file vals-file) (delete-file vals-file)))
   (asdf:clear-system :wouldwork)
   (handler-bind ((warning #'muffle-warning))
     (let ((*compile-verbose* nil)
@@ -209,7 +215,7 @@
         (setf *problem-name* (first parameters)      ; position 0
               *algorithm* (third parameters)         ; position 2  
               *debug* (nth 11 parameters)            ; position 11
-              *threads* (or (nth 13 parameters) 2))  ; position 13
+              *threads* (or (nth 13 parameters) 0))  ; position 13
         ;; Handle debug feature flag based on loaded value
         (if (> *debug* 0)
             (pushnew :ww-debug *features*)

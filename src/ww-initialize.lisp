@@ -21,7 +21,9 @@
   (setq *happening-names* (sort (copy-list *happening-names*) #'< :key (lambda (object)
                                                   (first (aref (get object :events) 0)))))
   (init-start-state)  ;finish start-state init later in converter.lisp
-  ;; Restore saved parameters BEFORE symmetry detection
+  ;; Restore saved parameters before symmetry detection. During refresh,
+  ;; problem-file ww-set forms are skipped, so saving here preserves the
+  ;; current settings for later reloads.
   (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
     (cond (*refreshing*
            (save-globals))

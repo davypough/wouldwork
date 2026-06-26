@@ -39,12 +39,18 @@
 
 
 (defun ww-reset ()
-  "Delete problem.lisp, then reload wouldwork with default problem.
+  "Discard generated problem and saved settings, then reload the default problem.
    Allows recovery if wouldwork loading fails with error in problem file."
   (format t "~%Loading wouldwork defaults...~2%")
   (let* ((root (asdf:system-source-directory :wouldwork))
-         (problem-file (merge-pathnames "src/problem.lisp" root)))
-    (when (probe-file problem-file) (delete-file problem-file)))
+         (problem-file (merge-pathnames "src/problem.lisp" root))
+         (vals-file (merge-pathnames "vals.lisp" root))
+         (ww-pkg (find-package :ww))
+         (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
+    (when (and refreshing-sym (boundp refreshing-sym))
+      (setf (symbol-value refreshing-sym) nil))
+    (when (probe-file problem-file) (delete-file problem-file))
+    (when (probe-file vals-file) (delete-file vals-file)))
   (asdf:clear-system :wouldwork)
   (handler-bind ((warning #'muffle-warning))
     (let ((*compile-verbose* nil)
@@ -55,7 +61,8 @@
 
 (defun refresh ()
   "Reload the current problem file after editing. Works even after load errors.
-   This recovery version works from CL-USER package when ww::refresh is unavailable."
+   Preserves current parameter settings. This recovery version works from
+   CL-USER package when ww::refresh is unavailable."
   (let* ((ww-pkg (find-package :ww))
          (problem-name-sym (and ww-pkg (find-symbol "*PROBLEM-NAME*" ww-pkg)))
          (problem-name (and problem-name-sym 
@@ -76,7 +83,7 @@
     (when (and final-goal-sym (boundp final-goal-sym))                        ;; CHANGED
       (setf (symbol-value final-goal-sym) nil))                               ;; CHANGED
     ;; Warn about undo checkpoint if set
-    ;; Set refreshing flag to preserve REPL-set parameters
+    ;; Set refreshing flag to preserve current parameter settings
     (when (and refreshing-sym (boundp refreshing-sym))
       (setf (symbol-value refreshing-sym) t))
     ;; Locate and copy problem file
