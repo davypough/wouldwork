@@ -240,10 +240,109 @@
   object)
   
 
+(defun quoted-form-p (form)
+  (and (consp form)
+       (eql (first form) 'quote)
+       (null (cddr form))))
+
+
+(defun translated-prop-list-p (form)
+  (and (consp form)
+       (eql (first form) 'list)
+       (quoted-form-p (second form))))
+
+
+(defun translated-prop-relation (prop-form)
+  (when (translated-prop-list-p prop-form)
+    (second (second prop-form))))
+
+
+(defun translated-not-literal-prop (literal-form)
+  (when (and (consp literal-form)
+             (eql (first literal-form) 'list)
+             (equal (second literal-form) '(quote not))
+             (translated-prop-list-p (third literal-form))
+             (null (cdddr literal-form)))
+    (third literal-form)))
+
+
+(defun simple-int-write-relation-p (relation)
+  "True when RELATION can bypass general update expansion in compiled int code."
+  (and (gethash relation *relations*)
+       (not (gethash relation *complements*))
+       (not (gethash relation *bijective-relations*))
+       (not (gethash relation *bijective-canonical*))
+       (null (gethash relation *symmetrics*))))
+
+
+(defun int-write-db-form-p (db-form)
+  (equal db-form '(problem-state.idb state)))
+
+
+(defun remove-prop-items-at-indexes (items indexes)
+  (loop with remaining-indexes = indexes
+        for item in items
+        for i from 0
+        unless (and remaining-indexes (= i (first remaining-indexes)))
+          collect item
+        else
+          do (setf remaining-indexes (rest remaining-indexes))))
+
+
+(defun select-prop-items-at-indexes (items indexes)
+  (loop with remaining-indexes = indexes
+        for item in items
+        for i from 0
+        when (and remaining-indexes (= i (first remaining-indexes)))
+          collect item
+          and do (setf remaining-indexes (rest remaining-indexes))))
+
+
+(defun int-write-key-form (prop-form fluent-indexes)
+  (let* ((items (cdr prop-form))
+         (key-items (remove-prop-items-at-indexes items fluent-indexes)))
+    (convert-prop-list (cons 'list key-items))))
+
+
+(defun int-write-value-form (prop-form fluent-indexes)
+  (if fluent-indexes
+    `(list ,@(select-prop-items-at-indexes (cdr prop-form) fluent-indexes))
+    t))
+
+
+(defun convert-int-update-form (form)
+  "Convert safe generated UPDATE forms into direct integer-key mutations."
+  (when (and (= (length form) 3)
+             (eql (first form) 'update)
+             (int-write-db-form-p (second form)))
+    (let* ((db-form (second form))
+           (literal-form (third form))
+           (negative-prop-form (translated-not-literal-prop literal-form))
+           (prop-form (or negative-prop-form literal-form))
+           (relation (translated-prop-relation prop-form)))
+      (when (and relation
+                 (simple-int-write-relation-p relation))
+        (let* ((fluent-indexes (get-prop-fluent-indices (list relation)))
+               (key-form (int-write-key-form prop-form fluent-indexes)))
+          `(progn
+             (when *print-updates*
+               (ut::prt ,literal-form))
+             ,(if negative-prop-form
+                `(del-int-prop-key ,db-form ,key-form)
+                `(add-int-prop-key
+                   ,db-form
+                   ,key-form
+                   ,(int-write-value-form prop-form fluent-indexes)))))))))
+
+
 (defun subst-int-code (code-tree)
   (labels ((process-item (item)
              (cond ((atom item) item)
                    ((not (typep item 'alexandria:proper-list)) item)
+                   ((and (consp item)
+                         (eql (first item) 'update))
+                    (or (convert-int-update-form item)
+                        (mapcar #'process-item item)))
                    ((and (consp item)
                          (eql (first item) 'gethash)
                          (consp (second item)) (eql (first (second item)) 'list))
