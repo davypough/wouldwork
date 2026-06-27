@@ -240,6 +240,7 @@
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
   (when (eql *tree-or-graph* 'graph)
+    (setf (problem-state.idb-hash *start-state*) nil)  ;ADDED: discard any hash cached during init-action processing (idb is mutated in place afterward)
     (ensure-idb-hash *start-state*)
     (let ((closed-table (if (> *threads* 0)
                             (closed-shard *start-state*)
@@ -766,6 +767,22 @@
                (setf hash (logxor hash (deep-sxhash (cons k v)))))  ; CHANGED: sxhash -> deep-sxhash
              idb-hash-table)
     hash))
+
+
+(defun validate-carried-hash (state)
+  "Debug gate. When *validate-idb-hash* is set, signal an error if STATE's
+   incrementally-carried idb-hash disagrees with a full compute-idb-hash rescan.
+   Skips states whose carried hash is NIL (recomputed downstream) and canonical-
+   symmetry mode (where the carried hash is intentionally left NIL)."
+  (declare (type problem-state state))
+  (when (and *validate-idb-hash*
+             (problem-state.idb-hash state)
+             (not (use-canonical-symmetry-p)))
+    (let ((carried (problem-state.idb-hash state))
+          (full (compute-idb-hash (problem-state.idb state))))
+      (unless (= carried full)
+        (error "Incremental idb-hash ~D disagrees with full rescan ~D for state:~%~A"
+               carried full state)))))
 
 
 (defun canonical-idb-equal-p (idb1 idb2)

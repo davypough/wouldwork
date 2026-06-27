@@ -263,7 +263,9 @@
                    (setf new-state act-state)))
               ;; Normal actions with happenings
               (*happening-names*  ;note that act-state = state+
-               (ut::mvs (net-state new-state) (amend-happenings state act-state)))  ;check for violation
+               (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
+               (when net-state  ;ADDED: happenings mutate idb outside the folded path; force hash recompute
+                 (setf (problem-state.idb-hash net-state) nil)))
               ;; Normal actions without happenings
               (t
                (setf net-state act-state)
@@ -324,7 +326,9 @@
        :happenings new-happenings  ;nil for normal actions, sim-state happenings for strategic-wait
        :time (+ (problem-state.time state) new-action-duration)
        :value (update.value updated-db)
-       :idb new-state-idb)))
+       :idb new-state-idb
+       :idb-hash (unless (eql (problem-state.name state) 'wait)  ;CHANGED: carry incremental hash; NIL after a wait-remhash forces downstream recompute
+                   (update.hash updated-db)))))
 
 
 (defun get-wait-happenings (state)
@@ -345,20 +349,27 @@
 
 (defun process-followups (net-state updated-db)
   "Triggering forms are saved previously during effect apply.
-   Followups execute on post-happening state, seeing cumulative changes."
+   Followups execute on post-happening state, seeing cumulative changes.
+   With no followups (the common case) net-state already carries its correct idb-hash,
+   so return immediately without copying state or rehashing."
   (declare (ignorable updated-db))
-  (iter (with state+ = (copy-problem-state-without-idb net-state))
-        (initially (setf (problem-state.idb state+) (problem-state.idb net-state)))
-        (for followup in (update.followups updated-db))
-        #+:ww-debug (when (>= *debug* 4)
-                      (ut::prt followup))
-        (apply (car followup) state+ (cdr followup))
-        (for updated-idb = (problem-state.idb state+))
-        #+:ww-debug (when (>= *debug* 4)
-                      (ut::prt (list-database updated-idb)))
-        (setf (problem-state.idb net-state) updated-idb)
-    (finally (setf (problem-state.idb-hash net-state) nil)
-             (return-from process-followups net-state))))
+  (unless (update.followups updated-db)  ;CHANGED: nothing to do; carried hash already describes net-state
+    (validate-carried-hash net-state)
+    (return-from process-followups net-state))
+  (let ((*idb-hash-acc* (problem-state.idb-hash net-state)))  ;thread carried hash through followup mutations (NIL = recompute downstream)
+    (iter (with state+ = (copy-problem-state-without-idb net-state))
+          (initially (setf (problem-state.idb state+) (problem-state.idb net-state)))
+          (for followup in (update.followups updated-db))
+          #+:ww-debug (when (>= *debug* 4)
+                        (ut::prt followup))
+          (apply (car followup) state+ (cdr followup))
+          (for updated-idb = (problem-state.idb state+))
+          #+:ww-debug (when (>= *debug* 4)
+                        (ut::prt (list-database updated-idb)))
+          (setf (problem-state.idb net-state) updated-idb)
+      (finally (setf (problem-state.idb-hash net-state) *idb-hash-acc*)  ;carry threaded hash
+               (validate-carried-hash net-state)  ;debug gate (no-op unless *validate-idb-hash*)
+               (return-from process-followups net-state)))))
 
 
 (defun expand (current-node)  ;called from df-bnb1

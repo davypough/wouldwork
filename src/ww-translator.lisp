@@ -546,13 +546,17 @@
   "For depth-first, translates an assert statement with selective write-mode context."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let ((state (copy-problem-state state)))
+    (pre `(let* ((parent-hash (unless (use-canonical-symmetry-p)  ;CHANGED: seed incremental idb-hash from parent (standard mode only)
+                                (ensure-idb-hash state)))
+                 (state (copy-problem-state state))
+                 (*idb-hash-acc* parent-hash))  ;CHANGED: NIL here disables folding (canonical-symmetry mode)
             ,@(mapcar (lambda (statement)
                         ;; Bind read-mode to nil only for direct assert statements
                         (let ((*proposition-read-mode* nil))
                           (translate statement 'eff)))
                       (cdr form))
             (push (make-update :changes (problem-state.idb state)
+                               :hash *idb-hash-acc*  ;CHANGED: carry incremental hash out of the effect
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0)

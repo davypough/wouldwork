@@ -172,7 +172,7 @@
                       proposition))))
     (when (and int-db *detect-propagated-changes*)
       (note-add-change db key value))
-    (setf (gethash key db) value)
+    (fold-store key value db int-db)  ;CHANGED: was (setf (gethash key db) value)
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement))
@@ -182,7 +182,7 @@
                    (if complement-indices
                        (get-fluentless-prop complement complement-indices)
                        complement))))
-        (remhash complement-key db)))))
+        (fold-remove complement-key db int-db)))))  ;CHANGED: was (remhash complement-key db)
 
 
 (defun del-prop (proposition db int-db)
@@ -197,7 +197,7 @@
                       proposition))))
     (when (and int-db *detect-propagated-changes*)
       (note-del-change db key))
-    (remhash key db)
+    (fold-remove key db int-db)  ;CHANGED: was (remhash key db)
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement)))
@@ -214,7 +214,7 @@
                   (if complement-indices
                       (get-prop-fluents complement complement-indices)
                       t)))
-            (setf (gethash complement-key db) complement-value)))))))
+            (fold-store complement-key complement-value db int-db)))))))  ;CHANGED: was (setf (gethash complement-key db) complement-value)
 
 
 (defun note-add-change (db key new-value)
@@ -232,6 +232,39 @@
    removed.  Called from del-prop only while *detect-propagated-changes* is in effect."
   (when (nth-value 1 (gethash key db))
     (setf *propagated-state-changed* t)))
+
+
+(defun fold-store (key value db int-db)
+  "Stores VALUE at KEY in DB. When an incremental idb hash is being accumulated over
+   an integer database (INT-DB and *idb-hash-acc* both set), folds the change into
+   *idb-hash-acc* so the running hash stays equal to (compute-idb-hash db) without a
+   full rescan. An idempotent re-store (KEY already present with an EQUAL value) leaves
+   the hash unchanged and skips the deep-sxhash work entirely -- this matters because
+   propagation fixpoint loops re-assert many already-true propositions. Otherwise XOR
+   is its own inverse: the old contribution is removed and the new one added in one step."
+  (declare (type hash-table db))
+  (when (and int-db *idb-hash-acc*)
+    (multiple-value-bind (old present) (gethash key db)
+      (cond ((not present)
+             (setf *idb-hash-acc* (logxor *idb-hash-acc* (deep-sxhash (cons key value)))))
+            ((not (equal old value))
+             (setf *idb-hash-acc* (logxor *idb-hash-acc*
+                                          (deep-sxhash (cons key old))
+                                          (deep-sxhash (cons key value))))))))
+  (setf (gethash key db) value))
+
+
+(defun fold-remove (key db int-db)
+  "Removes KEY from DB. When an incremental idb hash is being accumulated over an
+   integer database (INT-DB and *idb-hash-acc* both set), folds the removal out of
+   *idb-hash-acc* so the running hash stays equal to (compute-idb-hash db). A removal
+   only subtracts the entry's current contribution; a missing key contributes nothing."
+  (declare (type hash-table db))
+  (when (and int-db *idb-hash-acc*)
+    (multiple-value-bind (old present) (gethash key db)
+      (when present
+        (setf *idb-hash-acc* (logxor *idb-hash-acc* (deep-sxhash (cons key old)))))))
+  (remhash key db))
 
 
 (defun bijective-index-propositions (proposition)

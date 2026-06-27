@@ -350,6 +350,18 @@
    real database mutation. A propagation pass binds it to NIL, runs its derivations,
    and returns it to signal whether another convergence pass is needed.")
 
+(defvar *idb-hash-acc* nil
+  "When non-nil during effect application, holds the running XOR hash of the integer
+   database being mutated, seeded from the parent state's idb-hash. fold-store and
+   fold-remove fold each add/delete into it, so a successor's idb-hash is known
+   without rescanning the whole idb. NIL disables folding, leaving non-effect database
+   paths (init, propagation, replay) untouched. Per-effect/per-thread dynamic binding.")
+
+(defvar *validate-idb-hash* nil
+  "Debug gate. When T, every successor's incrementally-carried idb-hash is checked
+   against a full compute-idb-hash rescan (validate-carried-hash); a mismatch signals
+   an error. Leave NIL for production search; enable only to validate the fold.")
+
 (sb-ext:defglobal *global-invariants* nil
   "List of invariant query functions to check on every state.")
 

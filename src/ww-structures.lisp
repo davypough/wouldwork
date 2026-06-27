@@ -163,7 +163,8 @@
   (value 0.0 :type real)
   (instantiations nil :type list)
   (followups nil :type list)    ;next & finally followup function calls
-  (sim-state nil))              ;strategic-wait simulation state
+  (sim-state nil)               ;strategic-wait simulation state
+  (hash nil :type (or null fixnum)))  ;ADDED: incremental idb-hash carried out of the effect (nil = recompute downstream)
 
 
 (defstruct (solution (:conc-name solution.))
