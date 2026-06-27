@@ -99,10 +99,10 @@
         (when (and refreshing-sym (boundp refreshing-sym))
           (setf (symbol-value refreshing-sym) nil))
         (return-from refresh nil))
-      ;; Delete current problem.lisp and copy fresh source
+      ;; Delete current problem.lisp and generate a fresh staged problem file.
       (when (probe-file problem-file)
         (delete-file problem-file))
-      (uiop:copy-file source-file problem-file)
+      (ww::copy-problem-with-tech-includes source-file problem-file)
       ;; Clear and reload
       (asdf:clear-system :wouldwork)
       (unwind-protect
