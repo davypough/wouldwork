@@ -107,40 +107,6 @@ any such settings appearing in the problem specification file until the problem
 is staged again.
 "))
 
-
-;; -------------------- some basic string functions ------------------ ;;
-
-(defun string-prefix-p (prefix str)
-  "Return T if PREFIX is a prefix of STR, otherwise NIL."
-  (and (<= (length prefix) (length str))
-       (string= prefix (subseq str 0 (length prefix)))))
-
-(defun string-suffix-p (suffix str)
-  "Return T if SUFFIX is a suffix of STR, otherwise NIL."
-  (and (<= (length suffix) (length str))
-       (string= suffix (subseq str (- (length str) (length suffix))))))
-
-(defun lstrip (str prefix)
-  "Removes prefix from str (only 1x)."
-  (let ((result str))
-    (when (string-prefix-p prefix result)
-      (setf result (subseq result (length prefix))))
-    result))
-
-(defun rstrip (str suffix)
-  "Removes suffix from str (only 1x)."
-  (let ((result str))
-    (when (string-suffix-p suffix result)
-      (setf result (subseq result 0 (- (length result) (length suffix)))))
-    result))
-
-(defun strip-name (str prefix suffix)
-  "Removes prefix and suffix from str."
-  (let* ((without-prefix (lstrip str prefix))
-         (suffix-with-dot (concatenate 'string "." suffix))
-         (result (rstrip without-prefix suffix-with-dot)))
-    result))
-
 (defun lookup (key plist &key (test #'string-equal) (default))
   "Key value lookup in plist with #'string= or any other function as test.
    The plist-related getf can only handle eql."
@@ -391,61 +357,6 @@ is staged again.
     (when problem-file
       (copy-problem-with-tech-includes problem-file (in-src "problem.lisp")))
     problem-file))
-
-
-(defun copy-problem-with-tech-includes (source-file target-file)
-  "Copy SOURCE-FILE to TARGET-FILE, expanding each (include-tech NAME) directive in
-   place by splicing tech/NAME-tech.lisp.  This lets a problem compose itself from
-   self-contained technology files at stage time, before the pre-scan reads problem.lisp."
-  (with-open-file (in source-file :direction :input)
-    (with-open-file (out target-file :direction :output :if-exists :supersede)
-      (loop for line = (read-line in nil nil)
-            while line
-            do (let ((tech-name (include-tech-directive line)))
-                 (if tech-name
-                   (write-tech-include tech-name out)
-                   (write-line line out)))))))
-
-
-(defun write-tech-include (tech-name-str out)
-  "Splice the capability file for TECH-NAME-STR into stream OUT, or note its absence.
-   A missing tech file is replaced by a comment and a console notice, so a problem may
-   be staged before all of its technologies have been written."
-  (let ((tech-file (tech-file-path tech-name-str)))
-    (if tech-file
-      (progn (format out "~&~%;;;; ==== begin technology ~A ====~%~%" tech-name-str)
-             (with-open-file (in tech-file :direction :input)
-               (loop for line = (read-line in nil nil)
-                     while line
-                     do (write-line line out)))
-             (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
-             (format t "~&  included technology: ~A~%" tech-name-str))
-      (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
-                     tech-name-str tech-name-str)
-             (format t "~&  MISSING technology, skipped: ~A~%" tech-name-str)))))
-
-
-(defun include-tech-directive (line)
-  "If LINE is solely an (include-tech NAME) directive, return NAME as a string, else NIL.
-   The directive must be the only non-whitespace content of the line, so an include-tech
-   appearing inside a larger form or a comment is not matched."
-  (let ((trimmed (string-trim '(#\Space #\Tab #\Return #\Linefeed) line))
-        (head "(include-tech "))
-    (when (string-prefix-p head trimmed)
-      (let* ((rest-str (subseq trimmed (length head)))
-             (name-end (position-if (lambda (ch) (member ch '(#\Space #\Tab #\))))
-                                    rest-str)))
-        (when name-end
-          (subseq rest-str 0 name-end))))))
-
-
-(defun tech-file-path (tech-name-str)
-  "Resolve tech/<TECH-NAME>-tech.lisp below the Wouldwork root, or NIL if absent."
-  (let ((relative (make-pathname :directory '(:relative "tech")
-                                 :name (concatenate 'string tech-name-str "-tech")
-                                 :type "lisp"))
-        (root (asdf:system-source-directory :wouldwork)))
-    (probe-file (merge-pathnames relative root))))
 
 
 (defun load-problem (problem-name-str)

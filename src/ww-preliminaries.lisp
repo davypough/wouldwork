@@ -51,6 +51,89 @@
      ,@body))
 
 
+;; -------------------- string and problem file helpers ------------------ ;;
+
+(defun string-prefix-p (prefix str)
+  "Return T if PREFIX is a prefix of STR, otherwise NIL."
+  (and (<= (length prefix) (length str))
+       (string= prefix (subseq str 0 (length prefix)))))
+
+(defun string-suffix-p (suffix str)
+  "Return T if SUFFIX is a suffix of STR, otherwise NIL."
+  (and (<= (length suffix) (length str))
+       (string= suffix (subseq str (- (length str) (length suffix))))))
+
+(defun lstrip (str prefix)
+  "Removes prefix from str (only 1x)."
+  (let ((result str))
+    (when (string-prefix-p prefix result)
+      (setf result (subseq result (length prefix))))
+    result))
+
+(defun rstrip (str suffix)
+  "Removes suffix from str (only 1x)."
+  (let ((result str))
+    (when (string-suffix-p suffix result)
+      (setf result (subseq result 0 (- (length result) (length suffix)))))
+    result))
+
+(defun strip-name (str prefix suffix)
+  "Removes prefix and suffix from str."
+  (let* ((without-prefix (lstrip str prefix))
+         (suffix-with-dot (concatenate 'string "." suffix))
+         (result (rstrip without-prefix suffix-with-dot)))
+    result))
+
+(defun copy-problem-with-tech-includes (source-file target-file)
+  "Copy SOURCE-FILE to TARGET-FILE, expanding each (include-tech NAME) directive in
+   place by splicing tech/NAME-tech.lisp.  This lets a problem compose itself from
+   self-contained technology files before the pre-scan reads problem.lisp."
+  (with-open-file (in source-file :direction :input)
+    (with-open-file (out target-file :direction :output :if-exists :supersede)
+      (loop for line = (read-line in nil nil)
+            while line
+            do (let ((tech-name (include-tech-directive line)))
+                 (if tech-name
+                   (write-tech-include tech-name out)
+                   (write-line line out)))))))
+
+(defun write-tech-include (tech-name-str out)
+  "Splice the capability file for TECH-NAME-STR into stream OUT, or note its absence.
+   A missing tech file is replaced by a comment and a console notice, so a problem may
+   be staged before all of its technologies have been written."
+  (let ((tech-file (tech-file-path tech-name-str)))
+    (if tech-file
+      (progn (format out "~&~%;;;; ==== begin technology ~A ====~%~%" tech-name-str)
+             (with-open-file (in tech-file :direction :input)
+               (loop for line = (read-line in nil nil)
+                     while line
+                     do (write-line line out)))
+             (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
+             (format t "~&  included technology: ~A~%" tech-name-str))
+      (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
+                     tech-name-str tech-name-str)
+             (format t "~&  MISSING technology, skipped: ~A~%" tech-name-str)))))
+
+(defun include-tech-directive (line)
+  "If LINE is an (include-tech NAME) directive, return NAME as a string, else NIL."
+  (let ((trimmed (string-trim '(#\Space #\Tab #\Return #\Linefeed) line))
+        (head "(include-tech "))
+    (when (string-prefix-p head trimmed)
+      (let* ((rest-str (subseq trimmed (length head)))
+             (name-end (position-if (lambda (ch) (member ch '(#\Space #\Tab #\))))
+                                    rest-str)))
+        (when name-end
+          (subseq rest-str 0 name-end))))))
+
+(defun tech-file-path (tech-name-str)
+  "Resolve tech/<TECH-NAME>-tech.lisp below the Wouldwork root, or NIL if absent."
+  (let ((relative (make-pathname :directory '(:relative "tech")
+                                 :name (concatenate 'string tech-name-str "-tech")
+                                 :type "lisp"))
+        (root (asdf:system-source-directory :wouldwork)))
+    (probe-file (merge-pathnames relative root))))
+
+
 (defun ww-reset ()
   "Discard generated problem and saved settings, then reload the default problem.
    Allows recovery if wouldwork loading fails with error in problem file."
@@ -237,11 +320,11 @@
          (vals-problem-name (read-init-vals vals-file))
          (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
     (cond ((not (probe-file problem-file))  ;no problem.lisp file?
-             (uiop:copy-file blocks3-file problem-file)  ;default problem.lisp
+             (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
              (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
           ((probe-file vals-file)  ;does vals.lisp exist?
              (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
-               (uiop:copy-file vals-problem-file problem-file)  ;make sure problem.lisp corresponds with vals.lisp
+               (copy-problem-with-tech-includes vals-problem-file problem-file)  ;make problem.lisp match vals.lisp
                (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
 
 
