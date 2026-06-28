@@ -86,33 +86,52 @@
 
 (defun copy-problem-with-tech-includes (source-file target-file)
   "Copy SOURCE-FILE to TARGET-FILE, expanding each (include-tech NAME) directive in
-   place by splicing tech/NAME-tech.lisp.  This lets a problem compose itself from
-   self-contained technology files before the pre-scan reads problem.lisp."
-  (with-open-file (in source-file :direction :input)
-    (with-open-file (out target-file :direction :output :if-exists :supersede)
-      (loop for line = (read-line in nil nil)
-            while line
-            do (let ((tech-name (include-tech-directive line)))
-                 (if tech-name
-                   (write-tech-include tech-name out)
-                   (write-line line out)))))))
+   place by splicing tech/NAME-tech.lisp.  Included tech files may include other
+   tech files the same way.  Each technology is spliced at most once per problem
+   copy.  This lets a problem compose itself from self-contained technology files
+   before the pre-scan reads problem.lisp."
+  (let ((included-techs (make-hash-table :test #'equal)))
+    (with-open-file (in source-file :direction :input)
+      (with-open-file (out target-file :direction :output :if-exists :supersede)
+        (loop for line = (read-line in nil nil)
+              while line
+              do (let ((tech-name (include-tech-directive line)))
+                   (if tech-name
+                     (write-tech-include tech-name out nil included-techs)
+                     (write-line line out))))))))
 
-(defun write-tech-include (tech-name-str out)
+(defun write-tech-include (tech-name-str out include-stack included-techs)
   "Splice the capability file for TECH-NAME-STR into stream OUT, or note its absence.
    A missing tech file is replaced by a comment and a console notice, so a problem may
    be staged before all of its technologies have been written."
-  (let ((tech-file (tech-file-path tech-name-str)))
-    (if tech-file
-      (progn (format out "~&~%;;;; ==== begin technology ~A ====~%~%" tech-name-str)
-             (with-open-file (in tech-file :direction :input)
-               (loop for line = (read-line in nil nil)
-                     while line
-                     do (write-line line out)))
-             (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
-             (format t "~&  included technology: ~A~%" tech-name-str))
-      (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
-                     tech-name-str tech-name-str)
-             (format t "~&  MISSING technology, skipped: ~A~%" tech-name-str)))))
+  (when (member tech-name-str include-stack :test #'string=)
+    (error "Circular technology include: ~{~A -> ~}~A"
+           (reverse include-stack)
+           tech-name-str))
+  (cond ((gethash tech-name-str included-techs)
+         (format out "~&;; (include-tech ~A): already included -- skipped~%"
+                 tech-name-str))
+        (t
+         (let ((tech-file (tech-file-path tech-name-str)))
+           (if tech-file
+             (progn (setf (gethash tech-name-str included-techs) t)
+                    (format out "~&~%;;;; ==== begin technology ~A ====~%~%" tech-name-str)
+                    (with-open-file (in tech-file :direction :input)
+                      (loop for line = (read-line in nil nil)
+                            while line
+                            do (let ((nested-tech-name (include-tech-directive line)))
+                                 (if nested-tech-name
+                                   (write-tech-include nested-tech-name
+                                                       out
+                                                       (cons tech-name-str include-stack)
+                                                       included-techs)
+                                   (write-line line out)))))
+                    (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
+                    (format t "~&  included technology: ~A~%" tech-name-str))
+             (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
+                            tech-name-str tech-name-str)
+                    (format t "~&  MISSING technology, skipped: ~A~%" tech-name-str)))))))
+
 
 (defun include-tech-directive (line)
   "If LINE is an (include-tech NAME) directive, return NAME as a string, else NIL."

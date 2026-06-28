@@ -154,6 +154,26 @@
 ;(declaim (inline add-prop del-prop))
 
 
+(defun add-int-prop-key (db key value)
+  "Store VALUE at integer KEY in DB, preserving propagated-change detection."
+  (declare (type hash-table db)
+           (type integer key))
+  (when *detect-propagated-changes*
+    (note-add-change db key value))
+  (setf (gethash key db) value)
+  t)
+
+
+(defun del-int-prop-key (db key)
+  "Remove integer KEY from DB, preserving propagated-change detection."
+  (declare (type hash-table db)
+           (type integer key))
+  (when *detect-propagated-changes*
+    (note-del-change db key))
+  (remhash key db)
+  t)
+
+
 (defun add-prop (proposition db int-db
                  &optional indices precomputed-key precomputed-values)
   "Add one proposition, without expanding bijective or symmetric relations.
@@ -167,12 +187,12 @@
          (key (if int-db
                   (or precomputed-key
                       (convert-fluentless-prop-to-integer proposition fluent-indices))
-                  (if fluent-indices
-                      (get-fluentless-prop proposition fluent-indices)
-                      proposition))))
-    (when (and int-db *detect-propagated-changes*)
-      (note-add-change db key value))
-    (fold-store key value db int-db)  ;CHANGED: was (setf (gethash key db) value)
+                   (if fluent-indices
+                       (get-fluentless-prop proposition fluent-indices)
+                       proposition))))
+    (if int-db
+      (add-int-prop-key db key value)
+      (setf (gethash key db) value))
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement))
@@ -191,13 +211,13 @@
   (declare (type hash-table db))
   (let* ((fluent-indices (get-prop-fluent-indices proposition))
          (key (if int-db
-                  (convert-fluentless-prop-to-integer proposition fluent-indices)
-                  (if fluent-indices
-                      (get-fluentless-prop proposition fluent-indices)
-                      proposition))))
-    (when (and int-db *detect-propagated-changes*)
-      (note-del-change db key))
-    (fold-remove key db int-db)  ;CHANGED: was (remhash key db)
+                   (convert-fluentless-prop-to-integer proposition fluent-indices)
+                   (if fluent-indices
+                       (get-fluentless-prop proposition fluent-indices)
+                       proposition))))
+    (if int-db
+      (del-int-prop-key db key)
+      (remhash key db))
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement)))

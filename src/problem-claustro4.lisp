@@ -5,9 +5,8 @@
 ;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
 ;;; expands in place; this file holds only the glue: types, the shared movable-object
 ;;; relations, the master propagation driver, and the init/goal.  Optics is supplied
-;;; by beam-tech, the full transmitter/receiver/
-;;; connector/crossing bundle; connector and crossing instances are empty in this baseline,
-;;; so the beam is effectively a direct transmitter -> receiver line.
+;;; by beam-direct-tech, the transmitter/receiver-only beam bundle.  The baseline has
+;;; one direct transmitter -> receiver line with authored gate/location occluders.
 ;;;
 ;;; NOTE: requires the include-tech splice in exchange-problem-file.  Until the named
 ;;; tech files exist, each (include-tech ...) is skipped with a comment and the load
@@ -27,9 +26,6 @@
 
 (ww-set *depth-cutoff* 33)
 
-(defparameter *max-pairings* 2)  ;max termini a connector may pair in one connect; caps connect's branching to a domain's port count
-
-
 ;;;; TYPES ;;;;
 ;;;; Object instances are problem-specific, so every type declaration lives here, ahead
 ;;;; of the technology includes that read these types.
@@ -44,20 +40,16 @@
   plate (plate1 plate2 plate3)
   box (box1)
   jammer (jammer1 jammer2)
-  connector ()  ;none in the baseline; beam-tech requires the type declared
   transmitter (transmitter1)
   receiver (receiver1)
   ladder (ladder1)
   hue (blue)
   mode (normal inverted toggle)  ;controller mode
-  cargo (either box jammer connector)  ;what an agent can hold and carry
+  cargo (either box jammer)  ;what an agent can hold and carry
   support-occupant (either agent cargo)  ;what can occupy the top of a support
   target (either gate)  ;what a jammer can jam
-  relay (either connector)  ;what can relay a beam
-  terminus (either transmitter receiver connector)  ;what a connector can pair/connect to
   support (either plate box)  ;what a movable object can rest on
-  crossing ()  ;authored beam-crossing points; none in the baseline
-  beam-endpoint (either transmitter receiver location)  ;a fixture or a connector's location
+  beam-blocker (either agent box jammer)  ;what can block/occlude a beam path
 )
 
 
@@ -69,7 +61,7 @@
 
 (define-dynamic-relations
   (holding agent $cargo)
-  (located (either agent box jammer connector) $location)
+  (located (either agent box jammer) $location)
   (on support-occupant $support)  ;support an occupant rests on (absent if ground)
   (open gate)  ;read by accessibility/visibility/reachability/optics clear-predicates
 )
@@ -91,7 +83,7 @@
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech plate)                 ;depressed; update-plate-status!
 (include-tech support-occupancy)     ;clear-support-top
-(include-tech beam)                  ;FULL optics bundle: +connector/crossing relations, relay branch, connector actions; replaces transmitter-receiver
+(include-tech beam-direct)           ;direct transmitter -> receiver beams with gate/location occluders
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target
 (include-tech box)                   ;pickup-box put-box
 (include-tech accessibility)         ;walk-via; accessible one-step-accessible one-way-clear accessible-clear; move
@@ -117,14 +109,10 @@
 
 (define-update propagate-consequences! ()
   ;; One propagation pass.  Assembled here from exactly the loaded technologies' update
-  ;; functions, in dependency order: crossings settle, then connector colors, then receivers
-  ;; light, then plates depress, then gates combine.  The crossing/connector stages iterate
-  ;; empty in this baseline (no connector/crossing instances) but keep the driver correct for
-  ;; any beam-tech domain.  Returns t iff some derivation changed stored state, telling
+  ;; functions, in dependency order: receivers light, then plates depress, then gates
+  ;; combine.  Returns t iff some derivation changed stored state, telling
   ;; propagate-changes! to run another pass.
   (let ((*propagated-state-changed* nil))
-    (update-crossing-status!)
-    (update-connector-status!)
     (update-receiver-status!)
     (update-plate-status!)
     (update-gate-status!)
