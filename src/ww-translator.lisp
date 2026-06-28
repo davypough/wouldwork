@@ -386,6 +386,18 @@
                   t))))))
 
 
+(defun empty-quantifier-collection-p (collection)
+  "Return true when COLLECTION would make a translated quantifier skip its body."
+  (not (and collection (caar collection))))
+
+
+(defun translate-empty-static-quantifier (body flag result)
+  "Validate BODY during translation, then emit RESULT for an empty static domain."
+  (let ((*within-quantifier* t))
+    (translate body flag))
+  result)
+
+
 (defun translate-existential (form flag)
   "Existential translation with context-dependent semantics.
    Pre: Query semantics returning T/NIL based on satisfaction
@@ -397,46 +409,54 @@
     (unless (member (first parameters) *parameter-headers*)
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
+      (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+             (type-inst (instantiate-type-spec pre-param-types))
+             (static-collection (unless queries
+                                  (ut::transpose (eval-instantiated-spec type-inst)))))
         (multiple-value-bind (var domain static-single-p)
             (and (null queries)
                  (static-single-quantifier-domain pre-param-?vars pre-param-types))
-          (if static-single-p
-              (ecase flag
-                (pre
-                 (let ((*within-quantifier* t))
-                   `(loop for ,var in ',domain
-                          thereis ,(translate body flag))))
-                (eff
-                 `(loop for ,var in ',domain
-                        thereis ,(let ((*within-quantifier* t))
-                                   (translate body 'eff)))))
-              (ecase flag
-                (pre
-                 ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
-                 (let ((*within-quantifier* t))
-                   `(let ((collection ,(if queries
-                                           `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                           `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
-                      (if (and collection (caar collection))
-                          (apply #'some (lambda (&rest args)
-                                         (destructuring-bind ,pre-param-?vars args
-                                           ,(translate body flag)))
-                                 collection)
-                          nil))))
-                (eff
-                  ;; Assertion semantics - execute body for suitable instantiations
+          (cond
+            ((and static-single-p (null domain))
+             (translate-empty-static-quantifier body flag nil))
+            (static-single-p
+             (ecase flag
+               (pre
+                (let ((*within-quantifier* t))
+                  `(loop for ,var in ',domain
+                         thereis ,(translate body flag))))
+               (eff
+                `(loop for ,var in ',domain
+                       thereis ,(let ((*within-quantifier* t))
+                                  (translate body 'eff))))))
+            ((and (null queries) (empty-quantifier-collection-p static-collection))
+             (translate-empty-static-quantifier body flag nil))
+            (t
+             (ecase flag
+               (pre
+                ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
+                (let ((*within-quantifier* t))
                   `(let ((collection ,(if queries
-                                         `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                         `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
+                                        `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                        `',static-collection)))
                      (if (and collection (caar collection))
                          (apply #'some (lambda (&rest args)
                                         (destructuring-bind ,pre-param-?vars args
-                                            ,(let ((*within-quantifier* t))
-                                          (translate body 'eff))))
+                                          ,(translate body flag)))
                                 collection)
-                         nil))))))))))
+                         nil))))
+               (eff
+                ;; Assertion semantics - execute body for suitable instantiations
+                `(let ((collection ,(if queries
+                                      `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                      `',static-collection)))
+                   (if (and collection (caar collection))
+                       (apply #'some (lambda (&rest args)
+                                      (destructuring-bind ,pre-param-?vars args
+                                        ,(let ((*within-quantifier* t))
+                                           (translate body 'eff))))
+                              collection)
+                       nil)))))))))))
 
 
 (defun translate-universal (form flag)
@@ -450,25 +470,33 @@
     (when (eql flag 'eff)
       (warn "Found FORALL statement in effect; DOALL is often intended: ~A" form))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
+      (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+             (type-inst (instantiate-type-spec pre-param-types))
+             (static-collection (unless queries
+                                  (ut::transpose (eval-instantiated-spec type-inst)))))
         (multiple-value-bind (var domain static-single-p)
             (and (null queries)
                  (static-single-quantifier-domain pre-param-?vars pre-param-types))
-          ;; Translation-time binding affects the translate call below
-          (let ((*within-quantifier* t))
-            (if static-single-p
-                `(loop for ,var in ',domain
-                       always ,(translate body flag))
-                `(let ((collection ,(if queries
-                                       `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                       `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
-                   (if (and collection (caar collection))
-                       (apply #'every (lambda (&rest args)
-                                       (destructuring-bind ,pre-param-?vars args
-                                         ,(translate body flag)))
-                              collection)
-                       t)))))))))
+          (cond
+            ((and static-single-p (null domain))
+             (translate-empty-static-quantifier body flag t))
+            ((and (null queries) (empty-quantifier-collection-p static-collection))
+             (translate-empty-static-quantifier body flag t))
+            (t
+             ;; Translation-time binding affects the translate call below
+             (let ((*within-quantifier* t))
+               (if static-single-p
+                   `(loop for ,var in ',domain
+                          always ,(translate body flag))
+                   `(let ((collection ,(if queries
+                                         `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                         `',static-collection)))
+                      (if (and collection (caar collection))
+                          (apply #'every (lambda (&rest args)
+                                          (destructuring-bind ,pre-param-?vars args
+                                            ,(translate body flag)))
+                                 collection)
+                          t)))))))))))
 
 
 (defun translate-doall (form flag)
@@ -480,26 +508,34 @@
     (unless (member (first parameters) *parameter-headers*)
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
-      (let ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
-            (type-inst (instantiate-type-spec pre-param-types)))
+      (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+             (type-inst (instantiate-type-spec pre-param-types))
+             (static-collection (unless queries
+                                  (ut::transpose (eval-instantiated-spec type-inst)))))
         (multiple-value-bind (var domain static-single-p)
             (and (null queries)
                  (static-single-quantifier-domain pre-param-?vars pre-param-types))
-          ;; Translation-time binding affects the translate call below
-          (let ((*within-quantifier* t))
-            (if static-single-p
-                `(dolist (,var ',domain t)
-                   ,(translate body flag))
-                `(progn
-                   (let ((collection ,(if queries
-                                         `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                         `(ut::transpose (quote ,(eval-instantiated-spec type-inst))))))
-                     (when (and collection (caar collection))
-                       (apply #'mapc (lambda (&rest args)
-                                      (destructuring-bind ,pre-param-?vars args
-                                        ,(translate body flag)))
-                              collection)))
-                   t))))))))
+          (cond
+            ((and static-single-p (null domain))
+             (translate-empty-static-quantifier body flag t))
+            ((and (null queries) (empty-quantifier-collection-p static-collection))
+             (translate-empty-static-quantifier body flag t))
+            (t
+             ;; Translation-time binding affects the translate call below
+             (let ((*within-quantifier* t))
+               (if static-single-p
+                   `(dolist (,var ',domain t)
+                      ,(translate body flag))
+                   `(progn
+                      (let ((collection ,(if queries
+                                           `(ut::transpose (eval-instantiated-spec ',type-inst state))
+                                           `',static-collection)))
+                        (when (and collection (caar collection))
+                          (apply #'mapc (lambda (&rest args)
+                                         (destructuring-bind ,pre-param-?vars args
+                                           ,(translate body flag)))
+                                 collection)))
+                      t))))))))))
 
 
 (defun translate-connective (form flag)

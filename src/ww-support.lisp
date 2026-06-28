@@ -155,22 +155,24 @@
 
 
 (defun add-int-prop-key (db key value)
-  "Store VALUE at integer KEY in DB, preserving propagated-change detection."
+  "Store VALUE at integer KEY in DB, preserving propagated-change detection
+   and any active incremental idb-hash fold."
   (declare (type hash-table db)
            (type integer key))
   (when *detect-propagated-changes*
     (note-add-change db key value))
-  (setf (gethash key db) value)
+  (fold-store key value db t)
   t)
 
 
 (defun del-int-prop-key (db key)
-  "Remove integer KEY from DB, preserving propagated-change detection."
+  "Remove integer KEY from DB, preserving propagated-change detection
+   and any active incremental idb-hash fold."
   (declare (type hash-table db)
            (type integer key))
   (when *detect-propagated-changes*
     (note-del-change db key))
-  (remhash key db)
+  (fold-remove key db t)
   t)
 
 
@@ -202,7 +204,9 @@
                    (if complement-indices
                        (get-fluentless-prop complement complement-indices)
                        complement))))
-        (fold-remove complement-key db int-db)))))  ;CHANGED: was (remhash complement-key db)
+        (if int-db
+          (del-int-prop-key db complement-key)
+          (remhash complement-key db))))))
 
 
 (defun del-prop (proposition db int-db)
@@ -234,7 +238,9 @@
                   (if complement-indices
                       (get-prop-fluents complement complement-indices)
                       t)))
-            (fold-store complement-key complement-value db int-db)))))))  ;CHANGED: was (setf (gethash complement-key db) complement-value)
+            (if int-db
+              (add-int-prop-key db complement-key complement-value)
+              (setf (gethash complement-key db) complement-value))))))))
 
 
 (defun note-add-change (db key new-value)

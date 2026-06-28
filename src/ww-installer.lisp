@@ -301,13 +301,13 @@
                  (symbolp (car form)))
         (case (car form)
           (define-query
-            (push (second form) *query-names*))
+            (pushnew (second form) *query-names*))
           (define-update
-            (push (second form) *update-names*))
+            (pushnew (second form) *update-names*))
           ((define-happening define-patroller)
-            (push (second form) *happening-names*))
+            (pushnew (second form) *happening-names*))
           (defun
-            (push (second form) defun-names)))))
+            (pushnew (second form) defun-names)))))
     (dolist (name defun-names)
       (unless (fboundp name)
         (let ((stub-name name))
@@ -412,7 +412,7 @@
   "Revised query function installation with read-only semantics"
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)
-  (push name *query-names*)
+  (pushnew name *query-names*)
   (setf (get name :raw-body) body)  ;store for interprocedural symmetry walk
   (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
   (let ((new-$vars (delete-duplicates 
@@ -445,7 +445,7 @@
    - Backtracking: changes as list of (forward inverse) pairs"
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
-  (push name *update-names*)
+  (pushnew name *update-names*)
   (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
   (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
   (let ((new-$vars (delete-duplicates
