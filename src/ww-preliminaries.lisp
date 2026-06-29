@@ -153,6 +153,23 @@
     (probe-file (merge-pathnames relative root))))
 
 
+(defun snapshot-source-file (snapshot-file)
+  "Return the source problem file recorded in SNAPSHOT-FILE's leading Filename
+   header (eg, ';;; Filename: problem-claustro4.lisp'), resolved under src/, or
+   NIL if the header is absent or the named file does not exist.  This lets the
+   loader recover a snapshot's provenance without consulting vals.lisp."
+  (let* ((root (asdf:system-source-directory :wouldwork))
+         (src-dir (merge-pathnames "src/" root))
+         (marker ";;; Filename:")
+         (first-line (with-open-file (in snapshot-file :direction :input)
+                       (read-line in nil nil)))
+         (trimmed (and first-line (string-trim '(#\Space #\Tab #\Return) first-line))))
+    (when (and trimmed (string-prefix-p marker trimmed))
+      (probe-file (merge-pathnames (string-trim '(#\Space #\Tab #\Return)
+                                                (subseq trimmed (length marker)))
+                                   src-dir)))))
+
+
 (defun ww-reset ()
   "Discard generated problem and saved settings, then reload the default problem.
    Allows recovery if wouldwork loading fails with error in problem file."
@@ -341,10 +358,13 @@
     (cond ((not (probe-file problem-file))  ;no problem.lisp file?
              (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
              (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
-          ((probe-file vals-file)  ;does vals.lisp exist?
-             (if (probe-file vals-problem-file)  ;does problem-<vals-problem-name>.lisp exist?
-               (copy-problem-with-tech-includes vals-problem-file problem-file)  ;make problem.lisp match vals.lisp
-               (delete-file vals-file))))))  ;vals.lisp inconsistent with problem.lisp
+          ((and (probe-file vals-file) (probe-file vals-problem-file))  ;CHANGED: vals.lisp names an existing source
+             (copy-problem-with-tech-includes vals-problem-file problem-file))  ;make problem.lisp match vals.lisp
+          (t  ;ADDED: vals.lisp absent or inconsistent -- recover source from problem.lisp's own header
+             (uiop:delete-file-if-exists vals-file)  ;ADDED: discard any inconsistent vals.lisp
+             (let ((header-source (snapshot-source-file problem-file)))  ;ADDED: provenance from snapshot header
+               (when header-source  ;ADDED: re-splice from recovered source, else leave snapshot as-is
+                 (copy-problem-with-tech-includes header-source problem-file)))))))
 
 
 ;; Call AFTER read-init-vals has restored *threads* from vals.lisp, so that
