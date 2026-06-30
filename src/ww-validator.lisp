@@ -75,6 +75,23 @@
         (check-type arg symbol)))
 
 
+(defun translatable-expression-form-p (form)
+  "Return true when FORM can be evaluated after Wouldwork translation."
+  (and (consp form)
+       (let ((operator (car form)))
+         (or (and (consp operator)
+                  (eq (car operator) 'lambda))
+             (and (symbolp operator)
+                  (or (eq operator 'lambda)
+                      (fboundp operator)
+                      (macro-function operator)
+                      (special-operator-p operator)
+                      (member operator *query-names*)
+                      (member operator *update-names*)
+                      (gethash operator *relations*)
+                      (gethash operator *static-relations*)))))))
+
+
 (defun check-proposition (proposition)
   "Detects an error in a proposition--eg, (height block1 3)
    or (loc ?queen $row (1+ $col)).
@@ -116,9 +133,7 @@
                      (eql (first type-def) 'either)
                      (member arg (iter (for type in (cdr type-def))
                                        (unioning (gethash type *types*)))))
-                (and (listp arg)  ;arg is a lisp function or special lisp op
-                     (or (fboundp (car arg))
-                         (and (symbolp arg) (special-operator-p (car arg)))))
+                (translatable-expression-form-p arg)
                 (error "The argument ~A is not of specified type ~A in proposition ~A"
                        arg type-def proposition))))))
 
@@ -203,9 +218,7 @@
             (numberp arg)
             (characterp arg)
             (stringp arg)
-            (and (listp arg)
-                 (or (fboundp (car arg))  ;arg is a lisp function
-                     (special-operator-p (car arg))))  ;arg is a special lisp op
+            (translatable-expression-form-p arg)
             (error "Found a malformed query or update argument ~A in ~A" arg fn-call))))
 
 

@@ -55,18 +55,26 @@
     idb))
 
 
+(defun translate-value-expression (item flag)
+  "Return Lisp code that evaluates ITEM as a proposition value."
+  (cond ((or (varp item)
+             (numberp item)
+             (stringp item)
+             (characterp item)
+             (null item))
+         item)
+        ((and (listp item)
+              (translatable-expression-form-p item))
+         (translate item flag))
+        ((listp item) `(quote ,item))
+        (t `(quote ,item))))
+
+
 (defun translate-list (form flag)
   "Most basic form translation."
-  (declare (ignore flag))
   (check-proposition form)
   `(list ,@(iter (for item in form)
-             (if (or (varp item)
-                     (numberp item)
-                     (stringp item)
-                     (characterp item)
-                     (listp item))
-               (collect item)
-               (collect `(quote ,item))))))
+             (collect (translate-value-expression item flag)))))
 
 
 (defun translate-simple-atom (form flag)
@@ -88,13 +96,7 @@
                (arg1 (second form))
                (arg2 (third form)))
           `(equalp (gethash ,(translate-list (list index1-name arg1) flag) ,state-db)
-                   (list ,(if (or (varp arg2)
-                                  (numberp arg2)
-                                  (stringp arg2)
-                                  (characterp arg2)
-                                  (listp arg2))
-                            arg2
-                            `',arg2))))
+                   (list ,(translate-value-expression arg2 flag))))
         ;; Non-bijective relation: direct lookup
         `(eql t (gethash ,(translate-list form flag) ,state-db)))))
 
@@ -115,25 +117,13 @@
                (arg1 (second form))
                (arg2 (third form)))
           `(equalp (gethash ,(translate-list (list index1-name arg1) flag) ,database-ref)
-                   (list ,(if (or (varp arg2)
-                                  (and (consp arg2)
-                                       (symbolp (car arg2))
-                                       (or (fboundp (car arg2))
-                                           (special-operator-p (car arg2)))))
-                            arg2
-                            `',arg2))))
+                   (list ,(translate-value-expression arg2 flag))))
         ;; Non-bijective relation
         (multiple-value-bind (fluentless-atom fluents)
             (ut::split-at-indexes fluent-indices form)
           `(equalp (gethash ,(translate-list fluentless-atom flag) ,database-ref)
                    (list ,@(mapcar (lambda (x)
-                                     (if (or (varp x)
-                                             (and (consp x)
-                                                  (symbolp (car x))
-                                                  (or (fboundp (car x))
-                                                      (special-operator-p (car x)))))
-                                       x
-                                       `',x))
+                                     (translate-value-expression x flag))
                                    fluents)))))))
 
 
@@ -209,17 +199,33 @@
     `(not ,(translate-positive-relation (second form) flag))))
 
 
+(defun explicit-state-argument-p (function-name args)
+  "Return true for the temporary legacy shape (query state ...)."
+  (let ((raw-args (get function-name :raw-args :missing)))
+    (and args
+         (eq (first args) 'state)
+         (not (eq raw-args :missing))
+         (= (length args) (1+ (length raw-args))))))
+
+
+(defun translate-function-call-argument (arg flag)
+  "Translate one source-level query/update argument."
+  (translate-value-expression arg flag))
+
+
 (defun translate-function-call (form flag)
-  "Corrected function call translation with robust update function detection"
-  (check-query/update-call form)
+  "Translate a query or update call, adding the implicit state argument."
   (let* ((function-name (car form))
+         (source-args (cdr form))
+         (args (if (explicit-state-argument-p function-name source-args)
+                 (cdr source-args)
+                 source-args))
          (state-arg 'state)
          (fn-call (append (list function-name state-arg)
                           (mapcar (lambda (arg)
-                                    (if (and (symbolp arg) (not (varp arg)))
-                                       `(quote ,arg)
-                                       arg))
-                                  (cdr form)))))
+                                    (translate-function-call-argument arg flag))
+                                  args))))
+    (check-query/update-call (cons function-name args))
     ;; Enhanced validation with robust update function detection
     ;; Allow update calls in 'eff (action effects) and 'pre (goal validation) contexts
     (when (and (update-function-p function-name)
@@ -687,13 +693,13 @@
 
 (defun translate-let (form flag)
   "Translates a let clause, including binding forms."
-  `(let ,(mapcar (lambda (binding)
-                   (if (consp binding)
-                       ;; Binding with initial value - translate the value
-                       `(,(first binding) ,(translate (second binding) flag))
-                       ;; Just a variable name - keep as is
-                       binding))
-                 (second form))
+  `(,(first form) ,(mapcar (lambda (binding)
+                             (if (consp binding)
+                                 ;; Binding with initial value - translate the value
+                                 `(,(first binding) ,(translate (second binding) flag))
+                                 ;; Just a variable name - keep as is
+                                 binding))
+                           (second form))
      ,@(iter (for statement in (cddr form))
              (collect (translate statement flag)))))
 
@@ -710,7 +716,7 @@
 
 (defun translate-case (form flag)
   "Translates a case statement."
-  `(case ,(second form)
+  `(case ,(translate (second form) flag)
      ,@(iter (for clause in (cddr form))
          (collect `(,(first clause) ,@(iter (for statement in (rest clause))
                                             (collect (translate statement flag))))))))
@@ -773,6 +779,96 @@
                    collect (translate item flag)))))  ; Called with *within-quantifier* = nil
 
 
+(defun translate-lambda-form (form flag)
+  "Translate the body of a Lisp lambda expression."
+  `(lambda ,(second form)
+     ,@(mapcar (lambda (body-form)
+                 (translate body-form flag))
+               (cddr form))))
+
+
+(defun translate-function-special-form (form flag)
+  "Translate #'(lambda ...) while preserving named function references."
+  (if (and (= (length form) 2)
+           (consp (second form))
+           (eq (first (second form)) 'lambda))
+    `(function ,(translate-lambda-form (second form) flag))
+    form))
+
+
+(defun translate-binding-form (form flag)
+  "Translate a binding form with one value expression and a body."
+  `(,(first form) ,(second form) ,(translate (third form) flag)
+     ,@(mapcar (lambda (body-form)
+                 (translate body-form flag))
+               (cdddr form))))
+
+
+(defun translate-set-form (form flag)
+  "Translate value positions in SETQ/SETF-style forms."
+  `(,(first form)
+     ,@(loop for (place value) on (rest form) by #'cddr
+             append (list (translate place flag)
+                          (translate value flag)))))
+
+
+(defun translate-body-form (form flag)
+  "Translate forms whose remaining elements are evaluated body forms."
+  `(,(first form)
+     ,@(mapcar (lambda (body-form)
+                 (translate body-form flag))
+               (rest form))))
+
+
+(defun ordinary-lisp-call-p (form)
+  "Return true when FORM is an ordinary function call, not a macro/special form."
+  (let ((operator (first form)))
+    (or (consp operator)
+        (and (symbolp operator)
+             (fboundp operator)
+             (not (macro-function operator))
+             (not (special-operator-p operator))))))
+
+
+(defun translate-ordinary-lisp-call (form flag)
+  "Translate evaluated arguments in an ordinary Lisp function call."
+  `(,(if (consp (first form))
+       (translate (first form) flag)
+       (first form))
+     ,@(mapcar (lambda (arg)
+                 (translate arg flag))
+               (rest form))))
+
+
+(defun translate-lisp-form (form flag)
+  "Translate Wouldwork subforms inside evaluated positions of Lisp forms."
+  (case (first form)
+    (quote form)
+    (function (translate-function-special-form form flag))
+    (lambda (translate-lambda-form form flag))
+    ((let let*) (translate-let form flag))
+    ((setq setf psetf) (translate-set-form form flag))
+    ((multiple-value-bind destructuring-bind)
+     (translate-binding-form form flag))
+    ((progn locally) (translate-body-form form flag))
+    (block
+     `(block ,(second form)
+        ,@(mapcar (lambda (body-form)
+                    (translate body-form flag))
+                  (cddr form))))
+    (return-from
+     `(return-from ,(second form)
+        ,@(mapcar (lambda (body-form)
+                    (translate body-form flag))
+                  (cddr form))))
+    (the
+     `(the ,(second form) ,(translate (third form) flag)))
+    (t
+     (if (ordinary-lisp-call-p form)
+       (translate-ordinary-lisp-call form flag)
+       form))))
+
+
 (defun translate-followup (form flag)
   ;Processes a trigger followup form for next & finally.
   (declare (ignore flag))
@@ -827,7 +923,7 @@
         ((eql (car form) 'bind) (translate-bind form flag))
         ((eql (car form) 'ww-loop) (translate-ww-loop form flag))
         ((eql (car form) 'assign) (translate-assign form flag))
-        ((eql (car form) 'let) (translate-let form flag))
+        ((member (car form) '(let let*)) (translate-let form flag))
         ((eql (car form) 'case) (translate-case form flag))
         ((eql (car form) 'cond) (translate-cond form flag))
         ((eql (car form) 'mv-assign) (translate-mv-assign form flag))
@@ -855,4 +951,4 @@
          (error "~2%If ~A is a query or update function, it is unrecognized as such (typo?).~%~
                  If it is a local variable, prefix it with $.)~2%"
                 (car form) form))
-        (t form)))
+        (t (translate-lisp-form form flag))))

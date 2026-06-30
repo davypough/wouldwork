@@ -81,7 +81,7 @@
   (do (bind (height ?support $h))
       (bind (on ?support $s))
       (or (and (support $s)
-               (+ $h (elevation? state $s)))
+               (+ $h (elevation? $s)))
           $h)))
 
 
