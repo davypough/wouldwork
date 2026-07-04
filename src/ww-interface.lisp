@@ -355,7 +355,8 @@ is staged again.
    expanding any (include-tech ...) directives by splicing technology files."
   (let ((problem-file (resolve-problem-file problem-name-str)))
     (when problem-file
-      (copy-problem-with-tech-includes problem-file (in-src "problem.lisp")))
+      (copy-problem-with-tech-includes problem-file (in-src "problem.lisp"))
+      (setf *skip-next-resplice* t))  ;the forced reload just below (via load-problem) must not re-splice
     problem-file))
 
 

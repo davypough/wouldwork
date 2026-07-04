@@ -42,7 +42,7 @@
 
 
 (define-static-relations
-  (item-id item $fixnum)  ;ids used for bounding
+  (id item $fixnum)  ;ids used for bounding
   (capacity $fixnum)  ;capacity of the knapsack
   (value item $fixnum)
   (weight item $fixnum)
@@ -101,9 +101,8 @@
        (bind (capacity $knapsack-capacity))
        (<= $new-knapsack-load $knapsack-capacity))
   (?item)
-  (assert (bind (contents $knapsack-items))
-          (bind (content-ids $knapsack-item-ids))
-          (bind (item-id ?item $item-id))
+  (assert (bind (content-ids $knapsack-item-ids))
+          (bind (id ?item $item-id))
           (setf $new-knapsack-items (cons ?item $knapsack-items))
           (setf $new-knapsack-item-ids
             (merge 'list (list $item-id) (copy-list $knapsack-item-ids) #'<))
@@ -136,7 +135,7 @@
                (weight $item $weight)
                (id-weight $id $weight)
                (id-value $id $value)
-               (item-id $item $id))))
+               (id $item $id))))
 
 #|
 (define-init-action initialize-weight&value-ids
@@ -150,5 +149,5 @@
                (bind (value $item $item-value))
                (id-weight $id $item-weight)
                (id-value $id $item-value)
-               (item-id $item $id))))            
+               (id $item $id))))            
 |#

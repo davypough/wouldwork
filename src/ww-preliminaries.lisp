@@ -29,6 +29,16 @@
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
 
 
+(defvar *skip-next-resplice* nil
+  "When T, this file's reload-time eval-when below skips its own problem.lisp splice
+   once, then clears the flag.  Set by exchange-problem-file (ww-interface.lisp)
+   immediately after it explicitly splices, so a forced (asdf:load-system ...) fired
+   right afterward (eg by %stage or refresh) does not redundantly re-splice the same
+   source a second time.  Declared with defvar, not defparameter, so its value survives
+   this file's own reload within that same forced (asdf:load-system ...) pass -- a
+   defparameter would reset it to nil before the eval-when below got to check it.")
+
+
 (defparameter *lock* (bt:make-lock))  ;for general thread protection
 (defparameter *search-lock*  (bt:make-lock "ww-search-lock"))
 (defparameter *integer-lock* (bt:make-lock "ww-integer-lock"))
@@ -275,6 +285,8 @@
   ;; CLEARED: fixed-size tables, write-only during init, lock-free during search
   (when (and (boundp '*types*) (hash-table-p *types*))
     (clrhash *types*))
+  (when (and (boundp '*type-signatures*) (hash-table-p *type-signatures*))
+    (clrhash *type-signatures*))
   (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
     (clrhash *constant-integers*))
   (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
@@ -355,16 +367,18 @@
          (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
          (vals-problem-name (read-init-vals vals-file))
          (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
-    (cond ((not (probe-file problem-file))  ;no problem.lisp file?
-             (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
-             (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
-          ((and (probe-file vals-file) (probe-file vals-problem-file))  ;CHANGED: vals.lisp names an existing source
-             (copy-problem-with-tech-includes vals-problem-file problem-file))  ;make problem.lisp match vals.lisp
-          (t  ;ADDED: vals.lisp absent or inconsistent -- recover source from problem.lisp's own header
-             (uiop:delete-file-if-exists vals-file)  ;ADDED: discard any inconsistent vals.lisp
-             (let ((header-source (snapshot-source-file problem-file)))  ;ADDED: provenance from snapshot header
-               (when header-source  ;ADDED: re-splice from recovered source, else leave snapshot as-is
-                 (copy-problem-with-tech-includes header-source problem-file)))))))
+    (if *skip-next-resplice*
+      (setf *skip-next-resplice* nil)  ;this reload's problem.lisp was already spliced explicitly just before it
+      (cond ((not (probe-file problem-file))  ;no problem.lisp file?
+               (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
+               (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
+            ((and (probe-file vals-file) (probe-file vals-problem-file))  ;CHANGED: vals.lisp names an existing source
+               (copy-problem-with-tech-includes vals-problem-file problem-file))  ;make problem.lisp match vals.lisp
+            (t  ;ADDED: vals.lisp absent or inconsistent -- recover source from problem.lisp's own header
+               (uiop:delete-file-if-exists vals-file)  ;ADDED: discard any inconsistent vals.lisp
+               (let ((header-source (snapshot-source-file problem-file)))  ;ADDED: provenance from snapshot header
+                 (when header-source  ;ADDED: re-splice from recovered source, else leave snapshot as-is
+                   (copy-problem-with-tech-includes header-source problem-file))))))))
 
 
 ;; Call AFTER read-init-vals has restored *threads* from vals.lisp, so that

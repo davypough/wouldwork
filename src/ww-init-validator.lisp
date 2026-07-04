@@ -774,15 +774,25 @@ would overwrite the previous value during install-init."
 
 
 (defun check-init-crossing-lists-match-declared-beams (literals)
-  "Checks that each crossing listed on a beam belongs to that declared beam."
+  "Checks that each crossing listed on a beam belongs to that declared beam.
+
+Location-to-location beams are bidirectional (BEAM-CROSSING> names them in one
+canonical direction while CROSSINGS-ALONG-BEAM> is authored for both directions),
+so the reverse pairing is also accepted when both endpoints are locations."
   (let ((crossing-beams (init-beams-for-crossing-map literals)))
     (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
       (destructuring-bind (source crossings destination)
           (rest (init-literal-proposition literal))
-        (let ((beam (list source destination)))
+        (let ((beam (list source destination))
+              (reverse-beam (list destination source))
+              (bidirectional-p (and (init-type-member-p source 'location)
+                                    (init-type-member-p destination 'location))))
           (dolist (crossing crossings)
-            (unless (member beam (gethash crossing crossing-beams)
-                            :test #'equal)
+            (unless (or (member beam (gethash crossing crossing-beams)
+                                 :test #'equal)
+                        (and bidirectional-p
+                             (member reverse-beam (gethash crossing crossing-beams)
+                                     :test #'equal)))
               (error "~%CROSSINGS-ALONG-BEAM> lists a crossing on an undeclared beam.~%~
                       Literal:       ~S~%~
                       Crossing:      ~S~%~

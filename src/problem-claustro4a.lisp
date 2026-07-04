@@ -1,22 +1,18 @@
-;;; Filename: problem-claustro5.lisp
+;;; Filename: problem-claustro4a.lisp
 
 ;;; Talos 'Claustrophobia', rebuilt from self-contained technology files.
-;;; Same objects, initializations, and goal as claustro3.  Behavior is supplied by
+;;; Same objects, initializations, and goal as claustro4, with an extra elevated platform.  Behavior is supplied by
 ;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
-;;; expands in place; this file holds only the glue: types, the shared movable-object
-;;; relations, the master propagation driver, and the init/goal.  Optics is supplied
+;;; expands in place; this file holds only the glue: types, the master propagation driver,
+;;; and the init/goal.  Optics is supplied
 ;;; by beam-direct-tech, the transmitter/receiver-only beam bundle.  The baseline has
 ;;; one direct transmitter -> receiver line with authored gate/location occluders.
-;;;
-;;; NOTE: requires the include-tech splice in exchange-problem-file.  Until the named
-;;; tech files exist, each (include-tech ...) is skipped with a comment and the load
-;;; halts at the first tech-provided update (update-receiver-status!) -- the expected
-;;; preliminary signal that the glue and splicer are sound.
+
 
 (in-package :ww)
 
 
-(ww-set *problem-name* claustro5)
+(ww-set *problem-name* claustro4a)
 
 (ww-set *problem-type* planning)
 
@@ -24,11 +20,15 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 33)
+(ww-set *progress-reporting-interval* 1000000)
+
+(ww-set *depth-cutoff* 36)
 
 ;;;; TYPES ;;;;
-;;;; Object instances are problem-specific, so every type declaration lives here, ahead
-;;;; of the technology includes that read these types.
+;;;; Leaf object types the problem instantiates live here, ahead of the technology includes.
+;;;; Every composite type (mobile-object, cargo, support-occupant, support, target,
+;;;; beam-blocker, fixed-location) is now declared identically inside its consuming tech
+;;;; file(s) instead, so no tech file depends on a type declaration living in the problem.
 
 
 (define-types
@@ -36,39 +36,15 @@
   gate  (gate1 gate2 gate3 gate4 gate5 gate6 gate7 gate8 gate9)
   screen (screen1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
-            location9 location10 location11)
+            location9 location10 location11 location12)
   plate (plate1 plate2 plate3)
-  box (box1 box2 box3)
+  box (box1 box2)
   jammer (jammer1 jammer2)
   transmitter (transmitter1)
   receiver (receiver1)
   ladder (ladder1)
   hue (blue)
   mode (normal inverted toggle)  ;controller mode
-  cargo (either box jammer)  ;what an agent can hold and carry
-  support-occupant (either agent cargo)  ;what can occupy the top of a support
-  target (either gate)  ;what a jammer can jam
-  support (either plate box)  ;what a movable object can rest on
-  beam-blocker (either agent box jammer)  ;what can block/occlude a beam path
-)
-
-
-;;;; GLUE RELATIONS ;;;;
-;;;; The shared movable-object substrate (holding, located, on) plus the two relations
-;;;; nearly every technology reads -- (open ...) and (position ...) -- hoisted here so
-;;;; the tech files stay focused on reusable behavior.
-
-
-(define-dynamic-relations
-  (holding agent $cargo)
-  (located (either agent box jammer) $location)
-  (on support-occupant $support)  ;support an occupant rests on (absent if ground)
-  (open gate)  ;read by accessibility/visibility/reachability/optics clear-predicates
-)
-
-
-(define-static-relations
-  (position (either plate ladder) $location)  ;fixed location; read by plate, ladder, and placement techs
 )
 
 
@@ -86,11 +62,12 @@
 (include-tech location-elevation)    ;elevation; location-elevation
 (include-tech beam-direct)           ;direct transmitter -> receiver beams with gate/location occluders
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target
-(include-tech box)                   ;pickup-box put-box
+(include-tech agent)                 ;agent-height
+(include-tech box)                   ;pickup-box put-box jump-onto; jump-via
 (include-tech accessibility)         ;walk-via; accessible one-step-accessible one-way-clear accessible-clear; move
 (include-tech visibility)            ;los-to-fixture los-to-location; visible visible-clear
 (include-tech reachability)          ;reachable-via; reachable reachable-clear
-(include-tech ladder)                ;traversable>; one-way-clear; use-ladder (kept #+ignore, matching claustro3)
+(include-tech ladder)                ;traversable>; one-way-clear; use-ladder
 
 
 ;;;; MASTER PROPAGATION DRIVER ;;;;
@@ -129,19 +106,19 @@
   (located jammer1 location1)
   (located jammer2 location9)
   (located box1 location4)
-  (located box2 location5)
-  (located box3 location6)
+  (located box2 location10)
 
   ;; Plates (fixed positions); box1 starts on plate1, so plate1 begins depressed
   (position plate1 location4)
   (position plate2 location5)
   (position plate3 location6)
   (on box1 plate1)
-  (on box2 plate2)
-  (on box3 plate3)
 
   ;; Ladder (fixed fixture, positioned like a plate); boards at location7, descends to location1
   (position ladder1 location7)
+
+  ;; Elevation (fixed floor levels above ground; absent means ground); location12 is a platform
+  (elevation location12 2)
 
   ;; Static environment follows
   ;; Gate controllers in DNF: ((c11 c12...) (c21...)) means (c11 AND c12...) OR (c21...)
@@ -254,6 +231,19 @@
   (los-to-fixture location11 (gate9) gate8)
   (los-to-fixture location11 () gate9)
 
+  ;; location12 (platform) sits directly above location10 via an ungated vertical jump, so it
+  ;; shares location10's interior sightlines; its view toward gate8/gate9 is inherited from
+  ;; claustro4's now-split (walk-via location10 (gate8 gate9) location11) sightline, now
+  ;; (jump-via location12 (gate8 gate9) location11).
+  (los-to-fixture location12 (gate7 gate6 gate5 gate3) gate2)
+  (los-to-fixture location12 (gate7 gate6 gate5) gate3)
+  (los-to-fixture location12 (gate7 gate6 gate5) gate4)
+  (los-to-fixture location12 (gate7 gate6) gate5)
+  (los-to-fixture location12 (gate7) gate6)
+  (los-to-fixture location12 () gate7)
+  (los-to-fixture location12 () gate8)
+  (los-to-fixture location12 (gate8) gate9)
+
   ;; Per-location line-of-sight to a different location; $list = occluder gates that must be open
   (los-to-location location1 () location2)
   (los-to-location location1 (gate2 gate3) location3)
@@ -299,7 +289,8 @@
   (los-to-location location9 (gate6 gate7) location10)
   (los-to-location location9 (gate6 gate7 gate8 gate9) location11)
 
-  (los-to-location location10 (gate8 gate9) location11)
+  (los-to-location location10 () location12)  ;ungated upward view onto the platform, mirroring the jump edge
+  (los-to-location location12 (gate8 gate9) location11)  ;platform's view toward location11, inherited from claustro4's split edge
 
   ;; Directional jamming exclusions: agent location, jammer placement, target gate
   (jam-disallowed> location1 location7 gate1)
@@ -321,10 +312,13 @@
 
   (walk-via location9 (gate6 gate7) location10)  ;area4 -> area5
 
-  (walk-via location10 (gate8 gate9) location11)  ;area5 -> area6
-
   ;; Alternate accessibility
   (traversable> location7 (ladder1) location1)   ;one-way via ladder
+
+  ;; Elevation crossings (jump only; excluded from move by one-step-accessible's equality check
+  ;; on location-elevation, but declared here as their own relation for clarity).
+  (jump-via location10 () location12)  ;area5 -> platform
+  (jump-via location12 (gate8 gate9) location11)  ;platform -> area6; sole route to location11
 
   ;; Reachability (put/pickup at a nearby location within reach); symmetric like accessible.
   ;; $list = barrier that must be open to reach across.
@@ -349,7 +343,5 @@
 
 
 (define-goal
-  ;; agent1 stands atop a two-box stack: box3 on plate3, box2 on box3, agent1 on box2.
-  (and (on box3 plate3)
-       (on box2 box3)
-       (on agent1 box2)))
+  ;; Claustrophobia planning goal: agent1 reaches location11.
+  (located agent1 location11))

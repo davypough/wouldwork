@@ -83,6 +83,7 @@
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech plate)                 ;depressed; update-plate-status!
 (include-tech support-occupancy)     ;clear-support-top
+(include-tech location-elevation)    ;elevation; location-elevation
 (include-tech beam-direct)           ;direct transmitter -> receiver beams with gate/location occluders
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target
 (include-tech box)                   ;pickup-box put-box

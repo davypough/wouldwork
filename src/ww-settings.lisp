@@ -217,6 +217,11 @@
    Not :synchronized - lock-free reads on the worker hot path
    (precondition expansion reads here ~59M times/run in queensN-csp profile).")
 
+(sb-ext:defglobal *type-signatures* (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
+  "Maps each type name to its resolved instance list, as most recently installed by
+   install-types. Used to detect a type declared with conflicting instance lists across
+   multiple tech or problem files. Written only during init(); not consulted during search.")
+
 (sb-ext:defglobal *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
 

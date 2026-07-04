@@ -37,6 +37,17 @@
            (setf (gethash type *types*) nil)))
 
 
+(defun check-type-signature-consistency (type instances)
+  "Errors if TYPE is already registered in *type-signatures* under a different resolved
+   instance list than INSTANCES, so two tech or problem files declaring the same type
+   (eg, a composite type built with 'either') are forced to agree exactly."
+  (multiple-value-bind (existing-instances foundp) (gethash type *type-signatures*)
+    (when (and foundp (not (equal existing-instances instances)))
+      (error "Type ~A is declared with conflicting instance lists: ~A vs ~A.  Every tech or ~
+              problem file that declares ~A must use an identical definition."
+             type existing-instances instances type))))
+
+
 (defun install-types (types&instances)
   (format t "~&Installing object types...")
   (check-type types&instances cons)
@@ -51,6 +62,8 @@
                               '(nil))))
         (when (eql (car instances) 'compute)
           (setf instances (eval (second instances))))
+        (check-type-signature-consistency type instances)
+        (setf (gethash type *type-signatures*) instances)
         (setf (gethash type *types*) instances)
         (unless (equal instances '(nil))
           (dolist (instance instances)
@@ -174,27 +187,45 @@
           (collect i))))
 
 
+(defun check-relation-signature-consistency (relation table new-signature bijectivep)
+  "Errors if RELATION's name is already registered in TABLE (*relations* or
+   *static-relations*) under a different argument signature than NEW-SIGNATURE, or
+   under a different :bijective status than BIJECTIVEP, so two tech files declaring
+   the same relation are forced to agree exactly."
+  (multiple-value-bind (existing-signature foundp) (gethash (car relation) table)
+    (when (and foundp (not (equal existing-signature new-signature)))
+      (error "Relation ~A is declared with conflicting signatures: ~A vs ~A.  Every tech or ~
+              problem file that declares ~A must use an identical argument list."
+             (car relation) existing-signature new-signature (car relation)))
+    (when (and foundp (not (eql (and (gethash (car relation) *bijective-relations*) t) bijectivep)))
+      (error "Relation ~A is declared :bijective in one place but not another.  Every tech or ~
+              problem file that declares ~A must agree on its :bijective status."
+             (car relation) (car relation)))))
+
+
 (defun register-dynamic-relation-signature (raw-relation)
   (multiple-value-bind (relation bijectivep)
       (bijective-relation-p raw-relation)
     (check-relation relation)
-    (if bijectivep
-      (progn
-        (check-bijective-relation relation)
-        (create-bijective-indices relation))
-      (progn
-        (setf (gethash (car relation) *relations*)
-              (relation-signature-value relation t))
-        (ut::if-it (relation-signature-fluent-indices relation)
-          (setf (gethash (car relation) *fluent-relation-indices*) ut::it))))))
+    (let ((new-signature (relation-signature-value relation t)))  ;; CHANGED
+      (check-relation-signature-consistency relation *relations* new-signature bijectivep)  ;; CHANGED
+      (if bijectivep
+        (progn
+          (check-bijective-relation relation)
+          (create-bijective-indices relation))
+        (progn
+          (setf (gethash (car relation) *relations*) new-signature)
+          (ut::if-it (relation-signature-fluent-indices relation)
+            (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))))))
 
 
 (defun register-static-relation-signature (relation)
   (check-relation relation)
-  (setf (gethash (car relation) *static-relations*)
-        (relation-signature-value relation nil))
-  (ut::if-it (relation-signature-fluent-indices relation)
-    (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))
+  (let ((new-signature (relation-signature-value relation nil)))
+    (check-relation-signature-consistency relation *static-relations* new-signature nil)  ;; CHANGED
+    (setf (gethash (car relation) *static-relations*) new-signature)
+    (ut::if-it (relation-signature-fluent-indices relation)
+      (setf (gethash (car relation) *fluent-relation-indices*) ut::it))))
 
 
 (defun register-complementary-relation-signatures (positives->negatives)
