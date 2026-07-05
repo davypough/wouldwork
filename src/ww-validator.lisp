@@ -67,12 +67,12 @@
 
 (defun check-query/update-function (fn-name args body)
   "Detects an error in the supplied arguments to a user-defined
-   query or update function--eg, (?queen $row $col)."
+   query or update function--eg, (?queen $row $col).
+   Per-parameter shape validation (legacy bare ?vars vs. a fully-typed pre-param-style
+   list) is handled by DISSECT-QUERY-PARAMS, called separately by the installer."
   (check-type fn-name symbol)
   (check-type args list)
-  (check-type body list)
-  (iter (for arg in args)
-        (check-type arg symbol)))
+  (check-type body list))
 
 
 (defun translatable-expression-form-p (form)
@@ -118,7 +118,8 @@
       (iter (for arg in (cdr proposition))
             (for type-def in effective-relation-def)
             (for position from 1)  ; Add position tracking
-            (or (?varp arg)  ;arg is a ?var
+            (or (and (?varp arg)  ;arg is a ?var of a compatible (or undeclared) type
+                     (type-specs-compatible-p (cdr (assoc arg *var-type-env*)) type-def))
                 ($varp arg)  ;arg is a $var
                 (member arg (gethash type-def *types*))  ;arg is a value of a user defined type
                 (and (member position (get-prop-fluent-indices proposition))
@@ -208,18 +209,26 @@
 
 (defun check-query/update-call (fn-call)
   "Checks the validity of a call to a query or update function
-   during translation--eg, (cleartop? ?block)"
+   during translation--eg, (cleartop? ?block).
+   When the callee has declared parameter types (:param-types, set by
+   DISSECT-QUERY-PARAMS at install time), also cross-checks each ?var argument's
+   declared type (from *VAR-TYPE-ENV*) against the callee's declared type at that
+   argument position -- lenient, as usual, when either side is undeclared."
   (check-type fn-call cons)
   (check-type (car fn-call) symbol)
-  (iter (for arg in (cdr fn-call))
-        (or (?varp arg)
-            ($varp arg)
-            (member arg (reduce #'union (alexandria:hash-table-values *types*)))  ;arg is a value of a type
-            (numberp arg)
-            (characterp arg)
-            (stringp arg)
-            (translatable-expression-form-p arg)
-            (error "Found a malformed query or update argument ~A in ~A" arg fn-call))))
+  (let ((callee-param-types (get (car fn-call) :param-types)))
+    (iter (for arg in (cdr fn-call))
+          (for position from 0)
+          (or (and (?varp arg)
+                   (type-specs-compatible-p (cdr (assoc arg *var-type-env*))
+                                            (nth position callee-param-types)))
+              ($varp arg)
+              (member arg (reduce #'union (alexandria:hash-table-values *types*)))  ;arg is a value of a type
+              (numberp arg)
+              (characterp arg)
+              (stringp arg)
+              (translatable-expression-form-p arg)
+              (error "Found a malformed query or update argument ~A in ~A" arg fn-call)))))
 
 
 (defun check-variable-names (action-name pre-param-?vars precondition effect all-detected-vars)
@@ -305,6 +314,12 @@
          (process-shadow-let action-name form owned))
         ((eq (first form) 'ww-loop)
          (process-shadow-ww-loop action-name form owned))
+        ((eq (first form) 'if)
+         (process-shadow-if action-name form owned))
+        ((eq (first form) 'cond)
+         (process-shadow-cond action-name form owned))
+        ((member (first form) '(exists forsome exist forall forevery doall))
+         (process-shadow-quantifier action-name form owned))
         (t (walk-shadow-sequence action-name form owned))))
 
 
@@ -394,6 +409,44 @@
            (intersection owned iter-$vars))))
 
 
+(defun process-shadow-if (action-name form owned)
+  "Handles if scoping for fluent-variable shadow detection. TEST is walked
+   in the incoming OWNED. The then-branch and else-branch (if present) are
+   each walked starting from an independent copy of the post-test OWNED,
+   isolating one branch's writes from the other, since only one branch
+   executes at runtime. A missing else-branch is treated as an empty
+   branch that writes nothing. Returns the merged OWNED: a $-variable is
+   only considered reliably owned afterward if every branch wrote it."
+  (let* ((test (second form))
+         (then-branch (third form))
+         (else-branch (fourth form))
+         (after-test (walk-effect-shadow action-name test owned))
+         (then-owned (walk-effect-shadow action-name then-branch after-test))
+         (else-owned (if (cdddr form)
+                       (walk-effect-shadow action-name else-branch after-test)
+                       after-test)))
+    (intersection then-owned else-owned)))
+
+
+(defun process-shadow-cond (action-name form owned)
+  "Handles cond scoping for fluent-variable shadow detection by converting
+   FORM to an equivalent nested-if structure and delegating to
+   PROCESS-SHADOW-IF, so cond clauses receive the same branch-isolating
+   merge treatment as if."
+  (process-shadow-if action-name (fluent-cond-clauses-to-if (cdr form)) owned))
+
+
+(defun process-shadow-quantifier (action-name form owned)
+  "Handles exists/forsome/exist/forall/forevery/doall scoping for fluent-
+   variable shadow detection. The body may execute zero, one, or many
+   times, so writes it performs cannot be assumed to have happened; returns
+   the intersection of 'the body ran' and 'the body did not run' (OWNED
+   unchanged), matching the same conservative policy used for if/cond."
+  (let* ((body (third form))
+         (after-body (walk-effect-shadow action-name body owned)))
+    (intersection after-body owned)))
+
+
 (defun collect-ww-loop-iter-$vars (form)
   "Returns the list of $-variables introduced as iteration variables by
    'for' clauses inside a ww-loop FORM."
@@ -406,6 +459,274 @@
                    (symbol (push spec vars))
                    (list (dolist (v spec) (push v vars)))))))
     (remove-if-not #'$varp vars)))
+
+
+;;; ====================================================================
+;;; Fluent-variable type tracking (Stage 4a: walker skeleton)
+;;;
+;;; Walks a precondition/effect/query body tracking an alist of
+;;; ($var . declared-type) bindings established by `bind` statements at
+;;; fluent positions. Mirrors the shadow-detection walker's dispatch/
+;;; threading structure above, but tracks declared types rather than a
+;;; written-vars set, and adds branch-isolating merge behavior for
+;;; if/cond/quantifiers, which the shadow walker does not need. This is
+;;; the environment-tracking skeleton only; cross-checking a $var's
+;;; tracked type against a relation's/callee's declared type at point of
+;;; use is Stage 4b, and wiring this walker into CREATE-ACTION and
+;;; INSTALL-QUERY/INSTALL-UPDATE is Stage 4c.
+;;; ====================================================================
+
+(defun walk-fluent-types (action-name form env)
+  "Recursive walker over precondition/effect/query-body subforms, tracking
+   ENV, an alist of ($var . declared-type) bindings established by BIND
+   statements at fluent positions. Dispatches on FORM's head to the
+   appropriate scoping/merging handler; unspecialized forms fall through to
+   WALK-FLUENT-SEQUENCE. Returns the updated ENV after walking FORM."
+  (cond ((atom form) env)
+        ((eq (first form) 'quote) env)
+        ((eq (first form) 'bind)
+         (process-fluent-bind action-name form env))
+        ((member (first form) '(assign setq))
+         (process-fluent-assign action-name form env))
+        ((member (first form) '(mv-assign mvsetq multiple-value-setq))
+         (process-fluent-mv-assign action-name form env))
+        ((eq (first form) 'let)
+         (process-fluent-let action-name form env))
+        ((eq (first form) 'ww-loop)
+         (process-fluent-ww-loop action-name form env))
+        ((member (first form) '(exists forsome exist forall forevery doall))
+         (process-fluent-quantifier action-name form env))
+        ((eq (first form) 'if)
+         (process-fluent-if action-name form env))
+        ((eq (first form) 'cond)
+         (process-fluent-cond action-name form env))
+        ((or (gethash (first form) *relations*) (gethash (first form) *static-relations*))
+         (check-fluent-proposition action-name form env)
+         (walk-fluent-sequence action-name form env))
+        ((member (first form) (append *query-names* *update-names*))
+         (check-fluent-query/update-call action-name form env)
+         (walk-fluent-sequence action-name form env))
+        (t (walk-fluent-sequence action-name form env))))
+
+
+(defun walk-fluent-sequence (action-name forms env)
+  "Walks each element of FORMS in source order, threading ENV through each
+   call. Used both for sequential bodies (do, progn, assert) and as the
+   fallback for unspecialized list forms."
+  (let ((current env))
+    (dolist (sub forms)
+      (setf current (walk-fluent-types action-name sub current)))
+    current))
+
+
+(defun process-fluent-bind (action-name form env)
+  "Inspects bind FORM, extending ENV with the declared type of each
+   $-variable bound at a fluent position, read off the target relation's
+   declared signature. Returns the updated environment."
+  (declare (ignore action-name))
+  (let* ((proposition (second form))
+         (relation (and (consp proposition) (first proposition)))
+         (relation-def (and relation (or (gethash relation *relations*)
+                                          (gethash relation *static-relations*))))
+         (fluent-positions (and relation (get-prop-fluent-indices proposition))))
+    (if (and fluent-positions (listp relation-def))
+      (let ((updated env))
+        (iter (for arg in (cdr proposition))
+              (for type-def in relation-def)
+              (for pos from 1)
+              (when (and (member pos fluent-positions) ($varp arg))
+                (setf updated (set-fluent-var-type updated arg type-def))))
+        updated)
+      env)))
+
+
+(defun process-fluent-assign (action-name form env)
+  "Walks the value sub-form of an assign/setq FORM, then marks the target
+   $-variable :unknown in ENV, since an arbitrary computed value can't be
+   attributed a declared type. Returns the updated environment."
+  (let* ((var (second form))
+         (val (third form))
+         (after-val (walk-fluent-types action-name val env)))
+    (if ($varp var)
+      (set-fluent-var-type after-val var :unknown)
+      after-val)))
+
+
+(defun process-fluent-mv-assign (action-name form env)
+  "Walks the value sub-form of an mv-assign/multiple-value-setq FORM, then
+   marks each target $-variable :unknown in ENV. Returns the updated
+   environment."
+  (let* ((vars (second form))
+         (val (third form))
+         (after-val (walk-fluent-types action-name val env))
+         ($vars (remove-if-not #'$varp vars))
+         (result after-val))
+    (dolist (var $vars result)
+      (setf result (set-fluent-var-type result var :unknown)))))
+
+
+(defun process-fluent-let (action-name form env)
+  "Handles let scoping for fluent-variable type tracking. Each binding's
+   value sub-form is walked in the outer environment; the body is walked
+   with let-bound $-variables hidden from ENV. On exit, type information
+   the body established for let-bound $-variables is discarded and any
+   outer-scope type for those names is restored."
+  (let* ((bindings (second form))
+         (let-vars (mapcar (lambda (b) (if (consp b) (first b) b)) bindings))
+         (let-$vars (remove-if-not #'$varp let-vars))
+         (after-bindings env))
+    (dolist (b bindings)
+      (when (and (consp b) (cdr b))
+        (setf after-bindings
+              (walk-fluent-types action-name (second b) after-bindings))))
+    (let* ((outer-entries (remove-if-not (lambda (entry) (member (car entry) let-$vars))
+                                          after-bindings))
+           (inner (remove-if (lambda (entry) (member (car entry) let-$vars))
+                              after-bindings))
+           (after-body (walk-fluent-sequence action-name (cddr form) inner)))
+      (append (remove-if (lambda (entry) (member (car entry) let-$vars)) after-body)
+              outer-entries))))
+
+
+(defun process-fluent-ww-loop (action-name form env)
+  "Handles ww-loop scoping for fluent-variable type tracking. Iteration
+   $-variables introduced by 'for' clauses are hidden from ENV inside the
+   loop body and their outer-scope type (if any) is restored on exit."
+  (let* ((iter-$vars (collect-ww-loop-iter-$vars form))
+         (inner (remove-if (lambda (entry) (member (car entry) iter-$vars)) env))
+         (after-body (walk-fluent-sequence action-name (cdr form) inner))
+         (outer-entries (remove-if-not (lambda (entry) (member (car entry) iter-$vars)) env)))
+    (append (remove-if (lambda (entry) (member (car entry) iter-$vars)) after-body)
+            outer-entries)))
+
+
+(defun process-fluent-quantifier (action-name form env)
+  "Handles exists/forsome/exist/forall/forevery/doall scoping for fluent-
+   variable type tracking. The body may execute zero, one, or many times
+   over its instantiation domain, so its $-variable bindings cannot be
+   assumed to survive into code following the quantifier: only bindings
+   consistent between 'the body ran' and 'the body did not run' (env
+   unchanged) carry forward, per the same conservative merge policy used
+   for if/cond."
+  (let* ((body (third form))
+         (after-body (walk-fluent-types action-name body env)))
+    (merge-fluent-envs (list after-body env))))
+
+
+(defun process-fluent-if (action-name form env)
+  "Handles if scoping for fluent-variable type tracking. TEST is walked in
+   the incoming ENV. The then-branch and else-branch (if present) are each
+   walked starting from an independent copy of the post-test environment,
+   isolating one branch's bindings from the other. A missing else-branch is
+   treated as an empty branch that binds nothing. Returns the merged
+   environment: a $-variable survives only if bound to the same type in
+   every branch."
+  (let* ((test (second form))
+         (then-branch (third form))
+         (else-branch (fourth form))
+         (after-test (walk-fluent-types action-name test env))
+         (then-env (walk-fluent-types action-name then-branch after-test))
+         (else-env (if (cdddr form)
+                     (walk-fluent-types action-name else-branch after-test)
+                     after-test)))
+    (merge-fluent-envs (list then-env else-env))))
+
+
+(defun process-fluent-cond (action-name form env)
+  "Handles cond scoping for fluent-variable type tracking by converting FORM
+   to an equivalent nested-if structure and delegating to PROCESS-FLUENT-IF,
+   so cond clauses receive the same branch-isolating merge treatment as if."
+  (process-fluent-if action-name (fluent-cond-clauses-to-if (cdr form)) env))
+
+
+(defun check-fluent-proposition (action-name proposition env)
+  "Cross-checks each $-variable argument of PROPOSITION -- a plain
+   (non-bind) relation reference -- against the relation's declared type at
+   that argument position, using ENV's tracked bindings established by
+   earlier bind statements. Mirrors CHECK-PROPOSITION's fluentless-position
+   realignment so argument/type-def positions stay correctly paired even
+   when PROPOSITION is short of its relation's full signature. Lenient, as
+   usual, when either side is undeclared."
+  (declare (ignore action-name))
+  (let* ((relation-def (or (gethash (first proposition) *relations*)
+                           (gethash (first proposition) *static-relations*)))
+         (fluent-indices (get-prop-fluent-indices proposition))
+         (fluentless-p (and fluent-indices
+                            (listp relation-def)
+                            (< (length (cdr proposition)) (length relation-def))))
+         (effective-relation-def (if fluentless-p
+                                   (loop for type-def in relation-def
+                                         for i from 1
+                                         unless (member i fluent-indices)
+                                           collect type-def)
+                                   relation-def)))
+    (when (listp effective-relation-def)
+      (iter (for arg in (cdr proposition))
+            (for type-def in effective-relation-def)
+            (when ($varp arg)
+              (let ((declared-type (cdr (assoc arg env))))
+                (unless (type-specs-compatible-p declared-type type-def)
+                  (error "The $-variable ~A (declared ~A) is not compatible with type ~A ~
+                          in proposition ~A"
+                         arg declared-type type-def proposition))))))))
+
+
+(defun check-fluent-query/update-call (action-name fn-call env)
+  "Cross-checks each $-variable argument of FN-CALL -- a query or update
+   function call -- against the callee's declared parameter type
+   (:param-types, set by DISSECT-QUERY-PARAMS at install time) at that
+   argument position, using ENV's tracked bindings. Lenient, as usual, when
+   either side is undeclared."
+  (declare (ignore action-name))
+  (let ((callee-param-types (get (car fn-call) :param-types)))
+    (iter (for arg in (cdr fn-call))
+          (for position from 0)
+          (when ($varp arg)
+            (let ((declared-type (cdr (assoc arg env))))
+              (unless (type-specs-compatible-p declared-type (nth position callee-param-types))
+                (error "The $-variable ~A (declared ~A) is not compatible with the declared ~
+                        parameter type ~A at position ~A of ~A"
+                       arg declared-type (nth position callee-param-types) position fn-call)))))))
+
+
+(defun fluent-cond-clauses-to-if (clauses)
+  "Recursively converts a list of cond CLAUSES into an equivalent nested if
+   form, purely for fluent-variable type-environment tracking. Kept as an
+   independent implementation local to validation, mirroring (but not
+   reusing) the clause-to-if conversion in TRANSLATE-COND, since that
+   conversion is part of the translation path and this is not."
+  (if (null clauses)
+    nil
+    (let* ((clause (car clauses))
+           (test (car clause))
+           (results (cdr clause))
+           (then-form (cond ((null results) test)
+                            ((null (cdr results)) (car results))
+                            (t `(do ,@results))))
+           (else-form (fluent-cond-clauses-to-if (cdr clauses))))
+      (if else-form
+        `(if ,test ,then-form ,else-form)
+        `(if ,test ,then-form)))))
+
+
+(defun merge-fluent-envs (envs)
+  "Merges a list of $-variable type ENVS (each an alist of ($var . type))
+   produced from isolated branches of a conditional or quantifier body.
+   A $-variable survives into the merged environment only if it is bound
+   to the same type in every member of ENVS; otherwise it is dropped, per
+   the conservative branch-isolation policy for fluent-type tracking."
+  (let ((candidate-vars (remove-duplicates (mapcar #'car (first envs)))))
+    (iter (for var in candidate-vars)
+          (let ((entries (mapcar (lambda (e) (assoc var e)) envs)))
+            (when (and (every (lambda (entry) entry) entries)
+                       (every (lambda (entry) (equal (cdr entry) (cdr (first entries)))) entries))
+              (collect (cons var (cdr (first entries)))))))))
+
+
+(defun set-fluent-var-type (env var type)
+  "Returns a new $-variable type ENV with VAR's binding set to TYPE,
+   replacing any existing entry for VAR."
+  (acons var type (remove var env :key #'car)))
 
 
 (defun check-action-parameter-instantiability (action-name pre-param-types)

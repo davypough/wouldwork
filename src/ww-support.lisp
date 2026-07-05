@@ -548,6 +548,42 @@
         (finally (return (values ?vars types)))))
 
 
+(defun flatten-param-types (types)
+  "Flattens a pre-param-types list (as returned by DISSECT-PRE-PARAMS) so the result
+   aligns positionally, one-for-one, with (alexandria:flatten pre-param-?vars). Discards
+   header symbols (from *parameter-headers*), which have no corresponding ?var slot.
+   A nested list whose first element is itself a header is a recursively-dissected
+   subparameter list and is flattened in turn. Any other list is a single type-spec for
+   one ?var -- a query-call form, the only kind of list that reaches this function
+   intact, since an inline either-combo is already normalized to a synthesized type
+   symbol by DISSECT-PRE-PARAMS -- and is kept as one unit rather than descended into."
+  (mapcan (lambda (item)
+            (cond ((member item *parameter-headers*) nil)
+                  ((and (consp item) (member (car item) *parameter-headers*))
+                   (flatten-param-types item))
+                  (t (list item))))
+          types))
+
+
+(defun dissect-query-params (args)
+  "Parses a define-query/define-update parameter list, which may be a legacy bare
+   list of ?vars or $vars (eg, (?box) or ($knapsack-item-ids)) or a fully-typed
+   pre-param-style list mirroring an action's pre-params (eg, (?box box-alias)).
+   Returns two values: the flat list of ?vars/$vars to use as the generated
+   function's actual lambda-list parameters, and the parallel flat list of
+   declared types -- for extending *VAR-TYPE-ENV* and for callee-side
+   call-argument checking -- or NIL for the legacy case, where no types are
+   declared."
+  (if (every #'varp args)
+    (values args nil)  ;legacy: bare ?vars and/or $vars, no declared types
+    (let ((headed-args (if (member (first args) *parameter-headers*)
+                          args
+                          (cons 'standard args))))
+      (check-precondition-parameters headed-args)
+      (multiple-value-bind (?vars types) (dissect-pre-params headed-args)
+        (values (alexandria:flatten ?vars) (flatten-param-types types))))))
+
+
 (defun dissect-eff-params (eff-parameter-list)
   "Returns a list of primitive eff-parameter variables and types."
   (iter (for (var-form type-form) on eff-parameter-list by #'cddr)

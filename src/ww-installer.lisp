@@ -440,28 +440,34 @@
 
 
 (defun install-query (name args body)
-  "Revised query function installation with read-only semantics"
+  "Revised query function installation with read-only semantics.
+   ARGS may be a legacy bare ?var list or a fully-typed pre-param-style list
+   mirroring an action's pre-params."
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)
   (pushnew name *query-names*)
-  (setf (get name :raw-body) body)  ;store for interprocedural symmetry walk
-  (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
-  (let ((new-$vars (delete-duplicates 
-                     (set-difference (get-all-nonspecial-vars #'$varp body) args))))
-    (setf (symbol-value name)
-      `(lambda (state ,@args)
-         ,(format nil "~A query-fn" name)
-         (declare (ignorable state))
-         (block ,name
-           (let (,@new-$vars)
-             (declare (ignorable ,@new-$vars))
-             ;; Use pre context for read-only query semantics
-             ,(if (eql (car body) 'let)
-                `(let ,(second body)
-                   ,(third body)
-                   ,(translate (fourth body) 'pre))
-                (translate body 'pre))))))
-    (fix-if-ignore '(state) (symbol-value name))))
+  (multiple-value-bind (flat-args param-types) (dissect-query-params args)
+    (setf (get name :raw-body) body)  ;store for interprocedural symmetry walk
+    (setf (get name :raw-args) flat-args)  ;store for interprocedural symmetry walk
+    (setf (get name :param-types) param-types)  ;store for callee-side call-argument checking
+    (walk-fluent-types name body nil)  ;; NEW: fluent-type checking
+    (let ((*var-type-env* (append (mapcar #'cons flat-args param-types) *var-type-env*))
+          (new-$vars (delete-duplicates
+                       (set-difference (get-all-nonspecial-vars #'$varp body) flat-args))))
+      (setf (symbol-value name)
+        `(lambda (state ,@flat-args)
+           ,(format nil "~A query-fn" name)
+           (declare (ignorable state))
+           (block ,name
+             (let (,@new-$vars)
+               (declare (ignorable ,@new-$vars))
+               ;; Use pre context for read-only query semantics
+               ,(if (eql (car body) 'let)
+                  `(let ,(second body)
+                     ,(third body)
+                     ,(translate (fourth body) 'pre))
+                  (translate body 'pre))))))
+      (fix-if-ignore '(state) (symbol-value name)))))
 
 
 (defmacro define-update (name args body)
@@ -470,6 +476,8 @@
 
 (defun install-update (name args body)
   "Installs a user-defined update function.
+   ARGS may be a legacy bare ?var list or a fully-typed pre-param-style list
+   mirroring an action's pre-params.
    Update functions translate according to current *algorithm* setting.
    Init-action processing (do-init-action-updates) handles both formats:
    - Depth-first: changes as hash-table with integer keys
@@ -477,30 +485,34 @@
   (format t "~&Installing ~A update-fn..." name)
   (check-query/update-function name args body)
   (pushnew name *update-names*)
-  (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
-  (setf (get name :raw-args) args)  ;store for interprocedural symmetry walk
-  (let ((new-$vars (delete-duplicates
-                     (set-difference
-                       (get-all-nonspecial-vars #'$varp body) args))))
-    ;; Translation uses current *algorithm* value
-    (if new-$vars
-      (setf (symbol-value name)
-        `(lambda (state ,@args)
-           ,(format nil "~A update-fn" name)
-           (declare (ignorable state)
-                    ,@(when (eq *algorithm* 'backtracking)
-                        '((special forward-list inverse-list))))
-           (let (updated-dbs ,@new-$vars)
-             (declare (ignorable updated-dbs ,@new-$vars))
-             ,(translate body 'eff))))
-      (setf (symbol-value name)
-        `(lambda (state ,@args)
-           ,(format nil "~A update-fn" name)
-           (declare (ignorable state)
-                    ,@(when (eq *algorithm* 'backtracking)
-                        '((special forward-list inverse-list))))
-          ,(translate body 'eff))))
-    (fix-if-ignore '(state) (symbol-value name))))
+  (multiple-value-bind (flat-args param-types) (dissect-query-params args)
+    (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
+    (setf (get name :raw-args) flat-args)  ;store for interprocedural symmetry walk
+    (setf (get name :param-types) param-types)  ;store for callee-side call-argument checking
+    (walk-fluent-types name body nil)  ;; NEW: fluent-type checking
+    (let ((*var-type-env* (append (mapcar #'cons flat-args param-types) *var-type-env*))
+          (new-$vars (delete-duplicates
+                       (set-difference
+                         (get-all-nonspecial-vars #'$varp body) flat-args))))
+      ;; Translation uses current *algorithm* value
+      (if new-$vars
+        (setf (symbol-value name)
+          `(lambda (state ,@flat-args)
+             ,(format nil "~A update-fn" name)
+             (declare (ignorable state)
+                      ,@(when (eq *algorithm* 'backtracking)
+                          '((special forward-list inverse-list))))
+             (let (updated-dbs ,@new-$vars)
+               (declare (ignorable updated-dbs ,@new-$vars))
+               ,(translate body 'eff))))
+        (setf (symbol-value name)
+          `(lambda (state ,@flat-args)
+             ,(format nil "~A update-fn" name)
+             (declare (ignorable state)
+                      ,@(when (eq *algorithm* 'backtracking)
+                          '((special forward-list inverse-list))))
+            ,(translate body 'eff))))
+      (fix-if-ignore '(state) (symbol-value name)))))
 
 
 (defmacro define-constraint (form)
@@ -567,6 +579,8 @@
   (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params pre-params)
     (let ((eff-param-vars (remove-if #'stringp eff-params)))  ;pure var list, connectives stripped  ;; CHANGED
       (let* ((flat-pre-param-?vars (alexandria:flatten pre-param-?vars))
+             (*var-type-env* (append (mapcar #'cons flat-pre-param-?vars (flatten-param-types pre-param-types))
+                                      *var-type-env*))
              (pre-?vars (delete-duplicates (get-all-nonspecial-vars #'?varp precondition) :from-end t))
              (pre-$vars (delete-duplicates (get-all-nonspecial-vars #'$varp precondition) :from-end t))
              (pre-special-$vars (get-special-vars precondition))
@@ -590,6 +604,8 @@
         (check-variable-names name (append flat-pre-param-?vars pre-bound-?vars eff-bound-?vars)
                               precondition effect (append pre-$vars eff-$vars pre-?vars eff-?vars))
         (walk-effect-shadow name effect (append pre-$vars pre-special-$vars))   ;; NEW: fluent-shadowing check
+        (let ((pre-fluent-env (walk-fluent-types name precondition nil)))
+          (walk-fluent-types name effect pre-fluent-env))   ;; NEW: fluent-type checking
         (cond (init-action
                  (setq *objective-value-p* nil))  ;this is an init-action, disable $objective-value
               ((or (member '$objective-value pre-$vars)  ;used in translate-assert
