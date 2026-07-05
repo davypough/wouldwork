@@ -16,7 +16,16 @@
   nil)
 
 
-;; Use *load-pathname* instead of asdf:system-source-directory to avoid circular dependency
+;; Use *load-pathname* instead of asdf:system-source-directory to avoid circular dependency.
+;; This is the earliest-possible bootstrap: it runs before ww-packages.lisp defines the
+;; :wouldwork package, so it cannot call copy-problem-with-tech-includes or
+;; ensure-problem-staged (ww-preliminaries.lisp) -- neither symbol exists yet.  It therefore
+;; does a plain file copy, not a tech-splicing one.  INVARIANT: problem-blocks3.lisp must
+;; never contain an (include-tech ...) directive, or this copy leaves an unexpanded
+;; directive in problem.lisp and the subsequent compile fails.  Every other entry point
+;; that stages a problem (stage, run, refresh, the cl-user recovery refresh, and the
+;; reload-time eval-when in ww-preliminaries.lisp) delegates to ensure-problem-staged
+;; instead, once the system is loaded far enough for that function to exist.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let* ((root (make-pathname :name nil :type nil :defaults *load-pathname*))
          (src-dir (merge-pathnames "src/" root))

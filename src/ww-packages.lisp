@@ -86,33 +86,22 @@
     ;; Set refreshing flag to preserve current parameter settings
     (when (and refreshing-sym (boundp refreshing-sym))
       (setf (symbol-value refreshing-sym) t))
-    ;; Locate and copy problem file
-    (let* ((root (asdf:system-source-directory :wouldwork))
-           (src-dir (merge-pathnames "src/" root))
-           (problem-file (merge-pathnames "problem.lisp" src-dir))
-           (source-file (merge-pathnames 
-                         (format nil "problem-~A.lisp" (string-downcase problem-name))
-                         src-dir)))
-      ;; Check source exists
-      (unless (probe-file source-file)
-        (format t "~%Source file not found: ~A~%" source-file)
-        (when (and refreshing-sym (boundp refreshing-sym))
-          (setf (symbol-value refreshing-sym) nil))
-        (return-from refresh nil))
-      ;; Delete current problem.lisp and generate a fresh staged problem file.
-      (when (probe-file problem-file)
-        (delete-file problem-file))
-      (ww::copy-problem-with-tech-includes source-file problem-file)
-      ;; Clear and reload
-      (asdf:clear-system :wouldwork)
-      (unwind-protect
-          (let ((*compile-verbose* nil)
-                (*compile-print* nil))
-            (asdf:load-system :wouldwork :force t))
-        ;; Cleanup: reset refreshing flag (look up fresh after reload)
-        (let* ((new-ww-pkg (find-package :ww))
-               (new-refreshing-sym (and new-ww-pkg 
-                                        (find-symbol "*REFRESHING*" new-ww-pkg))))
-          (when (and new-refreshing-sym (boundp new-refreshing-sym))
-            (setf (symbol-value new-refreshing-sym) nil)))))
+    ;; Locate and splice problem file via the shared staging decision (idempotent)
+    (unless (ww::ensure-problem-staged (string-downcase problem-name))
+      (format t "~%Source file not found for problem: ~A~%" problem-name)
+      (when (and refreshing-sym (boundp refreshing-sym))
+        (setf (symbol-value refreshing-sym) nil))
+      (return-from refresh nil))
+    ;; Clear and reload
+    (asdf:clear-system :wouldwork)
+    (unwind-protect
+        (let ((*compile-verbose* nil)
+              (*compile-print* nil))
+          (asdf:load-system :wouldwork :force t))
+      ;; Cleanup: reset refreshing flag (look up fresh after reload)
+      (let* ((new-ww-pkg (find-package :ww))
+             (new-refreshing-sym (and new-ww-pkg 
+                                      (find-symbol "*REFRESHING*" new-ww-pkg))))
+        (when (and new-refreshing-sym (boundp new-refreshing-sym))
+          (setf (symbol-value new-refreshing-sym) nil))))
     (setf *package* (find-package :ww))))

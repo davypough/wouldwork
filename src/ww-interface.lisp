@@ -194,9 +194,8 @@ is staged again.
   "Refreshes the current problem.lisp file--eg, after editing it.
    Preserves the current parameter settings instead of reapplying problem-file settings."
   (save-globals)
-  (uiop:delete-file-if-exists (in-src "problem.lisp"))
   (setf *goal* nil
-        *final-goal* nil)                                                  ;; CHANGED
+        *final-goal* nil)
   (setf *refreshing* t)
   (unwind-protect
       (with-silenced-compilation
@@ -350,19 +349,9 @@ is staged again.
     (lookup problem-name-str (list-problem-files-plist))))
 
 
-(defun exchange-problem-file (problem-name-str)
-  "Copy a named or project-relative problem file to src/problem.lisp,
-   expanding any (include-tech ...) directives by splicing technology files."
-  (let ((problem-file (resolve-problem-file problem-name-str)))
-    (when problem-file
-      (copy-problem-with-tech-includes problem-file (in-src "problem.lisp"))
-      (setf *skip-next-resplice* t))  ;the forced reload just below (via load-problem) must not re-splice
-    problem-file))
-
-
 (defun load-problem (problem-name-str)
   "Stage a named or project-relative problem file, then reload Wouldwork."
-  (when (exchange-problem-file problem-name-str)
+  (when (ensure-problem-staged problem-name-str)
     (asdf:load-system :wouldwork :force t)))
 
 

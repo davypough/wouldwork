@@ -29,16 +29,6 @@
   "Flag to indicate if Wouldwork is currently being loaded. Reset in ww-initialize.lisp")
 
 
-(defvar *skip-next-resplice* nil
-  "When T, this file's reload-time eval-when below skips its own problem.lisp splice
-   once, then clears the flag.  Set by exchange-problem-file (ww-interface.lisp)
-   immediately after it explicitly splices, so a forced (asdf:load-system ...) fired
-   right afterward (eg by %stage or refresh) does not redundantly re-splice the same
-   source a second time.  Declared with defvar, not defparameter, so its value survives
-   this file's own reload within that same forced (asdf:load-system ...) pass -- a
-   defparameter would reset it to nil before the eval-when below got to check it.")
-
-
 (defparameter *lock* (bt:make-lock))  ;for general thread protection
 (defparameter *search-lock*  (bt:make-lock "ww-search-lock"))
 (defparameter *integer-lock* (bt:make-lock "ww-integer-lock"))
@@ -94,21 +84,52 @@
          (result (rstrip without-prefix suffix-with-dot)))
     result))
 
+(defvar *tech-inclusion-trace* nil
+  "Accumulates technology-inclusion and missing-technology notices, in reverse
+   order, from the most recent call to copy-problem-with-tech-includes -- reset at
+   the start of every such call, regardless of whether that call ends up rewriting
+   problem.lisp.  Printed by ensure-problem-staged immediately after splicing
+   completes, before the reload/compile that follows begins -- see
+   *staging-trace-already-shown* for how the two ensure-problem-staged passes
+   within one command avoid printing it twice.")
+
+
+(defun read-file-string (path)
+  "Return the complete contents of the file at PATH as a string."
+  (with-open-file (in path :direction :input)
+    (let* ((length (file-length in))
+           (buffer (make-string length)))
+      (subseq buffer 0 (read-sequence buffer in)))))
+
+
 (defun copy-problem-with-tech-includes (source-file target-file)
   "Copy SOURCE-FILE to TARGET-FILE, expanding each (include-tech NAME) directive in
    place by splicing tech/NAME-tech.lisp.  Included tech files may include other
    tech files the same way.  Each technology is spliced at most once per problem
    copy.  This lets a problem compose itself from self-contained technology files
-   before the pre-scan reads problem.lisp."
-  (let ((included-techs (make-hash-table :test #'equal)))
-    (with-open-file (in source-file :direction :input)
+   before the pre-scan reads problem.lisp.
+   Content-addressed: the full spliced content is computed first and compared
+   against TARGET-FILE's current content; the file is only overwritten when the
+   two differ, so any number of callers may invoke it freely without needing to
+   coordinate with one another.
+   Resets *tech-inclusion-trace* to reflect this call's computation regardless of
+   whether the file ends up rewritten; printing that trace is init's job, not this
+   function's -- see *tech-inclusion-trace*."
+  (setf *tech-inclusion-trace* nil)
+  (let* ((included-techs (make-hash-table :test #'equal))
+         (new-content (with-output-to-string (out)
+                        (with-open-file (in source-file :direction :input)
+                          (loop for line = (read-line in nil nil)
+                                while line
+                                do (let ((tech-name (include-tech-directive line)))
+                                     (if tech-name
+                                       (write-tech-include tech-name out nil included-techs)
+                                       (write-line line out)))))))
+         (unchanged (and (probe-file target-file)
+                         (string= new-content (read-file-string target-file)))))
+    (unless unchanged
       (with-open-file (out target-file :direction :output :if-exists :supersede)
-        (loop for line = (read-line in nil nil)
-              while line
-              do (let ((tech-name (include-tech-directive line)))
-                   (if tech-name
-                     (write-tech-include tech-name out nil included-techs)
-                     (write-line line out))))))))
+        (write-string new-content out)))))
 
 (defun write-tech-include (tech-name-str out include-stack included-techs)
   "Splice the capability file for TECH-NAME-STR into stream OUT, or note its absence.
@@ -124,7 +145,8 @@
         (t
          (let ((tech-file (tech-file-path tech-name-str)))
            (if tech-file
-             (progn (setf (gethash tech-name-str included-techs) t)
+             (progn (check-tech-file-syntax tech-name-str tech-file)
+                    (setf (gethash tech-name-str included-techs) t)
                     (format out "~&~%;;;; ==== begin technology ~A ====~%~%" tech-name-str)
                     (with-open-file (in tech-file :direction :input)
                       (loop for line = (read-line in nil nil)
@@ -137,10 +159,29 @@
                                                        included-techs)
                                    (write-line line out)))))
                     (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
-                    (format t "~&  included technology: ~A~%" tech-name-str))
+                    (push (format nil "~&  included technology: ~A~%" tech-name-str)
+                          *tech-inclusion-trace*))
              (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
                             tech-name-str tech-name-str)
-                    (format t "~&  MISSING technology, skipped: ~A~%" tech-name-str)))))))
+                    (push (format nil "~&  MISSING technology, skipped: ~A~%" tech-name-str)
+                          *tech-inclusion-trace*)))))))
+
+
+(defun check-tech-file-syntax (tech-name-str tech-file)
+  "Read every top-level form in TECH-FILE with the standard reader before splicing it
+   into problem.lisp.  A malformed tech file -- most commonly an unbalanced parenthesis
+   -- is caught and blamed on TECH-NAME-STR and TECH-FILE right here, instead of
+   surfacing later as an uninformative end-of-file error while SBCL compiles the merged
+   problem.lisp.  The trace of technologies already spliced successfully is flushed
+   first, so the halt point is visible before the error is signaled."
+  (let ((text (read-file-string tech-file)))
+    (with-input-from-string (in text)
+      (handler-case (loop until (eq (read in nil in) in))
+        (error ()
+          (dolist (message (reverse *tech-inclusion-trace*)) (write-string message))
+          (error "Technology tech/~A-tech.lisp (~A) failed to read cleanly -- check for ~
+                  an unbalanced parenthesis.  Splicing halted here."
+                 tech-name-str tech-file))))))
 
 
 (defun include-tech-directive (line)
@@ -359,26 +400,76 @@
         (string *problem-name*)))))
 
 
-(eval-when (:load-toplevel :execute)
-  (let* ((root (asdf:system-source-directory :wouldwork))
-         (src-dir (merge-pathnames "src/" root))
-         (problem-file (merge-pathnames "problem.lisp" src-dir))
-         (vals-file (merge-pathnames "vals.lisp" root))
-         (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
-         (vals-problem-name (read-init-vals vals-file))
-         (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir)))
-    (if *skip-next-resplice*
-      (setf *skip-next-resplice* nil)  ;this reload's problem.lisp was already spliced explicitly just before it
+(defvar *staging-trace-already-shown* nil
+  "T immediately after the explicit-name branch of ensure-problem-staged has
+   printed *tech-inclusion-trace*, so the reload it's about to trigger via
+   (asdf:load-system ...) doesn't print the identical trace again when its own
+   autodetect pass -- which recomputes the same content -- runs moments later
+   within the same command.  Cleared by the very next autodetect pass regardless
+   of whether it actually skipped a print, so it can never linger stale into
+   some later, unrelated command.")
+
+
+(defun ensure-problem-staged (&optional problem-name-designator)
+  "The single point of decision for what src/problem.lisp's content should currently
+   be, and the single point of action for making it so, via copy-problem-with-tech-includes
+   (a harmless no-op when the computed content is already current).  Every entry point
+   that can trigger a (re)splice -- load-problem below, this file's own reload-time
+   eval-when, and the cl-user recovery refresh in ww-packages.lisp -- delegates here,
+   so none of them needs to coordinate with the others.
+   With PROBLEM-NAME-DESIGNATOR (a string or symbol naming a registered problem or a
+   project-relative path): resolves it via resolve-problem-file, splices that file
+   into problem.lisp, and prints the inclusion trace immediately -- before the
+   caller's subsequent reload/compile begins, so a failure during that reload is
+   easy to correlate with what was just spliced in.  Returns the resolved
+   problem-file pathname, or NIL if it could not be resolved.
+   With no argument: autodetects the authoritative source for an unattended reload --
+   problem.lisp's absence defaults to blocks3; otherwise vals.lisp, if it names an
+   existing source, takes precedence; failing that, problem.lisp's own snapshot header
+   is consulted.  Prints the inclusion trace only if this pass actually spliced
+   something and the explicit-name branch didn't already show the identical content
+   moments ago -- see *staging-trace-already-shown*.  Always returns NIL in this case."
+  (if problem-name-designator
+    (let* ((root (asdf:system-source-directory :wouldwork))
+           (target-file (merge-pathnames "problem.lisp" (merge-pathnames "src/" root)))
+           (problem-file (resolve-problem-file (string problem-name-designator))))
+      (when problem-file
+        (copy-problem-with-tech-includes problem-file target-file)
+        (dolist (message (reverse *tech-inclusion-trace*))
+          (write-string message))
+        (setf *staging-trace-already-shown* t))
+      problem-file)
+    (let* ((root (asdf:system-source-directory :wouldwork))
+           (src-dir (merge-pathnames "src/" root))
+           (problem-file (merge-pathnames "problem.lisp" src-dir))
+           (vals-file (merge-pathnames "vals.lisp" root))
+           (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
+           (vals-problem-name (read-init-vals vals-file))
+           (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir))
+           (spliced nil))
       (cond ((not (probe-file problem-file))  ;no problem.lisp file?
-               (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
-               (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
-            ((and (probe-file vals-file) (probe-file vals-problem-file))  ;CHANGED: vals.lisp names an existing source
-               (copy-problem-with-tech-includes vals-problem-file problem-file))  ;make problem.lisp match vals.lisp
-            (t  ;ADDED: vals.lisp absent or inconsistent -- recover source from problem.lisp's own header
-               (uiop:delete-file-if-exists vals-file)  ;ADDED: discard any inconsistent vals.lisp
-               (let ((header-source (snapshot-source-file problem-file)))  ;ADDED: provenance from snapshot header
-                 (when header-source  ;ADDED: re-splice from recovered source, else leave snapshot as-is
-                   (copy-problem-with-tech-includes header-source problem-file))))))))
+              (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
+              (setf spliced t)
+              (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
+            ((and (probe-file vals-file) (probe-file vals-problem-file))  ;vals.lisp names an existing source
+              (copy-problem-with-tech-includes vals-problem-file problem-file)  ;make problem.lisp match vals.lisp
+              (setf spliced t))
+            (t  ;vals.lisp absent or inconsistent -- recover source from problem.lisp's own header
+              (uiop:delete-file-if-exists vals-file)  ;discard any inconsistent vals.lisp
+              (let ((header-source (snapshot-source-file problem-file)))  ;provenance from snapshot header
+                (when header-source  ;re-splice from recovered source, else leave snapshot as-is
+                  (copy-problem-with-tech-includes header-source problem-file)
+                  (setf spliced t)))))
+      (cond (*staging-trace-already-shown*
+              (setf *staging-trace-already-shown* nil))
+            (spliced
+              (dolist (message (reverse *tech-inclusion-trace*))
+                (write-string message))))
+      nil)))
+
+
+(eval-when (:load-toplevel :execute)
+  (ensure-problem-staged))
 
 
 ;; Call AFTER read-init-vals has restored *threads* from vals.lisp, so that
