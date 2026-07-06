@@ -36,10 +36,11 @@
 ;;;; TYPES ;;;;
 ;;;; Leaf object types the problem instantiates live here, ahead of the technology
 ;;;; includes.  Every composite type that a consuming tech file needs (mobile-object,
-;;;; cargo, support-occupant, support, target, fixed-location) is declared identically
+;;;; cargo, support-occupant, support, target, fixed-position-object) is declared identically
 ;;;; inside that tech file instead, so no tech file depends on a type declaration living
-;;;; in the problem.  terminus and beam-endpoint are the two exceptions: they are
-;;;; corner-topo-specific composites that no tech file declares, so they must live here.
+;;;; in the problem.  beam-endpoint is the remaining exception: it is a corner-topo-specific
+;;;; composite that no tech file declares, so it must live here.  terminus is now owned by
+;;;; beam-relay-tech, but the identical declaration is left here for local readability.
 
 
 (define-types
@@ -54,11 +55,11 @@
   crossing    (crossing1 crossing2 crossing3 crossing4 crossing5 crossing6 crossing7 crossing8 crossing9 crossing10
                crossing11 crossing12 crossing13 crossing14 crossing15 crossing16 crossing17 crossing18 crossing19 crossing20
                crossing21 crossing22 crossing23 crossing24 crossing25 crossing26)  ;26 beam crossings (corner geometry); see define-init
-  terminus      (either transmitter receiver connector)  ;what a connector can pair/connect to; not supplied by any tech file
+  terminus      (either transmitter receiver connector)  ;what a connector can pair/connect to; also supplied by beam-relay-tech
   beam-endpoint (either transmitter receiver location)  ;a fixture, or a connector's location; not supplied by any tech file
   ;; No inert leaf types remain.  plate, jammer, box, screen, and ladder were all originally
   ;; listed here as null-instance types required only because a consuming technology's own
-  ;; composite type (mobile-object, cargo, support-occupant, support, fixed-location) referenced
+  ;; composite type (mobile-object, cargo, support-occupant, support, fixed-position-object) referenced
   ;; it, or because a tech file called it as a bare implicit type-predicate.  Each consuming
   ;; tech file now references its base type only through its own -alias (either <type>)
   ;; declaration, which tolerates the base type's absence without requiring this problem to

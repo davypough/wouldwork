@@ -27,7 +27,7 @@
 ;;;; TYPES ;;;;
 ;;;; Leaf object types the problem instantiates live here, ahead of the technology includes.
 ;;;; Every composite type (mobile-object, cargo, support-occupant, support, target,
-;;;; beam-blocker, fixed-location) is now declared identically inside its consuming tech
+;;;; beam-blocker, fixed-position-object) is now declared identically inside its consuming tech
 ;;;; file(s) instead, so no tech file depends on a type declaration living in the problem.
 
 
