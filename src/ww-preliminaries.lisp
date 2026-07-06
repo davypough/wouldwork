@@ -161,7 +161,7 @@
                     (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
                     (push (format nil "~&  included technology: ~A~%" tech-name-str)
                           *tech-inclusion-trace*))
-             (progn (format out ";; (include-tech ~A): tech/~A-tech.lisp not found -- skipped~%"
+             (progn (format out ";; (include-tech ~A): tech/~A.lisp not found -- skipped~%"
                             tech-name-str tech-name-str)
                     (push (format nil "~&  MISSING technology, skipped: ~A~%" tech-name-str)
                           *tech-inclusion-trace*)))))))
@@ -179,7 +179,7 @@
       (handler-case (loop until (eq (read in nil in) in))
         (error ()
           (dolist (message (reverse *tech-inclusion-trace*)) (write-string message))
-          (error "Technology tech/~A-tech.lisp (~A) failed to read cleanly -- check for ~
+          (error "Technology tech/~A.lisp (~A) failed to read cleanly -- check for ~
                   an unbalanced parenthesis.  Splicing halted here."
                  tech-name-str tech-file))))))
 
@@ -196,9 +196,9 @@
           (subseq rest-str 0 name-end))))))
 
 (defun tech-file-path (tech-name-str)
-  "Resolve tech/<TECH-NAME>-tech.lisp below the Wouldwork root, or NIL if absent."
+  "Resolve tech/<TECH-NAME>.lisp below the Wouldwork root, or NIL if absent."
   (let ((relative (make-pathname :directory '(:relative "tech")
-                                 :name (concatenate 'string tech-name-str "-tech")
+                                 :name tech-name-str
                                  :type "lisp"))
         (root (asdf:system-source-directory :wouldwork)))
     (probe-file (merge-pathnames relative root))))

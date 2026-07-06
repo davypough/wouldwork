@@ -30,11 +30,30 @@
   `(install-types ',types&values))
 
 
+(defmacro define-optional-types (&rest type-names)
+  "Declares each of TYPE-NAMES as tolerant of the problem's own DEFINE-TYPES omitting it
+   entirely -- registers the bare type as present in *TYPES* with no instances unless a
+   real DEFINE-TYPES elsewhere in the spliced file already (or later) supplies one.  Lets
+   a tech file use a bare type name directly in pre-params or relation signatures instead
+   of an (either ...)-wrapped alias.  See INSTALL-OPTIONAL-TYPES for the guard that makes
+   this order-independent."
+  `(install-optional-types ',type-names))
+
+
 (defun predeclare-type-names (types&instances)
   "Register type names before problem translation; real INSTALL-TYPES installs instances."
   (loop for (type) on types&instances by #'cddr
         do (check-type type symbol)
            (setf (gethash type *types*) nil)))
+
+
+(defun predeclare-optional-type-names (type-names)
+  "Register each of TYPE-NAMES before problem translation, exactly like
+   PREDECLARE-TYPE-NAMES, so a bare optional type is a recognized *TYPES* key
+   regardless of where its DEFINE-OPTIONAL-TYPES form falls in the spliced file."
+  (dolist (type-name type-names)
+    (check-type type-name symbol)
+    (setf (gethash type-name *types*) nil)))
 
 
 (defun check-type-signature-consistency (type instances)
@@ -71,6 +90,20 @@
             (when (symbolp instance)
               (setf (gethash (list 'something instance) *static-db*) t)
               (setf (gethash (list type instance) *static-db*) t))))))
+
+
+(defun install-optional-types (type-names)
+  "Ensures each of TYPE-NAMES is a recognized *TYPES* key with no instances, unless a real
+   DEFINE-TYPES form -- anywhere in the spliced file, before or after this call -- already
+   installed it with actual instances.  Consults *TYPE-SIGNATURES*, which only a real
+   INSTALL-TYPES call ever populates, to detect that case and avoid clobbering it.  Unlike
+   an (either ...)-wrapped alias, a type left at NIL here is a genuine empty instance list,
+   so CHECK-ACTION-PARAMETER-INSTANTIABILITY correctly skips any action parameterized on it."
+  (format t "~&Installing optional types...")
+  (dolist (type-name type-names)
+    (check-type type-name symbol)
+    (unless (nth-value 1 (gethash type-name *type-signatures*))
+      (setf (gethash type-name *types*) nil))))
 
 
 (defun symmetric-type-indexes (types)
@@ -350,9 +383,12 @@
 
 (defun prescan-problem-type-names (forms)
   (dolist (form forms)
-    (when (and (consp form)
-               (eql (car form) 'define-types))
-      (predeclare-type-names (cdr form)))))
+    (when (consp form)
+      (case (car form)
+        (define-types
+          (predeclare-type-names (cdr form)))
+        (define-optional-types
+          (predeclare-optional-type-names (cdr form)))))))
 
 
 (defun prescan-problem-relation-signatures (forms)
