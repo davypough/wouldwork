@@ -66,6 +66,7 @@
 (include-tech visibility)            ;los-to-fixture los-to-location; visible visible-clear
 (include-tech reachability)          ;reachable-via; reachable reachable-clear
 (include-tech ladder)                ;traversable>; one-way-clear; use-ladder
+(include-tech barrier)               ;traversable traversable>
 
 
 ;;;; MASTER PROPAGATION DRIVER ;;;;

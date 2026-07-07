@@ -502,7 +502,7 @@ would overwrite the previous value during install-init."
   (check-init-list-relation-items-have-types
     literals 'walk-via '(gate screen ladder))
   (check-init-list-relation-items-have-types
-    literals 'traversable> '(ladder))
+    literals 'traversable> '(gate screen ladder))
   (when (init-dnf-controls-relation-p)
     (check-init-controls-list-contents literals)))
 
