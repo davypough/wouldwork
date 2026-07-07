@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tech/ directory — organization &amp; mental model</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1b1b18; --muted:#5f5e5a; --border:#d8d6cd;
+  --code-bg:#f4f2ec; --accent:#0c447c; --accent-bg:#e6f1fb;
+  --hub-bg:#faeeda; --hub-fg:#633806;
+  --role-bg:#e1f5ee; --role-fg:#085041;
+  --service-bg:#eeedfe; --service-fg:#3c3489;
+  --peer-bg:#fbeaf0; --peer-fg:#72243e;
+  --assembly-bg:#e6f1fb; --assembly-fg:#0c447c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1c1c1a; --fg:#e8e6dc; --muted:#a8a69c; --border:#3a3934;
+    --code-bg:#28271f; --accent:#85b7eb; --accent-bg:#042c53;
+    --hub-bg:#412402; --hub-fg:#fac775;
+    --role-bg:#04342c; --role-fg:#9fe1cb;
+    --service-bg:#26215c; --service-fg:#cecbf6;
+    --peer-bg:#4b1528; --peer-fg:#f4c0d1;
+    --assembly-bg:#042c53; --assembly-fg:#85b7eb;
+  }
+}
+*{box-sizing:border-box;}
+body{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--fg); max-width:920px; margin:0 auto; padding:2.5rem 1.5rem 6rem; line-height:1.65;}
+h1{font-size:1.7rem; margin-bottom:.2rem;}
+h2{font-size:1.3rem; margin-top:3rem; border-bottom:1px solid var(--border); padding-bottom:.35rem;}
+h3{font-size:1.08rem; margin-top:1.8rem;}
+p{margin:.8rem 0;}
+.subtitle{color:var(--muted); margin-top:0; font-size:1.05rem;}
+code{font-family:"SF Mono",Consolas,"Liberation Mono",monospace; background:var(--code-bg); padding:.1em .35em; border-radius:4px; font-size:.88em;}
+table{border-collapse:collapse; width:100%; margin:1.1rem 0; font-size:.9rem;}
+th,td{border:1px solid var(--border); padding:.5rem .6rem; text-align:left; vertical-align:top;}
+th{background:var(--code-bg);}
+td code, th code{white-space:nowrap;}
+.tag{display:inline-block; padding:.15em .6em; border-radius:999px; font-size:.76rem; font-weight:600; white-space:nowrap;}
+.tag.role{background:var(--role-bg); color:var(--role-fg);}
+.tag.service{background:var(--service-bg); color:var(--service-fg);}
+.tag.assembly{background:var(--assembly-bg); color:var(--assembly-fg);}
+.tag.hub{background:var(--hub-bg); color:var(--hub-fg);}
+.tag.peer{background:var(--peer-bg); color:var(--peer-fg);}
+.tiers{display:flex; flex-direction:column; align-items:center; margin:1.6rem 0;}
+.tier{border:1px solid var(--border); border-radius:8px; padding:.9rem 1.3rem; width:100%; max-width:560px; text-align:center; background:var(--code-bg);}
+.tier .name{font-weight:600;}
+.tier .detail{color:var(--muted); font-size:.85rem; margin-top:.2rem;}
+.arrow{font-size:1.4rem; color:var(--muted); margin:.1rem 0; line-height:1;}
+ol.checklist li, ul li{margin-bottom:.6rem;}
+.callout{border-left:3px solid var(--accent); background:var(--accent-bg); padding:.8rem 1.1rem; border-radius:0 6px 6px 0; margin:1.2rem 0;}
+.callout p{margin:.3rem 0;}
+footer{margin-top:3.5rem; color:var(--muted); font-size:.82rem; border-top:1px solid var(--border); padding-top:1.1rem;}
+nav.toc{background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:1rem 1.3rem; margin:1.5rem 0 2rem;}
+nav.toc ul{margin:.3rem 0 0; padding-left:1.2rem;}
+nav.toc a{color:var(--accent); text-decoration:none;}
+nav.toc a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<h1>tech/ directory: organization &amp; mental model</h1>
+<p class="subtitle">How the technology files relate to each other, and how to add a new one without breaking what's already there.</p>
+
+<nav class="toc">
+<strong>Contents</strong>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#reframe">The core idea: a role system, not a type hierarchy</a></li>
+<li><a href="#vocabulary">Vocabulary</a></li>
+<li><a href="#tiers">The tier picture</a></li>
+<li><a href="#inventory">File inventory</a></li>
+<li><a href="#worked-example">Worked example: box</a></li>
+<li><a href="#special-cases">Special cases: hub, peer-plugins, composite-behavior</a></li>
+<li><a href="#dependencies">Two axes of dependency: hard vs. soft</a></li>
+<li><a href="#checklist">Integration checklist</a></li>
+</ul>
+</nav>
+
+<h2 id="overview">Overview</h2>
+<p>Every problem (e.g. <code>problem-claustro4a.lisp</code>) declares its own leaf object types and instances in a <code>define-types</code> block, then pulls in behavior via a list of <code>(include-tech ...)</code> directives that the stage-time splicer expands in place before translation. This document is a map of what lives in <code>tech/</code>, why it's organized the way it is, and a checklist for integrating a new object type so that additions stay consistent with what's already there instead of quietly drifting from it.</p>
+
+<h2 id="reframe">The core idea: a role system, not a type hierarchy</h2>
+<p>A leaf object type (<code>box</code>, <code>gate</code>, <code>jammer</code>, ...) is inert until it acquires <em>roles</em>. A role is one shared composite type plus the single relation that makes it useful &mdash; "has a location," "can be held," "can rest on / be rested on," "has a fixed position," "has a height." Each role has exactly one canonical owner file. A technology file's job is almost always one of a small number of things: own a role, own a derived-fact service, or assemble a leaf type by nesting whichever roles it needs and adding whatever is genuinely unique to that object.</p>
+
+<h2 id="vocabulary">Vocabulary</h2>
+<table>
+<tr><th>Kind</th><th>Owns</th><th>Examples</th><th>Rule of thumb</th></tr>
+<tr>
+<td><span class="tag role">role</span></td>
+<td>One composite <code>either</code>-type + its one relation (occasionally one helper query)</td>
+<td><code>-location.lisp</code> &rarr; <code>mobile-object</code>/<code>has-location</code>;<br><code>-support-occupancy.lisp</code> &rarr; <code>support</code> + <code>support-occupant</code>/<code>on</code>/<code>cleartop</code></td>
+<td>Nest it, never hand-copy it. Exactly one owner per role, full stop.</td>
+</tr>
+<tr>
+<td><span class="tag service">service</span></td>
+<td>No type, no relation of its own to write &mdash; only a derived query built on top of roles</td>
+<td><code>accessibility</code> &rarr; <code>accessible</code>; <code>reachability</code> &rarr; <code>reachable</code>; <code>visibility</code> &rarr; <code>visible</code></td>
+<td>Pure query layer. (<code>accessibility</code> is the one exception &mdash; see below.)</td>
+</tr>
+<tr>
+<td><span class="tag assembly">assembly</span></td>
+<td>A leaf type (declared optional) + whichever roles it nests + its own bespoke relations/queries/actions</td>
+<td><code>box</code>, <code>agent</code>, <code>plate</code>, <code>jammer</code>, <code>ladder</code>, <code>barrier</code></td>
+<td>Where actions live. Roles are ingredients you assemble, not code you retype.</td>
+</tr>
+<tr>
+<td><span class="tag hub">hub</span></td>
+<td>An assembly whose derived fact every service also reads</td>
+<td><code>gate</code> &mdash; its <code>(open gate)</code> fact is read by <code>accessibility</code>, <code>reachability</code>, <code>visibility</code>, and every beam file</td>
+<td>Expect it to be the most cross-referenced file in the directory; changes here ripple widest.</td>
+</tr>
+<tr>
+<td><span class="tag peer">peer-plugin</span></td>
+<td>2+ assemblies sharing one role file that <em>also</em> ships null-object default hooks the peers override</td>
+<td><code>beam-direct</code> / <code>beam-relay</code> / <code>beam-crossing</code> over <code>-beam-substrate</code></td>
+<td>Use only when 2+ interchangeable variants need to override specific behavior slots &mdash; not for a plain shared relation.</td>
+</tr>
+</table>
+
+<h2 id="tiers">The tier picture</h2>
+<p>Stacking the vocabulary above by what depends on what gives three tiers. Substrate roles sit at the bottom; capability services sit in the middle and consume roles; object &amp; behavior assemblies sit on top and consume both. The one wrinkle: <code>gate</code> is an assembly by ownership, but every service reads its <code>open</code> fact, so there's a real dependency arrow running back up from the service tier into the object tier.</p>
+<div class="tiers">
+<div class="tier"><div class="name">Object &amp; behavior technologies</div><div class="detail">box, agent, plate, gate, jammer, ladder, barrier, beam-direct/relay/crossing &mdash; own a leaf type (or composite), plus their own queries and actions</div></div>
+<div class="arrow">&uarr;&darr;</div>
+<div class="tier"><div class="name">Capability services</div><div class="detail">accessibility, reachability, visibility &mdash; derive facts from roles; read gate's <code>open</code></div></div>
+<div class="arrow">&uarr;</div>
+<div class="tier"><div class="name">Substrate (nested-only roles)</div><div class="detail">-location, -holding, -position, -height, -elevation, -support-occupancy, -beam-substrate</div></div>
+</div>
+
+<h2 id="inventory">File inventory</h2>
+<p>What every file in <code>tech/</code> currently owns, what it nests, and what kind it is. Kept up to date as the directory evolves.</p>
+<table>
+<tr><th>File</th><th>Owns</th><th>Nests</th><th>Actions</th><th>Kind</th></tr>
+<tr><td><code>-location.lisp</code></td><td><code>mobile-object</code>, <code>has-location</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>-holding.lisp</code></td><td><code>cargo</code>, <code>holding</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>-position.lisp</code></td><td><code>fixed-position-object</code>, <code>has-position</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>-height.lisp</code></td><td><code>heighted-object</code>, <code>has-height</code> (box/fence/gate/agent/screen/jammer)</td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>-support-occupancy.lisp</code></td><td><code>support</code>, <code>support-occupant</code>, <code>on</code>, query <code>cleartop</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>-beam-substrate.lisp</code></td><td><code>hue</code>/<code>transmitter</code>/<code>receiver</code> (optional), <code>active</code>, <code>has-chroma</code>, null-object default hooks, <code>update-receiver-status!</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span> (hook/interface variant)</td></tr>
+<tr><td><code>-elevation.lisp</code></td><td><code>elevated-object</code>, <code>has-elevation</code>, queries <code>object-elevation</code>/<code>location-elevation</code>/<code>fixture-elevation</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag role">role</span></td></tr>
+<tr><td><code>accessibility.lisp</code></td><td><code>gate</code>/<code>screen</code>/<code>ladder</code> (optional), <code>walk-via</code>, <code>accessible</code>, <code>one-step-accessible</code>, <code>accessible-clear</code>, <code>all-clear</code></td><td><code>-support-occupancy</code>, <code>-location</code>, <code>-holding</code>, <code>-elevation</code></td><td><code>move</code></td><td><span class="tag service">service</span> (the one with an action)</td></tr>
+<tr><td><code>reachability.lisp</code></td><td><code>gate</code> (optional), <code>reachable-via</code>, <code>reachable</code>, <code>reachable-clear</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag service">service</span></td></tr>
+<tr><td><code>visibility.lisp</code></td><td><code>fixture</code>, <code>gate</code>/<code>transmitter</code>/<code>receiver</code> (optional), <code>los-to-fixture</code>, <code>los-to-location</code>, <code>visible</code>, <code>visible-clear</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag service">service</span></td></tr>
+<tr><td><code>gate.lisp</code></td><td><code>gate</code>/<code>plate</code>/<code>jammer</code>/<code>mode</code>/<code>receiver</code> (optional), <code>open</code>, <code>controls</code>, query <code>energized</code>, <code>update-gate-status!</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag hub">hub</span></td></tr>
+<tr><td><code>plate.lisp</code></td><td><code>plate</code> (optional), <code>depressed</code>, <code>update-plate-status!</code></td><td>&mdash;</td><td>&mdash;</td><td><span class="tag assembly">assembly</span> (no actions)</td></tr>
+<tr><td><code>agent.lisp</code></td><td>query <code>agent-height</code></td><td><code>-height</code></td><td>&mdash;</td><td><span class="tag assembly">assembly</span> (smallest; query-only)</td></tr>
+<tr><td><code>box.lisp</code></td><td><code>plate</code>/<code>box</code> (optional), <code>jump-via</code>, queries <code>support-top-elevation</code>/<code>occupant-elevation</code>/<code>box-height</code></td><td><code>-support-occupancy</code>, <code>-location</code>, <code>-holding</code>, <code>-position</code>, <code>-height</code>, <code>-elevation</code></td><td><code>pickup-box</code>, <code>put-box</code>, <code>jump-to</code></td><td><span class="tag assembly">assembly</span> (fullest example)</td></tr>
+<tr><td><code>jammer.lisp</code></td><td><code>target</code> composite, <code>plate</code>/<code>jammer</code>/<code>box</code> (optional), <code>jamming</code>, <code>jam-disallowed&gt;</code></td><td><code>-support-occupancy</code>, <code>-location</code>, <code>-holding</code>, <code>-position</code></td><td><code>pickup-jammer</code>, <code>jam-target</code></td><td><span class="tag assembly">assembly</span></td></tr>
+<tr><td><code>ladder.lisp</code></td><td><code>ladder</code> (optional), <code>traversable&gt;</code>, query <code>one-way-clear</code></td><td><code>-support-occupancy</code>, <code>-location</code>, <code>-position</code></td><td><code>use-ladder</code></td><td><span class="tag assembly">assembly</span></td></tr>
+<tr><td><code>barrier.lisp</code></td><td><code>vaultable-barrier</code> composite, <code>box</code>/<code>fence</code> (optional), <code>traversable</code>/<code>traversable&gt;</code>, queries <code>barrier-height</code>/<code>vault-clearance-height</code></td><td><code>-support-occupancy</code>, <code>-height</code>, <code>-location</code>, <code>-elevation</code></td><td><code>vault-over</code></td><td><span class="tag assembly">assembly</span> (composite-behavior variant &mdash; see below)</td></tr>
+<tr><td><code>beam-direct.lisp</code></td><td><code>beam-blocker</code> composite, <code>gate</code>/<code>transmitter</code>/<code>receiver</code> (optional), <code>coupled</code>, <code>beam-via</code>, elevation-aware query <code>beam-clear</code> + hook overrides</td><td><code>-beam-substrate</code>, <code>-location</code>, <code>-support-occupancy</code>, <code>-height</code>, <code>-elevation</code></td><td>&mdash;</td><td><span class="tag peer">peer-plugin</span></td></tr>
+<tr><td><code>beam-relay.lisp</code></td><td><code>terminus</code> composite, several optional types, <code>paired</code>, <code>color</code> + hook overrides</td><td><code>-beam-substrate</code></td><td><code>pickup-connector</code>, <code>connect-connector</code></td><td><span class="tag peer">peer-plugin</span> (the one with actions)</td></tr>
+<tr><td><code>beam-crossing.lisp</code></td><td><code>gate</code>/<code>transmitter</code> (optional), <code>crossing-active</code>, <code>beam-crossing&gt;</code>, <code>update-crossing-status!</code> + hook overrides</td><td><code>-beam-substrate</code></td><td>&mdash;</td><td><span class="tag peer">peer-plugin</span></td></tr>
+</table>
+
+<h2 id="worked-example">Worked example: box</h2>
+<p><code>box.lisp</code> doesn't own <code>mobile-object</code>, <code>cargo</code>, <code>support</code>/<code>support-occupant</code>, <code>heighted-object</code>, or fixed floor elevation &mdash; it nests the role files that do, and adds only what's genuinely its own: <code>jump-via</code>, <code>box-height</code>, <code>support-top-elevation</code>, <code>occupant-elevation</code>, and its three actions. That's the pattern to imitate for any new movable, stackable object: figure out which existing roles it needs, nest those files, and write only the bespoke remainder.</p>
+
+<h2 id="special-cases">Special cases</h2>
+
+<h3>gate — the hub</h3>
+<p><code>gate.lisp</code> owns a real leaf type and its own <code>update-gate-status!</code>, which makes it look like an ordinary assembly. But its <code>(open gate)</code> fact is read by <code>accessibility</code>, <code>reachability</code>, <code>visibility</code>, and every beam file. Any change to how <code>open</code> is computed or what it depends on has the widest blast radius in the directory.</p>
+
+<h3>beam-direct / beam-relay / beam-crossing — peer-plugins</h3>
+<p>These three share one role file, <code>-beam-substrate.lisp</code>, which is unusual for a role file in that it also ships null-object default queries (e.g. <code>direct-beam-reaches-receiver</code> defaults to always <code>nil</code>). Each peer overrides only the hooks it owns; an absent peer contributes nothing rather than erroring. Use this pattern only when 2+ variants genuinely need to plug into the same interface &mdash; a single relation doesn't need it.</p>
+<p><code>beam-direct</code> also reads <code>-elevation</code> and <code>-height</code> so authored fixture elevations can set the horizontal beam level. A location in <code>beam-via</code> blocks only when a beam blocker with <code>has-location</code> there has a base-to-top vertical span that intersects that level.</p>
+
+<h3>barrier — composite-behavior assembly</h3>
+<p>No problem instantiates a leaf type called <code>barrier</code>. What <code>barrier.lisp</code> owns is <code>vaultable-barrier</code>, a composite spanning <code>gate</code> and <code>screen</code> (owned elsewhere) plus <code>fence</code>, the one genuinely new leaf type the file introduces. So this file is centered on a <em>behavior</em> (<code>vault-over</code>) applicable to a composite of objects, rather than on one owned object &mdash; distinct from <code>box</code>/<code>jammer</code>/<code>ladder</code>, which are each centered on one problem-facing leaf type. <code>jammer.lisp</code>'s <code>target (either gate)</code> is a smaller-scale version of the same thing, but <code>jammer</code> still has its own real leaf type anchoring it, so it stays object-centered.</p>
+<div class="callout">
+<p><strong>Case study.</strong> Until this document was written, <code>barrier.lisp</code> hand-declared <code>mobile-object</code>/<code>has-location</code> instead of nesting <code>-location.lisp</code>, purely because it needs <code>has-location</code> on <code>?agent</code> and <code>?box</code> in <code>vault-over</code>'s precondition &mdash; a need completely unrelated to <code>vaultable-barrier</code>'s composite membership. The file's own header even flagged the duplication. It's fixed now (nests <code>-location</code> like everyone else), but it's a good illustration that a file's <em>subject</em> (a composite behavior, here) and its <em>role dependencies</em> (shared substrate, needed for unrelated reasons) are two separate questions &mdash; don't let one influence how you handle the other.</p>
+</div>
+
+<h2 id="dependencies">Two axes of dependency: hard vs. soft</h2>
+<p><strong>Hard</strong> dependencies are <code>(include-tech ...)</code> nests &mdash; enforced by the splicer; a file can't be missing what it nests. <strong>Soft</strong> dependencies are a query call into another file's relation without nesting it. These only work because the problem's own <code>include-tech</code> list happens to also bring in the right sibling file. They're documented in each file's <code>REQUIRES</code> header, but nothing checks them automatically.</p>
+<table>
+<tr><th>File</th><th>Calls (soft)</th><th>Actually defined in</th></tr>
+<tr><td><code>plate</code></td><td><code>cleartop</code></td><td><code>-support-occupancy</code></td></tr>
+<tr><td><code>gate</code></td><td><code>active</code>, <code>depressed</code>, <code>jamming</code></td><td><code>-beam-substrate</code>, <code>plate</code>, <code>jammer</code></td></tr>
+<tr><td><code>jammer</code></td><td><code>occupant-elevation</code></td><td><code>box</code></td></tr>
+<tr><td><code>barrier</code></td><td><code>occupant-elevation</code>, <code>support-top-elevation</code></td><td><code>box</code></td></tr>
+<tr><td><code>ladder</code></td><td><code>accessible-clear</code>/<code>all-clear</code></td><td><code>accessibility</code></td></tr>
+<tr><td><code>box</code></td><td><code>reachable</code>, <code>all-clear</code></td><td><code>reachability</code>, <code>accessibility</code></td></tr>
+<tr><td><code>beam-relay</code></td><td><code>holding</code>/<code>has-location</code>/<code>on</code>/<code>has-position</code>, <code>reachable</code>, <code>visible</code>, <code>cleartop</code></td><td>whichever of <code>box</code>/<code>jammer</code>/<code>ladder</code> is included; <code>reachability</code>; <code>visibility</code>; <code>-support-occupancy</code></td></tr>
+<tr><td><code>beam-direct</code> / <code>beam-relay</code> / <code>beam-crossing</code></td><td><code>open</code></td><td><code>gate</code></td></tr>
+</table>
+
+<h2 id="checklist">Integration checklist</h2>
+<p>For a new object type, work through these in order.</p>
+<ol class="checklist">
+<li><strong>Classify it first.</strong> Does it just need to <em>participate</em> in existing roles (have a location, be held, rest on/be rested on, have a fixed position, have a height), or does it need a genuinely new relation nobody has? Most new objects are almost entirely the former.</li>
+<li><strong>New role, one consumer</strong> &rarr; declare its type + relation inline in the new object's own assembly file (like <code>barrier</code>'s <code>vaultable-barrier</code> or <code>jammer</code>'s <code>target</code>). Don't create a substrate file for something with exactly one user.</li>
+<li><strong>New role, 2+ plausible consumers</strong> &rarr; give it its own dash-prefixed, nest-only file: one <code>define-types</code>, one relation, at most one derived query. No actions, no driver logic.</li>
+<li><strong>Existing role</strong> &rarr; nest the owning substrate file. Never retype the <code>either</code> form by hand (see the <code>barrier</code> case study above).</li>
+<li><strong>Declare the leaf type optional</strong> (<code>define-optional-types</code>) in the new assembly and in every other file that references it as a bare pre-param type. This is idempotent and order-independent, so repeating it is always safe.</li>
+<li><strong>Identify soft dependencies</strong> &mdash; which services (<code>reachable</code>/<code>visible</code>/<code>accessible</code>) or hub facts (<code>open</code>) the new actions will call. Document them in a <code>REQUIRES</code> header like the existing files do; remember the owning file has to be in the problem's <code>include-tech</code> list.</li>
+<li><strong>New derived boolean fact?</strong> Give it a <code>define-update</code>, and slot a call into <code>propagate-consequences!</code> in the right causal position.</li>
+<li><strong>Write the actions.</strong> This is the one genuinely bespoke step.</li>
+<li><strong>Test via REPL</strong>, unless the new tech isn't referenced by any problem's <code>include-tech</code> yet, in which case the testing waiver applies.</li>
+</ol>
+
+<footer>
+Generated as a working reference for the <code>tech/</code> directory's organization. Update the file inventory table when files are added, renamed, or re-categorized.
+</footer>
+
+</body>
+</html>
