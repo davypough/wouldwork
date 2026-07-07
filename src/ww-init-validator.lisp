@@ -162,9 +162,9 @@ would overwrite the previous value during install-init."
 
 
 (defun init-on-location-consistency-required-p (object support)
-  (and (init-relation-can-locate-object-p 'location object)
-       (or (init-relation-can-locate-object-p 'location support)
-           (init-relation-can-locate-object-p 'position support))))
+  (and (init-relation-can-locate-object-p 'has-location object)
+       (or (init-relation-can-locate-object-p 'has-location support)
+           (init-relation-can-locate-object-p 'has-position support))))
 
 
 (defun init-binary-on-literals (literals)
@@ -173,13 +173,13 @@ would overwrite the previous value during install-init."
                  (positive-init-literals-with-relation 'on literals)))
 
 
-(defun init-check-object-not-held-and-located (literals locations)
+(defun init-check-object-not-held-and-has-location (literals locations)
   (dolist (literal (init-literals-with-relation 'holding literals))
     (destructuring-bind (agent object)
         (rest (init-literal-proposition literal))
       (declare (ignore agent))
       (when (gethash object locations)
-        (error "~%DEFINE-INIT object is both held and located.~%~
+        (error "~%DEFINE-INIT object is both held and assigned HAS-LOCATION.~%~
                 Literal: ~S~%~
                 Object:  ~S"
                literal object)))))
@@ -202,12 +202,12 @@ would overwrite the previous value during install-init."
   (let ((object-location (gethash object locations))
         (support-location (init-object-location support locations positions)))
     (unless object-location
-      (error "~%DEFINE-INIT places an object on a support, but the object has no LOCATION.~%~
+      (error "~%DEFINE-INIT places an object on a support, but the object has no HAS-LOCATION.~%~
               Literal: ~S~%~
               Object:  ~S"
              literal object))
     (unless support-location
-      (error "~%DEFINE-INIT places an object on a support with no LOCATION or POSITION.~%~
+      (error "~%DEFINE-INIT places an object on a support with no HAS-LOCATION or HAS-POSITION.~%~
               Literal: ~S~%~
               Support: ~S"
              literal support))
@@ -241,12 +241,12 @@ would overwrite the previous value during install-init."
 
 
 (defun check-init-object-placement-consistency (literals)
-  "Checks physical consistency of LOCATION, HOLDING, ON, and POSITION facts."
-  (let ((locations (init-literal-map 'location literals 1 2))
-        (positions (init-literal-map 'position literals 1 2))
+  "Checks physical consistency of HAS-LOCATION, HOLDING, ON, and HAS-POSITION facts."
+  (let ((locations (init-literal-map 'has-location literals 1 2))
+        (positions (init-literal-map 'has-position literals 1 2))
         (on-map (init-literal-map 'on literals 1 2))
         (support-occupants (make-hash-table :test #'equal)))
-    (init-check-object-not-held-and-located literals locations)
+    (init-check-object-not-held-and-has-location literals locations)
     (dolist (literal (init-binary-on-literals literals))
       (destructuring-bind (object support)
           (rest (init-literal-proposition literal))
@@ -274,13 +274,13 @@ would overwrite the previous value during install-init."
 (defun check-init-paired-consistency (literals)
   "Checks basic consistency of initial connector pairings."
   (when (init-connector-paired-relation-p)
-    (let ((locations (init-literal-map 'location literals 1 2))
+    (let ((locations (init-literal-map 'has-location literals 1 2))
           (pair-counts (make-hash-table :test #'equal)))
       (dolist (literal (init-literals-with-relation 'paired literals))
         (destructuring-bind (connector terminus)
             (rest (init-literal-proposition literal))
           (unless (gethash connector locations)
-            (error "~%PAIRED connector has no LOCATION.~%~
+            (error "~%PAIRED connector has no HAS-LOCATION.~%~
                     Literal:  ~S~%~
                     Connector: ~S"
                    literal connector))
@@ -291,7 +291,7 @@ would overwrite the previous value during install-init."
                    literal connector))
           (when (and (init-type-member-p terminus 'connector)
                      (not (gethash terminus locations)))
-            (error "~%PAIRED connector target has no LOCATION.~%~
+            (error "~%PAIRED connector target has no HAS-LOCATION.~%~
                     Literal: ~S~%~
                     Target:  ~S"
                    literal terminus))
@@ -401,7 +401,7 @@ would overwrite the previous value during install-init."
 (defun check-init-paired-sightlines (literals)
   "Checks that initial pairings have authored sightline topology."
   (when (init-connector-paired-relation-p)
-    (let ((locations (init-literal-map 'location literals 1 2)))
+    (let ((locations (init-literal-map 'has-location literals 1 2)))
       (dolist (literal (init-literals-with-relation 'paired literals))
         (destructuring-bind (connector terminus)
             (rest (init-literal-proposition literal))
@@ -522,11 +522,24 @@ would overwrite the previous value during install-init."
 
 (defun init-chroma-map (literals)
   (let ((chromas (make-hash-table :test #'equal)))
-    (dolist (literal (init-literals-with-relation 'chroma literals))
+    (dolist (literal (init-literals-with-relation 'has-chroma literals))
       (destructuring-bind (endpoint hue)
           (rest (init-literal-proposition literal))
         (setf (gethash endpoint chromas) hue)))
     chromas))
+
+
+(defun init-elevation-map (literals)
+  (let ((elevations (make-hash-table :test #'equal)))
+    (dolist (literal (init-literals-with-relation 'has-elevation literals))
+      (destructuring-bind (object level)
+          (rest (init-literal-proposition literal))
+        (setf (gethash object elevations) level)))
+    elevations))
+
+
+(defun init-elevation-level (object elevations)
+  (gethash object elevations 0))
 
 
 (defun init-coupled-p (transmitter receiver literals)
@@ -549,29 +562,40 @@ would overwrite the previous value during install-init."
 
 
 (defun check-init-coupled-beam-consistency (literals)
-  "Checks that coupled transmitter/receiver beams have chroma and corridors."
-  (let ((chromas (init-chroma-map literals)))
+  "Checks that coupled transmitter/receiver beams have matching chroma and corridors."
+  (let ((chromas (init-chroma-map literals))
+        (elevations (init-elevation-map literals)))
     (dolist (literal (init-literals-with-relation 'coupled literals))
       (destructuring-bind (transmitter receiver)
           (rest (init-literal-proposition literal))
         (let ((transmitter-hue (gethash transmitter chromas))
-              (receiver-hue (gethash receiver chromas)))
+              (receiver-hue (gethash receiver chromas))
+              (transmitter-elevation (init-elevation-level transmitter elevations))
+              (receiver-elevation (init-elevation-level receiver elevations)))
           (unless transmitter-hue
-            (error "~%COUPLED transmitter has no CHROMA entry.~%~
+            (error "~%COUPLED transmitter has no HAS-CHROMA entry.~%~
                     Literal:     ~S~%~
                     Transmitter: ~S"
                    literal transmitter))
           (unless receiver-hue
-            (error "~%COUPLED receiver has no CHROMA entry.~%~
+            (error "~%COUPLED receiver has no HAS-CHROMA entry.~%~
                     Literal: ~S~%~
                     Receiver: ~S"
                    literal receiver))
           (unless (eql transmitter-hue receiver-hue)
-            (error "~%COUPLED endpoints have mismatched CHROMA values.~%~
+            (error "~%COUPLED endpoints have mismatched HAS-CHROMA values.~%~
                     Literal:         ~S~%~
                     Transmitter hue: ~S~%~
                     Receiver hue:    ~S"
                    literal transmitter-hue receiver-hue))
+          (unless (= transmitter-elevation receiver-elevation)
+            (error "~%COUPLED endpoints have mismatched HAS-ELEVATION values.~%~
+                    Direct beams are currently horizontal; give both endpoints the same ~
+                    has-elevation value or omit both for ground level.~%~
+                    Literal:                    ~S~%~
+                    Transmitter has-elevation:  ~S~%~
+                    Receiver has-elevation:     ~S"
+                   literal transmitter-elevation receiver-elevation))
           (unless (init-beam-via-p transmitter receiver literals)
             (error "~%COUPLED pair has no matching BEAM-VIA corridor.~%~
                     Literal:       ~S~%~

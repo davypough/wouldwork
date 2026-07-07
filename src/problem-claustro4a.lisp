@@ -101,23 +101,23 @@
 
 (define-init
   ;; Dynamic state (agent-manipulable or derived)
-  (located agent1 location1)
-  (located jammer1 location1)
-  (located jammer2 location9)
-  (located box1 location4)
-  (located box2 location10)
+  (has-location agent1 location1)
+  (has-location jammer1 location1)
+  (has-location jammer2 location9)
+  (has-location box1 location4)
+  (has-location box2 location10)
 
   ;; Plates (fixed positions); box1 starts on plate1, so plate1 begins depressed
-  (position plate1 location4)
-  (position plate2 location5)
-  (position plate3 location6)
+  (has-position plate1 location4)
+  (has-position plate2 location5)
+  (has-position plate3 location6)
   (on box1 plate1)
 
   ;; Ladder (fixed fixture, positioned like a plate); boards at location7, descends to location1
-  (position ladder1 location7)
+  (has-position ladder1 location7)
 
   ;; Elevation (fixed floor levels above ground; absent means ground); location12 is a platform
-  (elevation location12 2)
+  (has-elevation location12 2)
 
   ;; Static environment follows
   ;; Gate controllers in DNF: ((c11 c12...) (c21...)) means (c11 AND c12...) OR (c21...)
@@ -128,8 +128,8 @@
   (controls ((receiver1)) gate7 normal)
   (controls ((plate1 plate2 plate3)) gate8 normal)  ;all three plates depressed -> open
   (controls ((plate1 plate2 plate3)) gate9 normal)
-  (chroma transmitter1 blue)
-  (chroma receiver1 blue)
+  (has-chroma transmitter1 blue)
+  (has-chroma receiver1 blue)
   (coupled transmitter1 receiver1)  ;fixed beam source -> target
 
   ;; Beam geometry
@@ -343,4 +343,4 @@
 
 (define-goal
   ;; Claustrophobia planning goal: agent1 reaches location11.
-  (located agent1 location11))
+  (has-location agent1 location11))
