@@ -83,15 +83,10 @@
 
 
 (include-tech gate)                  ;controls; energized; update-gate-status!
-(include-tech plate)                 ;depressed; update-plate-status! -- inert, no plates
-(include-tech support-occupancy)     ;cleartop -- plate-tech's & beam-relay-tech's dependency
-(include-tech elevation)             ;elevation; location-elevation -- accessibility-tech's dependency
 (include-tech beam-relay)            ;paired; color; pickup-connector; connect-connector
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>
-(include-tech jammer)                ;jamming; pickup-jammer (skipped, no jammer instances); jam-target (installed but unreachable, no jammer ever held)
 (include-tech accessibility)         ;walk-via; accessible; one-step-accessible; move
 (include-tech visibility)            ;los-to-fixture; los-to-location; visible; visible-clear
-(include-tech reachability)          ;reachable; reachable-clear -- inert (no reachable-via facts), so reachable reduces to same-location identity
 
 
 ;;;; MASTER PROPAGATION DRIVER ;;;;
@@ -121,7 +116,6 @@
     (update-crossing-status!)
     (update-connector-status!)
     (update-receiver-status!)
-    (update-plate-status!)
     (update-gate-status!)
     *propagated-state-changed*))
 
@@ -131,20 +125,20 @@
 
 (define-init
   ;; Dynamic state
-  (located agent1 location1)
-  (located connector1 location1)
-  (located connector2 location2)
-  (located connector3 location3)
+  (has-location agent1 location1)
+  (has-location connector1 location1)
+  (has-location connector2 location2)
+  (has-location connector3 location3)
 
   ;; Gate control (DNF): receiver1 active -> gate1 open
   (controls ((receiver1)) gate1 normal)
 
   ;; Fixed hues
-  (chroma transmitter1 red)
-  (chroma transmitter2 blue)
-  (chroma receiver1 red)
-  (chroma receiver2 red)
-  (chroma receiver3 blue)
+  (has-has-chroma transmitter1 red)
+  (has-chroma transmitter2 blue)
+  (has-chroma receiver1 red)
+  (has-chroma receiver2 red)
+  (has-chroma receiver3 blue)
 
   ;; Location -> fixture sightlines (occluder gates that must be open); from corner los0/los1
   (los-to-fixture location1 () transmitter1)
@@ -251,6 +245,6 @@
 
 
 (define-goal
-  (and (located agent1 location4)
+  (and (has-location agent1 location4)
        (active receiver2)
        (active receiver3)))

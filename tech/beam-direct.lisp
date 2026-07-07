@@ -12,19 +12,20 @@
 ;;; Self-contained; spliced by (include-tech beam-direct).
 ;;;
 ;;; REQUIRES:
-;;;   types : location, hue, agent  --  gate, transmitter, receiver, box, jammer, and plate
-;;;           are declared optional here (define-optional-types).  Gate is coordinated with
-;;;           gate, accessibility, visibility, reachability, and beam-crossing, which all
-;;;           convert gate together since they share the (open gate) relation verbatim.
-;;;           Box/jammer are beam blockers; plate may appear as a non-raising support.
+;;;   types : location, hue, agent  --  gate, transmitter, receiver, box, jammer, connector,
+;;;           and plate are declared optional here (define-optional-types).  Gate is
+;;;           coordinated with gate, accessibility, visibility, reachability, and
+;;;           beam-crossing, which all convert gate together since they share the
+;;;           (open gate) relation verbatim.  Box/jammer/connector are beam blockers;
+;;;           plate may appear as a non-raising support.
 ;;;   nested : -location (mobile-object, (has-location ...)); -support-occupancy
-;;;            (support-occupant, support, (on ...)); -height (heighted-object, has-height);
-;;;            -elevation (elevated-object, has-elevation, fixture-elevation,
-;;;            location-elevation) -- shared via nested include-tech rather than local
-;;;            declaration
+;;;            (support-occupant, support, (on ...)); -height (heighted-object, has-height,
+;;;            declared-height); -elevation (elevated-object, has-elevation,
+;;;            fixture-elevation, location-elevation) -- shared via nested include-tech
+;;;            rather than local declaration
 ;;; PROVIDES:
-;;;   types     : beam-blocker (either agent box jammer)  --  sole consumer; not declared
-;;;               elsewhere
+;;;   types     : beam-blocker (either agent box jammer connector)  --  sole consumer; not
+;;;               declared elsewhere
 ;;;               gate, transmitter, receiver  --  declared optional here; other techs
 ;;;               (-beam-substrate, beam-relay, beam-crossing, visibility, gate, etc.)
 ;;;               independently declare their own gate-alias/transmitter-alias/receiver-alias
@@ -34,9 +35,9 @@
 ;;;               ever asserts it
 ;;;               coupled, beam-via
 ;;;   queries   : direct-beam-reaches-receiver, direct-beam-elevation, beam-clear,
-;;;               beam-blocker-height, beam-blocker-base-elevation,
-;;;               beam-blocker-top-elevation, beam-blocker-intersects-beam,
-;;;               direct-beam-live-for-cutting
+;;;               beam-blocker-base-elevation, beam-blocker-top-elevation
+;;;               (reads -height.lisp's declared-height for a blocker's default unit height),
+;;;               beam-blocker-intersects-beam, direct-beam-live-for-cutting
 ;;;               (overriding -beam-substrate null-object defaults)
 
 (include-tech -beam-substrate)
@@ -49,10 +50,10 @@
 
 
 (define-types
-  beam-blocker (either agent box jammer))  ;what can block/occlude a beam path; sole consumer of this type
+  beam-blocker (either agent box jammer connector))  ;what can block/occlude a beam path; sole consumer of this type
 
 
-(define-optional-types gate transmitter receiver box jammer plate)
+(define-optional-types gate transmitter receiver box jammer connector plate)
 
 
 (define-dynamic-relations
@@ -116,16 +117,10 @@
 
 
 (define-query beam-blocker-top-elevation (?blocker beam-blocker)
+  ;; Blocker's own default unit height comes from -height.lisp's shared declared-height,
+  ;; mirroring box/agent/jammer's default of 1 unless declared otherwise.
   (+ (beam-blocker-base-elevation ?blocker)
-     (beam-blocker-height ?blocker)))
-
-
-(define-query beam-blocker-height (?blocker beam-blocker)
-  ;; Beam blocking uses a unit-height default for all blockers, mirroring box/agent
-  ;; defaults while also giving jammers a sensible physical span unless declared otherwise.
-  (if (bind (has-height ?blocker $h))
-    $h
-    1))
+     (declared-height ?blocker)))
 
 
 (define-query direct-beam-live-for-cutting (?from transmitter ?to receiver)

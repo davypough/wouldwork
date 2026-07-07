@@ -58,9 +58,9 @@
 
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech plate)                 ;depressed; update-plate-status!
+(include-tech elevation)             ;has-elevation; location-elevation; fixture-elevation
 (include-tech beam-direct)           ;direct transmitter -> receiver beams with gate/location occluders
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target; nests -support-occupancy
-(include-tech agent)                 ;agent-height
 (include-tech box)                   ;pickup-box put-box jump-onto; jump-via
 (include-tech accessibility)         ;walk-via; accessible one-step-accessible one-way-clear accessible-clear; move
 (include-tech visibility)            ;los-to-fixture los-to-location; visible visible-clear

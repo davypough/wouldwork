@@ -11,7 +11,8 @@
 ;;;               declare it
 ;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
 ;;;               -location (mobile-object, (has-location ...)); -holding (cargo, (holding ...));
-;;;               -position (fixed-position-object, (has-position ...))  --  all shared via
+;;;               -position (fixed-position-object, (has-position ...)); -height
+;;;               (heighted-object, (has-height ...), declared-height)  --  all shared via
 ;;;               nested include-tech rather than local declaration
 ;;;   queries   : reachable (reachability), visible (visibility),
 ;;;               occupant-elevation (box, for pickup-jammer's vertical reach)
@@ -32,6 +33,7 @@
 (include-tech -location)
 (include-tech -holding)
 (include-tech -position)
+(include-tech -height)
 
 (in-package :ww)
 
@@ -58,7 +60,7 @@
        (bind (has-location ?agent $a-location))
        (bind (has-location ?jammer $jammer-location))
        (reachable $jammer-location $a-location)
-       (<= (abs (- (occupant-elevation ?jammer) (occupant-elevation ?agent))) 1))  ;vertical reach: jammer rests within +/-1 of agent level
+       (<= (abs (- (occupant-elevation ?jammer) (occupant-elevation ?agent))) (declared-height ?jammer)))  ;vertical reach: jammer rests within its declared-or-default height of the agent's level
   (":" ?agent "picks up" ?jammer "at" $a-location)
   (assert (holding ?agent ?jammer)
           (not (has-location ?jammer $jammer-location))
