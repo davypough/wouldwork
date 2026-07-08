@@ -35,6 +35,7 @@
 ;;;               (traversable> location $list location)
 ;;;               barrier-height reads the shared has-height relation, with a per-kind default
 ;;;               when undeclared (fence 2, gate/screen 3)
+;;;               vault-clearance-height adds each barrier's fixed base elevation
 ;;;   queries   : barrier-height, vaultable-barrier-list, vault-clearance-height
 ;;;   action    : vault-over
 
@@ -80,9 +81,11 @@
 
 
 (define-query vault-clearance-height (?barriers)
-  ;; Clearance is governed by the tallest barrier named on the edge.
+  ;; Clearance is governed by the highest top elevation among the barriers named on the edge.
+  ;; A barrier's top is its fixed base elevation plus its physical height.
   (ww-loop for $barrier in ?barriers
-           maximize (barrier-height $barrier)))
+           maximize (+ (object-elevation $barrier)
+                       (barrier-height $barrier))))
 
 
 (define-action vault-over

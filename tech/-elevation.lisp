@@ -1,24 +1,25 @@
 ;;; Filename: -elevation.lisp
 
-;;; Elevation substrate: the fixed vertical level of a location's own floor or a fixed
-;;; fixture's beam/sightline anchor.  Most objects are ordinary ground-level anchors and
-;;; declare no fact; raised locations or fixtures assert one.  Declared identically by
+;;; Elevation substrate: the fixed vertical level of a location's own floor, a fixed
+;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Most objects are ordinary
+;;; ground-level anchors and declare no fact; raised locations, obstacles, or fixtures assert
+;;; one.  Declared identically by
 ;;; every tech file that reads it, so consumers nest-include this file instead of each
 ;;; re-declaring the relation and queries.
 ;;;
 ;;; PROVIDES:
-;;;   types    : elevated-object (either location gate transmitter receiver)
+;;;   types    : elevated-object (either location gate screen fence transmitter receiver)
 ;;;   relation : (has-elevation elevated-object $fixnum)
 ;;;   queries  : object-elevation, location-elevation, fixture-elevation
 
 (in-package :ww)
 
 
-(define-optional-types gate transmitter receiver)
+(define-optional-types gate screen fence transmitter receiver)
 
 
 (define-types
-  elevated-object (either location gate transmitter receiver))
+  elevated-object (either location gate screen fence transmitter receiver))
 
 
 (define-static-relations
