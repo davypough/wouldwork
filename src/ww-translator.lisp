@@ -19,6 +19,17 @@
    When NIL, IF statements preserve natural value-returning semantics.")
 
 
+(defparameter *formula-context-p* t
+  "Dynamic variable indicating whether translation is occurring within a formula context,
+   ie, a position where and/or/not combine proposition truth values (preconditions,
+   effects, goals, quantifier bodies). When T (the default), and/or/not are translated
+   as WouldWork logical connectives via TRANSLATE-CONNECTIVE, including static-truth
+   pruning. When NIL, and/or/not are translated as ordinary Common Lisp forms, used for
+   plain Lisp value-computation positions (setf/setq value, assign/mv-assign value,
+   ordinary function-call arguments, let/mv-bind init-values, lambda bodies) where a
+   literal like 0 or NIL is just a value, not a proposition truth marker.")
+
+
 (defparameter *var-type-env* nil
   "Dynamic alist of (?var . declared-type) bindings in effect during translation of the
    current action precondition/effect or query/update body, including any locally-typed
@@ -992,7 +1003,8 @@ predicates stay unknown because their argument may or may not be an instance."
   `(,(first form) ,(mapcar (lambda (binding)
                              (if (consp binding)
                                  ;; Binding with initial value - translate the value
-                                 `(,(first binding) ,(translate (second binding) flag))
+                                 `(,(first binding) ,(let ((*formula-context-p* nil))  ; CHANGED
+                                                        (translate (second binding) flag)))  ; CHANGED
                                  ;; Just a variable name - keep as is
                                  binding))
                            (second form))
@@ -1002,12 +1014,18 @@ predicates stay unknown because their argument may or may not be an instance."
 
 (defun translate-mv-assign (form flag)
   "Translates an mv-assign statement, always returning t as a conjunct."
-  `(progn (multiple-value-setq ,(second form) ,(translate (third form) flag)) t))
+  `(progn (multiple-value-setq ,(second form)
+                                ,(let ((*formula-context-p* nil))          ; CHANGED
+                                   (translate (third form) flag)))          ; CHANGED
+          t))
 
 
 (defun translate-assign (form flag)
   "Translates an assign statement, always returning t as a conjunct."
-  `(progn (setq ,(second form) ,(translate (third form) flag)) t))
+  `(progn (setq ,(second form)
+                ,(let ((*formula-context-p* nil))          ; CHANGED
+                   (translate (third form) flag)))          ; CHANGED
+          t))
 
 
 (defun translate-case-body (statements flag)
@@ -1092,9 +1110,10 @@ predicates stay unknown because their argument may or may not be an instance."
 (defun translate-lambda-form (form flag)
   "Translate the body of a Lisp lambda expression."
   `(lambda ,(second form)
-     ,@(mapcar (lambda (body-form)
-                 (translate body-form flag))
-               (cddr form))))
+     ,@(let ((*formula-context-p* nil))                ; CHANGED
+         (mapcar (lambda (body-form)
+                   (translate body-form flag))
+                 (cddr form)))))
 
 
 (defun translate-function-special-form (form flag)
@@ -1108,7 +1127,9 @@ predicates stay unknown because their argument may or may not be an instance."
 
 (defun translate-binding-form (form flag)
   "Translate a binding form with one value expression and a body."
-  `(,(first form) ,(second form) ,(translate (third form) flag)
+  `(,(first form) ,(second form)
+     ,(let ((*formula-context-p* nil))               ; CHANGED
+        (translate (third form) flag))               ; CHANGED
      ,@(mapcar (lambda (body-form)
                  (translate body-form flag))
                (cdddr form))))
@@ -1119,7 +1140,8 @@ predicates stay unknown because their argument may or may not be an instance."
   `(,(first form)
      ,@(loop for (place value) on (rest form) by #'cddr
              append (list (translate place flag)
-                          (translate value flag)))))
+                          (let ((*formula-context-p* nil))          ; CHANGED
+                            (translate value flag))))))              ; CHANGED
 
 
 (defun translate-body-form (form flag)
@@ -1142,12 +1164,13 @@ predicates stay unknown because their argument may or may not be an instance."
 
 (defun translate-ordinary-lisp-call (form flag)
   "Translate evaluated arguments in an ordinary Lisp function call."
-  `(,(if (consp (first form))
-       (translate (first form) flag)
-       (first form))
-     ,@(mapcar (lambda (arg)
-                 (translate arg flag))
-               (rest form))))
+  (let ((*formula-context-p* nil))                        ; CHANGED
+    `(,(if (consp (first form))
+         (translate (first form) flag)
+         (first form))
+       ,@(mapcar (lambda (arg)
+                   (translate arg flag))
+                 (rest form)))))
 
 
 (defun translate-lisp-form (form flag)
@@ -1161,6 +1184,7 @@ predicates stay unknown because their argument may or may not be an instance."
     ((multiple-value-bind destructuring-bind)
      (translate-binding-form form flag))
     ((progn locally) (translate-body-form form flag))
+    ((and or) (translate-body-form form flag))  ; CHANGED: reached only when *formula-context-p* is nil
     (block
      `(block ,(second form)
         ,@(mapcar (lambda (body-form)
@@ -1246,7 +1270,7 @@ predicates stay unknown because their argument may or may not be an instance."
               (consp (cadr form))
               (symbolp (caadr form))
               (gethash (caadr form) *relations*)) (translate-negative-relation form flag))
-        ((member (car form) *connectives*) (translate-connective form flag))
+        ((and *formula-context-p* (member (car form) *connectives*)) (translate-connective form flag))
         ((or (gethash (car form) *relations*) (gethash (car form) *static-relations*))
            (translate-positive-relation form flag))
         ((member (car form) (append *query-names* *update-names* '(apply-simulated-state!)))

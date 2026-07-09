@@ -207,6 +207,7 @@
 
 (defun dfs ()
   "Main search program."
+  (reset-symmetry-statistics)
   (when *global-invariants*
     (unless (validate-global-invariants nil *start-state*)
       (format t "~%Invariant validation failed on initial state.~%")
