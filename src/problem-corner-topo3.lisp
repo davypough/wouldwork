@@ -1,21 +1,21 @@
-;;; Filename: problem-corner-topo2.lisp
+;;; Filename: problem-corner-topo3.lisp
 
 ;;; Talos Principle problem 'Around the Corner' (Purgatory workshop 3), rebuilt from
 ;;; self-contained technology files, following the problem-claustro4a.lisp architecture.
-;;; Same objects, hues, controls, connectivity, and topological (coordinate-free) beam
-;;; geometry as problem-corner-topo.lisp.  Behavior is supplied entirely by
-;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
-;;; expands in place; this file holds only the glue: types, the master propagation
-;;; driver, and the init/goal.  Beam relaying through movable connectors is supplied by
-;;; beam-relay-tech; crossing-based beam cutting (no coordinate geometry, just authored
-;;; crossing/sightline facts) is supplied by beam-crossing-tech.  Only normal-mode gate
-;;; control is used, matching corner-topo.
+;;; This is a hybrid of problem-corner.lisp's coordinate geometry and
+;;; problem-corner-topo2.lisp's topological planning model: endpoint coordinates are
+;;; authored once (BEAM-POSITION>), from which the nested -beam-coordinates substrate (see
+;;; tech/-beam-coordinates.lisp, pulled in automatically by beam-crossing) derives
+;;; CROSSINGS-ALONG-BEAM> at init time; planning itself uses only that derived topology,
+;;; exactly as problem-corner-topo2.lisp does with its hand-authored version of the same
+;;; relation.  This file supplies only the coordinates and the CROSSING pool size; all of
+;;; the geometry math and the BEAM-CROSSING> derivation now live in the technology files.
 
 
 (in-package :ww)
 
 
-(ww-set *problem-name* corner-topo2)
+(ww-set *problem-name* corner-topo3)
 
 (ww-set *problem-type* planning)
 
@@ -41,6 +41,9 @@
 ;;;; in the problem.  beam-endpoint is the remaining exception: it is a corner-topo-specific
 ;;;; composite that no tech file declares, so it must live here.  terminus is now owned by
 ;;;; beam-relay-tech, but the identical declaration is left here for local readability.
+;;;; crossing must still be declared in full here (its instance count can't itself be
+;;;; derived -- see -beam-coordinates.lisp's header), even though its content
+;;;; (crossings-along-beam>) is now fully computed from the coordinates below.
 
 
 (define-types
@@ -54,7 +57,7 @@
   mode        (normal inverted toggle)  ;controller mode; corner uses only normal
   crossing    (crossing1 crossing2 crossing3 crossing4 crossing5 crossing6 crossing7 crossing8 crossing9 crossing10
                crossing11 crossing12 crossing13 crossing14 crossing15 crossing16 crossing17 crossing18 crossing19 crossing20
-               crossing21 crossing22 crossing23 crossing24 crossing25 crossing26)  ;26 beam crossings (corner geometry); see define-init
+               crossing21 crossing22 crossing23 crossing24 crossing25 crossing26)  ;pool assigned from computed geometry during initialization
   terminus      (either transmitter receiver connector)  ;what a connector can pair/connect to; also supplied by beam-relay-tech
   beam-endpoint (either transmitter receiver location)  ;a fixture, or a connector's location; not supplied by any tech file
   ;; No inert leaf types remain.  plate, jammer, box, screen, and ladder were all originally
@@ -68,17 +71,19 @@
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
-;;;; corner-topo2 needs beam relaying through movable connectors (beam-relay) with
+;;;; corner-topo3 needs beam relaying through movable connectors (beam-relay) with
 ;;;; crossing-based beam cutting (beam-crossing), plus the walking/sightline background
 ;;;; (accessibility, visibility).  Beam-relay's nested -reachability substrate supplies
 ;;;; identity reach, so pickup/connect require the agent's own location exactly as in
 ;;;; corner-topo.  Including the full reachability technology would override that default
-;;;; and add reachable-via edges, but this problem has none.
+;;;; and add reachable-via edges, but this problem has none.  beam-crossing nests in
+;;;; -beam-coordinates automatically, which is what turns the BEAM-POSITION> facts below
+;;;; into CROSSINGS-ALONG-BEAM>.
 
 
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup-connector; connect-connector
-(include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>
+(include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; beam-position>
 (include-tech accessibility)         ;walk-via; accessible; one-step-accessible; move
 (include-tech visibility)            ;los-to-fixture; los-to-location; visible; visible-clear
 
@@ -169,65 +174,26 @@
   (walk-via location2 (gate1) location4)
   (walk-via location3 (gate1) location4)
 
-  ;; Beam crossings: 26 crossings, one object per geometric point (corner geometry).  Connector-
-  ;; connector (L->L) segments are bidirectional, so beam-crossing> names an L->L beam in a canonical
-  ;; direction while crossings-along-beam> is authored for both directions; beam-reaches-crossing resolves
-  ;; the live orientation.  beam-crossing> names the two beams meeting at a point; crossings-along-beam>
-  ;; lists a directed beam's crossings nearest-source first.
-  (beam-crossing> crossing1 transmitter1 location1 transmitter2 location2)
-  (beam-crossing> crossing2 transmitter1 location1 transmitter2 location3)
-  (beam-crossing> crossing3 transmitter1 location1 transmitter2 location4)
-  (beam-crossing> crossing4 transmitter1 location2 transmitter2 location3)
-  (beam-crossing> crossing5 transmitter1 location2 location3 receiver1)
-  (beam-crossing> crossing6 transmitter1 location2 location1 location3)
-  (beam-crossing> crossing7 transmitter2 location2 transmitter1 location4)
-  (beam-crossing> crossing8 transmitter2 location2 location3 receiver1)
-  (beam-crossing> crossing9 transmitter2 location2 location1 location3)
-  (beam-crossing> crossing10 transmitter2 location3 transmitter1 location4)
-  (beam-crossing> crossing11 transmitter1 location4 location2 receiver1)
-  (beam-crossing> crossing12 transmitter1 location4 location3 receiver1)
-  (beam-crossing> crossing13 transmitter1 location4 location1 location2)
-  (beam-crossing> crossing14 transmitter1 location4 location1 location3)
-  (beam-crossing> crossing15 transmitter2 location4 location2 receiver1)
-  (beam-crossing> crossing16 transmitter2 location4 location3 receiver1)
-  (beam-crossing> crossing17 transmitter2 location4 location1 location2)
-  (beam-crossing> crossing18 transmitter2 location4 location1 location3)
-  (beam-crossing> crossing19 location2 receiver1 location1 location4)
-  (beam-crossing> crossing20 location2 receiver2 location3 receiver3)
-  (beam-crossing> crossing21 location2 receiver2 location3 location4)
-  (beam-crossing> crossing22 location2 receiver3 location4 receiver2)
-  (beam-crossing> crossing23 location2 receiver3 location3 location4)
-  (beam-crossing> crossing24 location3 receiver1 location1 location2)
-  (beam-crossing> crossing25 location3 receiver1 location1 location4)
-  (beam-crossing> crossing26 location3 receiver3 location4 receiver2)
-
-  (crossings-along-beam> location1 (crossing17 crossing13 crossing24) location2)
-  (crossings-along-beam> location1 (crossing18 crossing14 crossing9 crossing6) location3)
-  (crossings-along-beam> location1 (crossing25 crossing19) location4)
-  (crossings-along-beam> location2 (crossing24 crossing13 crossing17) location1)
-  (crossings-along-beam> location2 (crossing11 crossing15 crossing19) receiver1)
-  (crossings-along-beam> location2 (crossing21 crossing20) receiver2)
-  (crossings-along-beam> location2 (crossing23 crossing22) receiver3)
-  (crossings-along-beam> location3 (crossing6 crossing9 crossing14 crossing18) location1)
-  (crossings-along-beam> location3 (crossing21 crossing23) location4)
-  (crossings-along-beam> location3 (crossing5 crossing8 crossing24 crossing12 crossing16 crossing25) receiver1)
-  (crossings-along-beam> location3 (crossing20 crossing26) receiver3)
-  (crossings-along-beam> location4 (crossing19 crossing25) location1)
-  (crossings-along-beam> location4 (crossing23 crossing21) location3)
-  (crossings-along-beam> location4 (crossing22 crossing26) receiver2)
-  (crossings-along-beam> transmitter1 (crossing2 crossing1 crossing3) location1)
-  (crossings-along-beam> transmitter1 (crossing4 crossing6 crossing5) location2)
-  (crossings-along-beam> transmitter1 (crossing10 crossing7 crossing14 crossing13 crossing12 crossing11) location4)
-  (crossings-along-beam> transmitter2 (crossing1 crossing7 crossing9 crossing8) location2)
-  (crossings-along-beam> transmitter2 (crossing2 crossing10 crossing4) location3)
-  (crossings-along-beam> transmitter2 (crossing3 crossing18 crossing17 crossing16 crossing15) location4)
+  ;; Exact 2D endpoint coordinates from problem-corner.lisp.  -beam-coordinates.lisp's
+  ;; establish-beam-coordinates init-action derives crossings-along-beam> from these
+  ;; (together with the los-to-fixture/los-to-location facts above) before search begins;
+  ;; the coordinates themselves drive nothing thereafter.
+  (beam-position> location1 9 1)
+  (beam-position> location2 9 8)
+  (beam-position> location3 10 9)
+  (beam-position> location4 7 8)
+  (beam-position> transmitter1 11 1/10)
+  (beam-position> transmitter2 10 1/10)
+  (beam-position> receiver1 81/10 1)
+  (beam-position> receiver2 7 109/10)
+  (beam-position> receiver3 1 109/10)
 )
 
 
 (define-init-action initialize-derived-state
-  ;; Derive the full derived layer (open, crossing-active, color, active) once after
-  ;; define-init, so the start state is consistent by construction.  Called directly
-  ;; (not as a finally followup).
+  ;; Derive the full derived layer (open, crossing-active, color, active) after
+  ;; -beam-coordinates.lisp's establish-beam-coordinates has established the static
+  ;; crossing topology from the coordinates above.
   0
   ()
   (always-true)

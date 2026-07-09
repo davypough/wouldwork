@@ -9,13 +9,11 @@
 ;;;   types     : agent, location  --  ladder is declared optional here (define-optional-types)
 ;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
 ;;;               -location (mobile-object, (has-location ...)); -position (fixed-position-object,
-;;;               (has-position ...))  --  all shared via nested include-tech rather than local
-;;;               declaration
-;;;   queries   : accessible-clear, all-clear (accessibility)
+;;;               (has-position ...)); -passability (obstacle-clear, all-clear)  --  all
+;;;               shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
-;;;   types     : ladder  --  declared optional here; accessibility independently
-;;;               declares its own ladder-alias for its own pre-params; the bare and aliased
-;;;               forms resolve compatibly
+;;;   types     : ladder  --  declared optional here and by nested -passability; the
+;;;               declarations resolve compatibly
 ;;;   relations : (traversable> location $list location)
 ;;;   query     : one-way-clear
 ;;;   action    : use-ladder
@@ -23,6 +21,7 @@
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -position)
+(include-tech -passability)
 
 (in-package :ww)
 
@@ -36,7 +35,7 @@
 
 (define-query one-way-clear (?agent ?means)
   ;; Every implement enabling a one-way edge must be usable by ?agent.  Delegates to
-  ;; accessibility's shared all-clear over the edge's means list, so use-ladder can
+  ;; passability's shared all-clear over the edge's means list, so use-ladder can
   ;; guard the hop without re-deriving passability inline.
   (all-clear ?agent ?means))
 

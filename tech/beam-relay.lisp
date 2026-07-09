@@ -12,9 +12,15 @@
 ;;; REQUIRES:
 ;;;   types      : agent, location  --  plate, box, hue, connector, transmitter, and
 ;;;                receiver are declared optional here (define-optional-types)
-;;;   relations  : holding, has-location, on, has-position
+;;;   nested     : -beam-substrate (beam relations, receiver update, and peer hooks);
+;;;                -holding (cargo, holding); -location (mobile-object, has-location);
+;;;                -support-occupancy (support-occupant, support, on, cleartop);
+;;;                -position (fixed-position-object, has-position);
+;;;                -visibility (null-default visible interface);
+;;;                -reachability (identity-default reachable query; overridden by
+;;;                reachability when that technology is included)
 ;;;   parameter  : *max-pairings*
-;;;   queries    : visible, reachable, cleartop
+;;;   extension  : visibility overrides -visibility's null default with authored LOS
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-connector-status! -> update-receiver-status!
 ;;; PROVIDES:
@@ -34,6 +40,12 @@
 ;;;   actions    : pickup-connector, connect-connector
 
 (include-tech -beam-substrate)
+(include-tech -holding)
+(include-tech -location)
+(include-tech -support-occupancy)
+(include-tech -position)
+(include-tech -visibility)
+(include-tech -reachability)
 
 (in-package :ww)
 

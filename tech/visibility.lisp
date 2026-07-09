@@ -7,32 +7,21 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, and receiver are declared optional here
-;;;               (define-optional-types), coordinated with gate, accessibility,
+;;;               through nested -visibility, coordinated with gate, accessibility,
 ;;;               reachability, beam-direct, and beam-crossing, which all convert gate
 ;;;               together since they share the (open gate) relation verbatim
+;;;   nested    : -visibility (fixture and the null-default visible interface)
 ;;; PROVIDES:
-;;;   types     : fixture (either gate transmitter receiver)  --  fixed object that can be
-;;;               directly named in a LOS fact
-;;;               gate, transmitter, receiver  --  declared optional here; other techs
-;;;               (-beam-substrate, beam-direct, beam-relay, beam-crossing, gate, etc.)
-;;;               independently declare their own transmitter-alias/receiver-alias for their
-;;;               own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : (open gate)  --  also declared identically by gate, accessibility,
 ;;;               reachability, and beam-direct; only gate's update-gate-status!
 ;;;               ever asserts it
 ;;;               (los-to-fixture location $list fixture),
 ;;;               (los-to-location location $list location)
-;;;   queries   : visible, visible-clear
+;;;   queries   : visible (overrides -visibility's null default), visible-clear
+
+(include-tech -visibility)
 
 (in-package :ww)
-
-
-(define-types
-  fixture (either gate transmitter receiver))  ;fixed object that can be directly named in a LOS fact
-
-
-(define-optional-types gate transmitter receiver)
-
 
 (define-dynamic-relations
   (open gate))  ;also declared by gate/accessibility/reachability/beam-direct; only gate writes it

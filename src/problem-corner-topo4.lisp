@@ -1,21 +1,23 @@
-;;; Filename: problem-corner-topo2.lisp
+;;; Filename: problem-corner-topo4.lisp
 
-;;; Talos Principle problem 'Around the Corner' (Purgatory workshop 3), rebuilt from
-;;; self-contained technology files, following the problem-claustro4a.lisp architecture.
-;;; Same objects, hues, controls, connectivity, and topological (coordinate-free) beam
-;;; geometry as problem-corner-topo.lisp.  Behavior is supplied entirely by
-;;; (include-tech ...) directives that the stage-time splicer (exchange-problem-file)
-;;; expands in place; this file holds only the glue: types, the master propagation
-;;; driver, and the init/goal.  Beam relaying through movable connectors is supplied by
-;;; beam-relay-tech; crossing-based beam cutting (no coordinate geometry, just authored
-;;; crossing/sightline facts) is supplied by beam-crossing-tech.  Only normal-mode gate
-;;; control is used, matching corner-topo.
+;;; Talos Principle problem 'Around the Corner' (Purgatory workshop 3).  Identical to
+;;; problem-corner-topo2.lisp in every respect except one: BEAM-CROSSING> is no longer
+;;; hand-authored.  topo2 requires the user to maintain two independent tables describing
+;;; the same 26 crossing points: BEAM-CROSSING> (which two beams meet at each crossing)
+;;; and CROSSINGS-ALONG-BEAM> (each directed beam's crossings, nearest-source first) --
+;;; with nothing to catch them drifting apart.  Only the ORDERING in CROSSINGS-ALONG-BEAM>
+;;; is irreducible geometric content; which two beams meet at a given crossing is fully
+;;; recoverable from that same table.  This file keeps CROSSINGS-ALONG-BEAM> exactly as
+;;; topo2 authored it, drops BEAM-CROSSING> from DEFINE-INIT entirely, and derives it once
+;;; at init time via INITIALIZE-BEAM-CROSSING-TOPOLOGY -- a symbolic grouping over
+;;; CROSSINGS-ALONG-BEAM> that needs no coordinates.  A crossing that doesn't resolve to
+;;; exactly two beams signals a load-time error instead of a silent inconsistency.
 
 
 (in-package :ww)
 
 
-(ww-set *problem-name* corner-topo2)
+(ww-set *problem-name* corner-topo4)
 
 (ww-set *problem-type* planning)
 
@@ -68,7 +70,7 @@
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
-;;;; corner-topo2 needs beam relaying through movable connectors (beam-relay) with
+;;;; corner-topo4 needs beam relaying through movable connectors (beam-relay) with
 ;;;; crossing-based beam cutting (beam-crossing), plus the walking/sightline background
 ;;;; (accessibility, visibility).  Beam-relay's nested -reachability substrate supplies
 ;;;; identity reach, so pickup/connect require the agent's own location exactly as in
@@ -81,6 +83,50 @@
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>
 (include-tech accessibility)         ;walk-via; accessible; one-step-accessible; move
 (include-tech visibility)            ;los-to-fixture; los-to-location; visible; visible-clear
+
+
+;;;; BEAM-CROSSING DERIVATION ;;;;
+;;;; BEAM-CROSSING> is not authored in this file's DEFINE-INIT.  It is derived once,
+;;;; below, purely from the already-authored CROSSINGS-ALONG-BEAM> facts -- no
+;;;; coordinates involved.  A crossing point necessarily lies on exactly two beams, and
+;;;; CROSSINGS-ALONG-BEAM> already records, for every directed beam, which crossings lie
+;;;; on it; grouping those entries by crossing id recovers the same pairing BEAM-CROSSING>
+;;;; would otherwise hand-author.  Connector-connector (location-location) beams are
+;;;; authored in both directions (crossings-along-beam> is consulted in whichever
+;;;; direction is live at a given moment), so only one canonical direction per L-L pair is
+;;;; taken here to avoid counting the same crossing from both mirrored copies -- the same
+;;;; ascending-type-order convention problem-corner-topo3.lisp's CORNER-TOPO3-POTENTIAL-BEAMS
+;;;; already uses for the identical purpose.  Fixed-direction beams (transmitter->location,
+;;;; location->receiver) are never mirrored, so no disambiguation is needed for them.
+
+
+(define-query corner-topo4-canonical-beams ()
+  ;; Every authored crossings-along-beam> fact, as a (from to) pair, keeping only the
+  ;; canonical direction for location-location pairs (ascending declared-type order).
+  ;; Fixed-direction beams (transmitter->location, location->receiver) are never
+  ;; mirrored, so they need no disambiguation.
+  (do (assign $beams nil)
+      (doall (?from beam-endpoint)
+        (doall (?to beam-endpoint)
+          (if (bind (crossings-along-beam> ?from $ids ?to))
+            (if (and (location ?from) (location ?to))
+              (if (member ?to (rest (member ?from (gethash 'location *types*))))
+                (push (list ?from ?to) $beams))
+              (push (list ?from ?to) $beams)))))
+      $beams))
+
+
+(define-query corner-topo4-beams-for-crossing (?crossing ?beams)
+  ;; The canonical beams (drawn from ?beams) whose crossings-along-beam> list contains
+  ;; ?crossing.  Correctly-authored data yields exactly two.
+  (do (assign $containing nil)
+      (ww-loop for $beam in ?beams
+               do (assign $from (first $beam))
+                  (assign $to (second $beam))
+                  (bind (crossings-along-beam> $from $ids $to))
+                  (if (member ?crossing $ids)
+                    (push $beam $containing)))
+      $containing))
 
 
 ;;;; MASTER PROPAGATION DRIVER ;;;;
@@ -169,38 +215,12 @@
   (walk-via location2 (gate1) location4)
   (walk-via location3 (gate1) location4)
 
-  ;; Beam crossings: 26 crossings, one object per geometric point (corner geometry).  Connector-
-  ;; connector (L->L) segments are bidirectional, so beam-crossing> names an L->L beam in a canonical
-  ;; direction while crossings-along-beam> is authored for both directions; beam-reaches-crossing resolves
-  ;; the live orientation.  beam-crossing> names the two beams meeting at a point; crossings-along-beam>
-  ;; lists a directed beam's crossings nearest-source first.
-  (beam-crossing> crossing1 transmitter1 location1 transmitter2 location2)
-  (beam-crossing> crossing2 transmitter1 location1 transmitter2 location3)
-  (beam-crossing> crossing3 transmitter1 location1 transmitter2 location4)
-  (beam-crossing> crossing4 transmitter1 location2 transmitter2 location3)
-  (beam-crossing> crossing5 transmitter1 location2 location3 receiver1)
-  (beam-crossing> crossing6 transmitter1 location2 location1 location3)
-  (beam-crossing> crossing7 transmitter2 location2 transmitter1 location4)
-  (beam-crossing> crossing8 transmitter2 location2 location3 receiver1)
-  (beam-crossing> crossing9 transmitter2 location2 location1 location3)
-  (beam-crossing> crossing10 transmitter2 location3 transmitter1 location4)
-  (beam-crossing> crossing11 transmitter1 location4 location2 receiver1)
-  (beam-crossing> crossing12 transmitter1 location4 location3 receiver1)
-  (beam-crossing> crossing13 transmitter1 location4 location1 location2)
-  (beam-crossing> crossing14 transmitter1 location4 location1 location3)
-  (beam-crossing> crossing15 transmitter2 location4 location2 receiver1)
-  (beam-crossing> crossing16 transmitter2 location4 location3 receiver1)
-  (beam-crossing> crossing17 transmitter2 location4 location1 location2)
-  (beam-crossing> crossing18 transmitter2 location4 location1 location3)
-  (beam-crossing> crossing19 location2 receiver1 location1 location4)
-  (beam-crossing> crossing20 location2 receiver2 location3 receiver3)
-  (beam-crossing> crossing21 location2 receiver2 location3 location4)
-  (beam-crossing> crossing22 location2 receiver3 location4 receiver2)
-  (beam-crossing> crossing23 location2 receiver3 location3 location4)
-  (beam-crossing> crossing24 location3 receiver1 location1 location2)
-  (beam-crossing> crossing25 location3 receiver1 location1 location4)
-  (beam-crossing> crossing26 location3 receiver3 location4 receiver2)
-
+  ;; Beam crossings: 26 crossings, one object per geometric point (corner geometry).
+  ;; BEAM-CROSSING> is NOT authored here -- it is derived at init time by
+  ;; INITIALIZE-BEAM-CROSSING-TOPOLOGY from the CROSSINGS-ALONG-BEAM> facts below.
+  ;; Connector-connector (L->L) segments are bidirectional, so crossings-along-beam> is
+  ;; authored for both directions; beam-reaches-crossing resolves the live orientation.
+  ;; crossings-along-beam> lists a directed beam's crossings nearest-source first.
   (crossings-along-beam> location1 (crossing17 crossing13 crossing24) location2)
   (crossings-along-beam> location1 (crossing18 crossing14 crossing9 crossing6) location3)
   (crossings-along-beam> location1 (crossing25 crossing19) location4)
@@ -224,10 +244,32 @@
 )
 
 
+(define-init-action initialize-beam-crossing-topology
+  ;; Derives BEAM-CROSSING> from the CROSSINGS-ALONG-BEAM> facts just asserted, purely
+  ;; symbolically -- no coordinates.  For each declared crossing, finds the (canonical)
+  ;; beams whose crossings-along-beam> list mentions it; errors if that count isn't
+  ;; exactly 2, which would indicate crossings-along-beam> itself is inconsistent.
+  0
+  ()
+  (always-true)
+  ()
+  (assert
+    (do (assign $beams (corner-topo4-canonical-beams))
+        (doall (?crossing crossing)
+          (do (assign $containing (corner-topo4-beams-for-crossing ?crossing $beams))
+              (if (/= (length $containing) 2)
+                (error "Crossing ~A appears on ~A canonical beam(s); expected exactly 2."
+                       ?crossing (length $containing)))
+              (assign $beam1 (first $containing))
+              (assign $beam2 (second $containing))
+              (beam-crossing> ?crossing
+                              (first $beam1) (second $beam1)
+                              (first $beam2) (second $beam2)))))))
+
+
 (define-init-action initialize-derived-state
-  ;; Derive the full derived layer (open, crossing-active, color, active) once after
-  ;; define-init, so the start state is consistent by construction.  Called directly
-  ;; (not as a finally followup).
+  ;; Derive the full derived layer (open, crossing-active, color, active) after
+  ;; initialize-beam-crossing-topology has established the static crossing topology.
   0
   ()
   (always-true)

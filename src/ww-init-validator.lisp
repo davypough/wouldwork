@@ -12,7 +12,8 @@
   (check-init-physical-consistency literals)
   (check-init-connector-consistency literals)
   (check-init-control-and-beam-consistency literals)
-  (check-init-crossing-consistency literals))
+  (check-init-crossing-consistency literals)
+  (report-init-sightline-coverage literals))  ;; NEW
 
 
 (defun check-init-general-consistency (literals)
@@ -43,6 +44,7 @@
   (check-init-beam-crossings-are-indexed-by-declared-beams literals)
   (check-init-crossing-lists-match-declared-beams literals)
   (check-init-location-beam-reverses literals)
+  (check-init-crossing-beams-have-sightlines literals)  ;; NEW
   (check-init-crossings-before-gate-prefixes literals)
   (check-init-crossings-before-gate-gates-occlude-beams literals))
 
@@ -624,11 +626,10 @@ would overwrite the previous value during install-init."
 
 
 (defun init-first-matching-list-value (relation literals test)
-  (dolist (literal (init-literals-with-relation relation literals))
+  (dolist (literal (init-literals-with-relation relation literals) (values nil nil))
     (let ((proposition (init-literal-proposition literal)))
       (when (funcall test proposition)
-        (return (values (third proposition) t)))))
-  (values nil nil))
+        (return (values (third proposition) t))))))
 
 
 (defun init-occluders-for-directed-beam (source destination literals)
@@ -851,6 +852,22 @@ so the reverse pairing is also accepted when both endpoints are locations."
                      literal crossings reverse-crossings (reverse crossings)))))))))
 
 
+(defun check-init-crossing-beams-have-sightlines (literals)  ;; NEW
+  "Checks that every CROSSINGS-ALONG-BEAM> beam has a matching sightline or corridor fact."
+  (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
+    (destructuring-bind (source crossings destination)
+        (rest (init-literal-proposition literal))
+      (declare (ignore crossings))
+      (multiple-value-bind (occluders found-p)
+          (init-occluders-for-directed-beam source destination literals)
+        (declare (ignore occluders))
+        (unless found-p
+          (error "~%CROSSINGS-ALONG-BEAM> beam has no matching sightline/corridor fact.~%~
+                  Literal:  ~S~%~
+                  Beam:     ~S -> ~S"
+                 literal source destination))))))
+
+
 (defun check-init-crossings-before-gate-prefixes (literals)
   "Checks that each CROSSINGS-BEFORE-GATE> list is an initial prefix of
 the matching CROSSINGS-ALONG-BEAM> list."
@@ -894,3 +911,72 @@ the matching CROSSINGS-ALONG-BEAM> list."
                   Beam:     ~S -> ~S~%~
                   Occluders: ~S"
                  literal gate source destination occluders))))))
+
+
+(defun init-beam-position-map (literals)
+  (let ((positions (make-hash-table :test #'equal)))
+    (dolist (literal (init-literals-with-relation 'beam-position> literals))
+      (destructuring-bind (endpoint x y)
+          (rest (init-literal-proposition literal))
+        (setf (gethash endpoint positions) (list x y))))
+    positions))
+
+
+(defun init-beam-distance (endpoint1 endpoint2 positions)
+  (let ((position1 (gethash endpoint1 positions))
+        (position2 (gethash endpoint2 positions)))
+    (when (and position1 position2)
+      (sqrt (+ (expt (- (first position1) (first position2)) 2)
+               (expt (- (second position1) (second position2)) 2))))))
+
+
+(defun report-init-missing-sightline (source destination positions)
+  (let ((distance (init-beam-distance source destination positions)))
+    (if distance
+      (format t "~%NOTE: No LOS fact for potential beam ~A -> ~A (straight-line distance ~,2F)."
+              source destination distance)
+      (format t "~%NOTE: No LOS fact for potential beam ~A -> ~A."
+              source destination))))
+
+
+(defun report-init-fixture-sightline-coverage (literals positions)
+  "Reports TRANSMITTER/LOCATION and LOCATION/RECEIVER pairs with no LOS-TO-FIXTURE fact."
+  (when (gethash 'los-to-fixture *static-relations*)
+    (dolist (transmitter (gethash 'transmitter *types*))
+      (dolist (location (gethash 'location *types*))
+        (unless (init-los-to-fixture-p location transmitter literals)
+          (report-init-missing-sightline transmitter location positions))))
+    (dolist (location (gethash 'location *types*))
+      (dolist (receiver (gethash 'receiver *types*))
+        (unless (init-los-to-fixture-p location receiver literals)
+          (report-init-missing-sightline location receiver positions))))))
+
+
+(defun report-init-location-sightline-coverage (literals positions)
+  "Reports LOCATION/LOCATION pairs with no LOS-TO-LOCATION fact."
+  (when (gethash 'los-to-location *static-relations*)
+    (let ((locations (gethash 'location *types*)))
+      (dolist (location1 locations)
+        (dolist (location2 (rest (member location1 locations)))
+          (unless (init-los-to-location-p location1 location2 literals)
+            (report-init-missing-sightline location1 location2 positions)))))))
+
+
+(defun init-beam-crossing-tech-p ()
+  (gethash 'crossings-along-beam> *static-relations*))
+
+
+(defun report-init-sightline-coverage (literals)
+  "Non-fatal report of TRANSMITTER/LOCATION, LOCATION/RECEIVER, and LOCATION/LOCATION
+   pairs with no authored LOS-TO-FIXTURE or LOS-TO-LOCATION fact. Only meaningful for
+   problems using BEAM-CROSSING technology, whose -BEAM-COORDINATES substrate treats every
+   such LOS-permitted pair as a potential beam; other problems (eg, BEAM-DIRECT-based ones)
+   use LOS-TO-FIXTURE/LOS-TO-LOCATION for unrelated sightline purposes, where sparse
+   coverage is normal and not worth reporting. Purely advisory even when it does run --
+   an occluding gate, wall, or corner can legitimately block a sightline -- so this never
+   errors; it only prints a note (with straight-line distance, when BEAM-POSITION>
+   coordinates are available for both endpoints) for manual review."
+  (when (init-beam-crossing-tech-p)
+    (let ((positions (init-beam-position-map literals)))
+      (report-init-fixture-sightline-coverage literals positions)
+      (report-init-location-sightline-coverage literals positions))))

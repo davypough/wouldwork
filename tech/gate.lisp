@@ -14,8 +14,12 @@
 ;;;               like the rest, coordinated across this file plus accessibility, visibility,
 ;;;               reachability, beam-direct, and beam-crossing, which all convert
 ;;;               together since they share the (open gate) relation verbatim
-;;;   relations : active (-beam-substrate); depressed (plate);
-;;;               jamming (jammer)
+;;;   nested    : -beam-substrate ((active receiver), null beam defaults)
+;;;   conditional relations:
+;;;               depressed (plate), guarded by plate
+;;;               jamming (jammer), guarded by an exists over jammer
+;;;               The owning tech is required only when the guarding optional type is nonempty;
+;;;               translation removes the guarded reference when that type is empty.
 ;;;   driver    : the master propagate-consequences! must call update-gate-status!
 ;;; PROVIDES:
 ;;;   types     : gate, plate, jammer, mode, receiver  --  declared optional here; a problem
@@ -29,6 +33,8 @@
 ;;;               (controls $list gate $mode)
 ;;;   query     : energized
 ;;;   update    : update-gate-status!
+
+(include-tech -beam-substrate)
 
 (in-package :ww)
 

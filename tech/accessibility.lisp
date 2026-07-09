@@ -7,37 +7,25 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  gate, screen, and ladder are declared optional here
-;;;               (define-optional-types), coordinated with gate, visibility, reachability,
+;;;               through nested -passability, coordinated with gate, visibility, reachability,
 ;;;               beam-direct, and beam-crossing, which all convert gate together since
 ;;;               they share the (open gate) relation verbatim
 ;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
-;;;               -location (mobile-object, (has-location ...)); -holding (cargo, (holding ...));
-;;;               -elevation ((has-elevation ...), location-elevation)
+;;;               -location (mobile-object, (has-location ...)); -passability
+;;;               (open, obstacle-clear, all-clear); -elevation
+;;;               ((has-elevation ...), location-elevation)
 ;;;               --  all shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
-;;;   types     : gate, screen, ladder  --  declared optional here; ladder independently
-;;;               declares its own ladder-alias for its own pre-params; the bare and aliased
-;;;               forms resolve compatibly
-;;;   relations : (open gate)  --  also declared identically by gate, visibility,
-;;;               reachability, and beam-direct; only gate's update-gate-status!
-;;;               ever asserts it
-;;;               (walk-via location $list location)
-;;;   queries   : accessible, one-step-accessible, accessible-clear, all-clear
+;;;   relations : (walk-via location $list location)
+;;;   queries   : accessible, one-step-accessible
 ;;;   action    : move
 
 (include-tech -support-occupancy)
 (include-tech -location)
-(include-tech -holding)
+(include-tech -passability)
 (include-tech -elevation)
 
 (in-package :ww)
-
-
-(define-optional-types gate screen ladder)
-
-
-(define-dynamic-relations
-  (open gate))  ;also declared by gate/visibility/reachability/beam-direct; only gate writes it
 
 
 (define-static-relations
@@ -92,25 +80,3 @@
   (and (bind (walk-via ?from $obstacles ?to))
        (= (location-elevation ?from) (location-elevation ?to))
        (all-clear ?agent $obstacles)))
-
-
-(define-query all-clear (?agent ?obstacles)
-  ;; Every item in a guarding/enabling list must be individually passable for ?agent.
-  ;; Shared by one-step-accessible (walk-via obstacles), jump-to (jump-via obstacles), and
-  ;; one-way-clear (traversable> means), so the aggregation loop over accessible-clear is
-  ;; written once.
-  (ww-loop for $f in ?obstacles
-           always (accessible-clear ?agent $f)))
-
-
-(define-query accessible-clear (?agent agent ?obstacle (either gate screen ladder))
-  ;; Per-kind passability for one obstacle.  All option branches are present; a problem
-  ;; exercises only the kinds it declares (gate/screen on walk edges here, ladder via
-  ;; ladder's one-way-clear).  An open gate passes; a screen or ladder passes only
-  ;; empty-handed.
-  (or (and (gate ?obstacle)
-           (open ?obstacle))
-      (and (screen ?obstacle)
-           (not (bind (holding ?agent $any-held-object))))
-      (and (ladder ?obstacle)
-           (not (bind (holding ?agent $any-held-object))))))

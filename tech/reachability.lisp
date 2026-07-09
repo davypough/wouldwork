@@ -9,6 +9,7 @@
 ;;;               coordinated with gate, accessibility, visibility, beam-direct, and
 ;;;               beam-crossing, which all convert gate together since they share the
 ;;;               (open gate) relation verbatim
+;;;   nested    : -reachability (identity-default reachable query overridden here)
 ;;; PROVIDES:
 ;;;   types     : gate  --  declared optional here; other techs (gate, accessibility,
 ;;;               visibility, beam-direct, beam-crossing, etc.) independently declare their
@@ -18,7 +19,9 @@
 ;;;               visibility, and beam-direct; only gate's update-gate-status!
 ;;;               ever asserts it
 ;;;               (reachable-via location $list location)
-;;;   queries   : reachable, reachable-clear
+;;;   queries   : reachable (overrides -reachability), reachable-clear
+
+(include-tech -reachability)
 
 (in-package :ww)
 

@@ -2,12 +2,10 @@
 
 ;;; Plate technology: pressure plates that depress under any movable object resting on them.
 ;;;
-;;; REQUIRES (supplied by other techs):
+;;; REQUIRES:
 ;;;   type   : plate  --  declared optional here via define-optional-types, so a problem
 ;;;            with no plate instances need not declare plate itself
-;;;   query  : cleartop (-support-occupancy) -- cleartop itself depends
-;;;            on -support-occupancy's own (on ...) declaration, but plate never
-;;;            references on directly
+;;;   nested : -support-occupancy (support-occupant, support, on, cleartop)
 ;;;   driver : the master propagate-consequences! must call update-plate-status!
 ;;; PROVIDES:
 ;;;   type     : plate  --  declared optional here (define-optional-types); a problem with no
@@ -16,6 +14,8 @@
 ;;;              two names resolve compatibly and do not conflict.
 ;;;   relation : (depressed plate)  --  read by gate's energized
 ;;;   update   : update-plate-status!
+
+(include-tech -support-occupancy)
 
 (in-package :ww)
 

@@ -1,29 +1,19 @@
 ;;; Filename: barrier.lisp
 
-;;; Barrier-vaulting technology: jump over a fence, gate, or screen from a box on
-;;; the departure side.
+;;; Barrier-vaulting technology: jump over a fence, gate, or screen from a sufficiently
+;;; elevated location or support on the departure side.
 ;;; Barrier edges may use symmetric traversable facts or directed traversable> facts.  The agent
-;;; must already be standing on a box at the departure location, no more than one level below the
-;;; tallest barrier top in the edge's means list, may carry cargo, and lands either on the ground
-;;; or on a clear box at the target location as long as the landing elevation is not above that
-;;; original standing elevation.
+;;; must stand no more than one level below the tallest barrier top in the edge's means list,
+;;; may carry cargo, and lands either on the ground or on a clear box at the target location as
+;;; long as the landing elevation is not above that original standing elevation.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and fence are declared optional here
 ;;;               (define-optional-types); gate and screen need no declaration of their own
 ;;;               here either, since vaultable-barrier's (either fence gate screen) tolerates
 ;;;               their absence directly
-;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
-;;;               -height (heighted-object, (has-height ...)); -location (mobile-object,
-;;;               (has-location ...)); -elevation ((has-elevation ...), location-elevation)  --
-;;;               all four shared via nested include-tech rather than
-;;;               local declaration.  (Previously this file declared support-occupant/support
-;;;               and mobile-object/has-location by hand instead of nesting their owning substrate
-;;;               files -- only correct when box/jammer/accessibility/ladder happened to
-;;;               also be included.  The nested includes make this file genuinely
-;;;               self-contained.)
-;;;   queries   : occupant-elevation, support-top-elevation (box, for the vaulting-height
-;;;               and landing-height checks)
+;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
+;;;               occupant-elevation, and support-top-elevation)
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
 ;;;   types     : box, fence  --  declared optional here; other techs (box, jammer,
@@ -39,10 +29,7 @@
 ;;;   queries   : barrier-height, vaultable-barrier-list, vault-clearance-height
 ;;;   action    : vault-over
 
-(include-tech -support-occupancy)
-(include-tech -height)
-(include-tech -location)
-(include-tech -elevation)
+(include-tech -support-elevation)
 
 (in-package :ww)
 
@@ -89,33 +76,33 @@
 
 
 (define-action vault-over
-  ;; Vault a fence/gate/screen edge from the box the agent is already standing on, tall enough
-  ;; to clear the tallest listed barrier: occupant-elevation must be no more than one level
-  ;; below that top.  Each landing branch must also be no higher than the departure elevation.
-  ;; The jump removes the departure support and branches over possible landings on clear
-  ;; target-side boxes, plus the ground fallback.
+  ;; Vault a fence/gate/screen edge from the agent's current standing elevation, whether that
+  ;; comes from the location floor or a box.  The agent must be no more than one level below
+  ;; the tallest listed barrier.  Each landing branch must also be no higher than the departure
+  ;; elevation.  The jump removes any departure support and branches over possible landings on
+  ;; clear target-side boxes, plus the ground fallback.
   1
-  (?agent agent ?box box)
+  (?agent agent)
   (and (bind (has-location ?agent $from))
-       (on ?agent ?box)
-       (bind (has-location ?box $from))
        (or (bind (traversable $from $means $to))
            (bind (traversable> $from $means $to)))
        (vaultable-barrier-list $means)
        (assign $departure-elevation (occupant-elevation ?agent))
        (<= (- (vault-clearance-height $means) $departure-elevation) 1))
-  (":" ?agent "jumps over" $means "from" ?box "at" $from "to" $to "on" $place)
+  (":" ?agent "jumps over" $means "from" $from "to" $to "on" $place)
   (do (doall (?landing-box box)
         (if (and (has-location ?landing-box $to)
                  (cleartop ?landing-box)
                  (<= (support-top-elevation ?landing-box) $departure-elevation))
           (assert (has-location ?agent $to)
-                  (not (on ?agent ?box))
+                  (if (bind (on ?agent $departure-support))
+                    (not (on ?agent $departure-support)))
                   (on ?agent ?landing-box)
                   (assign $place ?landing-box)
                   (finally (propagate-changes!)))))
       (if (<= (location-elevation $to) $departure-elevation)
         (assert (has-location ?agent $to)
-                (not (on ?agent ?box))
+                (if (bind (on ?agent $departure-support))
+                  (not (on ?agent $departure-support)))
                 (assign $place 'ground)
                 (finally (propagate-changes!))))))

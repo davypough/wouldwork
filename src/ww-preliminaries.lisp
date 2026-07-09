@@ -365,6 +365,22 @@
     (setf *static-idb* (make-hash-table :synchronized (> *threads* 0))))
   (when (boundp '*prop-key-cache*)
     (setf *prop-key-cache* (make-hash-table :test #'equal :synchronized (> *threads* 0))))
+  ;; Remove compiled functions and translation metadata owned by the previous problem.
+  ;; Otherwise an omitted technology can leave a stale query/update looking like an
+  ;; ordinary Lisp function during translation.
+  (let ((old-function-names
+          (append (when (and (boundp '*query-names*) (listp *query-names*))
+                    (copy-list *query-names*))
+                  (when (and (boundp '*update-names*) (listp *update-names*))
+                    (copy-list *update-names*)))))
+    (dolist (function-name (delete-duplicates old-function-names))
+      (when (fboundp function-name)
+        (fmakunbound function-name))
+      (when (boundp function-name)
+        (makunbound function-name))
+      (remprop function-name :raw-body)
+      (remprop function-name :raw-args)
+      (remprop function-name :param-types)))
   ;; Reset lists that accumulate problem definitions
   (when (and (boundp '*query-names*) (listp *query-names*))
     (setf *query-names* nil))

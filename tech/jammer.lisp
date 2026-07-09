@@ -9,13 +9,13 @@
 ;;;   types     : agent, location  --  plate, jammer, and box are declared optional here
 ;;;               (define-optional-types), so a problem lacking any of them need not
 ;;;               declare it
-;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
-;;;               -location (mobile-object, (has-location ...)); -holding (cargo, (holding ...));
-;;;               -position (fixed-position-object, (has-position ...)); -height
-;;;               (heighted-object, (has-height ...), declared-height)  --  all shared via
+;;;   nested    : -holding (cargo, holding); -support-elevation
+;;;               (support occupancy, location, position, height, elevation, and
+;;;               occupant-elevation); -reachability
+;;;               (identity-default reachable, overridden by reachability); -visibility
+;;;               (null-default visible interface)  --  all shared via
 ;;;               nested include-tech rather than local declaration
-;;;   queries   : reachable (reachability), visible (visibility),
-;;;               occupant-elevation (box, for pickup-jammer's vertical reach)
+;;;   extension : visibility overrides -visibility's null default with authored LOS
 ;;;   driver    : propagate-changes! (master); (jamming ...) is consumed by gate's
 ;;;               update-gate-status!
 ;;; PROVIDES:
@@ -29,11 +29,10 @@
 ;;;               (jam-disallowed> location location target)
 ;;;   actions   : pickup-jammer, jam-target
 
-(include-tech -support-occupancy)
-(include-tech -location)
 (include-tech -holding)
-(include-tech -position)
-(include-tech -height)
+(include-tech -support-elevation)
+(include-tech -reachability)
+(include-tech -visibility)
 
 (in-package :ww)
 

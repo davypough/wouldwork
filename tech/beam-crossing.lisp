@@ -5,17 +5,25 @@
 ;;; specific behavior; it does NOT pull in the direct beam line, so a problem wanting
 ;;; a direct line must include beam-direct as well.  If beam-relay is also included,
 ;;; relay beams participate through relay hook queries supplied by beam-relay.
+;;; BEAM-CROSSING> is derived internally, lazily and once, from whichever facts populate
+;;; CROSSINGS-ALONG-BEAM> -- hand-authored directly (as corner-topo2 does), or computed
+;;; from coordinates via the nested -beam-coordinates substrate (see that file).  A problem
+;;; may still assert BEAM-CROSSING> itself (as corner-topo3/4 do); it is simply never read.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-crossing).
 ;;;
 ;;; REQUIRES:
-;;;   types     : crossing, beam-endpoint  --  gate and transmitter are declared optional
-;;;               here (define-optional-types), gate coordinated with gate, accessibility,
-;;;               visibility, reachability, and beam-direct, which all convert gate
-;;;               together since they share the (open gate) relation verbatim
+;;;   types     : beam-endpoint  --  declared by the problem; crossing is declared optional
+;;;               by the nested -beam-coordinates substrate, though a problem with any
+;;;               crossings still declares its own full crossing1, crossing2, ... pool;
+;;;               gate and transmitter are declared optional here (define-optional-types),
+;;;               gate coordinated with gate, accessibility, visibility, reachability, and
+;;;               beam-direct, which all convert gate together since they share the (open
+;;;               gate) relation verbatim
 ;;;   driver    : propagate-consequences! must call update-crossing-status! before
 ;;;               update-connector-status! and/or update-receiver-status!
 ;;; PROVIDES:
+;;;   nested    : -beam-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM> input)
 ;;;   types     : gate, transmitter  --  declared optional here; other techs (gate,
 ;;;               accessibility, visibility, reachability, beam-direct, -beam-substrate,
 ;;;               beam-relay, etc.) independently declare their own gate-alias/
@@ -29,10 +37,11 @@
 ;;;   queries   : current-crossing-set, beam-reaches-crossing,
 ;;;               compute-active-crossings, arbitrate-crossings, crossing-reaches,
 ;;;               crossing-priority, beam-source-distance, same-crossing-set,
-;;;               beam-cut, beam-cut-in
+;;;               beam-cut, beam-cut-in, beam-crossing-endpoints
 ;;;   update    : update-crossing-status!
 
 (include-tech -beam-substrate)
+(include-tech -beam-coordinates)
 
 (in-package :ww)
 
@@ -169,14 +178,84 @@
       $kept))
 
 
+(defparameter *beam-crossing-cache* nil
+  "Hash table mapping a crossing to its (from1 to1 from2 to2) endpoint list, lazily
+   derived from CROSSINGS-ALONG-BEAM> on first use and memoized for the rest of the run --
+   CROSSINGS-ALONG-BEAM> is static and never changes after initialization, so the mapping
+   never needs to be recomputed.")
+
+
+(define-query beam-crossing-endpoints (?xing)
+  ;; Returns (values from1 to1 from2 to2) for ?xing -- the two beams that meet there --
+  ;; equivalent to (bind (beam-crossing> ?xing from1 to1 from2 to2)), but derived from
+  ;; CROSSINGS-ALONG-BEAM> regardless of whether BEAM-CROSSING> itself was ever authored.
+  (do (ensure-beam-crossing-cache)
+      (assign $endpoints (gethash ?xing *beam-crossing-cache*))
+      (values (first $endpoints) (second $endpoints) (third $endpoints) (fourth $endpoints))))
+
+
+(define-query ensure-beam-crossing-cache ()
+  ;; Populates *beam-crossing-cache* once, from the already-authored CROSSINGS-ALONG-BEAM>
+  ;; facts, purely symbolically -- no coordinates.  For each declared crossing, finds the
+  ;; (canonical) beams whose crossings-along-beam> list mentions it; errors if that count
+  ;; isn't exactly 2, which would indicate crossings-along-beam> itself is inconsistent.
+  (if (not *beam-crossing-cache*)
+    (do (assign $beams (beam-crossing-canonical-beams))
+        (assign $cache (make-hash-table :test 'eq))
+        (doall (?crossing crossing)
+          (do (assign $containing (beam-crossing-beams-for-crossing ?crossing $beams))
+              (if (/= (length $containing) 2)
+                (error "Crossing ~A appears on ~A canonical beam(s); expected exactly 2."
+                       ?crossing (length $containing)))
+              (assign $beam1 (first $containing))
+              (assign $beam2 (second $containing))
+              (setf (gethash ?crossing $cache)
+                    (list (first $beam1) (second $beam1) (first $beam2) (second $beam2)))))
+        (setf *beam-crossing-cache* $cache))))
+
+
+(define-query beam-crossing-canonical-beams ()
+  ;; Every (from . to) pair with an authored CROSSINGS-ALONG-BEAM> entry, keeping only one
+  ;; direction for beams authored bidirectionally.  Bidirectional authoring (both (from to)
+  ;; and (to from) present) is detected structurally -- by the presence of the reverse
+  ;; entry -- rather than by endpoint type, so this works for any beam-endpoint composition
+  ;; a problem declares.  Errors if a bidirectional pair's two authored lists disagree.
+  (do (assign $beams nil)
+      (doall (?from beam-endpoint)
+        (doall (?to beam-endpoint)
+          (if (bind (crossings-along-beam> ?from $ids ?to))
+            (do (assign $mirrored (bind (crossings-along-beam> ?to $reverse-ids ?from)))
+                (if (or (not $mirrored)
+                        (string< (symbol-name ?from) (symbol-name ?to)))
+                  (do (if (and $mirrored (not (equal $ids (reverse $reverse-ids))))
+                        (error "CROSSINGS-ALONG-BEAM> for ~A -> ~A and its reverse ~A -> ~A ~
+                                disagree: ~A vs (reverse ~A)."
+                               ?from ?to ?to ?from $ids $reverse-ids))
+                      (push (list ?from ?to) $beams)))))))
+      $beams))
+
+
+(define-query beam-crossing-beams-for-crossing (?crossing ?beams)
+  ;; The canonical beams (drawn from ?beams) whose crossings-along-beam> list contains
+  ;; ?crossing.  Correctly-authored data yields exactly two.
+  (do (assign $containing nil)
+      (ww-loop for $beam in ?beams
+               do (assign $from (first $beam))
+                  (assign $to (second $beam))
+                  (bind (crossings-along-beam> $from $ids $to))
+                  (if (member ?crossing $ids)
+                    (push $beam $containing)))
+      $containing))
+
+
 (define-query crossing-reaches (?xing ?active ?lighting)
-  (and (bind (beam-crossing> ?xing $f1 $t1 $f2 $t2))
-       (beam-reaches-crossing $f1 $t1 ?xing ?active ?lighting)
-       (beam-reaches-crossing $f2 $t2 ?xing ?active ?lighting)))
+  (do (mv-assign ($f1 $t1 $f2 $t2) (beam-crossing-endpoints ?xing))
+      (and (beam-reaches-crossing $f1 $t1 ?xing ?active ?lighting)
+           (beam-reaches-crossing $f2 $t2 ?xing ?active ?lighting))))
 
 
 (define-query crossing-priority (?xing ?lighting)
-  (do (bind (beam-crossing> ?xing $f1 $t1 $f2 $t2))
+  (do (mv-assign ($f1 $t1 $f2 $t2) (beam-crossing-endpoints ?xing))
       (assign $d1 (beam-source-distance $f1 ?lighting))
       (assign $d2 (beam-source-distance $f2 ?lighting))
       (if (< $d1 $d2)

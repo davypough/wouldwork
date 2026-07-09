@@ -62,7 +62,7 @@
 (include-tech beam-direct)           ;direct transmitter -> receiver beams with gate/location occluders
 (include-tech jammer)                ;jamming jam-disallowed>; pickup-jammer jam-target; nests -support-occupancy
 (include-tech box)                   ;pickup-box put-box jump-onto; jump-via
-(include-tech accessibility)         ;walk-via; accessible one-step-accessible one-way-clear accessible-clear; move
+(include-tech accessibility)         ;walk-via; accessible; one-step-accessible; move
 (include-tech visibility)            ;los-to-fixture los-to-location; visible visible-clear
 (include-tech reachability)          ;reachable-via; reachable reachable-clear
 (include-tech ladder)                ;traversable>; one-way-clear; use-ladder

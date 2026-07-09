@@ -439,11 +439,262 @@
   (not (and collection (caar collection))))
 
 
+(defun static-empty-quantifier-truth (form)
+  "Return the truth value of a quantifier over a statically empty domain, if known."
+  (when (and (consp form)
+             (member (first form) '(forsome exists exist forall forevery doall))
+             (consp (second form))
+             (listp (second form)))
+    (let ((parameters (copy-list (second form))))
+      (handler-case
+          (progn
+            (unless (member (first parameters) *parameter-headers*)
+              (setf parameters (cons 'standard parameters)))
+            (multiple-value-bind (pre-param-?vars pre-param-types)
+                (dissect-pre-params parameters)
+              (let* ((queries (intersection (alexandria:flatten pre-param-types)
+                                             *query-names*))
+                     (type-inst (instantiate-type-spec pre-param-types))
+                     (static-collection
+                       (unless queries
+                         (ut::transpose (eval-instantiated-spec type-inst)))))
+                (multiple-value-bind (var domain static-single-p)
+                    (and (null queries)
+                         (static-single-quantifier-domain pre-param-?vars
+                                                          pre-param-types))
+                  (declare (ignore var))
+                  (when (or (and static-single-p (null domain))
+                            (and (null queries)
+                                 (empty-quantifier-collection-p static-collection)))
+                    (if (member (first form) '(forsome exists exist))
+                      :false
+                      :true))))))
+        (error () :unknown)))))
+
+
 (defun translate-empty-static-quantifier (body flag result)
-  "Validate BODY during translation, then emit RESULT for an empty static domain."
-  (let ((*within-quantifier* t))
-    (translate body flag))
+  "Emit RESULT for an empty static quantifier without translating its unreachable BODY."
+  (declare (ignore body flag))
   result)
+
+
+(defun empty-static-type-p (type)
+  "Return true when TYPE is known and has no possible instances in this problem."
+  (multiple-value-bind (instances present-p) (gethash type *types*)
+    (and present-p
+         (or (null instances)
+             (equal instances '(nil))))))
+
+
+(defun empty-static-type-predicate-p (form)
+  "Return true for unary type predicates over known empty static types."
+  (and (consp form)
+       (symbolp (first form))
+       (null (cddr form))
+       (empty-static-type-p (first form))))
+
+
+(defun static-literal-value (form)
+  "Return FORM's literal value and T when FORM is statically self-evaluating."
+  (cond ((null form) (values nil t))
+        ((eq form t) (values t t))
+        ((or (keywordp form)
+             (numberp form)
+             (stringp form)
+             (characterp form))
+         (values form t))
+        ((and (consp form)
+              (eq (first form) 'quote)
+              (= (length form) 2))
+         (values (second form) t))
+        (t (values nil nil))))
+
+
+(defun case-default-clause-p (clause lastp)
+  "Return true when CLAUSE is a final CASE default clause."
+  (and lastp
+       (member (first clause) '(t otherwise))))
+
+
+(defun case-clause-matches-key-p (key clause lastp)
+  "Return true when static CASE key KEY selects CLAUSE."
+  (let ((keys (first clause)))
+    (or (case-default-clause-p clause lastp)
+        (if (consp keys)
+          (member key keys :test #'eql)
+          (eql key keys)))))
+
+
+(defun static-case-selected-clause (key clauses)
+  "Return the CASE clause selected by static KEY, if any."
+  (loop for remaining on clauses
+        for clause = (first remaining)
+        do (unless (consp clause)
+             (error "Invalid CASE clause (must be list): ~A" clause))
+        when (case-clause-matches-key-p key clause (null (rest remaining)))
+          do (return (values clause t))
+        finally (return (values nil nil))))
+
+
+(defun static-form-truth (form)
+  "Classify simple forms whose truth is known from empty optional types.
+Returns :TRUE, :FALSE, or :UNKNOWN.  This is deliberately narrow: non-empty type
+predicates stay unknown because their argument may or may not be an instance."
+  (labels ((truth (item)
+             (multiple-value-bind (literal literalp) (static-literal-value item)
+               (if literalp
+                 (if literal :true :false)
+                 (let ((empty-quantifier-truth (static-empty-quantifier-truth item)))
+                   (cond
+                     ((member empty-quantifier-truth '(:true :false))
+                      empty-quantifier-truth)
+                     ((empty-static-type-predicate-p item) :false)
+                     ((atom item) :unknown)
+                     ((and (eql (first item) 'not)
+                           (= (length item) 2))
+                      (case (truth (second item))
+                        (:true :false)
+                        (:false :true)
+                        (otherwise :unknown)))
+                     ((and (eql (first item) 'and)
+                           (rest item))
+                      (loop with all-true = t
+                            for operand in (rest item)
+                            for operand-truth = (truth operand)
+                            when (eql operand-truth :false)
+                              do (return :false)
+                            when (not (eql operand-truth :true))
+                              do (setf all-true nil)
+                            finally (return (if all-true :true :unknown))))
+                     ((and (eql (first item) 'or)
+                           (rest item))
+                      (loop with all-false = t
+                            for operand in (rest item)
+                            for operand-truth = (truth operand)
+                            when (eql operand-truth :true)
+                              do (return :true)
+                            when (not (eql operand-truth :false))
+                              do (setf all-false nil)
+                            finally (return (if all-false :false :unknown))))
+                     ((eql (first item) 'if) (if-truth item))
+                     ((eql (first item) 'cond) (cond-truth item))
+                     ((eql (first item) 'case) (case-truth item))
+                     (t :unknown))))))
+           (progn-truth (forms)
+             (if forms
+               (truth (car (last forms)))
+               :false))
+           (if-truth (item)
+             (case (truth (second item))
+               (:true (truth (third item)))
+               (:false (if (fourth item)
+                         (truth (fourth item))
+                         :false))
+               (otherwise :unknown)))
+           (cond-truth (item)
+             (if (not (cdr item))
+               :unknown
+               (dolist (clause (cdr item) :false)
+                 (unless (consp clause)
+                   (return :unknown))
+                 (let ((test-truth (truth (first clause))))
+                   (cond ((eql test-truth :true)
+                          (return (if (rest clause)
+                                    (progn-truth (rest clause))
+                                    :true)))
+                         ((not (eql test-truth :false))
+                          (return :unknown)))))))
+           (case-truth (item)
+             (multiple-value-bind (key knownp) (static-literal-value (second item))
+               (if knownp
+                 (multiple-value-bind (clause foundp)
+                     (static-case-selected-clause key (cddr item))
+                   (if foundp
+                     (progn-truth (rest clause))
+                     :false))
+                 :unknown))))
+    (truth form)))
+
+
+(defun static-read-context-p (flag)
+  "Return true when connective translation is evaluating propositions, not writing them."
+  (or (eq flag 'pre)
+      (forced-read-mode-p)))
+
+
+(defun translate-simplified-connective (operator operands flag)
+  "Translate OPERATOR after pruning operands made unreachable by empty optional types."
+  (case operator
+    (and
+     (cond ((some (lambda (operand)
+                    (eql (static-form-truth operand) :false))
+                  operands)
+            nil)
+           (t
+            (let ((remaining (remove-if (lambda (operand)
+                                          (eql (static-form-truth operand) :true))
+                                        operands)))
+              (cond ((null remaining) t)
+                    ((null (rest remaining)) (translate (first remaining) flag))
+                    (t `(and ,@(mapcar (lambda (operand)
+                                          (translate operand flag))
+                                        remaining))))))))
+    (or
+     (cond ((some (lambda (operand)
+                    (eql (static-form-truth operand) :true))
+                  operands)
+            t)
+           (t
+            (let ((remaining (remove-if (lambda (operand)
+                                          (eql (static-form-truth operand) :false))
+                                        operands)))
+              (cond ((null remaining) nil)
+                    ((null (rest remaining)) (translate (first remaining) flag))
+                    (t `(or ,@(mapcar (lambda (operand)
+                                         (translate operand flag))
+                                       remaining))))))))
+    (not
+     (let ((truth (static-form-truth (first operands))))
+       (case truth
+         (:true nil)
+         (:false t)
+         (otherwise `(not ,(translate (first operands) flag))))))
+    (otherwise
+     `(,operator ,@(mapcar (lambda (operand)
+                             (translate operand flag))
+                           operands)))))
+
+
+(defun check-conditional-branch-form (branch form)
+  "Reject IF branches whose surface syntax must be wrapped in DO."
+  (when (and branch
+             (listp branch)
+             (eql (car branch) 'and))
+    (error "AND not allowed in <then> or <else> clause of IF statement; use DO in effect: ~A"
+           form)))
+
+
+(defun translate-conditional-branch (branch flag form)
+  "Translate a reachable IF branch in write mode."
+  (check-conditional-branch-form branch form)
+  (let ((*proposition-read-mode* nil))
+    (translate branch flag)))
+
+
+(defun translate-static-conditional (truth form flag)
+  "Translate only the reachable side of an IF whose test has static truth."
+  (ecase truth
+    (:true
+     (if (and (eq flag 'eff) *within-quantifier*)
+       `(progn ,(translate-conditional-branch (third form) flag form) t)
+       (translate-conditional-branch (third form) flag form)))
+    (:false
+     (cond ((fourth form)
+            (if (and (eq flag 'eff) *within-quantifier*)
+              `(progn ,(translate-conditional-branch (fourth form) flag form) t)
+              (translate-conditional-branch (fourth form) flag form)))
+           ((and *within-quantifier* (not (eq flag 'eff))) t)
+           (t nil)))))
 
 
 (defun translate-existential (form flag)
@@ -608,66 +859,66 @@
     (warn "Translating non-standard connective: ~A" (car form)))
   (when (< (length form) 2)
     (error "Connective ~A requires at least one operand in form: ~A" (car form) form))
+  (when (and (eql (car form) 'not)
+             (not (= (length form) 2)))
+    (error "NOT requires exactly one operand in form: ~A" form))
   ;; Simplified flag validation - removed context-aware
   (ecase flag
     ((pre eff)
-     ;; Preserve connective structure, translate all operands with same context
-     `(,(car form) ,@(mapcar (lambda (operand)
-                               (translate operand flag))
-                             (cdr form))))))
+     (if (static-read-context-p flag)
+       (translate-simplified-connective (car form) (cdr form) flag)
+       ;; Preserve connective structure, translate all operands with same context
+       `(,(car form) ,@(mapcar (lambda (operand)
+                                 (translate operand flag))
+                               (cdr form)))))))
 
 
 (defun translate-conditional (form flag)
   "Conditional translation with proper read-mode isolation."
-  (when (or (and (third form) (listp (third form)) (eql (car (third form)) 'and))
-            (and (fourth form) (listp (fourth form)) (eql (car (fourth form)) 'and)))
-    (error "AND not allowed in <then> or <else> clause of IF statement; use DO in effect: ~A" form))
-  ;; Test translation with forced read-mode
-  (let ((test-translation (let ((*proposition-read-mode* t))
-                            (translate (second form) flag))))
-    (cond
-      ;; Special case: Effect context within quantifiers - ensure T return for success
-      ((and (eq flag 'eff) *within-quantifier*)
-       (if (fourth form)
-           ;; Explicit else clause exists
-           `(if ,test-translation
-              (progn ,(let ((*proposition-read-mode* nil))
-                        (translate (third form) flag)) t)
-              (progn ,(let ((*proposition-read-mode* nil))
-                        (translate (fourth form) flag)) t))
-           ;; No explicit else - return t for success, nil for no-match
-           `(if ,test-translation
-              (progn ,(let ((*proposition-read-mode* nil))
-                        (translate (third form) flag)) t)
-              nil)))
-      
-      ;; Quantifier context with proper forall semantics (non-effect cases)
-      (*within-quantifier*
-       (if (fourth form)
-           ;; Explicit else clause exists - return actual values from both branches
-           `(if ,test-translation
-              ,(let ((*proposition-read-mode* nil))
-                 (translate (third form) flag))
-              ,(let ((*proposition-read-mode* nil))
-                 (translate (fourth form) flag)))
-           ;; No explicit else - implicit else should be t for forall semantics
-           `(if ,test-translation
-              ,(let ((*proposition-read-mode* nil))
-                 (translate (third form) flag))
-              t)))  ; Neutral element for universal quantification
-      
-      ;; Value context - standard conditional behavior
-      (t
-       (if (fourth form)
-           `(if ,test-translation
-              ,(let ((*proposition-read-mode* nil))
-                (translate (third form) flag))
-              ,(let ((*proposition-read-mode* nil))
-                (translate (fourth form) flag)))
-           `(if ,test-translation
-              ,(let ((*proposition-read-mode* nil))
-                (translate (third form) flag))
-              nil))))))
+  (let ((test-truth (static-form-truth (second form))))
+    (if (member test-truth '(:true :false))
+      (translate-static-conditional test-truth form flag)
+      (progn
+        (check-conditional-branch-form (third form) form)
+        (when (fourth form)
+          (check-conditional-branch-form (fourth form) form))
+        ;; Test translation with forced read-mode
+        (let ((test-translation (let ((*proposition-read-mode* t))
+                                  (translate (second form) flag))))
+          (cond
+            ;; Special case: Effect context within quantifiers - ensure T return for success
+            ((and (eq flag 'eff) *within-quantifier*)
+             (if (fourth form)
+                 ;; Explicit else clause exists
+                 `(if ,test-translation
+                    (progn ,(translate-conditional-branch (third form) flag form) t)
+                    (progn ,(translate-conditional-branch (fourth form) flag form) t))
+                 ;; No explicit else - return t for success, nil for no-match
+                 `(if ,test-translation
+                    (progn ,(translate-conditional-branch (third form) flag form) t)
+                    nil)))
+
+            ;; Quantifier context with proper forall semantics (non-effect cases)
+            (*within-quantifier*
+             (if (fourth form)
+                 ;; Explicit else clause exists - return actual values from both branches
+                 `(if ,test-translation
+                    ,(translate-conditional-branch (third form) flag form)
+                    ,(translate-conditional-branch (fourth form) flag form))
+                 ;; No explicit else - implicit else should be t for forall semantics
+                 `(if ,test-translation
+                    ,(translate-conditional-branch (third form) flag form)
+                    t)))  ; Neutral element for universal quantification
+
+            ;; Value context - standard conditional behavior
+            (t
+             (if (fourth form)
+                 `(if ,test-translation
+                    ,(translate-conditional-branch (third form) flag form)
+                    ,(translate-conditional-branch (fourth form) flag form))
+                 `(if ,test-translation
+                    ,(translate-conditional-branch (third form) flag form)
+                    nil)))))))))
 
 
 (defun translate-assert (form flag)
@@ -759,12 +1010,26 @@
   `(progn (setq ,(second form) ,(translate (third form) flag)) t))
 
 
+(defun translate-case-body (statements flag)
+  "Translate the body of a selected CASE clause."
+  `(progn ,@(mapcar (lambda (statement)
+                      (translate statement flag))
+                    statements)))
+
+
 (defun translate-case (form flag)
   "Translates a case statement."
-  `(case ,(translate (second form) flag)
-     ,@(iter (for clause in (cddr form))
-         (collect `(,(first clause) ,@(iter (for statement in (rest clause))
-                                            (collect (translate statement flag))))))))
+  (multiple-value-bind (key knownp) (static-literal-value (second form))
+    (if knownp
+      (multiple-value-bind (clause foundp)
+          (static-case-selected-clause key (cddr form))
+        (if foundp
+          (translate-case-body (rest clause) flag)
+          nil))
+      `(case ,(translate (second form) flag)
+         ,@(iter (for clause in (cddr form))
+             (collect `(,(first clause) ,@(iter (for statement in (rest clause))
+                                                (collect (translate statement flag))))))))))
 
 
 (defun translate-cond (form flag)

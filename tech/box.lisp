@@ -10,15 +10,12 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  plate and box are declared optional here
 ;;;               (define-optional-types), so a problem lacking either need not declare it
-;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
-;;;               -location (mobile-object, (has-location ...)); -holding (cargo, (holding ...));
-;;;               -position (fixed-position-object, (has-position ...)); -height
-;;;               (heighted-object, (has-height ...), declared-height); -elevation
-;;;               ((has-elevation ...), location-elevation)  --  all shared via nested
+;;;   nested    : -support-elevation (support occupancy, location, position, height,
+;;;               elevation, support-top-elevation, and occupant-elevation); -reachability
+;;;               (identity-default reachable, overridden by reachability); -passability
+;;;               (holding, obstacle-clear, all-clear)  --  all shared via nested
 ;;;               include-tech rather than local declaration, same pattern as
 ;;;               beam-direct/beam-relay/beam-crossing nesting -beam-substrate
-;;;   queries   : reachable (reachability, for pickup/put);
-;;;               all-clear (accessibility, for jump-to's location crossings)
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
 ;;;   types     : plate, box  --  declared optional here; other techs (plate, gate, jammer,
@@ -26,17 +23,11 @@
 ;;;               forms for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : (jump-via location $list location)  --  vertical/elevation-crossing edge;
 ;;;               jump-only, never usable by move
-;;;   queries   : support-top-elevation, occupant-elevation  ; both read -height.lisp's
-;;;               declared-height for a box's own default unit height; plate/ground reads
-;;;               location-elevation
 ;;;   actions   : pickup-box, put-box, jump-to              ; jump-to also crosses to an elevation-differing adjacent location
 
-(include-tech -support-occupancy)
-(include-tech -location)
-(include-tech -holding)
-(include-tech -position)
-(include-tech -height)
-(include-tech -elevation)
+(include-tech -support-elevation)
+(include-tech -reachability)
+(include-tech -passability)
 
 (in-package :ww)
 
@@ -139,24 +130,3 @@
                   (has-location ?agent ?to-location)
                   (assign $place ?to-location)
                   (finally (propagate-changes!)))))))
-
-
-(define-query support-top-elevation (?support support)
-  ;; Elevation of a support's top surface, where an occupant standing on it would rest: for a
-  ;; plate, the elevation of the location it's positioned at; otherwise the box's own resting
-  ;; level plus its declared-or-default height (declared-height, -height.lisp).
-  (if (box ?support)
-    (+ (occupant-elevation ?support) (declared-height ?support))
-    (do (bind (has-position ?support $location))
-        (location-elevation $location))))
-
-
-(define-query occupant-elevation (?occupant support-occupant)
-  ;; Standing level of an occupant: on the ground or on a plate, the elevation of its own
-  ;; location; otherwise the support box's own level plus its declared-or-default height
-  ;; (declared-height, -height.lisp).
-  (if (and (bind (on ?occupant $support))
-           (box $support))
-    (+ (occupant-elevation $support) (declared-height $support))
-    (do (bind (has-location ?occupant $location))
-        (location-elevation $location))))
