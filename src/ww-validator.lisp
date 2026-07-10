@@ -285,6 +285,63 @@
            eff-parameter-list)))                                                     ;; CHANGED
 
 
+(defun get-assert-established-$vars (assert-form)
+  "Returns the $-variables established by SETQ, SETF, ASSIGN, WW-ASSIGN,
+   MVSETQ, BIND, or LET occurring anywhere within ASSERT-FORM's own body
+   (including nested inside IF/COND/DO). Mirrors the statement forms
+   recognized by CHECK-VARIABLE-NAMES, restricted here to $-variables."
+  (let (established)
+    (ut::walk-tree (lambda (item)
+                     (when (consp item)
+                       (case (first item)
+                         ((setq setf assign ww-assign)
+                          (when ($varp (second item))
+                            (push (second item) established)))
+                         (mvsetq
+                          (alexandria:appendf established
+                                              (remove-if-not #'$varp (second item))))
+                         ((bind let)
+                          (alexandria:appendf established
+                                              (remove-if-not #'$varp (second item)))))))
+                   (cdr assert-form))
+    (delete-duplicates established)))
+
+
+(defun get-all-assert-established-$vars (effect-form)
+  "Returns the union, across every ASSERT form anywhere in EFFECT-FORM, of
+   the $-variables each ASSERT establishes within its own body via
+   GET-ASSERT-ESTABLISHED-$VARS."
+  (let (established)
+    (ut::walk-tree (lambda (item)
+                     (when (and (consp item) (eq (first item) 'assert))
+                       (alexandria:appendf established (get-assert-established-$vars item))))
+                   effect-form)
+    (delete-duplicates established)))
+
+
+(defun check-eff-param-var-provenance (action-name eff-param-vars pre-bound-$vars effect)
+  "Warns when an eff-params $-variable is neither bound by the precondition
+   (PRE-BOUND-$VARS) nor established within an ASSERT statement's own body.
+   Such a variable's printed value in :instantiations then depends on
+   wherever in the effect body it happens to be set -- eg, an outer
+   IF-test that merely gates the ASSERT -- rather than on a guaranteed
+   binding site local to the ASSERT that reports it. Does not trace
+   through query/update function calls, matching CHECK-VARIABLE-NAMES's
+   own scope."
+  (let* ((eff-param-$vars (remove-if-not #'$varp eff-param-vars))
+         (assert-established (get-all-assert-established-$vars effect))
+         (unaccounted (set-difference eff-param-$vars
+                                       (append pre-bound-$vars assert-established))))
+    (when unaccounted
+      (warn "Action ~A: eff-param $-variable~P ~{~A~^, ~} declared in the ~
+             signature but not bound by the precondition nor established ~
+             within an ASSERT statement's own body. Its value at the ~
+             :instantiations capture point depends on incidental ~
+             control-flow placement rather than a guaranteed binding site. ~
+             Consider binding it in the precondition instead."
+            action-name (length unaccounted) unaccounted))))
+
+
 ;;; ====================================================================
 ;;; Fluent-variable shadowing detection
 ;;;

@@ -19,7 +19,7 @@
 
 
 (define-dynamic-relations
-  (on disk support))
+  (on disk $support))
 
 
 (define-static-relations
@@ -41,8 +41,7 @@
        (bind (size ?support2 $support-size))
        (< $disk-size $support-size))
   (?disk ?support1 ?support2)
-  (assert (not (on ?disk ?support1))
-          (on ?disk ?support2)))
+  (assert (on ?disk ?support2)))
 
 
 (define-init

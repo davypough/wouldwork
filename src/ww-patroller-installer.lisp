@@ -188,6 +188,12 @@
       (setf (get object :patroller-mode) mode)
       ;; Patroller name is registered in *happening-names* by the problem pre-scan;
       ;; do not push here.
+      ;; *eff-param-vars* is a global (not dynamically rebindable) that TRANSLATE-ASSERT
+      ;; splices into an ASSERT's :instantiations. It only carries an action's own
+      ;; signature from CREATE-ACTION, so reset it here to keep a stale value left over
+      ;; from the last action installed from leaking into an ASSERT nested in one of
+      ;; this patroller's own interrupt/rebound/kill/aftereffect clauses.
+      (setf *eff-param-vars* nil)
       ;; Handle interrupt (same pattern as define-happening)
       (when interrupt
         (setf (get object :interrupt) interrupt)
@@ -231,7 +237,7 @@
                      (declare (ignorable updated-dbs followups ,@$vars))
                      ,(translate aftereffect 'pre)
                      updated-dbs))))
-  (fix-if-ignore '(state) (get object :aftereffect-lambda))))))
+        (fix-if-ignore '(state) (get object :aftereffect-lambda))))))
 
 
 ;;; ============================================================================

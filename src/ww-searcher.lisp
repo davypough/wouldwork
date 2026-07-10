@@ -1371,7 +1371,7 @@
                    (format t ctrl-str state-depth)))))
           (t (format t "~%New path to goal found at depth = ~:D" state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-               (format t "Objective value = ~:A~%" (solution.value solution)))
+               (format t " Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)
                (format t "Time = ~:A~%" (solution.time solution)))))
     (when (eql *algorithm* 'depth-first)

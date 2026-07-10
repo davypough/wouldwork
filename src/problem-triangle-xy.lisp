@@ -41,7 +41,7 @@
 
 
 (define-dynamic-relations
-    (loc peg $fixnum $fixnum)      ;location of a peg
+    (loc peg $row $col)      ;location of a peg
     (contents row col $peg)  ;peg contents at a location
     (remaining-pegs $list)   ;list of remaining pegs
     (peg-count $integer))    ;pegs remaining on the board

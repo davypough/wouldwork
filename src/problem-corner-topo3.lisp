@@ -30,7 +30,7 @@
 (ww-set *progress-reporting-interval* 1000000)
 
 
-(defparameter *max-pairings* 3)  ;max termini a connector may pair in one connect (beam-relay-tech's connect-connector)
+(defparameter *max-pairings* 3)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
 
 
 ;;;; TYPES ;;;;
@@ -39,8 +39,8 @@
 ;;;; cargo, support-occupant, support, target, fixed-position-object) is declared identically
 ;;;; inside that tech file instead, so no tech file depends on a type declaration living
 ;;;; in the problem.  beam-endpoint is the remaining exception: it is a corner-topo-specific
-;;;; composite that no tech file declares, so it must live here.  terminus is now owned by
-;;;; beam-relay-tech, but the identical declaration is left here for local readability.
+;;;; composite that no tech file declares, so it must live here.  terminus is owned by
+;;;; beam-relay.
 ;;;; crossing must still be declared in full here (its instance count can't itself be
 ;;;; derived -- see -beam-coordinates.lisp's header), even though its content
 ;;;; (crossings-along-beam>) is now fully computed from the coordinates below.
@@ -58,7 +58,6 @@
   crossing    (crossing1 crossing2 crossing3 crossing4 crossing5 crossing6 crossing7 crossing8 crossing9 crossing10
                crossing11 crossing12 crossing13 crossing14 crossing15 crossing16 crossing17 crossing18 crossing19 crossing20
                crossing21 crossing22 crossing23 crossing24 crossing25 crossing26)  ;pool assigned from computed geometry during initialization
-  terminus      (either transmitter receiver connector)  ;what a connector can pair/connect to; also supplied by beam-relay-tech
   beam-endpoint (either transmitter receiver location)  ;a fixture, or a connector's location; not supplied by any tech file
   ;; No inert leaf types remain.  plate, jammer, box, screen, and ladder were all originally
   ;; listed here as null-instance types required only because a consuming technology's own
@@ -107,8 +106,8 @@
   ;; One propagation pass.  Assembled here from exactly the loaded technologies' update
   ;; functions, in dependency order: active crossings are computed first so connector
   ;; lighting and receiver activation both see which beams are cut; connectors are lit
-  ;; next so a freshly-lit connector can power its receiver within the same pass; plates
-  ;; and gates follow (plates are inert here, but the causal slot is still exercised).
+  ;; next so a freshly-lit connector can power its receiver within the same pass; gates
+  ;; follow.
   ;; Returns t iff some derivation changed stored state, telling propagate-changes! to
   ;; run another pass.
   (let ((*propagated-state-changed* nil))

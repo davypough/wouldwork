@@ -25,16 +25,18 @@
   UP-tile (UP1)
   L-tile (L1)
   Y-tile (Y1)
-  tile   (either GUN-tile CANE-tile VER-tile UP-tile L-tile Y-tile))  ;Y is yellow
+  tile   (either GUN-tile CANE-tile VER-tile UP-tile L-tile Y-tile)  ;Y is yellow
+  row (0 1 2 3 4 5 6)
+  col (0 1 2 3 4 5 6 7))
 
 
 (define-dynamic-relations
-  (loc tile $fixnum $fixnum)  ;location of a tile with coordinates
+  (loc tile $row $col)  ;location of a tile with coordinates
   (emptys $list))
 
 
 (define-static-relations
-  (Y1-goal $fixnum $fixnum))  ;the ref coord of the goal location
+  (Y1-goal $row $col))  ;the ref coord of the goal location
 
 
 (define-query heuristic? ()

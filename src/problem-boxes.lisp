@@ -30,7 +30,7 @@
 
 (define-dynamic-relations
   (holding myself box)
-  (loc (either myself box plate) area)
+  (loc object $area)
   (on box plate))
 
 
@@ -72,8 +72,7 @@
        (exists (?g gate)
          (open? ?g ?area1 ?area2)))
   (?area1 ?area2)
-  (assert (not (loc me ?area1))
-          (loc me ?area2)))
+  (assert (loc me ?area2)))
 
 
 (define-action pickup
@@ -118,10 +117,10 @@
   (loc me area1)
   (loc box1 area1)    
   (loc box2 area2)
-  ;static
   (loc plate1 area1)
   (loc plate2 area1)
   (loc plate3 area3)
+  ;static
   (controls plate1 gate1)
   (controls plate2 gate2)
   (controls plate3 gate3)

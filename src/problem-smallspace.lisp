@@ -23,17 +23,17 @@
 (define-types
   me          (me1)
   gate        (gate1 gate2)
-  barrier     (nil)  ;cannot move cargo thru a barrier
-  jammer      (nil)
-  gun         (nil)
+  barrier     ()  ;cannot move cargo thru a barrier
+  jammer      ()
+  gun         ()
   connector   (connector1 connector2)
-  plate       (nil)
-  box         (nil)
-  fan         (nil)
-  gears       (nil)
-  switch      (nil)
-  ladder      (nil)
-  rostrum     (nil)
+  plate       ()
+  box         ()
+  fan         ()
+  gears       ()
+  switch      ()
+  ladder      ()
+  rostrum     ()
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2)
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
@@ -99,7 +99,7 @@
                   (gate ?d1)
                   (not (active ?d1)))
              (and (gate ?d1)
-                  (active ?d1)
+                  (not (active ?d1))
                   (gate ?d2)
                   (not (active ?d2)))))))
 
@@ -130,7 +130,7 @@
                   (gate ?d1)
                   (not (active ?d1)))
              (and (gate ?d1)
-                  (active ?d1)
+                  (not (active ?d1))
                   (gate ?d2)
                   (not (active ?d2)))))))
 
@@ -646,4 +646,3 @@
               (assign $valid-source nil)))))
     ;; Return result
     $valid-source))
-

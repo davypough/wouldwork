@@ -1,4 +1,4 @@
-;;; Filename: problem-captjohn-csp.lisp
+;;; Filename: problem-captjohn.lisp
 
 ;;; Brain Teaser logic problem, 
 ;;; Capt John's Journey (part 1)
@@ -18,6 +18,12 @@
     guard   (guard1 guard2)
     grass   (grass1 grass2 grass3)
     object  (either captain ship crew guard grass))
+
+
+(defparameter *initial-coordinates*
+  '((0 0) (0 1) (0 2)
+    (1 0) (1 1) (1 2)
+    (2 0) (2 1) (2 2)))
 
 
 (define-dynamic-relations
@@ -201,16 +207,17 @@
 
 
 (define-init
-  (remaining john   ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining wasp   ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining crew1  ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining crew2  ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining guard1 ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining guard2 ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining grass1 ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining grass2 ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
-  (remaining grass3 ((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2))))
+  `(remaining john   ,*initial-coordinates*)
+  `(remaining wasp   ,*initial-coordinates*)
+  `(remaining crew1  ,*initial-coordinates*)
+  `(remaining crew2  ,*initial-coordinates*)
+  `(remaining guard1 ,*initial-coordinates*)
+  `(remaining guard2 ,*initial-coordinates*)
+  `(remaining grass1 ,*initial-coordinates*)
+  `(remaining grass2 ,*initial-coordinates*)
+  `(remaining grass3 ,*initial-coordinates*))
 
 
-(define-goal  ;when the last variable has been assigned
-  (eq (problem-state.name state) (action.name (car (last *actions*)))))
+(define-goal
+  (forall (?obj object)
+    (= (length (get-remaining ?obj)) 1)))

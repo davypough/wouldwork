@@ -48,14 +48,14 @@
 
 
 (define-dynamic-relations
-    (loc peg $index $index $index)      ;location of a peg
+    (loc> peg $index $index $index)      ;location of a peg
     (contents> index index index $peg)  ;peg contents at a location
     (board-pegs $list)   ;list of remaining pegs
     (peg-count $integer))    ;pegs remaining on the board
 
 
 (define-static-relations
-    (pos position $index $index $index))      ;location of a position
+    (pos> position $index $index $index))      ;location of a position
 
 
 (define-query get-remaining-pegs? ()
@@ -65,12 +65,12 @@
 
 (define-update move! (?peg ?fm-x ?fm-y ?fm-z ?to-x ?to-y ?to-z)
   (do (not (contents> ?fm-x ?fm-y ?fm-z ?peg))
-      (loc ?peg ?to-x ?to-y ?to-z)
+      (loc> ?peg ?to-x ?to-y ?to-z)
       (contents> ?to-x ?to-y ?to-z ?peg)))
 
 
 (define-update discard! (?peg ?x ?y ?z)
-  (do (not (loc ?peg ?x ?y ?z))
+  (do (not (loc> ?peg ?x ?y ?z))
       (not (contents> ?x ?y ?z ?peg))))
 
 
@@ -80,7 +80,7 @@
 (define-action jump-LD-RU
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $y (- *N* 3))
        (>= $z 4)
        (assign $y+1 (+ $y 1))
@@ -105,7 +105,7 @@
 (define-action jump-RU-LD
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $z (- *N* 3))
        (>= $y 4)
        (assign $y+1 (+ $y 1))
@@ -130,7 +130,7 @@
 (define-action jump-RD-LU
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $x (- *N* 3))
        (>= $z 4)
        (assign $x+1 (+ $x 1))
@@ -155,7 +155,7 @@
 (define-action jump-LU-RD
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $z (- *N* 3))
        (>= $x 4)
        (assign $x-1 (- $x 1))
@@ -180,7 +180,7 @@
 (define-action jump-RH-LH
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $x (- *N* 3))
        (>= $y 4)
        (assign $x+1 (+ $x 1))
@@ -205,7 +205,7 @@
 (define-action jump-LH-RH
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $y (- *N* 3))
        (>= $x 4)
        (assign $x-1 (- $x 1))
@@ -233,7 +233,7 @@
 (define-action jump-LD
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $y (- *N* 2))
        (>= $z 3)
        (assign $y+1 (1+ $y))
@@ -255,7 +255,7 @@
 (define-action jump-RU
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $z (- *N* 2))
        (>= $y 3)
        (assign $y-1 (1- $y))
@@ -277,7 +277,7 @@
 (define-action jump-RD
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $x (- *N* 2))
        (>= $z 3)
        (assign $x+1 (+ $x 1))
@@ -299,7 +299,7 @@
 (define-action jump-LU
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $z (- *N* 2))
        (>= $x 3)
        (assign $x-1 (- $x 1))
@@ -321,7 +321,7 @@
 (define-action jump-RH
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $x (- *N* 2))
        (>= $y 3)
        (assign $x+1 (+ $x 1))
@@ -343,7 +343,7 @@
 (define-action jump-LH
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (<= $y (- *N* 2))
        (>= $x 3)
        (assign $x-1 (1- $x))
@@ -373,10 +373,10 @@
     for x from 1 to *N*
       do (loop for y from 1 to (- (1+ *N*) x)
                for z = (- (1+ *N*) x) then (1- z)
-               do (update *static-db* `(pos ,(pop positions) ,x ,y ,z))
+               do (update *static-db* `(pos> ,(pop positions) ,x ,y ,z))
                unless (member (list x y z) *init-holes* :test #'equal)
                do (let ((peg (pop pegs)))
-                    (update *db* `(loc ,peg ,x ,y ,z))
+                    (update *db* `(loc> ,peg ,x ,y ,z))
                     (update *db* `(contents> ,x ,y ,z ,peg))))))
 
 

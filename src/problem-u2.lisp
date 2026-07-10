@@ -22,7 +22,7 @@
 
 
 (define-dynamic-relations
-  (on object side)
+  (on object $side)
   (current-time $fixnum))
 
 
@@ -40,9 +40,7 @@
        (bind (current-time $current-time))
        (<= (+ $current-time $walk-time) 17)) 
   (?person ?side1 ?side2 $walk-time $current-time)
-  (assert (not (on ?person ?side1))
-          (on ?person ?side2)
-          (not (on lite ?side1))
+  (assert (on ?person ?side2)
           (on lite ?side2)
           (current-time (+ $current-time $walk-time))))
 
@@ -59,11 +57,8 @@
        (bind (current-time $current-time))
        (<= (+ $current-time $walk-time) 17))
   (?person1 ?person2 ?side1 ?side2 $walk-time $current-time)
-  (assert (not (on ?person1 ?side1))
-          (on ?person1 ?side2)
-          (not (on ?person2 ?side1))
+  (assert (on ?person1 ?side2)
           (on ?person2 ?side2)
-          (not (on lite ?side1))
           (on lite ?side2)
           (current-time (+ $current-time $walk-time))))
 

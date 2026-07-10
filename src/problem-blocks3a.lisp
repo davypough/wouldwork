@@ -26,7 +26,7 @@
 
 
 (define-dynamic-relations
-  (on block $support))  ;a block can be on a fluent support, allows direct lookup with bind
+  (on block $support))  ;each block has one current support
 
 
 (define-query cleartop? (?block)
@@ -47,8 +47,9 @@
 
 
 (define-init
-  (on A T)  ;note: all possible (on block $support) relations must be initially
-  (on B T)  ;      instantiated for greatest efficiency
+  ;; Every block needs one initial support so PUT can bind its current support.
+  (on A T)
+  (on B T)
   (on C T))
 
 

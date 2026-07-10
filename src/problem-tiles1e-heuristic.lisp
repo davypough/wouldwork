@@ -23,16 +23,18 @@
   HOR-tile (HOR)
   VER-tile (VER)
   L-tile (L1 YL2)  ;YL2 is yellow
-  tile (either SQ-tile HOR-tile VER-tile L-tile))
+  tile (either SQ-tile HOR-tile VER-tile L-tile)
+  row (0 1 2 3)
+  col (0 1 2 3))
 
 
 (define-dynamic-relations
-  (loc tile $fixnum $fixnum)  ;location of a tile with row, col coordinates
+  (loc tile $row $col)  ;location of a tile with row, col coordinates
   (emptys $list))  ;list of empty (row . col) coordinates
 
 
 (define-static-relations
-  (YL2-goal $fixnum $fixnum))
+  (YL2-goal $row $col))
 
 
 (define-query heuristic? ()

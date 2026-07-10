@@ -44,8 +44,6 @@
   beam            ()  ;initial beams
   hue             (blue red)  ;the hue of a transmitter, receiver, repeater, or active connector
   area            (area1 area2 area3 area4)  ;position points
-  real-cargo      (either real-connector real-box)
-  ghost-cargo     (either ghost-connector ghost-box)
   cargo           (either connector box)  ;what the player can pickup & carry
   support         (either box buzzer mine)  ;objects that can support certain other objects
   relay           (either connector repeater)
@@ -66,13 +64,13 @@
   ;(elevation (either agent cargo) $fixnum)
   (paired connector terminus)  ;potential beam between a connector and a terminus
   (color relay $hue)  ;having a color means it is active
-  (beam-segment beam $source $target $rational $rational)  ;endpoint-x endpoint-y
+  (beam-segment> beam $source $target $rational $rational)  ;endpoint-x endpoint-y
   (current-beams $list)
 )
 
 
 (define-static-relations
-  (coords (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
+  (coords> (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
   (controls (either receiver plate) (either gate blower))
   (chroma (either transmitter receiver) $hue)  ;fixed color
   (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
@@ -443,7 +441,7 @@
 
 (define-query get-fixed-coordinates (?area/fixture)
   ;; Efficiently get x,y,z coordinates for fixed objects
-  (do (bind (coords ?area/fixture $x $y $z))
+  (do (bind (coords> ?area/fixture $x $y $z))
       (values $x $y $z)))
 
 
@@ -451,11 +449,11 @@
   ;; Finds x,y,z coordinates for any arbitrary object
   (cond 
     ;; Direct coords for areas and fixtures
-    ((bind (coords ?object $x $y $z))
+    ((bind (coords> ?object $x $y $z))
      (values $x $y $z))
     ;; Indirect via loc for movable objects (agents, cargo, buzzer, mine)
     ((and (bind (loc ?object $area))
-          (bind (coords $area $x $y $z)))
+          (bind (coords> $area $x $y $z)))
      (values $x $y $z))
     (t (error "~%No coordinates found for ~A~%" ?object))))
 
@@ -463,7 +461,7 @@
 (define-query beam-exists-p (?source ?target)
   ; Returns t if a beam already exists from ?source to ?target
   (exists (?b (get-current-beams))
-    (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
+    (and (bind (beam-segment> ?b $src $tgt $end-x $end-y))
          (eql $src ?source)
          (eql $tgt ?target))))
 
@@ -472,7 +470,7 @@
   ; Returns t if a beam from ?source to ?target reaches ?target's coordinates
   (do (mv-assign ($target-x $target-y $target-z) (get-coordinates ?target))
       (exists (?b (get-current-beams))
-        (and (bind (beam-segment ?b $src $tgt $end-x $end-y))
+        (and (bind (beam-segment> ?b $src $tgt $end-x $end-y))
              (eql $src ?source)
              (eql $tgt ?target)
              (= $end-x $target-x)
@@ -552,7 +550,7 @@
          (and (different ?c ?connector)
               (loc ?c ?area)
               (exists (?b (get-current-beams))
-                (and (bind (beam-segment ?b $src $tgt $ex $ey))
+                (and (bind (beam-segment> ?b $src $tgt $ex $ey))
                      (eql $tgt ?c)))))))
 
 
@@ -799,7 +797,7 @@
     ;; Loop 3: Check cargo and agents (dynamic positions)
     (doall (?obj (either cargo agent))
       (if (and (bind (loc ?obj $area))
-               (bind (coords $area $x1 $y1 $z1))
+               (bind (coords> $area $x1 $y1 $z1))
                ;; Endpoint exclusion
                (not (or (and (= $x1 ?source-x) (= $y1 ?source-y))
                         (and (= $x1 ?target-x) (= $y1 ?target-y)))))
@@ -821,7 +819,7 @@
       ;; Build coordinate cache for all beam sources
       (assign $coord-cache (make-hash-table :test 'eq))
       (doall (?b (get-current-beams))
-        (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+        (do (bind (beam-segment> ?b $src $tgt $end-x $end-y))
             ;; Cache source coordinates if not already cached
             (if (not (gethash $src $coord-cache))
               (do (mv-assign ($x $y $z) (get-coordinates $src))
@@ -835,8 +833,8 @@
         (doall (?b2 (get-current-beams))
           (if (and (different ?b1 ?b2)
                    (string< (symbol-name ?b1) (symbol-name ?b2))) ; Avoid duplicate pairs
-            (do (bind (beam-segment ?b1 $src1 $tgt1 $end1-x $end1-y))
-                (bind (beam-segment ?b2 $src2 $tgt2 $end2-x $end2-y))
+            (do (bind (beam-segment> ?b1 $src1 $tgt1 $end1-x $end1-y))
+                (bind (beam-segment> ?b2 $src2 $tgt2 $end2-x $end2-y))
                 ;; Skip counter-propagating pairs when:
                 ;; 1. Both beams carry the same hue (no conflict), OR
                 ;; 2. Either endpoint is a transmitter (transmitter beams are
@@ -952,7 +950,7 @@
     (mv-assign ($r-x $r-y) (get-fixed-coordinates ?receiver))
     (bind (chroma ?receiver $required-hue))
     (exists (?b (get-current-beams))
-      (and (bind (beam-segment ?b $source $target $end-x $end-y))
+      (and (bind (beam-segment> ?b $source $target $end-x $end-y))
            (eql $target ?receiver)
            (= $end-x $r-x)
            (= $end-y $r-y)
@@ -967,7 +965,7 @@
   (do
     (mv-assign ($c-x $c-y $c-z) (get-coordinates ?connector))
     (exists (?b (get-current-beams))
-      (and (bind (beam-segment ?b $source $target $end-x $end-y))
+      (and (bind (beam-segment> ?b $source $target $end-x $end-y))
            (eql $target ?connector)  ; Beam must target this connector
            (= $end-x $c-x)            ; Beam must reach connector coordinates
            (= $end-y $c-y)
@@ -993,7 +991,7 @@
       (ww-loop for $source in $frontier do
         ;; Check all beams originating from this source
         (doall (?b (get-current-beams))
-          (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+          (do (bind (beam-segment> ?b $src $tgt $end-x $end-y))
               (if (eql $src $source)
                 ;; Beam originates from current source - check if target is a relay
                 (if (relay $tgt)
@@ -1027,7 +1025,7 @@
         (assign $source-dist (gethash $source $distances))
         ;; Check all beams originating from this source
         (doall (?b (get-current-beams))
-          (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+          (do (bind (beam-segment> ?b $src $tgt $end-x $end-y))
               (if (eql $src $source)
                 ;; Beam originates from current source - check if target is a relay
                 (if (relay $tgt)
@@ -1111,7 +1109,7 @@
   ;; Returns t if any beams were removed, nil otherwise
   (do
     (doall (?b (get-current-beams))
-      (do (bind (beam-segment ?b $src $tgt $end-x $end-y))
+      (do (bind (beam-segment> ?b $src $tgt $end-x $end-y))
           ;; Determine if beam should be removed
           (assign $should-remove nil)
           ;; Reason 1: Pairing no longer exists (check bidirectional)
@@ -1130,7 +1128,7 @@
 
 (define-update recalculate-all-beams! ()
   (do (doall (?b (get-current-beams))
-        (do (bind (beam-segment ?b $source $target $old-end-x $old-end-y))
+        (do (bind (beam-segment> ?b $source $target $old-end-x $old-end-y))
             ;; Get source coordinates
             (mv-assign ($source-x $source-y $source-z) (get-coordinates $source))
             ;; Get target coordinates  
@@ -1141,7 +1139,7 @@
             ;; Update beam segment if endpoint changed
             (if (or (/= $new-end-x $old-end-x)
                     (/= $new-end-y $old-end-y))
-              (beam-segment ?b $source $target $new-end-x $new-end-y))))
+              (beam-segment> ?b $source $target $new-end-x $new-end-y))))
       nil))  ;must return nil
 
 
@@ -1157,7 +1155,7 @@
     (assign $effective-t (make-hash-table :test 'eq))
     (assign $beam-geometry (make-hash-table :test 'eq))
     (ww-loop for $b in $beams do
-      (do (bind (beam-segment $b $src $tgt $old-end-x $old-end-y))
+      (do (bind (beam-segment> $b $src $tgt $old-end-x $old-end-y))
           (mv-assign ($src-x $src-y $src-z) (get-coordinates $src))
           (mv-assign ($tgt-x $tgt-y $tgt-z) (get-coordinates $tgt))
           (assign $dx (- $tgt-x $src-x))
@@ -1203,7 +1201,7 @@
       finally (inconsistent-state))
     (if $resolved
       (ww-loop for $b in $beams do
-        (do (bind (beam-segment $b $src $tgt $old-end-x $old-end-y))
+        (do (bind (beam-segment> $b $src $tgt $old-end-x $old-end-y))
             (assign $geom (gethash $b $beam-geometry))
             (assign $src-x (first $geom))
             (assign $src-y (second $geom))
@@ -1213,7 +1211,7 @@
             (assign $new-end-y (+ $src-y (* (gethash $b $effective-t) $dy)))
             (if (or (/= $new-end-x $old-end-x)
                     (/= $new-end-y $old-end-y))
-              (beam-segment $b $src $tgt $new-end-x $new-end-y)))))
+              (beam-segment> $b $src $tgt $new-end-x $new-end-y)))))
     nil))  ;must return nil
 
 
@@ -1364,14 +1362,14 @@
     (mv-assign ($target-x $target-y $target-z) (get-coordinates ?target))
     (mv-assign ($end-x $end-y) (find-first-obstacle-intersection $source-x $source-y $target-x $target-y))
     ;; Create beam relations
-    (beam-segment $new-beam ?source ?target $end-x $end-y)
+    (beam-segment> $new-beam ?source ?target $end-x $end-y)
     (current-beams (cons $new-beam $current-beams))
     $new-beam))
 
 
 (define-update remove-beam-segment-p! (?beam)
-  (if (bind (beam-segment ?beam $source $target $end-x $end-y))
-    (do (not (beam-segment ?beam $source $target $end-x $end-y))
+  (if (bind (beam-segment> ?beam $source $target $end-x $end-y))
+    (do (not (beam-segment> ?beam $source $target $end-x $end-y))
         (bind (current-beams $beams))
         (current-beams (substitute nil ?beam $beams))
         t)
@@ -1632,15 +1630,15 @@
   (current-beams ())  ; Empty - can be populated by init-action, if exist initially
 
   ;; Static spatial configuration
-  (coords area1 9 1 0)
-  (coords area2 9 8 0)
-  (coords area3 10 9 0)
-  (coords area4 7 8 0)
-  (coords transmitter1 11 1/10 1)
-  (coords transmitter2 10 1/10 1)
-  (coords receiver1 81/10 1 1)
-  (coords receiver2 7 109/10 1)
-  (coords receiver3 1 109/10 1)
+  (coords> area1 9 1 0)
+  (coords> area2 9 8 0)
+  (coords> area3 10 9 0)
+  (coords> area4 7 8 0)
+  (coords> transmitter1 11 1/10 1)
+  (coords> transmitter2 10 1/10 1)
+  (coords> receiver1 81/10 1 1)
+  (coords> receiver2 7 109/10 1)
+  (coords> receiver3 1 109/10 1)
   (controls receiver1 gate1)
   (wall-segments ((wall1 8 7 8 8) (wall2 8 0 8 3)))  ;internal walls only needed
   (gate-segments ((gate1 8 3 8 7) (gate2 2 11 6 11)))
@@ -1785,13 +1783,13 @@
   ;Verify this state is in (find-goal-states) with (known-goal-states-enumerated-p)
   '((ACTIVE RECEIVER2)
     (ACTIVE RECEIVER3)
-    (BEAM-SEGMENT BEAM4 TRANSMITTER2 CONNECTOR1 9 8)
-    (BEAM-SEGMENT BEAM5 TRANSMITTER1 CONNECTOR3 10 9)
-    (BEAM-SEGMENT BEAM6 CONNECTOR3 RECEIVER2 7 109/10)
-    (BEAM-SEGMENT BEAM7 CONNECTOR3 CONNECTOR1 19/2 17/2)
-    (BEAM-SEGMENT BEAM8 CONNECTOR1 RECEIVER1 81/10 1)
-    (BEAM-SEGMENT BEAM9 CONNECTOR1 RECEIVER3 1 109/10)
-    (BEAM-SEGMENT BEAM10 CONNECTOR1 CONNECTOR3 19/2 17/2)
+    (BEAM-SEGMENT> BEAM4 TRANSMITTER2 CONNECTOR1 9 8)
+    (BEAM-SEGMENT> BEAM5 TRANSMITTER1 CONNECTOR3 10 9)
+    (BEAM-SEGMENT> BEAM6 CONNECTOR3 RECEIVER2 7 109/10)
+    (BEAM-SEGMENT> BEAM7 CONNECTOR3 CONNECTOR1 19/2 17/2)
+    (BEAM-SEGMENT> BEAM8 CONNECTOR1 RECEIVER1 81/10 1)
+    (BEAM-SEGMENT> BEAM9 CONNECTOR1 RECEIVER3 1 109/10)
+    (BEAM-SEGMENT> BEAM10 CONNECTOR1 CONNECTOR3 19/2 17/2)
     (COLOR CONNECTOR3 RED)
     (COLOR CONNECTOR1 BLUE)
     (CURRENT-BEAMS (BEAM10 BEAM9 BEAM8 BEAM7 BEAM6 BEAM5 BEAM4 NIL NIL NIL))

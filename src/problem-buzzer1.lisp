@@ -42,7 +42,6 @@
   area            (area1 area2 area3 area4 area5)
   cargo           (either box)
   fixture         (either transmitter)
-  support         (either box buzzer)
 )
 
 
@@ -56,7 +55,7 @@
 
 
 (define-static-relations
-  (fix-coords (either area fixture) $fixnum $fixnum $fixnum)
+  (fix-coords> (either area fixture) $fixnum $fixnum $fixnum)
   (accessible0 area area)
 )
 
@@ -248,11 +247,11 @@
     1
   (?agent agent)
   (and (bind (elevation ?agent $h-agent))
-       (= $h-agent 0))  ;must be on ground
+       (= $h-agent 0)  ;must be on ground
+       (bind (loc ?agent $area1)))
   (?agent $area1 ?area2)
   (do (doall (?area2 area)
-        (if (and (bind (loc ?agent $area1))
-                 (different ?area2 $area1)
+        (if (and (different ?area2 $area1)
                  (accessible ?agent $area1 ?area2)
                  (safe ?area2))
           (assert (loc ?agent ?area2))))
@@ -278,13 +277,13 @@
   (elevation box2 1)
 
   ;; Static spatial configuration
-  (fix-coords area1 20 12 0)
-  (fix-coords area2 14 12 0)
-  (fix-coords area3 10 12 0)
-  (fix-coords area4 7 12 0)
-  (fix-coords area5 2 12 0)
-  (fix-coords transmitter1 7 0 1)
-  (fix-coords transmitter2 15 0 1)
+  (fix-coords> area1 20 12 0)
+  (fix-coords> area2 14 12 0)
+  (fix-coords> area3 10 12 0)
+  (fix-coords> area4 7 12 0)
+  (fix-coords> area5 2 12 0)
+  (fix-coords> transmitter1 7 0 1)
+  (fix-coords> transmitter2 15 0 1)
 
   ;; Ground-level accessibility
   (accessible0 area1 area2)
@@ -301,9 +300,3 @@
   (loc buzzer1 area5)
 )
 
-#|
-Notes:
- 
-
-
-|#

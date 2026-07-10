@@ -31,6 +31,7 @@
   cargo       (either connector)  ;what an agent can pickup & carry
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
   fixture     (either transmitter receiver)
+  zone        (either gate area)
 )
 
 
@@ -49,10 +50,10 @@
   (chroma terminus $hue)
   ;potential clear los from an area to a fixture
   (los0 area fixture)  
-  (los1 area (either $gate $area) fixture)  ;los can be blocked either by a closed $gate or object in $area
+  (los1 area zone fixture)  ;los can be blocked either by a closed gate or object in an area
   ;potential visibility from an area to another area
   (visible0 area area)  
-  (visible1 area (either $gate $area) area)
+  (visible1 area zone area)
   ;potential accesibility to move from an area to another area
   (accessible0 area area)
   (accessible1 area gate area)
@@ -76,23 +77,25 @@
 
 (define-query los (?area ?fixture)
   (or (los0 ?area ?fixture)
-      (and (bind (los1 ?area $zone ?fixture))
-           (or (and (gate $zone)
-                    (open $zone))
-               (and (area $zone)
+      (exists (?zone zone)
+        (and (los1 ?area ?zone ?fixture)
+             (or (and (gate ?zone)
+                      (open ?zone))
+                 (and (area ?zone)
                     (not (exists (?obj (either agent cargo))
-                           (loc ?obj $zone)))))))
+                           (loc ?obj ?zone))))))))
 )
 
 
 (define-query visible (?area1 ?area2)
   (or (visible0 ?area1 ?area2)
-      (and (bind (visible1 ?area1 $zone ?area2))
-           (or (and (gate $zone)
-                    (open $zone))
-               (and (area $zone)
+      (exists (?zone zone)
+        (and (visible1 ?area1 ?zone ?area2)
+             (or (and (gate ?zone)
+                      (open ?zone))
+                 (and (area ?zone)
                     (not (exists (?obj (either agent cargo))
-                           (loc ?obj $zone)))))))
+                           (loc ?obj ?zone))))))))
 )
 
 
@@ -225,7 +228,7 @@
           (connected $cargo ?terminus2)
           (assign $hue1 (get-hue-if-source ?terminus1))
           (assign $hue2 (get-hue-if-source ?terminus2))
-          (unless (and $hue1 $hue2 (not (eq $hue1 $hue2)))
+          (if (not (and $hue1 $hue2 (not (eql $hue1 $hue2))))
             (assign $hue (or $hue1 $hue2)))
           (if $hue
             (chain-activate! $cargo $hue)))
@@ -250,9 +253,9 @@
           (assign $hue1 (get-hue-if-source ?terminus1))
           (assign $hue2 (get-hue-if-source ?terminus2))
           (assign $hue3 (get-hue-if-source ?terminus3))
-          (unless (or (and $hue1 $hue2 (not (eql $hue1 $hue2)))  ; hue1 vs hue2 conflict
-                      (and $hue1 $hue3 (not (eql $hue1 $hue3)))  ; hue1 vs hue3 conflict  
-                      (and $hue2 $hue3 (not (eql $hue2 $hue3))))  ; hue2 vs hue3 conflict
+          (if (not (or (and $hue1 $hue2 (not (eql $hue1 $hue2)))  ; hue1 vs hue2 conflict
+                       (and $hue1 $hue3 (not (eql $hue1 $hue3)))  ; hue1 vs hue3 conflict
+                       (and $hue2 $hue3 (not (eql $hue2 $hue3)))))  ; hue2 vs hue3 conflict
             (assign $hue (or $hue1 $hue2 $hue3)))
           (if $hue
             (chain-activate! $cargo $hue)))

@@ -21,7 +21,7 @@
 (define-types  ;types for smallspace
   me          (me1)
   gate        (gate1 gate2)
-  plate       (nil)
+  plate       ()
   connector   (connector1 connector2)
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2)

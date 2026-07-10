@@ -30,7 +30,7 @@
 
 
 (define-query heuristic? ()
-  ;Get the closest minimum manhattan distance from H1 to the goal.
+  ;Get the closest minimum manhattan distance from YSQ to the goal.
   (do (bind (loc YSQ $YSQ-coords))
       (setf $goal-coords (third *goal*))  ;eg, for a goal like (loc YSQ ((0 . 14)))
       (+ (abs (- (caar $YSQ-coords) (caar $goal-coords)))

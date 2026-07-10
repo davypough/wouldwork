@@ -21,7 +21,7 @@
 
 
 (define-dynamic-relations
-  (loc queen $fixnum $fixnum)   ;row column of a queen
+  (loc queen $fixnum $column)   ;row column of a queen
   (placed queen)
   (next-row $fixnum))
 

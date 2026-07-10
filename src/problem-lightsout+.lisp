@@ -28,7 +28,6 @@
   connector   (connector1 connector2 connector3)
   ;jammer      (nil)
   plate       (plate1)
-  ladder      (ladder1 ladder2)
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3)
   hue         (blue red)  ;the color of a transmitter, receiver, or active connector
@@ -36,7 +35,7 @@
   cargo       (either connector)  ;what an agent (me) can pickup & carry
   ;target      (either gate)  ;what a jammer can jam
   terminus    (either transmitter receiver connector)  ;what a connector can connect to
-  fixture     (either transmitter receiver plate ladder)  ;has a permanent locale in an area
+  fixture     (either transmitter receiver plate)  ;has a permanent locale in an area
   station     (either transmitter receiver gate)  ;useful for los determinations
 )
 
@@ -55,16 +54,15 @@
 (define-static-relations
   (locale fixture $area)  ;locale is a fixed location, loc is dynamic
   (separates gate area area)
-  (climbable> ladder area area)
   (controls (either receiver plate) gate)
   (chroma (either transmitter receiver) $hue)
   ;potential los from an area to a transmitter or receiver
   (los0 area station)  ;(either transmitter receiver))
-  (los1 area $gate station)  ;(either transmitter receiver))
-  (los2 area $gate $gate station)  ;(either transmitter receiver))
+  (los1 area gate station)  ;(either transmitter receiver))
+  (los2 area gate gate station)  ;(either transmitter receiver))
   (visible0 area area)  ;visibility between areas is for connecting connectors
-  (visible1 area $gate area)
-  (visible2 area $gate $gate area)
+  (visible1 area gate area)
+  (visible2 area gate gate area)
 )
 
 
@@ -135,27 +133,33 @@
 
 (define-query open-los? (?area ?station)
   (or (los0 ?area ?station)
-      (and (bind (los1 ?area $gate ?station))
-           (not (active $gate)))
-      (and (bind (los2 ?area $gate1 $gate2 ?station))
-           (not (active $gate1))
-           (not (active $gate2)))))
+      (exists (?gate gate)
+        (and (los1 ?area ?gate ?station)
+             (not (active ?gate))))
+      (exists ((?gate1 ?gate2) gate)
+        (and (los2 ?area ?gate1 ?gate2 ?station)
+             (not (active ?gate1))
+             (not (active ?gate2))))))
 
 
 (define-query los? (?area ?station)
   ;There is a los, but not necessarily open
   (or (los0 ?area ?station)
-      (bind (los1 ?area $gate ?station))
-      (bind (los2 ?area $gate1 $gate2 ?station))))
+      (exists (?gate gate)
+        (los1 ?area ?gate ?station))
+      (exists ((?gate1 ?gate2) gate)
+        (los2 ?area ?gate1 ?gate2 ?station))))
 
 
 (define-query visible? (?area1 ?area2)
   (or (visible0 ?area1 ?area2)  ;directly visible
-      (and (visible1 ?area1 $gate ?area2)
-           (not (active $gate)))
-      (and (visible2 ?area1 $gate1 $gate2 ?area2)
-         (not (active $gate1))
-         (not (active $gate2)))))
+      (exists (?gate gate)
+        (and (visible1 ?area1 ?gate ?area2)
+             (not (active ?gate))))
+      (exists ((?gate1 ?gate2) gate)
+        (and (visible2 ?area1 ?gate1 ?gate2 ?area2)
+             (not (active ?gate1))
+             (not (active ?gate2))))))
 
 
 (define-query connectable? (?area ?terminus)
@@ -639,8 +643,6 @@
   (locale receiver2 area2)
   (locale receiver3 area3)
   (locale plate1 area1)
-  (locale ladder1 area2)
-  (locale ladder2 area3)
   (chroma transmitter1 red)
   (chroma transmitter2 blue)
   (chroma receiver1 blue)
@@ -674,9 +676,7 @@
   (visible1 area1 gate1 area2)
   (visible0 area1 area3)  ;thru window
   (visible2 area1 gate1 gate2 area3)
-  (visible1 area1 gate1 area2)
   (visible1 area1 gate2 area2)  ;thru window
-  (visible2 area1 gate1 gate2 area3)
   (visible0 area2 area2)
   (visible1 area2 gate2 area3)
   (visible0 area3 area3)

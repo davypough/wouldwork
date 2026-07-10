@@ -32,7 +32,7 @@
 
 (define-dynamic-relations
   (holding myself cargo)
-  (loc (either myself cargo threat target switch) area)
+  (loc (either myself cargo target switch) $area)
   (red switch)
   (green switch)
   (jamming jammer target))
@@ -40,7 +40,6 @@
 
 (define-static-relations
   (adjacent area area)
-  (los area target)    ;line-of-sight exists
   (visible area area)  ;area is visible from another area
   (controls switch gun)
   (watches gun area))
@@ -71,10 +70,10 @@
 (define-happening sentry1
   :inits ((loc sentry1 area6))  ;what's true at t=0
   :events  ;events happening at t>0
-  ((1 (not (loc sentry1 area6)) (loc sentry1 area7))
-   (2 (not (loc sentry1 area7)) (loc sentry1 area6))
-   (3 (not (loc sentry1 area6)) (loc sentry1 area5))
-   (4 (not (loc sentry1 area5)) (loc sentry1 area6)))
+  ((1 (loc sentry1 area7))
+   (2 (loc sentry1 area6))
+   (3 (loc sentry1 area5))
+   (4 (loc sentry1 area6)))
   :repeat t
   :interrupt (exists (?j jammer)
                (jamming ?j sentry1)))
@@ -163,8 +162,7 @@
        (passable? ?area1 ?area2)
        (safe? ?area2))
   (?area1 ?area2)
-  (assert (not (loc me ?area1))
-          (loc me ?area2)))
+  (assert (loc me ?area2)))
 
 
 (define-action wait
@@ -187,10 +185,6 @@
   (always-true)
   (watches gun1 area2)
   (controls switch1 gun1)
-  (los area1 gun1)
-  (los area2 gun1)
-  (los area3 gun1)
-  (los area4 gun1)
   (visible area5 area6)
   (visible area5 area7)
   (visible area5 area8)

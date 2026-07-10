@@ -20,7 +20,7 @@
 
 
 (define-dynamic-relations
-  (loc queen $fixnum $fixnum)
+  (loc queen $fixnum $column)
   (placed queen)
   (next-row $fixnum))
 

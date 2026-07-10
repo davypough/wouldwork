@@ -433,6 +433,12 @@
   ;; do not push here.
   (when (getf plist :interrupt)
     (setf (get object :interrupt) (getf plist :interrupt)))
+  ;; *eff-param-vars* is a global (not dynamically rebindable) that TRANSLATE-ASSERT
+  ;; splices into an ASSERT's :instantiations. It only carries an action's own
+  ;; signature from CREATE-ACTION, so reset it here to keep a stale value left over
+  ;; from the last action installed from leaking into an ASSERT nested in this
+  ;; happening's own interrupt clause.
+  (setf *eff-param-vars* nil)
   (ut::if-it (getf plist :interrupt)
     (let (($vars (get-all-nonspecial-vars #'$varp ut::it)))
       (setf (get object :interrupt-lambda)
@@ -640,6 +646,7 @@
         (check-variable-names name (append flat-pre-param-?vars pre-bound-?vars eff-bound-?vars)
                               precondition effect (append pre-$vars eff-$vars pre-?vars eff-?vars))
         (walk-effect-shadow name effect (append pre-$vars pre-special-$vars))   ;; NEW: fluent-shadowing check
+        (check-eff-param-var-provenance name eff-param-vars (append pre-$vars pre-special-$vars) effect)  ;; NEW: eff-param provenance check
         (let ((pre-fluent-env (walk-fluent-types name precondition nil)))
           (walk-fluent-types name effect pre-fluent-env))   ;; NEW: fluent-type checking
         (cond (init-action

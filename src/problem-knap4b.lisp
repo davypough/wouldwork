@@ -42,7 +42,7 @@
 
 
 (define-static-relations
-  (id item $fixnum)  ;ids used for bounding
+  (id item $item-id)  ;ids used for bounding
   (capacity $fixnum)  ;capacity of the knapsack
   (value item $fixnum)
   (weight item $fixnum)

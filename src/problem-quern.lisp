@@ -1,7 +1,7 @@
 ;;; Filename: problem-quern.lisp
 
 ;;; Fluent problem specification for pouring between 4 jugs
-;;; to achieve 10 gal.
+;;; to achieve 6 gal.
 
 
 (in-package :ww)  ;required

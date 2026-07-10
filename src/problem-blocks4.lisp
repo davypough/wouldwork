@@ -28,12 +28,6 @@
     (on block support))
 
 
-(define-static-relations
-    (height support $real))
-
-
-
-
 (define-query cleartop? (?block)
   (not (exists (?b block)
          (on ?b ?block))))
@@ -41,7 +35,7 @@
 
 (define-action put
     1
-  (?block block (?block-support ?target) support)
+  (standard ?block block (?block-support ?target) support)
   (and (cleartop? ?block)
        (on ?block ?block-support)
        (or (and (block ?target) (cleartop? ?target))  ;there is no block on the ?target block

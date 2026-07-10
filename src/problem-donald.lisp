@@ -29,7 +29,7 @@
 
 
 (define-dynamic-relations
-  (remaining (either letter carry) $list))
+  (remaining variable $list))
 
 
 (define-query get-remaining (?var)

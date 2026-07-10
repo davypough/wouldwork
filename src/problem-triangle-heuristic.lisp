@@ -45,14 +45,14 @@
 
 
 (define-dynamic-relations
-    (loc peg $index $index $index)      ;location of a peg
+    (loc> peg $index $index $index)      ;location of a peg
     (contents> index index index $peg)  ;peg contents at a location
     (board-pegs $list)   ;list of remaining pegs
     (peg-count $integer))    ;pegs remaining on the board
 
 
 (define-static-relations
-    (pos position $index $index $index))      ;location of a position
+    (pos> position $index $index $index))      ;location of a position
 
 
 (define-query get-remaining-pegs? ()
@@ -62,12 +62,12 @@
 
 (define-update move! (?peg ?fm-x ?fm-y ?fm-z ?to-x ?to-y ?to-z)
   (do (not (contents> ?fm-x ?fm-y ?fm-z ?peg))
-      (loc ?peg ?to-x ?to-y ?to-z)
+      (loc> ?peg ?to-x ?to-y ?to-z)
       (contents> ?to-x ?to-y ?to-z ?peg)))
 
 
 (define-update discard! (?peg ?x ?y ?z)
-  (do (not (loc ?peg ?x ?y ?z))
+  (do (not (loc> ?peg ?x ?y ?z))
       (not (contents> ?x ?y ?z ?peg))))
 
 
@@ -79,7 +79,7 @@
       (assign $x-max 0) (assign $y-max 0) (assign $z-max 0)
       (assign $enclosed-hole-count 0)
       (doall (?peg (get-remaining-pegs?))
-        (do (bind (loc ?peg $x $y $z))
+        (do (bind (loc> ?peg $x $y $z))
             (if (< $x $x-min)
               (assign $x-min $x))   
             (if (< $y $y-min)
@@ -93,7 +93,7 @@
             (if (> $z $z-max)
               (assign $z-max $z))))
       (doall (?pos position)
-        (do (bind (pos ?pos $x $y $z))
+        (do (bind (pos> ?pos $x $y $z))
             (if (and (not (bind (contents> $x $y $z $any-peg)))
                      (<= $x-min $x $x-max)
                      (<= $y-min $y $y-max)
@@ -106,7 +106,7 @@
 (define-action jump
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (assign $x-2 (- $x 2))
        (assign $x-1 (- $x 1))
        (assign $x+1 (+ $x 1))
@@ -194,10 +194,10 @@
     for x from 1 to *N*
       do (loop for y from 1 to (- (1+ *N*) x)
                for z = (- (1+ *N*) x) then (1- z)
-               do (update *static-db* `(pos ,(pop positions) ,x ,y ,z))
+               do (update *static-db* `(pos> ,(pop positions) ,x ,y ,z))
                unless (member (list x y z) *init-holes* :test #'equal)
                do (let ((peg (pop pegs)))
-                    (update *db* `(loc ,peg ,x ,y ,z))
+                    (update *db* `(loc> ,peg ,x ,y ,z))
                     (update *db* `(contents> ,x ,y ,z ,peg))
                     ))))
 

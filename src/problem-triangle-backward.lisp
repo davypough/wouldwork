@@ -57,14 +57,14 @@
 
 
 (define-dynamic-relations
-    (loc peg $index $index $index)      ;location of a peg, x, y, z
+    (loc> peg $index $index $index)      ;location of a peg, x, y, z
     (contents> index index index $peg)  ;peg contents at a location
     (board-pegs $list)       ;list of pegs currently on the board
     (peg-count $integer))    ;pegs on the board
 
 
 (define-static-relations
-    (pos position $index $index $index))      ;location of a position
+    (pos> position $index $index $index))      ;location of a position
 
 
 (define-query get-remaining-pegs? ()
@@ -73,7 +73,7 @@
       
 
 (define-update put! (?peg ?x ?y ?z)
-  (do (loc ?peg ?x ?y ?z)
+  (do (loc> ?peg ?x ?y ?z)
       (contents> ?x ?y ?z ?peg)))
 
 
@@ -83,10 +83,10 @@
   (?pos position)
   (and (bind (peg-count $peg-count))
        (= $peg-count 0)
-       (bind (pos ?pos $x $y $z))
+       (bind (pos> ?pos $x $y $z))
        (assign $next-peg (nth $peg-count *reversed-pegs*)))  ;(first $remaining-pegs)))
   (($x $y) fluent)
-  (assert (loc $next-peg $x $y $z)
+  (assert (loc> $next-peg $x $y $z)
           (contents> $x $y $z $next-peg)
           (peg-count 1)
           (board-pegs (list $next-peg))))
@@ -104,7 +104,7 @@
   1
   (?peg (get-remaining-pegs?))
   (and ;(>= $peg-count 1)  ;only needed if first two rules (above) are in play
-       (bind (loc ?peg $x $y $z))
+       (bind (loc> ?peg $x $y $z))
        (assign $x-2 (- $x 2))
        (assign $x-1 (- $x 1))
        (assign $x+1 (+ $x 1))
@@ -197,13 +197,13 @@
     ;into the database
     initially (setf *reversed-pegs* (reverse pegs))
               (update *db* `(peg-count 1))
-              (update *db* `(loc ,(first *reversed-pegs*) 3 3 2))  ;set first peg
+              (update *db* `(loc> ,(first *reversed-pegs*) 3 3 2))  ;set first peg
               (update *db* `(contents> 3 3 2 ,(first *reversed-pegs*)))
               (update *db* `(board-pegs ,(list (first *reversed-pegs*))))
     for x from 1 to *N*
       do (loop for y from 1 to (- (1+ *N*) x)
                for z = (- (1+ *N*) x) then (1- z)
-               do (update *static-db* `(pos ,(pop positions) ,x ,y ,z)))))
+               do (update *static-db* `(pos> ,(pop positions) ,x ,y ,z)))))
 
 
 (define-goal  ;pegs remaining

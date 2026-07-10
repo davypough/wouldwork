@@ -33,7 +33,7 @@
 
 (define-dynamic-relations
   (holding agent cargo)
-  (loc (either agent cargo threat target switch) $area)
+  (loc (either agent cargo target switch) $area)
   (red switch)
   (green switch)
   (jamming jammer target))
@@ -41,7 +41,6 @@
 
 (define-static-relations
   (adjacent area area)
-  (los area target)    ;line-of-sight exists
   (visible area area)  ;area is visible from another area
   (controls switch gun)
   (watches gun area))
@@ -171,10 +170,6 @@
   (always-true)
   (watches gun1 area2)
   (controls switch1 gun1)
-  (los area1 gun1)
-  (los area2 gun1)
-  (los area3 gun1)
-  (los area4 gun1)
   (visible area5 area6)
   (visible area5 area7)
   (visible area5 area8)

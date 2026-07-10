@@ -101,4 +101,5 @@
    
 (define-goal
   (and (bind (path $path))
+       (= (length $path) 6)
        (eql (first $path) 'a)))

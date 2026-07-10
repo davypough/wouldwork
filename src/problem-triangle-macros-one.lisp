@@ -46,14 +46,14 @@
 
 
 (define-dynamic-relations
-    (loc peg $index $index $index)      ;location of a peg
+    (loc> peg $index $index $index)      ;location of a peg
     (contents> index index index $peg)  ;peg contents at a location
     (board-pegs $list)   ;list of remaining pegs
     (peg-count $integer))    ;pegs remaining on the board
 
 
 (define-static-relations
-    (pos position $index $index $index))      ;location of a position
+    (pos> position $index $index $index))      ;location of a position
 
 
 (define-query get-remaining-pegs? ()
@@ -63,12 +63,12 @@
 
 (define-update move! (?peg ?fm-x ?fm-y ?fm-z ?to-x ?to-y ?to-z)
   (do (not (contents> ?fm-x ?fm-y ?fm-z ?peg))
-      (loc ?peg ?to-x ?to-y ?to-z)
+      (loc> ?peg ?to-x ?to-y ?to-z)
       (contents> ?to-x ?to-y ?to-z ?peg)))
 
 
 (define-update discard! (?peg ?x ?y ?z)
-  (do (not (loc ?peg ?x ?y ?z))
+  (do (not (loc> ?peg ?x ?y ?z))
       (not (contents> ?x ?y ?z ?peg))))
 
 
@@ -78,7 +78,7 @@
 (define-action double-jump  ; . . 0 .
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))  
+  (and (bind (loc> ?peg $x $y $z))  
        (assign $x-3 (- $x 3))
        (assign $x-2 (- $x 2))
        (assign $x-1 (- $x 1))
@@ -104,9 +104,9 @@
                (>= $z 4)
                (bind (contents> $x $y+1 $z-1 $adj-peg))
                (not (bind (contents> $x $y+2 $z-2 $any-peg)))
-               (bind (contents> $x $y+3 $z-3 $2nd-peg))
-               (assign $dir 'ld-ru))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x $y+3 $z-3 $2nd-peg)))
+        (assert (assign $dir 'ld-ru)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x $y+1 $z-1)
                 (move! $2nd-peg $x $y+3 $z-3 $x $y+1 $z-1)
                 (peg-count (- $peg-count 2))
@@ -116,9 +116,9 @@
                (>= $y 4)
                (bind (contents> $x $y-1 $z+1 $adj-peg))
                (not (bind (contents> $x $y-2 $z+2 $any-peg)))
-               (bind (contents> $x $y-3 $z+3 $2nd-peg))
-               (assign $dir 'ru-ld))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x $y-3 $z+3 $2nd-peg)))
+        (assert (assign $dir 'ru-ld)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x $y-1 $z+1)
                 (move! $2nd-peg $x $y-3 $z+3 $x $y-1 $z+1)
                 (peg-count (- $peg-count 2))
@@ -128,9 +128,9 @@
                (>= $z 4)
                (bind (contents> $x+1 $y $z-1 $adj-peg))
                (not (bind (contents> $x+2 $y $z-2 $any-peg)))
-               (bind (contents> $x+3 $y $z-3 $2nd-peg))
-               (assign $dir 'rd-lu))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x+3 $y $z-3 $2nd-peg)))
+        (assert (assign $dir 'rd-lu)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x+1 $y $z-1)
                 (move! $2nd-peg $x+3 $y $z-3 $x+1 $y $z-1)
                 (peg-count (- $peg-count 2))
@@ -140,9 +140,9 @@
                (>= $x 4)
                (bind (contents> $x-1 $y $z+1 $adj-peg))
                (not (bind (contents> $x-2 $y $z+2 $any-peg)))
-               (bind (contents> $x-3 $y $z+3 $2nd-peg))
-               (assign $dir 'lu-rd))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x-3 $y $z+3 $2nd-peg)))
+        (assert (assign $dir 'lu-rd)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x-1 $y $z+1)
                 (move! $2nd-peg $x-3 $y $z+3 $x-1 $y $z+1)
                 (peg-count (- $peg-count 2))
@@ -152,9 +152,9 @@
                (>= $y 4)
                (bind (contents> $x+1 $y-1 $z $adj-peg))
                (not (bind (contents> $x+2 $y-2 $z $any-peg)))
-               (bind (contents> $x+3 $y-3 $z $2nd-peg))
-               (assign $dir 'rh-lh))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x+3 $y-3 $z $2nd-peg)))
+        (assert (assign $dir 'rh-lh)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x+1 $y-1 $z)
                 (move! $2nd-peg $x+3 $y-3 $z $x+1 $y-1 $z)
                 (peg-count (- $peg-count 2))
@@ -164,9 +164,9 @@
                (>= $x 4)
                (bind (contents> $x-1 $y+1 $z $adj-peg))
                (not (bind (contents> $x-2 $y+2 $z $any-peg)))
-               (bind (contents> $x-3 $y+3 $z $2nd-peg))
-               (assign $dir 'lh-rh))
-        (assert (discard! ?peg $x $y $z)
+               (bind (contents> $x-3 $y+3 $z $2nd-peg)))
+        (assert (assign $dir 'lh-rh)
+                (discard! ?peg $x $y $z)
                 (discard! $adj-peg $x-1 $y+1 $z)
                 (move! $2nd-peg $x-3 $y+3 $z $x-1 $y+1 $z)
                 (peg-count (- $peg-count 2))
@@ -176,7 +176,7 @@
 (define-action jump
   1
   (?peg (get-remaining-pegs?))
-  (and (bind (loc ?peg $x $y $z))
+  (and (bind (loc> ?peg $x $y $z))
        (assign $x-2 (- $x 2))
        (assign $x-1 (- $x 1))
        (assign $x+1 (+ $x 1))
@@ -195,9 +195,9 @@
   (do (if (and (<= $y (- *N* 2))
                (>= $z 3)
                (bind (contents> $x $y+1 $z-1 $adj-peg))
-               (not (bind (contents> $x $y+2 $z-2 $any-peg)))
-               (assign $dir 'ld))
-        (assert (move! ?peg $x $y $z $x $y+2 $z-2)
+               (not (bind (contents> $x $y+2 $z-2 $any-peg))))
+        (assert (assign $dir 'ld)
+                (move! ?peg $x $y $z $x $y+2 $z-2)
                 (discard! $adj-peg $x $y+1 $z-1)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))
@@ -205,9 +205,9 @@
       (if (and (<= $z (- *N* 2))
                (>= $y 3)
                (bind (contents> $x $y-1 $z+1 $adj-peg))
-               (not (bind (contents> $x $y-2 $z+2 $any-peg)))
-               (assign $dir 'ru))
-        (assert (move! ?peg $x $y $z $x $y-2 $z+2)
+               (not (bind (contents> $x $y-2 $z+2 $any-peg))))
+        (assert (assign $dir 'ru)
+                (move! ?peg $x $y $z $x $y-2 $z+2)
                 (discard! $adj-peg $x $y-1 $z+1)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))
@@ -215,9 +215,9 @@
       (if (and (<= $x (- *N* 2))
                (>= $z 3)
                (bind (contents> $x+1 $y $z-1 $adj-peg))
-               (not (bind (contents> $x+2 $y $z-2 $any-peg)))
-               (assign $dir 'rd))
-        (assert (move! ?peg $x $y $z $x+2 $y $z-2)
+               (not (bind (contents> $x+2 $y $z-2 $any-peg))))
+        (assert (assign $dir 'rd)
+                (move! ?peg $x $y $z $x+2 $y $z-2)
                 (discard! $adj-peg $x+1 $y $z-1)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))
@@ -225,9 +225,9 @@
       (if (and (<= $z (- *N* 2))
                (>= $x 3)
                (bind (contents> $x-1 $y $z+1 $adj-peg))
-               (not (bind (contents> $x-2 $y $z+2 $any-peg)))
-               (assign $dir 'lu))
-        (assert (move! ?peg $x $y $z $x-2 $y $z+2)
+               (not (bind (contents> $x-2 $y $z+2 $any-peg))))
+        (assert (assign $dir 'lu)
+                (move! ?peg $x $y $z $x-2 $y $z+2)
                 (discard! $adj-peg $x-1 $y $z+1)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))
@@ -235,9 +235,9 @@
       (if (and (<= $x (- *N* 2))
                (>= $y 3)
                (bind (contents> $x+1 $y-1 $z $adj-peg))
-               (not (bind (contents> $x+2 $y-2 $z $any-peg)))
-               (assign $dir 'rh))
-        (assert (move! ?peg $x $y $z $x+2 $y-2 $z)
+               (not (bind (contents> $x+2 $y-2 $z $any-peg))))
+        (assert (assign $dir 'rh)
+                (move! ?peg $x $y $z $x+2 $y-2 $z)
                 (discard! $adj-peg $x+1 $y-1 $z)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))
@@ -245,9 +245,9 @@
       (if (and (<= $y (- *N* 2))
                (>= $x 3)
                (bind (contents> $x-1 $y+1 $z $adj-peg))
-               (not (bind (contents> $x-2 $y+2 $z $any-peg)))
-               (assign $dir 'lh))
-        (assert (move! ?peg $x $y $z $x-2 $y+2 $z)
+               (not (bind (contents> $x-2 $y+2 $z $any-peg))))
+        (assert (assign $dir 'lh)
+                (move! ?peg $x $y $z $x-2 $y+2 $z)
                 (discard! $adj-peg $x-1 $y+1 $z)
                 (peg-count (1- $peg-count))
                 (board-pegs (remove $adj-peg $board-pegs))))))
@@ -264,15 +264,14 @@
     for x from 1 to *N*
       do (loop for y from 1 to (- (1+ *N*) x)
                for z = (- (1+ *N*) x) then (1- z)
-               do (update *static-db* `(pos ,(pop positions) ,x ,y ,z))
+               do (update *static-db* `(pos> ,(pop positions) ,x ,y ,z))
                unless (member (list x y z) *init-holes* :test #'equal)
                do (let ((peg (pop pegs)))
-                    (update *db* `(loc ,peg ,x ,y ,z))
+                    (update *db* `(loc> ,peg ,x ,y ,z))
                     (update *db* `(contents> ,x ,y ,z ,peg))))))
 
 
 (define-goal  ;only one peg left
   `(peg-count ,*final-peg-count*))
-
 
 

@@ -50,7 +50,6 @@
   (jamming jammer $target)
   (connecting connector terminus)
   (active (either connector gate receiver gears))
-  (height support $real)
   (color terminus $hue))
 
 
@@ -169,23 +168,15 @@
 
   (define-query passable? (?area1 ?area2)
   (or (adjacent ?area1 ?area2)
-      (exists (?b (either barrier ladder))
+      (exists (?b barrier)
         (and (separates ?b ?area1 ?area2)
+             (free me)))  ;must drop cargo first
+      (exists (?ladder ladder)
+        (and (climbable> ?ladder ?area1 ?area2)
              (free me)))  ;must drop cargo first
       (exists (?g gate)
         (and (separates ?g ?area1 ?area2)
              (not (active ?g))))))
-
-
-(define-query sourced? (?conn-or-rcvr $visits)
-  (do (push ?conn-or-rcvr $visits)   ;(ut::prt $visits) (break)
-      (or (exists (?t transmitter)
-            (connecting ?t ?conn-or-rcvr))
-          (exists (?c connector)
-            (and (connecting ?c ?conn-or-rcvr)  
-                 (active ?c)
-                 (not (member ?c $visits))
-                 (sourced? ?c $visits))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; UPDATE FUNCTIONS ;;;;;;;;;;;;;;;;;;;;;;
@@ -253,7 +244,7 @@
               (chain-deactivate! ?c ?hue))))
       (doall (?t transmitter ?c connector)  ;reactivate connectors with a transmitter source
         (if (and (not (eql ?c ?connector))
-                 (connecting ?t ?c)
+                 (connecting ?c ?t)
                  (not (active ?c))
                  (bind (color ?t $thue)))
           (chain-activate! ?c $thue)))))
