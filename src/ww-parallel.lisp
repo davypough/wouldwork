@@ -37,10 +37,10 @@
             target *split-depth-max*)
     
     (loop
-      ;; Termination: task-count target met, frontier exhausted, or safety cap hit  ; CHANGED
+      ;; Termination: task-count target met, frontier exhausted, or safety cap hit
       (when (or (>= (+ (length tasks) (length frontier)) target)
                 (null frontier)
-                (>= current-depth *split-depth-max*))  ; CHANGED: safety cap last
+                (>= current-depth *split-depth-max*))  ; safety cap last
         ;; All remaining frontier nodes become tasks
         (setf tasks (nconc tasks frontier))
         (format t "~&Generated ~D tasks at depths 0-~D~%" (length tasks) current-depth)
@@ -79,7 +79,7 @@
                   (when (goal succ-state)
                     ;; Register solution immediately (serial, no locking needed)
                     (register-solution node succ-state)
-                    (when (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+                    (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                     ;; Early termination: found requested number of solutions during task gen
                     (format t "~&Solution found during task generation!~%")
                     (return-from generate-root-tasks nil))
@@ -96,7 +96,7 @@
                     (ensure-idb-hash succ-state)
                     (let* ((succ-depth (1+ (node.depth node)))
                            (shard (closed-shard succ-state))
-                           (closed-entry (closed-bucket-find succ-state succ-depth shard)))   ; CHANGED: bucket lookup with verification
+                           (closed-entry (closed-bucket-find succ-state succ-depth shard)))
                       (cond
                         ;; Already visited - check if better
                         (closed-entry
@@ -104,18 +104,18 @@
                          (unless (better-than-closed closed-entry succ-state succ-depth)
                            (return-from process-succ))
                          ;; Better path - remove old entry
-                         (closed-bucket-remove succ-state succ-depth shard))                  ; CHANGED: was (remhash key shard)
+                         (closed-bucket-remove succ-state succ-depth shard))                  ; was (remhash key shard)
                         ;; New state - will insert below
                         (t nil))
                       ;; Insert/update in closed
-                      (closed-bucket-insert (make-closed-entry succ-state succ-depth)         ; CHANGED: was inline 4-element list
-                                            succ-state succ-depth shard)))                    ; CHANGED
+                      (closed-bucket-insert (make-closed-entry succ-state succ-depth)         ; was inline 4-element list
+                                            succ-state succ-depth shard)))
                   
                   ;; Create successor node for next frontier
                   (let ((succ-node (make-node 
                                     :state succ-state
                                     :depth (1+ (node.depth node))
-                                    :parent (if *hybrid-mode*                            ; CHANGED: hybrid format vs plain node
+                                    :parent (if *hybrid-mode*
                                                 (list (cons node (record-move succ-state)))
                                                 node))))
                     (push succ-node next-frontier)))))))
@@ -279,11 +279,11 @@
         
         ;; Goal check (before duplicate detection - goals always processed)
         (when (goal succ-state)
-          (if *hybrid-mode*                                                ; CHANGED: hybrid defers for path enumeration
-              (defer-hybrid-goal current-node succ-state)                 ; CHANGED
+          (if *hybrid-mode*                                                ; hybrid defers for path enumeration
+              (defer-hybrid-goal current-node succ-state)
               (register-parallel-solution current-node succ-state worker-id))
           (ws-finalize-path stats succ-depth)
-          (when (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+          (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
             (return-from worker-process-successors-phase1 'first-found))
           (return-from process-one))
         
@@ -313,7 +313,7 @@
           ;; Atomic check+update under shard lock
           (with-closed-shard-lock (succ-state)
             (let* ((shard (closed-shard succ-state))
-                   (closed-entry (closed-bucket-find succ-state succ-depth shard)))   ; CHANGED: bucket lookup with verification
+                   (closed-entry (closed-bucket-find succ-state succ-depth shard)))
               
               (cond
                 ;; State already in closed
@@ -322,7 +322,7 @@
                  (cond
                    ;; Hybrid mode: accumulate parent pointer
                    (*hybrid-mode*
-                    (let ((closed-node (sixth closed-entry)))                          ; CHANGED: was (fifth closed-values) — node lives at position 6 in hybrid entries
+                    (let ((closed-node (sixth closed-entry)))                          ; was (fifth closed-values) — node lives at position 6 in hybrid entries
                       (when closed-node
                         (add-parent-to-node closed-node current-node
                                             (record-move succ-state))))
@@ -331,14 +331,14 @@
                    ;; Check if new path is better - reopen if so
                    ((better-than-closed closed-entry succ-state succ-depth)
                     ;; Remove old entry and insert new one
-                    (closed-bucket-remove succ-state succ-depth shard)                 ; CHANGED: was (remhash key shard)
+                    (closed-bucket-remove succ-state succ-depth shard)                 ; was (remhash key shard)
                     (let ((succ-node (make-node :state succ-state
                                                 :depth succ-depth
-                                                :parent (if *hybrid-mode*              ; CHANGED: hybrid format vs plain node
+                                                :parent (if *hybrid-mode*
                                                             (list (cons current-node (record-move succ-state)))
                                                             current-node))))
-                      (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; CHANGED: was inline list
-                                            succ-state succ-depth shard)               ; CHANGED
+                      (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; was inline list
+                                            succ-state succ-depth shard)
                       (push succ-node succ-nodes)))
                    
                    ;; Not better - drop this successor
@@ -349,11 +349,11 @@
                 (t
                  (let ((succ-node (make-node :state succ-state
                                              :depth succ-depth
-                                             :parent (if *hybrid-mode*                 ; CHANGED: hybrid format vs plain node
+                                             :parent (if *hybrid-mode*
                                                          (list (cons current-node (record-move succ-state)))
                                                          current-node))))
-                   (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)     ; CHANGED: was inline list
-                                         succ-state succ-depth shard)                  ; CHANGED
+                   (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)     ; was inline list
+                                         succ-state succ-depth shard)
                    (push succ-node succ-nodes)))))))))
     
     (nreverse succ-nodes)))

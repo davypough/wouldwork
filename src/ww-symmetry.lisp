@@ -640,7 +640,7 @@
                           (canon-val (canonicalize-value val canonical-map)))
                      ;; keep your existing combiner here (whatever you currently use)
                      (setf hash (ldb (byte 62 0)
-                                     (+ hash (deep-sxhash (cons canon-key canon-val)))))))  ; CHANGED: sxhash -> deep-sxhash
+                                     (+ hash (deep-sxhash (cons canon-key canon-val)))))))
                  idb)
         hash))))
 
@@ -837,11 +837,11 @@ Returns an alist (obj . signature), where signature is a sorted list of
   "Return formatted string of symmetry statistics for progress reporting."
   (cond ((not *symmetry-pruning*) nil)
         ((use-canonical-symmetry-p)
-         (if (> *total-states-processed* 0)                                      ;; CHANGED
-             (format nil "Symmetry: ~:D canonical duplicates pruned (~,1F% of total states)"  ;; CHANGED
+         (if (> *total-states-processed* 0)
+             (format nil "Symmetry: ~:D canonical duplicates pruned (~,1F% of total states)"
                      *symmetric-duplicates-pruned*
-                     (* 100.0 (/ *symmetric-duplicates-pruned*                   ;; CHANGED
-                                 *total-states-processed*)))                     ;; CHANGED
+                     (* 100.0 (/ *symmetric-duplicates-pruned*
+                                 *total-states-processed*)))
              (format nil "Symmetry: ~:D canonical duplicates pruned"
                      *symmetric-duplicates-pruned*)))
         (t

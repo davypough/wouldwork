@@ -103,7 +103,7 @@
                   action
         #+:ww-debug (when (>= *debug* 4)
                       (format t "~%~A" name))
-        (let ((precondition-args precondition-args))                    ;; CHANGED: shadow slot alias
+        (let ((precondition-args precondition-args))                    ;; shadow slot alias
           (when dynamic  ;holds the insts with query calls
             (unless (setf precondition-args  ;overrides previous arguments list if dynamic
                       (remove-if (lambda (sublist)
@@ -264,7 +264,7 @@
               ;; Normal actions with happenings
               (*happening-names*  ;note that act-state = state+
                (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
-               (when net-state  ;ADDED: happenings mutate idb outside the folded path; force hash recompute
+               (when net-state  ;happenings mutate idb outside the folded path; force hash recompute
                  (setf (problem-state.idb-hash net-state) nil)))
               ;; Normal actions without happenings
               (t
@@ -327,7 +327,7 @@
        :time (+ (problem-state.time state) new-action-duration)
        :value (update.value updated-db)
        :idb new-state-idb
-       :idb-hash (unless (eql (problem-state.name state) 'wait)  ;CHANGED: carry incremental hash; NIL after a wait-remhash forces downstream recompute
+       :idb-hash (unless (eql (problem-state.name state) 'wait)  ;carry incremental hash; NIL after a wait-remhash forces downstream recompute
                    (update.hash updated-db)))))
 
 
@@ -353,7 +353,7 @@
    With no followups (the common case) net-state already carries its correct idb-hash,
    so return immediately without copying state or rehashing."
   (declare (ignorable updated-db))
-  (unless (update.followups updated-db)  ;CHANGED: nothing to do; carried hash already describes net-state
+  (unless (update.followups updated-db)  ;nothing to do; carried hash already describes net-state
     (validate-carried-hash net-state)
     (return-from process-followups net-state))
   (let ((*idb-hash-acc* (problem-state.idb-hash net-state)))  ;thread carried hash through followup mutations (NIL = recompute downstream)

@@ -84,23 +84,23 @@
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))  ;unchanged
     (setf *tree-or-graph* 'tree)  ;unchanged
     (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))  ;unchanged
-  (when (and (eq *algorithm* 'backtracking) *happening-names*)  ;NEW
-    (error "~%ERROR: Backtracking is incompatible with exogenous happenings; happenings are not integrated into the backtracking search infrastructure.~%"))  ;NEW
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'heuristic?))  ;NEW
-    (format t "~%Note: heuristic? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))  ;NEW
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'bounding-function?))  ;NEW
-    (format t "~%Note: bounding-function? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))  ;NEW
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'min-steps-remaining?))  ;NEW
-    (format t "~%Note: min-steps-remaining? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))  ;NEW
-  (when (and (eq *algorithm* 'backtracking)  ;NEW
-             (member *solution-type* '(min-length min-time min-value max-value)))  ;NEW
-    (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" *solution-type*))  ;NEW
+  (when (and (eq *algorithm* 'backtracking) *happening-names*)
+    (error "~%ERROR: Backtracking is incompatible with exogenous happenings; happenings are not integrated into the backtracking search infrastructure.~%"))
+  (when (and (eq *algorithm* 'backtracking) (fboundp 'heuristic?))
+    (format t "~%Note: heuristic? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
+  (when (and (eq *algorithm* 'backtracking) (fboundp 'bounding-function?))
+    (format t "~%Note: bounding-function? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
+  (when (and (eq *algorithm* 'backtracking) (fboundp 'min-steps-remaining?))
+    (format t "~%Note: min-steps-remaining? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
+  (when (and (eq *algorithm* 'backtracking)
+             (member *solution-type* '(min-length min-time min-value max-value)))
+    (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" *solution-type*))
   (when (and (eq *algorithm* 'backtracking) (eq *problem-type* 'planning))  ;unchanged
     (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))  ;unchanged
-  (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))  ;changed: now auto-sets tree
-    (setf *tree-or-graph* 'tree)  ;NEW
-    (format t "~%Note: Setting *tree-or-graph* to tree (CSP problems have no repeated states).~%"))  ;changed
-  (when (and (eq *algorithm* 'backtracking) (not (eq *problem-type* 'csp)) (<= *depth-cutoff* 0))  ;changed: CSP excluded (depth naturally bounded by number of actions)
+  (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))
+    (setf *tree-or-graph* 'tree)
+    (format t "~%Note: Setting *tree-or-graph* to tree (CSP problems have no repeated states).~%"))
+  (when (and (eq *algorithm* 'backtracking) (not (eq *problem-type* 'csp)) (<= *depth-cutoff* 0))
     (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%"))
   ;; Symmetry pruning warnings
   (when *symmetry-pruning*

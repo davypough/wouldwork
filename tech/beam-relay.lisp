@@ -13,14 +13,17 @@
 ;;;   types      : agent, location  --  plate, box, hue, connector, transmitter, and
 ;;;                receiver are declared optional here (define-optional-types)
 ;;;   nested     : -beam-substrate (beam relations, receiver update, and peer hooks);
-;;;                -holding (cargo, holding); -location (mobile-object, has-location);
-;;;                -support-occupancy (support-occupant, support, on, cleartop);
-;;;                -position (fixed-position-object, has-position);
+;;;                -placement (placement-options, place-held-object!; also brings in
+;;;                support occupancy, location, position, height, elevation, and holding);
 ;;;                -visibility (null-default visible interface);
+;;;                -accessibility (identity-default accessible query; overridden by
+;;;                accessibility when that technology is included);
 ;;;                -reachability (identity-default reachable query; overridden by
-;;;                reachability when that technology is included)
+;;;                reachability when that technology is included);
+;;;                -pickup (pickup-clear, shared with box and jammer)
 ;;;   parameter  : *max-pairings*
-;;;   extension  : visibility overrides -visibility's null default with authored LOS
+;;;   extension  : visibility overrides -visibility's null defaults with authored live and
+;;;                potential LOS
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-connector-status! -> update-receiver-status!
 ;;; PROVIDES:
@@ -36,16 +39,15 @@
 ;;;   queries    : relay-beam-reaches-receiver, compute-connector-lighting,
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
 ;;;                connectable-location, connectable-terminus
-;;;   update     : update-connector-status!
-;;;   actions    : pickup-connector, connect-connector
+;;;   updates    : update-connector-status!
+;;;   actions    : pickup-connector, put-connector, connect-connector
 
 (include-tech -beam-substrate)
-(include-tech -holding)
-(include-tech -location)
-(include-tech -support-occupancy)
-(include-tech -position)
+(include-tech -placement)
 (include-tech -visibility)
+(include-tech -accessibility)
 (include-tech -reachability)
+(include-tech -pickup)
 
 (in-package :ww)
 
@@ -68,10 +70,9 @@
 (define-action pickup-connector
   1
   (?agent agent ?connector connector)
-  (and (not (bind (holding ?agent $any-held-object)))
-       (bind (has-location ?agent $a-location))
+  (and (bind (has-location ?agent $a-location))
        (bind (has-location ?connector $connector-location))
-       (reachable $connector-location $a-location))
+       (pickup-clear ?agent $a-location ?connector $connector-location))
   (":" ?agent "picks up" ?connector "at" $a-location)
   (assert (holding ?agent ?connector)
           (not (has-location ?connector $connector-location))
@@ -86,6 +87,21 @@
           (finally (propagate-changes!))))
 
 
+(define-action put-connector
+  1
+  (?agent agent ?connector connector ?location location)
+  (and (holding ?agent ?connector)
+       (bind (has-location ?agent $a-location))
+       (reachable ?location $a-location)
+       (assign $places (placement-options ?agent ?location ?connector)))
+  (":" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
+  (ww-loop for $placement-option in $places
+           do (assert (assign $place $placement-option)
+                      (place-held-object!
+                        ?agent ?connector ?location $placement-option)
+                      (finally (propagate-changes!)))))
+
+
 (define-action connect-connector
   1
   (?agent agent ?location location)
@@ -94,40 +110,26 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (connectable-location $connector ?location)
+       (assign $places (placement-options ?agent ?location $connector))
+       (assign $pairing-vantages (accessible ?agent $a-location))
        (exists (?t terminus)
-         (connectable-terminus ?location $connector ?t)))
+         (connectable-terminus $pairing-vantages ?location $connector ?t)))
   (":" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
   (do (assign $connectable nil)
       (doall (?terminus terminus)
-        (if (connectable-terminus ?location $connector ?terminus)
+        (if (connectable-terminus $pairing-vantages ?location $connector ?terminus)
           (assign $connectable (cons ?terminus $connectable))))
-      (ww-loop for $termini in (rest (subsets-up-to $connectable *max-pairings*))
-               do (do (doall (?plate plate)
-                        (if (and (has-position ?plate ?location)
-                                 (cleartop ?plate))
-                          (assert (not (holding ?agent $connector))
-                                  (has-location $connector ?location)
-                                  (on $connector ?plate)
-                                  (assign $place ?plate)
-                                  (ww-loop for $terminus in $termini
-                                           do (paired $connector $terminus))
-                                  (finally (propagate-changes!)))))
-                      (doall (?support-box box)
-                        (if (and (has-location ?support-box ?location)
-                                 (cleartop ?support-box))
-                          (assert (not (holding ?agent $connector))
-                                  (has-location $connector ?location)
-                                  (on $connector ?support-box)
-                                  (assign $place ?support-box)
-                                  (ww-loop for $terminus in $termini
-                                           do (paired $connector $terminus))
-                                  (finally (propagate-changes!)))))
-                      (assert (not (holding ?agent $connector))
-                              (has-location $connector ?location)
-                              (assign $place 'ground)
-                              (ww-loop for $terminus in $termini
-                                       do (paired $connector $terminus))
-                              (finally (propagate-changes!)))))))
+      (ww-loop for $selected-termini in
+                 (rest (subsets-up-to $connectable *max-pairings*))
+               do (ww-loop for $placement-option in $places
+                           do (assert
+                                (assign $termini $selected-termini)
+                                (assign $place $placement-option)
+                                (place-held-object!
+                                  ?agent $connector ?location $placement-option)
+                                (ww-loop for $terminus in $selected-termini
+                                         do (paired $connector $terminus))
+                                (finally (propagate-changes!)))))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -250,12 +252,20 @@
               (bind (color ?other $hue))))))
 
 
-(define-query connectable-terminus (?location location ?connector connector ?terminus terminus)
-  (or (and (or (transmitter ?terminus)
-               (receiver ?terminus))
-           (visible ?location ?terminus))
-      (and (connector ?terminus)
-           (different ?terminus ?connector)
-           (bind (has-location ?terminus $t-loc))
-           (different ?location $t-loc)
-           (visible ?location $t-loc))))
+(define-query connectable-terminus (?pairing-vantages
+                                    ?placement-location
+                                    ?connector
+                                    ?terminus)
+  ;; Pairing selection uses potential LOS from any currently accessible vantage.  Accessibility
+  ;; respects current walking obstacles; potential LOS ignores the open state of its own gate
+  ;; occluders.  Exact placement and live visible checks subsequently determine active beams.
+  (ww-loop for $vantage in ?pairing-vantages
+           thereis
+             (or (and (or (transmitter ?terminus)
+                          (receiver ?terminus))
+                      (potentially-visible $vantage ?terminus))
+                 (and (connector ?terminus)
+                      (different ?terminus ?connector)
+                      (bind (has-location ?terminus $t-loc))
+                      (different ?placement-location $t-loc)
+                      (potentially-visible $vantage $t-loc)))))

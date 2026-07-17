@@ -9,12 +9,12 @@
 ;;;   types     : agent, location  --  plate, jammer, and box are declared optional here
 ;;;               (define-optional-types), so a problem lacking any of them need not
 ;;;               declare it
-;;;   nested    : -holding (cargo, holding); -support-elevation
-;;;               (support occupancy, location, position, height, elevation, and
-;;;               occupant-elevation); -reachability
-;;;               (identity-default reachable, overridden by reachability); -visibility
-;;;               (null-default visible interface)  --  all shared via
-;;;               nested include-tech rather than local declaration
+;;;   nested    : -placement (placement-options, place-held-object!; also brings in
+;;;               support occupancy, location, position, height, elevation, and holding);
+;;;               -reachability (identity-default reachable, overridden by reachability);
+;;;               -visibility (null-default visible interface); -pickup (pickup-clear,
+;;;               shared with box and beam-relay)  --  all shared via nested include-tech
+;;;               rather than local declaration
 ;;;   extension : visibility overrides -visibility's null default with authored LOS
 ;;;   driver    : propagate-changes! (master); (jamming ...) is consumed by gate's
 ;;;               update-gate-status!
@@ -29,10 +29,10 @@
 ;;;               (jam-disallowed> location location target)
 ;;;   actions   : pickup-jammer, jam-target
 
-(include-tech -holding)
-(include-tech -support-elevation)
+(include-tech -placement)
 (include-tech -reachability)
 (include-tech -visibility)
+(include-tech -pickup)
 
 (in-package :ww)
 
@@ -55,11 +55,9 @@
 (define-action pickup-jammer
   1
   (?agent agent ?jammer jammer)
-  (and (not (bind (holding ?agent $any-held-object)))
-       (bind (has-location ?agent $a-location))
+  (and (bind (has-location ?agent $a-location))
        (bind (has-location ?jammer $jammer-location))
-       (reachable $jammer-location $a-location)
-       (<= (abs (- (occupant-elevation ?jammer) (occupant-elevation ?agent))) (declared-height ?jammer)))  ;vertical reach: jammer rests within its declared-or-default height of the agent's level
+       (pickup-clear ?agent $a-location ?jammer $jammer-location))
   (":" ?agent "picks up" ?jammer "at" $a-location)
   (assert (holding ?agent ?jammer)
           (not (has-location ?jammer $jammer-location))
@@ -78,28 +76,11 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (visible ?location ?target)
-       (not (jam-disallowed> $a-location ?location ?target)))
+       (not (jam-disallowed> $a-location ?location ?target))
+       (assign $places (placement-options ?agent ?location $any-jammer)))
   (":" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
-  (do (doall (?plate plate)
-        (if (and (has-position ?plate ?location)
-                 (cleartop ?plate))
-          (assert (not (holding ?agent $any-jammer))
-                  (jamming $any-jammer ?target)
-                  (has-location $any-jammer ?location)
-                  (on $any-jammer ?plate)
-                  (assign $place ?plate)
-                  (finally (propagate-changes!)))))
-      (doall (?box box)
-        (if (and (has-location ?box ?location)
-                 (cleartop ?box))
-          (assert (not (holding ?agent $any-jammer))
-                  (jamming $any-jammer ?target)
-                  (has-location $any-jammer ?location)
-                  (on $any-jammer ?box)
-                  (assign $place ?box)
-                  (finally (propagate-changes!)))))
-      (assert (not (holding ?agent $any-jammer))
-              (jamming $any-jammer ?target)
-              (has-location $any-jammer ?location)
-              (assign $place 'ground)
-              (finally (propagate-changes!)))))
+  (ww-loop for $placement-option in $places
+           do (assert (assign $place $placement-option)
+                      (jamming $any-jammer ?target)
+                      (place-held-object! ?agent $any-jammer ?location $placement-option)
+                      (finally (propagate-changes!)))))

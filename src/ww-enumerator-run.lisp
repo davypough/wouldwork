@@ -1137,7 +1137,7 @@ Set to NIL for no cap.")
     (format t "~&[find-predecessors ~S] Layer ~D diagnostics (sample details): ~S~%"
             direction layer
             (getf diagnostics :op-sample-detail))
-    (when (getf diagnostics :productive-frontier-count)  ;; ADDED: frontier productivity
+    (when (getf diagnostics :productive-frontier-count)
       (format t "~&[find-predecessors ~S] Layer ~D diagnostics (frontier productivity): ~
                  ~:D of ~:D frontier states produced validations (first idx=~:D, last idx=~:D).~%"
               direction layer

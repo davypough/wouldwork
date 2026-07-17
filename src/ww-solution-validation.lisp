@@ -123,9 +123,9 @@
       (setf wait-duration (first provided-args))
       (setf provided-args nil))
     
-    ;; Strip any display connectives from a path pasted off annotated solution output,    ;; CHANGED
-    ;; so the count check and matching see the pure value list.                            ;; CHANGED
-    (setf provided-args (strip-display-connectives action provided-args))                  ;; CHANGED
+    ;; Strip any display connectives from a path pasted off annotated solution output,
+    ;; so the count check and matching see the pure value list.
+    (setf provided-args (strip-display-connectives action provided-args))
     
     ;; Check argument count matches effect variables
     (let ((expected-count (length (action.effect-variables action)))
@@ -143,7 +143,7 @@
     (let ((precondition-args (get-precondition-args action state))
           (first-passing-pre-result nil)
           (first-passing-pre-args nil)
-          (all-instantiations nil))                              ; ADDED
+          (all-instantiations nil))
       
       ;; Find any passing precondition, execute effect, collect instantiations
       (dolist (pre-args precondition-args)
@@ -154,12 +154,12 @@
               (setf first-passing-pre-result pre-result)
               (setf first-passing-pre-args pre-args))
             
-            ;; Execute effect to get updated-dbs                 ; CHANGED
+            ;; Execute effect to get updated-dbs
             (let ((updated-dbs (if (eql pre-result t)
                                    (funcall (action.eff-defun-name action) state)
                                    (apply (action.eff-defun-name action) state pre-result))))
               
-              ;; Check each update's instantiations for match    ; CHANGED
+              ;; Check each update's instantiations for match
               (dolist (update updated-dbs)
                 (let ((inst (update.instantiations update)))
                   (push inst all-instantiations)
@@ -195,7 +195,7 @@
                       (return-from apply-action-to-state
                         (values new-state t nil))))))))))
       
-      ;; No matching update found - determine failure type       ; CHANGED
+      ;; No matching update found - determine failure type
       (if first-passing-pre-result
           ;; Precondition passed but no instantiation matched
           (values nil nil (cons :state-mismatch (first all-instantiations)))
@@ -408,7 +408,7 @@
        (when action
          (format t "~%Precondition: ~S~%" (action.precondition-form action))
          (diagnose-precondition-failure action
-                                        (strip-display-connectives action (rest action-form))  ;; CHANGED
+                                        (strip-display-connectives action (rest action-form))
                                         state)))
       
       ;; State mismatch - precondition passed but bindings differ
@@ -416,7 +416,7 @@
        (format t "~%Reason: State mismatch - Loss of synchronization with expected trajectory~%")
        (when action
          (report-state-mismatch action
-                                (strip-display-connectives action (rest action-form))  ;; CHANGED
+                                (strip-display-connectives action (rest action-form))
                                 (cdr reason))))
       
       ;; Other failure reasons (strings)

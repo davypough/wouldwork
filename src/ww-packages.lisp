@@ -69,7 +69,7 @@
                             (boundp problem-name-sym)
                             (symbol-value problem-name-sym)))
          (goal-sym (and ww-pkg (find-symbol "*GOAL*" ww-pkg)))
-         (final-goal-sym (and ww-pkg (find-symbol "*FINAL-GOAL*" ww-pkg)))  ;; ADDED
+         (final-goal-sym (and ww-pkg (find-symbol "*FINAL-GOAL*" ww-pkg)))
          (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
     ;; Check we have a problem to refresh
     (unless (and problem-name (not (eq problem-name 'ww::unspecified)))
@@ -79,9 +79,9 @@
     ;; Clear goal if bound
     (when (and goal-sym (boundp goal-sym))
       (setf (symbol-value goal-sym) nil))
-    ;; Clear final-goal if bound                                              ;; CHANGED
-    (when (and final-goal-sym (boundp final-goal-sym))                        ;; CHANGED
-      (setf (symbol-value final-goal-sym) nil))                               ;; CHANGED
+    ;; Clear final-goal if bound
+    (when (and final-goal-sym (boundp final-goal-sym))
+      (setf (symbol-value final-goal-sym) nil))
     ;; Warn about undo checkpoint if set
     ;; Set refreshing flag to preserve current parameter settings
     (when (and refreshing-sym (boundp refreshing-sym))

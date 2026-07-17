@@ -141,18 +141,18 @@
           (final-table (make-hash-table :test #'equal)))
       
       (dolist (prop initial-props)
-        (setf (gethash prop initial-table) t))  ; CHANGED: use full prop as key
+        (setf (gethash prop initial-table) t))  ; use full prop as key
       
       (dolist (prop final-props)
-        (setf (gethash prop final-table) t))    ; CHANGED: use full prop as key
+        (setf (gethash prop final-table) t))    ; use full prop as key
       
       ;; Find additions and deletions
       (dolist (prop final-props)
-        (unless (gethash prop initial-table)    ; CHANGED: lookup by full prop
+        (unless (gethash prop initial-table)    ; lookup by full prop
           (push prop added)))
       
       (dolist (prop initial-props)
-        (unless (gethash prop final-table)      ; CHANGED: lookup by full prop
+        (unless (gethash prop final-table)      ; lookup by full prop
           (push prop deleted))))
     
     ;; Display results

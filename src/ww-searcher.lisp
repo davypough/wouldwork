@@ -181,7 +181,7 @@
    Returns T when all constraints are met; NIL otherwise, in which case
    ALL-PATHS falls back to standard EVERY semantics (one path per unique
    goal state).  Parallel search always uses the EVERY fallback."
-  (unless (eql *solution-type* 'all-paths)                               ; CHANGED
+  (unless (eql *solution-type* 'all-paths)
     (return-from initialize-hybrid-mode nil))
   (when (> *threads* 0)
     (format t "~&Note: ALL-PATHS with parallel search falls back to EVERY semantics ~
@@ -194,11 +194,11 @@
       (setf constraints-met nil))
     (unless (> *depth-cutoff* 0)
       (setf constraints-met nil))
-    (if constraints-met                                                    ; CHANGED
+    (if constraints-met
         (format t "~&ALL-PATHS mode active: enumerating all paths to all goal states ~
                    at depth ~D.~%" *depth-cutoff*)
         (format t "~&Note: ALL-PATHS requires depth-first + graph + depth-cutoff > 0. ~
-                   Falling back to EVERY semantics.~%"))                  ; CHANGED
+                   Falling back to EVERY semantics.~%"))
     constraints-met))
 
 
@@ -241,13 +241,13 @@
   (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
   ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
   (when (eql *tree-or-graph* 'graph)
-    (setf (problem-state.idb-hash *start-state*) nil)  ;ADDED: discard any hash cached during init-action processing (idb is mutated in place afterward)
+    (setf (problem-state.idb-hash *start-state*) nil)  ;discard any hash cached during init-action processing (idb is mutated in place afterward)
     (ensure-idb-hash *start-state*)
     (let ((closed-table (if (> *threads* 0)
                             (closed-shard *start-state*)
                             *closed*)))
-      (closed-bucket-insert (make-closed-entry *start-state* 0)        ; CHANGED: was raw setf gethash with inline 4-element list
-                            *start-state* 0 closed-table)))             ; CHANGED
+      (closed-bucket-insert (make-closed-entry *start-state* 0)        ; was raw setf gethash with inline 4-element list
+                            *start-state* 0 closed-table)))
   (setf *program-cycles* 0)
   (setf *average-branching-factor* 0.0)
   (setf *total-states-processed* 1)  ;start state is first
@@ -282,9 +282,9 @@
       (progn
         (process-partitioned-parallel)
         (finalize-parallel-search-results)
-        (display-parallel-timing)       ; ADDED: timing breakdown
-        (display-worker-stats)          ; ADDED: per-worker load balance
-        (display-closed-shard-stats)))  ; ADDED: shard distribution / skew
+        (display-parallel-timing)
+        (display-worker-stats)
+        (display-closed-shard-stats)))
     (ecase *algorithm*
       (depth-first (search-serial))
       (backtracking (search-backtracking))))
@@ -292,7 +292,7 @@
     (finalize-hybrid-solutions))
   (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
     (unless *shutdown-requested*
-      (summarize-search-results (if (solution-count-reached-p)  ; CHANGED: handle fixnum
+      (summarize-search-results (if (solution-count-reached-p)  ; handle fixnum
                                   'first
                                   'exhausted)))))
 
@@ -300,7 +300,6 @@
 (defun auto-wait-debug-find-prop (props pred &rest prefix)
   "Return the first proposition in PROPS whose (car ...) is PRED and whose
    arguments begin with PREFIX. Used for compact debug signatures."
-  ;; ADDED
   (declare (type list props))
   (find-if (lambda (p)
              (and (consp p)
@@ -313,7 +312,6 @@
 
 (defun auto-wait-debug-state-signature (state)
   "Compact signature to detect whether STATE drifted/mutated between re-push and backtrack-wait."
-  ;; ADDED
   (declare (type problem-state state))
   (let* ((idb (problem-state.idb state))
          (props (list-database idb)))
@@ -358,8 +356,8 @@
       (hs::push-hstack current-node *open* :new-only nil))  ; Push underneath successors
     (iter (for succ-node in succ-nodes)
           (hs::push-hstack succ-node *open*
-                         :new-only (and (eq *tree-or-graph* 'graph)   ; CHANGED
-                                        (not *hybrid-mode*))))         ; CHANGED: hybrid allows same-idb nodes at different depths
+                         :new-only (and (eq *tree-or-graph* 'graph)
+                                        (not *hybrid-mode*))))         ; hybrid allows same-idb nodes at different depths
     (increment-global *program-cycles* 1)  ;finished with this cycle
     (setf *average-branching-factor* (compute-average-branching-factor))
     (print-search-progress)  ;#nodes expanded so far
@@ -485,7 +483,7 @@
            (update-max-depth-explored succ-depth)
            (finalize-path-depth succ-depth)
            (increment-global *total-states-processed* 1)
-           (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+           (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                '(first)
                nil)))  ; Continue searching for more solutions
         
@@ -536,17 +534,17 @@
     (when (and (> *depth-cutoff* 0) (= (node.depth current-node) *depth-cutoff*))
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
-    (when (fboundp 'min-steps-remaining?)                                                ;; ADDED
-      (let ((lb (funcall (symbol-function 'min-steps-remaining?) (node.state current-node))) ;; ADDED
-            (depth (node.depth current-node)))                                            ;; ADDED
-        (when (or (and (> *depth-cutoff* 0)                                               ;; ADDED
-                       (> (+ depth lb) *depth-cutoff*))                                   ;; ADDED
-                  (and *solution-paths*                                                   ;; ADDED
-                       (member *solution-type* '(min-length first))                       ;; ADDED
-                       (>= (+ depth lb) (solution.depth (first *solution-paths*)))))      ;; ADDED
-          (increment-global *lower-bound-pruned* 1)                                      ;; ADDED
-          (narrate "State pruned by lower bound" (node.state current-node) depth)        ;; ADDED
-          (return-from df-bnb1 nil))))                                                   ;; ADDED
+    (when (fboundp 'min-steps-remaining?)
+      (let ((lb (funcall (symbol-function 'min-steps-remaining?) (node.state current-node)))
+            (depth (node.depth current-node)))
+        (when (or (and (> *depth-cutoff* 0)
+                       (> (+ depth lb) *depth-cutoff*))
+                  (and *solution-paths*
+                       (member *solution-type* '(min-length first))
+                       (>= (+ depth lb) (solution.depth (first *solution-paths*)))))
+          (increment-global *lower-bound-pruned* 1)
+          (narrate "State pruned by lower bound" (node.state current-node) depth)
+          (return-from df-bnb1 nil))))
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     ;; Backtrack-triggered wait check
@@ -584,7 +582,7 @@
                  (update-max-depth-explored succ-depth)
                  (finalize-path-depth succ-depth)
                  (increment-global *total-states-processed* 1)
-                 (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+                 (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                      (return-from df-bnb1 '(first))
                      (return-from df-bnb1 nil))))
               
@@ -634,7 +632,7 @@
               (defer-hybrid-goal current-node succ-state)
               (register-solution current-node succ-state))
           (finalize-path-depth succ-depth)
-          (if (solution-count-reached-p)  ; CHANGED: was (eql *solution-type* 'first)
+          (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
             (return-from process-successors '(first))
             (next-iteration)))
         (unless (boundp 'goal-fn)
@@ -672,15 +670,15 @@
                        (next-iteration))
                       ((better-than-closed closed-values succ-state succ-depth)
                        (narrate "Returning this previously closed state to open" succ-state succ-depth)
-                       (closed-bucket-remove succ-state succ-depth *closed*))      ; CHANGED: was (remhash (closed-key …) *closed*)
+                       (closed-bucket-remove succ-state succ-depth *closed*))      ; was (remhash (closed-key …) *closed*)
                       (t
                        (narrate "Dropping this previously closed state" succ-state succ-depth)
                        (finalize-path-depth succ-depth)
                        (next-iteration)))))
             ;; State is new or reopened - reserve immediately
             (let ((succ-node (generate-new-node current-node succ-state)))
-              (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; CHANGED: was (setf (gethash …) …)
-                                    succ-state succ-depth *closed*)                       ; CHANGED
+              (closed-bucket-insert (make-closed-entry succ-state succ-depth succ-node)   ; was (setf (gethash …) …)
+                                    succ-state succ-depth *closed*)
               (collecting succ-node))))
         ;; Tree search path - generate node without closed tracking
         (when (eql *tree-or-graph* 'tree)
@@ -765,7 +763,7 @@
   (let ((hash 0))
     (declare (type fixnum hash))
     (maphash (lambda (k v)
-               (setf hash (logxor hash (deep-sxhash (cons k v)))))  ; CHANGED: sxhash -> deep-sxhash
+               (setf hash (logxor hash (deep-sxhash (cons k v)))))
              idb-hash-table)
     hash))
 
@@ -909,20 +907,20 @@
   "Retrieve the closed entry for STATE at DEPTH from *closed* (or its shard
    in parallel mode). Returns the entry list or NIL.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (closed-bucket-find state depth                                    ; CHANGED: delegates to bucket accessor
-                      (if (> *threads* 0)                            ; CHANGED
-                          (closed-shard state)                       ; CHANGED
-                          *closed*)))                                ; CHANGED
+  (closed-bucket-find state depth
+                      (if (> *threads* 0)
+                          (closed-shard state)
+                          *closed*)))
 
 
 (defun get-closed-node (state depth)
   "Retrieve the node stored in *closed* for hybrid mode.
    Returns the node from STATE's closed entry, or NIL if absent.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
-  (let ((entry (closed-bucket-find state depth                      ; CHANGED: delegates to bucket accessor
-                                   (if (> *threads* 0)              ; CHANGED
-                                       (closed-shard state)         ; CHANGED
-                                       *closed*))))                 ; CHANGED
+  (let ((entry (closed-bucket-find state depth
+                                   (if (> *threads* 0)
+                                       (closed-shard state)
+                                       *closed*))))
     (when entry
       (sixth entry))))
 
@@ -971,7 +969,7 @@
   "Determines if f-value of successor is better than open state, and updates it."
   (let ((open-state (node.state open-node)))
     (ecase *solution-type*
-      ((min-length first every all-paths)                                 ; CHANGED
+      ((min-length first every all-paths)
          nil)  ;in depth first search succ depth is never better than open
       (min-time
          (when (< (problem-state.time succ-state) (problem-state.time open-state))
@@ -992,7 +990,7 @@
         (closed-time (third closed-values))
         (closed-value (fourth closed-values)))
     (case *solution-type*
-      ((first every all-paths min-length)                                 ; CHANGED
+      ((first every all-paths min-length)
        (< succ-depth closed-depth))
       (min-time
        (< (problem-state.time succ-state) closed-time))
@@ -1066,7 +1064,7 @@
 
 (defun on-current-path (succ-state current-node)
   "Determines if a successor is already on the current path from the start state.
-   Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."  ; CHANGED: Updated docstring
+   Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."
   (ensure-idb-hash succ-state)  ; ensure hash is cached
   (when (iter (for node initially current-node then (node.parent node))
               (while node)
@@ -1191,8 +1189,8 @@
             *problem-name*
             (if *hybrid-mode* "hybrid " "")
             *tree-or-graph*
-            (if (and (eql *solution-type* 'all-paths) (not *hybrid-mode*)) ; CHANGED
-                'every                                                      ; CHANGED: fell back
+            (if (and (eql *solution-type* 'all-paths) (not *hybrid-mode*))
+                'every
                 *solution-type*))
   (ecase condition
     (first
@@ -1211,11 +1209,11 @@
                (format t "~2%Exhaustive search for every solution finished (up to the depth cutoff, if any)."))
               (t
                (format t "~2%Exhaustive search for every solution finished (except solutions in pruned branches)."))))
-      (when (eql *solution-type* 'all-paths)                              ; CHANGED
-        (if *hybrid-mode*                                                  ; CHANGED
-            (format t "~2%ALL-PATHS enumerated all paths to all goal states at depth ~D."  ; CHANGED
-                    *depth-cutoff*)                                        ; CHANGED
-            (format t "~2%ALL-PATHS fell back to EVERY semantics: one representative path per unique goal state.")))))  ; CHANGED
+      (when (eql *solution-type* 'all-paths)
+        (if *hybrid-mode*
+            (format t "~2%ALL-PATHS enumerated all paths to all goal states at depth ~D."
+                    *depth-cutoff*)
+            (format t "~2%ALL-PATHS fell back to EVERY semantics: one representative path per unique goal state.")))))
   (format t "~2%Depth cutoff = ~:D" *depth-cutoff*)
   (format t "~2%Maximum depth explored = ~:D" *max-depth-explored*)
   (format t "~2%Program cycles = ~:D" *program-cycles*)
@@ -1283,12 +1281,12 @@
                      (format t "~2%Duration of a minimum time solution = ~:D" minimum-time)
                      (format t "~2%A minimum time solution path from start state to goal state:~%")
                      (printout-solution minimum-time-solution)))))
-        (all-paths                                                         ; CHANGED
-          (format t "~2%Total paths enumerated = ~:D across ~:D unique goal state~:P."  ; CHANGED
-                  (length *solution-paths*) (length *unique-solution-states*))  ; CHANGED
-          (format t "~2%Number of steps in a minimum path length solution = ~:D" shallowest-depth)  ; CHANGED
-          (format t "~2%A minimum length solution path from start state to goal state:~%")  ; CHANGED
-          (printout-solution shallowest-depth-solution)))))                ; CHANGED
+        (all-paths
+          (format t "~2%Total paths enumerated = ~:D across ~:D unique goal state~:P."
+                  (length *solution-paths*) (length *unique-solution-states*))
+          (format t "~2%Number of steps in a minimum path length solution = ~:D" shallowest-depth)
+          (format t "~2%A minimum length solution path from start state to goal state:~%")
+          (printout-solution shallowest-depth-solution)))))
   (if (boundp 'goal-fn)
     (when (or (and (eql *solution-type* 'count) (= *solution-count* 0))
               (and (not (eql *solution-type* 'count)) (null *solution-paths*)))
@@ -1396,8 +1394,8 @@
 
 (defun solution-better-p (new-soln old-soln)
   "Returns T if NEW-SOLN is better than OLD-SOLN based on *solution-type*."
-  (case *solution-type*  ; CHANGED: ecase -> case to allow otherwise clause
-    ((min-length first every all-paths)                                   ; CHANGED
+  (case *solution-type*  ; ecase -> case to allow otherwise clause
+    ((min-length first every all-paths)
      (< (solution.depth new-soln) (solution.depth old-soln)))
     (min-time
      (< (solution.time new-soln) (solution.time old-soln)))
@@ -1405,7 +1403,7 @@
      (< (solution.value new-soln) (solution.value old-soln)))
     (max-value
      (> (solution.value new-soln) (solution.value old-soln)))
-    (otherwise  ; ADDED: fixnum case - prefer shorter depth
+    (otherwise  ; fixnum case - prefer shorter depth
      (< (solution.depth new-soln) (solution.depth old-soln)))))
 
 
@@ -1431,11 +1429,11 @@
     (dolist (item path)
       (incf step)
       (let* ((action-form (second item))
-             (display-form (cons (car action-form)                               ;; ADDED
-                                 (merge-effect-format (car action-form)          ;; ADDED
-                                                      (cdr action-form))))       ;; ADDED
+             (display-form (cons (car action-form)
+                                 (merge-effect-format (car action-form)
+                                                      (cdr action-form))))
              (new-state (replay-action-to-state action-form current-state)))     ;replay uses pure action-form
-        (write (list (first item) display-form) :pretty t :escape nil)           ;; CHANGED: connectives, unquoted
+        (write (list (first item) display-form) :pretty t :escape nil)           ; connectives, unquoted
         (terpri)
         (cond (new-state
                (setf current-state new-state)
@@ -1695,7 +1693,7 @@
      (let ((best (first *solution-paths*)))
        (format t "~%best solution value = ~A (depth ~:D, ~:D states since last improvement)"
                (solution.value best) (solution.depth best) states-since)))
-    ((member *solution-type* '(every all-paths))                          ; CHANGED
+    ((member *solution-type* '(every all-paths))
      (format t "~%solutions found = ~:D unique (~:D states since last new)"
              (length *unique-solution-states*) states-since))
     ((typep *solution-type* 'fixnum)

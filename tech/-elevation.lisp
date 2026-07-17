@@ -1,29 +1,29 @@
 ;;; Filename: -elevation.lisp
 
 ;;; Elevation substrate: the fixed vertical level of a location's own floor, a fixed
-;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Most objects are ordinary
-;;; ground-level anchors and declare no fact; raised locations, obstacles, or fixtures assert
-;;; one.  Declared identically by
+;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Locations and barrier
+;;; fixtures default to base elevation 0; transmitter and receiver beam anchors default to
+;;; elevation 1.  Nondefault objects assert an explicit fact.  Declared identically by
 ;;; every tech file that reads it, so consumers nest-include this file instead of each
 ;;; re-declaring the relation and queries.
 ;;;
 ;;; PROVIDES:
-;;;   types    : elevated-object (either location gate screen fence transmitter receiver)
+;;;   types    : elevated-object (either location gate screen fence wall transmitter receiver)
 ;;;   relation : (has-elevation elevated-object $fixnum)
 ;;;   queries  : object-elevation, location-elevation, fixture-elevation
 
 (in-package :ww)
 
 
-(define-optional-types gate screen fence transmitter receiver)
+(define-optional-types gate screen fence wall transmitter receiver)
 
 
 (define-types
-  elevated-object (either location gate screen fence transmitter receiver))
+  elevated-object (either location gate screen fence wall transmitter receiver))
 
 
 (define-static-relations
-  (has-elevation elevated-object $fixnum))  ;fixed anchor level; absent means ground (0)
+  (has-elevation elevated-object $fixnum))  ;fixed base/anchor level; absent default depends on role
 
 
 (define-query object-elevation (?object elevated-object)
@@ -39,5 +39,12 @@
 
 
 (define-query fixture-elevation (?fixture (either gate transmitter receiver))
-  ;; Declared anchor level of a fixed LOS/beam fixture, or zero if none was asserted.
-  (object-elevation ?fixture))
+  ;; Declared fixed-fixture level.  Gates use base elevation 0 by default; transmitters and
+  ;; receivers use beam-anchor elevation 1.  These roles have different physical meanings,
+  ;; so fixture cannot have one universal omitted-value default.
+  (if (bind (has-elevation ?fixture $level))
+    $level
+    (if (or (transmitter ?fixture)
+            (receiver ?fixture))
+      1
+      0)))

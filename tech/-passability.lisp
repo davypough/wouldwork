@@ -5,22 +5,18 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent
-;;;   nested    : -holding (cargo, holding)
+;;;   nested    : -holding (cargo, holding); -gate (gate optional type, (open gate) relation)
 ;;; PROVIDES:
-;;;   types     : gate, screen, ladder  --  declared optional
-;;;   relation  : (open gate)
+;;;   types     : screen, ladder  --  declared optional
 ;;;   queries   : obstacle-clear, all-clear
 
 (include-tech -holding)
+(include-tech -gate)
 
 (in-package :ww)
 
 
-(define-optional-types gate screen ladder)
-
-
-(define-dynamic-relations
-  (open gate))  ;only gate's update-gate-status! writes it
+(define-optional-types screen ladder)
 
 
 (define-query all-clear (?agent ?obstacles)

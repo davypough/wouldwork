@@ -11,7 +11,7 @@
   `(unless (and *refreshing* *ww-loading*)
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
-       ((*depth-cutoff* *progress-reporting-interval* *randomize-search*  ;changed: *solution-type* removed
+       ((*depth-cutoff* *progress-reporting-interval* *randomize-search*
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
          *donation-fraction* *enable-work-donation*)
@@ -19,19 +19,19 @@
           (unless *ww-loading*
             (save-globals)
             (display-current-parameters)))
-       (*solution-type*  ;NEW: separated to allow compatibility check
-         (when (and (eq *algorithm* 'backtracking)  ;NEW
-                    (member ',val '(min-length min-time min-value max-value)))  ;NEW
-           (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" ',val))  ;NEW
-         (setf ,param ',val)  ;NEW
-         (unless *ww-loading*  ;NEW
-           (save-globals)  ;NEW
-           (display-current-parameters)))  ;NEW
-       (*num-closed-shards*                                         ; ADDED
-         (setf *num-closed-shards* ',val                           ; ADDED
-               *closed-shard-mask* (1- ',val))                     ; ADDED: keep mask in sync
-         (unless *ww-loading*                                      ; ADDED
-           (save-globals)                                          ; ADDED
+       (*solution-type*
+         (when (and (eq *algorithm* 'backtracking)
+                    (member ',val '(min-length min-time min-value max-value)))
+           (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" ',val))
+         (setf ,param ',val)
+         (unless *ww-loading*
+           (save-globals)
+           (display-current-parameters)))
+       (*num-closed-shards*
+         (setf *num-closed-shards* ',val
+               *closed-shard-mask* (1- ',val))
+         (unless *ww-loading*
+           (save-globals)
            (display-current-parameters)))
        (*tree-or-graph*
          (if (and (eq *algorithm* 'backtracking) (eq ',val 'graph))
@@ -81,7 +81,7 @@
             (save-globals)
             (with-silenced-compilation
               (asdf:load-system :wouldwork :force t))))
-       (*problem-type*  ;changed: separated from *problem-name* to allow REPL setting with reload
+       (*problem-type*
          (if *ww-loading*
            (setf ,param ',val)
            (progn

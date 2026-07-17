@@ -240,8 +240,8 @@
   (multiple-value-bind (relation bijectivep)
       (bijective-relation-p raw-relation)
     (check-relation relation)
-    (let ((new-signature (relation-signature-value relation t)))  ;; CHANGED
-      (check-relation-signature-consistency relation *relations* new-signature bijectivep)  ;; CHANGED
+    (let ((new-signature (relation-signature-value relation t)))
+      (check-relation-signature-consistency relation *relations* new-signature bijectivep)
       (if bijectivep
         (progn
           (check-bijective-relation relation)
@@ -255,7 +255,7 @@
 (defun register-static-relation-signature (relation)
   (check-relation relation)
   (let ((new-signature (relation-signature-value relation nil)))
-    (check-relation-signature-consistency relation *static-relations* new-signature nil)  ;; CHANGED
+    (check-relation-signature-consistency relation *static-relations* new-signature nil)
     (setf (gethash (car relation) *static-relations*) new-signature)
     (ut::if-it (relation-signature-fluent-indices relation)
       (setf (gethash (car relation) *fluent-relation-indices*) ut::it))))
@@ -492,7 +492,7 @@
     (setf (get name :raw-body) body)  ;store for interprocedural symmetry walk
     (setf (get name :raw-args) flat-args)  ;store for interprocedural symmetry walk
     (setf (get name :param-types) param-types)  ;store for callee-side call-argument checking
-    (walk-fluent-types name body nil)  ;; NEW: fluent-type checking
+    (walk-fluent-types name body nil)
     (let ((*var-type-env* (append (mapcar #'cons flat-args param-types) *var-type-env*))
           (new-$vars (delete-duplicates
                        (set-difference (get-all-nonspecial-vars #'$varp body) flat-args))))
@@ -531,7 +531,7 @@
     (setf (get name :raw-body) body)  ;store for extract-effect-modified-relations
     (setf (get name :raw-args) flat-args)  ;store for interprocedural symmetry walk
     (setf (get name :param-types) param-types)  ;store for callee-side call-argument checking
-    (walk-fluent-types name body nil)  ;; NEW: fluent-type checking
+    (walk-fluent-types name body nil)
     (let ((*var-type-env* (append (mapcar #'cons flat-args param-types) *var-type-env*))
           (new-$vars (delete-duplicates
                        (set-difference
@@ -619,7 +619,7 @@
   (unless (member (first pre-params) *parameter-headers*)
     (push 'standard pre-params))
   (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params pre-params)
-    (let ((eff-param-vars (remove-if #'stringp eff-params)))  ;pure var list, connectives stripped  ;; CHANGED
+    (let ((eff-param-vars (remove-if #'stringp eff-params)))  ;pure var list, connectives stripped
       (let* ((flat-pre-param-?vars (alexandria:flatten pre-param-?vars))
              (*var-type-env* (append (mapcar #'cons flat-pre-param-?vars (flatten-param-types pre-param-types))
                                       *var-type-env*))
@@ -645,10 +645,10 @@
         ;         eff-extra-?vars eff-extra-$vars eff-missing-vars)
         (check-variable-names name (append flat-pre-param-?vars pre-bound-?vars eff-bound-?vars)
                               precondition effect (append pre-$vars eff-$vars pre-?vars eff-?vars))
-        (walk-effect-shadow name effect (append pre-$vars pre-special-$vars))   ;; NEW: fluent-shadowing check
-        (check-eff-param-var-provenance name eff-param-vars (append pre-$vars pre-special-$vars) effect)  ;; NEW: eff-param provenance check
+        (walk-effect-shadow name effect (append pre-$vars pre-special-$vars))
+        (check-eff-param-var-provenance name eff-param-vars (append pre-$vars pre-special-$vars) effect)
         (let ((pre-fluent-env (walk-fluent-types name precondition nil)))
-          (walk-fluent-types name effect pre-fluent-env))   ;; NEW: fluent-type checking
+          (walk-fluent-types name effect pre-fluent-env))
         (cond (init-action
                  (setq *objective-value-p* nil))  ;this is an init-action, disable $objective-value
               ((or (member '$objective-value pre-$vars)  ;used in translate-assert
@@ -692,8 +692,8 @@
                                                          ,(if eff-args
                                                             `(list ,@eff-args)
                                                             `t))))))
-                       :effect-variables eff-param-vars  ;pure var list, connectives stripped  ;; CHANGED
-                       :effect-format eff-params  ;annotated list w/ connectives, display only  ;; ADDED
+                       :effect-variables eff-param-vars  ;pure var list, connectives stripped
+                       :effect-format eff-params  ;annotated list w/ connectives, display only
                        :effect-lambda `(lambda (state ,@eff-args)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
@@ -706,8 +706,8 @@
                        :effect-adds nil))
         (fix-if-ignore '(state) (action.precondition-lambda action))
         (fix-if-ignore `(state ,@eff-missing-vars) (action.effect-lambda action))
-        (setf (action.effect-adds action)                                ;; CHANGED
-              (extract-effect-modified-relations effect))                 ;; CHANGED
+        (setf (action.effect-adds action)
+              (extract-effect-modified-relations effect))
         action))))
 
 

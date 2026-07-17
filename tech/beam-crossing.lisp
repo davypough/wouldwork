@@ -6,33 +6,35 @@
 ;;; a direct line must include beam-direct as well.  If beam-relay is also included,
 ;;; relay beams participate through relay hook queries supplied by beam-relay.
 ;;; BEAM-CROSSING> is derived internally, lazily and once, from whichever facts populate
-;;; CROSSINGS-ALONG-BEAM> -- hand-authored directly (as corner-topo2 does), or computed
-;;; from coordinates via the nested -beam-coordinates substrate (see that file).  A problem
-;;; may still assert BEAM-CROSSING> itself (as corner-topo3/4 do); it is simply never read.
+;;; CROSSINGS-ALONG-BEAM> -- hand-authored directly, or computed from coordinates via the
+;;; nested -beam-crossing-coordinates substrate (see that file; problem-corner-topo and
+;;; problem-corner-topo+ both use the coordinate path).  A problem may still assert
+;;; BEAM-CROSSING> itself; it is simply never read.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-crossing).
 ;;;
 ;;; REQUIRES:
-;;;   types     : beam-endpoint  --  declared by the problem; crossing is declared optional
-;;;               by the nested -beam-coordinates substrate, though a problem with any
-;;;               crossings still declares its own full crossing1, crossing2, ... pool;
-;;;               gate and transmitter are declared optional here (define-optional-types),
-;;;               gate coordinated with gate, accessibility, visibility, reachability, and
-;;;               beam-direct, which all convert gate together since they share the (open
-;;;               gate) relation verbatim
+;;;   types     : crossing is declared optional by the nested -beam-crossing-coordinates
+;;;               substrate, though a problem with any crossings still declares its own full
+;;;               crossing1, crossing2, ... pool; beam-endpoint is declared by the nested
+;;;               -beam-los-coordinates substrate (via -beam-crossing-coordinates);
+;;;               transmitter is declared optional here (define-optional-types); gate comes
+;;;               from nested -gate
 ;;;   driver    : propagate-consequences! must call update-crossing-status! before
 ;;;               update-connector-status! and/or update-receiver-status!
 ;;; PROVIDES:
-;;;   nested    : -beam-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM> input)
-;;;   types     : gate, transmitter  --  declared optional here; other techs (gate,
+;;;   nested    : -beam-crossing-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM>/
+;;;               CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
+;;;               BEAM-ENDPOINT, TRANSCEIVER-POSITION>, WALL-SEGMENTS, GATE-SEGMENTS,
+;;;               BOUNDARY-WALL, and LOS derivation);
+;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
+;;;               accessibility (via -passability), reachability, visibility, and
+;;;               beam-direct, which all nest -gate instead of hand-declaring it
+;;;   types     : transmitter  --  declared optional here; other techs (gate,
 ;;;               accessibility, visibility, reachability, beam-direct, -beam-substrate,
-;;;               beam-relay, etc.) independently declare their own gate-alias/
-;;;               transmitter-alias for their own pre-params; the bare and aliased forms
-;;;               resolve compatibly
-;;;   relations : (open gate)  --  also declared identically by gate, accessibility,
-;;;               visibility, reachability, and beam-direct; only gate's
-;;;               update-gate-status! ever asserts it
-;;;               crossing-active, beam-crossing>, crossings-along-beam>,
+;;;               beam-relay, etc.) independently declare their own transmitter-alias
+;;;               for their own pre-params; the bare and aliased forms resolve compatibly
+;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,
 ;;;               crossings-before-gate>
 ;;;   queries   : current-crossing-set, beam-reaches-crossing,
 ;;;               compute-active-crossings, arbitrate-crossings, crossing-reaches,
@@ -41,16 +43,16 @@
 ;;;   update    : update-crossing-status!
 
 (include-tech -beam-substrate)
-(include-tech -beam-coordinates)
+(include-tech -beam-crossing-coordinates)
+(include-tech -gate)
 
 (in-package :ww)
 
 
-(define-optional-types gate transmitter)
+(define-optional-types transmitter)
 
 
 (define-dynamic-relations
-  (open gate)  ;also declared by gate/accessibility/visibility/reachability/beam-direct; only gate writes it
   (crossing-active crossing))
 
 

@@ -319,7 +319,7 @@
                (consp (second form)))
     (error "Invalid bind form structure: ~A" form))
   (check-proposition (second form))
-  (check-bind-relation-has-fluent (second form))    ;; ADDED: bind on a fluentless relation is an error
+  (check-bind-relation-has-fluent (second form))    ;bind on a fluentless relation is an error
   (check-bind-fluent-consistency (second form)))
 
 
@@ -936,17 +936,17 @@ predicates stay unknown because their argument may or may not be an instance."
   "For depth-first, translates an assert statement with selective write-mode context."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let* ((parent-hash (unless (use-canonical-symmetry-p)  ;CHANGED: seed incremental idb-hash from parent (standard mode only)
+    (pre `(let* ((parent-hash (unless (use-canonical-symmetry-p)  ;seed incremental idb-hash from parent (standard mode only)
                                 (ensure-idb-hash state)))
                  (state (copy-problem-state state))
-                 (*idb-hash-acc* parent-hash))  ;CHANGED: NIL here disables folding (canonical-symmetry mode)
+                 (*idb-hash-acc* parent-hash))  ;NIL here disables folding (canonical-symmetry mode)
             ,@(mapcar (lambda (statement)
                         ;; Bind read-mode to nil only for direct assert statements
                         (let ((*proposition-read-mode* nil))
                           (translate statement 'eff)))
                       (cdr form))
             (push (make-update :changes (problem-state.idb state)
-                               :hash *idb-hash-acc*  ;CHANGED: carry incremental hash out of the effect
+                               :hash *idb-hash-acc*  ;carry incremental hash out of the effect
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0)
@@ -1003,8 +1003,8 @@ predicates stay unknown because their argument may or may not be an instance."
   `(,(first form) ,(mapcar (lambda (binding)
                              (if (consp binding)
                                  ;; Binding with initial value - translate the value
-                                 `(,(first binding) ,(let ((*formula-context-p* nil))  ; CHANGED
-                                                        (translate (second binding) flag)))  ; CHANGED
+                                 `(,(first binding) ,(let ((*formula-context-p* nil))
+                                                        (translate (second binding) flag)))
                                  ;; Just a variable name - keep as is
                                  binding))
                            (second form))
@@ -1015,16 +1015,16 @@ predicates stay unknown because their argument may or may not be an instance."
 (defun translate-mv-assign (form flag)
   "Translates an mv-assign statement, always returning t as a conjunct."
   `(progn (multiple-value-setq ,(second form)
-                                ,(let ((*formula-context-p* nil))          ; CHANGED
-                                   (translate (third form) flag)))          ; CHANGED
+                                ,(let ((*formula-context-p* nil))
+                                   (translate (third form) flag)))
           t))
 
 
 (defun translate-assign (form flag)
   "Translates an assign statement, always returning t as a conjunct."
   `(progn (setq ,(second form)
-                ,(let ((*formula-context-p* nil))          ; CHANGED
-                   (translate (third form) flag)))          ; CHANGED
+                ,(let ((*formula-context-p* nil))
+                   (translate (third form) flag)))
           t))
 
 
@@ -1110,7 +1110,7 @@ predicates stay unknown because their argument may or may not be an instance."
 (defun translate-lambda-form (form flag)
   "Translate the body of a Lisp lambda expression."
   `(lambda ,(second form)
-     ,@(let ((*formula-context-p* nil))                ; CHANGED
+     ,@(let ((*formula-context-p* nil))
          (mapcar (lambda (body-form)
                    (translate body-form flag))
                  (cddr form)))))
@@ -1128,8 +1128,8 @@ predicates stay unknown because their argument may or may not be an instance."
 (defun translate-binding-form (form flag)
   "Translate a binding form with one value expression and a body."
   `(,(first form) ,(second form)
-     ,(let ((*formula-context-p* nil))               ; CHANGED
-        (translate (third form) flag))               ; CHANGED
+     ,(let ((*formula-context-p* nil))
+        (translate (third form) flag))
      ,@(mapcar (lambda (body-form)
                  (translate body-form flag))
                (cdddr form))))
@@ -1140,8 +1140,8 @@ predicates stay unknown because their argument may or may not be an instance."
   `(,(first form)
      ,@(loop for (place value) on (rest form) by #'cddr
              append (list (translate place flag)
-                          (let ((*formula-context-p* nil))          ; CHANGED
-                            (translate value flag))))))              ; CHANGED
+                          (let ((*formula-context-p* nil))
+                            (translate value flag))))))
 
 
 (defun translate-body-form (form flag)
@@ -1164,7 +1164,7 @@ predicates stay unknown because their argument may or may not be an instance."
 
 (defun translate-ordinary-lisp-call (form flag)
   "Translate evaluated arguments in an ordinary Lisp function call."
-  (let ((*formula-context-p* nil))                        ; CHANGED
+  (let ((*formula-context-p* nil))
     `(,(if (consp (first form))
          (translate (first form) flag)
          (first form))
@@ -1184,7 +1184,7 @@ predicates stay unknown because their argument may or may not be an instance."
     ((multiple-value-bind destructuring-bind)
      (translate-binding-form form flag))
     ((progn locally) (translate-body-form form flag))
-    ((and or) (translate-body-form form flag))  ; CHANGED: reached only when *formula-context-p* is nil
+    ((and or) (translate-body-form form flag))  ; reached only when *formula-context-p* is nil
     (block
      `(block ,(second form)
         ,@(mapcar (lambda (body-form)

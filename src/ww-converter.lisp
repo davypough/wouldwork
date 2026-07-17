@@ -146,7 +146,7 @@
     (iter (for obj in objects)
           (when (or (listp obj) (vectorp obj))
             (setf *constant-integers*
-                  (make-hash-table :test #'equal :size 2003 :rehash-threshold 1.0))  ;; CHANGED: was :synchronized (> *threads* 0)
+                  (make-hash-table :test #'equal :size 2003 :rehash-threshold 1.0))  ;; was :synchronized (> *threads* 0)
             (leave)))
     (iter (for obj in objects)
           (for i from 100)

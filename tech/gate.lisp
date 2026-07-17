@@ -9,12 +9,13 @@
 ;;; matching claustro4a; toggle is reserved.)
 ;;;
 ;;; REQUIRES (supplied by other techs):
-;;;   types     : (none bare)  --  gate, plate, jammer, mode, and receiver are all declared
-;;;               optional here (define-optional-types).  gate is now a plain optional type
-;;;               like the rest, coordinated across this file plus accessibility, visibility,
-;;;               reachability, beam-direct, and beam-crossing, which all convert
-;;;               together since they share the (open gate) relation verbatim
-;;;   nested    : -beam-substrate ((active receiver), null beam defaults)
+;;;   types     : (none bare)  --  plate, jammer, mode, and receiver are declared optional
+;;;               here (define-optional-types); gate itself comes from nested -gate
+;;;   nested    : -beam-substrate ((active receiver), null beam defaults);
+;;;               -gate (gate optional type, (open gate) relation) -- shared with
+;;;               accessibility (via -passability), reachability, visibility, beam-direct,
+;;;               beam-crossing, and -passability, which all nest -gate instead of
+;;;               hand-declaring it
 ;;;   conditional relations:
 ;;;               depressed (plate), guarded by plate
 ;;;               jamming (jammer), guarded by an exists over jammer
@@ -22,28 +23,22 @@
 ;;;               translation removes the guarded reference when that type is empty.
 ;;;   driver    : the master propagate-consequences! must call update-gate-status!
 ;;; PROVIDES:
-;;;   types     : gate, plate, jammer, mode, receiver  --  declared optional here; a problem
+;;;   types     : plate, jammer, mode, receiver  --  declared optional here; a problem
 ;;;               with none of these need not declare them.  Other techs (plate, jammer, box,
 ;;;               beam-relay, -beam-substrate, visibility, etc.) still declare their own
 ;;;               plate-alias/jammer-alias/receiver-alias for their own pre-params; the bare
 ;;;               and aliased forms resolve compatibly and do not conflict.
-;;;   relations : (open gate)  --  also declared identically by accessibility, visibility,
-;;;               reachability, and beam-direct; only this file's update-gate-status!
-;;;               ever asserts it
-;;;               (controls $list gate $mode)
+;;;   relations : (controls $list gate $mode)
 ;;;   query     : energized
-;;;   update    : update-gate-status!
+;;;   update    : update-gate-status!  --  the only file that ever asserts (open gate)
 
 (include-tech -beam-substrate)
+(include-tech -gate)
 
 (in-package :ww)
 
 
-(define-optional-types gate plate jammer mode receiver)
-
-
-(define-dynamic-relations
-  (open gate))  ;also declared by accessibility/visibility/reachability/beam-direct; only this file writes it
+(define-optional-types plate jammer mode receiver)
 
 
 (define-static-relations

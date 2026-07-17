@@ -6,14 +6,17 @@
 ;;; not part of accessibility -- they are explicit ladder actions (ladder).
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  gate, screen, and ladder are declared optional here
-;;;               through nested -passability, coordinated with gate, visibility, reachability,
-;;;               beam-direct, and beam-crossing, which all convert gate together since
-;;;               they share the (open gate) relation verbatim
+;;;   types     : agent, location  --  gate and screen come from nested -passability's own
+;;;               nested -gate/-holding; ladder is declared optional by -passability directly
 ;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
 ;;;               -location (mobile-object, (has-location ...)); -passability
-;;;               (open, obstacle-clear, all-clear); -elevation
-;;;               ((has-elevation ...), location-elevation)
+;;;               (open, obstacle-clear, all-clear, plus nested -gate's (open gate) relation
+;;;               -- shared with gate, reachability, visibility, beam-direct, and
+;;;               beam-crossing, which all nest -gate instead of hand-declaring it);
+;;;               -elevation ((has-elevation ...), location-elevation)
+;;;               -accessibility (identity-default accessible interface);
+;;;               -accessibility-coordinates (optional coordinate-based WALK-VIA input,
+;;;               via WALL-SEGMENTS/GATE-SEGMENTS/WINDOW-SEGMENTS)
 ;;;               --  all shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
 ;;;   relations : (walk-via location $list location)
@@ -24,6 +27,8 @@
 (include-tech -location)
 (include-tech -passability)
 (include-tech -elevation)
+(include-tech -accessibility)
+(include-tech -accessibility-coordinates)
 
 (in-package :ww)
 

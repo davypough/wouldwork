@@ -81,10 +81,10 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (ww-set <problem-parameter> <new-value>)
    -- set a problem parameter to a new value
-   eg, (ww-set *solution-type* <one of first, every, all-paths, min-length, min-time,  ; CHANGED
+   eg, (ww-set *solution-type* <one of first, every, all-paths, min-length, min-time,
                                        min-value, max-value, or a positive integer N
                                        to find exactly N solutions;
-                                       all-paths requires depth-first + graph + depth-cutoff>0>)  ; CHANGED
+                                       all-paths requires depth-first + graph + depth-cutoff>0>)
        (ww-set *tree-or-graph* <one of tree or graph>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)
@@ -209,7 +209,7 @@ is staged again.
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
         default-problem-type default-solution-type default-progress-reporting-interval 
         default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal
-        default-threads)                                               ;; CHANGED
+        default-threads)
       *default-parameters*
     (setf *problem-name* default-problem-name
           *depth-cutoff* default-depth-cutoff  
@@ -224,7 +224,7 @@ is staged again.
           *symmetry-pruning* default-symmetry-pruning
           *debug* default-debug
           *goal* default-goal
-          *threads* default-threads))                                  ;; CHANGED
+          *threads* default-threads))
   (setf *features* (remove :ww-debug *features*)))
 
 
@@ -233,7 +233,7 @@ is staged again.
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
                       *solution-type* *progress-reporting-interval* *randomize-search* 
                       *branch* *probe* *symmetry-pruning* *debug* *goal*
-                      *threads*)                                       ;; CHANGED
+                      *threads*)
                 *globals-file*))
 
 
@@ -246,7 +246,7 @@ is staged again.
     (destructuring-bind 
          (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
           progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal
-          threads)                                                      ;; CHANGED
+          threads)
         padded
       (setf *problem-name* problem-name
             *depth-cutoff* depth-cutoff
@@ -411,7 +411,7 @@ is staged again.
 
 
 (defun solve ()
-  (cond (*final-goal*  ;mid-chain: continue toward original goal           ;; CHANGED
+  (cond (*final-goal*  ;mid-chain: continue toward original goal
          (continue-from-solution *final-goal*)
          (ww-solve))
         (t (ww-solve))))

@@ -151,7 +151,7 @@
   (precondition-lambda nil :type list)
   (iprecondition-lambda nil :type list)
   (effect-variables nil :type list)
-  (effect-format nil :type list)  ;annotated effect list w/ string connectives, display only  ;; ADDED
+  (effect-format nil :type list)  ;annotated effect list w/ string connectives, display only
   (effect-adds nil :type list)  ;relation symbols modified by this action's effect (set by installer)
   (effect-lambda nil :type list)
   (ieffect-lambda nil :type list))
@@ -164,7 +164,7 @@
   (instantiations nil :type list)
   (followups nil :type list)    ;next & finally followup function calls
   (sim-state nil)               ;strategic-wait simulation state
-  (hash nil :type (or null fixnum)))  ;ADDED: incremental idb-hash carried out of the effect (nil = recompute downstream)
+  (hash nil :type (or null fixnum)))  ;incremental idb-hash carried out of the effect (nil = recompute downstream)
 
 
 (defstruct (solution (:conc-name solution.))

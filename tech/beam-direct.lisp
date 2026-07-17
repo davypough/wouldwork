@@ -7,33 +7,38 @@
 ;;; overrides the direct arrival and cut-liveness hooks, adding the direct-only wiring
 ;;; (coupled, beam-via).  The shared interface (has-chroma/active relations, the receiver-status
 ;;; driver, the arrival/cut orchestrators, and the null-object hook defaults) lives in
-;;; -beam-substrate.
+;;; -beam-substrate.  Also nests -beam-los-coordinates, so a problem that would rather author
+;;; 2D positions than hand-list corridor occluders can assert WALL-SEGMENTS/GATE-SEGMENTS/
+;;; BOUNDARY-WALL and get LOS-TO-TRANSCEIVER/LOS-TO-LOCATION derived automatically (see that
+;;; file); entirely inert otherwise, so a problem that hand-authors its own beam-via corridor
+;;; (as claustro-topo does) is unaffected.  A problem with two direct beams that can cross
+;;; also includes beam-crossing alongside beam-direct -- -beam-los-coordinates is spliced only
+;;; once regardless, and beam-crossing's own -beam-crossing-coordinates nests it too, always
+;;; before its crossing-specific derivation.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-direct).
 ;;;
 ;;; REQUIRES:
-;;;   types : location, hue, agent  --  gate, transmitter, receiver, box, jammer, connector,
-;;;           and plate are declared optional here (define-optional-types).  Gate is
-;;;           coordinated with gate, accessibility, visibility, reachability, and
-;;;           beam-crossing, which all convert gate together since they share the
-;;;           (open gate) relation verbatim.  Box/jammer/connector are beam blockers;
-;;;           plate may appear as a non-raising support.
+;;;   types : location, hue, agent  --  transmitter, receiver, box, jammer, connector, and
+;;;           plate are declared optional here (define-optional-types); gate comes from
+;;;           nested -gate.  Box/jammer/connector are beam blockers; plate may appear as a
+;;;           non-raising support.
 ;;;   nested : -location (mobile-object, (has-location ...)); -support-occupancy
 ;;;            (support-occupant, support, (on ...)); -height (heighted-object, has-height,
 ;;;            declared-height); -elevation (elevated-object, has-elevation,
-;;;            fixture-elevation, location-elevation) -- shared via nested include-tech
-;;;            rather than local declaration
+;;;            fixture-elevation, location-elevation); -gate (gate optional type, (open gate)
+;;;            relation) -- shared with gate, accessibility (via -passability), reachability,
+;;;            visibility, and beam-crossing, which all nest -gate instead of hand-declaring it
 ;;; PROVIDES:
+;;;   nested    : -beam-los-coordinates (BEAM-ENDPOINT type; TRANSCEIVER-POSITION>,
+;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS)
 ;;;   types     : beam-blocker (either agent box jammer connector)  --  sole consumer; not
 ;;;               declared elsewhere
-;;;               gate, transmitter, receiver  --  declared optional here; other techs
+;;;               transmitter, receiver  --  declared optional here; other techs
 ;;;               (-beam-substrate, beam-relay, beam-crossing, visibility, gate, etc.)
-;;;               independently declare their own gate-alias/transmitter-alias/receiver-alias
+;;;               independently declare their own transmitter-alias/receiver-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
-;;;   relations : (open gate)  --  also declared identically by gate, accessibility,
-;;;               visibility, and reachability; only gate's update-gate-status!
-;;;               ever asserts it
-;;;               coupled, beam-via
+;;;   relations : coupled, beam-via
 ;;;   queries   : direct-beam-reaches-receiver, direct-beam-elevation, beam-clear,
 ;;;               beam-blocker-base-elevation, beam-blocker-top-elevation
 ;;;               (reads -height.lisp's declared-height for a blocker's default unit height),
@@ -45,6 +50,8 @@
 (include-tech -support-occupancy)
 (include-tech -height)
 (include-tech -elevation)
+(include-tech -beam-los-coordinates)
+(include-tech -gate)
 
 (in-package :ww)
 
@@ -53,11 +60,7 @@
   beam-blocker (either agent box jammer connector))  ;what can block/occlude a beam path; sole consumer of this type
 
 
-(define-optional-types gate transmitter receiver box jammer connector plate)
-
-
-(define-dynamic-relations
-  (open gate))  ;also declared by gate/accessibility/visibility/reachability; only gate writes it
+(define-optional-types transmitter receiver box jammer connector plate)
 
 
 (define-static-relations

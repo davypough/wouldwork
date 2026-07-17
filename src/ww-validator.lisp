@@ -238,7 +238,7 @@
               :key (lambda (item)
                      (when (consp item)
                        (case (first item)
-                         ((setq setf assign ww-assign)  ;CHANGED: added assign, ww-assign
+                         ((setq setf assign ww-assign)
                           (when (symbolp (second item)) (push (second item) valid-vars)))
                          (mvsetq      (alexandria:appendf valid-vars
                                         (remove-if-not #'varp (second item))))
@@ -278,11 +278,11 @@
 
 (defun check-effect-parameters (eff-parameter-list)
   "Checks a user action effect parameter list. Each element must be a ? or $
-   variable, or a string connective (a display-only filler, eg \"from\")."          ;; CHANGED
+   variable, or a string connective (a display-only filler, eg \"from\")."
   (check-type eff-parameter-list list)
-  (unless (every (lambda (item) (or (varp item) (stringp item))) eff-parameter-list) ;; CHANGED
+  (unless (every (lambda (item) (or (varp item) (stringp item))) eff-parameter-list)
     (error "Expecting only ?/$ variables or string connectives in an effect parameter list: ~A"
-           eff-parameter-list)))                                                     ;; CHANGED
+           eff-parameter-list)))
 
 
 (defun get-assert-established-$vars (assert-form)
@@ -844,10 +844,10 @@
                               Must be either planning or csp (ie, constraint satisfaction problem)." val)))
     (*algorithm* (unless (member val '(depth-first backtracking))
                    (error "Can't set *algorithm* to ~S. Must be either depth-first or backtracking." val)))
-    (*solution-type* (unless (or (member val '(first every all-paths min-length min-time min-value max-value)) ; CHANGED
+    (*solution-type* (unless (or (member val '(first every all-paths min-length min-time min-value max-value))
                                  (and (typep val 'fixnum) (> val 0)))
                        (error "Can't set *solution-type* to ~S. Must be one of~%~
-                               first, every, all-paths, min-length, min-time, min-value, max-value,~%~  ; CHANGED
+                               first, every, all-paths, min-length, min-time, min-value, max-value,~%~
                                or a positive integer (to find that many solutions)." val)))
     (*progress-reporting-interval* (unless (and (typep val 'fixnum) (> val 0))
                                      (error "Can't set *progress-reporting-interval* to ~S.
@@ -887,16 +887,16 @@
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))
-    ((*num-closed-shards* *split-depth-max* *tasks-per-thread* *min-tasks*  ; ADDED
-      *bound-refresh-interval* *donation-check-interval* *donation-threshold*)  ; ADDED
-     (unless (and (typep val 'fixnum) (> val 0))                               ; ADDED
-       (error "Can't set ~S to ~S. Must be a positive integer." param val)))  ; ADDED
-    ((*donation-fraction*)                                                      ; ADDED
-     (unless (and (realp val) (>= val 0.0) (<= val 1.0))                       ; ADDED
-       (error "Can't set *donation-fraction* to ~S. Must be a real between 0.0 and 1.0." val)))  ; ADDED
-    ((*enable-work-donation*)                                                   ; ADDED
-     (unless (typep val 'boolean)                                               ; ADDED
-       (error "Can't set *enable-work-donation* to ~S. Must be T or NIL." val)))  ; ADDED
+    ((*num-closed-shards* *split-depth-max* *tasks-per-thread* *min-tasks*
+      *bound-refresh-interval* *donation-check-interval* *donation-threshold*)
+     (unless (and (typep val 'fixnum) (> val 0))
+       (error "Can't set ~S to ~S. Must be a positive integer." param val)))
+    ((*donation-fraction*)
+     (unless (and (realp val) (>= val 0.0) (<= val 1.0))
+       (error "Can't set *donation-fraction* to ~S. Must be a real between 0.0 and 1.0." val)))
+    ((*enable-work-donation*)
+     (unless (typep val 'boolean)
+       (error "Can't set *enable-work-donation* to ~S. Must be T or NIL." val)))
     (otherwise (error "~S is not a valid parameter name in (ww-set ~S ~S)." param param val))))
 
 

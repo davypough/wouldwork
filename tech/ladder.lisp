@@ -1,8 +1,8 @@
 ;;; Filename: ladder.lisp
 
-;;; Ladder technology: one-way traversal over a ladder-like object.  A one-way edge
-;;; (traversable>) carries the agent from its current location to the edge's destination when
-;;; every enabling implement is usable.  Unlike walking (accessibility), one-way edges are not
+;;; Ladder technology: one-way climbing over a ladder-like object.  A directed climb edge
+;;; (climb-via>) carries the agent from its current location to the edge's destination when
+;;; every enabling implement is usable.  Unlike walking (accessibility), climb edges are not
 ;;; folded into the reachable-set closure; they are explicit ladder actions.
 ;;;
 ;;; REQUIRES:
@@ -14,7 +14,7 @@
 ;;; PROVIDES:
 ;;;   types     : ladder  --  declared optional here and by nested -passability; the
 ;;;               declarations resolve compatibly
-;;;   relations : (traversable> location $list location)
+;;;   relations : (climb-via> location $list location)
 ;;;   query     : one-way-clear
 ;;;   action    : use-ladder
 
@@ -30,7 +30,7 @@
 
 
 (define-static-relations
-  (traversable> location $list location))  ;one-way edge (> suppresses symmetry); $list = enabling means (eg ladders)
+  (climb-via> location $list location))  ;directed climb edge; $list = enabling means
 
 
 (define-query one-way-clear (?agent ?means)
@@ -50,7 +50,7 @@
        (not (bind (on ?agent $anyplace)))
        (bind (has-position ?ladder $ladder-location))
        (eql $a-location $ladder-location)
-       (bind (traversable> $a-location $means $dest))
+       (bind (climb-via> $a-location $means $dest))
        (member ?ladder $means)
        (one-way-clear ?agent $means))
   (":" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)

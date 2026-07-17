@@ -7,9 +7,10 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : fixture (either gate transmitter receiver); gate, transmitter, and
-;;;              receiver are declared optional
-;;;   query    : visible  --  null default, overridden by visibility
+;;;   types    : fixture (either gate transmitter receiver), transceiver (either
+;;;              transmitter receiver); gate, transmitter, and receiver are declared
+;;;              optional
+;;;   queries  : visible, potentially-visible  --  null defaults, overridden by visibility
 
 (in-package :ww)
 
@@ -18,8 +19,13 @@
 
 
 (define-types
-  fixture (either gate transmitter receiver))
+  fixture (either gate transmitter receiver)
+  transceiver (either transmitter receiver))  ;a transmitter or receiver; los-to-transceiver's target type
 
 
 (define-query visible (?location location ?object (either fixture location))
+  (do ?location ?object nil))
+
+
+(define-query potentially-visible (?location location ?object (either fixture location))
   (do ?location ?object nil))

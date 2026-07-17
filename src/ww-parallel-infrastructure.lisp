@@ -155,7 +155,7 @@
     (let ((got-item-p nil))
       (unwind-protect
           (loop
-            (when *shutdown-requested*                              ; ADDED: wake on Ctrl-C shutdown
+            (when *shutdown-requested*
               (return nil))
             (unless (tq-empty-p queue)
               (let* ((buffer (tq-buffer queue))
@@ -440,8 +440,8 @@
    Recomputes *closed-shard-mask* from *num-closed-shards* to ensure
    the two are always in sync regardless of how *num-closed-shards* was set."
   ;; Recompute mask from current *num-closed-shards* -- guards against
-  ;; direct setf of *num-closed-shards* bypassing ww-set.  ; ADDED
-  (setf *closed-shard-mask* (1- *num-closed-shards*))      ; ADDED
+  ;; direct setf of *num-closed-shards* bypassing ww-set.
+  (setf *closed-shard-mask* (1- *num-closed-shards*))
   ;; Create shard locks
   (initialize-closed-shard-locks)
   ;; Create hash table shards
@@ -497,8 +497,8 @@
    Counts stored entries (states), not bucket count."
   (if *closed-shards*
       (loop for shard across *closed-shards*
-            sum (loop for bucket being the hash-values of shard         ; CHANGED: was (hash-table-count shard)
-                      sum (length bucket)))                             ; CHANGED
+            sum (loop for bucket being the hash-values of shard
+                      sum (length bucket)))
       0))
 
 
@@ -516,9 +516,9 @@
    Useful for checking distribution quality."
   (when *closed-shards*
     (loop for i from 0 below *num-closed-shards*
-          for shard = (svref *closed-shards* i)                                  ; CHANGED: factored out for readability
-          for count = (loop for bucket being the hash-values of shard            ; CHANGED: was (hash-table-count (svref ...))
-                            sum (length bucket))                                 ; CHANGED
+          for shard = (svref *closed-shards* i)
+          for count = (loop for bucket being the hash-values of shard
+                            sum (length bucket))
           when (> count 0)
             collect (cons i count))))
 
@@ -637,7 +637,7 @@
    *unique-solution-states* is deferred to finalize-parallel-search-results.
    Per-solution console output is gated to *solution-type* = first or
    *debug* >= 1, to avoid serializing workers on stdout I/O when many
-   solutions are found."                                                ;; CHANGED: docstring extended
+   solutions are found."
   (declare (type node current-node)
            (type problem-state goal-state)
            (type fixnum worker-id))
@@ -674,7 +674,7 @@
     ;; stdout I/O when many solutions are found (every, fixnum). *first*
     ;; prints one line. Optimization types log interesting events via the
     ;; "New best bound" print above; raise *debug* to see every match.
-    (when (or (eql *solution-type* 'first) (>= *debug* 1))               ;; CHANGED: gated
+    (when (or (eql *solution-type* 'first) (>= *debug* 1))
       (bt:with-lock-held (*lock*)
         (format t "~&[Worker ~D] Solution found at depth ~D~%" worker-id state-depth)
         (when (member *solution-type* '(min-time))

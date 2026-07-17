@@ -2,12 +2,13 @@
 
 ;;; Support-elevation substrate: the vertical level of a support's top and of an
 ;;; occupant standing either on a support or directly at a location.  These queries
-;;; are shared by box manipulation, jammer pickup, and barrier vaulting.
+;;; are shared by cargo manipulation and barrier vaulting.
 ;;;
 ;;; REQUIRES:
 ;;;   nested  : -support-occupancy, -location, -position, -height, -elevation
 ;;; PROVIDES:
-;;;   queries : support-top-elevation, occupant-elevation
+;;;   queries : support-top-elevation, occupant-elevation,
+;;;             within-agent-vertical-reach
 
 (include-tech -support-occupancy)
 (include-tech -location)
@@ -38,3 +39,11 @@
     (+ (occupant-elevation $support) (declared-height $support))
     (do (bind (has-location ?occupant $location))
         (location-elevation $location))))
+
+
+(define-query within-agent-vertical-reach (?agent agent ?target-elevation)
+  ;; Cargo pickup and placement use one vertical-reach convention: measure from
+  ;; the agent's standing elevation, with the agent's declared height as the
+  ;; maximum absolute distance above or below that level.
+  (<= (abs (- ?target-elevation (occupant-elevation ?agent)))
+      (declared-height ?agent)))

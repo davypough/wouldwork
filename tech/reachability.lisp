@@ -5,43 +5,30 @@
 ;;; every barrier gate open.
 ;;;
 ;;; REQUIRES:
-;;;   types     : location  --  gate is declared optional here (define-optional-types),
-;;;               coordinated with gate, accessibility, visibility, beam-direct, and
-;;;               beam-crossing, which all convert gate together since they share the
-;;;               (open gate) relation verbatim
-;;;   nested    : -reachability (identity-default reachable query overridden here)
+;;;   types     : location
+;;;   nested    : -reachability (identity-default reachable query overridden here);
+;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
+;;;               accessibility (via -passability), visibility, beam-direct, and
+;;;               beam-crossing, which all nest -gate instead of hand-declaring it
 ;;; PROVIDES:
-;;;   types     : gate  --  declared optional here; other techs (gate, accessibility,
-;;;               visibility, beam-direct, beam-crossing, etc.) independently declare their
-;;;               own gate-alias for their own pre-params; the bare and aliased forms
-;;;               resolve compatibly
-;;;   relations : (open gate)  --  also declared identically by gate, accessibility,
-;;;               visibility, and beam-direct; only gate's update-gate-status!
-;;;               ever asserts it
-;;;               (reachable-via location $list location)
+;;;   relations : (reach-via location $list location)
 ;;;   queries   : reachable (overrides -reachability), reachable-clear
 
 (include-tech -reachability)
+(include-tech -gate)
 
 (in-package :ww)
 
 
-(define-optional-types gate)
-
-
-(define-dynamic-relations
-  (open gate))  ;also declared by gate/accessibility/visibility/beam-direct; only gate writes it
-
-
 (define-static-relations
-  (reachable-via location $list location))  ;reach edge (eg through a wall opening); $list = barrier gates that must be open
+  (reach-via location $list location))  ;reach edge (eg through a wall opening); $list = barrier gates that must be open
 
 
 (define-query reachable (?location1 location ?location2 location)
   ;; Within reach iff the same location, or a reach edge joins them with every barrier open.
-  ;; Agent-independent; reachable-via is symmetric (both endpoints are locations).
+  ;; Agent-independent; reach-via is symmetric (both endpoints are locations).
   (or (eql ?location1 ?location2)
-      (and (bind (reachable-via ?location1 $barriers ?location2))
+      (and (bind (reach-via ?location1 $barriers ?location2))
            (ww-loop for $b in $barriers
                     always (reachable-clear $b)))))
 

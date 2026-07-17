@@ -459,7 +459,7 @@ Returns a list of validated predecessor states."
 
 
 (defun bw-regressed-predecessor-report (candidate-goal-states candidate-actions &key
-                                                             (validator #'bw-regress+validate) ; CHANGED
+                                                             (validator #'bw-regress+validate)
                                                              (normalizer *bw-default-normalizer*)
                                                              (strip-relations *bw-normalize-strip-relations*)
                                                              (projection-relations *bw-default-projection-relations*)
@@ -479,7 +479,7 @@ Returns a list of per-goal report plists:
                   (loop for action in candidate-actions
                         collect
                         (let* ((validated
-                                 (funcall validator goal-state action             ; CHANGED
+                                 (funcall validator goal-state action
                                           :normalizer normalizer
                                           :strip-relations strip-relations
                                           :projection-relations projection-relations
@@ -515,7 +515,7 @@ Accepted inputs:
   - a list of PROBLEM-STATEs          => that list
   - a proposition list                => (list (bw-make-state-from-propositions ...))
   - a list of proposition lists       => (mapcar bw-make-state-from-propositions ...)
-  - a report plist with :GOAL-STATES  => coerces (GETF <report> :GOAL-STATES)  ;; NEW
+  - a report plist with :GOAL-STATES  => coerces (GETF <report> :GOAL-STATES)
 
 Note: NIL by itself is treated as \"no goal states\". To represent a single empty
 proposition list as a goal-state, pass (list nil)."
@@ -524,12 +524,12 @@ proposition list as a goal-state, pass (list nil)."
     ((null candidate-goal-states)
      nil)
 
-    ;; NEW: Allow passing a FIND-GOAL-STATES report plist directly.
+    ;; Allow passing a FIND-GOAL-STATES report plist directly.
     ;; We detect this by the presence of the :GOAL-STATES key.
     ((and (consp candidate-goal-states)
           (keywordp (first candidate-goal-states))
-          (member :goal-states candidate-goal-states))                 ;; NEW
-     (bw-coerce-goal-states (getf candidate-goal-states :goal-states))) ;; NEW
+          (member :goal-states candidate-goal-states))
+     (bw-coerce-goal-states (getf candidate-goal-states :goal-states)))
 
     ;; Single PROBLEM-STATE
     ((typep candidate-goal-states 'problem-state)
@@ -2324,7 +2324,7 @@ We also avoid terminus choices that are connectors located in the same AREA (pre
                   (let* ((partners (bw--paired-partners-of target-state cargo))
                          ;; Filter out cargo itself and any connector terminus in same area
                          (partners
-                           (remove-if (lambda (term)  ;; CHANGED: was (lambda (t) ...)
+                           (remove-if (lambda (term)  ;; was (lambda (t) ...)
                                         (or (eql term cargo)
                                             (and (bw--connector-symbol-p term)
                                                  (eql (bw--loc-of target-state term) area))))

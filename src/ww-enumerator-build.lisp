@@ -1924,7 +1924,7 @@ Early keys must match EARLY-TYPES and must not include symmetric objects."
                (partners (expand-type-spec-instances* partner-type-spec))
                (max-k (or (enum-max-per-key r) default-max-per-key))
                (sym-rel-p (member r symmetric-relations :test #'eq))
-               (keys (enum-sort-keys-fail-first unsorted-keys partners max-k  ;; CHANGED: sort first
+               (keys (enum-sort-keys-fail-first unsorted-keys partners max-k
                                                 :symmetric-relation-p sym-rel-p))
                (requires-predicate (unless *enum-disable-csp-metadata-pruning*
                                      (enum-requires-predicate r)))
