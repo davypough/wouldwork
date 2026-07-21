@@ -3,6 +3,9 @@
 ;;; Jumping technology: change the agent's support at its current location or cross an
 ;;; authored jump edge.  Landings may be ground or a clear box top.  Level and downward
 ;;; landings are unrestricted; upward landings are limited by the agent's declared height.
+;;; Jumping handles exclusively elevation-related moves: local support changes involve box
+;;; tops only (mounting and dismounting flush supports like plates and gears-mounted fans
+;;; belongs to the step technology; a fan resting on a box top is not a jump landing).
 ;;; Open gates and passable screens impose no clearance requirement.  Closed gates,
 ;;; non-passable screens, fences, and walls must be within vaulting reach; a multi-feature
 ;;; jump must clear the highest feature that is not currently passable.
@@ -103,8 +106,9 @@
 
 (define-action jump-to
   ;; Change the agent's support or location: climb onto a clear box at the current location,
-  ;; step or drop to local ground, or cross an authored jump edge to ground or a clear box at
-  ;; the adjacent location.  The agent may carry cargo throughout.
+  ;; drop from a box to local ground, or cross an authored jump edge to ground or a clear box
+  ;; at the adjacent location.  The agent may carry cargo throughout.  Dismounting a flush
+  ;; steppable support (plate, fan on gears) is step technology's step-off, not a jump.
   1
   (?agent agent)
   (bind (has-location ?agent $a-location))
@@ -120,7 +124,8 @@
                   (on ?agent ?box)
                   (assign $place ?box)
                   (finally (propagate-changes!)))))
-      (if (bind (on ?agent $current-support))
+      (if (and (bind (on ?agent $current-support))
+               (box $current-support))
         (assert (not (on ?agent $current-support))
                 (assign $place 'ground)
                 (finally (propagate-changes!))))

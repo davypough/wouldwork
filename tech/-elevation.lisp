@@ -8,18 +8,20 @@
 ;;; re-declaring the relation and queries.
 ;;;
 ;;; PROVIDES:
-;;;   types    : elevated-object (either location gate screen fence wall transmitter receiver)
+;;;   types    : elevated-object (either location gate screen fence wall transmitter
+;;;              receiver wall-gears)  --  wall-gears may declare the stream elevation of
+;;;              their mounted fan (default 1, via -gears-fan's gears-elevation)
 ;;;   relation : (has-elevation elevated-object $fixnum)
 ;;;   queries  : object-elevation, location-elevation, fixture-elevation
 
 (in-package :ww)
 
 
-(define-optional-types gate screen fence wall transmitter receiver)
+(define-optional-types gate screen fence wall transmitter receiver wall-gears)
 
 
 (define-types
-  elevated-object (either location gate screen fence wall transmitter receiver))
+  elevated-object (either location gate screen fence wall transmitter receiver wall-gears))
 
 
 (define-static-relations

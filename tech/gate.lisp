@@ -9,9 +9,11 @@
 ;;; matching claustro4a; toggle is reserved.)
 ;;;
 ;;; REQUIRES (supplied by other techs):
-;;;   types     : (none bare)  --  plate, jammer, mode, and receiver are declared optional
-;;;               here (define-optional-types); gate itself comes from nested -gate
-;;;   nested    : -beam-substrate ((active receiver), null beam defaults);
+;;;   types     : (none bare)  --  jammer is declared optional here (define-optional-types);
+;;;               plate, mode, and receiver come from nested -controls; gate itself comes
+;;;               from nested -gate
+;;;   nested    : -controls ((controls ...), energized; nests -beam-substrate for
+;;;               (active receiver))  --  shared with the blower techs' gears (-gears-fan);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with
 ;;;               accessibility (via -passability), reachability, visibility, beam-direct,
 ;;;               beam-crossing, and -passability, which all nest -gate instead of
@@ -23,26 +25,19 @@
 ;;;               translation removes the guarded reference when that type is empty.
 ;;;   driver    : the master propagate-consequences! must call update-gate-status!
 ;;; PROVIDES:
-;;;   types     : plate, jammer, mode, receiver  --  declared optional here; a problem
-;;;               with none of these need not declare them.  Other techs (plate, jammer, box,
-;;;               beam-relay, -beam-substrate, visibility, etc.) still declare their own
-;;;               plate-alias/jammer-alias/receiver-alias for their own pre-params; the bare
-;;;               and aliased forms resolve compatibly and do not conflict.
-;;;   relations : (controls $list gate $mode)
-;;;   query     : energized
+;;;   types     : jammer  --  declared optional here; a problem with no jammers need not
+;;;               declare it.  Other techs (plate, jammer, box, beam-relay, -beam-substrate,
+;;;               visibility, etc.) still declare their own jammer-alias for their own
+;;;               pre-params; the bare and aliased forms resolve compatibly and do not conflict.
 ;;;   update    : update-gate-status!  --  the only file that ever asserts (open gate)
 
-(include-tech -beam-substrate)
+(include-tech -controls)
 (include-tech -gate)
 
 (in-package :ww)
 
 
-(define-optional-types plate jammer mode receiver)
-
-
-(define-static-relations
-  (controls $list gate $mode))  ;$list = DNF OR-list of AND-lists of controllers (receiver/plate); mode: normal | inverted
+(define-optional-types jammer)
 
 
 (define-update update-gate-status! ()
@@ -67,11 +62,3 @@
                 $control-on)
           (open ?gate)
           (not (open ?gate))))))
-
-
-(define-query energized (?controller (either receiver plate))
-  ;; A controller drives its output when on: a receiver when active, a plate when depressed.
-  (or (and (receiver ?controller)
-           (active ?controller))
-      (and (plate ?controller)
-           (depressed ?controller))))

@@ -7,10 +7,12 @@
 ;;; REQUIRES:
 ;;;   type     : support
 ;;; PROVIDES:
-;;;   types    : support-occupant (either agent box jammer connector)  --  also declared
+;;;   types    : support-occupant (either agent box jammer connector fan)  --  also declared
 ;;;              identically by box, jammer, accessibility, and ladder
-;;;              support (either plate box)  --  also declared identically by box,
-;;;              jammer, accessibility, and ladder
+;;;              support (either plate box fan)  --  also declared identically by
+;;;              box, jammer, accessibility, and ladder.  Gears are not a support: only
+;;;              a fan can occupy them, via -gears-fan's (mounted-on ...) attachment
+;;;              rather than (on ...)
 ;;;   relation : (on support-occupant $support)  --  also declared identically by box,
 ;;;              jammer, accessibility, and ladder; multiple techs both read
 ;;;              and write it
@@ -20,8 +22,8 @@
 
 
 (define-types
-  support-occupant (either agent box jammer connector)  ;also declared identically by box/jammer/accessibility/ladder
-  support (either plate box))  ;also declared identically by box/jammer/accessibility/ladder; what a movable object can rest on
+  support-occupant (either agent box jammer connector fan)  ;also declared identically by box/jammer/accessibility/ladder
+  support (either plate box fan))  ;also declared identically by box/jammer/accessibility/ladder; what a movable object can rest on (fan-on-gears is an attachment, not support)
 
 
 (define-dynamic-relations

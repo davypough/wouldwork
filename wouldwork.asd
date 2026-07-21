@@ -30,7 +30,7 @@
   (let* ((root (make-pathname :name nil :type nil :defaults *load-pathname*))
          (src-dir (merge-pathnames "src/" root))
          (problem-file (merge-pathnames "problem.lisp" src-dir))
-         (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
+         (blocks3-file (merge-pathnames "problem-blocks3.lisp" (merge-pathnames "probs/" root)))
          (vals-file (merge-pathnames "vals.lisp" root)))
     (unless (probe-file problem-file)
       ;; No problem.lisp exists, copy default

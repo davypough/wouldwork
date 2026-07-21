@@ -61,8 +61,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (solve)
   -- attempts to solve the currently staged problem
 
-(get-src-folder-path)
+(get-probs-folder-path)
    -- the location where all problem specification files should appear
+      (test problems live in the test folder, per (get-test-folder-path))
 
 (profile)
    -- employs a basic profiler on the currently staged problem,
@@ -124,6 +125,14 @@ is staged again.
   
 (Defun get-src-folder-path ()
   (add-dir (asdf:system-source-directory :wouldwork) "src"))
+
+
+(defun get-probs-folder-path ()
+  (add-dir (asdf:system-source-directory :wouldwork) "probs"))
+
+
+(defun get-test-folder-path ()
+  (add-dir (asdf:system-source-directory :wouldwork) "test"))
    
 (defun add-dir (root dir)
   "Add to absolute path an additional directory"
@@ -267,11 +276,11 @@ is staged again.
 ;; -------------------- problem.lisp file handling ------------------------ ;;
 
 
-(defparameter *problem-folder-paths* (list (get-src-folder-path))
+(defparameter *problem-folder-paths* (list (get-probs-folder-path) (get-test-folder-path))
 "This variable holds all folder pathnames which can hold problems in this system.
    The user cann add custom folder pathnames to this folder using the function
    `add-problem-folder` and remove by `remove-problem-folder`.
-   The Package directory's `src` folder, however will always persist.")
+   The Package directory's `probs` and `test` folders, however, are always present at startup.")
 
 
 (defun add-problem-folder (folder-path)
@@ -286,7 +295,7 @@ is staged again.
 
 (defun remove-problem-folder (folder-path)
   "Removes folder-path from global `*problem-folder-paths*` list.
-   It always leaves the packages' `src` folder present!"
+   It always leaves at least one folder present!"
   (let ((path (probe-file (pathname folder-path))))
     (cond ((<= (length *problem-folder-paths*) 1)
            (Format t "Not removing anything, because *problem-folder-paths* contains only the src folder")
@@ -299,7 +308,7 @@ is staged again.
 
 
 (defun list-problem-files-plist (&optional (prefix "problem-") (suffix "lisp"))
-  "Return a plist of files in the 'src' directory that start with 'problem-'.
+  "Return a plist of files in the problem folders that start with 'problem-'.
    The key is the filename without 'problem-' and '.lisp'.
    The value is the full path of the file. Uses the root directory of the 'wouldwork' system."
   (let ((files)

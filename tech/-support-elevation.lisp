@@ -19,24 +19,29 @@
 (in-package :ww)
 
 
-(define-optional-types plate box)
+(define-optional-types plate box fan)
 
 
 (define-query support-top-elevation (?support support)
-  ;; A box top is its resting level plus its declared-or-default height.  A plate
-  ;; top is the floor elevation of the location where the plate is positioned.
+  ;; A box top is its resting level plus its declared-or-default height.  A fan is a
+  ;; movable, zero-thickness support: its top is its own resting level, so a fan mounted
+  ;; on gears stays flush with the floor.  A plate top is the floor elevation of the
+  ;; location where the plate is positioned.
   (if (box ?support)
     (+ (occupant-elevation ?support) (declared-height ?support))
-    (do (bind (has-position ?support $location))
-        (location-elevation $location))))
+    (if (fan ?support)
+      (occupant-elevation ?support)
+      (do (bind (has-position ?support $location))
+          (location-elevation $location)))))
 
 
 (define-query occupant-elevation (?occupant support-occupant)
-  ;; An occupant on a box stands at that box's top.  An occupant on the ground or
-  ;; on a plate stands at the floor elevation of its own location.
-  (if (and (bind (on ?occupant $support))
-           (box $support))
-    (+ (occupant-elevation $support) (declared-height $support))
+  ;; An occupant on a support stands at that support's top (for a plate this is the floor
+  ;; elevation, so flush fixtures cost nothing; a box or fan support chains recursively).
+  ;; An occupant on the ground -- including a fan mounted on gears, whose attachment is
+  ;; not an (on ...) fact -- stands at the floor elevation of its own location.
+  (if (bind (on ?occupant $support))
+    (support-top-elevation $support)
     (do (bind (has-location ?occupant $location))
         (location-elevation $location))))
 

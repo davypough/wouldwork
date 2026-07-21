@@ -135,7 +135,7 @@
   ;; (same segment declared there) so LOS/accessibility derivations here see it too.
   (wall-segments
     ((wall1 24 0 24 2)
-     (wall2 24 4 24 101/10)
+     (wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
      (wall3 11 10 16 10)))
 
   (window-segments

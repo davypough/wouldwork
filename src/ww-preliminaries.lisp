@@ -204,21 +204,30 @@
     (probe-file (merge-pathnames relative root))))
 
 
+(defun problem-source-file (filename)
+  "Resolve FILENAME (eg, \"problem-blocks3.lisp\") in the standard problem folders
+   below the Wouldwork root -- probs/ first, then test/ -- or NIL if absent from
+   both.  Deliberately independent of ww-interface's user-extensible
+   *problem-folder-paths*, since this runs during the reload-time eval-when
+   before ww-interface loads."
+  (let ((root (asdf:system-source-directory :wouldwork)))
+    (or (probe-file (merge-pathnames filename (merge-pathnames "probs/" root)))
+        (probe-file (merge-pathnames filename (merge-pathnames "test/" root))))))
+
+
 (defun snapshot-source-file (snapshot-file)
   "Return the source problem file recorded in SNAPSHOT-FILE's leading Filename
-   header (eg, ';;; Filename: problem-claustro4.lisp'), resolved under src/, or
-   NIL if the header is absent or the named file does not exist.  This lets the
-   loader recover a snapshot's provenance without consulting vals.lisp."
-  (let* ((root (asdf:system-source-directory :wouldwork))
-         (src-dir (merge-pathnames "src/" root))
-         (marker ";;; Filename:")
+   header (eg, ';;; Filename: problem-claustro4.lisp'), resolved in the standard
+   problem folders (probs/, test/), or NIL if the header is absent or the named
+   file does not exist.  This lets the loader recover a snapshot's provenance
+   without consulting vals.lisp."
+  (let* ((marker ";;; Filename:")
          (first-line (with-open-file (in snapshot-file :direction :input)
                        (read-line in nil nil)))
          (trimmed (and first-line (string-trim '(#\Space #\Tab #\Return) first-line))))
     (when (and trimmed (string-prefix-p marker trimmed))
-      (probe-file (merge-pathnames (string-trim '(#\Space #\Tab #\Return)
-                                                (subseq trimmed (length marker)))
-                                   src-dir)))))
+      (problem-source-file (string-trim '(#\Space #\Tab #\Return)
+                                        (subseq trimmed (length marker)))))))
 
 
 (defun ww-reset ()
@@ -459,15 +468,16 @@
            (src-dir (merge-pathnames "src/" root))
            (problem-file (merge-pathnames "problem.lisp" src-dir))
            (vals-file (merge-pathnames "vals.lisp" root))
-           (blocks3-file (merge-pathnames "problem-blocks3.lisp" src-dir))
+           (blocks3-file (problem-source-file "problem-blocks3.lisp"))
            (vals-problem-name (read-init-vals vals-file))
-           (vals-problem-file (merge-pathnames (concatenate 'string "problem-" vals-problem-name ".lisp") src-dir))
+           (vals-problem-file (problem-source-file
+                                (concatenate 'string "problem-" vals-problem-name ".lisp")))
            (spliced nil))
       (cond ((not (probe-file problem-file))  ;no problem.lisp file?
               (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
               (setf spliced t)
               (uiop:delete-file-if-exists vals-file))  ;rebuild in ww-initialize.lisp
-            ((and (probe-file vals-file) (probe-file vals-problem-file))  ;vals.lisp names an existing source
+            ((and (probe-file vals-file) vals-problem-file)  ;vals.lisp names an existing source
               (copy-problem-with-tech-includes vals-problem-file problem-file)  ;make problem.lisp match vals.lisp
               (setf spliced t))
             (t  ;vals.lisp absent or inconsistent -- recover source from problem.lisp's own header

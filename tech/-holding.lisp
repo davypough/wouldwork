@@ -6,7 +6,7 @@
 ;;; of each re-declaring the same union and relation.
 ;;;
 ;;; PROVIDES:
-;;;   type     : cargo (either box jammer connector)  --  what an agent can carry; subtypes
+;;;   type     : cargo (either box jammer connector fan)  --  what an agent can carry; subtypes
 ;;;              absent from the problem's own define-types resolve to nil, a no-op
 ;;;   relation : (holding agent $cargo)
 
@@ -14,7 +14,7 @@
 
 
 (define-types
-  cargo (either box jammer connector))  ;what an agent can carry
+  cargo (either box jammer connector fan))  ;what an agent can carry
 
 
 (define-dynamic-relations
