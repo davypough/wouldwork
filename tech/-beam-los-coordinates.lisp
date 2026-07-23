@@ -2,9 +2,10 @@
 
 ;;; Beam LOS coordinates substrate: derives LOS-TO-TRANSCEIVER/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;; from raw WALL-SEGMENTS/GATE-SEGMENTS/BOUNDARY-WALL segment geometry, for a problem that
-;;; would rather author 2D positions than hand-list sightlines.  Nested under beam-direct-tech
-;;; and beam-crossing-tech (via -beam-crossing-coordinates), so it is always present wherever
-;;; either is included; entirely inert unless the problem actually asserts WALL-SEGMENTS -- a
+;;; would rather author 2D positions than hand-list sightlines.  Nested under visibility-tech
+;;; (the owner of the los relations derived here) and beam-crossing-tech (via
+;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
+;;; always present wherever either is included; entirely inert unless the problem actually asserts WALL-SEGMENTS -- a
 ;;; problem that hand-authors its own LOS-TO-TRANSCEIVER/LOS-TO-TARGET/LOS-TO-LOCATION facts
 ;;; (as corner-topo and claustro-topo do) is unaffected.
 ;;;
@@ -37,20 +38,21 @@
 ;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
 ;;; duplicate is harmless.
 ;;;
-;;; Self-contained; spliced by (include-tech -beam-los-coordinates), nested from beam-direct
+;;; Self-contained; spliced by (include-tech -beam-los-coordinates), nested from visibility
 ;;; and from -beam-crossing-coordinates (itself nested from beam-crossing).  Splicing is
-;;; deduplicated per problem copy, so a problem including both beam-direct and beam-crossing
+;;; deduplicated per problem copy, so a problem including both visibility and beam-crossing
 ;;; still gets this file exactly once, and always before -beam-crossing-coordinates' own
 ;;; ESTABLISH-BEAM-COORDINATES/DERIVE-CROSSINGS-BEFORE-GATE, regardless of which of the two
 ;;; parent techs the problem lists first.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  declared by the problem; transmitter, receiver declared
-;;;               optional by -beam-substrate, a sibling nested include of beam-direct/
-;;;               beam-crossing
+;;;               optional by -visibility/-beam-substrate, sibling nested includes of the
+;;;               parent techs
 ;;;   relations : los-to-transceiver, los-to-target, los-to-location  --  declared by
-;;;               visibility-tech; only consulted if the problem also includes visibility
-;;;               and authors position facts for its beam endpoints
+;;;               visibility-tech, this file's primary parent; a beam-crossing problem
+;;;               reaching this file through -beam-crossing-coordinates must still include
+;;;               visibility for these relations to exist
 ;;; PROVIDES:
 ;;;   nested    : -location-coordinates (LOCATION-POSITION>; shared with accessibility, so
 ;;;               a location's coordinates are entered once regardless of which

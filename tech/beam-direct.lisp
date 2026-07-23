@@ -7,14 +7,11 @@
 ;;; overrides the direct arrival and cut-liveness hooks, adding the direct-only wiring
 ;;; (coupled, beam-via).  The shared interface (has-chroma/active relations, the receiver-status
 ;;; driver, the arrival/cut orchestrators, and the null-object hook defaults) lives in
-;;; -beam-substrate.  Also nests -beam-los-coordinates, so a problem that would rather author
-;;; 2D positions than hand-list corridor occluders can assert WALL-SEGMENTS/GATE-SEGMENTS/
-;;; BOUNDARY-WALL and get LOS-TO-TRANSCEIVER/LOS-TO-LOCATION derived automatically (see that
-;;; file); entirely inert otherwise, so a problem that hand-authors its own beam-via corridor
-;;; (as claustro-topo does) is unaffected.  A problem with two direct beams that can cross
-;;; also includes beam-crossing alongside beam-direct -- -beam-los-coordinates is spliced only
-;;; once regardless, and beam-crossing's own -beam-crossing-coordinates nests it too, always
-;;; before its crossing-specific derivation.
+;;; -beam-substrate.  A problem that would rather author 2D positions than hand-list
+;;; sightline occluders gets that derivation from visibility-tech, which nests
+;;; -beam-los-coordinates (the owner of the los relations owns their coordinate
+;;; derivation); this file no longer nests it itself.  A problem with two direct beams
+;;; that can cross also includes beam-crossing alongside beam-direct.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-direct).
 ;;;
@@ -30,8 +27,6 @@
 ;;;            relation) -- shared with gate, accessibility (via -passability), reachability,
 ;;;            visibility, and beam-crossing, which all nest -gate instead of hand-declaring it
 ;;; PROVIDES:
-;;;   nested    : -beam-los-coordinates (BEAM-ENDPOINT type; TRANSCEIVER-POSITION>,
-;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS)
 ;;;   types     : beam-blocker (either agent box jammer connector)  --  sole consumer; not
 ;;;               declared elsewhere
 ;;;               transmitter, receiver  --  declared optional here; other techs
@@ -50,7 +45,6 @@
 (include-tech -support-occupancy)
 (include-tech -height)
 (include-tech -elevation)
-(include-tech -beam-los-coordinates)
 (include-tech -gate)
 
 (in-package :ww)

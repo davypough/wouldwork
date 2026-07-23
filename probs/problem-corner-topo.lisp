@@ -62,6 +62,8 @@
 (define-types
   agent       (agent1)
   gate        (gate1)  ;only the dynamic gate (controlled by receiver1); corner's walls/window are static occlusion baked into the los facts
+  wall        (wall1 wall2 wall3)
+  window      (window1)
   location    (location1 location2 location3 location4)  ;corner area1..area4
   connector   (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)

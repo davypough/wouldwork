@@ -9,6 +9,7 @@
 (defun validate-init-literals (literals)
   "Checks semantic consistency across raw DEFINE-INIT literals."
   (check-init-general-consistency literals)
+  (check-init-segment-consistency literals)
   (check-init-physical-consistency literals)
   (check-init-connector-consistency literals)
   (check-init-control-and-beam-consistency literals)
@@ -19,6 +20,19 @@
 (defun check-init-general-consistency (literals)
   (check-init-duplicate-fluent-keys literals)
   (check-init-no-derived-facts literals))
+
+
+(defun check-init-segment-consistency (literals)
+  "Checks the named-segment lists (WALL-SEGMENTS, GATE-SEGMENTS, WINDOW-SEGMENTS,
+   SCREEN-SEGMENTS): every record is a well-formed axis-aligned (name x1 y1 x2 y2)
+   entry, segment names are globally unique, every name is a declared instance of its
+   kind's object type, and -- when the problem asserts WALL-SEGMENTS, marking it
+   coordinate-driven -- every declared instance of each kind's type is covered by a
+   record, so no typed segment token silently contributes no geometry."
+  (check-init-segment-records-well-formed literals)
+  (check-init-segment-names-unique literals)
+  (check-init-segment-names-typed literals)
+  (check-init-segment-types-covered literals))
 
 
 (defun check-init-physical-consistency (literals)
@@ -530,6 +544,92 @@ would overwrite the previous value during install-init."
     literals 'jump-via> '(gate screen fence wall))
   (when (init-dnf-controls-relation-p)
     (check-init-controls-list-contents literals)))
+
+
+(defun init-segment-relation-types ()
+  "The named-segment relations and the object type each record name must instantiate."
+  '((wall-segments . wall)
+    (gate-segments . gate)
+    (window-segments . window)
+    (screen-segments . screen)))
+
+
+(defun init-segment-records (relation literals)
+  (loop for literal in (positive-init-literals-with-relation relation literals)
+        append (second (init-literal-proposition literal))))
+
+
+(defun check-init-segment-records-well-formed (literals)
+  (dolist (entry (init-segment-relation-types))
+    (dolist (record (init-segment-records (car entry) literals))
+      (init-check-segment-record (car entry) record))))
+
+
+(defun init-check-segment-record (kind record)
+  (unless (and (listp record)
+               (= (length record) 5)
+               (symbolp (first record))
+               (first record)
+               (every #'rationalp (rest record)))
+    (error "~%Malformed ~S record in DEFINE-INIT.~%~
+            Record: ~S~%~
+            Expected shape: (name x1 y1 x2 y2), a symbol name and rational coordinates."
+           kind record))
+  (let ((x1 (second record))
+        (y1 (third record))
+        (x2 (fourth record))
+        (y2 (fifth record)))
+    (when (and (= x1 x2) (= y1 y2))
+      (error "~%Zero-length ~S record in DEFINE-INIT.~%~
+              Record: ~S"
+             kind record))
+    (unless (or (= x1 x2) (= y1 y2))
+      (error "~%~S record in DEFINE-INIT is not axis-aligned.~%~
+              Record: ~S~%~
+              Segments must be horizontal (y1 = y2) or vertical (x1 = x2)."
+             kind record))))
+
+
+(defun check-init-segment-names-unique (literals)
+  (let ((seen (make-hash-table :test #'eql)))
+    (dolist (entry (init-segment-relation-types))
+      (dolist (record (init-segment-records (car entry) literals))
+        (ut::if-it (gethash (first record) seen)
+          (error "~%Duplicate segment name in DEFINE-INIT.~%~
+                  Name:        ~S~%~
+                  First kind:  ~S~%~
+                  Second kind: ~S"
+                 (first record) ut::it (car entry))
+          (setf (gethash (first record) seen) (car entry)))))))
+
+
+(defun check-init-segment-names-typed (literals)
+  (dolist (entry (init-segment-relation-types))
+    (dolist (record (init-segment-records (car entry) literals))
+      (unless (init-type-member-p (first record) (cdr entry))
+        (error "~%Segment name in DEFINE-INIT is not a declared instance of its type.~%~
+                Record kind:   ~S~%~
+                Record:        ~S~%~
+                Expected type: ~S~%~
+                Declare ~S as an instance of type ~S in DEFINE-TYPES."
+               (car entry) record (cdr entry) (first record) (cdr entry))))))
+
+
+(defun check-init-segment-types-covered (literals)
+  (when (positive-init-literals-with-relation 'wall-segments literals)
+    (dolist (entry (init-segment-relation-types))
+      (init-check-segment-type-coverage (car entry) (cdr entry) literals))))
+
+
+(defun init-check-segment-type-coverage (kind type literals)
+  (let ((names (mapcar #'first (init-segment-records kind literals))))
+    (dolist (instance (gethash type *types*))
+      (unless (member instance names)
+        (error "~%Declared ~S instance has no ~S record in DEFINE-INIT.~%~
+                Instance:       ~S~%~
+                Record names:   ~S~%~
+                Every ~S instance in a coordinate-driven problem must contribute a segment."
+               type kind instance names type)))))
 
 
 (defun check-init-controls-modes (literals)

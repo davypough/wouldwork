@@ -10,7 +10,8 @@
 ;;; wanting two crossing direct beams includes both beam-direct and beam-crossing together;
 ;;; splicing is deduplicated per problem copy and this file always nests -beam-los-coordinates
 ;;; as its own first form, so LOS derivation runs before crossing derivation regardless of
-;;; which of the two parent techs the problem lists first.
+;;; whether visibility-tech (which also nests -beam-los-coordinates, as the owner of the los
+;;; relations it derives) was listed before or after beam-crossing.
 ;;;
 ;;; The problem still declares its own CROSSING pool (crossing1, crossing2, ...) by name and
 ;;; count -- WW's compile-time DOALL domain can't discover dynamically-created objects, so the

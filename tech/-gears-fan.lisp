@@ -49,6 +49,9 @@
 ;;;               gears (either floor-gears wall-gears)
 ;;;   relations : (aimed-at> gears $location)  --  fixed destination of the air stream
 ;;;               (mounted-on fan $gears)  --  the fan's attachment to its gears
+;;;               (welded fan $gears)  --  static; the fan and gears form an inseparable
+;;;               unit: pickup-fan refuses to separate them.  A welding problem declares
+;;;               both (welded ...) and the init's (mounted-on ...)
 ;;;               (turning gears)  --  derived; asserted only by update-gears-status!
 ;;;               (blowing fan)  --  derived; a fan blows iff it is mounted on turning
 ;;;               gears; asserted only by update-gears-status!
@@ -84,7 +87,8 @@
 
 
 (define-static-relations
-  (aimed-at> gears $location))  ;fixed destination the air stream carries an occupant to
+  (aimed-at> gears $location)  ;fixed destination the air stream carries an occupant to
+  (welded fan $gears))  ;the fan is permanently attached to these gears and cannot be separated; declare alongside the init's (mounted-on ...)
 
 
 (define-query gears-elevation (?gears gears)
@@ -150,12 +154,14 @@
   ;; pickup-clear path; a wall-mounted fan has no has-location, so it is reached through
   ;; its gears' position and stream elevation instead, and nothing can rest on it.
   ;; Occupied fans (like occupied boxes) cannot be lifted, so an agent standing on a fan
-  ;; can never carry it away.  Lifting a fan off turning gears is allowed -- the fan
-  ;; itself is never blown -- and the ensuing propagation clears its blowing status and
-  ;; applies the mounting tech's consequences (e.g. dropping hovering occupants).
+  ;; can never carry it away.  A fan welded to its gears is an inseparable unit and can
+  ;; never be picked up.  Lifting a fan off turning gears is allowed -- the fan itself is
+  ;; never blown -- and the ensuing propagation clears its blowing status and applies the
+  ;; mounting tech's consequences (e.g. dropping hovering occupants).
   1
   (?agent agent ?fan fan)
-  (and (bind (has-location ?agent $a-location))
+  (and (not (bind (welded ?fan $weld-gears)))
+       (bind (has-location ?agent $a-location))
        (or (and (bind (has-location ?fan $fan-location))
                 (cleartop ?fan)
                 (pickup-clear ?agent $a-location ?fan $fan-location))

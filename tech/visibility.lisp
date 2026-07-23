@@ -9,13 +9,24 @@
 ;;; own location via LOS-TO-LOCATION instead.  A sightline must exist in the los tables and is
 ;;; clear iff every occluder gate is open.
 ;;;
+;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENTS --
+;;; derived from raw 2D segment geometry by nested -beam-los-coordinates (entirely inert
+;;; otherwise), mirroring accessibility's own nested -accessibility-coordinates deriving
+;;; WALK-VIA.  This file owns the los relations, so it owns their coordinate derivation too;
+;;; beam-direct, beam-relay, and beam-crossing all consume sightlines through the visible
+;;; interface without nesting the derivation themselves (beam-crossing's own
+;;; -beam-crossing-coordinates re-nests it only to guarantee LOS derivation splices before
+;;; its crossing derivation; splicing is deduplicated, so that is never a second copy).
+;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, receiver, and transceiver are declared
 ;;;               optional/composite here through nested -visibility
 ;;;   nested    : -visibility (fixture, transceiver, and the null-default visible interface);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
 ;;;               accessibility (via -passability), reachability, beam-direct, and
-;;;               beam-crossing, which all nest -gate instead of hand-declaring it
+;;;               beam-crossing, which all nest -gate instead of hand-declaring it;
+;;;               -beam-los-coordinates (BEAM-ENDPOINT type; TRANSCEIVER-POSITION>,
+;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS)
 ;;; PROVIDES:
 ;;;   relations : (los-to-transceiver location $list transceiver),
 ;;;               (los-to-target location $list gate),
@@ -25,6 +36,7 @@
 
 (include-tech -visibility)
 (include-tech -gate)
+(include-tech -beam-los-coordinates)
 
 (in-package :ww)
 

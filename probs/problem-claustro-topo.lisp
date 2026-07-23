@@ -32,6 +32,8 @@
   agent (agent1)
   gate  (gate1 gate2 gate3 gate4 gate5 gate6 gate7 gate8 gate9)
   screen (screen1)
+  wall (wall1 wall2 wall3)
+  window (window1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
             location9 location10 location11 location12 location13)
   plate (plate1 plate2 plate3)
