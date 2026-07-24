@@ -77,6 +77,7 @@
           (setf instances (eval instances))
           (check-type instances list))
         (when (eql (car instances) 'either)
+          (setf (gethash type *type-components*) (cdr instances))  ;schema retained for the translator's leaf-type compatibility check
           (setf instances (or (remove-if #'null (remove-duplicates (apply #'either (cdr instances))))
                               '(nil))))
         (when (eql (car instances) 'compute)

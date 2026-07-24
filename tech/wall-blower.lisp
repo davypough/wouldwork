@@ -36,13 +36,16 @@
 ;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
 ;;;               gears-elevation, update-gears-status!, relocate-stack!, fan actions;
 ;;;               nests -support-occupancy, -location, -position, -elevation, -controls,
-;;;               -placement, -reachability, and -pickup)
+;;;               -placement, -reachability, and -pickup); -stream-passability
+;;;               (obstacle-clear's gears branch and the derived air-stream walking
+;;;               bands, with stream-width's 3-unit default)
 ;;;   driver    : the master propagate-consequences! must call
 ;;;               update-wall-blower-status! after update-gears-status!
 ;;; PROVIDES:
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
 
 (include-tech -gears-fan)
+(include-tech -stream-passability)
 
 (in-package :ww)
 

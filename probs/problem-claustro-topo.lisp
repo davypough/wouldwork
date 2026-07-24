@@ -32,7 +32,7 @@
   agent (agent1)
   gate  (gate1 gate2 gate3 gate4 gate5 gate6 gate7 gate8 gate9)
   screen (screen1)
-  wall (wall1 wall2 wall3)
+  wall (wall1 wall2 wall3 wall4 wall5)
   window (window1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
             location9 location10 location11 location12 location13)
@@ -135,10 +135,19 @@
   ;; Opaque internal wall, interrupted by a visibility-transparent,
   ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo+.lisp
   ;; (same segment declared there) so LOS/accessibility derivations here see it too.
+  ;; wall4 and wall5 are the ground-level footprint of the raised slab that location12,
+  ;; location13, gate8, and gate9 sit on (elevation 2): east edge between location12 and
+  ;; location10, west edge between location13 and location11, sealing against the
+  ;; boundary at y 10 and 17.  Walking across the slab at ground level is thereby
+  ;; blocked; the elevation-2 crossing location12 <-> location13 lies entirely inside
+  ;; the footprint (gated by gate8/gate9), and the level changes onto and off the slab
+  ;; are the authored jump-via edges below.
   (wall-segments
     ((wall1 24 0 24 2)
      (wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
-     (wall3 11 10 16 10)))
+     (wall3 11 10 16 10)
+     (wall4 7 10 7 17)
+     (wall5 3 10 3 17)))
 
   (window-segments
     ((window1 24 2 24 4)))

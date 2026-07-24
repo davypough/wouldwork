@@ -1,7 +1,9 @@
 ;;; Filename: -placement.lisp
 
-;;; Placement substrate: where a carried object may be set down -- a plate, a fan, a clear
-;;; box top, or bare ground -- gated by cleartop and the agent's vertical reach.  Shared by
+;;; Placement substrate: where a carried object may be set down -- a plate, a floor-mounted
+;;; fan, a clear box top, or bare ground -- gated by cleartop and the agent's vertical
+;;; reach.  A fan qualifies as a support only while mounted on gears: a loose fan is mere
+;;; cargo, like a connector, and a wall-mounted fan has no has-location.  Shared by
 ;;; every carried-object technology that must choose where a held object comes to rest:
 ;;; box, jammer, beam-relay, and floor-blower's fan.  Declared identically by each until
 ;;; now; this file owns it once.  Mounting a fan on gears is an attachment, not a support
@@ -14,8 +16,8 @@
 ;;;               within-agent-vertical-reach); -holding (cargo, holding)
 ;;; PROVIDES:
 ;;;   query     : placement-options  --  legal plate/fan/box/ground placements at a
-;;;               location, excluding a given object (?self) as a candidate support; a
-;;;               wall-mounted fan has no has-location, so it is never offered
+;;;               location, excluding a given object (?self) as a candidate support;
+;;;               only a floor-mounted fan is ever offered
 ;;;   update    : place-held-object!  --  releases ?agent's hold, sets ?object's location,
 ;;;               and rests it on ?place unless ?place is 'ground
 
@@ -41,7 +43,8 @@
           (assign $places (cons ?plate $places))))
       (doall (?fan fan)
         (if (and (different ?fan ?self)
-                 (has-location ?fan ?location)
+                 (bind (mounted-on ?fan $gears))  ;a fan supports only while gears-mounted; a loose fan is mere cargo
+                 (has-location ?fan ?location)  ;and a wall-mounted fan has no has-location, so floor-mounted only
                  (cleartop ?fan)
                  (within-agent-vertical-reach ?agent (support-top-elevation ?fan)))
           (assign $places (cons ?fan $places))))

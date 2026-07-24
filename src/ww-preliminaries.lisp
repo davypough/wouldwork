@@ -337,6 +337,8 @@
     (clrhash *types*))
   (when (and (boundp '*type-signatures*) (hash-table-p *type-signatures*))
     (clrhash *type-signatures*))
+  (when (and (boundp '*type-components*) (hash-table-p *type-components*))
+    (clrhash *type-components*))
   (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
     (clrhash *constant-integers*))
   (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))

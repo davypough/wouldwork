@@ -28,6 +28,10 @@
 ;;;               -placement (placement-options, place-held-object!; nests
 ;;;               -support-elevation and -holding); -reachability (reachable);
 ;;;               -pickup (pickup-clear)
+;;;   conditional relations:
+;;;               jamming (jammer), guarded by an exists over jammer (gate.lisp's pattern):
+;;;               a jamming jammer forces gears stopped in update-gears-status!; jammer is
+;;;               declared optional here, so a problem with no jammers need not declare it
 ;;;   substrate edits (companions to this file; these files splice before this file's
 ;;;   gears union is installed, so they reference the leaf types directly):
 ;;;               -controls          : (controls $list (either gate floor-gears wall-gears) $mode)
@@ -73,7 +77,7 @@
 (in-package :ww)
 
 
-(define-optional-types floor-gears wall-gears fan)
+(define-optional-types floor-gears wall-gears fan jammer)
 
 
 (define-types
@@ -106,13 +110,15 @@
 
 
 (define-update update-gears-status! ()
-  ;; Pass 1: turning <=> uncontrolled OR control-on, with control-on computed exactly as
-  ;; gate.lisp's update-gate-status! computes it: some DNF clause has every member
-  ;; energized (normal); inverted negates that aggregate.  Pass 2: a fan blows iff it is
-  ;; mounted on turning gears.  Pure state derivation only: what blowing does (launching,
-  ;; sweeping, dropping) is mounting-specific and owned by each mounting tech's own
-  ;; consequences update, which the driver calls after this one.  Change detection is
-  ;; automatic, so an unchanged re-assert is silent.
+  ;; Pass 1: turning <=> (uncontrolled OR control-on) AND not jammed, with control-on
+  ;; computed exactly as gate.lisp's update-gate-status! computes it: some DNF clause has
+  ;; every member energized (normal); inverted negates that aggregate.  A jamming jammer
+  ;; forces gears stopped -- the polarity mirror of gate's jam-forces-open: a jam always
+  ;; disables the barrier.  Pass 2: a fan blows iff it is mounted on turning gears.  Pure
+  ;; state derivation only: what blowing does (launching, sweeping, dropping) is
+  ;; mounting-specific and owned by each mounting tech's own consequences update, which
+  ;; the driver calls after this one.  Change detection is automatic, so an unchanged
+  ;; re-assert is silent.
   (do (doall (?g gears)
         (do (assign $control-on t)  ;uncontrolled gears are always on
             (if (bind (controls $clauses ?g $mode))
@@ -124,7 +130,9 @@
                     (assign $control-on $any-clause-on)
                     (if (eql $mode 'inverted)
                       (assign $control-on (not $any-clause-on))))))
-            (if $control-on
+            (if (and $control-on
+                     (not (exists (?j jammer)
+                            (jamming ?j ?g))))
               (turning ?g)
               (not (turning ?g)))))
       (doall (?f fan)

@@ -4,7 +4,10 @@
 ;;; location.  In this file, a fixture is a fixed LOS object: a gate, transmitter, or
 ;;; receiver.  Sightlines are split by consuming role, not just by object kind: LOS-TO-
 ;;; TRANSCEIVER covers a transceiver (transmitter or receiver), the beam endpoints beam-relay/
-;;; beam-direct pair or relay to; LOS-TO-TARGET covers gate, what jammer's jam-target aims at.
+;;; beam-direct pair or relay to; LOS-TO-TARGET covers gate, what jammer's jam-target aims at
+;;; (a gears jam target instead resolves through its HAS-POSITION location's ordinary
+;;; LOS-TO-LOCATION entry -- gears hang at a location, not along a segment -- so
+;;; LOS-TO-TARGET remains gate-only).
 ;;; A connector-to-connector pairing never consults either -- it resolves through a connector's
 ;;; own location via LOS-TO-LOCATION instead.  A sightline must exist in the los tables and is
 ;;; clear iff every occluder gate is open.

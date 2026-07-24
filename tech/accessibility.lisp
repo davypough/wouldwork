@@ -15,11 +15,13 @@
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it);
 ;;;               -elevation ((has-elevation ...), location-elevation)
 ;;;               -accessibility (identity-default accessible interface);
-;;;               -accessibility-coordinates (optional coordinate-based WALK-VIA input,
-;;;               via WALL-SEGMENTS/GATE-SEGMENTS/WINDOW-SEGMENTS)
+;;;               -accessibility-coordinates (optional coordinate-based WALK-VIA/WALK-VIA>
+;;;               derivation from WALL/GATE/WINDOW/SCREEN-SEGMENTS, BOUNDARY-WALL, and
+;;;               derived air-stream bands)
 ;;;               --  all shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
-;;;   relations : (walk-via location $list location)
+;;;   relations : (walk-via location $list location), (walk-via> location $list location)
+;;;               --  $list is a DNF clause list: () direct, else OR over clauses, AND within
 ;;;   queries   : accessible, one-step-accessible
 ;;;   action    : move
 
@@ -34,7 +36,8 @@
 
 
 (define-static-relations
-  (walk-via location $list location))  ;symmetric walking edge; $list = guarding obstacles (gates/screens)
+  (walk-via location $list location)  ;symmetric walking edge; $list = DNF door clauses: () direct, else OR over clauses, AND within, e.g. ((gate1) (gate2 gate3))
+  (walk-via> location $list location))  ;directional walking edge, same $list convention; emitted by -accessibility-coordinates for rides into a stream's destination (inbound widened by side-curtain rides, outbound ordinary)
 
 
 (define-action move
@@ -79,9 +82,13 @@
 
 
 (define-query one-step-accessible (?agent agent ?from location ?to location)
-  ;; True iff a walking edge joins ?from and ?to, the two locations share the same elevation
-  ;; (walking never changes elevation; jump does), and every guarding obstacle is passable
-  ;; for ?agent.  Free-access regions are sparse connected edges; accessible takes their closure.
-  (and (bind (walk-via ?from $obstacles ?to))
+  ;; True iff a walking edge joins ?from and ?to -- symmetric WALK-VIA or directional
+  ;; WALK-VIA> in this direction -- the two locations share the same elevation (walking
+  ;; never changes elevation; jump does), and the edge's DNF door clauses are satisfied:
+  ;; () is direct, otherwise some clause must have every door passable for ?agent.
+  (and (or (bind (walk-via ?from $clauses ?to))
+           (bind (walk-via> ?from $clauses ?to)))
        (= (location-elevation ?from) (location-elevation ?to))
-       (all-clear ?agent $obstacles)))
+       (or (not $clauses)
+           (ww-loop for $clause in $clauses
+                    thereis (all-clear ?agent $clause)))))

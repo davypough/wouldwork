@@ -222,6 +222,14 @@
    install-types. Used to detect a type declared with conflicting instance lists across
    multiple tech or problem files. Written only during init(); not consulted during search.")
 
+(sb-ext:defglobal *type-components* (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
+  "Maps each composite type alias -- one declared as (either ...) -- to its declared
+   component type list, captured by install-types before the alias is flattened to its
+   instance union.  Lets the translator reason about schema-level type compatibility:
+   two type-specs sharing a leaf type are compatible even in a problem that declares no
+   instances of that leaf (the guarded branch is dead there, not mistyped).  Written
+   only during init(); not consulted during search.")
+
 (sb-ext:defglobal *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
 

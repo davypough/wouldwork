@@ -1,4 +1,4 @@
-;;; Filename: problem-wall-blower-test.lisp
+;;; Filename: problem-phobia.lisp
 
 ;;; Claustrophobia problem from Subscription -- Oti's Trials
 
@@ -13,7 +13,9 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *progress-reporting-interval* 1000000)
+
+(ww-set *depth-cutoff* 25)
 
 
 (defparameter *max-pairings* 2)  ;rename to max-connector-pairings for clarity
@@ -29,12 +31,12 @@
   gate (gate1 gate2)
   transmitter (transmitter1)
   receiver (receiver1 receiver2)
-  location (compute (loop for i from 1 to 11
+  location (compute (loop for i from 1 to 13
                           collect (intern (format nil "LOCATION~D" i))))
   wall-gears (wgears1 wgears2 wgears3 wgears4)
   floor-gears (fgears1)
   fan (fan1 fan2 fan3 fan4)
-  wall (wall1 wall2 wall3 wall4 wall5)
+  wall (wall1 wall2 wall3 wall4 wall5 wall6)
   hue (red)
   mode (normal inverted)
 )
@@ -44,6 +46,7 @@
 
 
 (include-tech floor-blower)
+(include-tech step)  ;boarding the floor fan (step-on) is how the agent rides fgears1's stream to the loft
 (include-tech wall-blower)
 (include-tech jammer)
 (include-tech gate)
@@ -110,6 +113,8 @@
   (location-position> location9 241/10 115/10)
   (location-position> location10 241/10 6)
   (location-position> location11 241/10 6)
+  (location-position> location12 7 8)  ;station: sees transmitter1 (up x=7 through the curtain gaps), receiver1, gate1, and gate2 through open gate1
+  (location-position> location13 239/10 19)  ;station in the north alcove: sees wgears2 (down x=23.9 past wall3's west end) and receiver2, so wgears2 can be jammed from the east side of its band
   (has-elevation location11 10)  ;do I need to specify this since it is the default
   (transceiver-position> transmitter1 7 169/10)
   (transceiver-position> receiver1 11/10 9)
@@ -125,6 +130,7 @@
   (mounted-on fan4 wgears4)
   (welded fan2 wgears2)
   (welded fan3 wgears3)
+  (welded fan4 wgears4)  ;only fan1 is liftable, so fan1 must be ferried to fgears1
 
   ;; Air stream blowing destination
   (aimed-at> wgears1 location1)
@@ -132,6 +138,11 @@
   (aimed-at> wgears3 location6)
   (aimed-at> wgears4 location8)
   (aimed-at> fgears1 location11)
+
+  ;; The east corridor (wall3 to the boundary, height 4) is fully sealed by wgears3's
+  ;; stream: default width 3 would leave half-unit walkable slips along wall3 and the
+  ;; boundary, deriving a direct location8<->location6 route the room does not have.
+  (stream-width wgears3 4)
 
   ;; Controllers
   (controls ((receiver1)) gate1 normal)
@@ -152,12 +163,22 @@
      (wall3 24 13 30 13)
      (wall4 24 10 24 13)
      (wall5 26 11 33 11)
+     (wall6 22 10 24 10)  ;seals the lower room's west slot: its only exit is L9's slot under wgears4
     ))
 
   (gate-segments
     ((gate1 1 12 6 12)
      (gate2 1 14 6 14)
     ))
+
+  ;; Air-stream barriers are DERIVED, not authored: each wall-gears' band runs from the
+  ;; solid backstop behind its fan through its has-position swept location to its
+  ;; aimed-at> destination, 3 units wide by default (override with a (stream-width
+  ;; gears w) fact) -- see -stream-passability and -accessibility-coordinates.  The
+  ;; swept location is standable only while its stream is off (every edge to it is
+  ;; gears-gated); each zone flanking a band's side curtains instead gets a free
+  ;; one-way walk-via> ride edge to the stream's destination -- step in laterally and
+  ;; be carried there while blowing, or walk the same trip across the dead band.
 )
 
 
@@ -174,8 +195,11 @@
 
 
 (define-goal
-  (and (exists (?f fan)
-         (and (mounted-on ?f fgears1)
-              (blowing ?f)))
-       (has-location agent1 location10)
-  ))
+  ;; Ride fgears1's air stream to the loft: mount a fan on fgears1 at location10, step
+  ;; onto it, and the ensuing propagation launches the agent to location11 (elevation 10).
+  ;; Hovering there is sustained only while the stream blows, so no blowing conjunct is
+  ;; needed: if the stream stopped, drop-occupants! would return the agent to location10
+  ;; before any goal check.
+  (has-location agent1 location11)
+  ;(holding agent1 connector2)
+)

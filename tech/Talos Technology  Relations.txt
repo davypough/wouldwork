@@ -41,8 +41,40 @@ Static relations
 (los-to-transceiver location $list transceiver)
 (reach-via location $list location)
 (screen-segments $list)
+(stream-width wall-gears $rational)
 (transceiver-position> (either transmitter receiver) $rational $rational)
 (walk-via location $list location)
+(walk-via> location $list location)
 (wall-segments $list)
 (welded fan $gears)
 (window-segments $list)
+
+Notes
+
+walk-via and walk-via> values are DNF door-clause lists, the same convention as
+controls: () means direct/unguarded; a nonempty value is OR over clauses, AND
+within, e.g. ((gate1) (gate2 gate3)).  Clause items may be gates, screens,
+ladders, or gears (a gears item is an air-stream crossing, passable unless a
+blowing fan is mounted).  walk-via is symmetric; walk-via> is directional,
+derived for rides into a stream's aimed-at> destination: from every zone
+flanking the band across a side curtain, inbound to the destination unions
+that zone's own family (step laterally into the flow and be carried there
+while blowing, or walk across the dead band while off -- correct either way);
+the reverse direction keeps its ordinary family.  A stream's swept location
+belongs to the band's interior zone only, so every edge to it carries the
+gears: it is standable exactly while the stream is off.  The front curtain
+grants no ride -- walking in against the flow is an ordinary gears-gated
+crossing.
+
+Air streams are derived, not authored: each wall-gears' band runs from the
+solid backstop behind its fan through its has-position swept location to its
+aimed-at> destination, 3 units wide unless a stream-width fact overrides.
+boundary-wall participates in both the LOS derivation and the walk-via
+derivation.
+
+jamming's $target is a gate or gears: a jam always disables the barrier --
+a jammed gate is forced open (update-gate-status!), jammed gears are forced
+stopped (update-gears-status!).  A gate target's sightline comes from
+los-to-target (gates span segments); a gears target's comes from its
+has-position location's los-to-location entry, or trivially from the gears'
+own location.

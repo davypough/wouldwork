@@ -28,11 +28,14 @@
    entry, segment names are globally unique, every name is a declared instance of its
    kind's object type, and -- when the problem asserts WALL-SEGMENTS, marking it
    coordinate-driven -- every declared instance of each kind's type is covered by a
-   record, so no typed segment token silently contributes no geometry."
+   record, so no typed segment token silently contributes no geometry.  Also checks
+   that every wall-gears' derivable air stream is well-posed in a coordinate-driven
+   problem, and that STREAM-WIDTH overrides are sound."
   (check-init-segment-records-well-formed literals)
   (check-init-segment-names-unique literals)
   (check-init-segment-names-typed literals)
-  (check-init-segment-types-covered literals))
+  (check-init-segment-types-covered literals)
+  (check-init-stream-consistency literals))
 
 
 (defun check-init-physical-consistency (literals)
@@ -518,6 +521,32 @@ would overwrite the previous value during install-init."
       (second (init-literal-proposition literal)))))
 
 
+(defun check-init-walk-via-clauses (literals)
+  "WALK-VIA and WALK-VIA> values are DNF door-clause lists, like CONTROLS: () direct,
+   else OR over clauses, AND within, each clause listing gates/screens/ladders/gears."
+  (dolist (relation '(walk-via walk-via>))
+    (dolist (literal (init-literals-with-relation relation literals))
+      (init-check-walk-via-literal-clauses
+        literal
+        (third (init-literal-proposition literal))))))
+
+
+(defun init-check-walk-via-literal-clauses (literal clauses)
+  (unless (listp clauses)
+    (error "~%WALK-VIA/WALK-VIA> must use a DNF list of door clauses.~%~
+            Literal: ~S~%~
+            Clauses: ~S"
+           literal clauses))
+  (dolist (clause clauses)
+    (unless (listp clause)
+      (error "~%WALK-VIA/WALK-VIA> must use a DNF list of door clauses.~%~
+              Literal: ~S~%~
+              Clause:  ~S~%~
+              A flat door list is the old convention; wrap it as a single clause."
+             literal clause))
+    (init-check-list-items-have-types literal clause '(gate screen ladder gears))))
+
+
 (defun init-dnf-controls-relation-p ()
   (equal (gethash 'controls *fluent-relation-indices*) '(1 3)))
 
@@ -534,8 +563,7 @@ would overwrite the previous value during install-init."
     literals 'reach-via '(gate))
   (check-init-list-relation-items-have-types
     literals 'beam-via '(gate location))
-  (check-init-list-relation-items-have-types
-    literals 'walk-via '(gate screen ladder))
+  (check-init-walk-via-clauses literals)
   (check-init-list-relation-items-have-types
     literals 'climb-via> '(gate screen ladder))
   (check-init-list-relation-items-have-types
@@ -630,6 +658,71 @@ would overwrite the previous value during install-init."
                 Record names:   ~S~%~
                 Every ~S instance in a coordinate-driven problem must contribute a segment."
                type kind instance names type)))))
+
+
+(defun check-init-stream-consistency (literals)
+  "In a coordinate-driven problem (WALL-SEGMENTS or BOUNDARY-WALL asserted), every
+   declared wall-gears' air stream must be derivable: a positioned HAS-POSITION swept
+   location and AIMED-AT> destination sharing an axis coordinate and not coincident.
+   Any STREAM-WIDTH override must name a wall-gears and give a positive width."
+  (when (or (positive-init-literals-with-relation 'wall-segments literals)
+            (positive-init-literals-with-relation 'boundary-wall literals))
+    (let ((positions (init-location-position-map literals)))
+      (dolist (gears (gethash 'wall-gears *types*))
+        (init-check-stream-derivable gears positions literals))))
+  (dolist (literal (init-literals-with-relation 'stream-width literals))
+    (destructuring-bind (gears width)
+        (rest (init-literal-proposition literal))
+      (unless (init-type-member-p gears 'wall-gears)
+        (error "~%STREAM-WIDTH names ~S, which is not a declared wall-gears instance.~%~
+                Literal: ~S"
+               gears (init-literal-proposition literal)))
+      (unless (and (rationalp width) (plusp width))
+        (error "~%STREAM-WIDTH of ~S must be a positive rational.~%~
+                Literal: ~S"
+               gears (init-literal-proposition literal))))))
+
+
+(defun init-check-stream-derivable (gears positions literals)
+  (let* ((swept (init-gears-related-location 'has-position gears literals))
+         (destination (init-gears-related-location 'aimed-at> gears literals))
+         (swept-point (and swept (gethash swept positions)))
+         (destination-point (and destination (gethash destination positions))))
+    (unless swept-point
+      (error "~%Wall-gears in a coordinate-driven problem has no positioned swept location.~%~
+              ~S needs a HAS-POSITION location with LOCATION-POSITION> coordinates."
+             gears))
+    (unless destination-point
+      (error "~%Wall-gears in a coordinate-driven problem has no positioned destination.~%~
+              ~S needs an AIMED-AT> destination with LOCATION-POSITION> coordinates."
+             gears))
+    (when (equal swept-point destination-point)
+      (error "~%The air stream of ~S has coincident swept location and destination.~%~
+              Swept location: ~S at ~S~%~
+              Destination:    ~S at ~S"
+             gears swept swept-point destination destination-point))
+    (unless (or (= (first swept-point) (first destination-point))
+                (= (second swept-point) (second destination-point)))
+      (error "~%The air stream of ~S is not axis-aligned.~%~
+              Swept location: ~S at ~S~%~
+              Destination:    ~S at ~S~%~
+              The swept location and destination must share an X or Y coordinate."
+             gears swept swept-point destination destination-point))))
+
+
+(defun init-location-position-map (literals)
+  (let ((map (make-hash-table :test #'eql)))
+    (dolist (literal (init-literals-with-relation 'location-position> literals))
+      (destructuring-bind (location x y)
+          (rest (init-literal-proposition literal))
+        (setf (gethash location map) (list x y))))
+    map))
+
+
+(defun init-gears-related-location (relation gears literals)
+  (loop for literal in (init-literals-with-relation relation literals)
+        when (eql (second (init-literal-proposition literal)) gears)
+          return (third (init-literal-proposition literal))))
 
 
 (defun check-init-controls-modes (literals)

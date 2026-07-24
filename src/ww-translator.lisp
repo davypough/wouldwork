@@ -58,18 +58,38 @@
       instances)))
 
 
+(defun type-spec-leaf-types (type-spec)
+  "The leaf type symbols TYPE-SPEC covers at the schema level: an (either ...) unions
+   its members' leaves, a named composite alias expands through *type-components*, and
+   any other symbol is its own leaf.  NIL for a spec with no symbolic type structure."
+  (cond ((and (consp type-spec) (eql (car type-spec) 'either))
+         (remove-duplicates (mapcan #'type-spec-leaf-types (cdr type-spec))))
+        ((symbolp type-spec)
+         (let ((components (gethash type-spec *type-components*)))
+           (if components
+             (remove-duplicates (mapcan #'type-spec-leaf-types components))
+             (list type-spec))))
+        (t nil)))
+
+
 (defun type-specs-compatible-p (declared-type relation-type-def)
   "Returns T if DECLARED-TYPE (a ?var's declared parameter type) and RELATION-TYPE-DEF
    (a relation or query/update's declared type at the argument position in question)
-   share at least one instance, so a ?var of DECLARED-TYPE could plausibly satisfy
-   RELATION-TYPE-DEF at runtime. Passes leniently (returns T) when either side resolves
-   to :unknown, since an inability to reason about a type-spec is not evidence of a
-   mismatch."
+   could plausibly agree at runtime: they share an instance in the current problem, or
+   they share a schema-level leaf type.  The latter matters for composed technologies:
+   a shared query may guard a branch on a leaf type the current problem declares no
+   instances of, leaving the proposition dead there rather than mistyped -- eg,
+   SUPPORT-TOP-ELEVATION's plate branch in a problem with no plates.  Passes leniently
+   (returns T) when either side resolves to :unknown, since an inability to reason
+   about a type-spec is not evidence of a mismatch."
   (let ((declared-instances (type-spec-instances declared-type))
         (relation-instances (type-spec-instances relation-type-def)))
     (or (eql declared-instances :unknown)
         (eql relation-instances :unknown)
-        (and (intersection declared-instances relation-instances) t))))
+        (and (intersection declared-instances relation-instances) t)
+        (and (intersection (type-spec-leaf-types declared-type)
+                           (type-spec-leaf-types relation-type-def))
+             t))))
 
 
 (defun get-database-reference (form flag)
