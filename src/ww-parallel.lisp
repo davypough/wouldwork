@@ -158,8 +158,10 @@
   (let ((local-stack (list task-node))   ; Local open list
         (local-bound *best-bound*)       ; Cached bound for pruning
         (cycles-since-refresh 0)         ; Track cycles for bound refresh
-        (cycles-since-donation-check 0)) ; Track cycles for donation check
-    (declare (type fixnum cycles-since-refresh cycles-since-donation-check))
+        (cycles-since-donation-check 0)  ; Track cycles for donation check
+        (prev-expansion-depth (node.depth task-node))) ; Reset per task, not per worker
+    (declare (type fixnum cycles-since-refresh cycles-since-donation-check
+                   prev-expansion-depth))
 
     (loop
       ;; Check termination conditions
@@ -176,7 +178,7 @@
       (when (>= cycles-since-refresh *bound-refresh-interval*)
         (setf local-bound *best-bound*)
         (setf cycles-since-refresh 0)
-        (maybe-report-parallel-progress worker-id))
+        (maybe-report-parallel-progress worker-id task-queue))
 
       ;; Check for work donation opportunity
       (when (>= cycles-since-donation-check *donation-check-interval*)
@@ -190,13 +192,18 @@
       ;; Everything below is “one iteration”; RETURN-FROM skips to next iteration.
       (block :next-iteration
         ;; Pop next node
-        (let ((current-node (pop local-stack)))
-          (declare (type node current-node))
+        (let* ((current-node (pop local-stack))
+               (current-depth (node.depth current-node))
+               (backtrack-distance (- prev-expansion-depth current-depth)))
+          (declare (type node current-node) (type fixnum current-depth backtrack-distance))
+          (when (> backtrack-distance 0)
+            (ws-record-backtrack stats backtrack-distance))
+          (setf prev-expansion-depth current-depth)
 
           ;; Depth cutoff check
           (when (and (> *depth-cutoff* 0)
-                     (>= (node.depth current-node) *depth-cutoff*))
-            (ws-finalize-path stats (node.depth current-node))
+                     (>= current-depth *depth-cutoff*))
+            (ws-inc-depth-cutoff-hits stats)
             (return-from :next-iteration nil))
 
           ;; Bounding function check (user-defined)
@@ -206,7 +213,7 @@
           ;; Branch-and-bound pruning using cached bound
           ;; Applies to min-length, min-time, min-value, max-value
           (unless (node-can-improve-bound-p current-node local-bound)
-            (ws-finalize-path stats (node.depth current-node))
+            (ws-inc-bound-pruned stats)
             (return-from :next-iteration nil))
 
           ;; Expand node
@@ -215,7 +222,7 @@
 
             (when (null succ-states)
               (ws-update-max-depth stats (node.depth current-node))
-              (ws-finalize-path stats (node.depth current-node))
+              (ws-finalize-dead-end-path stats (node.depth current-node))
               (return-from :next-iteration nil))
 
             (ws-update-max-depth stats (1+ (node.depth current-node)))
@@ -263,7 +270,6 @@
     (dolist (succ-state succ-states)
       (block process-one
         (when (state-is-inconsistent succ-state)
-          (ws-finalize-path stats succ-depth)
           (increment-global *inconsistent-states-dropped* 1)
           (return-from process-one))
         ;; Global invariant validation
@@ -275,6 +281,7 @@
         (when (and *solution-paths*
                    (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
+            (ws-inc-bound-pruned stats)
             (return-from process-one)))
         
         ;; Goal check (before duplicate detection - goals always processed)
@@ -282,7 +289,6 @@
           (if *hybrid-mode*                                                ; hybrid defers for path enumeration
               (defer-hybrid-goal current-node succ-state)
               (register-parallel-solution current-node succ-state worker-id))
-          (ws-finalize-path stats succ-depth)
           (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
             (return-from worker-process-successors-phase1 'first-found))
           (return-from process-one))
@@ -296,7 +302,7 @@
           (when (and (eql *problem-type* 'planning)
                      (on-current-path succ-state current-node))
             (ws-inc-repeated stats)
-            (ws-finalize-path stats succ-depth)
+            (ws-finalize-duplicate-path stats succ-depth)
             (return-from process-one))
           ;; Tree search - create node
           (push (make-node :state succ-state
@@ -326,7 +332,7 @@
                       (when closed-node
                         (add-parent-to-node closed-node current-node
                                             (record-move succ-state))))
-                    (ws-finalize-path stats succ-depth))
+                    (ws-finalize-duplicate-path stats succ-depth))
                    
                    ;; Check if new path is better - reopen if so
                    ((better-than-closed closed-entry succ-state succ-depth)
@@ -343,7 +349,7 @@
                    
                    ;; Not better - drop this successor
                    (t
-                    (ws-finalize-path stats succ-depth))))
+                    (ws-finalize-duplicate-path stats succ-depth))))
                 
                 ;; State not in closed - insert and create node
                 (t

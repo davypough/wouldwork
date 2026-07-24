@@ -15,7 +15,9 @@
 
 (ww-set *progress-reporting-interval* 1000000)
 
-(ww-set *depth-cutoff* 25)
+(ww-set *symmetry-pruning* t)
+
+(ww-set *depth-cutoff* 30)
 
 
 (defparameter *max-pairings* 2)  ;rename to max-connector-pairings for clarity
@@ -78,6 +80,19 @@
     (update-floor-blower-status!)
     *propagated-state-changed*)
 )
+
+
+;;;; HEURISTIC ;;;;
+
+
+(define-query heuristic? ()
+  ;Manhattan distance from agent1's current location to the loft (location11).
+  ;Lower is better; biases DFS/B&B to try the location10->location11 direction first.
+  (do (bind (has-location agent1 $agent-loc))
+      (bind (location-position> $agent-loc $x $y))
+      (bind (location-position> location11 $goal-x $goal-y))
+      (+ (abs (- $x $goal-x))
+         (abs (- $y $goal-y)))))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -201,5 +216,8 @@
   ;; needed: if the stream stopped, drop-occupants! would return the agent to location10
   ;; before any goal check.
   (has-location agent1 location11)
-  ;(holding agent1 connector2)
 )
+
+
+  ;(holding agent1 connector2)  ;first subgoal
+  ;(and (has-location agent1 location6) (has-location fan1 location6) (holding agent1 jammer1))  ;second subgoal

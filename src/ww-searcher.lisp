@@ -255,15 +255,19 @@
   (setf *prior-program-cycles* 0)
   (setf *last-improvement-states* 0)
   (setf *bound-pruned* 0)
-  (setf *max-backtrack-distance* 0)
+  (setf *accumulated-backtrack-distance* 0)
+  (setf *num-backtracks* 0)
   (setf *prev-expansion-depth* 0)
   (setf *rem-init-successors* nil)  ;branch nodes from start state
   (setf *num-init-successors* 0)
   (setf *max-depth-explored* 0)
   (setf *num-idle-threads* 0)
-  (setf *accumulated-depths* 0)
+  (setf *dead-end-accumulated-depths* 0)
+  (setf *dead-end-num-paths* 0)
+  (setf *duplicate-accumulated-depths* 0)
+  (setf *duplicate-num-paths* 0)
+  (setf *depth-cutoff-hits* 0)
   (setf *repeated-states* 0)
-  (setf *num-paths* 0)
   (setf *solution-paths* nil)
   (setf *hybrid-goals* nil)
   (setf *unique-solution-states* nil)
@@ -273,6 +277,9 @@
   (setf *search-tree* nil)
   (setf *start-time* (get-internal-real-time))
   (setf *prior-time* 0)
+  (setf *prior-parallel-progress-time* *start-time*)
+  (setf *prior-parallel-progress-states* 0)
+  (setf *prior-parallel-progress-cycles* 0)
   (setf *inconsistent-states-dropped* 0)
   (setf *lower-bound-pruned* 0)
   (clrhash *prop-key-cache*)
@@ -481,7 +488,6 @@
                          (update-search-tree wait-state (1+ (node.depth current-node)) "backtrack-wait->goal"))
            (register-solution current-node wait-state)
            (update-max-depth-explored succ-depth)
-           (finalize-path-depth succ-depth)
            (increment-global *total-states-processed* 1)
            (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                '(first)
@@ -520,8 +526,9 @@
    (when current-node
      (let* ((current-depth (node.depth current-node))
             (backtrack-distance (- *prev-expansion-depth* current-depth)))
-       (when (> backtrack-distance *max-backtrack-distance*)
-         (setf *max-backtrack-distance* backtrack-distance))
+       (when (> backtrack-distance 0)
+         (incf *accumulated-backtrack-distance* backtrack-distance)
+         (incf *num-backtracks*))
        (setf *prev-expansion-depth* current-depth)))
    (when *probe*
      (apply #'probe current-node *probe*))
@@ -532,6 +539,7 @@
     (when (null current-node)  ;open is empty
       (return-from df-bnb1 nil))
     (when (and (> *depth-cutoff* 0) (= (node.depth current-node) *depth-cutoff*))
+      (increment-global *depth-cutoff-hits* 1)
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
     (when (fboundp 'min-steps-remaining?)
@@ -574,13 +582,12 @@
                    (unless (f-value-better wait-state succ-depth)
                      ;; Can't improve, treat as dead end
                      (update-max-depth-explored (node.depth current-node))
-                     (finalize-path-depth (node.depth current-node))
+                     (finalize-dead-end-depth (node.depth current-node))
                      (return-from df-bnb1 nil)))
                  ;; Register solution: current-node is predecessor, wait-state is goal
                  ;; The solution path will show: ... -> (current-node's action) -> (WAIT duration)
                  (register-solution current-node wait-state)
                  (update-max-depth-explored succ-depth)
-                 (finalize-path-depth succ-depth)
                  (increment-global *total-states-processed* 1)
                  (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                      (return-from df-bnb1 '(first))
@@ -602,7 +609,7 @@
               (:fail nil))))
         (update-max-depth-explored (node.depth current-node))
         (narrate "No successor states" (node.state current-node) (node.depth current-node))
-        (finalize-path-depth (node.depth current-node)) 
+        (finalize-dead-end-depth (node.depth current-node))
         (return-from df-bnb1 nil))
       #+:ww-debug (when (>= *debug* 1)
                     (update-search-tree (node.state current-node) (node.depth current-node) ""))
@@ -619,7 +626,6 @@
         (for succ-state in succ-states)
         (when (state-is-inconsistent succ-state)
           (increment-global *inconsistent-states-dropped* 1)
-          (finalize-path-depth succ-depth)
           (next-iteration))
         (when *global-invariants*
           (validate-global-invariants current-node succ-state))
@@ -631,7 +637,6 @@
           (if *hybrid-mode*
               (defer-hybrid-goal current-node succ-state)
               (register-solution current-node succ-state))
-          (finalize-path-depth succ-depth)
           (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
             (return-from process-successors '(first))
             (next-iteration)))
@@ -640,7 +645,7 @@
         (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
           (when (on-current-path succ-state current-node)
             (increment-global *repeated-states*)
-            (finalize-path-depth succ-depth)
+            (finalize-duplicate-depth succ-depth)
             (next-iteration)))
         (when (eql *tree-or-graph* 'graph)
           ;; Check if state already on open
@@ -650,11 +655,11 @@
               (increment-global *repeated-states*)
               (cond (*hybrid-mode*
                      (add-parent-to-node open-node current-node (record-move succ-state))
-                     (finalize-path-depth succ-depth))
+                     (finalize-duplicate-depth succ-depth))
                     (t
                      (if (update-open-if-succ-better open-node succ-state)
                        (setf (node.parent open-node) current-node)
-                       (finalize-path-depth succ-depth))))
+                       (finalize-duplicate-depth succ-depth))))
               (next-iteration)))
           ;; Check if state in closed
           (with-search-structures-lock
@@ -666,14 +671,14 @@
                          (when closed-node
                            (add-parent-to-node closed-node current-node (record-move succ-state))))
                        (narrate "Accumulating parent for closed state" succ-state succ-depth)
-                       (finalize-path-depth succ-depth)
+                       (finalize-duplicate-depth succ-depth)
                        (next-iteration))
                       ((better-than-closed closed-values succ-state succ-depth)
                        (narrate "Returning this previously closed state to open" succ-state succ-depth)
                        (closed-bucket-remove succ-state succ-depth *closed*))      ; was (remhash (closed-key …) *closed*)
                       (t
                        (narrate "Dropping this previously closed state" succ-state succ-depth)
-                       (finalize-path-depth succ-depth)
+                       (finalize-duplicate-depth succ-depth)
                        (next-iteration)))))
             ;; State is new or reopened - reserve immediately
             (let ((succ-node (generate-new-node current-node succ-state)))
@@ -1130,10 +1135,17 @@
   (> (estimate-to-goal state1) (estimate-to-goal state2)))
 
 
-(defun finalize-path-depth (depth)
-  "Records the path depth of a path that terminates."
-  (increment-global *accumulated-depths* depth)
-  (increment-global *num-paths* 1))
+(defun finalize-dead-end-depth (depth)
+  "Records the depth of a path that terminated in a dead end (no successor states)."
+  (increment-global *dead-end-accumulated-depths* depth)
+  (increment-global *dead-end-num-paths* 1))
+
+
+(defun finalize-duplicate-depth (depth)
+  "Records the depth of a path that terminated by colliding with an
+   already-open or already-closed state."
+  (increment-global *duplicate-accumulated-depths* depth)
+  (increment-global *duplicate-num-paths* 1))
 
 
 ;;; Solution Processing Functions
@@ -1221,6 +1233,22 @@
   (when (eql *tree-or-graph* 'graph)
     (format t "~2%Repeated states = ~:D, ie, ~,1F percent"
               *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
+  (format t "~2%Average dead-end depth = ~A"
+          (if (> *dead-end-num-paths* 0)
+              (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))
+              'pending))
+  (format t "~2%Average duplicate depth = ~A"
+          (if (> *duplicate-num-paths* 0)
+              (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))
+              'pending))
+  (when (> *depth-cutoff-hits* 0)
+    (format t "~2%Depth-cutoff hits = ~:D, ie, ~,1F percent"
+            *depth-cutoff-hits*
+            (* 100.0 (/ *depth-cutoff-hits* *total-states-processed*))))
+  (when (> *num-backtracks* 0)
+    (format t "~2%Average backtrack distance = ~,1F levels (~:D backtracks)"
+            (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)
+            *num-backtracks*))
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
             *inconsistent-states-dropped*))
@@ -1554,7 +1582,7 @@
             0)
     ;; ===== Execution =====
     (format t "~2%total states processed so far = ~:D" *total-states-processed*)
-    (format t "~%current average processing speed = ~:D states/sec"
+    (format t "~%current recent processing speed = ~:D states/sec"
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
                       (/ (- (get-internal-real-time) *prior-time*)
                          internal-time-units-per-second))))
@@ -1565,19 +1593,22 @@
               (coerce (/ (- *total-states-processed* *prior-total-states-processed*)
                          (- *program-cycles* *prior-program-cycles*))
                       'single-float))
-      (format t "~%average search depth = ~A"
-              (if (> *num-paths* 0)
-                  (round (/ *accumulated-depths* *num-paths*))
-                  'pending))
       (when (> *max-depth-explored* 0)
         (format t "~%effective branching factor (b*) = ~,2F"
                 (compute-effective-branching-factor *total-states-processed*
                                                     *max-depth-explored*))))
-    (when (eql *problem-type* 'csp)
-      (format t "~%average search depth = ~A"
-              (if (> *num-paths* 0)
-                  (round (/ *accumulated-depths* *num-paths*))
-                  'pending)))
+    (format t "~%average dead-end depth = ~A"
+            (if (> *dead-end-num-paths* 0)
+                (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))
+                'pending))
+    (format t "~%average duplicate depth = ~A"
+            (if (> *duplicate-num-paths* 0)
+                (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))
+                'pending))
+    (when (> *depth-cutoff-hits* 0)
+      (format t "~%depth-cutoff hits = ~:D (~,1F% of total states)"
+              *depth-cutoff-hits*
+              (* 100.0 (/ *depth-cutoff-hits* *total-states-processed*))))
     ;; ===== Search Dynamics =====
     (unless (eql *problem-type* 'csp)
       (format t "~%frontier nodes: ~:D"
@@ -1614,8 +1645,10 @@
       (format t "~%min-steps-remaining? pruned = ~:D (~,1F% of total states)"
               *lower-bound-pruned*
               (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
-    (when (> *max-backtrack-distance* 0)
-      (format t "~%max backtrack distance = ~D levels" *max-backtrack-distance*))
+    (when (> *num-backtracks* 0)
+      (format t "~%average backtrack distance = ~,1F levels (~:D backtracks)"
+              (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)
+              *num-backtracks*))
     ;; ===== Progress / Coverage =====
     (when (and (zerop *threads*) (not (eql *problem-type* 'csp)))
       (iter (while (and *rem-init-successors*

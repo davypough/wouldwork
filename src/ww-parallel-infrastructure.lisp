@@ -305,8 +305,14 @@
   (repeated-states 0 :type fixnum)         ; Duplicates detected
   (program-cycles 0 :type fixnum)          ; Nodes expanded
   (max-depth 0 :type fixnum)               ; Deepest node seen
-  (accumulated-depths 0 :type fixnum)      ; Sum of terminal path depths
-  (num-paths 0 :type fixnum)               ; Number of terminated paths
+  (dead-end-accumulated-depths 0 :type fixnum)   ; Sum of dead-end termination depths
+  (dead-end-num-paths 0 :type fixnum)            ; Number of dead-end terminations
+  (duplicate-accumulated-depths 0 :type fixnum)  ; Sum of duplicate-collision termination depths
+  (duplicate-num-paths 0 :type fixnum)           ; Number of duplicate-collision terminations
+  (depth-cutoff-hits 0 :type fixnum)             ; Nodes blocked by *depth-cutoff*
+  (bound-pruned 0 :type fixnum)                  ; Nodes/successors rejected by branch-and-bound
+  (accumulated-backtrack-distance 0 :type fixnum) ; Sum of backtrack-event depth drops
+  (num-backtracks 0 :type fixnum)                 ; Count of backtrack events
   (solutions-found 0 :type fixnum)         ; Solutions found by this worker
   (nodes-donated 0 :type fixnum)           ; Nodes donated to queue
   (donation-events 0 :type fixnum))        ; Number of donation events
@@ -338,15 +344,27 @@
         sum (ws-repeated-states stats) into total-repeated
         sum (ws-program-cycles stats) into total-cycles
         maximize (ws-max-depth stats) into max-depth
-        sum (ws-accumulated-depths stats) into total-depths
-        sum (ws-num-paths stats) into total-paths
+        sum (ws-dead-end-accumulated-depths stats) into total-dead-end-depths
+        sum (ws-dead-end-num-paths stats) into total-dead-end-paths
+        sum (ws-duplicate-accumulated-depths stats) into total-duplicate-depths
+        sum (ws-duplicate-num-paths stats) into total-duplicate-paths
+        sum (ws-depth-cutoff-hits stats) into total-cutoff-hits
+        sum (ws-bound-pruned stats) into total-bound-pruned
+        sum (ws-accumulated-backtrack-distance stats) into total-backtrack-distance
+        sum (ws-num-backtracks stats) into total-backtracks
         finally
         (setf *total-states-processed* (+ *total-states-processed* total-states))
         (setf *repeated-states* (+ *repeated-states* total-repeated))
         (setf *program-cycles* (+ *program-cycles* total-cycles))
         (setf *max-depth-explored* (max *max-depth-explored* max-depth))
-        (setf *accumulated-depths* (+ *accumulated-depths* total-depths))
-        (setf *num-paths* (+ *num-paths* total-paths))))
+        (setf *dead-end-accumulated-depths* (+ *dead-end-accumulated-depths* total-dead-end-depths))
+        (setf *dead-end-num-paths* (+ *dead-end-num-paths* total-dead-end-paths))
+        (setf *duplicate-accumulated-depths* (+ *duplicate-accumulated-depths* total-duplicate-depths))
+        (setf *duplicate-num-paths* (+ *duplicate-num-paths* total-duplicate-paths))
+        (setf *depth-cutoff-hits* (+ *depth-cutoff-hits* total-cutoff-hits))
+        (setf *bound-pruned* (+ *bound-pruned* total-bound-pruned))
+        (setf *accumulated-backtrack-distance* (+ *accumulated-backtrack-distance* total-backtrack-distance))
+        (setf *num-backtracks* (+ *num-backtracks* total-backtracks))))
 
 
 (defun compute-donation-totals ()
@@ -385,11 +403,38 @@
     (setf (ws-max-depth stats) depth)))
 
 
-(defun ws-finalize-path (stats depth)
-  "Record a terminated path at DEPTH."
+(defun ws-inc-bound-pruned (stats)
+  "Increment bound-pruned for worker."
+  (declare (type worker-stats stats))
+  (incf (ws-bound-pruned stats)))
+
+
+(defun ws-record-backtrack (stats distance)
+  "Record a backtrack event of DISTANCE levels for worker."
+  (declare (type worker-stats stats) (type fixnum distance))
+  (incf (ws-accumulated-backtrack-distance stats) distance)
+  (incf (ws-num-backtracks stats)))
+
+
+(defun ws-finalize-dead-end-path (stats depth)
+  "Record a dead-end path termination at DEPTH (no successor states)."
   (declare (type worker-stats stats) (type fixnum depth))
-  (incf (ws-accumulated-depths stats) depth)
-  (incf (ws-num-paths stats)))
+  (incf (ws-dead-end-accumulated-depths stats) depth)
+  (incf (ws-dead-end-num-paths stats)))
+
+
+(defun ws-finalize-duplicate-path (stats depth)
+  "Record a duplicate-collision path termination at DEPTH (state already
+   open or closed)."
+  (declare (type worker-stats stats) (type fixnum depth))
+  (incf (ws-duplicate-accumulated-depths stats) depth)
+  (incf (ws-duplicate-num-paths stats)))
+
+
+(defun ws-inc-depth-cutoff-hits (stats)
+  "Increment depth-cutoff-hits for worker."
+  (declare (type worker-stats stats))
+  (incf (ws-depth-cutoff-hits stats)))
 
 
 (defun ws-inc-solutions (stats)
@@ -521,6 +566,23 @@
                             sum (length bucket))
           when (> count 0)
             collect (cons i count))))
+
+
+(defun closed-shard-load-stats ()
+  "Returns (values max-count min-count skew) of entry counts across all
+   closed shards. Counts stored entries (states), not bucket count.
+   Skew is 'INFINITE when any shard is still empty."
+  (let* ((counts (map 'vector
+                      (lambda (shard)
+                        (loop for bucket being the hash-values of shard
+                              sum (length bucket)))
+                      *closed-shards*))
+         (max-c (loop for c across counts maximize c))
+         (min-c (loop for c across counts minimize c))
+         (skew  (if (zerop min-c)
+                    'infinite
+                    (coerce (/ max-c min-c) 'single-float))))
+    (values max-c min-c skew)))
 
 
 ;;; ============================================================
@@ -702,11 +764,11 @@
   "Minimum seconds between progress reports.")
 
 
-(defun maybe-report-parallel-progress (worker-id)
+(defun maybe-report-parallel-progress (worker-id task-queue)
   "Report progress if enough time has passed. Only one worker reports at a time."
-  (declare (type fixnum worker-id))
+  (declare (type fixnum worker-id) (type task-queue task-queue))
   (let ((now (get-internal-real-time)))
-    (when (> (- now *last-progress-time*) 
+    (when (> (- now *last-progress-time*)
              (* *progress-interval-seconds* internal-time-units-per-second))
       ;; Try to get lock without blocking
       (when (sb-thread:grab-mutex *progress-lock* :waitp nil)
@@ -714,42 +776,107 @@
             (when (> (- now *last-progress-time*)
                      (* *progress-interval-seconds* internal-time-units-per-second))
               (setf *last-progress-time* now)
-              (report-parallel-progress worker-id))
+              (report-parallel-progress worker-id task-queue))
           (sb-thread:release-mutex *progress-lock*))))))
 
 
-(defun report-parallel-progress (worker-id)
+(defun report-parallel-progress (worker-id task-queue)
   "Print current search progress aggregated across workers."
-  (declare (type fixnum worker-id))
+  (declare (type fixnum worker-id) (type task-queue task-queue))
   ;; Aggregate current stats
   (let ((total-states 0)
         (total-cycles 0)
         (max-depth 0)
-        (total-solutions 0))
+        (total-solutions 0)
+        (total-repeated 0)
+        (total-dead-end-depths 0)
+        (total-dead-end-paths 0)
+        (total-duplicate-depths 0)
+        (total-duplicate-paths 0)
+        (total-cutoff-hits 0)
+        (total-bound-pruned 0)
+        (total-backtrack-distance 0)
+        (total-backtracks 0))
     (loop for stats across *worker-stats-vector*
           do (incf total-states (ws-states-processed stats))
              (incf total-cycles (ws-program-cycles stats))
              (incf total-solutions (ws-solutions-found stats))
+             (incf total-repeated (ws-repeated-states stats))
+             (incf total-dead-end-depths (ws-dead-end-accumulated-depths stats))
+             (incf total-dead-end-paths (ws-dead-end-num-paths stats))
+             (incf total-duplicate-depths (ws-duplicate-accumulated-depths stats))
+             (incf total-duplicate-paths (ws-duplicate-num-paths stats))
+             (incf total-cutoff-hits (ws-depth-cutoff-hits stats))
+             (incf total-bound-pruned (ws-bound-pruned stats))
+             (incf total-backtrack-distance (ws-accumulated-backtrack-distance stats))
+             (incf total-backtracks (ws-num-backtracks stats))
              (setf max-depth (max max-depth (ws-max-depth stats))))
-    (bt:with-lock-held (*lock*)
-      (format t "~2%[Progress from worker ~D]~%" worker-id)
-      (format t "  Total states processed: ~:D~%" (+ *total-states-processed* total-states))
-      (format t "  Program cycles: ~:D~%" (+ *program-cycles* total-cycles))
-      (format t "  Max depth explored: ~D~%" (max *max-depth-explored* max-depth))
-      (format t "  Solutions found so far: ~D~%" (+ (length *solution-paths*) total-solutions))
-      (when (member *solution-type* '(min-length min-time min-value max-value))
-        (let ((bound *best-bound*))
-          (unless (= bound most-positive-fixnum)
-            (format t "  Current best bound: ~A~%" 
-                    (if (eql *solution-type* 'max-value)
-                        (- bound)
-                        bound)))))
-      (when (and (eql *tree-or-graph* 'graph) *closed-shards*)
-        (format t "  Closed entries: ~:D~%" (closed-shards-total-count)))
-      (format t "  Elapsed time: ~:D sec~%"
-              (round (/ (- (get-internal-real-time) *start-time*)
-                        internal-time-units-per-second)))
-      (finish-output))))
+    (let* ((now (get-internal-real-time))
+           (states-so-far (+ *total-states-processed* total-states))
+           (cycles-so-far (+ *program-cycles* total-cycles))
+           (depth-so-far (max *max-depth-explored* max-depth))
+           (backtrack-distance-so-far (+ *accumulated-backtrack-distance* total-backtrack-distance))
+           (backtracks-so-far (+ *num-backtracks* total-backtracks))
+           (recent-secs (/ (- now *prior-parallel-progress-time*) internal-time-units-per-second))
+           (recent-states (- states-so-far *prior-parallel-progress-states*))
+           (recent-cycles (- cycles-so-far *prior-parallel-progress-cycles*)))
+      (bt:with-lock-held (*lock*)
+        (format t "~2%[Progress from worker ~D]~%" worker-id)
+        (format t "  Total states processed: ~:D~%" states-so-far)
+        (format t "  Recent processing speed: ~:D states/sec~%"
+                (round (/ recent-states recent-secs)))
+        (format t "  Program cycles: ~:D~%" cycles-so-far)
+        (format t "  Net average branching factor: ~,1F (recent: ~,1F)~%"
+                (coerce (/ (1- states-so-far) cycles-so-far) 'single-float)
+                (coerce (/ recent-states recent-cycles) 'single-float))
+        (format t "  Effective branching factor (b*): ~,2F~%"
+                (compute-effective-branching-factor states-so-far depth-so-far))
+        (format t "  Max depth explored: ~D~%" depth-so-far)
+        (format t "  Solutions found so far: ~D~%" (+ (length *solution-paths*) total-solutions))
+        (when (member *solution-type* '(min-length min-time min-value max-value))
+          (let ((bound *best-bound*))
+            (unless (= bound most-positive-fixnum)
+              (format t "  Current best bound: ~A~%"
+                      (if (eql *solution-type* 'max-value)
+                          (- bound)
+                          bound))))
+          (when (> total-bound-pruned 0)
+            (format t "  Bound-based pruning: ~:D (~,1F%)~%"
+                    total-bound-pruned
+                    (* 100.0 (/ total-bound-pruned states-so-far)))))
+        (when (and (eql *tree-or-graph* 'graph) *closed-shards*)
+          (format t "  Closed entries: ~:D~%" (closed-shards-total-count))
+          (format t "  Repeated states: ~:D (~,1F%)~%"
+                  total-repeated (* 100.0 (/ total-repeated states-so-far)))
+          (multiple-value-bind (max-c min-c skew) (closed-shard-load-stats)
+            (format t "  Closed-shard load: max=~:D  min=~:D  skew=~A~%"
+                    max-c min-c
+                    (if (numberp skew) (format nil "~,2Fx" skew) skew))))
+        (format t "  Average dead-end depth: ~A~%"
+                (if (> total-dead-end-paths 0)
+                    (round (/ total-dead-end-depths total-dead-end-paths))
+                    'pending))
+        (format t "  Average duplicate depth: ~A~%"
+                (if (> total-duplicate-paths 0)
+                    (round (/ total-duplicate-depths total-duplicate-paths))
+                    'pending))
+        (when (> total-cutoff-hits 0)
+          (format t "  Depth-cutoff hits: ~:D (~,1F%)~%"
+                  total-cutoff-hits
+                  (* 100.0 (/ total-cutoff-hits states-so-far))))
+        (when (> backtracks-so-far 0)
+          (format t "  Average backtrack distance: ~,1F levels (~:D backtracks)~%"
+                  (coerce (/ backtrack-distance-so-far backtracks-so-far) 'single-float)
+                  backtracks-so-far))
+        (format t "  Idle threads: ~D of ~D~%"
+                (- *threads* (tq-active-workers task-queue)) *threads*)
+        (format t "  Elapsed time: ~:D sec~%"
+                (round (/ (- now *start-time*)
+                          internal-time-units-per-second)))
+        (finish-output))
+      (setf *prior-parallel-progress-time* now)
+      (setf *prior-parallel-progress-states* states-so-far)
+      (setf *prior-parallel-progress-cycles* cycles-so-far))))
 
 
 ;;; ============================================================

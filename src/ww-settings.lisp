@@ -82,6 +82,19 @@
   "Program cycles at last progress printing (shared).")
 (declaim (type fixnum *prior-program-cycles*))
 
+(sb-ext:defglobal *prior-parallel-progress-time* 0
+  "Internal real time at the previous parallel progress report. Used to compute
+   windowed (recent) processing speed, independent of the report throttle's
+   own timestamp bookkeeping.")
+
+(sb-ext:defglobal *prior-parallel-progress-states* 0
+  "Total states processed as of the previous parallel progress report.")
+(declaim (type fixnum *prior-parallel-progress-states*))
+
+(sb-ext:defglobal *prior-parallel-progress-cycles* 0
+  "Total program cycles as of the previous parallel progress report.")
+(declaim (type fixnum *prior-parallel-progress-cycles*))
+
 (sb-ext:defglobal *last-improvement-states* 0
   "Value of *total-states-processed* at the most recent solution registration
    (or hybrid-goal deferral). Used by the progress printout to measure
@@ -93,14 +106,19 @@
    the best solution found so far (the f-value-better check in process-successors).")
 (declaim (type fixnum *bound-pruned*))
 
-(sb-ext:defglobal *max-backtrack-distance* 0
-  "Largest single-step decrease in expansion depth observed during search.
-   Each time df-bnb1 pops a node whose depth is less than the previous
-   node's depth, the difference is a candidate; the running maximum is
-   retained. Diagnostic: large values indicate deep thrashing (early variable
-   choices are wrong); small values indicate local repair (variable ordering
-   is sound).")
-(declaim (type fixnum *max-backtrack-distance*))
+(sb-ext:defglobal *accumulated-backtrack-distance* 0
+  "Sums the depth-drop of every backtrack event during search. Each time
+   df-bnb1 (or a parallel worker) pops a node shallower than the previously
+   expanded node, that drop is a backtrack event. Paired with *num-backtracks*
+   to give the average backtrack distance. Diagnostic: large values indicate
+   deep thrashing (early choices are wrong); small values indicate local
+   repair (ordering is sound).")
+(declaim (type fixnum *accumulated-backtrack-distance*))
+
+(sb-ext:defglobal *num-backtracks* 0
+  "Count of backtrack events (node pops shallower than the previous
+   expansion) during search.")
+(declaim (type fixnum *num-backtracks*))
 
 (sb-ext:defglobal *prev-expansion-depth* 0
   "Depth of the most recently expanded node, used to compute the per-step
@@ -125,13 +143,27 @@
   "Keeps track of the maximum depth reached so far during the search (shared).")
 (declaim (type fixnum *max-depth-explored*))
 
-(sb-ext:defglobal *accumulated-depths* 0
-  "Sums the final depths of all terminated paths so far.")
-(declaim (type fixnum *accumulated-depths*))
+(sb-ext:defglobal *dead-end-accumulated-depths* 0
+  "Sums the depths at which paths terminated with no successor states
+   (genuine exploration exhaustion).")
+(declaim (type fixnum *dead-end-accumulated-depths*))
 
-(sb-ext:defglobal *num-paths* 0
-  "Tracks the total number of paths explored so far.")
-(declaim (type fixnum *num-paths*))
+(sb-ext:defglobal *dead-end-num-paths* 0
+  "Tracks the number of paths terminated with no successor states.")
+(declaim (type fixnum *dead-end-num-paths*))
+
+(sb-ext:defglobal *duplicate-accumulated-depths* 0
+  "Sums the depths at which paths terminated by colliding with an
+   already-open or already-closed state.")
+(declaim (type fixnum *duplicate-accumulated-depths*))
+
+(sb-ext:defglobal *duplicate-num-paths* 0
+  "Tracks the number of paths terminated by state duplication.")
+(declaim (type fixnum *duplicate-num-paths*))
+
+(sb-ext:defglobal *depth-cutoff-hits* 0
+  "Count of nodes whose expansion was blocked because they reached *depth-cutoff*.")
+(declaim (type fixnum *depth-cutoff-hits*))
 
 (sb-ext:defglobal *num-init-successors* 0
   "The number of branches completed so far from the start state.")
