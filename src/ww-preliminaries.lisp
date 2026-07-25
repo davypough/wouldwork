@@ -94,6 +94,40 @@
    within one command avoid printing it twice.")
 
 
+(defvar *included-tech-names* nil
+  "The bare names, as strings, of the technologies the problem file itself included on the
+   most recent call to copy-problem-with-tech-includes, in reverse order.  Nested
+   technologies are deliberately absent, which is the whole difference between this list
+   and *tech-inclusion-trace*: the trace records every splice, because its job is to show
+   what the staged problem.lisp is made of.
+
+   Read by report-inert-techs, whose only useful advice is to drop an include.  Naming a
+   technology the author never wrote and cannot remove would be advice with nothing behind
+   it.  A receiver-free blower problem is the case that forced the distinction:
+   -beam-substrate contributes only update-receiver-status!, which quantifies solely over
+   an empty receiver type and so is genuinely inert there -- but it arrives through
+   -controls and -gears-fan beneath floor-blower and wall-blower, several levels below
+   anything the problem wrote.  The technology worth naming in such a report is always the
+   one the problem included: were beam-relay included in a connector-free problem,
+   beam-relay itself is inert and is reported.")
+
+
+(defvar *spliced-tech-names* nil
+  "The bare names, as strings, of every technology spliced into problem.lisp on the most
+   recent call to copy-problem-with-tech-includes, in reverse order.  Nested technologies
+   are present, which is the whole difference between this list and *included-tech-names*.
+
+   Read by driver-candidate-updates, which needs the opposite of what report-inert-techs
+   needs.  update-gears-status! and update-receiver-status! reach a blower problem only
+   through -gears-fan and -beam-substrate, several levels below anything the problem wrote,
+   yet both belong in its propagation driver.  A candidate set built from
+   *included-tech-names* would silently omit them.
+
+   Deduplicated by construction: write-tech-include splices each technology at most once
+   per problem copy, and pushes only where it splices, so -beam-substrate appears once
+   however many peers nest it.")
+
+
 (defun read-file-string (path)
   "Return the complete contents of the file at PATH as a string."
   (with-open-file (in path :direction :input)
@@ -116,6 +150,8 @@
    whether the file ends up rewritten; printing that trace is init's job, not this
    function's -- see *tech-inclusion-trace*."
   (setf *tech-inclusion-trace* nil)
+  (setf *included-tech-names* nil)
+  (setf *spliced-tech-names* nil)
   (let* ((included-techs (make-hash-table :test #'equal))
          (new-content (with-output-to-string (out)
                         (with-open-file (in source-file :direction :input)
@@ -134,7 +170,12 @@
 (defun write-tech-include (tech-name-str out include-stack included-techs)
   "Splice the capability file for TECH-NAME-STR into stream OUT, or note its absence.
    A missing tech file is replaced by a comment and a console notice, so a problem may
-   be staged before all of its technologies have been written."
+   be staged before all of its technologies have been written.
+
+   INCLUDE-STACK carries the chain of technologies currently being expanded, which detects
+   a circular include.  It is empty exactly when the directive came from the problem file
+   rather than from another technology, so it also decides what reaches
+   *included-tech-names* -- see that variable for why nested technologies are excluded."
   (when (member tech-name-str include-stack :test #'string=)
     (error "Circular technology include: ~{~A -> ~}~A"
            (reverse include-stack)
@@ -160,7 +201,10 @@
                                    (write-line line out)))))
                     (format out "~%;;;; ==== end technology ~A ====~%" tech-name-str)
                     (push (format nil "~&  included technology: ~A~%" tech-name-str)
-                          *tech-inclusion-trace*))
+                          *tech-inclusion-trace*)
+                    (push tech-name-str *spliced-tech-names*)
+                    (when (null include-stack)
+                      (push tech-name-str *included-tech-names*)))
              (progn (format out ";; (include-tech ~A): tech/~A.lisp not found -- skipped~%"
                             tech-name-str tech-name-str)
                     (push (format nil "~&  MISSING technology, skipped: ~A~%" tech-name-str)
@@ -174,14 +218,56 @@
    surfacing later as an uninformative end-of-file error while SBCL compiles the merged
    problem.lisp.  The trace of technologies already spliced successfully is flushed
    first, so the halt point is visible before the error is signaled."
-  (let ((text (read-file-string tech-file)))
+  (let ((text (read-file-string tech-file))
+        (forms nil))
     (with-input-from-string (in text)
-      (handler-case (loop until (eq (read in nil in) in))
+      (handler-case (setf forms (loop for form = (read in nil in)
+                                      until (eq form in)
+                                      collect form))
         (error ()
           (dolist (message (reverse *tech-inclusion-trace*)) (write-string message))
           (error "Technology tech/~A.lisp (~A) failed to read cleanly -- check for ~
                   an unbalanced parenthesis.  Splicing halted here."
-                 tech-name-str tech-file))))))
+                 tech-name-str tech-file))))
+    (check-tech-file-form-order tech-name-str forms)))
+
+
+(defun check-tech-file-form-order (tech-name-str forms)
+  "Errors when a definition form precedes an (include-tech ...) directive in a technology
+   file.
+
+   Splice order is the seed the derived propagation driver orders its updates by, and splice
+   order is a depth-first walk of the include directives in the order they appear.  A
+   directive sitting below a DEFINE-UPDATE therefore silently changes which update reaches
+   the driver first -- a reordering with no syntactic symptom, in a file that still reads,
+   compiles and runs.  Every technology already places its directives above its definitions;
+   this makes that an invariant rather than a habit.
+
+   Read with whatever *PACKAGE* is current, so the test is on symbol names rather than on
+   symbol identity."
+  (let ((first-definition nil))
+    (dolist (form forms)
+      (let ((head (tech-form-head-name form)))
+        (when (and (null first-definition)
+                   (eql 0 (search "DEFINE-" head)))
+          (setf first-definition head))
+        (when (and first-definition
+                   (string= head "INCLUDE-TECH"))
+          (error "Technology tech/~A.lisp places an (include-tech ...) directive below ~
+                  ~(~A~).~2%~
+                  Splice order seeds the derived propagation driver, so a directive under a ~
+                  definition reorders the updates reaching that driver without any other ~
+                  symptom.  Move every (include-tech ...) directive above the file's ~
+                  definitions."
+                 tech-name-str first-definition))))))
+
+
+(defun tech-form-head-name (form)
+  "The symbol name of FORM's head, or the empty string when FORM has no symbol in head
+   position."
+  (if (and (consp form) (symbolp (car form)))
+    (symbol-name (car form))
+    ""))
 
 
 (defun include-tech-directive (line)
@@ -193,7 +279,29 @@
              (name-end (position-if (lambda (ch) (member ch '(#\Space #\Tab #\))))
                                     rest-str)))
         (when name-end
+          (check-include-tech-line trimmed rest-str name-end)
           (subseq rest-str 0 name-end))))))
+
+
+(defun check-include-tech-line (trimmed rest-str name-end)
+  "Errors when anything but whitespace or a trailing comment follows an (include-tech ...)
+   directive on its own line.  COPY-PROBLEM-WITH-TECH-INCLUDES substitutes the spliced
+   technology for the whole line, so code sharing that line is discarded -- and nothing
+   downstream notices, because the resulting problem.lisp still reads, compiles, and runs.
+   A directive tucked onto the end of a DEFINE-UPDATE body deletes the form beside it and
+   splices a tech file into the middle of that body, where its DEFINE-UPDATEs stop being
+   top-level forms and install on first call instead of at load.  Every symptom of that is
+   downstream of the deletion, so the error belongs here, at the point of loss."
+  (let ((close (position #\) rest-str :start name-end)))
+    (unless close
+      (error "Malformed technology directive -- no closing parenthesis:~%  ~A" trimmed))
+    (let ((tail (string-trim '(#\Space #\Tab) (subseq rest-str (1+ close)))))
+      (unless (or (zerop (length tail))
+                  (char= (char tail 0) #\;))
+        (error "Code follows a technology directive on the same line:~%  ~A~2%~
+                Splicing replaces the entire line, so~%  ~A~%would be discarded without ~
+                warning.  Put the directive on a line of its own."
+               trimmed tail)))))
 
 (defun tech-file-path (tech-name-str)
   "Resolve tech/<TECH-NAME>.lisp below the Wouldwork root, or NIL if absent."

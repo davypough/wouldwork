@@ -307,7 +307,6 @@
                             (declare (ignore val))
                             (setf (gethash key *static-relations*) '(something)))
                           *types*)
-                 (setf (gethash 'inconsistent-state *relations*) t)
                  (add-proposition '(always-true) *static-db*)
                  (setf (gethash 'always-true *static-relations*) '(always-true))))
   ;; Install symmetric relations (exclude bijective relations and their indices)
@@ -393,6 +392,15 @@
 
 
 (defun prescan-problem-relation-signatures (forms)
+  ;; INCONSISTENT-STATE is the planner's own relation, not a problem's: PROPAGATE-CHANGES!
+  ;; asserts it when the fixpoint fails to converge, and INIT-START-STATE tests for it.
+  ;; It has to be in *RELATIONS* before anything is translated, or TRANSLATE reads
+  ;; (INCONSISTENT-STATE) as a call to an unrecognized function.  It used to be registered
+  ;; inside INSTALL-DYNAMIC-RELATIONS, which made its availability depend on a
+  ;; DEFINE-DYNAMIC-RELATIONS form appearing above the fixpoint loop -- an accident of
+  ;; layout that held only while every driver was written in the problem file, below its
+  ;; declarations.  tech/-propagation.lisp now supplies the loop and splices above them.
+  (setf (gethash 'inconsistent-state *relations*) t)
   (dolist (form forms)
     (when (consp form)
       (case (car form)

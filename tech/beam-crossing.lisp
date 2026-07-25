@@ -42,6 +42,7 @@
 ;;;               beam-cut, beam-cut-in, beam-crossing-endpoints
 ;;;   update    : update-crossing-status!
 
+(include-tech -propagation)
 (include-tech -beam-substrate)
 (include-tech -beam-crossing-coordinates)
 (include-tech -gate)

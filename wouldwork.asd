@@ -74,6 +74,7 @@
 		                     (:file "ww-translator")
 		                     (:file "ww-init-validator")
 		                     (:file "ww-installer")
+		                     (:file "ww-propagation-order")
                              (:file "ww-patroller-installer")
                              (:file "ww-interface")
                              (:file "ww-problem-tests")

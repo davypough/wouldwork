@@ -95,37 +95,6 @@
 (include-tech visibility)            ;los-to-transceiver; los-to-location; visible; visible-clear
 
 
-;;;; MASTER PROPAGATION DRIVER ;;;;
-
-
-(define-update propagate-changes! ()
-  ;; Binds the change-detection gate so add-prop/del-prop flag *propagated-state-changed*
-  ;; on real derived-fact mutations during the fixpoint.  Each pass runs to convergence (no
-  ;; change) or, failing that, the cap declares the state inconsistent.
-  (let ((*detect-propagated-changes* t))
-    (ww-loop for $iteration from 1 to 5
-             do (if (not (propagate-consequences!))
-                  (return t))
-             finally (inconsistent-state)
-                     (return nil))))
-
-
-(define-update propagate-consequences! ()
-  ;; One propagation pass.  Assembled here from exactly the loaded technologies' update
-  ;; functions, in dependency order: active crossings are computed first so connector
-  ;; lighting and receiver activation both see which beams are cut; connectors are lit
-  ;; next so a freshly-lit connector can power its receiver within the same pass; gates
-  ;; follow.
-  ;; Returns t iff some derivation changed stored state, telling propagate-changes! to
-  ;; run another pass.
-  (let ((*propagated-state-changed* nil))
-    (update-crossing-status!)
-    (update-connector-status!)
-    (update-receiver-status!)
-    (update-gate-status!)
-    *propagated-state-changed*))
-
-
 ;;;; INITIALIZATION ;;;;
 
 

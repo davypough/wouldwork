@@ -15,6 +15,7 @@
 ;;;   relation : (depressed plate)  --  read by gate's energized
 ;;;   update   : update-plate-status!
 
+(include-tech -propagation)
 (include-tech -support-occupancy)
 
 (in-package :ww)

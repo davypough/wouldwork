@@ -53,7 +53,7 @@
                 (bind (has-location ?fixture $f-location))))
        (eql $a-location $f-location)
        (cleartop ?fixture))
-  (":" ?agent "at" $a-location "steps onto" ?fixture)
+  (">" ?agent "at" $a-location "steps onto" ?fixture)
   (assert (on ?agent ?fixture)
           (finally (propagate-changes!))))
 
@@ -68,6 +68,6 @@
   (and (bind (on ?agent $fixture))
        (steppable $fixture)
        (bind (has-location ?agent $a-location)))
-  (":" ?agent "at" $a-location "steps off" $fixture)
+  (">" ?agent "at" $a-location "steps off" $fixture)
   (assert (not (on ?agent $fixture))
           (finally (propagate-changes!))))

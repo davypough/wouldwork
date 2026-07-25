@@ -3,5 +3,6 @@ CLAUDE.md
 vals.lisp
 src/problem.lisp
 doc/
+artifacts/
 .claude/
 .agents/

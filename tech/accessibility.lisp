@@ -51,7 +51,7 @@
   (and (bind (has-location ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (assign $reachable (accessible ?agent $a-location)))
-  (":" ?agent "moves from" $a-location "to" $dest)
+  (">" ?agent "moves from" $a-location "to" $dest)
   (doall (?to-location location)
     (if (and (member ?to-location $reachable)
              (different $a-location ?to-location))

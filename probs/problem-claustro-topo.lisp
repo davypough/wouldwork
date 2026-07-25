@@ -63,28 +63,6 @@
 (include-tech ladder)
 
 
-;;;; MASTER PROPAGATION DRIVER ;;;;
-
-
-(define-update propagate-changes! ()
-  (let ((*detect-propagated-changes* t))
-    (ww-loop for $iteration from 1 to 5
-             do (if (not (propagate-consequences!))
-                  (return t))
-             finally (inconsistent-state)
-                     (return nil)))
-)
-
-
-(define-update propagate-consequences! ()
-  (let ((*propagated-state-changed* nil))
-    (update-receiver-status!)
-    (update-plate-status!)
-    (update-gate-status!)
-    *propagated-state-changed*)
-)
-
-
 ;;;; INITIALIZATION ;;;;
 
 

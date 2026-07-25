@@ -205,17 +205,44 @@
 
 (defun strip-display-connectives (action provided-args)
   "Returns PROVIDED-ARGS with any display connectives removed, yielding the pure value
-   list used for matching and diagnostics. When ACTION's effect-format template carries
-   string connectives and PROVIDED-ARGS matches the template length (ie, it was pasted
-   from annotated solution output), drops the args at the template's string positions.
-   Otherwise returns PROVIDED-ARGS unchanged (un-annotated action, or already-pure form)."
+   list used for matching and diagnostics. Returns PROVIDED-ARGS unchanged when ACTION's
+   effect-format template carries no string connectives, or when PROVIDED-ARGS is already
+   the pure value list. Otherwise PROVIDED-ARGS was pasted from annotated solution output,
+   and the connective tokens are dropped."
   (let ((template (action.effect-format action)))
-    (if (and (some #'stringp template)
-             (= (length provided-args) (length template)))
-      (loop for slot in template
-            for arg in provided-args
-            unless (stringp slot) collect arg)
-      provided-args)))
+    (if (or (notany #'stringp template)
+            (= (length provided-args) (length (action.effect-variables action))))
+      provided-args
+      (extract-annotated-values template provided-args))))
+
+
+(defun extract-annotated-values (template provided-args)
+  "Walks TEMPLATE left to right against PROVIDED-ARGS, the token list read back from
+   annotated solution output. Annotated output is printed with escaping off, so a string
+   connective contributes one token per whitespace-delimited word rather than one token
+   overall; those tokens are discarded. Each variable slot consumes one token, which is
+   collected. Returns the pure value list."
+  (let ((tokens provided-args)
+        (values nil))
+    (dolist (slot template (nreverse values))
+      (if (stringp slot)
+        (loop repeat (count-connective-words slot)
+              do (pop tokens))
+        (push (pop tokens) values)))))
+
+
+(defun count-connective-words (string)
+  "Number of whitespace-delimited words in STRING, ie the number of tokens STRING
+   contributes when printed unescaped and read back."
+  (let ((count 0)
+        (in-word nil))
+    (loop for char across string
+          do (if (member char '(#\Space #\Tab #\Newline #\Return #\Page))
+               (setf in-word nil)
+               (unless in-word
+                 (setf in-word t)
+                 (incf count))))
+    count))
 
 
 (defun get-precondition-args (action state)

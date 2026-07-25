@@ -36,7 +36,7 @@
        (bind (has-location ?box $box-location))
        (cleartop ?box)
        (pickup-clear ?agent $a-location ?box $box-location))
-  (":" ?agent "picks up" ?box "at" $box-location "from" $a-location)
+  (">" ?agent "picks up" ?box "at" $box-location "from" $a-location)
   (assert (holding ?agent ?box)
           (not (has-location ?box $box-location))
           (if (bind (on ?box $support))
@@ -55,7 +55,7 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (assign $places (placement-options ?agent ?location ?box)))
-  (":" ?agent "puts" ?box "on" $place "at" ?location)
+  (">" ?agent "puts" ?box "on" $place "at" ?location)
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (place-held-object! ?agent ?box ?location $placement-option)

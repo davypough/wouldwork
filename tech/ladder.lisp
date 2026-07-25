@@ -53,6 +53,6 @@
        (bind (climb-via> $a-location $means $dest))
        (member ?ladder $means)
        (one-way-clear ?agent $means))
-  (":" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
+  (">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
   (assert (has-location ?agent $dest)
           (finally (propagate-changes!))))

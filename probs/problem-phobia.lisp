@@ -13,11 +13,11 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *progress-reporting-interval* 1000000)
+(ww-set *progress-reporting-interval* 2000000)
 
 (ww-set *symmetry-pruning* t)
 
-(ww-set *depth-cutoff* 30)
+(ww-set *depth-cutoff* 20)
 
 
 (defparameter *max-pairings* 2)  ;rename to max-connector-pairings for clarity
@@ -55,31 +55,6 @@
 (include-tech beam-relay)
 (include-tech visibility)
 (include-tech accessibility)
-
-
-;;;; MASTER PROPAGATION DRIVER ;;;;
-
-
-(define-update propagate-changes! ()
-  (let ((*detect-propagated-changes* t))
-    (ww-loop for $iteration from 1 to 5
-             do (if (not (propagate-consequences!))
-                  (return t))
-             finally (inconsistent-state)
-                     (return nil)))
-)
-
-
-(define-update propagate-consequences! ()
-  (let ((*propagated-state-changed* nil))
-    (update-connector-status!)
-    (update-receiver-status!)
-    (update-gate-status!)
-    (update-gears-status!)  ;derives turning/blowing state
-    (update-wall-blower-status!)  ;wall-mounting consequences: sweep the faced location
-    (update-floor-blower-status!)
-    *propagated-state-changed*)
-)
 
 
 ;;;; HEURISTIC ;;;;
@@ -220,4 +195,4 @@
 
 
   ;(holding agent1 connector2)  ;first subgoal
-  ;(and (has-location agent1 location6) (has-location fan1 location6) (holding agent1 jammer1))  ;second subgoal
+  ;(and (active receiver2) (has-location agent1 location13) (has-location jammer1 location13) (has-location fan1 location13) (jamming jammer1 wgears2))  ;second subgoal

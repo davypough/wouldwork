@@ -28,6 +28,8 @@
 ;;;               beam-relay-source-distance
 ;;;   update    : update-receiver-status!
 
+(include-tech -propagation)
+
 (in-package :ww)
 
 

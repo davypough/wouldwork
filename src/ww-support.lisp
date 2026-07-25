@@ -536,6 +536,7 @@
                                               '(nil)
                                               (remove-duplicates (apply #'append type-instances)))))
                    (setf (gethash new-type *types*) combined-instances)
+                   (setf (gethash new-type *type-components*) (cdr item))  ;← added: schema, exactly as INSTALL-TYPES retains it for a named (either ...) type, so TYPE-SPEC-LEAF-TYPES can expand this synthesized name instead of treating it as an opaque leaf
                    (if (symbolp prior-item)  ;single prior ?variable
                      (collecting new-type into types)
                      (appending (make-list (length prior-item) :initial-element new-type) into types))))

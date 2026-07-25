@@ -18,6 +18,8 @@
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
   (setf *init-actions* (nreverse *init-actions*))
+  (report-propagation-diagnostics)  ;static analysis; errors on a reaction-order violation
+  (install-derived-propagation-driver)  ;derives the driver a problem did not author
   (setq *happening-names* (sort (copy-list *happening-names*) #'< :key (lambda (object)
                                                   (first (aref (get object :events) 0)))))
   (init-start-state)  ;finish start-state init later in converter.lisp

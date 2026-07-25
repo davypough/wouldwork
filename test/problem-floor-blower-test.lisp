@@ -48,29 +48,6 @@
 (include-tech accessibility)
 
 
-;;;; MASTER PROPAGATION DRIVER ;;;;
-
-
-(define-update propagate-changes! ()
-  (let ((*detect-propagated-changes* t))
-    (ww-loop for $iteration from 1 to 5
-             do (if (not (propagate-consequences!))
-                  (return t))
-             finally (inconsistent-state)
-                     (return nil)))
-)
-
-
-(define-update propagate-consequences! ()
-  (let ((*propagated-state-changed* nil))
-    (update-receiver-status!)  ;no receivers here; kept to document the required ordering
-    (update-plate-status!)
-    (update-gears-status!)  ;derives turning/blowing state
-    (update-floor-blower-status!)  ;floor-mounting consequences: launch and drop
-    *propagated-state-changed*)
-)
-
-
 ;;;; INITIALIZATION ;;;;
 
 

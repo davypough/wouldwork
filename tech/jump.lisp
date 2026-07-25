@@ -112,7 +112,7 @@
   1
   (?agent agent)
   (bind (has-location ?agent $a-location))
-  (":" ?agent "at" $a-location "jumps onto" $place)
+  (">" ?agent "at" $a-location "jumps onto" $place)
   (do (doall (?box box)
         (if (and (has-location ?box $a-location)
                  (cleartop ?box)

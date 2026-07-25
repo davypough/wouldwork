@@ -60,7 +60,7 @@
   (and (bind (has-location ?agent $a-location))
        (bind (has-location ?jammer $jammer-location))
        (pickup-clear ?agent $a-location ?jammer $jammer-location))
-  (":" ?agent "picks up" ?jammer "at" $a-location)
+  (">" ?agent "picks up" ?jammer "at" $a-location)
   (assert (holding ?agent ?jammer)
           (not (has-location ?jammer $jammer-location))
           (if (bind (jamming ?jammer $any-target))
@@ -89,7 +89,7 @@
                     (visible ?location $t-location))))
        (not (jam-disallowed> $a-location ?location ?target))
        (assign $places (placement-options ?agent ?location $any-jammer)))
-  (":" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
+  (">" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (jamming $any-jammer ?target)

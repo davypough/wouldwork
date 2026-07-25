@@ -44,6 +44,7 @@
 ;;; PROVIDES:
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
 
+(include-tech -propagation)
 (include-tech -gears-fan)
 (include-tech -stream-passability)
 

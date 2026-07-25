@@ -42,6 +42,7 @@
 ;;;   updates    : update-connector-status!
 ;;;   actions    : pickup-connector, put-connector, connect-connector
 
+(include-tech -propagation)
 (include-tech -beam-substrate)
 (include-tech -placement)
 (include-tech -visibility)
@@ -73,7 +74,7 @@
   (and (bind (has-location ?agent $a-location))
        (bind (has-location ?connector $connector-location))
        (pickup-clear ?agent $a-location ?connector $connector-location))
-  (":" ?agent "picks up" ?connector "at" $a-location)
+  (">" ?agent "picks up" ?connector "at" $a-location)
   (assert (holding ?agent ?connector)
           (not (has-location ?connector $connector-location))
           (do (doall (?t terminus)
@@ -94,7 +95,7 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (assign $places (placement-options ?agent ?location ?connector)))
-  (":" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
+  (">" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (place-held-object!
@@ -114,7 +115,7 @@
        (assign $pairing-vantages (accessible ?agent $a-location))
        (exists (?t terminus)
          (connectable-terminus $pairing-vantages ?location $connector ?t)))
-  (":" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
+  (">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
   (do (assign $connectable nil)
       (doall (?terminus terminus)
         (if (connectable-terminus $pairing-vantages ?location $connector ?terminus)

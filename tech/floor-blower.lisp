@@ -41,6 +41,7 @@
 ;;;               default elevation 10 instead of 0
 ;;;   updates   : update-floor-blower-status!, blow-occupants-away!, drop-occupants!
 
+(include-tech -propagation)
 (include-tech -gears-fan)
 
 (in-package :ww)

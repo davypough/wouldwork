@@ -65,6 +65,7 @@
 ;;;   updates   : update-gears-status! (state only), relocate-stack!
 ;;;   actions   : pickup-fan, put-fan, mount-fan
 
+(include-tech -propagation)
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -position)
@@ -179,7 +180,7 @@
                 (bind (has-position $w-gears $fan-location))
                 (reachable $fan-location $a-location)
                 (within-agent-vertical-reach ?agent (gears-elevation $w-gears)))))
-  (":" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
+  (">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
   (assert (holding ?agent ?fan)
           (if (bind (has-location ?fan $f-location))
             (not (has-location ?fan $f-location)))
@@ -200,7 +201,7 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (assign $places (placement-options ?agent ?location ?fan)))
-  (":" ?agent "puts" ?fan "on" $place "at" ?location)
+  (">" ?agent "puts" ?fan "on" $place "at" ?location)
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (place-held-object! ?agent ?fan ?location $placement-option)
@@ -222,7 +223,7 @@
               (and (bind (mounted-on ?f $g))
                    (eql $g ?gears))))
        (within-agent-vertical-reach ?agent (gears-elevation ?gears)))
-  (":" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
+  (">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
   (assert (not (holding ?agent ?fan))
           (if (floor-gears ?gears)
             (has-location ?fan $g-location))

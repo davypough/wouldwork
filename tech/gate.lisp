@@ -31,6 +31,7 @@
 ;;;               pre-params; the bare and aliased forms resolve compatibly and do not conflict.
 ;;;   update    : update-gate-status!  --  the only file that ever asserts (open gate)
 
+(include-tech -propagation)
 (include-tech -controls)
 (include-tech -gate)
 
