@@ -1,0 +1,268 @@
+LAYER 4 — TEMPORAL & CAUSAL REASONING
+Source: Layer 0 (initial state, action definitions, los table)
+        Layer 2 (gate1 closed, chain requirements)
+        Layer 3 (candidate configurations, resource constraints)
+
+Purpose: Reason about the temporal sequence of events implied by the goal
+state. Determine the goal-satisfying action. Resolve whether agent1 holds
+a connector. Eliminate Config II. Reasoning is BACKWARD from the goal —
+we deduce what must be true from the fact that the goal conditions hold,
+without reconstructing the full pre-goal dynamics.
+
+Inputs: Layer 0 §4, §6, §8, §9; Layer 2 P2.3, P2.4, P2.5, P2.8;
+        Layer 3 P3.3–P3.6
+
+Outputs: Identification of goal-satisfying action, proof that agent holds
+a connector, elimination of Config II, identification of the held
+connector.
+
+
+========================================================================
+1. ACTION EFFECTS RELEVANT TO DEDUCTION
+========================================================================
+
+  pickup-connector:  Removes connector's location (connector becomes held).
+                     Clears ALL pairings of the picked-up connector.
+                     Removes it from all beam paths.
+                     Propagates consequences (beams, activations, gates).
+
+  connect-to-N:      Places held connector at agent's area.
+                     Establishes N pairings. Propagates consequences.
+
+  move:              Changes agent location only. No effect on beams,
+                     pairings, or gate state.
+
+
+========================================================================
+2. GATE1 TRANSITION
+========================================================================
+
+Established:
+  - Gate1 is closed in the goal state (P2.4).
+  - Agent1 is in area4 in the goal state.
+  - Agent1 started in area1 (Layer 0 §9).
+  - Reaching area4 requires gate1 open (Layer 1 P1.2).
+
+2a. Because agent1 is in area4 (goal) and area4 requires gate1 open for
+    access (P1.2) and agent1 started in area1 (Layer 0 §9), agent1 must
+    have entered area4 while gate1 was open.
+
+2b. Because gate1 is closed in the goal state (P2.4) but was open when
+    agent1 entered area4 (step 2a), gate1 transitioned from open to
+    closed while agent1 was in area4.
+
+2c. Because gate1 closed while agent1 was in area4 (step 2b), receiver1
+    was deactivated while agent1 was in area4.
+
+2d. Because receiver1 was deactivated while agent1 was in area4 (step 2c),
+    the deactivating action was performed by agent1 in area4. Move does
+    not affect gate state, so the action was either pickup-connector or
+    connect-to-N.
+
+
+========================================================================
+3. THE BLUE CHAIN CANNOT ROUTE THROUGH AREA4
+========================================================================
+
+3a. Because gate1 is closed (P2.4), area4 has no los to transmitter2
+    (P2.5).
+
+3b. Because area4 has no los to transmitter2 (step 3a), any blue chain
+    from transmitter2 through area4 to receiver3 would require at least
+    two connectors (a relay in the east section and a terminal in area4).
+
+3c. Because receiver2 is active (goal), there must be a red connector
+    serving receiver2. This commits one connector to Chain R.
+
+3d. Because one connector serves receiver2 (step 3c) and one connector
+    is involved in the deactivating action in area4 (step 2d — either
+    picked up or placed), at most one connector remains for a blue
+    chain through area4.
+
+3e. Because a blue chain through area4 requires at least two connectors
+    (step 3b) and at most one is available for it (step 3d), no blue
+    chain can route through area4.
+
+
+========================================================================
+4. THE BLUE CONNECTOR SERVING RECEIVER3
+========================================================================
+
+4a. Because receiver3 is active (goal), there must be a blue beam
+    extending from a blue connector to receiver3.
+
+4b. Because the blue chain cannot route through area4 (step 3e), the
+    blue connector serving receiver3 is not in area4.
+
+4c. Because area1 has no los to receiver3 (P1.5), the blue connector
+    is not in area1.
+
+4d. Because a blue beam from area3 to receiver3 would cross any red
+    beam serving receiver2 (Layer 1 §3a: area3→R2 vs area2→R3 crosses;
+    and from Layer 1 §4a, placing blue in area3 interferes with red
+    in area2 or area3), the blue connector cannot be in area3.
+
+    More precisely: if the blue connector were in area3, the red connector
+    serving receiver2 must be in an area where the red chain does not
+    interfere with the blue chain from area3. From Layer 1 §4a, blue in
+    area3 interferes with red in area2 (T-end crossing) and cannot be
+    same-area with red in area3. The only remaining option is red in
+    area4 — but area4 cannot support a 1-hop red chain (no los to
+    transmitter1 with gate1 closed, P2.5), and red 2-hop is not viable
+    (P3.1). Therefore the blue connector cannot be in area3.
+
+4e. Because the blue connector cannot be in area1 (step 4c), area3
+    (step 4d), or area4 (step 4b), the blue connector must be in area2.
+
+
+========================================================================
+5. PICKUP IS THE GOAL-SATISFYING ACTION
+========================================================================
+
+5a. Because receiver2 and receiver3 are active in the goal state (initial
+    assumptions) and pickup-connector clears all pairings of the picked-up
+    connector (Pickup effect), the picked-up connector cannot be part of
+    either the receiver2 chain or the receiver3 chain. If it were, the
+    pickup would break the chain, deactivating the corresponding receiver
+    — contradicting the goal.
+
+5b. Because the picked-up connector is not part of the receiver2 or
+    receiver3 chains (step 5a), the pickup leaves those chains intact.
+
+5c. Because the pickup leaves the receiver2 and receiver3 chains intact
+    (step 5b), and agent1 is in area4 (goal), all three goal conditions
+    are satisfied immediately after the pickup:
+      - (loc agent1 area4): agent performed the pickup in area4. ✓
+      - (active receiver2): Chain R intact. ✓
+      - (active receiver3): Chain B intact. ✓
+
+5d. Because all goal conditions are satisfied immediately after the
+    pickup, pickup-connector is the goal-satisfying (final) action.
+
+5e. Because pickup-connector is the final action and it removes the
+    connector from play, agent1 holds a connector in the goal state.
+    This is a derived goal condition, not part of the explicit goal.
+
+
+========================================================================
+6. ELIMINATING CONFIG II
+========================================================================
+
+6a. Config II (Layer 3 P3.3) commits all three connectors to active beam
+    chains — red in area3, blue relay in area2, blue terminal in area4.
+    No connector is held.
+
+6b. Because agent1 holds a connector in the goal state (step 5e), and
+    Config II has no held connector (step 6a), Config II is eliminated.
+
+6c. Only Config I survives: red connector in area3 (1-hop → receiver2),
+    blue connector in area2 (1-hop → receiver3), third connector held
+    by agent1.
+
+
+========================================================================
+7. THE RED CONNECTOR SERVING RECEIVER2
+========================================================================
+
+7a. Because area1 has no los to receiver2 (P1.5), the red connector
+    is not in area1.
+
+7b. Because the blue connector is in area2 (step 4e) and only one
+    engaged connector may occupy a given area (Engaged rule), the red
+    connector cannot be in area2.
+
+7c. Because a red beam from area4 to receiver2 crosses any blue beam
+    from area2 to receiver3 (Layer 1 P1.9), the red connector is not
+    in area4.
+
+7d. Because the red connector cannot be in area1 (step 7a), area2
+    (step 7b), or area4 (step 7c), the red connector must be in area3.
+
+    (This is consistent with both Config I and the invariant P3.4.)
+
+
+========================================================================
+8. THE HELD CONNECTOR
+========================================================================
+
+8a. Because one connector is in area2 (blue, step 4e), one is in area3
+    (red, step 7d), and agent1 holds a connector (step 5e), the held
+    connector is the remaining third connector.
+
+8b. Because the held connector is not part of either chain (step 5a),
+    it has no pairings and no derived color.
+
+
+========================================================================
+9. CHAIN PAIRINGS
+========================================================================
+
+9a. Because there are only three connectors and two are committed to
+    chains (blue in area2, red in area3), and the held connector cannot
+    participate in any chain (step 5a, 8b), each chain must be 1-hop.
+
+9b. The blue connector in area2 must pair directly with transmitter2
+    (the only blue transmitter) and receiver3 (the goal receiver it
+    serves). These are its only chain-relevant pairings.
+
+9c. The red connector in area3 must pair directly with transmitter1
+    (the only red transmitter) and receiver2 (the goal receiver it
+    serves). These are its only chain-relevant pairings.
+
+
+========================================================================
+10. CONNECTOR IDENTITY
+========================================================================
+
+The analysis establishes three roles:
+  - Blue chain connector: in area2, paired (transmitter2, receiver3).
+  - Red chain connector: in area3, paired (transmitter1, receiver2).
+  - Held connector: held by agent1, no pairings.
+
+The three physical connectors (connector1, connector2, connector3) are
+functionally interchangeable. Any permutation satisfies the structural
+constraints. The specific assignment depends on the planner's action
+sequence.
+
+The planner's known solution assigns:
+  connector1 → area2 (blue chain)
+  connector2 → held
+  connector3 → area3 (red chain)
+
+
+========================================================================
+11. OUTPUT PROPOSITIONS
+========================================================================
+
+P4.1  Gate1 transitioned from open to closed while agent1 was in area4.
+
+P4.2  The deactivating action was pickup-connector, performed by agent1
+      in area4. The picked-up connector was in area4 before the pickup.
+
+P4.3  The picked-up connector is not part of Chain R or Chain B. The
+      pickup leaves both chains intact.
+
+P4.4  Pickup-connector is the goal-satisfying (final) action. After the
+      pickup, all goal conditions are met without further action.
+
+P4.5  Agent1 holds a connector in the goal state. This is a derived
+      goal condition.
+
+P4.6  Config II (Layer 3 P3.3) is eliminated. Only Config I applies.
+
+P4.7  The blue connector serving receiver3 is in area2 (elimination of
+      area1, area3, area4).
+
+P4.8  The red connector serving receiver2 is in area3 (elimination of
+      area1, area2, area4).
+
+P4.9  The held connector is the third, uncommitted connector, with no
+      pairings.
+
+P4.10 Chain pairings are uniquely determined: blue connector pairs with
+      (transmitter2, receiver3); red connector pairs with (transmitter1,
+      receiver2).
+
+P4.11 Connector identity is underdetermined by deductive analysis. The
+      planner's known assignment: connector1→area2, connector3→area3,
+      connector2→held.

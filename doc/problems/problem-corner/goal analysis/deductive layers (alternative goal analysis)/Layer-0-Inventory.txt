@@ -1,0 +1,168 @@
+LAYER 0 — DOMAIN INVENTORY
+Source: problem-corner.lisp (define-init, define-types, define-static-relations)
+
+Purpose: Exhaustive catalog of every object instance, its type, fixed properties,
+and all static relations. Pure transcription — no reasoning. This layer is the
+reference sheet cited by all subsequent layers.
+
+Inputs: None (transcription from problem definition)
+
+Outputs: Object inventory, coordinate table, chromatic assignments, control
+relations, geometry segments, line-of-sight table, visibility table,
+accessibility table.
+
+
+========================================================================
+1. OBJECT INSTANCES BY TYPE
+========================================================================
+
+Agents:         agent1
+Gates:          gate1, gate2
+Walls:          wall1, wall2
+Windows:        window1
+Connectors:     connector1, connector2, connector3
+Transmitters:   transmitter1, transmitter2
+Receivers:      receiver1, receiver2, receiver3
+Hues:           blue, red
+Areas:          area1, area2, area3, area4
+
+Composite types (for reference):
+  cargo    = {connector1, connector2, connector3}
+  relay    = {connector1, connector2, connector3}  (no repeaters)
+  terminus = {transmitter1, transmitter2, receiver1, receiver2, receiver3,
+              connector1, connector2, connector3}  (no repeaters)
+  source   = {transmitter1, transmitter2, connector1, connector2, connector3}
+  occluder = {connector1..3, agent1, gate1, gate2, wall1, wall2}
+  target   = {connector1, connector2, connector3, receiver1, receiver2, receiver3}
+  focus    = {transmitter1, transmitter2, receiver1, receiver2, receiver3}
+  fixture  = {transmitter1, transmitter2, receiver1, receiver2, receiver3}
+
+
+========================================================================
+2. COORDINATE TABLE
+========================================================================
+
+Object            X       Y       Z     Notes
+─────────────────────────────────────────────────
+area1             9       1       0
+area2             9       8       0
+area3            10       9       0
+area4             7       8       0
+transmitter1     11      1/10     1     south wall, east side
+transmitter2     10      1/10     1     south wall, west of T1
+receiver1        81/10    1       1     south interior
+receiver2         7     109/10    1     north wall, west side
+receiver3         1     109/10    1     north wall, far west
+gate1             —       —       —     segment-defined (see §5)
+gate2             —       —       —     segment-defined (see §5)
+
+
+========================================================================
+3. CHROMATIC ASSIGNMENTS (fixed)
+========================================================================
+
+(chroma transmitter1 red)
+(chroma transmitter2 blue)
+(chroma receiver1 red)
+(chroma receiver2 red)
+(chroma receiver3 blue)
+
+
+========================================================================
+4. CONTROL RELATIONS
+========================================================================
+
+(controls receiver1 gate1)
+
+No other control relations defined. gate2 is uncontrolled.
+
+
+========================================================================
+5. GEOMETRY SEGMENTS
+========================================================================
+
+Wall segments:    (wall1  8 7  8 8)     vertical, short
+                  (wall2  8 0  8 3)     vertical, south portion
+
+Gate segments:    (gate1  8 3  8 7)     vertical, between wall2 and wall1
+                  (gate2  2 11  6 11)   horizontal, north boundary
+
+Window segments:  (window1  8 8  8 11)  vertical, above wall1
+
+Combined: wall1 + gate1 + wall2 form a continuous vertical barrier at x=8
+from y=0 to y=8. window1 extends from y=8 to y=11. Together these separate
+the domain into a west section (x < 8, containing area4) and an east section
+(x >= 8, containing areas 1-3 and both transmitters).
+
+
+========================================================================
+6. LINE-OF-SIGHT TABLE (area → fixture)
+========================================================================
+
+los0 = always clear (no gate/area dependency)
+los1 = conditional on gate open or area unoccupied
+
+              transmitter1  transmitter2  receiver1  receiver2  receiver3
+  area1       los0          los0          los0       —          —
+  area2       los0          los0          los0       los0       los0
+  area3       los0          los0          los0       los0       los0
+  area4       los1(gate1)   los1(gate1)   —          los0       los0
+
+Key observations (transcribed, not deduced):
+  - area1 has NO los to receiver2 or receiver3 under any configuration.
+  - area4 requires gate1 open to see either transmitter.
+  - area4 has NO los to receiver1 under any configuration.
+
+
+========================================================================
+7. VISIBILITY TABLE (area → area, for connector-to-connector pairing)
+========================================================================
+
+visible0 = always clear
+visible1 = conditional
+
+              area1     area2     area3     area4
+  area1       —         vis0      vis0      vis1(gate1)
+  area2       vis0      —         vis0      vis0
+  area3       vis0      vis0      —         vis0
+  area4       vis1(gate1) vis0    vis0      —
+
+Note: visibility is symmetric per the definitions.
+
+
+========================================================================
+8. ACCESSIBILITY TABLE (area → area, for agent movement)
+========================================================================
+
+accessible0 = always passable
+accessible1 = conditional on gate open
+
+              area1     area2     area3     area4
+  area1       —         acc0      acc0      acc1(gate1)
+  area2       acc0      —         acc0      acc1(gate1)
+  area3       acc0      acc0      —         acc1(gate1)
+  area4       acc1(gate1) acc1(gate1) acc1(gate1)  —
+
+Key: areas 1-3 are mutually accessible unconditionally.
+     area4 requires gate1 open to reach from any other area (and vice versa).
+
+
+========================================================================
+9. INITIAL MUTABLE STATE
+========================================================================
+
+(loc agent1 area1)
+(loc connector1 area1)
+(loc connector2 area2)
+(loc connector3 area3)
+(current-beams ())
+No pairings. No colors on connectors. No receivers active. No gates open.
+
+
+========================================================================
+10. GOAL SPECIFICATION
+========================================================================
+
+(and (loc agent1 area4)
+     (active receiver2)
+     (active receiver3))

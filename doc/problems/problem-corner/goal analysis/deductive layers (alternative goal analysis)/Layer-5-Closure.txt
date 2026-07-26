@@ -1,0 +1,213 @@
+LAYER 5 — CLOSURE & VERIFICATION
+Source: All prior layers.
+
+Purpose: Collect all established propositions, resolve any remaining open
+cells in the elimination matrices, verify consistency (no contradictions),
+and produce the canonical goal-state specification as ground literals.
+
+Inputs: P1.1–P1.12, P2.1–P2.8, P3.1–P3.6, P4.1–P4.11
+
+Outputs: Fully resolved elimination matrices, canonical goal assignments,
+consistency verification.
+
+
+========================================================================
+1. SUMMARY OF DETERMINED FACTS
+========================================================================
+
+From Layer 2:
+  - Gate1 is closed (P2.4).
+  - Receiver1 is not active (P2.3).
+  - Receiver2 is active (goal).
+  - Receiver3 is active (goal).
+
+From Layer 4:
+  - Agent1 is in area4 (goal).
+  - Agent1 holds a connector (P4.5).
+  - Blue connector is in area2 (P4.7), with derived color blue.
+  - Red connector is in area3 (P4.8), with derived color red.
+  - The held connector has no pairings and no color (P4.9).
+  - Only Config I applies — both chains are 1-hop (P4.6).
+  - Blue connector is paired with (transmitter2, receiver3) (P4.10).
+  - Red connector is paired with (transmitter1, receiver2) (P4.10).
+  - Pickup-connector is the final action (P4.4).
+
+
+========================================================================
+2. FULLY RESOLVED LOCATION MATRIX
+========================================================================
+
+Every cell is determined. Three connectors occupy three distinct
+dispositions: area2, area3, held.
+
+               area1    area2    area3    area4    held
+  ─────────────────────────────────────────────────────────
+  Blue (→R3)   ✗(P1.5)  ✓(P4.7) ✗(L1§4a) ✗(§3e)  ✗
+  Red  (→R2)   ✗(P1.5)  ✗(P4.7) ✓(P4.8)  ✗(P1.9) ✗
+  Held         ✗        ✗       ✗        ✗        ✓(P4.5)
+
+Elimination justifications:
+  Blue not in area1:  no los to receiver3 (P1.5).
+  Blue not in area3:  beam interference with any red chain (Layer 1 §4a).
+  Blue not in area4:  resource counting — not enough connectors (Layer 4 §3).
+  Blue not held:      receiver3 is active, requires blue connector placed.
+  Red not in area1:   no los to receiver2 (P1.5).
+  Red not in area2:   area exclusion — blue connector occupies area2 (P4.7).
+  Red not in area4:   beam from area4→R2 crosses area2→R3 (P1.9).
+  Red not held:       receiver2 is active, requires red connector placed.
+  Held not in area1:  excluded by exhaustion (blue→area2, red→area3, and
+                      the third connector must be held per P4.5).
+  Held not in area2:  occupied by blue connector.
+  Held not in area3:  occupied by red connector.
+  Held not in area4:  the held connector was picked up FROM area4 (P4.2),
+                      so it is no longer located there.
+
+
+========================================================================
+3. FULLY RESOLVED UPSTREAM PAIRING MATRIX
+========================================================================
+
+What source can pair upstream into each connector:
+
+                transmitter1  transmitter2  Blue-conn  Red-conn  Held
+  ──────────────────────────────────────────────────────────────────────
+  Blue (→R3)    ✗ color       ✓(P4.10)      —          ✗ color   ✗(P4.9)
+  Red  (→R2)    ✓(P4.10)     ✗ color        ✗ color    —         ✗(P4.9)
+  Held          ✗(P4.9)      ✗(P4.9)        ✗(P4.9)    ✗(P4.9)  —
+
+Elimination justifications:
+  Blue ← T1:       color mismatch (transmitter1 is red, blue chain needs blue).
+  Blue ← Red-conn: color mismatch (red connector carries red).
+  Blue ← Held:     held connector has no pairings (P4.9).
+  Red  ← T2:       color mismatch (transmitter2 is blue, red chain needs red).
+  Red  ← Blue-conn: color mismatch.
+  Red  ← Held:     held connector has no pairings (P4.9).
+  Held ← anything: held connector has no pairings (P4.9).
+
+
+========================================================================
+4. FULLY RESOLVED DOWNSTREAM PAIRING MATRIX
+========================================================================
+
+What target can each connector pair downstream into:
+
+                R1     R2      R3      Blue-conn  Red-conn  Held
+  ──────────────────────────────────────────────────────────────────
+  Blue (→R3)    ✗ col  ✗ col   ✓(P4.10) —         ✗ col     ✗(P4.9)
+  Red  (→R2)    ✗(P2.4) ✓(P4.10) ✗ col  ✗ col     —         ✗(P4.9)
+  Held          ✗(P4.9) ✗(P4.9) ✗(P4.9) ✗(P4.9)  ✗(P4.9)   —
+
+Elimination justifications:
+  Blue → R1:       color mismatch (receiver1 needs red).
+  Blue → R2:       color mismatch (receiver2 needs red).
+  Blue → Red-conn: color mismatch.
+  Blue → Held:     held has no pairings (P4.9).
+  Red  → R1:       receiver1 is not active (P2.3); gate1 closed (P2.4).
+                   The red connector is not paired with receiver1 because
+                   doing so would require receiver1 active, contradicting
+                   P2.3. (Alternatively: a pairing with R1 would create
+                   an A→R1 beam that interferes with T2→area2, preventing
+                   receiver3 from activating.)
+  Red  → R3:       color mismatch (receiver3 needs blue).
+  Red  → Blue-conn: color mismatch.
+  Red  → Held:     held has no pairings (P4.9).
+  Held → anything: held has no pairings (P4.9).
+
+
+========================================================================
+5. CONSISTENCY VERIFICATION
+========================================================================
+
+5a. Goal literal satisfaction.
+
+  (loc agent1 area4):   agent1 is in area4. ✓
+  (active receiver2):   Chain R exists: transmitter1 → red-conn(area3) →
+                        receiver2. Red-conn has los0 to both transmitter1
+                        and receiver2 (Layer 0 §6). Red-conn derives
+                        color red from transmitter1. Beam reaches
+                        receiver2. Color matches chroma. ✓
+  (active receiver3):   Chain B exists: transmitter2 → blue-conn(area2) →
+                        receiver3. Blue-conn has los0 to both transmitter2
+                        and receiver3 (Layer 0 §6). Blue-conn derives
+                        color blue from transmitter2. Beam reaches
+                        receiver3. Color matches chroma. ✓
+
+5b. Chain non-interference.
+
+  Chain R segments: transmitter1→area3, area3→receiver2.
+  Chain B segments: transmitter2→area2, area2→receiver3.
+
+  T-end:   T1→area3 vs T2→area2: NO (Layer 1 §2). ✓
+  R-end:   area3→R2 vs area2→R3: NO (Layer 1 §3a). ✓
+  Cross-1: T1→area3 vs area2→R3: NO (Layer 1 §3c). ✓
+  Cross-2: area3→R2 vs T2→area2: NO (Layer 1 §3c). ✓
+  All four checks pass. Chains R and B do not interfere. ✓
+
+5c. Gate state consistency.
+
+  Gate1 is closed (P2.4). Receiver1 is not active (P2.3). No red chain
+  serves receiver1 — the red connector is paired only with transmitter1
+  and receiver2, not receiver1. Consistent. ✓
+
+5d. Resource accounting.
+
+  3 connectors: 1 in area2, 1 in area3, 1 held. Total = 3. ✓
+  1 agent: in area4. ✓
+  2 engaged connectors, 1 uncommitted. ✓
+
+5e. No beam occlusion by agent or held connector.
+
+  Agent1 is in area4 (7, 8). Does this occlude any active beam?
+  Chain R: T1(11,0.1)→area3(10,9) and area3(10,9)→R2(7,10.9).
+  Chain B: T2(10,0.1)→area2(9,8) and area2(9,8)→R3(1,10.9).
+
+  Agent at (7,8) vs T1→area3: x=11-t at x=7 gives t=4. Outside. ✓
+  Agent at (7,8) vs area3→R2: x=10-3t at x=7 gives t=1. Endpoint. ✓
+  Agent at (7,8) vs T2→area2: x=10-s at x=7 gives s=3. Outside. ✓
+  Agent at (7,8) vs area2→R3: x=9-8s at x=7 gives s=0.25, y=8.725.
+    Distance from (7,8): 0.725 > 0.25 tolerance. Not occluded. ✓
+
+  Held connector has no location — cannot occlude anything. ✓
+
+
+========================================================================
+6. CANONICAL GOAL STATE
+========================================================================
+
+The fully determined goal state, expressed as ground base-relation
+literals. Connector identity uses the planner's known assignment
+(P4.11): connector1 → area2 (blue), connector3 → area3 (red),
+connector2 → held.
+
+  (loc agent1 area4)
+  (loc connector1 area2)
+  (loc connector3 area3)
+  (holds agent1 connector2)
+  (paired connector1 transmitter2)
+  (paired connector1 receiver3)
+  (paired connector3 transmitter1)
+  (paired connector3 receiver2)
+
+Derived state (consequences of base relations):
+  (color connector1 blue)
+  (color connector3 red)
+  (active receiver2)
+  (active receiver3)
+  gate1 closed (not open)
+  receiver1 not active
+
+
+========================================================================
+7. OUTPUT PROPOSITIONS
+========================================================================
+
+P5.1  All elimination matrix cells are fully resolved. No open cells
+      remain.
+
+P5.2  The goal state is consistent: goal literals are satisfied, chains
+      do not interfere, resource counts balance, no beam occlusion by
+      agent or uncommitted connectors.
+
+P5.3  The canonical goal state is uniquely determined up to connector
+      identity permutation. The structural configuration (locations,
+      pairings, colors, activations) is unique.

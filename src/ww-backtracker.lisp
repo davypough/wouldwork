@@ -428,6 +428,7 @@
     (format t "~%New path to goal found at depth = ~:D" solution-depth)
     (when (eql *solution-type* 'min-time)
       (format t "Time = ~:A~%" (solution.time solution)))
+    (finish-output)
     (push solution *solution-paths*)
     (when (not (member (problem-state.idb (solution.goal solution)) *unique-solution-states* 
                        :key (lambda (soln) (problem-state.idb (solution.goal soln)))

@@ -1,0 +1,218 @@
+DEDUCTIONS FOR COMPLETING THE GOAL STATE FOR PROBLEM-CORNER.LISP
+
+Initial Assumptions: R2-red is active, R3-blue is active, agent1 is located in area4
+
+Static Rules:
+- Active (receiver): A receiver is active iff a connector of matching color is paired with it and located in an area with line of sight to it.
+- Open (gate): G1 is open iff R1-red is active.
+- los: Line of sight between an area and any fixture is determined solely by the open/closed state of any gate separating them.
+- Interference: Two beams interfere if their paths cross.
+- Color (connector): A connector's color is derived from any non-conflicted upstream source -- either a transmitter or an already-colored connector.
+- Engaged (connector): A connector is engaged iff it is paired into a transmitter-to-receiver chain. An engaged connector must have los to its upstream source and los to its downstream receiver. Only one engaged connector may occupy a given area at a time.
+- Transmitter separation: T1-red and T2-blue are both separated from area4 by gate1; area4 has los to either transmitter only when gate1 is open.
+- Passage: Gate1 is the only passage between area4 and areas 1-3; crossing requires gate1 to be open.
+- Move neutrality: Moving the agent does not change gate state.
+- Pickup effect: Picking up a connector removes it from all beam paths and clears all its pairings.
+- Geometric facts (verified from problem coordinates):
+  - area1 has no los to R3-blue or R2-red under any gate configuration.
+  - A red beam from area4 to R2-red conflicts with any blue beam from C1-<blue> to R3-blue.
+  - A beam from area2 to R2-red crosses the blue beam from area3 to R3-blue.
+  - Any blue beam chain from T2-blue terminating at area2 or area4 conflicts with any red beam chain from T1-red terminating at R1-red.
+  - A beam from T1-red to area1 crosses T2-blue's beam to any of area2, area3, or area4 (t~0.53, s~0.06 for area2).
+
+
+GOAL STATE DEDUCTIONS
+
+OBJECTIVE 1: Establish that gate1 is closed.
+
+1. Because R3-blue is active [req]
+   and an active receiver requires a beam chain from a matching-color transmitter [bkgnd]
+   and T2-blue is the only blue transmitter [bkgnd]
+   then there must be a blue chain (N-blue) extending from T2-blue to R3-blue.
+
+2. Because N-blue is a blue chain extending from T2-blue to R3-blue [step 1]
+   and R3-blue is positioned on the north wall [bkgnd]
+   and T2-blue is positioned on the south wall [bkgnd]
+   then N-blue partitions the domain into two sections (S-west and S-east).
+
+3. Because N-blue partitions the domain into S-west and S-east [step 2]
+   and T1-red is the only red transmitter [bkgnd]
+   and T1-red is in S-east [bkgnd]
+   and R1-red is in S-west [bkgnd]
+   then any red chain from T1-red to R1-red must cross N-blue.
+
+4. Because any red chain from T1-red to R1-red must cross N-blue [step 3]
+   and two chains of different colors interfere if their paths cross [bkgnd]
+   then there can be no red chain from T1-red to R1-red.
+
+5. Because there can be no red chain from T1-red to R1-red [step 4]
+   and a receiver is active only if a matching-color chain reaches it from a transmitter [bkgnd]
+   and T1-red is the only red transmitter [bkgnd]
+   then R1-red cannot be active.
+
+6. Because R1-red cannot be active [step 5]
+   and gate1 is open iff R1-red is active [bkgnd]
+   then gate1 cannot be open.
+
+OBJECTIVE 2: Establish that pickup-connector is the goal-satisfying action.
+
+7. Because gate1 cannot be open [step 6]
+   and agent1 is in area4 [req]
+   and gate1 is the only passage between area4 and areas 1-3 [bkgnd]
+   then agent1 must have entered area4 while gate1 was open.
+
+8. Because agent1 entered area4 while gate1 was open [step 7]
+   and gate1 cannot be open [step 6]
+   then gate1 closed sometime after agent1 entered area4.
+
+9. Because gate1 closed after agent1 entered area4 [step 8]
+   and gate1 is open iff R1-red is active [bkgnd]
+   and moving the agent does not change gate state [bkgnd]
+   then R1-red was deactivated while agent1 was in area4.
+
+10. Because R1-red was deactivated while agent1 was in area4 [step 9]
+    and picking up a connector removes it from all beam paths [bkgnd]
+    and no other action can disrupt an established beam chain [bkgnd]
+    then the deactivating action was pickup-connector.
+
+11. Because the deactivating action was pickup-connector [step 10]
+    and agent1 is the only agent [bkgnd]
+    and agent1 is in area4 [step 9]
+    then pickup-connector was performed by agent1 in area4.
+
+12. Because gate1 cannot be open [step 6]
+    and area4 has los to T2-blue only when gate1 is open [bkgnd]
+    then area4 has no los to T2-blue.
+
+13. Because area4 has no los to T2-blue [step 12]
+    and a connector requires los to any terminus it pairs with [bkgnd]
+    then any chain from T2-blue to area4 requires at least two connectors.
+
+14. Because R2-red is active [req]
+    and an active receiver requires a beam from a matching-color connector [bkgnd]
+    then there must be a red beam extending from a red connector (C2-<red>) to R2-red.
+
+15. Because any chain from T2-blue to area4 requires at least two connectors [step 13]
+    and C2-<red> must serve R2-red [step 14]
+    and one connector is held after pickup [step 11]
+    and there are only three connectors [bkgnd]
+    then there are not enough connectors for a blue chain from T2-blue through area4 to R3-blue.
+
+16. Because R3-blue is active [req]
+    and an active receiver requires a beam from a matching-color connector [bkgnd]
+    then there must be a blue beam extending from a blue connector (C1-<blue>) to R3-blue.
+
+17. Because there are not enough connectors for a blue chain from T2-blue through area4 to R3-blue [step 15]
+    and C1-<blue> must be part of the blue chain to R3-blue [step 16]
+    then C1-<blue> cannot be in area4.
+
+18. Because R2-red is active [req]
+    and R3-blue is active [req]
+    and picking up a connector removes it from all beam paths [bkgnd]
+    and a receiver deactivates if its sole chain is broken [bkgnd]
+    then the picked-up connector cannot be part of the R2-red or R3-blue chains.
+
+19. Because the picked-up connector is not part of the R2-red or R3-blue chains [step 18]
+    and picking up a connector removes only that connector from beam paths [bkgnd]
+    then the pickup leaves the R2-red and R3-blue chains intact.
+
+20. Because the pickup leaves the R2-red and R3-blue chains intact [step 19]
+    and agent1 is in area4 [req]
+    and the goal requires R2-red active, R3-blue active, and agent1 in area4 [req]
+    then all goal conditions are satisfied immediately after the pickup.
+
+21. Because all goal conditions are satisfied immediately after the pickup [step 20]
+    and pickup-connector leaves the agent holding a connector [bkgnd]
+    then pickup-connector is the goal-satisfying action with agent1 holding a connector at the goal.
+
+OBJECTIVE 3: Establish that C2-<red> is in area3.
+
+22. Because area1 has no los to R3-blue under any gate configuration [bkgnd]
+    and C1-<blue> must have a beam to R3-blue [step 16]
+    and a beam requires los [bkgnd]
+    then C1-<blue> cannot be in area1.
+
+23. Because C1-<blue> must have a beam to R3-blue [step 16]
+    and C2-<red> must have a beam to R2-red [step 14]
+    and a blue beam from area3 to R3-blue interferes with any red beam to R2-red [bkgnd]
+    then C1-<blue> cannot be in area3.
+
+24. Because C1-<blue> cannot be in area1 [step 22]
+    and C1-<blue> cannot be in area3 [step 23]
+    and C1-<blue> cannot be in area4 [step 17]
+    and the only areas are area1, area2, area3, and area4 [bkgnd]
+    then C1-<blue> must be in area2.
+
+25. Because area1 has no los to R2-red under any gate configuration [bkgnd]
+    and C2-<red> must have a beam to R2-red [step 14]
+    and a beam requires los [bkgnd]
+    then C2-<red> cannot be in area1.
+
+26. Because C2-<red> must have a beam to R2-red [step 14]
+    and C1-<blue> must have a beam to R3-blue [step 16]
+    and a red beam from area4 to R2-red interferes with any blue beam from C1-<blue> to R3-blue [bkgnd]
+    then C2-<red> cannot be in area4.
+
+27. Because C1-<blue> is in area2 [step 24]
+    and only one engaged connector may occupy a given area [bkgnd]
+    then C2-<red> cannot be in area2.
+
+28. Because C2-<red> cannot be in area1 [step 25]
+    and C2-<red> cannot be in area2 [step 27]
+    and C2-<red> cannot be in area4 [step 26]
+    and the only areas are area1, area2, area3, and area4 [bkgnd]
+    then C2-<red> must be in area3.
+
+OBJECTIVE 4: Establish the identity of the held connector and all necessary beam chain pairings.
+
+29. Because C1-<blue> is in area2 [step 24]
+    and C2-<red> is in area3 [step 28]
+    and agent1 holds a connector at the goal [step 21]
+    and there are only three connectors [bkgnd]
+    then the held connector is C3.
+
+30. Because C3 is held [step 29]
+    and a held connector has no location [bkgnd]
+    and an engaged connector must be located in an area [bkgnd]
+    then C3 is not engaged and cannot participate in any chain.
+
+31. Because C3 cannot participate in any chain [step 30]
+    and there are only three connectors [bkgnd]
+    and C1-<blue> requires an upstream blue source [bkgnd]
+    and C2-<red> requires an upstream red source [bkgnd]
+    and T2-blue is the only blue transmitter [bkgnd]
+    and T1-red is the only red transmitter [bkgnd]
+    then C1-<blue> must receive a direct beam from T2-blue and C2-<red> must receive a direct beam from T1-red.
+
+
+LOGICAL ELIMINATION MATRICES
+(✓ = possible, ✗ = eliminated, col = color conflict)
+
+LOCATION MATRIX
+             area1     area2     area3     area4     held
+C1-<blue>    ✗(22)     ✓(24)     ✗(23)     ✗(17)     ✗
+C2-<red>     ✗(25)     ✗(27)     ✓(28)     ✗(26)     ✗
+C3           ✗(29)     ✗(29)     ✗(29)     ✗(29)     ✓(29)
+
+UPSTREAM PAIRING MATRIX (what source can pair into each connector)
+             T1-red    T2-blue   C1-<blue>  C2-<red>  C3
+C1-<blue>    ✗ col     ✓(31)     —          ✗ col     ✗(30)
+C2-<red>     ✓(31)     ✗ col     ✗ col      —         ✗(30)
+C3           ✗(29)     ✗(29)     ✗(29)      ✗(29)     —
+
+DOWNSTREAM PAIRING MATRIX (what target can each connector pair into)
+             R1-red    R2-red    R3-blue   C1-<blue>  C2-<red>  C3
+C1-<blue>    ✗ col     ✗ col     ✓(16)     —          ✗ col     ✗(30)
+C2-<red>     ✗(6)      ✓(14)     ✗ col     ✗ col      —         ✗(30)
+C3           ✗(29)     ✗(29)     ✗(29)     ✗(29)      ✗(29)     —
+
+
+FULLY DETERMINED CANONICAL GOAL ASSIGNMENTS
+(loc agent1 area4)
+(loc connector1 area2)
+(loc connector2 area3)
+(holds agent1 connector3)
+(paired connector1 transmitter2)
+(paired connector1 receiver3)
+(paired connector2 transmitter1)
+(paired connector2 receiver2)

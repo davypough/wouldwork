@@ -2,7 +2,7 @@ AGENTS.md
 CLAUDE.md
 vals.lisp
 src/problem.lisp
-doc/
 artifacts/
 .claude/
 .agents/
+.asdf-cache/
