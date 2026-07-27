@@ -33,12 +33,12 @@
            (read-globals))
           (t
            (save-globals))))
-  (initialize-symmetry-detection)
   (do-integer-conversion)                      ; Full conversion and compilation of baseline
-  (initialize-initial-signatures)              ;symmetry signatures
   (finalize-patroller-happenings)              ; Check initial rebound conditions
   (do-init-action-updates *start-state*)       ; Add init action propositions
   (convert-databases-to-integers)              ; Only convert new propositions, no recompilation
+  (initialize-symmetry-detection)              ;changed: after init actions, so signatures see derived static facts
+  (initialize-initial-signatures)              ;changed: moved with it; still after do-integer-conversion
   (validate-start-state-consistency)
   (setf *inconsistent-state-key*
         (convert-to-integer-memoized '(inconsistent-state)))

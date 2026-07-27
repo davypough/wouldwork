@@ -3,6 +3,17 @@
 > **Usage:** Attach this file when starting a new problem specification session.
 > Provide a preliminary description of your problem in the prompt.
 
+> **Status:** Where this file and the *Wouldwork User Manual* disagree, this file is
+> currently the correct one — the Manual has pending updates tracked in
+> `doc/user-manual-sync.md`.
+
+**Companion documents.** This file covers writing a spec. Once a spec exists and needs
+analysis, `working-reference-builder.md` normalizes its scattered facts into a working
+reference, and `inferring-missing-relations.md` uses that reference to locate an omitted
+relation in a spec that is correct but unsolvable. For the technology library,
+`tech/README.html`; for relation signatures, `tech/Talos Technology  Relations.txt`; for
+what the engine does at load time, `../load-ordering/ordering-of-operations.md`.
+
 
 ---
 
@@ -12,6 +23,47 @@
 The user provides a preliminary problem description and attaches this template.
 Claude reads the DSL reference (Section 1) and the template structure (Section 2),
 then begins the structured interview.
+
+### Step 1 — Establish the problem family, before anything else
+
+This fork determines the entire shape of the specification. Settle it first; do not
+begin the interview proper until it is decided.
+
+**Path A — a new Talos Principle problem.**
+Build it on the `tech/` technology library. These files implement a *topological*
+representation of Talos mechanics — beams, connectors, gates, accessibility,
+visibility, elevation — as reusable roles that splice into the spec via
+`include-tech` (Section 1.5). A new Talos problem should be assembled from the
+existing technologies rather than hand-authoring the mechanics, so that behavior
+stays consistent across problems and fixes propagate.
+
+Read `tech/README.html` before drafting. It is authoritative for the technology
+library: the role system, the tier picture, the file inventory, hard vs. soft
+dependencies, and the integration checklist.
+
+**Path B — everything else.**
+Hand-authored specifications with no `include-tech`. This includes all non-Talos
+problems *and* the legacy Talos specs — `problem-corner.lisp` is the reference
+example — which predate the technology library and are not written against it. Do
+not retrofit `tech/` onto a legacy spec as part of a new problem session; treat the
+two approaches as separate.
+
+On Path B, resolve one more question before the interview:
+
+**Planning or CSP?** Set via `(ww-set *problem-type* planning)` or `csp`.
+
+- *Planning* — actions represent changes to the problem state; the solution is a
+  sequence of steps. Usually paired with `depth-first` + `graph`.
+- *CSP* — actions represent sequential assignments of values to variables; the
+  solution is a complete assignment satisfying the constraints.
+  `problem-captjohn.lisp` is the reference example. Usually paired with
+  `backtracking` + `tree`, and leave `*depth-cutoff*` at 0, since search must reach
+  a depth equal to the number of rules.
+
+A CSP can be expressed as a planning problem, but the CSP specialization prunes far
+more aggressively and matters greatly at scale. Ask which the user's problem is;
+"find an arrangement satisfying constraints" indicates CSP, "find a sequence of steps"
+indicates planning.
 
 ### Interview Strategy
 1. **One question at a time.** Wait for user's answer before proceeding.
@@ -27,16 +79,22 @@ then begins the structured interview.
 4. **Conditional branches:** Skip questions that don't apply. If the user
    describes a pure combinatorial problem, skip physics/propagation questions.
    If there are no derived effects, skip cascade questions.
-5. **Don't ask about representation early.** Capture the user's conceptual
+5. **On Path A, ask which technologies apply, not how they work.** The mechanics are
+   already specified in `tech/`. The interview's job is to identify which technologies
+   the puzzle needs and what the problem must supply to them — leaf types, geometry,
+   initial facts — not to re-elicit beam or gate behavior.
+6. **Don't ask about representation early.** Capture the user's conceptual
    model first. Representation decisions belong in the Implementation Notes
    phase after the template is complete.
-6. **Infer where possible.** If the user's description unambiguously answers
+7. **Infer where possible.** If the user's description unambiguously answers
    a question, note the inference in the template rather than asking.
 
 ### Post-Interview Phases
 1. **Template review:** Present the final template for user confirmation.
 2. **Implementation notes:** Discuss representation strategy, performance
    considerations, and how the problem maps to Wouldwork constructs.
+   On Path A, this is where the technology selection is finalized against
+   `tech/README.html`'s integration checklist.
 3. **Spec drafting:** Write the `.lisp` file using the DSL reference below.
 4. **Testing:** Provide a REPL expression the user can run to test.
 
@@ -47,19 +105,37 @@ then begins the structured interview.
 
 ### 1.1 File Structure
 
-Every problem spec is a `.lisp` file in the `src/` directory.
+Every problem spec is a `.lisp` file in the **`probs/`** directory. Test problems
+exercising a single technology go in **`test/`**. Wouldwork resolves a problem name
+by searching `probs/` first, then `test/`.
+
+**Do not write a spec in `src/`.** `src/problem.lisp` is a *generated* file — staging
+any problem overwrites it. It is the spliced snapshot the engine compiles, not a
+source file.
+
 Required package declaration: `(in-package :ww)`
 
 Sections appear in this canonical order:
+
 1. `ww-set` declarations (problem parameters)
-2. `define-types` (object types and instances)
-3. `define-dynamic-relations` (state relations that change)
-4. `define-static-relations` (state relations that don't change)
-5. Query functions (`define-query`)
-6. Update functions (`define-update`)
-7. Actions (`define-action`)
-8. `define-init` (initial state assertions)
-9. `define-goal` (goal condition)
+2. `defparameter` / `defun` helpers, if any
+3. `define-types` (object types and instances) — and `define-optional-types`
+4. `include-tech` directives — **Path A only; must come after `define-types`**
+5. `define-dynamic-relations` (state relations that change)
+6. `define-static-relations` (state relations that don't change)
+7. Query functions (`define-query`)
+8. Update functions (`define-update`)
+9. Actions (`define-action`)
+10. `define-happening` / `define-patroller` (exogenous events), if any
+11. `define-init` (initial state assertions)
+12. `define-init-action` (derivations run once at initialization), if any
+13. `define-goal` (goal condition)
+
+Only one of these orderings is a hard requirement rather than a convention:
+**`define-types` must precede every `include-tech` directive.** Section 1.5 explains
+why, and why violating it fails silently. The rest is house style — forward references
+among queries and updates are resolved by a pre-scan pass, so definition order among
+them does not matter.
 
 
 ### 1.2 Problem Parameters (`ww-set`)
@@ -67,13 +143,31 @@ Sections appear in this canonical order:
 ```lisp
 (ww-set *problem-name* <symbol>)          ; e.g., match3a
 (ww-set *problem-type* planning)          ; or csp (constraint satisfaction)
-(ww-set *solution-type* <type>)           ; first, every, min-length, min-time,
-                                          ; min-value, max-value, or integer N
+(ww-set *solution-type* <type>)           ; first, every, all-paths, min-length,
+                                          ; min-time, min-value, max-value, or integer N
 (ww-set *tree-or-graph* <mode>)           ; tree or graph
 (ww-set *depth-cutoff* <integer>)         ; max search depth (0 = no limit)
 (ww-set *symmetry-pruning* <bool>)        ; t or nil
 (ww-set *progress-reporting-interval* <integer>)  ; e.g., 1000000
 ```
+
+**Three parameters must NOT appear in a problem file. Each signals an error if it
+does:**
+
+| Parameter | Why |
+|---|---|
+| `*debug*` | gates conditional compilation |
+| `*algorithm*` | selects which translations are generated |
+| `*probe*` | gates conditional compilation, and validates against loaded actions |
+
+Each requires recompilation to take effect, and the problem file is read during the
+very compile it would need to influence. Set all three at the REPL after staging; each
+triggers an automatic reload. `*problem-name*` is the mirror-image case — it must be
+set in the problem file and is refused at the REPL.
+
+Note also that on an ordinary load, a saved `vals.lisp` overrides the problem file's
+`ww-set` values. Use `(stage <problem>)` to get the problem's own intended settings.
+See `doc/load-ordering/parameter-precedence.md`.
 
 
 ### 1.3 Type System (`define-types`)
@@ -91,6 +185,8 @@ Defines object types and their instances (ground atoms).
 - Type names become unary predicates: `(block A)` is automatically true.
 - Numeric instances are permitted: `row (0 1 2 3)`.
 - `(compute <form>)` can generate instances programmatically.
+- A type declared with an empty instance list — `beam ()` — is legal, and is the
+  pattern for populations that only exist at runtime. See Section 1.9.
 
 
 ### 1.4 Relations
@@ -127,7 +223,48 @@ Relations that never change. Asserted in `define-init` and stored separately.
 ```
 
 
-### 1.5 Variable Conventions
+### 1.5 Technology Includes (`include-tech`) — Path A
+
+New Talos Principle problems assemble their mechanics from the `tech/` library rather
+than hand-authoring them:
+
+```lisp
+(include-tech gate)                  ;controls; energized; update-gate-status!
+(include-tech beam-relay)            ;paired; color; pickup/put/connect actions
+(include-tech beam-crossing)         ;crossing-active; crossings-along-beam>
+(include-tech accessibility)         ;walk-via; accessible; move
+(include-tech visibility)            ;los-to-transceiver; visible; visible-clear
+```
+
+**What it does.** `include-tech` is not a runtime macro. Before compilation, each
+directive's target file is *textually spliced* into the generated `src/problem.lisp`,
+recursively — a technology may include others. Each technology is spliced at most once;
+repeats leave a `;; ... already included -- skipped` marker. By the time anything is
+evaluated, the tech bodies are ordinary top-level forms.
+
+**The one hard ordering rule: `define-types` must appear above the includes.**
+
+A `define-query` body is translated the instant its form is evaluated, and a `doall`
+over a bare type name is compiled into a *literal* domain list at that moment. A type
+declared below the includes is therefore already known by name — the pre-scan pass
+registers it — but with an empty instance list. Every tech query iterating over it
+collapses into a silent no-op. **This is not an error.** Nothing warns you; the problem
+just fails to do anything. `problem-corner-topo.lisp` carries a comment block warning
+about exactly this.
+
+**Division of labor.** Composite types a technology needs (`mobile-object`, `cargo`,
+`support`, `target`, and so on) are declared inside the technology file itself, so no
+tech file depends on a declaration living in the problem. The problem declares only the
+leaf types it instantiates. Where both declare the same type, consistency is enforced —
+they must resolve to the same instance list.
+
+**Further reading.** `tech/README.html` is authoritative for the library: the role
+system, tiers, file inventory, hard vs. soft dependencies, and the integration
+checklist. `doc/load-ordering/ordering-of-operations.md` covers splicing and its
+failure modes in engine terms (Stage 2, and Traps 1–3).
+
+
+### 1.6 Variable Conventions
 
 | Prefix | Meaning | Scope |
 |--------|---------|-------|
@@ -138,12 +275,12 @@ Relations that never change. Asserted in `define-init` and stored separately.
 - `$variables` are untyped — they hold computed values.
 
 
-### 1.6 Query Functions (`define-query`)
+### 1.7 Query Functions (`define-query`)
 
 Read-only functions that examine state. Cannot modify the database.
 
 ```lisp
-(define-query <n> (<args>)
+(define-query <name> (<args>)
   <body>)    ; MUST be a single expression — use (do ...) to group multiple statements
 ```
 
@@ -154,8 +291,9 @@ Read-only functions that examine state. Cannot modify the database.
 - Return value is the value of the last expression in the body.
 - Can use all DSL operators: `bind`, `exists`, `forall`, `doall`, `ww-loop`,
   `setq`, `do`, `if`, `cond`, `let`, `mvsetq`, etc.
-- Query functions call other queries freely.
-- Use `(return-from <n> <value>)` for early return.
+- Query functions call other queries freely, including forward references to queries
+  defined later in the file.
+- Use `(return-from <name> <value>)` for early return.
 
 Example:
 ```lisp
@@ -165,12 +303,12 @@ Example:
 ```
 
 
-### 1.7 Update Functions (`define-update`)
+### 1.8 Update Functions (`define-update`)
 
 Functions that modify the database (assert/retract relations).
 
 ```lisp
-(define-update <n> (<args>)
+(define-update <name> (<args>)
   <body>)    ; MUST be a single expression — use (do ...) to group multiple statements
 ```
 
@@ -193,15 +331,17 @@ Functions that modify the database (assert/retract relations).
                 (return t))       ; converged, no changes
            finally (inconsistent-state) (return nil)))  ; failed to converge
 ```
-Returns T on convergence, NIL on failure.
+Returns T on convergence, NIL on failure. On Path A this driver is usually derived
+automatically from the splice order of the included technologies; author one only if
+the problem needs to override that.
 
 
-### 1.8 Actions (`define-action`)
+### 1.9 Actions (`define-action`)
 
 The primary search operators. Each action has 6 components:
 
 ```lisp
-(define-action <n>
+(define-action <name>
     <cost>                    ; numeric cost (usually 1)
   <parameter-header>          ; typed iteration variables
   <precondition>              ; boolean test (pre context)
@@ -262,7 +402,7 @@ A list of variables whose values are captured for the solution trace:
 ```
 
 
-### 1.9 Iteration and Quantification
+### 1.10 Iteration and Quantification
 
 | Form | Context | Meaning |
 |------|---------|---------|
@@ -276,13 +416,17 @@ A list of variables whose values are captured for the solution trace:
   in `(do ...)`. This is the most common source of translation errors.
 - Multi-variable quantifiers: `(exists ((?a ?b) type) ...)` or
   `(doall ((?x ?y) type) ...)`.
-- Type can be a query call for dynamic iteration: `(doall (?b (get-current-beams)) ...)`.
+- **Static vs. dynamic domain.** A bare type name compiles to a literal list at
+  translation time. A query call — `(doall (?b (get-current-beams)) ...)` — is
+  evaluated at runtime against state instead. The query form is the only way to
+  iterate a population that isn't known when the file loads; declare the type empty
+  (`beam ()`) and publish the pool through a relation.
 - **Performance note:** For dynamic query types, nested `doall`s with a guard
   are more efficient than `(doall (combination (?a ?b) (dynamic-query)) ...)`
   because `combination`/`standard` perform runtime product/dedup on every call.
 
 
-### 1.10 Initialization (`define-init`)
+### 1.11 Initialization (`define-init`)
 
 Asserts the initial state — both dynamic and static relations:
 
@@ -300,8 +444,14 @@ Asserts the initial state — both dynamic and static relations:
 - If a relation name is in `define-static-relations`, it goes to the static DB.
 - `(not (...))` retracts a relation (rarely needed in init).
 
+`define-init-action` runs a derivation once during initialization — computing static
+facts from raw geometry, for instance. Two cautions: init-actions fire in file/splice
+order, *not* by the numeric duration argument; and an init-action is **silently
+skipped** if any of its parameter types has no instances. See
+`doc/load-ordering/ordering-of-operations.md`, Traps 4–6.
 
-### 1.11 Goal (`define-goal`)
+
+### 1.12 Goal (`define-goal`)
 
 A boolean expression evaluated in `pre` context:
 
@@ -319,7 +469,7 @@ A boolean expression evaluated in `pre` context:
 - Goal is evaluated against each candidate state during search.
 
 
-### 1.12 Key Patterns
+### 1.13 Key Patterns
 
 #### Functional Relations (single value per key)
 When a relation like `(cell row col $fixnum)` has typed keys and a fluent value,
@@ -344,7 +494,10 @@ Used when you need to test modifications without corrupting the search state
 
 #### `register-dynamic-object`
 `(register-dynamic-object <symbol> <type>)` registers a new object at runtime
-(e.g., creating new beam entities during propagation).
+(e.g., creating new beam entities during propagation). It assigns an integer code and
+asserts the type proposition, but it does **not** add the object to the type's
+extension — so the object is reachable only through a predicate test or a query-domain
+`doall`, never through a static-domain one. Total planning objects are capped at 999.
 
 #### Common Lisp Integration
 Arbitrary CL code is allowed in query/update bodies: `push`, `incf`, `cons`,
@@ -356,17 +509,26 @@ Functions defined with `defun`/`defparameter` at top level are available
 globally (they are standard CL, not translated by the DSL).
 
 
-### 1.13 Running
+### 1.14 Running
 
 ```lisp
 (progn (ql:quickload :wouldwork) (in-package :ww))
-(run)                            ; solve the currently loaded problem
-(run "match3a")                  ; load and solve by name
-(stage "match3a")                ; load without solving
-(solve)                          ; solve the staged problem
-(refresh)                        ; reload after editing the problem file
+(stage match3a)                  ; stage a problem without solving it
+(solve)                          ; solve the currently staged problem
+(run match3a)                    ; stage and solve in one step
+(refresh)                        ; reload after editing the current problem file
 (params)                         ; display current parameters
+(list-problem-names)             ; list available problems
+(help)                           ; list all commands
+(ww-reset)                       ; discard generated problem and saved settings
 ```
+
+`run` and `stage` are macros; each requires a problem name, given either as a bare
+symbol or as a string — `(run match3a)` and `(run "match3a")` are equivalent. There is
+no zero-argument `(run)`; use `(solve)` to solve what is already staged.
+
+`(stage X)` applies the problem file's own `ww-set` settings. `(refresh)` deliberately
+skips them, preserving whatever you set at the REPL.
 
 
 ---
@@ -376,6 +538,11 @@ globally (they are standard CL, not translated by the DSL).
 Fill in progressively during the interview. Mark sections `(pending)` until answered.
 
 ```
+0. PROBLEM FAMILY:
+   - Path A (new Talos, tech/-based) or Path B (hand-authored): (pending)
+   - If Path A, technologies required: (pending)
+   - If Path B, planning or csp: (pending)
+
 1. DOMAIN STRUCTURE:
    - (pending)
 

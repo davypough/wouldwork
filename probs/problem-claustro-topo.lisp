@@ -111,7 +111,7 @@
      (16 0) (33 0) (33 17) (0 17)))
 
   ;; Opaque internal wall, interrupted by a visibility-transparent,
-  ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo+.lisp
+  ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo.lisp
   ;; (same segment declared there) so LOS/accessibility derivations here see it too.
   ;; wall4 and wall5 are the ground-level footprint of the raised slab that location12,
   ;; location13, gate8, and gate9 sit on (elevation 2): east edge between location12 and

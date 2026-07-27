@@ -5,9 +5,10 @@
 ;;; would rather author 2D positions than hand-list sightlines.  Nested under visibility-tech
 ;;; (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
-;;; always present wherever either is included; entirely inert unless the problem actually asserts WALL-SEGMENTS -- a
-;;; problem that hand-authors its own LOS-TO-TRANSCEIVER/LOS-TO-TARGET/LOS-TO-LOCATION facts
-;;; (as corner-topo and claustro-topo do) is unaffected.
+;;; always present wherever either is included; entirely inert unless the problem actually
+;;; asserts WALL-SEGMENTS, so a problem that hand-authors its own LOS-TO-TRANSCEIVER/LOS-TO-
+;;; TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently takes that
+;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENTS and derive.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-POSITION>
 ;;; (nested from -location-coordinates, shared with accessibility-tech's own coordinate
@@ -34,7 +35,7 @@
 ;;;
 ;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver location) -- the composite
 ;;; every consuming query/init-action here iterates over.  A problem may also declare it
-;;; identically in its own DEFINE-TYPES (as problem-corner-topo+ does); CHECK-TYPE-SIGNATURE-
+;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
 ;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
 ;;; duplicate is harmless.
 ;;;
@@ -232,7 +233,7 @@
   ;; from WALL-SEGMENTS/GATE-SEGMENTS raw segment geometry, when the problem supplies it,
   ;; instead of requiring them hand-authored.  LOS-TO-TARGET is gated on (exists (?j jammer)
   ;; t): nothing else consumes a location<->gate sightline, so a problem without a jammer
-  ;; (like corner-topo+) skips that derivation entirely rather than asserting facts no query
+  ;; (like corner-topo) skips that derivation entirely rather than asserting facts no query
   ;; ever reads.  A gate's own LOS-TO-TARGET entries use BEAM-COORDINATES-GATE-MIDPOINT
   ;; as their reference point, since a gate is authored as an extended segment rather than
   ;; a point endpoint.  When the problem also asserts BOUNDARY-WALL, each polygon edge
@@ -241,8 +242,8 @@
   ;; any consequence for a beam this blocks (eg, a connector losing its light) is resolved
   ;; the normal way, since this init-action runs before the problem's own INITIALIZE-
   ;; DERIVED-STATE calls PROPAGATE-CHANGES!.  Runs only when the problem has asserted
-  ;; WALL-SEGMENTS -- inert otherwise, so a problem that hand-authors its own LOS facts (as
-  ;; corner-topo and claustro-topo do) is unaffected.  Defined here, textually before
+  ;; WALL-SEGMENTS -- inert otherwise, so a problem that hand-authors its own LOS facts
+  ;; instead is unaffected.  Defined here, textually before
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
   ;; there on DO-INIT-ACTION-UPDATES), not by the numeric-looking argument below, and

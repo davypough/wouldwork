@@ -27,6 +27,7 @@ Static relations
 (coupled transmitter receiver)
 (crossings-along-beam> beam-endpoint $list beam-endpoint)
 (crossings-before-gate> beam-endpoint $list gate beam-endpoint)
+(current-crossings> $list)
 (gate-segments $list)
 (has-chroma (either transmitter receiver) $hue)
 (has-elevation elevated-object $fixnum)

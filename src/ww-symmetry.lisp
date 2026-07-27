@@ -925,8 +925,9 @@ Returns an alist (obj . signature), where signature is a sorted list of
 
 
 (defun initialize-symmetry-detection ()
-  "Initialize symmetry detection if enabled. Call after problem loading,
-   before integer conversion."
+  "Initialize symmetry detection if enabled. Must be called AFTER
+   do-init-action-updates, so that object signatures see the static facts
+   derived by init actions and not merely those authored in define-init."
   (when *symmetry-pruning*
     (detect-symmetry-groups)
     (cond

@@ -49,9 +49,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (test-commands)
   -- run a series of tests to exercise potential user REPL commands
 
-(list-all-problems) alias (probs)
-   -- lists all currently specifed problems
-      in the src directory (use these names with run or stage)
+(list-all-problems), or (probs) for the bare list
+   -- lists all currently specified problems in the probs and test
+      directories (use these names with run or stage)
 
 (stage <problem-name>) eg, (stage \"blocks3\") or (stage blocks3)
   -- loads a problem into wouldwork in preparation for solving or debugging,

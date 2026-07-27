@@ -7,16 +7,17 @@
 ;;; relay beams participate through relay hook queries supplied by beam-relay.
 ;;; BEAM-CROSSING> is derived internally, lazily and once, from whichever facts populate
 ;;; CROSSINGS-ALONG-BEAM> -- hand-authored directly, or computed from coordinates via the
-;;; nested -beam-crossing-coordinates substrate (see that file; problem-corner-topo and
-;;; problem-corner-topo+ both use the coordinate path).  A problem may still assert
+;;; nested -beam-crossing-coordinates substrate (see that file; problem-corner-topo uses the
+;;; coordinate path).  A problem may still assert
 ;;; BEAM-CROSSING> itself; it is simply never read.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-crossing).
 ;;;
 ;;; REQUIRES:
 ;;;   types     : crossing is declared optional by the nested -beam-crossing-coordinates
-;;;               substrate, though a problem with any crossings still declares its own full
-;;;               crossing1, crossing2, ... pool; beam-endpoint is declared by the nested
+;;;               substrate and stays empty; the pool is minted at init time and reached
+;;;               through CURRENT-CROSSINGS>/GET-CURRENT-CROSSINGS rather than through the
+;;;               type extension, so no problem declares it; beam-endpoint is declared by the nested
 ;;;               -beam-los-coordinates substrate (via -beam-crossing-coordinates);
 ;;;               transmitter is declared optional here (define-optional-types); gate comes
 ;;;               from nested -gate
@@ -35,8 +36,8 @@
 ;;;               beam-relay, etc.) independently declare their own transmitter-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,
-;;;               crossings-before-gate>
-;;;   queries   : current-crossing-set, beam-reaches-crossing,
+;;;               crossings-before-gate>, current-crossings>
+;;;   queries   : get-current-crossings, current-crossing-set, beam-reaches-crossing,
 ;;;               compute-active-crossings, arbitrate-crossings, crossing-reaches,
 ;;;               crossing-priority, beam-source-distance, same-crossing-set,
 ;;;               beam-cut, beam-cut-in, beam-crossing-endpoints
@@ -60,7 +61,8 @@
 (define-static-relations
   (beam-crossing> crossing $beam-endpoint $beam-endpoint $beam-endpoint $beam-endpoint)
   (crossings-along-beam> beam-endpoint $list beam-endpoint)
-  (crossings-before-gate> beam-endpoint $list gate beam-endpoint))
+  (crossings-before-gate> beam-endpoint $list gate beam-endpoint)
+  (current-crossings> $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -98,7 +100,7 @@
                           (assign $active $next))))
                finally (inconsistent-state))
       (if $resolved
-        (doall (?x crossing)
+        (doall (?x (get-current-crossings))
           (if (member ?x $active)
             (crossing-active ?x)
             (not (crossing-active ?x)))))))
@@ -107,9 +109,26 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
+(define-query get-current-crossings ()
+  ;; The crossing pool, as a runtime lookup rather than a compile-time type extension.
+  ;; Every DOALL over crossings in this file iterates (get-current-crossings) instead of
+  ;; the bare CROSSING type, because TRANSLATE-DOALL resolves a bare type name into a
+  ;; literal domain at load time -- when INSTALL-QUERY calls TRANSLATE -- and the pool
+  ;; isn't known until -beam-crossing-coordinates' ESTABLISH-BEAM-COORDINATES has computed
+  ;; the geometry during init.  Naming a query in the type slot selects TRANSLATE-DOALL's
+  ;; other branch, which evaluates the domain against state on each call.  This must
+  ;; therefore stay a DEFINE-QUERY: the branch is selected by membership in *QUERY-NAMES*,
+  ;; so demoting it to a plain DEFUN would silently revert every caller to an empty
+  ;; compile-time domain.  Returns nil when nothing has asserted CURRENT-CROSSINGS>, which
+  ;; makes each such DOALL skip its body -- the same inert behavior a problem with no
+  ;; crossings gets today.
+  (do (bind (current-crossings> $crossings))
+      $crossings))
+
+
 (define-query current-crossing-set ()
   (do (assign $active nil)
-      (doall (?x crossing)
+      (doall (?x (get-current-crossings))
         (if (crossing-active ?x)
           (assign $active (cons ?x $active))))
       $active))
@@ -150,7 +169,7 @@
 (define-query compute-active-crossings (?active)
   (do (assign $lighting (compute-connector-lighting ?active))
       (assign $next nil)
-      (doall (?x crossing)
+      (doall (?x (get-current-crossings))
         (if (crossing-reaches ?x ?active $lighting)
           (assign $next (cons ?x $next))))
       $next))
@@ -164,7 +183,7 @@
                do (assign $lighting (compute-connector-lighting $kept))
                   (assign $best nil)
                   (assign $best-priority most-positive-fixnum)
-                  (doall (?x crossing)
+                  (doall (?x (get-current-crossings))
                     (if (and (member ?x $remaining)
                              (crossing-reaches ?x $kept $lighting))
                       (do (assign $priority (crossing-priority ?x $lighting))
@@ -205,7 +224,7 @@
   (if (not *beam-crossing-cache*)
     (do (assign $beams (beam-crossing-canonical-beams))
         (assign $cache (make-hash-table :test 'eq))
-        (doall (?crossing crossing)
+        (doall (?crossing (get-current-crossings))
           (do (assign $containing (beam-crossing-beams-for-crossing ?crossing $beams))
               (if (/= (length $containing) 2)
                 (error "Crossing ~A appears on ~A canonical beam(s); expected exactly 2."

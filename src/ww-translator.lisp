@@ -1302,7 +1302,11 @@ predicates stay unknown because their argument may or may not be an instance."
               (not (fboundp (car form)))
               (not (macro-function (car form)))
               (not (special-operator-p (car form))))
-         (error "~2%If ~A is a query or update function, it is unrecognized as such (typo?).~%~
-                 If it is a local variable, prefix it with $.)~2%"
+         (error "~2%~A is not recognized here. It may be:~%~
+                 - a relation that no included technology declares -- check the problem's include-tech list,~%~
+                 ~2Tsince a tech file may use relations that a different tech file owns;~%~
+                 - a query or update function name that is misspelled;~%~
+                 - a local variable missing its $ prefix.~%~
+                 Occurring in: ~S~2%"
                 (car form) form))
         (t (translate-lisp-form form flag))))
