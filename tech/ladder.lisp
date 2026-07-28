@@ -9,8 +9,10 @@
 ;;;   types     : agent, location  --  ladder is declared optional here (define-optional-types)
 ;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
 ;;;               -location (mobile-object, (has-location ...)); -position (fixed-position-object,
-;;;               (has-position ...)); -passability (obstacle-clear, all-clear)  --  all
-;;;               shared via nested include-tech rather than local declaration
+;;;               (has-position ...)); -passability (obstacle-clear, all-clear); -threat
+;;;               (safe -- true unless an armed gun or other threat endangers the
+;;;               destination)  --  all shared via nested include-tech rather than local
+;;;               declaration
 ;;; PROVIDES:
 ;;;   types     : ladder  --  declared optional here and by nested -passability; the
 ;;;               declarations resolve compatibly
@@ -22,6 +24,7 @@
 (include-tech -location)
 (include-tech -position)
 (include-tech -passability)
+(include-tech -threat)
 
 (in-package :ww)
 
@@ -52,7 +55,8 @@
        (eql $a-location $ladder-location)
        (bind (climb-via> $a-location $means $dest))
        (member ?ladder $means)
-       (one-way-clear ?agent $means))
+       (one-way-clear ?agent $means)
+       (safe $dest))
   (">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
   (assert (has-location ?agent $dest)
           (finally (propagate-changes!))))

@@ -3,22 +3,24 @@
 ;;; Gears/fan substrate: the shared machinery every blower technology programs against,
 ;;; modeled on -beam-substrate's peer-substrate pattern.  A blower is a fan mounted on a
 ;;; set of fixed gears; the mountings differ (floor-blower's flush floor fixture,
-;;; wall-blower's wall fixture, a future angled-blower), but the constituents are the
-;;; same: floor-gears and wall-gears are leaf types unified as gears, the fan is a
-;;; carryable disc, mounting is an attachment via (mounted-on ...) rather than a support
-;;; placement, control follows gate.lisp's DNF convention via -controls, and the derived
-;;; state is uniform -- gears turn when uncontrolled or control-on, and a fan blows iff
-;;; it is mounted on turning gears.  What blowing *does* is mounting-specific, so this
-;;; file's update-gears-status! derives turning/blowing only; each mounting tech owns its
-;;; own consequences update (floor-blower's update-floor-blower-status! launches and
-;;; drops, wall-blower's update-wall-blower-status! sweeps), called after it.
+;;; wall-blower's wall fixture, angled-blower's flush pad fixture), but the constituents
+;;; are the same: floor-gears, wall-gears, and angled-gears are leaf types unified as
+;;; gears, the fan is a carryable disc, mounting is an attachment via (mounted-on ...)
+;;; rather than a support placement, control follows gate.lisp's DNF convention via
+;;; -controls, and the derived state is uniform -- gears turn when uncontrolled or
+;;; control-on, and a fan blows iff it is mounted on turning gears.  What blowing *does*
+;;; is mounting-specific, so this file's update-gears-status! derives turning/blowing
+;;; only; each mounting tech owns its own consequences update (floor-blower's
+;;; update-floor-blower-status! launches and drops, wall-blower's
+;;; update-wall-blower-status! sweeps, angled-blower's update-angled-blower-status!
+;;; launches along the arc), called after it.
 ;;;
-;;; A floor-mounted fan is a floor object: mount-fan gives it a has-location, so it is
-;;; steppable (step.lisp) and a placement target (-placement) at its gears' location.  A
-;;; wall-mounted fan hangs on the wall with NO has-location: every has-location bind in
-;;; step, placement, and the resting-fan pickup branch fails for it automatically, so
-;;; nothing can stand or rest on it, and pickup-fan reaches it through its own
-;;; wall-mounted branch instead (vertical reach to gears-elevation).
+;;; A floor- or angled-mounted fan is a floor object: mount-fan gives it a has-location,
+;;; so it is steppable (step.lisp) and a placement target (-placement) at its gears'
+;;; location.  A wall-mounted fan hangs on the wall with NO has-location: every
+;;; has-location bind in step, placement, and the resting-fan pickup branch fails for it
+;;; automatically, so nothing can stand or rest on it, and pickup-fan reaches it through
+;;; its own wall-mounted branch instead (vertical reach to gears-elevation).
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
@@ -34,10 +36,13 @@
 ;;;               declared optional here, so a problem with no jammers need not declare it
 ;;;   substrate edits (companions to this file; these files splice before this file's
 ;;;   gears union is installed, so they reference the leaf types directly):
-;;;               -controls          : (controls $list (either gate floor-gears wall-gears) $mode)
+;;;               -controls          : (controls $list (either gate floor-gears wall-gears
+;;;                                    angled-gears) $mode)
 ;;;               -position          : fixed-position-object (either plate ladder
-;;;                                    floor-gears wall-gears)
-;;;               -elevation         : elevated-object includes wall-gears
+;;;                                    floor-gears wall-gears angled-gears)
+;;;               -elevation         : elevated-object includes wall-gears only --
+;;;                                    floor-gears and angled-gears are both flush, so
+;;;                                    neither needs an elevation override
 ;;;               -support-occupancy : support (either plate box fan); gears are NOT a
 ;;;                                    support -- only a fan can occupy them, by attachment
 ;;;               -location          : mobile-object includes fan
@@ -49,8 +54,8 @@
 ;;;               after update-receiver-status! and update-plate-status!, and each
 ;;;               included mounting tech's consequences update after that
 ;;; PROVIDES:
-;;;   types     : floor-gears, wall-gears, fan  --  declared optional here
-;;;               gears (either floor-gears wall-gears)
+;;;   types     : floor-gears, wall-gears, angled-gears, fan  --  declared optional here
+;;;               gears (either floor-gears wall-gears angled-gears)
 ;;;   relations : (aimed-at> gears $location)  --  fixed destination of the air stream
 ;;;               (mounted-on fan $gears)  --  the fan's attachment to its gears
 ;;;               (welded fan $gears)  --  static; the fan and gears form an inseparable
@@ -62,7 +67,12 @@
 ;;;   query     : gears-elevation  --  the working height of a mounted fan: wall gears'
 ;;;               declared has-elevation or 1 (matching transmitter/receiver anchors);
 ;;;               floor gears' floor elevation
-;;;   updates   : update-gears-status! (state only), relocate-stack!
+;;;               landing-support  --  the first clear plate/floor-mounted-fan/box at a
+;;;               location whose top matches a required elevation (nil accepts any), no
+;;;               agent or reach gate
+;;;   updates   : update-gears-status! (state only), relocate-stack!, land-on-support!
+;;;               (rests a relocated object on its destination's landing-support match;
+;;;               read by wall-blower's sweep and angled-blower's arc)
 ;;;   actions   : pickup-fan, put-fan, mount-fan
 
 (include-tech -propagation)
@@ -78,11 +88,11 @@
 (in-package :ww)
 
 
-(define-optional-types floor-gears wall-gears fan jammer)
+(define-optional-types floor-gears wall-gears angled-gears fan jammer)
 
 
 (define-types
-  gears (either floor-gears wall-gears))
+  gears (either floor-gears wall-gears angled-gears))
 
 
 (define-dynamic-relations
@@ -100,8 +110,8 @@
   ;; The working height of a fan mounted on ?gears, used for mounting/dismounting reach
   ;; and for wall-blower's stream-strike test (who the horizontal air stream hits).
   ;; Wall gears hang at their declared has-elevation, defaulting to 1 (the same anchor
-  ;; default as transmitters and receivers); floor gears are flush, so their fan works at
-  ;; the floor elevation of their position.
+  ;; default as transmitters and receivers); floor and angled gears are both flush, so
+  ;; their fan works at the floor elevation of their position.
   (if (wall-gears ?gears)
     (if (bind (has-elevation ?gears $level))
       $level
@@ -157,9 +167,60 @@
                   (assign $moving $next))))
 
 
+(define-query landing-support (?location location ?self support-occupant ?required-elevation)
+  ;; The first clear plate, floor-mounted fan, or box at ?location whose top matches
+  ;; ?required-elevation, excluding ?self as a candidate, scanned in that plate/fan/box
+  ;; order, or nil if none does -- nil for ?required-elevation accepts any candidate's
+  ;; elevation.  The ?self exclusion matters only when ?self is itself a box: by the time
+  ;; land-on-support! calls this, relocate-stack! has already moved ?self to ?location, so
+  ;; without the exclusion a relocated box could be offered as its own landing support
+  ;; (harmless for plate/fan candidates, since ?self can never be eql to a
+  ;; differently-typed one -- the same reasoning -placement's placement-options already
+  ;; documents for its own ?self parameter).  Shared by wall-blower's flush-only landing
+  ;; and angled-blower's any-elevation landing, via land-on-support!.  Unlike
+  ;; -placement's placement-options, this carries no agent or vertical-reach gate: it is
+  ;; read by a physical consequence, not an agent's manipulation choice.
+  (do (assign $landing nil)
+      (doall (?plate plate)
+        (if (and (not $landing)
+                 (different ?plate ?self)
+                 (has-position ?plate ?location)
+                 (cleartop ?plate)
+                 (or (not ?required-elevation)
+                     (eql (support-top-elevation ?plate) ?required-elevation)))
+          (assign $landing ?plate)))
+      (doall (?fan fan)
+        (if (and (not $landing)
+                 (different ?fan ?self)
+                 (bind (mounted-on ?fan $gears))
+                 (has-location ?fan ?location)
+                 (cleartop ?fan)
+                 (or (not ?required-elevation)
+                     (eql (support-top-elevation ?fan) ?required-elevation)))
+          (assign $landing ?fan)))
+      (doall (?box box)
+        (if (and (not $landing)
+                 (different ?box ?self)
+                 (has-location ?box ?location)
+                 (cleartop ?box)
+                 (or (not ?required-elevation)
+                     (eql (support-top-elevation ?box) ?required-elevation)))
+          (assign $landing ?box)))
+      $landing))
+
+
+(define-update land-on-support! (?base ?destination ?required-elevation)
+  ;; Rest ?base, already moved to ?destination by relocate-stack!, on the first
+  ;; landing-support match there (excluding ?base itself), or leave it resting on bare
+  ;; ground (relocate-stack!'s default) if none matches.
+  (do (assign $support (landing-support ?destination ?base ?required-elevation))
+      (if $support
+        (on ?base $support))))
+
+
 (define-action pickup-fan
   ;; Pick up a clear fan within reach.  Two cases: a fan with a has-location (resting on
-  ;; a support or ground, or mounted on floor gears) goes through the ordinary
+  ;; a support or ground, or mounted on floor or angled gears) goes through the ordinary
   ;; pickup-clear path; a wall-mounted fan has no has-location, so it is reached through
   ;; its gears' position and stream elevation instead, and nothing can rest on it.
   ;; Occupied fans (like occupied boxes) cannot be lifted, so an agent standing on a fan
@@ -210,9 +271,9 @@
 
 (define-action mount-fan
   ;; Attach a held fan to vacant gears at a reachable location, within vertical reach of
-  ;; the gears' working height.  A floor mount makes the fan a floor object at the gears'
-  ;; location; a wall mount hangs it with no has-location.  Mounting on already-turning
-  ;; gears is legal; the empty fan just starts blowing.
+  ;; the gears' working height.  A floor or angled mount makes the fan a floor object at
+  ;; the gears' location; a wall mount hangs it with no has-location.  Mounting on
+  ;; already-turning gears is legal; the empty fan just starts blowing.
   1
   (?agent agent ?fan fan ?gears gears)
   (and (holding ?agent ?fan)
@@ -225,7 +286,8 @@
        (within-agent-vertical-reach ?agent (gears-elevation ?gears)))
   (">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
   (assert (not (holding ?agent ?fan))
-          (if (floor-gears ?gears)
+          (if (or (floor-gears ?gears)
+                  (angled-gears ?gears))
             (has-location ?fan $g-location))
           (mounted-on ?fan ?gears)
           (finally (propagate-changes!))))

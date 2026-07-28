@@ -14,7 +14,8 @@
 ;;;   types     : agent, location  --  box, fence, and wall are declared optional here
 ;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
 ;;;               support-top-elevation, and occupant-elevation); -passability
-;;;               (holding and obstacle-clear)
+;;;               (holding and obstacle-clear); -threat (safe -- true unless an armed gun
+;;;               or other threat endangers the landing location)
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
 ;;;   types     : box, fence, wall  --  declared optional; jumping remains usable without them
@@ -28,6 +29,7 @@
 
 (include-tech -support-elevation)
 (include-tech -passability)
+(include-tech -threat)
 
 (in-package :ww)
 
@@ -137,7 +139,8 @@
                  (jump-path-clear ?agent $features)
                  (cleartop ?landing-box)
                  (jump-elevation-reachable
-                   ?agent (support-top-elevation ?landing-box)))
+                   ?agent (support-top-elevation ?landing-box))
+                 (safe $to-location))
           (assert (if (bind (on ?agent $prior-support))
                     (not (on ?agent $prior-support)))
                   (has-location ?agent $to-location)
@@ -149,7 +152,8 @@
                      (bind (jump-via> $a-location $features ?to-location)))
                  (jump-path-clear ?agent $features)
                  (jump-elevation-reachable
-                   ?agent (location-elevation ?to-location)))
+                   ?agent (location-elevation ?to-location))
+                 (safe ?to-location))
           (assert (if (bind (on ?agent $prior-support))
                     (not (on ?agent $prior-support)))
                   (has-location ?agent ?to-location)

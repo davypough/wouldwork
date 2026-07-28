@@ -16,7 +16,11 @@
 ;;; over the floor and blow only objects standing at elevation 1 (e.g. on a box top).  A
 ;;; blown object is torn off whatever support it rests on, relocates to the gears'
 ;;; aimed-at> destination (an ordinary ground location -- no hover), and carries its own
-;;; stacked riders along; an agent's held cargo travels with it implicitly.  A jamming
+;;; stacked riders along; an agent's held cargo travels with it implicitly.  If a clear
+;;; plate or floor-mounted fan sits at the destination -- its top exactly at the
+;;; destination's own floor elevation, unlike a box's raised top -- the object lands on
+;;; it instead of bare ground, so a plate there depresses and a fan there (if its own
+;;; gears are turning) launches the object onward in a later propagation pass.  A jamming
 ;;; jammer or a paired connector stays jamming/paired through the ride: its effect is
 ;;; re-derived by propagation from the destination, not retracted here.  A fan is a
 ;;; zero-thickness disc, so a loose fan lying flat sits below every stream and stays
@@ -27,15 +31,17 @@
 ;;; (or above) the stream passes freely.
 ;;;
 ;;; Authoring obligation: aimed-at> destinations must not chain the swept locations of
-;;; simultaneously-blowing wall fans into a cycle, or propagation's iteration cap trips
-;;; inconsistent-state.  Acyclic chains (one fan blowing into another's swept location)
-;;; are fine and settle within the cap.
+;;; simultaneously-blowing wall fans -- directly, or indirectly by landing on another
+;;; blower's fan -- into a cycle, or propagation's iteration cap trips inconsistent-state.
+;;; Acyclic chains (one fan blowing into another's swept location, or landing on another
+;;; fan's flush top) are fine and settle within the cap (10 iterations).
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  wall-gears and fan come from nested -gears-fan
 ;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
-;;;               gears-elevation, update-gears-status!, relocate-stack!, fan actions;
-;;;               nests -support-occupancy, -location, -position, -elevation, -controls,
+;;;               gears-elevation, landing-support, land-on-support!,
+;;;               update-gears-status!, relocate-stack!, fan actions; nests
+;;;               -support-occupancy, -location, -position, -elevation, -controls,
 ;;;               -placement, -reachability, and -pickup); -stream-passability
 ;;;               (obstacle-clear's gears branch and the derived air-stream walking
 ;;;               bands, with stream-width's 3-unit default)
@@ -71,8 +77,15 @@
   ;; object is torn off whatever support it rests on (plate, box, fan) and relocates via
   ;; relocate-stack!, its own stacked riders traveling still stacked; jamming and
   ;; connector-pairing facts persist through the ride, their effects re-derived by
-  ;; propagation from the destination.  A fan is zero-thickness, so no fan (loose or
-  ;; mounted) is ever struck; occupants standing below or above the stream stay put.
+  ;; propagation from the destination.  After relocating, land-on-support! rests the
+  ;; object on its destination's landing-support match constrained to the destination's
+  ;; own floor elevation (a plate, or a floor-mounted fan) -- a box's raised top never
+  ;; matches, so it is never landed on here -- or leaves it on bare ground if none is
+  ;; flush.  A fan is zero-thickness, so no fan (loose or mounted) is ever struck;
+  ;; occupants standing below or above the stream stay put.  An armed gun (or other
+  ;; threat) at the destination is not this file's concern: -threat's
+  ;; enforce-threat-safety! backstop drops the whole resulting state if the sweep lands
+  ;; the agent somewhere unsafe, so the physics here stay unconditional.
   (do (bind (has-position ?gears $swept))
       (bind (aimed-at> ?gears $destination))
       (assign $stream (gears-elevation ?gears))
@@ -86,4 +99,5 @@
                        (<= $stream (+ $standing $height)))
                 (do (if (bind (on ?x $support))
                       (not (on ?x $support)))
-                    (relocate-stack! ?x $destination))))))))
+                    (relocate-stack! ?x $destination)
+                    (land-on-support! ?x $destination (location-elevation $destination)))))))))

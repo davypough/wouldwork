@@ -64,9 +64,9 @@
 ;;;;
 ;;;; visibility is not optional here even though this problem has no sightlines to speak
 ;;;; of.  beam-crossing nests -beam-crossing-coordinates, which nests -beam-los-coordinates,
-;;;; whose DERIVE-LOS-FROM-SEGMENTS references LOS-TO-TRANSCEIVER/LOS-TO-LOCATION -- and
+;;;; whose DERIVE-LOS-FROM-SEGMENTS references LOS-TO-APPARATUS/LOS-TO-LOCATION -- and
 ;;;; visibility is what declares those relations.  Omitting it does not merely lose a
-;;;; capability; the tech file fails to translate, with an error naming LOS-TO-TRANSCEIVER
+;;;; capability; the tech file fails to translate, with an error naming LOS-TO-APPARATUS
 ;;;; and no hint that the missing piece is an include.  Every beam-crossing problem in the
 ;;;; repository includes visibility for this reason.  It stays inert here regardless, since
 ;;;; DERIVE-LOS-FROM-SEGMENTS is guarded on WALL-SEGMENTS, which this problem never asserts.
@@ -99,16 +99,16 @@
   (beam-via transmitter2 () receiver2)
 
   ;; Diagonal endpoints; the two segments properly intersect at (5,5).
-  (transceiver-position> transmitter1 0 0)
-  (transceiver-position> receiver1 10 10)
-  (transceiver-position> transmitter2 10 0)
-  (transceiver-position> receiver2 0 10)
+  (apparatus-coords> transmitter1 0 0)
+  (apparatus-coords> receiver1 10 10)
+  (apparatus-coords> transmitter2 10 0)
+  (apparatus-coords> receiver2 0 10)
 
   ;; Locations sit off both diagonals so they cannot be mistaken for beam endpoints.
   ;; BEAM-COORDINATES-ENDPOINT-POSITIONS requires a position for every location regardless
   ;; of whether any beam reaches it.
-  (location-position> loc1 2 9)
-  (location-position> loc2 8 9)
+  (location-coords> loc1 2 9)
+  (location-coords> loc2 8 9)
 
   (walk-via loc1 () loc2)
 )

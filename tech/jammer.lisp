@@ -1,11 +1,12 @@
 ;;; Filename: jammer.lisp
 
 ;;; Jammer technology: a carried jammer that, when placed at a location with line of sight
-;;; to a target, jams it.  Jamming forces a gate open (gate's update-gate-status!) and
-;;; forces gears stopped (-gears-fan's update-gears-status!) -- the same override with
-;;; opposite polarity: a jam always disables the barrier.  A placed jammer is movable
-;;; cargo: it may rest on a plate (depressing it) or a clear box top, and picking it up
-;;; clears both its jamming and its support.
+;;; to a target, jams it.  Jamming forces a gate open (gate's update-gate-status!), forces
+;;; gears stopped (-gears-fan's update-gears-status!), and forces a gun safe (gun's
+;;; update-gun-status!) -- the same override with opposite polarity in each case: a jam
+;;; always disables the barrier or threat.  A placed jammer is movable cargo: it may rest
+;;; on a plate (depressing it) or a clear box top, and picking it up clears both its
+;;; jamming and its support.
 ;;;
 ;;; REQUIRES (supplied by other techs):
 ;;;   types     : agent, location  --  plate, jammer, and box are declared optional here
@@ -25,8 +26,8 @@
 ;;;               box, barrier, beam-relay, accessibility, ladder, etc.) still declare their
 ;;;               own plate-alias/box-alias forms for their own pre-params; the bare and
 ;;;               aliased forms resolve compatibly
-;;;               target (either gate floor-gears wall-gears)  --  what a jammer can jam;
-;;;               connector pairings use beam-relay's terminus instead
+;;;               target (either gate floor-gears wall-gears gun)  --  what a jammer can
+;;;               jam; connector pairings use beam-relay's terminus instead
 ;;;   relations : (jamming jammer $target)
 ;;;               (jam-disallowed> location location target)
 ;;;   actions   : pickup-jammer, jam-target
@@ -40,10 +41,10 @@
 
 
 (define-types
-  target (either gate floor-gears wall-gears))  ;what a jammer can jam: a gate (forced open) or gears (forced stopped); connector pairings use terminus
+  target (either gate floor-gears wall-gears gun))  ;what a jammer can jam: a gate (forced open), gears (forced stopped), or a gun (forced safe); connector pairings use terminus
 
 
-(define-optional-types plate jammer box floor-gears wall-gears)
+(define-optional-types plate jammer box floor-gears wall-gears gun)
 
 
 (define-dynamic-relations
@@ -77,11 +78,14 @@
        (jammer $any-jammer)
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
-       ;; A gate is an extended segment with its own derived LOS-TO-TARGET sightlines.
-       ;; Gears hang at their HAS-POSITION location, so their sightline resolves through
-       ;; that location's ordinary LOS-TO-LOCATION entry -- or trivially when the jammer
-       ;; is placed at the gears' own location.
-       (or (and (gate ?target)
+       ;; A gate is an extended segment with its own derived LOS-TO-TARGET sightlines; a
+       ;; gun is a point fixture with LOS-TO-APPARATUS entries instead, exactly like a
+       ;; transmitter or receiver -- both resolve through visible with no HAS-POSITION
+       ;; shortcut, since nothing can ever share a gun's position.  Gears hang at their
+       ;; HAS-POSITION location, so their sightline resolves through that location's
+       ;; ordinary LOS-TO-LOCATION entry instead -- or trivially when the jammer is placed
+       ;; at the gears' own location.
+       (or (and (or (gate ?target) (gun ?target))
                 (visible ?location ?target))
            (and (or (floor-gears ?target) (wall-gears ?target))
                 (bind (has-position ?target $t-location))

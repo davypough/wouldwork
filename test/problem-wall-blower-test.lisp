@@ -3,11 +3,15 @@
 ;;; Minimal wall-blower (wall-gears + fan) exercise.  near holds the agent and the
 ;;; control plate; mid is the location faced by wgears1 (mounted on mid's wall at the
 ;;; default stream elevation 1) and holds box1; far is the air stream's aimed-at>
-;;; destination, an ordinary ground location.  fan1 starts mounted on wgears1, hanging
-;;; with no has-location.  Expected minimum solution (1 step): step-on plate1 -- the
-;;; agent's weight depresses the plate, setting the gears turning; the mounted fan blows
-;;; and sweeps box1 from mid to far.  A second, longer route (walking to mid) would
-;;; instead sweep the agent itself to far, which does not achieve the goal.
+;;; destination, an ordinary ground location, and also holds plate2 -- a flush,
+;;; elevation-0 support with nothing controlled by it, placed there only to exercise
+;;; sweep-occupants-away!'s new landing-on-a-support behavior.  fan1 starts mounted on
+;;; wgears1, hanging with no has-location.  Expected minimum solution (1 step): step-on
+;;; plate1 -- the agent's weight depresses the plate, setting the gears turning; the
+;;; mounted fan blows and sweeps box1 from mid to far, landing on plate2 (its top is
+;;; flush with far's floor elevation) instead of bare ground, so the resulting state has
+;;; both (has-location box1 far) and (depressed plate2).  A second, longer route (walking
+;;; to mid) would instead sweep the agent itself to far, which does not achieve the goal.
 
 
 (in-package :ww)
@@ -30,7 +34,7 @@
 (define-types
   agent (agent1)
   location (near mid far)
-  plate (plate1)
+  plate (plate1 plate2)
   box (box1)
   wall-gears (wgears1)
   fan (fan1)
@@ -57,7 +61,9 @@
   (has-location box1 mid)
 
   ;; Fixed-position objects; wgears1 hangs on mid's wall, facing (sweeping) mid.
+  ;; plate2 sits at far, uncontrolling, solely as a landing support for box1.
   (has-position plate1 near)
+  (has-position plate2 far)
   (has-position wgears1 mid)
 
   ;; The fan starts mounted on the wall gears (an attachment, not an (on ...) fact).

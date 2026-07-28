@@ -64,8 +64,8 @@
   ;Manhattan distance from agent1's current location to the loft (location11).
   ;Lower is better; biases DFS/B&B to try the location10->location11 direction first.
   (do (bind (has-location agent1 $agent-loc))
-      (bind (location-position> $agent-loc $x $y))
-      (bind (location-position> location11 $goal-x $goal-y))
+      (bind (location-coords> $agent-loc $x $y))
+      (bind (location-coords> location11 $goal-x $goal-y))
       (+ (abs (- $x $goal-x))
          (abs (- $y $goal-y)))))
 
@@ -92,23 +92,23 @@
   (has-position wgears4 location9)
 
   ;; Object coordinates
-  (location-position> location1 12 125/10)
-  (location-position> location2 61/10 125/10)
-  (location-position> location3 4 16)
-  (location-position> location4 18 115/10)
-  (location-position> location5 239/10 115/10)
-  (location-position> location6 28 15)
-  (location-position> location7 349/10 15)
-  (location-position> location8 30 115/10)
-  (location-position> location9 241/10 115/10)
-  (location-position> location10 241/10 6)
-  (location-position> location11 241/10 6)
-  (location-position> location12 7 8)  ;station: sees transmitter1 (up x=7 through the curtain gaps), receiver1, gate1, and gate2 through open gate1
-  (location-position> location13 239/10 19)  ;station in the north alcove: sees wgears2 (down x=23.9 past wall3's west end) and receiver2, so wgears2 can be jammed from the east side of its band
+  (location-coords> location1 12 125/10)
+  (location-coords> location2 61/10 125/10)
+  (location-coords> location3 4 16)
+  (location-coords> location4 18 115/10)
+  (location-coords> location5 239/10 115/10)
+  (location-coords> location6 28 15)
+  (location-coords> location7 349/10 15)
+  (location-coords> location8 30 115/10)
+  (location-coords> location9 241/10 115/10)
+  (location-coords> location10 241/10 6)
+  (location-coords> location11 241/10 6)
+  (location-coords> location12 7 8)  ;station: sees transmitter1 (up x=7 through the curtain gaps), receiver1, gate1, and gate2 through open gate1
+  (location-coords> location13 239/10 19)  ;station in the north alcove: sees wgears2 (down x=23.9 past wall3's west end) and receiver2, so wgears2 can be jammed from the east side of its band
   (has-elevation location11 10)  ;do I need to specify this since it is the default
-  (transceiver-position> transmitter1 7 169/10)
-  (transceiver-position> receiver1 11/10 9)
-  (transceiver-position> receiver2 23 209/10)
+  (apparatus-coords> transmitter1 7 169/10)
+  (apparatus-coords> receiver1 11/10 9)
+  (apparatus-coords> receiver2 23 209/10)
 
   ;; Object properties
   (has-chroma transmitter1 red)

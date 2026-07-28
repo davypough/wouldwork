@@ -1,30 +1,32 @@
 ;;; Filename: -beam-los-coordinates.lisp
 
-;;; Beam LOS coordinates substrate: derives LOS-TO-TRANSCEIVER/LOS-TO-TARGET/LOS-TO-LOCATION
+;;; Beam LOS coordinates substrate: derives LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;; from raw WALL-SEGMENTS/GATE-SEGMENTS/BOUNDARY-WALL segment geometry, for a problem that
 ;;; would rather author 2D positions than hand-list sightlines.  Nested under visibility-tech
 ;;; (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
-;;; asserts WALL-SEGMENTS, so a problem that hand-authors its own LOS-TO-TRANSCEIVER/LOS-TO-
+;;; asserts WALL-SEGMENTS, so a problem that hand-authors its own LOS-TO-APPARATUS/LOS-TO-
 ;;; TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently takes that
 ;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENTS and derive.
 ;;;
-;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-POSITION>
+;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
 ;;; (nested from -location-coordinates, shared with accessibility-tech's own coordinate
 ;;; substrate, so a location's position is entered once even when a problem uses both
-;;; capabilities) for location endpoints, and TRANSCEIVER-POSITION> (declared here) for
-;;; transmitter/receiver endpoints only -- a problem with pure location-to-location beams
-;;; and no fixtures never needs TRANSCEIVER-POSITION> at all.
+;;; capabilities) for location endpoints, and APPARATUS-COORDS> (declared here) for
+;;; transmitter/receiver/gun endpoints only -- a problem with pure location-to-location
+;;; beams and no fixtures never needs APPARATUS-COORDS> at all.  A gun's LOS-TO-
+;;; APPARATUS entries are derived the same way a receiver's are (gated on a jammer
+;;; being present, like LOS-TO-TARGET, since nothing but jam-target ever reads them).
 ;;;
-;;; DERIVE-LOS-FROM-SEGMENTS tests every location<->transceiver, location<->gate, and
+;;; DERIVE-LOS-FROM-SEGMENTS tests every location<->apparatus, location<->gate, and
 ;;; location<->location pair against that geometry, excluding any pair a wall blocks and
 ;;; recording any gate that properly does as an occluder.  A wall blocks at its own corner
 ;;; exactly like its interior -- so a sightline can't leak through the junction where it
 ;;; meets another wall, a gate, or the boundary wall -- while a gate stays strict at its own
 ;;; corner, since the neighboring wall already covers that point; a beam endpoint that lies
 ;;; exactly on a wall or gate, corner or interior, is an authoring error (see BEAM-
-;;; COORDINATES-OBSTACLE-INTERSECTION-PARAMETER).  A gate has no TRANSCEIVER-POSITION> of its
+;;; COORDINATES-OBSTACLE-INTERSECTION-PARAMETER).  A gate has no APPARATUS-COORDS> of its
 ;;; own -- it is authored as an extended segment, not a point endpoint -- so its LOS-TO-TARGET
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon, its final point wrapping back to
@@ -33,8 +35,8 @@
 ;;; WALL-SEGMENTS/GATE-SEGMENTS, BOUNDARY-WALL is consulted only here, not by
 ;;; -accessibility-coordinates.lisp's own WALK-VIA derivation.
 ;;;
-;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver location) -- the composite
-;;; every consuming query/init-action here iterates over.  A problem may also declare it
+;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver gun location) -- the
+;;; composite every consuming query/init-action here iterates over.  A problem may also declare it
 ;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
 ;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
 ;;; duplicate is harmless.
@@ -47,24 +49,25 @@
 ;;; parent techs the problem lists first.
 ;;;
 ;;; REQUIRES:
-;;;   types     : location  --  declared by the problem; transmitter, receiver declared
-;;;               optional by -visibility/-beam-substrate, sibling nested includes of the
-;;;               parent techs
-;;;   relations : los-to-transceiver, los-to-target, los-to-location  --  declared by
+;;;   types     : location  --  declared by the problem; transmitter, receiver, gun
+;;;               declared optional by -visibility/-beam-substrate, sibling nested
+;;;               includes of the parent techs
+;;;   relations : los-to-apparatus, los-to-target, los-to-location  --  declared by
 ;;;               visibility-tech, this file's primary parent; a beam-crossing problem
 ;;;               reaching this file through -beam-crossing-coordinates must still include
 ;;;               visibility for these relations to exist
 ;;; PROVIDES:
-;;;   nested    : -location-coordinates (LOCATION-POSITION>; shared with accessibility, so
+;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with accessibility, so
 ;;;               a location's coordinates are entered once regardless of which
 ;;;               capabilities the problem uses)
-;;;   types     : beam-endpoint (either transmitter receiver location); jammer declared
-;;;               optional here only to gate DERIVE-LOS-FROM-SEGMENTS's LOS-TO-TARGET
-;;;               derivation below, so a problem with no jammer never gets location<->gate
-;;;               sightlines nothing can consume
-;;;   relations : transceiver-position> (transmitter/receiver only), wall-segments,
+;;;   types     : beam-endpoint (either transmitter receiver gun location); jammer and gun
+;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
+;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
+;;;               no jammer never gets location<->gate or location<->gun sightlines
+;;;               nothing can consume
+;;;   relations : apparatus-coords> (transmitter/receiver/gun), wall-segments,
 ;;;               gate-segments, boundary-wall -- all default to no facts; a problem that
-;;;               asserts wall-segments gets LOS-TO-TRANSCEIVER/LOS-TO-TARGET/LOS-TO-LOCATION
+;;;               asserts wall-segments gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;;               derived automatically instead of hand-authoring them; boundary-wall
 ;;;               additionally folds its polygon edges into that derivation's wall list
 ;;;   init      : derive-los-from-segments
@@ -75,14 +78,14 @@
 
 
 (define-types
-  beam-endpoint (either transmitter receiver location))  ;a fixture, or a connector's location
+  beam-endpoint (either transmitter receiver gun location))  ;a fixture, or a connector's location
 
 
-(define-optional-types jammer)
+(define-optional-types jammer gun)
 
 
 (define-static-relations
-  (transceiver-position> (either transmitter receiver) $rational $rational)
+  (apparatus-coords> (either transmitter receiver gun) $rational $rational)
   (wall-segments $list)
   (gate-segments $list)
   (boundary-wall $list))  ;closed polygon ((x1 y1) (x2 y2) ... (xn yn)); last point wraps to first
@@ -99,7 +102,7 @@
 
 
 (defun beam-coordinates-gate-midpoint (gate-record)
-  ;; Returns GATE-RECORD's own (x y) midpoint -- a gate has no TRANSCEIVER-POSITION> of its own,
+  ;; Returns GATE-RECORD's own (x y) midpoint -- a gate has no APPARATUS-COORDS> of its own,
   ;; since it is authored as an extended segment rather than a point endpoint, so its
   ;; LOS-TO-TARGET entries (DERIVE-LOS-FROM-SEGMENTS, below) use this single reference
   ;; point in its place.
@@ -190,7 +193,7 @@
   ;; intersects BEAM's interior, strict at the gate's own corner (left to its
   ;; neighboring wall) -- BEAM's occluder list.  A LOS-TO-TARGET beam's own first
   ;; endpoint is that gate's own name, standing in for BEAM-COORDINATES-GATE-MIDPOINT
-  ;; (a gate has no TRANSCEIVER-POSITION> of its own) -- so a gate is always skipped against a
+  ;; (a gate has no APPARATUS-COORDS> of its own) -- so a gate is always skipped against a
   ;; beam it is itself an endpoint of, or its own midpoint would trip BEAM-COORDINATES-
   ;; OBSTACLE-INTERSECTION-PARAMETER's lies-exactly-on-obstacle error every time, not
   ;; because of any authoring mistake.  A single return value, not multiple values:
@@ -211,17 +214,17 @@
 
 
 (define-query beam-coordinates-endpoint-positions ()
-  ;; Routes each beam-endpoint to its owning position relation: LOCATION-POSITION> for a
-  ;; location, TRANSCEIVER-POSITION> (transmitter/receiver only) for everything else.
+  ;; Routes each beam-endpoint to its owning position relation: LOCATION-COORDS> for a
+  ;; location, APPARATUS-COORDS> (transmitter/receiver only) for everything else.
   (do (assign $positions nil)
       (doall (?endpoint beam-endpoint)
         (if (location ?endpoint)
-          (if (bind (location-position> ?endpoint $x $y))
+          (if (bind (location-coords> ?endpoint $x $y))
             (push (list ?endpoint $x $y) $positions)
-            (error "No LOCATION-POSITION> is defined for location ~A." ?endpoint))
-          (if (bind (transceiver-position> ?endpoint $x $y))
+            (error "No LOCATION-COORDS> is defined for location ~A." ?endpoint))
+          (if (bind (apparatus-coords> ?endpoint $x $y))
             (push (list ?endpoint $x $y) $positions)
-            (error "No TRANSCEIVER-POSITION> is defined for beam endpoint ~A." ?endpoint))))
+            (error "No APPARATUS-COORDS> is defined for beam endpoint ~A." ?endpoint))))
       $positions))
 
 
@@ -229,13 +232,15 @@
 
 
 (define-init-action derive-los-from-segments
-  ;; Derives LOS-TO-TRANSCEIVER/LOS-TO-LOCATION, and LOS-TO-TARGET when a jammer is present,
-  ;; from WALL-SEGMENTS/GATE-SEGMENTS raw segment geometry, when the problem supplies it,
-  ;; instead of requiring them hand-authored.  LOS-TO-TARGET is gated on (exists (?j jammer)
-  ;; t): nothing else consumes a location<->gate sightline, so a problem without a jammer
-  ;; (like corner-topo) skips that derivation entirely rather than asserting facts no query
-  ;; ever reads.  A gate's own LOS-TO-TARGET entries use BEAM-COORDINATES-GATE-MIDPOINT
-  ;; as their reference point, since a gate is authored as an extended segment rather than
+  ;; Derives LOS-TO-APPARATUS/LOS-TO-LOCATION, and LOS-TO-TARGET/gun's LOS-TO-APPARATUS
+  ;; entries when a jammer is present, from WALL-SEGMENTS/GATE-SEGMENTS raw segment
+  ;; geometry, when the problem supplies it, instead of requiring them hand-authored.
+  ;; LOS-TO-TARGET and gun's LOS-TO-APPARATUS entries are both gated on (exists (?j
+  ;; jammer) t): nothing but jam-target ever consumes a location<->gate or location<->gun
+  ;; sightline, so a problem without a jammer (like corner-topo) skips both derivations
+  ;; entirely rather than asserting facts no query ever reads.  A gate's own LOS-TO-TARGET
+  ;; entries use BEAM-COORDINATES-GATE-MIDPOINT as their reference point, since a gate is
+  ;; authored as an extended segment rather than
   ;; a point endpoint.  When the problem also asserts BOUNDARY-WALL, each polygon edge
   ;; (BEAM-COORDINATES-BOUNDARY-SEGMENTS) is folded into the wall list, so a sightline that
   ;; would have to cut outside the map's own silhouette is blocked exactly like a wall --
@@ -247,7 +252,7 @@
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
   ;; there on DO-INIT-ACTION-UPDATES), not by the numeric-looking argument below, and
-  ;; ESTABLISH-BEAM-COORDINATES reads LOS-TO-TRANSCEIVER/LOS-TO-LOCATION to enumerate its own
+  ;; ESTABLISH-BEAM-COORDINATES reads LOS-TO-APPARATUS/LOS-TO-LOCATION to enumerate its own
   ;; beam set.  Ends with its own CONVERT-DATABASES-TO-INTEGERS for the same reason that
   ;; init-action does -- so the facts asserted here are visible to its own later BIND calls.
   0
@@ -269,22 +274,29 @@
                         (beam-coordinates-los-occluders
                           (list ?transmitter ?location) $positions $all-walls $gates))
                 (if (not (eql $occluders :blocked))
-                  (los-to-transceiver ?location $occluders ?transmitter)))))
+                  (los-to-apparatus ?location $occluders ?transmitter)))))
         (doall (?location location)
           (doall (?receiver receiver)
             (do (assign $occluders
                         (beam-coordinates-los-occluders
                           (list ?location ?receiver) $positions $all-walls $gates))
                 (if (not (eql $occluders :blocked))
-                  (los-to-transceiver ?location $occluders ?receiver)))))
+                  (los-to-apparatus ?location $occluders ?receiver)))))
         (if (exists (?j jammer) t)
-          (doall (?location location)
-            (doall (?gate gate)
-              (do (assign $occluders
-                          (beam-coordinates-los-occluders
-                            (list ?gate ?location) $target-positions $all-walls $gates))
-                  (if (not (eql $occluders :blocked))
-                    (los-to-target ?location $occluders ?gate))))))
+          (do (doall (?location location)
+                (doall (?gate gate)
+                  (do (assign $occluders
+                              (beam-coordinates-los-occluders
+                                (list ?gate ?location) $target-positions $all-walls $gates))
+                      (if (not (eql $occluders :blocked))
+                        (los-to-target ?location $occluders ?gate)))))
+              (doall (?location location)
+                (doall (?gun gun)
+                  (do (assign $occluders
+                              (beam-coordinates-los-occluders
+                                (list ?location ?gun) $positions $all-walls $gates))
+                      (if (not (eql $occluders :blocked))
+                        (los-to-apparatus ?location $occluders ?gun)))))))
         (doall (?source location)
           (doall (?destination location)
             (if (member ?destination

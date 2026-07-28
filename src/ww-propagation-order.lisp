@@ -7,9 +7,10 @@
 ;;; Exactly one finding is fatal -- a reaction violation, which halts INIT.  It names a
 ;;; defect no later pass can repair, so admitting it would trade an accurate error here
 ;;; for a mystifying one later, or for a plan built on a state that silently diverged
-;;; from the model.  Everything else prints and continues, being either a convergence
-;;; cost or advice.  The distinction was calibrated against CLAUSTRO-TOPO, CORNER-TOPO,
-;;; and PHOBIA, all of which report clean, and confirmed by relocating
+;;; from the model.  Everything else is convergence advice: it prints for an authored
+;;; driver, where the author can act on it, and stays silent for a generated driver.
+;;; The distinction was calibrated against CLAUSTRO-TOPO, CORNER-TOPO, and PHOBIA, and
+;;; confirmed by relocating
 ;;; UPDATE-GEARS-STATUS! below the blowers in PHOBIA, which produces exactly the two
 ;;; expected reaction violations and nothing else.
 ;;;
@@ -213,13 +214,17 @@
        t))
 
 
-(defun report-propagation-order-findings (order)
-  "Builds the dependency graph over ORDER and prints any violations."
+(defun report-propagation-order-findings (order &key (report-convergence-costs t))
+  "Builds the dependency graph over ORDER and reports its violations.
+
+   REPORT-CONVERGENCE-COSTS controls the advisory notes about pure derivations.  Reaction
+   violations always signal an error because they are correctness defects."
   (multiple-value-bind (reads writes base-facts adjacency components)
       (propagation-graph order)
     (report-propagation-violations
       (propagation-order-violations order adjacency components reads writes base-facts)
-      order base-facts)))
+      order base-facts
+      :report-convergence-costs report-convergence-costs)))
 
 
 (defun propagation-graph (order)
@@ -524,16 +529,18 @@
     (sort shared #'string< :key #'symbol-name)))
 
 
-(defun report-propagation-violations (violations order base-facts)
-  "Prints the convergence-only violations, then signals an error naming every reaction
-   violation and giving a sequence that would satisfy them.  A derivation violation never
-   errors: reading a value the driver computes later costs the fixpoint a pass and
-   converges to the same state, so there is nothing to fail.  A reaction violation halts
-   INIT, because the side effect it commits from stale state is exactly what no later
-   pass can undo."
+(defun report-propagation-violations
+    (violations order base-facts &key (report-convergence-costs t))
+  "Optionally prints convergence-only violations, then signals an error naming every
+   reaction violation and giving a sequence that would satisfy them.
+
+   A derivation violation never errors: reading a value the driver computes later costs
+   the fixpoint a pass and converges to the same state, so there is nothing to fail.  A
+   reaction violation always halts INIT, because the side effect it commits from stale
+   state is exactly what no later pass can undo."
   (let ((reactions (remove-if-not #'fourth violations))
         (derivations (remove-if #'fourth violations)))
-    (when derivations
+    (when (and report-convergence-costs derivations)
       (format t "~&  Note: order violations among pure derivations.  These cost the ~
                  fixpoint an extra pass and are not incorrect:~%")
       (dolist (violation derivations)
@@ -1287,10 +1294,11 @@
    sentinel at load, and the author's sequence is left exactly as written.
 
    The derived order is audited before it is installed, by the same
-   REPORT-PROPAGATION-ORDER-FINDINGS that audits an authored one, so a reaction violation
-   halts INIT here as it would there.  DERIVED-PROPAGATION-ORDER argues no such violation
-   is constructible; running the check anyway is what would catch that argument being
-   wrong, and a construction argument is not a test.
+   REPORT-PROPAGATION-ORDER-FINDINGS that audits an authored one.  Convergence-only notes
+   stay silent because the generated order is not the problem author's responsibility, but
+   a reaction violation still halts INIT here as it would there.  DERIVED-PROPAGATION-ORDER
+   argues no such violation is constructible; running the check anyway is what would catch
+   that argument being wrong, and a construction argument is not a test.
 
    An empty derived order leaves the sentinel in place rather than installing a driver that
    propagates nothing.  It arises when every candidate update is inert, which makes an empty
@@ -1305,7 +1313,7 @@
                             (driver-candidate-updates)))))
     (unless order
       (return-from install-derived-propagation-driver))
-    (report-propagation-order-findings order)
+    (report-propagation-order-findings order :report-convergence-costs nil)
     (format t "~&Deriving propagation driver: ~{~A~^ ~}~%" order)
     (install-update 'propagate-consequences! nil
                     (derived-propagation-driver-body order))))

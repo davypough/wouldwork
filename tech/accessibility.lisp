@@ -17,7 +17,11 @@
 ;;;               -accessibility (identity-default accessible interface);
 ;;;               -accessibility-coordinates (optional coordinate-based WALK-VIA/WALK-VIA>
 ;;;               derivation from WALL/GATE/WINDOW/SCREEN-SEGMENTS, BOUNDARY-WALL, and
-;;;               derived air-stream bands)
+;;;               derived air-stream bands);
+;;;               -threat (safe -- true unless an armed gun or other threat endangers the
+;;;               location; gated inside one-step-accessible, not move, so an unsafe
+;;;               location is excluded as a BFS through-node as well as a destination; a
+;;;               problem with no threats pays nothing)
 ;;;               --  all shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
 ;;;   relations : (walk-via location $list location), (walk-via> location $list location)
@@ -31,6 +35,7 @@
 (include-tech -elevation)
 (include-tech -accessibility)
 (include-tech -accessibility-coordinates)
+(include-tech -threat)
 
 (in-package :ww)
 
@@ -84,11 +89,19 @@
 (define-query one-step-accessible (?agent agent ?from location ?to location)
   ;; True iff a walking edge joins ?from and ?to -- symmetric WALK-VIA or directional
   ;; WALK-VIA> in this direction -- the two locations share the same elevation (walking
-  ;; never changes elevation; jump does), and the edge's DNF door clauses are satisfied:
-  ;; () is direct, otherwise some clause must have every door passable for ?agent.
+  ;; never changes elevation; jump does), the edge's DNF door clauses are satisfied:
+  ;; () is direct, otherwise some clause must have every door passable for ?agent -- and
+  ;; ?to is safe.  Gating safety here, not just in move's destination check, matters
+  ;; because move is not a single hop: accessible's BFS uses this same predicate to expand
+  ;; through every intermediate node of the closure, and move then offers any node in that
+  ;; closure as a one-shot destination.  Checking safety only at move's final destination
+  ;; would let an agent skip straight past an armed threat to a safe location beyond it,
+  ;; never having to detour or disarm it; gating it here excludes an unsafe location as a
+  ;; through-node as well as an endpoint, so it can neither be walked into nor walked past.
   (and (or (bind (walk-via ?from $clauses ?to))
            (bind (walk-via> ?from $clauses ?to)))
        (= (location-elevation ?from) (location-elevation ?to))
        (or (not $clauses)
            (ww-loop for $clause in $clauses
-                    thereis (all-clear ?agent $clause)))))
+                    thereis (all-clear ?agent $clause)))
+       (safe ?to)))

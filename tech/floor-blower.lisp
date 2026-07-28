@@ -92,7 +92,9 @@
   ;; ride: its effect is re-derived by propagation from the destination, not retracted
   ;; here.  Only another fan is too flat to catch the stream: it is merely toppled off
   ;; the fan's top and rests on ground at the fan's own location, which is already its
-  ;; has-location.
+  ;; has-location.  An armed gun (or other threat) at the destination is not this file's
+  ;; concern: -threat's enforce-threat-safety! backstop drops the whole resulting state if
+  ;; the ride lands the agent somewhere unsafe, so the physics here stay unconditional.
   (do (bind (aimed-at> ?gears $destination))
       (doall (?x support-occupant)
         (if (on ?x ?fan)

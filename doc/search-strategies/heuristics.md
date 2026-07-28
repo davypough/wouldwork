@@ -82,7 +82,7 @@ Spatial or numeric distance from where things are to where they need to be.
 
 **Applicability criteria.** Coordinates or a metric exist; the goal is positional; few detours are forced by gating.
 
-**Note on availability.** Wouldwork has no built-in distance library. `manhattan-distance` and friends are plain Common Lisp defuns you write in your own problem file. `get-coordinates` and `get-fixed-coordinates` exist only inside the `problem-corner-*-macro` variants, not as general utilities — coordinate access depends on how your problem represents position (`location-position>`, `coords>`, or a fluent of your own).
+**Note on availability.** Wouldwork has no built-in distance library. `manhattan-distance` and friends are plain Common Lisp defuns you write in your own problem file. `get-coordinates` and `get-fixed-coordinates` exist only inside the `problem-corner-*-macro` variants, not as general utilities — coordinate access depends on how your problem represents position (`location-coords>`, `coords>`, or a fluent of your own).
 
 ### 3. Conditional / penalty
 

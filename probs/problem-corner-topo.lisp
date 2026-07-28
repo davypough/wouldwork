@@ -2,7 +2,7 @@
 
 ;;; Companion to problem-corner.lisp: same puzzle and geometry, but nothing here is
 ;;; hand-authored topology anymore.  tech/-beam-los-coordinates.lisp's DERIVE-LOS-FROM-
-;;; SEGMENTS derives LOS-TO-TRANSCEIVER/LOS-TO-LOCATION; tech/-beam-crossing-
+;;; SEGMENTS derives LOS-TO-APPARATUS/LOS-TO-LOCATION; tech/-beam-crossing-
 ;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-CROSSINGS-BEFORE-GATE mint the
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-accessibility-coordinates.lisp's DERIVE-WALK-VIA-FROM-SEGMENTS derives WALK-VIA --
@@ -22,7 +22,7 @@
 ;;; solid wall, not the window above it -- which -beam-los-coordinates.lisp's wall-corner
 ;;; convention excludes (see that file's header).
 ;;;
-;;; Expected derived figures, useful as a regression baseline: 17 LOS-TO-TRANSCEIVER + 5
+;;; Expected derived figures, useful as a regression baseline: 17 LOS-TO-APPARATUS + 5
 ;;; LOS-TO-LOCATION pairs; 26 crossings (location2/location4 crossed no other beam either
 ;;; way); 4 CROSSINGS-BEFORE-GATE> facts -- two for the location1/location4 beam, which is
 ;;; derived in both directions, and one each for the two transmitter beams.
@@ -95,9 +95,9 @@
 
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect connector actions
-(include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; transceiver-position>
+(include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
 (include-tech accessibility)         ;walk-via; accessible; one-step-accessible; move
-(include-tech visibility)            ;los-to-transceiver; los-to-location; visible; visible-clear
+(include-tech visibility)            ;los-to-apparatus; los-to-location; visible; visible-clear
 
 
 ;;;; INITIALIZATION ;;;;
@@ -140,23 +140,23 @@
   (gate-segments ((gate1 8 3 8 11/2)))
   (window-segments ((window1 8 8 8 11)))
 
-  ;; Exact 2D endpoint coordinates, split between LOCATION-POSITION> (locations; shared
+  ;; Exact 2D endpoint coordinates, split between LOCATION-COORDS> (locations; shared
   ;; with accessibility-tech's own coordinate needs -- see tech/-location-coordinates.lisp)
-  ;; and TRANSCEIVER-POSITION> (transmitter/receiver only).  tech/-beam-los-coordinates.lisp's
+  ;; and APPARATUS-COORDS> (transmitter/receiver only).  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS uses these together with the wall/gate segments above to
-  ;; derive LOS-TO-TRANSCEIVER/LOS-TO-LOCATION, and ESTABLISH-BEAM-COORDINATES uses them again
+  ;; derive LOS-TO-APPARATUS/LOS-TO-LOCATION, and ESTABLISH-BEAM-COORDINATES uses them again
   ;; for CROSSINGS-ALONG-BEAM>, before search begins; the coordinates themselves drive
   ;; nothing thereafter.  location4 is at (6,8) here -- a deliberate divergence from
   ;; problem-corner.lisp's (7,8); see file header.
-  (location-position> location1 9 1)
-  (location-position> location2 9 8)
-  (location-position> location3 10 9)
-  (location-position> location4 6 8)
-  (transceiver-position> transmitter1 11 1/10)
-  (transceiver-position> transmitter2 10 1/10)
-  (transceiver-position> receiver1 81/10 1)
-  (transceiver-position> receiver2 7 109/10)
-  (transceiver-position> receiver3 1 109/10)
+  (location-coords> location1 9 1)
+  (location-coords> location2 9 8)
+  (location-coords> location3 10 9)
+  (location-coords> location4 6 8)
+  (apparatus-coords> transmitter1 11 1/10)
+  (apparatus-coords> transmitter2 10 1/10)
+  (apparatus-coords> receiver1 81/10 1)
+  (apparatus-coords> receiver2 7 109/10)
+  (apparatus-coords> receiver3 1 109/10)
 )
 
 

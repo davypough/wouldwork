@@ -68,7 +68,7 @@ A scaffold that has held up in practice. Each milestone is a checkpoint to confi
 | `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open. Symmetric, agent-independent. |
 | `los-to-location location $list location` | Sightline between two locations | Can I *see that spot* from here? | `$list` = occluders; `()` is a direct, always-clear line; clear iff every occluder gate is open. |
 | `los-to-target location $list gate` | Sightline to a jam target | Can I *jam that gate* from here? | As above. Gate targets only — a gears target resolves through its `has-position` location's `los-to-location` entry instead. |
-| `los-to-transceiver location $list transceiver` | Sightline to a beam endpoint | Can a connector here *pair* with that transmitter/receiver? | As above. |
+| `los-to-apparatus location $list apparatus` | Sightline to a beam endpoint | Can a connector here *pair* with that transmitter/receiver? | As above. |
 | `beam-via transmitter $list receiver` | Beam corridor | Does the beam *reach its receiver*? | Corridor gates open **and** corridor locations unoccupied. |
 | `controls $list <barrier> $mode` | Derived barrier state from controllers | Is this gate *driven open/closed* right now? | `$list` is a DNF clause list of controllers. `normal` = open when energized; `inverted` = open when not; jamming overrides. |
 | `jam-disallowed> location location target` | Explicit jam prohibition | Is jamming ruled out from here? | — |
@@ -94,7 +94,7 @@ Clause items on a traversal edge may be **gates, screens, ladders, or gears**:
 Movement and sightline facts come from one of two places, and this decides how a gap may legitimately be fixed.
 
 - **Hand-authored.** The problem asserts `walk-via` and `los-to-*` facts directly. A missing edge is fixed by adding the fact.
-- **Derived from geometry.** If the problem asserts `wall-segments` (with `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall`), then `-accessibility-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization, from raw 2D segment geometry. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-position>` is wrong.
+- **Derived from geometry.** If the problem asserts `wall-segments` (with `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall`), then `-accessibility-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization, from raw 2D segment geometry. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-coords>` is wrong.
 
 Check for `wall-segments` in the spec before synthesizing anything in Section 6.
 
@@ -118,7 +118,7 @@ First confirm the facts are hand-authored, not derived (Section 4). Then map eac
 
 - *"The agent must be able to walk here"* → `walk-via` entries joining the location to its neighbors — or `walk-via>` if the passage is one-way. Choose the DNF clause list.
 - *"The agent must be able to jump or climb here"* → `jump-via` / `jump-via>` / `climb-via>`, same clause convention.
-- *"The target must be visible from here"* → the appropriate `los-to-*` relation for the consuming role: `los-to-target` for a jammer's gate target, `los-to-transceiver` for beam pairing, `los-to-location` for everything else. Choose the occluder list.
+- *"The target must be visible from here"* → the appropriate `los-to-*` relation for the consuming role: `los-to-target` for a jammer's gate target, `los-to-apparatus` for beam pairing, `los-to-location` for everything else. Choose the occluder list.
 - *"Cargo must cross a gap from here without the agent walking"* → `reach-via`, with a flat list of barrier gates.
 
 Then pick **barriers/occluders** to satisfy two competing constraints simultaneously:
@@ -150,7 +150,7 @@ The barrier choice is frequently the keystone of the whole inference, not a styl
 - **Forgetting that screens and ladders block reach absolutely.** They have an empty-handed exemption on walk edges only.
 - **Conflating reach with movement (or sight).** They cross barriers under different rules; a fix valid for one is often invalid for another.
 - **Fixing the symptom site.** The deadlock surfaces downstream of the omission; place the new relations at the deadlock's *cause*.
-- **Wrong `los-to-*` for the role.** Sightlines are split by consuming role, not object kind. A jammer aiming at a gate needs `los-to-target`; beam pairing needs `los-to-transceiver`; a gears jam target needs `los-to-location` on its `has-position` location.
+- **Wrong `los-to-*` for the role.** Sightlines are split by consuming role, not object kind. A jammer aiming at a gate needs `los-to-target`; beam pairing needs `los-to-apparatus`; a gears jam target needs `los-to-location` on its `has-position` location.
 
 ---
 

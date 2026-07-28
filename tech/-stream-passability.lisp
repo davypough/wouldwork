@@ -11,7 +11,7 @@
 ;;; Also supplies the stream geometry to -accessibility-coordinates' derivation by
 ;;; redefining ACCESSIBILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
 ;;; the gears' HAS-POSITION location (the swept location), the AIMED-AT> destination,
-;;; both locations' LOCATION-POSITION> coordinates, and the stream's width -- 3 units
+;;; both locations' LOCATION-COORDS> coordinates, and the stream's width -- 3 units
 ;;; by default, overridable per gears with a (STREAM-WIDTH gears w) fact, the same
 ;;; default-with-override convention as elevation.  The derivation turns each spec
 ;;; into a barred band: center line from the backstop wall behind the fan to the
@@ -79,11 +79,11 @@
               (error "Wall-gears ~A has no HAS-POSITION swept location." ?g))
             (if (not (bind (aimed-at> ?g $destination)))
               (error "Wall-gears ~A has no AIMED-AT> destination." ?g))
-            (if (not (bind (location-position> $swept-location $sx $sy)))
-              (error "The swept location ~A of ~A has no LOCATION-POSITION> coordinates."
+            (if (not (bind (location-coords> $swept-location $sx $sy)))
+              (error "The swept location ~A of ~A has no LOCATION-COORDS> coordinates."
                      $swept-location ?g))
-            (if (not (bind (location-position> $destination $dx $dy)))
-              (error "The destination ~A of ~A has no LOCATION-POSITION> coordinates."
+            (if (not (bind (location-coords> $destination $dx $dy)))
+              (error "The destination ~A of ~A has no LOCATION-COORDS> coordinates."
                      $destination ?g))
             (assign $width (if (bind (stream-width ?g $override)) $override 3))
             (push (list ?g $swept-location $destination $sx $sy $dx $dy $width) $specs)))

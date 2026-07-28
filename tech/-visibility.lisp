@@ -7,20 +7,22 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : fixture (either gate transmitter receiver), transceiver (either
-;;;              transmitter receiver); gate, transmitter, and receiver are declared
-;;;              optional
+;;;   types    : fixture (either gate transmitter receiver gun), apparatus (either
+;;;              transmitter receiver gun); gate, transmitter, receiver, and gun are
+;;;              declared optional.  gun joins both unions as a point fixture exactly like
+;;;              transmitter/receiver -- jam-target's LOS check reads it through visible,
+;;;              not through has-position, so nothing can ever occupy a gun's position.
 ;;;   queries  : visible, potentially-visible  --  null defaults, overridden by visibility
 
 (in-package :ww)
 
 
-(define-optional-types gate transmitter receiver)
+(define-optional-types gate transmitter receiver gun)
 
 
 (define-types
-  fixture (either gate transmitter receiver)
-  transceiver (either transmitter receiver))  ;a transmitter or receiver; los-to-transceiver's target type
+  fixture (either gate transmitter receiver gun)
+  apparatus (either transmitter receiver gun))  ;a transmitter, receiver, or gun; los-to-apparatus's target type
 
 
 (define-query visible (?location location ?object (either fixture location))

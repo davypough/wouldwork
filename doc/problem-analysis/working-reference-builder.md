@@ -22,7 +22,7 @@ Settle this before transcribing anything; it changes what Sections 1–3 can con
 
 **Does the spec assert `wall-segments`?**
 
-- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-accessibility-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-position>`, `wall-segments`, `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
+- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-accessibility-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `wall-segments`, `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
 - **No — hand-authored.** The spec states its edges directly. Transcribe them.
 
 Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* hand-authored sightline relations in its own older vocabulary (`los0`/`los1`, `visible0`/`visible1`, `accessible0`/`accessible1`). Transcribe whatever that file actually declares; do not translate it into `tech/` names.
@@ -73,13 +73,13 @@ From `reach-via` and `reachable-clear` (`tech/reachability.lisp`).
 
 ### 3. Visibility (line of sight) network
 
-From `los-to-location`, `los-to-target`, `los-to-transceiver`, and `visible-clear` (`tech/visibility.lisp`).
+From `los-to-location`, `los-to-target`, `los-to-apparatus`, and `visible-clear` (`tech/visibility.lisp`).
 
 There are no sightline groups in the current representation — entries are per location, or per location pair.
 
 - **Split the tables by consuming role**, since that is how the relations are split, and using the wrong one is a common error:
   - `los-to-target` — a jammer's target. **Gates only.** A gears jam target instead resolves through its `has-position` location's `los-to-location` entry.
-  - `los-to-transceiver` — beam pairing with a transmitter or receiver.
+  - `los-to-apparatus` — beam pairing with a transmitter or receiver.
   - `los-to-location` — everything else, including connector-to-connector pairing.
 - **A location × target table of occluder lists** for each role in use. Use the word-token legend (rule 6): `clear` for an empty list, `(occluders…)` where a sightline exists but is occluded, `none` where there is no entry at all and therefore no sightline. **This table is the historically error-prone one — transcribe it exactly and call it out in the verification request.**
 - **The transparency rule** from `visible-clear`: a sightline must exist in the tables, and is clear iff every occluder is an open gate.

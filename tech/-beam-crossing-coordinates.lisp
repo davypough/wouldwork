@@ -2,7 +2,7 @@
 
 ;;; Beam crossing coordinates substrate: computes CROSSINGS-ALONG-BEAM>/CROSSINGS-BEFORE-GATE>
 ;;; from the beam geometry -beam-los-coordinates.lisp already derived (or the problem hand-
-;;; authored) as LOS-TO-TRANSCEIVER/LOS-TO-LOCATION, for a problem that would rather author 2D
+;;; authored) as LOS-TO-APPARATUS/LOS-TO-LOCATION, for a problem that would rather author 2D
 ;;; positions than hand-list which crossings lie on which beam and in what order.  Nested under
 ;;; beam-crossing-tech only -- unlike -beam-los-coordinates, this file's derivations are never
 ;;; useful to a problem that includes beam-direct alone, since CROSSINGS-ALONG-BEAM>/CROSSINGS-
@@ -27,7 +27,7 @@
 ;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENTS: DERIVE-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
 ;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls have no
-;;; counterpart here: a wall-blocked beam is excluded from LOS-TO-TRANSCEIVER/LOS-TO-LOCATION
+;;; counterpart here: a wall-blocked beam is excluded from LOS-TO-APPARATUS/LOS-TO-LOCATION
 ;;; entirely by -beam-los-coordinates, so it never becomes a beam to split in the first place.
 ;;; Without a populated CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
@@ -37,8 +37,8 @@
 ;;; beam-crossing.
 ;;;
 ;;; REQUIRES:
-;;;   nested    : -beam-los-coordinates (BEAM-ENDPOINT type; TRANSCEIVER-POSITION>, LOCATION-
-;;;               POSITION>; LOS-TO-TRANSCEIVER/LOS-TO-LOCATION, hand-authored or derived)
+;;;   nested    : -beam-los-coordinates (BEAM-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
+;;;               POSITION>; LOS-TO-APPARATUS/LOS-TO-LOCATION, hand-authored or derived)
 ;;;   relations : crossings-along-beam>, crossings-before-gate>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
 ;;; PROVIDES:
@@ -186,11 +186,11 @@
   (do (assign $beams nil)
       (doall (?location location)
         (doall (?transmitter transmitter)
-          (if (bind (los-to-transceiver ?location $gates ?transmitter))
+          (if (bind (los-to-apparatus ?location $gates ?transmitter))
             (push (list ?transmitter ?location) $beams))))
       (doall (?location location)
         (doall (?receiver receiver)
-          (if (bind (los-to-transceiver ?location $gates ?receiver))
+          (if (bind (los-to-apparatus ?location $gates ?receiver))
             (push (list ?location ?receiver) $beams))))
       (doall (?source location)
         (doall (?destination location)
@@ -275,10 +275,10 @@
 
 
 (define-init-action establish-beam-coordinates
-  ;; Runs only when the problem has authored TRANSCEIVER-POSITION> or LOCATION-POSITION> facts --
+  ;; Runs only when the problem has authored APPARATUS-COORDS> or LOCATION-COORDS> facts --
   ;; inert otherwise, so a purely topological problem (hand-authoring CROSSINGS-ALONG-
   ;; BEAM> directly) is entirely unaffected.  Computes every proper beam intersection from
-  ;; the authored sightlines (LOS-TO-TRANSCEIVER, LOS-TO-LOCATION) and coordinates, mints
+  ;; the authored sightlines (LOS-TO-APPARATUS, LOS-TO-LOCATION) and coordinates, mints
   ;; one crossing per intersection, publishes the pool as CURRENT-CROSSINGS>, and asserts
   ;; CROSSINGS-ALONG-BEAM> accordingly.  CURRENT-CROSSINGS> is asserted before the
   ;; per-beam loop below purely for readability; nothing in this effect reads it back, but
@@ -297,8 +297,8 @@
   ;; *STATIC-IDB* and find no crossings at all.
   0
   ()
-  (or (exists (?e beam-endpoint) (bind (transceiver-position> ?e $x $y)))
-      (exists (?e location) (bind (location-position> ?e $x $y))))
+  (or (exists (?e beam-endpoint) (bind (apparatus-coords> ?e $x $y)))
+      (exists (?e location) (bind (location-coords> ?e $x $y))))
   ()
   (assert
     (do (assign $beams (beam-coordinates-potential-beams))
@@ -340,12 +340,12 @@
   ;; CROSSINGS-BEFORE-GATE> fact per gate, each with that gate's own cutoff -- correct
   ;; because BEAM-REACHES-CROSSING already ORs the blocking test across every gate.
   ;; Runs only when the problem has asserted GATE-SEGMENTS -- inert otherwise.  Needs
-  ;; GATE-SEGMENTS for the actual gate segment coordinates (the LOS-TO-TRANSCEIVER/LOS-TO-
+  ;; GATE-SEGMENTS for the actual gate segment coordinates (the LOS-TO-APPARATUS/LOS-TO-
   ;; LOCATION occluder list only has gate names), so, unlike ESTABLISH-BEAM-COORDINATES,
   ;; can't run for a problem that hand-authors its own gate-conditioned LOS facts without
   ;; also supplying the geometry -- such a problem simply leaves CROSSINGS-BEFORE-GATE>
   ;; unpopulated.  Defined here, after
-  ;; -beam-los-coordinates' own DERIVE-LOS-FROM-SEGMENTS (needs LOS-TO-TRANSCEIVER/LOS-TO-
+  ;; -beam-los-coordinates' own DERIVE-LOS-FROM-SEGMENTS (needs LOS-TO-APPARATUS/LOS-TO-
   ;; LOCATION populated) -- file/load order, same as that init-action's own commentary
   ;; explains.  Reads the crossing pool back from CURRENT-CROSSINGS> rather than minting
   ;; its own: the crossings this splits must be the very objects CROSSINGS-ALONG-BEAM>
@@ -368,7 +368,7 @@
                   $beams $positions $crossings))
         (doall (?location location)
           (doall (?transmitter transmitter)
-            (if (bind (los-to-transceiver ?location $beam-gates ?transmitter))
+            (if (bind (los-to-apparatus ?location $beam-gates ?transmitter))
               (ww-loop for $gate-name in $beam-gates
                        do (assign $gate-record (assoc $gate-name $gates))
                           (assign $gate-parameter
@@ -381,7 +381,7 @@
                             ?transmitter (car $split) $gate-name ?location)))))
         (doall (?location location)
           (doall (?receiver receiver)
-            (if (bind (los-to-transceiver ?location $beam-gates ?receiver))
+            (if (bind (los-to-apparatus ?location $beam-gates ?receiver))
               (ww-loop for $gate-name in $beam-gates
                        do (assign $gate-record (assoc $gate-name $gates))
                           (assign $gate-parameter

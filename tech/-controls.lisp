@@ -14,12 +14,14 @@
 ;;;               depressed (plate), guarded by plate  --  owned by plate.lisp; translation
 ;;;               removes the guarded reference when the plate type is empty
 ;;; PROVIDES:
-;;;   types     : gate, floor-gears, wall-gears, plate, receiver, mode  --  declared
-;;;               optional here.  The gears leaf types appear directly (not via the gears
-;;;               union) because this file splices before -gears-fan installs the union.
-;;;   relations : (controls $list (either gate floor-gears wall-gears) $mode)  --  $list =
-;;;               DNF OR-list of AND-lists of controllers (receiver/plate); mode:
-;;;               normal | inverted
+;;;   types     : gate, floor-gears, wall-gears, angled-gears, plate, receiver, mode, gun --
+;;;               declared optional here.  The gears leaf types appear directly (not via
+;;;               the gears union) because this file splices before -gears-fan installs
+;;;               the union; gun likewise appears directly since gun.lisp nests this file
+;;;               rather than the other way around.
+;;;   relations : (controls $list (either gate floor-gears wall-gears angled-gears gun)
+;;;               $mode)  --  $list = DNF OR-list of AND-lists of controllers
+;;;               (receiver/plate); mode: normal | inverted
 ;;;   query     : energized
 
 (include-tech -beam-substrate)
@@ -27,11 +29,11 @@
 (in-package :ww)
 
 
-(define-optional-types gate floor-gears wall-gears plate receiver mode)
+(define-optional-types gate floor-gears wall-gears angled-gears plate receiver mode gun)
 
 
 (define-static-relations
-  (controls $list (either gate floor-gears wall-gears) $mode))  ;$list = DNF OR-list of AND-lists of controllers (receiver/plate); mode: normal | inverted
+  (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode))  ;$list = DNF OR-list of AND-lists of controllers (receiver/plate); mode: normal | inverted
 
 
 (define-query energized (?controller (either receiver plate))

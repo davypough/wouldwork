@@ -233,7 +233,7 @@ than hand-authoring them:
 (include-tech beam-relay)            ;paired; color; pickup/put/connect actions
 (include-tech beam-crossing)         ;crossing-active; crossings-along-beam>
 (include-tech accessibility)         ;walk-via; accessible; move
-(include-tech visibility)            ;los-to-transceiver; visible; visible-clear
+(include-tech visibility)            ;los-to-apparatus; visible; visible-clear
 ```
 
 **What it does.** `include-tech` is not a runtime macro. Before compilation, each

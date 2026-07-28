@@ -46,7 +46,7 @@
   ;; on real derived-fact mutations during the fixpoint.  Each pass runs to convergence (no
   ;; change) or, failing that, the cap declares the state inconsistent.
   (let ((*detect-propagated-changes* t))
-    (ww-loop for $iteration from 1 to 5
+    (ww-loop for $iteration from 1 to 10
              do (if (not (propagate-consequences!))
                   (return t))
              finally (inconsistent-state)

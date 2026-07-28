@@ -65,7 +65,7 @@
 ;;; elevation-equality check rejects any derived edge between different levels.  See
 ;;; problem-claustro-topo's slab (wall4/wall5) for the pattern.
 ;;;
-;;; Reuses LOCATION-POSITION> (nested from -location-coordinates, shared with
+;;; Reuses LOCATION-COORDS> (nested from -location-coordinates, shared with
 ;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Declares its
 ;;; own segment relations (identical signatures to -beam-los-coordinates.lisp's, for a
 ;;; problem that also includes a beam tech), so this derivation never requires any beam
@@ -79,7 +79,7 @@
 ;;;   types     : location  --  declared by the problem, as accessibility itself already
 ;;;               requires; screen declared optional by nested -passability, spliced by
 ;;;               accessibility.lisp before this file
-;;;   nested    : -location-coordinates (LOCATION-POSITION>)
+;;;   nested    : -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
 ;;;   relations : wall-segments, gate-segments, window-segments, screen-segments,
 ;;;               boundary-wall  --  default to no facts; a problem that asserts
@@ -649,19 +649,19 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
-(define-query accessibility-coordinates-location-positions ()
+(define-query accessibility-coordinates-location-coords ()
   (do (assign $positions nil)
       (doall (?location location)
-        (if (bind (location-position> ?location $x $y))
+        (if (bind (location-coords> ?location $x $y))
           (push (list ?location $x $y) $positions)
-          (error "No LOCATION-POSITION> is defined for location ~A." ?location)))
+          (error "No LOCATION-COORDS> is defined for location ~A." ?location)))
       $positions))
 
 
 (define-query accessibility-coordinates-stream-specs ()
   ;; Default: no air streams.  -stream-passability, nested by wall-blower, redefines
   ;; this to gather one (gears swept-location destination sx sy dx dy width) spec per
-  ;; wall-gears from HAS-POSITION, AIMED-AT>, LOCATION-POSITION>, and STREAM-WIDTH
+  ;; wall-gears from HAS-POSITION, AIMED-AT>, LOCATION-COORDS>, and STREAM-WIDTH
   ;; facts -- so this file never references blower relations itself.
   (do (assign $specs nil)
       $specs))
@@ -691,7 +691,7 @@
         (assign $screens (if (bind (screen-segments $screen-facts)) $screen-facts))
         (assign $boundary (if (bind (boundary-wall $boundary-points)) $boundary-points))
         (assign $stream-specs (accessibility-coordinates-stream-specs))
-        (assign $positions (accessibility-coordinates-location-positions))
+        (assign $positions (accessibility-coordinates-location-coords))
         (assign $arrangement (accessibility-coordinates-build-arrangement
                                $positions $walls $gates $windows $screens $stream-specs $boundary))
         (doall (?source location)

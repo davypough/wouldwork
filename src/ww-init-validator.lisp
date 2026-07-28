@@ -13,8 +13,7 @@
   (check-init-physical-consistency literals)
   (check-init-connector-consistency literals)
   (check-init-control-and-beam-consistency literals)
-  (check-init-crossing-consistency literals)
-  (report-init-sightline-coverage literals))
+  (check-init-crossing-consistency literals))
 
 
 (defun check-init-general-consistency (literals)
@@ -364,14 +363,14 @@ would overwrite the previous value during install-init."
                edges))))
 
 
-(defun init-los-to-transceiver-p (location transceiver literals)
+(defun init-los-to-apparatus-p (location apparatus literals)
   (some (lambda (literal)
-          (destructuring-bind (los-location occluders los-transceiver)
+          (destructuring-bind (los-location occluders los-apparatus)
               (rest (init-literal-proposition literal))
             (declare (ignore occluders))
             (and (eql location los-location)
-                 (eql transceiver los-transceiver))))
-        (init-literals-with-relation 'los-to-transceiver literals)))
+                 (eql apparatus los-apparatus))))
+        (init-literals-with-relation 'los-to-apparatus literals)))
 
 
 (defun init-los-to-location-p (location1 location2 literals)
@@ -386,13 +385,13 @@ would overwrite the previous value during install-init."
         (init-literals-with-relation 'los-to-location literals)))
 
 
-(defun init-transceiver-has-potential-sightline-p (transceiver literals)
+(defun init-apparatus-has-potential-sightline-p (apparatus literals)
   (some (lambda (literal)
-          (destructuring-bind (los-location occluders los-transceiver)
+          (destructuring-bind (los-location occluders los-apparatus)
               (rest (init-literal-proposition literal))
             (declare (ignore los-location occluders))
-            (eql transceiver los-transceiver)))
-        (positive-init-literals-with-relation 'los-to-transceiver literals)))
+            (eql apparatus los-apparatus)))
+        (positive-init-literals-with-relation 'los-to-apparatus literals)))
 
 
 (defun init-location-has-potential-sightline-p (location literals)
@@ -405,14 +404,14 @@ would overwrite the previous value during install-init."
         (positive-init-literals-with-relation 'los-to-location literals)))
 
 
-(defun init-check-paired-transceiver-sightline
-    (literal connector transceiver literals)
-  (unless (init-transceiver-has-potential-sightline-p transceiver literals)
-    (error "~%PAIRED transceiver target has no potential LOS-TO-TRANSCEIVER from any location.~%~
+(defun init-check-paired-apparatus-sightline
+    (literal connector apparatus literals)
+  (unless (init-apparatus-has-potential-sightline-p apparatus literals)
+    (error "~%PAIRED apparatus target has no potential LOS-TO-APPARATUS from any location.~%~
             Literal:   ~S~%~
             Connector: ~S~%~
             Target:    ~S"
-           literal connector transceiver)))
+           literal connector apparatus)))
 
 
 (defun init-check-paired-connector-sightline
@@ -446,7 +445,7 @@ would overwrite the previous value during install-init."
               (cond
                 ((or (init-type-member-p terminus 'transmitter)
                      (init-type-member-p terminus 'receiver))
-                 (init-check-paired-transceiver-sightline
+                 (init-check-paired-apparatus-sightline
                    literal connector terminus literals))
                 ((init-type-member-p terminus 'connector)
                  (let ((terminus-location (gethash terminus locations)))
@@ -554,7 +553,7 @@ would overwrite the previous value during install-init."
 (defun check-init-list-contents (literals)
   "Checks domain-specific element types inside DEFINE-INIT list values."
   (check-init-list-relation-items-have-types
-    literals 'los-to-transceiver '(gate))
+    literals 'los-to-apparatus '(gate))
   (check-init-list-relation-items-have-types
     literals 'los-to-target '(gate))
   (check-init-list-relation-items-have-types
@@ -667,7 +666,7 @@ would overwrite the previous value during install-init."
    Any STREAM-WIDTH override must name a wall-gears and give a positive width."
   (when (or (positive-init-literals-with-relation 'wall-segments literals)
             (positive-init-literals-with-relation 'boundary-wall literals))
-    (let ((positions (init-location-position-map literals)))
+    (let ((positions (init-location-coords-map literals)))
       (dolist (gears (gethash 'wall-gears *types*))
         (init-check-stream-derivable gears positions literals))))
   (dolist (literal (init-literals-with-relation 'stream-width literals))
@@ -690,11 +689,11 @@ would overwrite the previous value during install-init."
          (destination-point (and destination (gethash destination positions))))
     (unless swept-point
       (error "~%Wall-gears in a coordinate-driven problem has no positioned swept location.~%~
-              ~S needs a HAS-POSITION location with LOCATION-POSITION> coordinates."
+              ~S needs a HAS-POSITION location with LOCATION-COORDS> coordinates."
              gears))
     (unless destination-point
       (error "~%Wall-gears in a coordinate-driven problem has no positioned destination.~%~
-              ~S needs an AIMED-AT> destination with LOCATION-POSITION> coordinates."
+              ~S needs an AIMED-AT> destination with LOCATION-COORDS> coordinates."
              gears))
     (when (equal swept-point destination-point)
       (error "~%The air stream of ~S has coincident swept location and destination.~%~
@@ -710,9 +709,9 @@ would overwrite the previous value during install-init."
              gears swept swept-point destination destination-point))))
 
 
-(defun init-location-position-map (literals)
+(defun init-location-coords-map (literals)
   (let ((map (make-hash-table :test #'eql)))
-    (dolist (literal (init-literals-with-relation 'location-position> literals))
+    (dolist (literal (init-literals-with-relation 'location-coords> literals))
       (destructuring-bind (location x y)
           (rest (init-literal-proposition literal))
         (setf (gethash location map) (list x y))))
@@ -859,7 +858,7 @@ would overwrite the previous value during install-init."
                   (eql (fourth prop) source))))))
     ((init-type-member-p source 'location)
      (init-first-matching-list-value
-       'los-to-transceiver literals
+       'los-to-apparatus literals
        (lambda (prop)
          (and (eql (second prop) source)
               (eql (fourth prop) destination)))))
@@ -873,7 +872,7 @@ would overwrite the previous value during install-init."
     ((and (init-type-member-p source 'transmitter)
           (init-type-member-p destination 'location))
      (init-first-matching-list-value
-       'los-to-transceiver literals
+       'los-to-apparatus literals
        (lambda (prop)
          (and (eql (second prop) destination)
               (eql (fourth prop) source)))))))
@@ -1125,82 +1124,3 @@ the matching CROSSINGS-ALONG-BEAM> list."
                   Beam:     ~S -> ~S~%~
                   Occluders: ~S"
                  literal gate source destination occluders))))))
-
-
-(defun init-endpoint-position-map (literals)
-  "Maps every beam/sightline endpoint -- transmitter, receiver, or location -- to its
-   authored (x y) position, merging TRANSCEIVER-POSITION> and LOCATION-POSITION> literals (same
-   3-arg shape) into one table so INIT-BEAM-DISTANCE can find either kind of endpoint."
-  (let ((positions (make-hash-table :test #'equal)))
-    (dolist (relation '(transceiver-position> location-position>))
-      (dolist (literal (init-literals-with-relation relation literals))
-        (destructuring-bind (endpoint x y)
-            (rest (init-literal-proposition literal))
-          (setf (gethash endpoint positions) (list x y)))))
-    positions))
-
-
-(defun init-beam-distance (endpoint1 endpoint2 positions)
-  (let ((position1 (gethash endpoint1 positions))
-        (position2 (gethash endpoint2 positions)))
-    (when (and position1 position2)
-      (sqrt (+ (expt (- (first position1) (first position2)) 2)
-               (expt (- (second position1) (second position2)) 2))))))
-
-
-(defun report-init-missing-sightline (source destination positions)
-  (let ((distance (init-beam-distance source destination positions)))
-    (if distance
-      (format t "~%NOTE: No LOS fact for potential beam ~A -> ~A (straight-line distance ~,2F)."
-              source destination distance)
-      (format t "~%NOTE: No LOS fact for potential beam ~A -> ~A."
-              source destination))))
-
-
-(defun report-init-transceiver-sightline-coverage (literals positions)
-  "Reports TRANSMITTER/LOCATION and LOCATION/RECEIVER pairs with no LOS-TO-TRANSCEIVER fact."
-  (when (gethash 'los-to-transceiver *static-relations*)
-    (dolist (transmitter (gethash 'transmitter *types*))
-      (dolist (location (gethash 'location *types*))
-        (unless (init-los-to-transceiver-p location transmitter literals)
-          (report-init-missing-sightline transmitter location positions))))
-    (dolist (location (gethash 'location *types*))
-      (dolist (receiver (gethash 'receiver *types*))
-        (unless (init-los-to-transceiver-p location receiver literals)
-          (report-init-missing-sightline location receiver positions))))))
-
-
-(defun report-init-location-sightline-coverage (literals positions)
-  "Reports LOCATION/LOCATION pairs with no LOS-TO-LOCATION fact."
-  (when (gethash 'los-to-location *static-relations*)
-    (let ((locations (gethash 'location *types*)))
-      (dolist (location1 locations)
-        (dolist (location2 (rest (member location1 locations)))
-          (unless (init-los-to-location-p location1 location2 literals)
-            (report-init-missing-sightline location1 location2 positions)))))))
-
-
-(defun init-beam-crossing-tech-p ()
-  (gethash 'crossings-along-beam> *static-relations*))
-
-
-(defun report-init-sightline-coverage (literals)
-  "Non-fatal report of TRANSMITTER/LOCATION, LOCATION/RECEIVER, and LOCATION/LOCATION
-   pairs with no authored LOS-TO-TRANSCEIVER or LOS-TO-LOCATION fact. Only meaningful for
-   problems using BEAM-CROSSING technology, whose -BEAM-COORDINATES substrate treats every
-   such LOS-permitted pair as a potential beam; other problems (eg, BEAM-DIRECT-based ones)
-   use LOS-TO-TRANSCEIVER/LOS-TO-LOCATION for unrelated sightline purposes, where sparse
-   coverage is normal and not worth reporting.  Also skipped when the problem asserts
-   WALL-SEGMENTS: -beam-coordinates.lisp's DERIVE-LOS-FROM-SEGMENTS init-action then
-   derives LOS-TO-TRANSCEIVER/LOS-TO-LOCATION from that geometry and overwrites any hand-
-   authored fact anyway, so a missing DEFINE-INIT literal is expected, not an oversight,
-   and checking for one is moot regardless of which problem asserts WALL-SEGMENTS. Purely
-   advisory even when it does run -- an occluding gate, wall, or corner can legitimately
-   block a sightline -- so this never errors; it only prints a note (with straight-line
-   distance, when TRANSCEIVER-POSITION> coordinates are available for both endpoints) for manual
-   review."
-  (when (and (init-beam-crossing-tech-p)
-             (not (init-literals-with-relation 'wall-segments literals)))
-    (let ((positions (init-endpoint-position-map literals)))
-      (report-init-transceiver-sightline-coverage literals positions)
-      (report-init-location-sightline-coverage literals positions))))

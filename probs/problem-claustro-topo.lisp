@@ -149,24 +149,24 @@
     ((screen1 24 99/10 33 99/10)))
 
   ;; Representative location coordinates
-  (location-position> location1 23 2)
-  (location-position> location2 20 9)
-  (location-position> location3 20 11)
-  (location-position> location4 21 14)
-  (location-position> location5 24 14)
-  (location-position> location6 27 14)
-  (location-position> location7 25 3)
-  (location-position> location8 31 9)
-  (location-position> location9 13 13)
-  (location-position> location10 8 13)
-  (location-position> location11 1 13)
-  (location-position> location12 6 13)
-  (location-position> location13 4 13)
+  (location-coords> location1 23 2)
+  (location-coords> location2 20 9)
+  (location-coords> location3 20 11)
+  (location-coords> location4 21 14)
+  (location-coords> location5 24 14)
+  (location-coords> location6 27 14)
+  (location-coords> location7 25 3)
+  (location-coords> location8 31 9)
+  (location-coords> location9 13 13)
+  (location-coords> location10 8 13)
+  (location-coords> location11 1 13)
+  (location-coords> location12 6 13)
+  (location-coords> location13 4 13)
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
   ;; unambiguously on the intended side of its adjacent boundary.
-  (transceiver-position> transmitter1 111/10 9)
-  (transceiver-position> receiver1 239/10 9)
+  (apparatus-coords> transmitter1 111/10 9)
+  (apparatus-coords> receiver1 239/10 9)
 
   ;; Directional jamming exclusions
   (jam-disallowed> location1 location7 gate1)
@@ -186,7 +186,7 @@
   (reach-via location5 () location6)
 
   ;; Beam corridor.  Hand-authored, not coordinate-derived: -beam-los-coordinates.lisp only
-  ;; derives LOS-TO-TRANSCEIVER/LOS-TO-LOCATION (per-location sightline occluders), not
+  ;; derives LOS-TO-APPARATUS/LOS-TO-LOCATION (per-location sightline occluders), not
   ;; BEAM-VIA's own gate+location corridor list, so beam-direct still needs this listed
   ;; explicitly.  transmitter1 (111/10 9) -> receiver1 (239/10 9) runs along y=9; gate1
   ;; (x=16, y 5-10) crosses it, and location2 (20 9) sits exactly on it, so a beam-blocker
