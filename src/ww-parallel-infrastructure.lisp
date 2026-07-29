@@ -630,24 +630,6 @@
    Set to NIL to disable load balancing (for debugging/comparison).")
 
 
-(defun initial-best-bound ()
-  "Return the initial value for *best-bound* based on *solution-type*.
-   All optimization types use 'lower is better' convention internally."
-  (case *solution-type*
-    ((first every) most-positive-fixnum)  ; Not used for pruning
-    ((min-length min-time min-value) most-positive-fixnum)
-    (max-value most-negative-fixnum)  ; Will be negated, so this becomes most-positive
-    (otherwise most-positive-fixnum)))
-
-
-(defun reset-parallel-control-flags ()
-  "Reset all parallel control flags for a new search."
-  (setf *parallel-search-active* nil
-        *first-solution-found* nil
-        *best-bound* (initial-best-bound)
-        *shutdown-requested* nil))
-
-
 (defun compute-state-bound-value (state depth)
   "Compute the bound value for STATE at DEPTH based on *solution-type*.
    Returns value in 'lower is better' convention."
@@ -658,6 +640,31 @@
     (min-value (problem-state.value state))
     (max-value (- (problem-state.value state)))  ; Negate for 'lower is better'
     (otherwise depth)))
+
+
+(defun initial-best-bound ()
+  "Return the initial value for *best-bound* based on *solution-type*.
+   Preserve any solution recorded before parallel workers start.
+   All optimization types use 'lower is better' convention internally."
+  (if (and *solution-paths*
+           (member *solution-type* '(min-length min-time min-value max-value)))
+      (reduce #'min *solution-paths*
+              :key (lambda (solution)
+                     (compute-state-bound-value (solution.goal solution)
+                                                (solution.depth solution))))
+      (case *solution-type*
+        ((first every) most-positive-fixnum)  ; Not used for pruning
+        ((min-length min-time min-value) most-positive-fixnum)
+        (max-value most-negative-fixnum)  ; Will be negated, so this becomes most-positive
+        (otherwise most-positive-fixnum))))
+
+
+(defun reset-parallel-control-flags ()
+  "Reset all parallel control flags for a new search."
+  (setf *parallel-search-active* nil
+        *first-solution-found* nil
+        *best-bound* (initial-best-bound)
+        *shutdown-requested* nil))
 
 
 (defun node-can-improve-bound-p (node local-bound)

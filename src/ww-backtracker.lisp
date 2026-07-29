@@ -86,34 +86,12 @@
 
 
 (defun search-backtracking ()
-  "Main entry point for backtracking search with algorithm-compatible processing"
-  ;; Initialize search statistics (matching wouldwork's initialization pattern)
-  (setf *program-cycles* 0)
-  (setf *total-states-processed* 0)
-  (setf *max-depth-explored* 0)
-  (setf *solution-paths* nil)
-  (setf *unique-solution-states* nil)
-  (setf *solution-count* 0)
-  (setf *start-time* (get-internal-real-time))
-  (setf *prior-total-states-processed* 0)
-  (setf *prior-time* 0)
-  (setf *average-branching-factor* 0.0)
-  (setf *inconsistent-states-dropped* 0)
+  "Runs backtracking after DFS has initialized shared search state."
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)
   ;(clrhash *proposition-cache*)
   ;(setf *last-object-index* 0)
-  ;; initial state validation
-  (when *global-invariants*
-    (unless (validate-global-invariants nil *backtrack-state*)
-      (format t "~%Invariant validation failed on initial state.~%")
-      (return-from search-backtracking nil)))
-  ;; Check if start state satisfies goal condition
-  (when (is-complete-solution)
-    (register-solution-bt 0)
-    (narrate-bt "Solution found at start ***" nil 0)
-    (return-from search-backtracking t))
   #+:ww-debug (when (and (<= *debug* 2) (>= *debug* 1))
                 (setf *search-tree* nil)
                 ;; Add initial state at depth 0
@@ -199,14 +177,14 @@
                              (when (> *debug* 0)
                                (finish-output))
                              (setf found-a-solution t)
-                             (when (eq *solution-type* 'first)
+                             (when (solution-count-reached-p)
                                (return-from backtrack t)))
                             ;; No solution yet - continue recursive exploration
                             (t
                              (let ((deeper-result (backtrack (1+ level))))
                                (when deeper-result
                                  (setf found-a-solution t)
-                                 (when (eq *solution-type* 'first)
+                                 (when (solution-count-reached-p)
                                    (return-from backtrack t))))))
                           (undo-choice-bt choice action level)))))))))))
     found-a-solution))

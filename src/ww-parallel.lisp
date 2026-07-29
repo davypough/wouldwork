@@ -78,7 +78,10 @@
                   ;; Goal check during task generation
                   (when (goal succ-state)
                     ;; Register solution immediately (serial, no locking needed)
-                    (register-solution node succ-state)
+                    (register-solution
+                      (make-node :state succ-state
+                                 :depth (1+ (node.depth node))
+                                 :parent node))
                     (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
                     ;; Early termination: found requested number of solutions during task gen
                     (format t "~&Solution found during task generation!~%")

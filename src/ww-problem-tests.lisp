@@ -325,6 +325,109 @@
   (run-bt-test-problems))
 
 
+;;; START-STATE GOAL TEST ;;;
+
+
+(defun check-start-is-goal-test (condition control &rest args)
+  "Signal a focused start-is-goal test failure unless CONDITION is true."
+  (unless condition
+    (error "~A" (apply #'format nil control args)))
+  t)
+
+
+(defun run-start-is-goal-case (algorithm tree-or-graph threads solution-type
+                               expected-count &key terminal expected-value)
+  "Run one start-is-goal configuration and validate its solution records."
+  (setf *algorithm* algorithm
+        *tree-or-graph* tree-or-graph
+        *threads* threads
+        *solution-type* solution-type
+        *depth-cutoff* 1
+        *randomize-search* nil
+        *branch* -1
+        *symmetry-pruning* nil
+        *debug* 0
+        *probe* nil
+        *auto-wait* nil)
+  (ww-solve)
+  (let ((root-solution (find 0 *solution-paths* :key #'solution.depth)))
+    (check-start-is-goal-test
+      root-solution
+      "No depth-zero solution for ~A/~A with ~D thread~:P and solution type ~A."
+      algorithm tree-or-graph threads solution-type)
+    (check-start-is-goal-test
+      (null (solution.path root-solution))
+      "The depth-zero solution path is not empty: ~S"
+      (solution.path root-solution))
+    (check-start-is-goal-test
+      (equalp (problem-state.idb (solution.goal root-solution))
+              (problem-state.idb *start-state*))
+      "The depth-zero goal state differs from the initialized start state.")
+    (check-start-is-goal-test
+      (= (solution.time root-solution) (problem-state.time *start-state*))
+      "The depth-zero solution time differs from the start time.")
+    (check-start-is-goal-test
+      (= (solution.value root-solution) (problem-state.value *start-state*))
+      "The depth-zero solution value differs from the start value.")
+    (check-start-is-goal-test
+      (= (length *solution-paths*) expected-count)
+      "Expected ~D solution~:P for ~A/~A/~A, but found ~D."
+      expected-count algorithm tree-or-graph solution-type
+      (length *solution-paths*))
+    (check-start-is-goal-test
+      (= (length *unique-solution-states*) expected-count)
+      "Expected ~D unique goal state~:P for ~A/~A/~A, but found ~D."
+      expected-count algorithm tree-or-graph solution-type
+      (length *unique-solution-states*))
+    (when terminal
+      (check-start-is-goal-test
+        (and (= *program-cycles* 0)
+             (= *total-states-processed* 1)
+             (= *max-depth-explored* 0))
+        "A terminal depth-zero solution expanded the search: cycles=~D, states=~D, depth=~D."
+        *program-cycles* *total-states-processed* *max-depth-explored*))
+    (when expected-value
+      (check-start-is-goal-test
+        (find expected-value *solution-paths* :key #'solution.value :test #'=)
+        "No solution has the expected objective value ~A."
+        expected-value)))
+  (format t "~&Passed start-is-goal case: ~A / ~A / ~D thread~:P / ~A~%"
+          algorithm tree-or-graph threads solution-type)
+  t)
+
+
+(defun test-start-is-goal ()
+  "Verify depth-zero goal handling across solution types and search engines."
+  (cleanup-test-files)
+  (unwind-protect
+      (progn
+        (%stage "test/problem-start-is-goal-test.lisp")
+        (run-start-is-goal-case 'depth-first 'graph 0 'first 1 :terminal t)
+        (run-start-is-goal-case 'depth-first 'graph 0 'min-length 1 :terminal t)
+        (run-start-is-goal-case 'depth-first 'graph 0 'min-time 1 :terminal t)
+        (run-start-is-goal-case 'depth-first 'graph 0 1 1 :terminal t)
+        (run-start-is-goal-case 'depth-first 'graph 0 2 2)
+        (run-start-is-goal-case 'depth-first 'graph 0 'every 3)
+        (run-start-is-goal-case 'depth-first 'graph 0 'all-paths 3)
+        (run-start-is-goal-case 'depth-first 'graph 0 'min-value 2
+                                :expected-value -10)
+        (run-start-is-goal-case 'depth-first 'graph 0 'max-value 2
+                                :expected-value 10)
+        (run-start-is-goal-case 'backtracking 'tree 0 'first 1 :terminal t)
+        (run-start-is-goal-case 'backtracking 'tree 0 2 2)
+        (run-start-is-goal-case 'backtracking 'tree 0 'every 3)
+        (run-start-is-goal-case 'depth-first 'graph 2 'first 1 :terminal t)
+        (run-start-is-goal-case 'depth-first 'graph 2 'every 3)
+        (run-start-is-goal-case 'depth-first 'graph 2 'min-value 3
+                                :expected-value -10)
+        (run-start-is-goal-case 'depth-first 'graph 2 'max-value 3
+                                :expected-value 10)
+        (format t "~2&All start-is-goal cases passed.~%")
+        t)
+    (cleanup-test-files)
+    (stage blocks3)))
+
+
 ;;; SIMPLE DEPTH-FIRST VS BACKTRACKING BENCHMARK ;;;
 
 

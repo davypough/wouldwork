@@ -238,70 +238,78 @@
         (initialize-closed-infrastructure hash-test))))
   (when (> *threads* 0)  ;; Ensure start state has synchronized IDB tables for parallel mode
     (ensure-start-state-synchronized))
-  (hs::push-hstack (make-node :state (copy-problem-state *start-state*)) *open* :new-only (eq *tree-or-graph* 'graph))
-  ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
-  (when (eql *tree-or-graph* 'graph)
-    (setf (problem-state.idb-hash *start-state*) nil)  ;discard any hash cached during init-action processing (idb is mutated in place afterward)
-    (ensure-idb-hash *start-state*)
-    (let ((closed-table (if (> *threads* 0)
-                            (closed-shard *start-state*)
-                            *closed*)))
-      (closed-bucket-insert (make-closed-entry *start-state* 0)        ; was raw setf gethash with inline 4-element list
-                            *start-state* 0 closed-table)))
-  (setf *program-cycles* 0)
-  (setf *average-branching-factor* 0.0)
-  (setf *total-states-processed* 1)  ;start state is first
-  (setf *prior-total-states-processed* 0)
-  (setf *prior-program-cycles* 0)
-  (setf *last-improvement-states* 0)
-  (setf *bound-pruned* 0)
-  (setf *accumulated-backtrack-distance* 0)
-  (setf *num-backtracks* 0)
-  (setf *prev-expansion-depth* 0)
-  (setf *rem-init-successors* nil)  ;branch nodes from start state
-  (setf *num-init-successors* 0)
-  (setf *max-depth-explored* 0)
-  (setf *num-idle-threads* 0)
-  (setf *dead-end-accumulated-depths* 0)
-  (setf *dead-end-num-paths* 0)
-  (setf *duplicate-accumulated-depths* 0)
-  (setf *duplicate-num-paths* 0)
-  (setf *depth-cutoff-hits* 0)
-  (setf *repeated-states* 0)
-  (setf *solution-paths* nil)
-  (setf *hybrid-goals* nil)
-  (setf *unique-solution-states* nil)
-  (setf *best-states* (list *start-state*))
-  (setf *solution-count* 0)
-  (setf *upper-bound* 1000000)
-  (setf *search-tree* nil)
-  (setf *start-time* (get-internal-real-time))
-  (setf *prior-time* 0)
-  (setf *prior-parallel-progress-time* *start-time*)
-  (setf *prior-parallel-progress-states* 0)
-  (setf *prior-parallel-progress-cycles* 0)
-  (setf *inconsistent-states-dropped* 0)
-  (setf *lower-bound-pruned* 0)
-  (clrhash *prop-key-cache*)
-  (if (> *threads* 0)
-    (if (eql *algorithm* 'backtracking)
-      (error "Parallel processing not supported with backtracking algorithm")
-      (progn
-        (process-partitioned-parallel)
-        (finalize-parallel-search-results)
-        (display-parallel-timing)
-        (display-worker-stats)
-        (display-closed-shard-stats)))
-    (ecase *algorithm*
-      (depth-first (search-serial))
-      (backtracking (search-backtracking))))
-  (when *hybrid-mode*
-    (finalize-hybrid-solutions))
-  (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
-    (unless *shutdown-requested*
-      (summarize-search-results (if (solution-count-reached-p)  ; handle fixnum
-                                  'first
-                                  'exhausted)))))
+  (let ((start-node (make-node :state (copy-problem-state *start-state*))))
+    (hs::push-hstack start-node *open* :new-only (eq *tree-or-graph* 'graph))
+    ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
+    (when (eql *tree-or-graph* 'graph)
+      (setf (problem-state.idb-hash *start-state*) nil)  ;discard any hash cached during init-action processing (idb is mutated in place afterward)
+      (ensure-idb-hash *start-state*)
+      (let ((closed-table (if (> *threads* 0)
+                              (closed-shard *start-state*)
+                              *closed*)))
+        (closed-bucket-insert (make-closed-entry *start-state* 0)        ; was raw setf gethash with inline 4-element list
+                              *start-state* 0 closed-table)))
+    (setf *program-cycles* 0)
+    (setf *average-branching-factor* 0.0)
+    (setf *total-states-processed* 1)  ;start state is first
+    (setf *prior-total-states-processed* 0)
+    (setf *prior-program-cycles* 0)
+    (setf *last-improvement-states* 0)
+    (setf *bound-pruned* 0)
+    (setf *accumulated-backtrack-distance* 0)
+    (setf *num-backtracks* 0)
+    (setf *prev-expansion-depth* 0)
+    (setf *rem-init-successors* nil)  ;branch nodes from start state
+    (setf *num-init-successors* 0)
+    (setf *max-depth-explored* 0)
+    (setf *num-idle-threads* 0)
+    (setf *dead-end-accumulated-depths* 0)
+    (setf *dead-end-num-paths* 0)
+    (setf *duplicate-accumulated-depths* 0)
+    (setf *duplicate-num-paths* 0)
+    (setf *depth-cutoff-hits* 0)
+    (setf *repeated-states* 0)
+    (setf *solution-paths* nil)
+    (setf *hybrid-goals* nil)
+    (setf *unique-solution-states* nil)
+    (setf *best-states* (list *start-state*))
+    (setf *solution-count* 0)
+    (setf *upper-bound* 1000000)
+    (setf *search-tree* nil)
+    (setf *start-time* (get-internal-real-time))
+    (setf *prior-time* 0)
+    (setf *prior-parallel-progress-time* *start-time*)
+    (setf *prior-parallel-progress-states* 0)
+    (setf *prior-parallel-progress-cycles* 0)
+    (setf *inconsistent-states-dropped* 0)
+    (setf *lower-bound-pruned* 0)
+    (setf *shutdown-requested* nil)
+    (clrhash *prop-key-cache*)
+    (let ((start-goal-p (goal (node.state start-node))))
+      (when start-goal-p
+        (register-solution start-node))
+      (unless (and start-goal-p
+                   (or (solution-count-reached-p)
+                       (member *solution-type* '(min-length min-time))))
+        (if (> *threads* 0)
+          (if (eql *algorithm* 'backtracking)
+            (error "Parallel processing not supported with backtracking algorithm")
+            (progn
+              (process-partitioned-parallel)
+              (finalize-parallel-search-results)
+              (display-parallel-timing)
+              (display-worker-stats)
+              (display-closed-shard-stats)))
+          (ecase *algorithm*
+            (depth-first (search-serial))
+            (backtracking (search-backtracking))))))
+    (when *hybrid-mode*
+      (finalize-hybrid-solutions))
+    (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
+      (unless *shutdown-requested*
+        (summarize-search-results (if (solution-count-reached-p)  ; handle fixnum
+                                    'first
+                                    'exhausted))))))
 
 
 (defun auto-wait-debug-find-prop (props pred &rest prefix)
@@ -486,7 +494,10 @@
            ;; Register solution
            #+:ww-debug (when (>= *debug* 1)
                          (update-search-tree wait-state (1+ (node.depth current-node)) "backtrack-wait->goal"))
-           (register-solution current-node wait-state)
+           (register-solution
+             (make-node :state wait-state
+                        :depth succ-depth
+                        :parent current-node))
            (update-max-depth-explored succ-depth)
            (increment-global *total-states-processed* 1)
            (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
@@ -584,9 +595,11 @@
                      (update-max-depth-explored (node.depth current-node))
                      (finalize-dead-end-depth (node.depth current-node))
                      (return-from df-bnb1 nil)))
-                 ;; Register solution: current-node is predecessor, wait-state is goal
                  ;; The solution path will show: ... -> (current-node's action) -> (WAIT duration)
-                 (register-solution current-node wait-state)
+                 (register-solution
+                   (make-node :state wait-state
+                              :depth succ-depth
+                              :parent current-node))
                  (update-max-depth-explored succ-depth)
                  (increment-global *total-states-processed* 1)
                  (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
@@ -636,7 +649,10 @@
         (when (goal succ-state)
           (if *hybrid-mode*
               (defer-hybrid-goal current-node succ-state)
-              (register-solution current-node succ-state))
+              (register-solution
+                (make-node :state succ-state
+                           :depth succ-depth
+                           :parent current-node)))
           (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
             (return-from process-successors '(first))
             (next-iteration)))
@@ -1367,41 +1383,44 @@
             finally (terpri)))))
 
  
-(defun register-solution (current-node goal-state)
-  "Inserts a new solution onto *solution-paths*."
-  (declare (type node current-node) (type problem-state goal-state))
-  (let* ((state-depth (1+ (node.depth current-node)))
+(defun register-solution (goal-node)
+  "Records the path ending at GOAL-NODE as a solution."
+  (declare (type node goal-node))
+  (let* ((goal-state (node.state goal-node))
+         (state-depth (node.depth goal-node))
          (solution
            (make-solution
              :depth state-depth
              :time (problem-state.time goal-state)
              :value (problem-state.value goal-state)
-             :path (let ((nominal-path (append (record-solution-path current-node)
-                                               (list (record-move ;(node.state current-node)
-                                                                  goal-state)))))
-                     (if (= (hash-table-count *state-codes*) 0)  ;if in backward search
+             :path (let ((nominal-path (record-solution-path goal-node)))
+                     (if (or (zerop state-depth)
+                             (= (hash-table-count *state-codes*) 0))  ;if in backward search
                        nominal-path
                        (append nominal-path 
                                (reverse (gethash (funcall (symbol-function 'encode-state)
-                                                          (list-database (problem-state.idb goal-state)))
-                                                 *state-codes*)))))
+                                                           (list-database (problem-state.idb goal-state)))
+                                                  *state-codes*)))))
              :goal goal-state)))
-    (cond ((> *threads* 0)
+    (let ((ctrl-str (if (zerop state-depth)
+                        "Start state satisfies goal; recorded zero-action solution at depth = ~:D"
+                        "New path to goal found at depth = ~:D")))
+      (cond ((> *threads* 0)
              #+:ww-debug (when (>= *debug* 1)
                            (lprt))
-             (let ((ctrl-str "~&New path to goal found at depth = ~:D~%"))
-               (bt:with-lock-held (*lock*)
-                 (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-                   (format t (concatenate 'string ctrl-str "Objective value = ~:A~2%")
-                           state-depth (solution.value solution))
-                   (format t ctrl-str state-depth))
-                 (finish-output))))
-          (t (format t "~%New path to goal found at depth = ~:D" state-depth)
+             (bt:with-lock-held (*lock*)
+               (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
+                 (format t (concatenate 'string "~&" ctrl-str
+                                        "~%Objective value = ~:A~2%")
+                          state-depth (solution.value solution))
+                 (format t (concatenate 'string "~&" ctrl-str "~%") state-depth))
+               (finish-output)))
+            (t (format t (concatenate 'string "~%" ctrl-str) state-depth)
              (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
                (format t " Objective value = ~:A~%" (solution.value solution)))
              (when (eql *solution-type* 'min-time)
                (format t "Time = ~:A~%" (solution.time solution)))
-             (finish-output)))
+             (finish-output))))
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solution-paths*)
