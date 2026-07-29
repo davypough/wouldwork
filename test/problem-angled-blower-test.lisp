@@ -46,7 +46,7 @@
 (include-tech angled-blower)
 (include-tech box)
 (include-tech step)
-(include-tech accessibility)
+(include-tech walkability)
 
 
 ;;;; INITIALIZATION ;;;;

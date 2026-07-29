@@ -64,7 +64,7 @@ A scaffold that has held up in practice. Each milestone is a checkpoint to confi
 | `walk-via location $list location` | Symmetric walking edge | Can the agent *walk between these two spots* now? | `$list` is a DNF clause list — see below. Agent-dependent. |
 | `walk-via> location $list location` | Directional walking edge | Can the agent walk *this way only*? | Same convention. Emitted for rides into an air stream's destination. |
 | `jump-via` / `jump-via>` | Jumping edge (symmetric / directional) | Can the agent *jump* this gap? | Same clause convention. |
-| `climb-via> location $list location` | One-way climb (ladders) | Can the agent climb here? | Same clause convention; not part of ordinary accessibility. |
+| `climb-via> location $list location` | One-way climb (ladders) | Can the agent climb here? | Same clause convention; not part of walkability. |
 | `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open. Symmetric, agent-independent. |
 | `los-to-location location $list location` | Sightline between two locations | Can I *see that spot* from here? | `$list` = occluders; `()` is a direct, always-clear line; clear iff every occluder gate is open. |
 | `los-to-target location $list gate` | Sightline to a jam target | Can I *jam that gate* from here? | As above. Gate targets only — a gears target resolves through its `has-position` location's `los-to-location` entry instead. |
@@ -94,7 +94,7 @@ Clause items on a traversal edge may be **gates, screens, ladders, or gears**:
 Movement and sightline facts come from one of two places, and this decides how a gap may legitimately be fixed.
 
 - **Hand-authored.** The problem asserts `walk-via` and `los-to-*` facts directly. A missing edge is fixed by adding the fact.
-- **Derived from geometry.** If the problem asserts `wall-segments` (with `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall`), then `-accessibility-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization, from raw 2D segment geometry. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-coords>` is wrong.
+- **Derived from geometry.** If the problem asserts `wall-segments` (with `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall`), then `-walkability-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization, from raw 2D segment geometry. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-coords>` is wrong.
 
 Check for `wall-segments` in the spec before synthesizing anything in Section 6.
 
@@ -143,7 +143,7 @@ The barrier choice is frequently the keystone of the whole inference, not a styl
 
 - **Hand-adding a derived fact.** The spec asserts `wall-segments`, so `walk-via` and the `los-to-*` tables are computed at init. Adding one by hand fixes nothing. Fix the geometry.
 - **Assuming a bridge.** Treating the missing relation as case 2(a) when it only extends one frontier (2(b)/2(c)). Check which it is.
-- **Committing to a destination before pruning.** A destination can look viable on sight or reach grounds yet be movement-unreachable. Prune accessibility first.
+- **Committing to a destination before pruning.** A destination can look viable on sight or reach grounds yet be movement-unreachable. Prune walkability first.
 - **Sightline that contradicts the wall.** Granting a location a clear view of a target that, by its position, should be occluded by the intervening wall's gates.
 - **Unbarred reach edge through a wall.** A `reach-via` with an empty barrier list punches a hole straight through a gated wall and can collapse the puzzle to two actions.
 - **Treating a reach list as DNF.** `reach-via`'s list is a flat conjunction — every gate must be open. Writing it as alternative clauses does not mean what it looks like.
@@ -199,5 +199,5 @@ Anti-trivialization holds: at the start, gate2/gate3 are closed, so location3 is
 **Pitfalls encountered.**
 
 - *Sightline-vs-wall:* an early attempt gave location3 the right sightline but an *unbarred* reach edge from location1 — a hole punched through the gate2/gate3 wall. Resolved by barring the reach edge.
-- *False destination:* area3 looked viable on sight grounds but is movement-unreachable; rejected only after accessibility pruning.
+- *False destination:* area3 looked viable on sight grounds but is movement-unreachable; rejected only after walkability pruning.
 - *Bridge assumption:* location3 is not a pure forward/backward bridge — it is a **forward-progress enabler** (case 2(b)) that lets the stalled agent in area2 acquire the stranded jammer.

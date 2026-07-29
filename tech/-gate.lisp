@@ -1,7 +1,7 @@
 ;;; Filename: -gate.lisp
 
 ;;; Gate substrate: the shared (open gate) relation and its gate optional type, owned in
-;;; one place so every capability that reads gate openness -- accessibility (via nested
+;;; one place so every capability that reads gate openness -- walkability (via nested
 ;;; -passability), reachability, visibility, beam-direct, beam-crossing, and -passability
 ;;; itself -- nests this file instead of hand-copying the declaration.  Only gate.lisp's
 ;;; update-gate-status! ever asserts (open gate); an unincluded gate leaves the relation

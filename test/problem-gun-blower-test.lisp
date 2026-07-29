@@ -1,9 +1,9 @@
 ;;; Filename: problem-gun-blower-test.lisp
 
-;;; Exercises -threat's enforce-threat-safety! backstop, not accessibility's precondition
+;;; Exercises -threat's enforce-threat-safety! backstop, not walkability's precondition
 ;;; check: gears1 is uncontrolled (always turning, -gears-fan's own default), so fan1 is
 ;;; already blowing once mounted -- stepping onto it launches the agent to loft with no
-;;; move/jump/ladder precondition involved at all.  gun1 is a point fixture (positioned via
+;;; walk/jump/ladder precondition involved at all.  gun1 is a point fixture (positioned via
 ;;; LOS, not has-position) and threatens loft.  While gun1 is armed, the step-on child state
 ;;; that would land the agent at loft is generated and then dropped as inconsistent-state,
 ;;; so step-on becomes a dead end from the unjammed state -- there is no successor at all

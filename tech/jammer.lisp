@@ -23,7 +23,7 @@
 ;;;               update-gate-status!
 ;;; PROVIDES:
 ;;;   types     : plate, jammer, box  --  declared optional here; other techs (plate, gate,
-;;;               box, barrier, beam-relay, accessibility, ladder, etc.) still declare their
+;;;               box, barrier, beam-relay, walkability, ladder, etc.) still declare their
 ;;;               own plate-alias/box-alias forms for their own pre-params; the bare and
 ;;;               aliased forms resolve compatibly
 ;;;               target (either gate floor-gears wall-gears gun)  --  what a jammer can

@@ -34,7 +34,7 @@
 ;;; discriminating; only computing 3/2 at mid, and only there, gets this right, and it is what
 ;;; makes receiver1 -- and therefore gate1, and therefore the goal -- reachable.
 ;;;
-;;; Expected minimum solution (2 steps): move agent1 low->mid, move agent1 mid->goal.  gate1
+;;; Expected minimum solution (2 steps): walk agent1 low->mid, walk agent1 mid->goal.  gate1
 ;;; is open from t=0, since compute-connector-lighting/relay-beam-reaches-receiver light
 ;;; connector2 and activate receiver1 during INITIALIZE-DERIVED-STATE's own PROPAGATE-CHANGES!,
 ;;; before any action runs -- so unsolvability (or a "no route" search failure) is the signal
@@ -81,7 +81,7 @@
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; compute-connector-lighting; relay-beam-reaches-receiver
 (include-tech visibility)    ;los-to-apparatus; los-to-location; visible; beam-visible
-(include-tech accessibility) ;walk-via; accessible; move
+(include-tech walkability)   ;walk-via; walkable-locations; walkable; walk
 
 
 ;;;; INITIALIZATION ;;;;

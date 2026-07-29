@@ -19,8 +19,9 @@
 ;;;                -support-elevation (occupant-elevation, read directly for a connector's
 ;;;                own current beam-anchor height); -elevation (fixture-elevation, read
 ;;;                directly for a transmitter/receiver's own beam-anchor height);
-;;;                -accessibility (identity-default accessible query; overridden by
-;;;                accessibility when that technology is included);
+;;;                -walkability (identity-default walkable-locations/walkable queries;
+;;;                walkable-locations is overridden by walkability when that technology
+;;;                is included);
 ;;;                -reachability (identity-default reachable query; overridden by
 ;;;                reachability when that technology is included);
 ;;;                -pickup (pickup-clear, shared with box and jammer)
@@ -51,7 +52,7 @@
 (include-tech -visibility)
 (include-tech -support-elevation)
 (include-tech -elevation)
-(include-tech -accessibility)
+(include-tech -walkability)
 (include-tech -reachability)
 (include-tech -pickup)
 
@@ -117,7 +118,7 @@
        (reachable ?location $a-location)
        (connectable-location $connector ?location)
        (assign $places (placement-options ?agent ?location $connector))
-       (assign $pairing-vantages (accessible ?agent $a-location))
+       (assign $pairing-vantages (walkable-locations ?agent $a-location))
        (exists (?t terminus)
          (connectable-terminus $pairing-vantages ?location $connector ?t)))
   (">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
@@ -285,7 +286,7 @@
      ?placement-location location
      ?connector connector
      ?terminus terminus)
-  ;; Pairing selection uses potential LOS from any currently accessible vantage.  Accessibility
+  ;; Pairing selection uses potential LOS from any currently walkable vantage.  Walkability
   ;; respects current walking obstacles; potential LOS ignores the open state of its own gate
   ;; occluders.  Exact placement and live visible checks subsequently determine active beams.
   ;; ?pairing-vantages is a computed Lisp list; the other parameters are planning objects.

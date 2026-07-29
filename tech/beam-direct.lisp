@@ -26,7 +26,7 @@
 ;;;   nested : -beam-occlusion (beam-blocker type, beam-blocker-occludes-location);
 ;;;            -elevation (elevated-object, has-elevation, fixture-elevation,
 ;;;            location-elevation); -gate (gate optional type, (open gate) relation) --
-;;;            shared with gate, accessibility (via -passability), reachability,
+;;;            shared with gate, walkability (via -passability), reachability,
 ;;;            visibility, and beam-crossing, which all nest -gate instead of
 ;;;            hand-declaring it
 ;;; PROVIDES:

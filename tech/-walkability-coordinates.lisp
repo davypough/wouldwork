@@ -1,9 +1,9 @@
-;;; Filename: -accessibility-coordinates.lisp
+;;; Filename: -walkability-coordinates.lisp
 
-;;; Accessibility coordinates substrate: derives WALK-VIA (and, for rides into an
+;;; Walkability coordinates substrate: derives WALK-VIA (and, for rides into an
 ;;; air stream's destination, WALK-VIA>) from raw segment geometry, for a problem that
 ;;; would rather author 2D positions than hand-list which locations can walk to which.  Nested under
-;;; accessibility-tech, so it is always present wherever (include-tech accessibility) is
+;;; walkability-tech, so it is always present wherever (include-tech walkability) is
 ;;; used; entirely inert unless the problem actually asserts WALL-SEGMENTS or
 ;;; BOUNDARY-WALL -- a problem that hand-authors WALK-VIA directly is unaffected.
 ;;;
@@ -29,8 +29,8 @@
 ;;; nearest solid (the backstop -- the wall the gears hang on), and widened to the
 ;;; stream's width -- 3 units by default, overridable per gears with a STREAM-WIDTH
 ;;; fact (see -stream-passability.lisp, which owns that relation and redefines
-;;; ACCESSIBILITY-COORDINATES-STREAM-SPECS to gather the facts; the default here
-;;; returns none, so accessibility alone never references blower relations).  The
+;;; WALKABILITY-COORDINATES-STREAM-SPECS to gather the facts; the default here
+;;; returns none, so walkability alone never references blower relations).  The
 ;;; resulting band is a conditional barrier region: its perimeter -- the front edge at
 ;;; the destination and the two sides, never the backstop edge -- enters the
 ;;; arrangement as curtain intervals labeled with the GEARS name (passable only while
@@ -61,7 +61,7 @@
 ;;; pair that crosses them regardless of level.  Multi-level maps therefore author an
 ;;; elevated platform's ground-level footprint as wall segments, keep the platform's own
 ;;; locations inside that footprint, and connect the levels only with authored
-;;; jump-via/climb-via> edges (which this derivation never touches); ONE-STEP-ACCESSIBLE's
+;;; jump-via/climb-via> edges (which this derivation never touches); ONE-STEP-WALKABLE's
 ;;; elevation-equality check rejects any derived edge between different levels.  See
 ;;; problem-claustro-topo's slab (wall4/wall5) for the pattern.
 ;;;
@@ -72,20 +72,20 @@
 ;;; tech to be included.  SCREEN-SEGMENTS has no counterpart there, and streams none at
 ;;; all -- they affect walking only, never a sightline.
 ;;;
-;;; Self-contained; spliced by (include-tech -accessibility-coordinates), nested from
-;;; accessibility and from -stream-passability.
+;;; Self-contained; spliced by (include-tech -walkability-coordinates), nested from
+;;; walkability and from -stream-passability.
 ;;;
 ;;; REQUIRES:
-;;;   types     : location  --  declared by the problem, as accessibility itself already
+;;;   types     : location  --  declared by the problem, as walkability itself already
 ;;;               requires; screen declared optional by nested -passability, spliced by
-;;;               accessibility.lisp before this file
+;;;               walkability.lisp before this file
 ;;;   nested    : -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
 ;;;   relations : wall-segments, gate-segments, window-segments, screen-segments,
 ;;;               boundary-wall  --  default to no facts; a problem that asserts
 ;;;               wall-segments or boundary-wall gets WALK-VIA/WALK-VIA> derived
 ;;;               automatically instead of hand-authoring them
-;;;   queries   : accessibility-coordinates-stream-specs  --  default no streams;
+;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
 ;;;               redefined by -stream-passability where wall blowers exist
 ;;;   init      : derive-walk-via-from-segments
 
@@ -107,38 +107,38 @@
 ;;;; database access, so no WW query wrapper is needed for these.  High-level first.
 
 
-(defun accessibility-coordinates-build-arrangement (positions walls gates windows screens stream-specs boundary-points)
+(defun walkability-coordinates-build-arrangement (positions walls gates windows screens stream-specs boundary-points)
   ;; Computes the full walking arrangement once: solids, derived stream bands with their
   ;; curtain segments, coordinate-compressed cells, per-interval coverage
   ;; classification, flood-filled zones, the door-labeled zone graph, every location's
   ;; zone membership (with its ride zones, if it is a stream's destination), and the
   ;; minimal door-set family between every membership zone and every zone.  Returned as
-  ;; a plist consumed pairwise by ACCESSIBILITY-COORDINATES-PAIR-SPEC.
+  ;; a plist consumed pairwise by WALKABILITY-COORDINATES-PAIR-SPEC.
   (let* ((solids (append (mapcar (lambda (segment) (list :wall segment)) walls)
                          (mapcar (lambda (segment) (list :window segment)) windows)
                          (mapcar (lambda (segment) (list :boundary segment))
-                                 (accessibility-coordinates-boundary-segments boundary-points))))
-         (bands (mapcar (lambda (spec) (accessibility-coordinates-stream-band spec solids))
+                                 (walkability-coordinates-boundary-segments boundary-points))))
+         (bands (mapcar (lambda (spec) (walkability-coordinates-stream-band spec solids))
                         stream-specs))
          (tagged (append solids
                          (mapcar (lambda (segment) (list :gate segment)) gates)
                          (mapcar (lambda (segment) (list :screen segment)) screens)
                          (loop for band in bands append (eighth band))))
-         (xs (accessibility-coordinates-axis-coordinates tagged :x))
-         (ys (accessibility-coordinates-axis-coordinates tagged :y))
-         (coverage (accessibility-coordinates-coverage-table tagged xs ys))
-         (classified (accessibility-coordinates-classify-coverage coverage))
-         (zones (accessibility-coordinates-flood-fill (length xs) (length ys) classified))
-         (edges (accessibility-coordinates-door-edges classified zones))
-         (memberships (accessibility-coordinates-memberships
+         (xs (walkability-coordinates-axis-coordinates tagged :x))
+         (ys (walkability-coordinates-axis-coordinates tagged :y))
+         (coverage (walkability-coordinates-coverage-table tagged xs ys))
+         (classified (walkability-coordinates-classify-coverage coverage))
+         (zones (walkability-coordinates-flood-fill (length xs) (length ys) classified))
+         (edges (walkability-coordinates-door-edges classified zones))
+         (memberships (walkability-coordinates-memberships
                         positions xs ys classified zones boundary-points bands))
          (sources (remove-duplicates
                     (loop for (nil zone-list nil) in memberships append zone-list)))
-         (families (accessibility-coordinates-family-table edges sources)))
+         (families (walkability-coordinates-family-table edges sources)))
     (list :memberships memberships :families families)))
 
 
-(defun accessibility-coordinates-pair-spec (arrangement loc-a loc-b)
+(defun walkability-coordinates-pair-spec (arrangement loc-a loc-b)
   ;; Resolves one location pair against the arrangement.  Returns NIL if no zone pair
   ;; across the two memberships is connected (blocked -- no fact), (:sym family) for an
   ;; ordinary symmetric WALK-VIA, or (:dir family-a->b family-b->a) when either endpoint
@@ -158,20 +158,20 @@
         (let ((fam (gethash (list za zb) families)))
           (when fam
             (setf connected t)
-            (setf base (accessibility-coordinates-family-union base fam))))))
+            (setf base (walkability-coordinates-family-union base fam))))))
     (when connected
-      (let ((into-b (accessibility-coordinates-ride-augmented-family
+      (let ((into-b (walkability-coordinates-ride-augmented-family
                       base (second entry-a) (third entry-b) families))
-            (into-a (accessibility-coordinates-ride-augmented-family
+            (into-a (walkability-coordinates-ride-augmented-family
                       base (second entry-b) (third entry-a) families)))
         (if (equal into-a into-b)
-          (list :sym (accessibility-coordinates-normalize-family into-a))
+          (list :sym (walkability-coordinates-normalize-family into-a))
           (list :dir
-                (accessibility-coordinates-normalize-family into-b)
-                (accessibility-coordinates-normalize-family into-a)))))))
+                (walkability-coordinates-normalize-family into-b)
+                (walkability-coordinates-normalize-family into-a)))))))
 
 
-(defun accessibility-coordinates-ride-augmented-family (base source-zones ride-zones families)
+(defun walkability-coordinates-ride-augmented-family (base source-zones ride-zones families)
   ;; The inbound family into a location: BASE plus, when the location is some stream's
   ;; destination, the families from every source zone to each of its ride zones --
   ;; reaching a zone flanking the band's side curtains suffices, because stepping
@@ -182,7 +182,7 @@
       (dolist (ride-zone ride-zones)
         (let ((fam (gethash (list source-zone ride-zone) families)))
           (when fam
-            (setf family (accessibility-coordinates-family-union family fam))))))
+            (setf family (walkability-coordinates-family-union family fam))))))
     family))
 
 
@@ -193,7 +193,7 @@
 ;;;; destination) is always first in the curtain list; the two sides follow.
 
 
-(defun accessibility-coordinates-stream-band (spec solids)
+(defun walkability-coordinates-stream-band (spec solids)
   ;; SPEC is (gears swept-location destination sx sy dx dy width): the gears' own
   ;; position, the AIMED-AT> destination and its position, and the stream's width.  The
   ;; center line must be axis-aligned; it extends backward from the swept location, away
@@ -209,7 +209,7 @@
       (error "The stream of ~A from (~A ~A) to (~A ~A) is not axis-aligned."
              gears sx sy dx dy))
     (if (= sy dy)
-      (let* ((backstop (accessibility-coordinates-stream-backstop
+      (let* ((backstop (walkability-coordinates-stream-backstop
                          gears sx sy :vertical (> dx sx) solids))
              (x-lo (min backstop dx))
              (x-hi (max backstop dx))
@@ -219,7 +219,7 @@
               (list (list :stream (list gears dx y-lo dx y-hi))
                     (list :stream (list gears x-lo y-lo x-hi y-lo))
                     (list :stream (list gears x-lo y-hi x-hi y-hi)))))
-      (let* ((backstop (accessibility-coordinates-stream-backstop
+      (let* ((backstop (walkability-coordinates-stream-backstop
                          gears sx sy :horizontal (> dy sy) solids))
              (y-lo (min backstop dy))
              (y-hi (max backstop dy))
@@ -231,7 +231,7 @@
                     (list :stream (list gears x-hi y-lo x-hi y-hi))))))))
 
 
-(defun accessibility-coordinates-stream-backstop (gears sx sy transversal-orientation destination-above-p solids)
+(defun walkability-coordinates-stream-backstop (gears sx sy transversal-orientation destination-above-p solids)
   ;; The coordinate of the nearest solid crossing the stream's center line behind the
   ;; fan: among solids of TRANSVERSAL-ORIENTATION whose own extent contains the center
   ;; line's fixed coordinate, the closest one on the opposite side of the swept
@@ -241,11 +241,11 @@
         (best nil))
     (dolist (tagged-solid solids)
       (let ((segment (second tagged-solid)))
-        (when (eql (accessibility-coordinates-orientation segment) transversal-orientation)
+        (when (eql (walkability-coordinates-orientation segment) transversal-orientation)
           (let ((coordinate (if (eql transversal-orientation :vertical)
                               (second segment)
                               (third segment)))
-                (range (accessibility-coordinates-along-range segment transversal-orientation)))
+                (range (walkability-coordinates-along-range segment transversal-orientation)))
             (when (and (<= (car range) fixed (cdr range))
                        (if destination-above-p (< coordinate along) (> coordinate along))
                        (or (null best)
@@ -257,7 +257,7 @@
     best))
 
 
-(defun accessibility-coordinates-along-range (segment orientation)
+(defun walkability-coordinates-along-range (segment orientation)
   ;; SEGMENT's own extent along its line's direction, as a sorted (low . high) pair: Y
   ;; for a :vertical segment, X for a :horizontal one.
   (let ((a (if (eql orientation :vertical) (third segment) (second segment)))
@@ -268,7 +268,7 @@
 ;;;; LOCATION MEMBERSHIP ;;;;
 
 
-(defun accessibility-coordinates-memberships (positions xs ys classified zones boundary-points bands)
+(defun walkability-coordinates-memberships (positions xs ys classified zones boundary-points bands)
   ;; One (location zone-list ride-zones) entry per location: the zones the location
   ;; belongs to, and -- when it is some stream's AIMED-AT> destination -- the zones from
   ;; which that stream can be ridden to it (the zones across its band's side curtains).
@@ -276,11 +276,11 @@
   ;; location landing there is an authoring mistake caught here.
   (let ((outside (when boundary-points (aref zones 0 0))))
     (loop for (location x y) in positions
-          collect (let ((zone-list (accessibility-coordinates-resolve-location
+          collect (let ((zone-list (walkability-coordinates-resolve-location
                                      location x y xs ys classified zones bands))
                         (ride-zones (loop for band in bands
                                           when (eql location (third band))
-                                            append (accessibility-coordinates-band-side-zones
+                                            append (walkability-coordinates-band-side-zones
                                                      band xs ys classified zones))))
                     (when (and outside (member outside zone-list))
                       (error "Location ~A (~A ~A) lies outside the boundary wall."
@@ -288,7 +288,7 @@
                     (list location zone-list (remove-duplicates ride-zones))))))
 
 
-(defun accessibility-coordinates-resolve-location (location x y xs ys classified zones bands)
+(defun walkability-coordinates-resolve-location (location x y xs ys classified zones bands)
   ;; A location's zone membership list: its cell's zone when strictly inside a cell (an
   ;; error for any location inside a band other than the band's own swept location);
   ;; either flanking cell's zone (they are one zone through that very interval) when on
@@ -298,17 +298,17 @@
   ;; disagree, errors -- an authoring mistake, not a case to guess at.
   (let ((xi (position x xs :test #'=))
         (yi (position y ys :test #'=))
-        (col (accessibility-coordinates-interval-index x xs))
-        (row (accessibility-coordinates-interval-index y ys)))
+        (col (walkability-coordinates-interval-index x xs))
+        (row (walkability-coordinates-interval-index y ys)))
     (cond ((and (null xi) (null yi))
-           (accessibility-coordinates-resolve-in-cell
+           (walkability-coordinates-resolve-in-cell
              location x y (aref zones col row) bands))
           ((null yi)
-           (accessibility-coordinates-resolve-on-line
+           (walkability-coordinates-resolve-on-line
              location x y :v (gethash (list :v xi row) classified)
              (aref zones xi row) (aref zones (1+ xi) row) bands))
           ((null xi)
-           (accessibility-coordinates-resolve-on-line
+           (walkability-coordinates-resolve-on-line
              location x y :h (gethash (list :h yi col) classified)
              (aref zones col yi) (aref zones col (1+ yi)) bands))
           (t
@@ -322,7 +322,7 @@
              corner-zones)))))
 
 
-(defun accessibility-coordinates-resolve-in-cell (location x y zone bands)
+(defun walkability-coordinates-resolve-in-cell (location x y zone bands)
   ;; Membership for a location strictly inside a cell.  Inside a stream band, only the
   ;; band's own swept location may stand, and it belongs to the band's zone alone --
   ;; every walking edge to or from it then carries the band's gears in each clause
@@ -341,7 +341,7 @@
                     location x y (first (first containing)))))))
 
 
-(defun accessibility-coordinates-resolve-on-line (location x y axis cover near-zone far-zone bands)
+(defun walkability-coordinates-resolve-on-line (location x y axis cover near-zone far-zone bands)
   ;; Membership for a location on a single grid-line interval of AXIS (:v or :h), given
   ;; that interval's classification and the two flanking cells' zones.  On a stream
   ;; curtain the location belongs to the zone OUTSIDE the band only -- the AIMED-AT>
@@ -365,14 +365,14 @@
              (list (if (= y (sixth band)) near-zone far-zone)))))))
 
 
-(defun accessibility-coordinates-band-side-zones (band xs ys classified zones)
+(defun walkability-coordinates-band-side-zones (band xs ys classified zones)
   ;; Every zone lying just across one of BAND's unclipped SIDE curtain intervals -- the
   ;; zones a walker can ride BAND's stream from: stepping laterally into the flow
   ;; carries them to the destination.  The front curtain (always first in the curtain
   ;; list) never grants a ride: entering against the flow is barred.
   (let ((neighbors nil))
     (dolist (curtain (rest (eighth band)))
-      (dolist (key (accessibility-coordinates-segment-interval-keys (second curtain) xs ys))
+      (dolist (key (walkability-coordinates-segment-interval-keys (second curtain) xs ys))
         (let ((class (gethash key classified)))
           (when (and (listp class)
                      (eql (first class) :door)
@@ -391,7 +391,7 @@
 ;;;; clauses, AND within -- the same DNF convention as CONTROLS.
 
 
-(defun accessibility-coordinates-family-table (edges sources)
+(defun walkability-coordinates-family-table (edges sources)
   ;; For every source zone in SOURCES, relaxes families over the door-labeled zone graph
   ;; to a fixpoint: the source starts at the family of one empty clause; each edge
   ;; extends the near side's family by its door and merges into the far side.  Families
@@ -404,7 +404,7 @@
         (setf (gethash source fams) (list nil))
         (loop for changed = nil
               do (dolist (edge edges)
-                   (when (accessibility-coordinates-relax-edge edge fams)
+                   (when (walkability-coordinates-relax-edge edge fams)
                      (setf changed t)))
               while changed)
         (loop for zone being the hash-keys of fams using (hash-value family)
@@ -412,7 +412,7 @@
     table))
 
 
-(defun accessibility-coordinates-relax-edge (edge fams)
+(defun walkability-coordinates-relax-edge (edge fams)
   ;; Relaxes one undirected door edge (zone-a zone-b door) in both directions.  Returns
   ;; true if either endpoint's family changed.
   (let ((changed nil))
@@ -421,8 +421,8 @@
         (let ((from-family (gethash (first direction) fams)))
           (when from-family
             (let* ((to (second direction))
-                   (candidate (accessibility-coordinates-family-add-door from-family door))
-                   (merged (accessibility-coordinates-family-union
+                   (candidate (walkability-coordinates-family-add-door from-family door))
+                   (merged (walkability-coordinates-family-union
                              (gethash to fams) candidate)))
               (when (> (length merged) 32)
                 (error "The minimal door-set family between two zones exceeds 32 ~
@@ -433,24 +433,24 @@
     changed))
 
 
-(defun accessibility-coordinates-family-union (family1 family2)
+(defun walkability-coordinates-family-union (family1 family2)
   ;; Alternative routes: all clauses of both, minimized and canonicalized.
-  (accessibility-coordinates-minimize-family (append family1 family2)))
+  (walkability-coordinates-minimize-family (append family1 family2)))
 
 
-(defun accessibility-coordinates-family-add-door (family door)
+(defun walkability-coordinates-family-add-door (family door)
   ;; Path extension: DOOR conjoined into every clause, then re-minimized (adding a shared
   ;; door can make formerly incomparable clauses comparable).
-  (accessibility-coordinates-minimize-family
+  (walkability-coordinates-minimize-family
     (mapcar (lambda (clause) (cons door clause)) family)))
 
 
-(defun accessibility-coordinates-minimize-family (family)
+(defun walkability-coordinates-minimize-family (family)
   ;; Antichain reduction to canonical form: canonical clauses, duplicates removed, any
   ;; clause with a proper subset present removed, clauses sorted by length then
   ;; lexicographically.
   (let* ((clauses (remove-duplicates
-                    (mapcar #'accessibility-coordinates-canonical-clause family)
+                    (mapcar #'walkability-coordinates-canonical-clause family)
                     :test #'equal))
          (minimal (remove-if (lambda (clause)
                                (some (lambda (other)
@@ -458,15 +458,15 @@
                                             (subsetp other clause)))
                                      clauses))
                              clauses)))
-    (sort (copy-list minimal) #'accessibility-coordinates-clause-precedes-p)))
+    (sort (copy-list minimal) #'walkability-coordinates-clause-precedes-p)))
 
 
-(defun accessibility-coordinates-canonical-clause (clause)
+(defun walkability-coordinates-canonical-clause (clause)
   ;; Doors within a clause in symbol-name order, duplicates removed.
   (sort (copy-list (remove-duplicates clause)) #'string< :key #'symbol-name))
 
 
-(defun accessibility-coordinates-clause-precedes-p (clause1 clause2)
+(defun walkability-coordinates-clause-precedes-p (clause1 clause2)
   ;; Canonical clause order: shorter first, then element-wise symbol-name order.
   (cond ((/= (length clause1) (length clause2))
          (< (length clause1) (length clause2)))
@@ -477,7 +477,7 @@
                  finally (return nil)))))
 
 
-(defun accessibility-coordinates-normalize-family (family)
+(defun walkability-coordinates-normalize-family (family)
   ;; The family of one empty clause is the direct/unguarded value ().
   (if (equal family '(nil))
     nil
@@ -487,7 +487,7 @@
 ;;;; ARRANGEMENT GEOMETRY ;;;;
 
 
-(defun accessibility-coordinates-boundary-segments (points)
+(defun walkability-coordinates-boundary-segments (points)
   ;; The closed polygon's edges as pseudo-segments (:boundary x1 y1 x2 y2); the last
   ;; point wraps to the first.  Every edge must be axis-aligned.
   (when points
@@ -498,7 +498,7 @@
           collect (list :boundary (first p1) (second p1) (first p2) (second p2)))))
 
 
-(defun accessibility-coordinates-orientation (segment)
+(defun walkability-coordinates-orientation (segment)
   ;; :horizontal if SEGMENT's two endpoints share Y, :vertical if they share X.  A
   ;; diagonal segment is an authoring mistake to catch here, not a case to generalize
   ;; the geometry for.
@@ -510,7 +510,7 @@
                     (first segment) x1 y1 x2 y2)))))
 
 
-(defun accessibility-coordinates-axis-coordinates (tagged-segments axis)
+(defun walkability-coordinates-axis-coordinates (tagged-segments axis)
   ;; The sorted, deduplicated coordinates every segment contributes along AXIS (:x or
   ;; :y), as a vector of grid-line coordinates.  Location coordinates never contribute.
   (coerce (sort (remove-duplicates
@@ -523,19 +523,19 @@
           'vector))
 
 
-(defun accessibility-coordinates-interval-index (value coordinates)
+(defun walkability-coordinates-interval-index (value coordinates)
   ;; The index of the open interval VALUE falls in: interval i spans coordinate i-1 to
   ;; coordinate i, with unbounded intervals 0 and (length COORDINATES) outside.
   (count-if (lambda (coordinate) (< coordinate value)) coordinates))
 
 
-(defun accessibility-coordinates-segment-interval-keys (segment xs ys)
+(defun walkability-coordinates-segment-interval-keys (segment xs ys)
   ;; The coverage keys of every cell edge-interval SEGMENT covers: (:v k r) is the
   ;; interval of vertical grid line k flanking row r; (:h m i) is the interval of
   ;; horizontal grid line m flanking column i.  Segment endpoints are themselves grid
   ;; coordinates, so a segment covers each interval entirely or not at all.
-  (let* ((orientation (accessibility-coordinates-orientation segment))
-         (range (accessibility-coordinates-along-range
+  (let* ((orientation (walkability-coordinates-orientation segment))
+         (range (walkability-coordinates-along-range
                   segment (if (eql orientation :vertical) :vertical :horizontal))))
     (if (eql orientation :vertical)
       (let ((k (position (second segment) xs :test #'=))
@@ -548,17 +548,17 @@
         (loop for i from (1+ ilo) to ihi collect (list :h m i))))))
 
 
-(defun accessibility-coordinates-coverage-table (tagged-segments xs ys)
+(defun walkability-coordinates-coverage-table (tagged-segments xs ys)
   ;; Marks every cell edge-interval each segment covers with the segment's (kind name).
   (let ((coverage (make-hash-table :test 'equal)))
     (dolist (tagged-segment tagged-segments)
       (destructuring-bind (kind segment) tagged-segment
-        (dolist (key (accessibility-coordinates-segment-interval-keys segment xs ys))
+        (dolist (key (walkability-coordinates-segment-interval-keys segment xs ys))
           (push (list kind (first segment)) (gethash key coverage)))))
     coverage))
 
 
-(defun accessibility-coordinates-classify-coverage (coverage)
+(defun walkability-coordinates-classify-coverage (coverage)
   ;; Classifies each covered interval: :solid when any wall/window/boundary covers it,
   ;; or (:door name kind) for a single gate/screen/stream curtain.  A stream curtain
   ;; overlapping a solid is silently clipped -- the solid wins; a gate or screen
@@ -590,7 +590,7 @@
     classified))
 
 
-(defun accessibility-coordinates-flood-fill (nx ny classified)
+(defun walkability-coordinates-flood-fill (nx ny classified)
   ;; Unions cells across open (unclassified) intervals into zones: a 2D array of zone
   ;; ids over the (1+ NX) x (1+ NY) cell grid, unbounded outer cells included -- a
   ;; closed solid boundary isolates them on its own.
@@ -603,7 +603,7 @@
           (let ((stack (list (list i j))))
             (loop while stack
                   do (destructuring-bind (ci cj) (pop stack)
-                       (dolist (neighbor (accessibility-coordinates-open-neighbors
+                       (dolist (neighbor (walkability-coordinates-open-neighbors
                                            ci cj nx ny classified))
                          (when (null (aref zones (first neighbor) (second neighbor)))
                            (setf (aref zones (first neighbor) (second neighbor)) zone-count)
@@ -612,7 +612,7 @@
     zones))
 
 
-(defun accessibility-coordinates-open-neighbors (i j nx ny classified)
+(defun walkability-coordinates-open-neighbors (i j nx ny classified)
   ;; The cells adjacent to cell (I J) across open intervals.
   (let ((neighbors nil))
     (when (and (< i nx) (null (gethash (list :v i j) classified)))
@@ -626,7 +626,7 @@
     neighbors))
 
 
-(defun accessibility-coordinates-door-edges (classified zones)
+(defun walkability-coordinates-door-edges (classified zones)
   ;; The labeled zone graph: one (zone-a zone-b door-name) edge per door that joins two
   ;; distinct zones somewhere, deduplicated; a door interval interior to one zone (a
   ;; walkaround exists) contributes nothing.
@@ -649,7 +649,7 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
-(define-query accessibility-coordinates-location-coords ()
+(define-query walkability-coordinates-location-coords ()
   (do (assign $positions nil)
       (doall (?location location)
         (if (bind (location-coords> ?location $x $y))
@@ -658,7 +658,7 @@
       $positions))
 
 
-(define-query accessibility-coordinates-stream-specs ()
+(define-query walkability-coordinates-stream-specs ()
   ;; Default: no air streams.  -stream-passability, nested by wall-blower, redefines
   ;; this to gather one (gears swept-location destination sx sy dx dy width) spec per
   ;; wall-gears from HAS-POSITION, AIMED-AT>, LOCATION-COORDS>, and STREAM-WIDTH
@@ -690,15 +690,15 @@
         (assign $windows (if (bind (window-segments $window-facts)) $window-facts))
         (assign $screens (if (bind (screen-segments $screen-facts)) $screen-facts))
         (assign $boundary (if (bind (boundary-wall $boundary-points)) $boundary-points))
-        (assign $stream-specs (accessibility-coordinates-stream-specs))
-        (assign $positions (accessibility-coordinates-location-coords))
-        (assign $arrangement (accessibility-coordinates-build-arrangement
+        (assign $stream-specs (walkability-coordinates-stream-specs))
+        (assign $positions (walkability-coordinates-location-coords))
+        (assign $arrangement (walkability-coordinates-build-arrangement
                                $positions $walls $gates $windows $screens $stream-specs $boundary))
         (doall (?source location)
           (doall (?destination location)
             (if (member ?destination
                         (rest (member ?source (gethash 'location *types*))))
-              (do (assign $spec (accessibility-coordinates-pair-spec
+              (do (assign $spec (walkability-coordinates-pair-spec
                                   $arrangement ?source ?destination))
                   (if $spec
                     (if (eql (first $spec) :sym)

@@ -31,7 +31,7 @@ begin the interview proper until it is decided.
 
 **Path A — a new Talos Principle problem.**
 Build it on the `tech/` technology library. These files implement a *topological*
-representation of Talos mechanics — beams, connectors, gates, accessibility,
+representation of Talos mechanics — beams, connectors, gates, walkability,
 visibility, elevation — as reusable roles that splice into the spec via
 `include-tech` (Section 1.5). A new Talos problem should be assembled from the
 existing technologies rather than hand-authoring the mechanics, so that behavior
@@ -232,7 +232,7 @@ than hand-authoring them:
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect actions
 (include-tech beam-crossing)         ;crossing-active; crossings-along-beam>
-(include-tech accessibility)         ;walk-via; accessible; move
+(include-tech walkability)          ;walk-via; walkable-locations; walkable; walk
 (include-tech visibility)            ;los-to-apparatus; visible; visible-clear
 ```
 
@@ -530,7 +530,7 @@ computed key values.
 #### State Copying
 `(copy-problem-state state)` creates a deep copy of the current state.
 Used when you need to test modifications without corrupting the search state
-(e.g., gated move preconditions that propagate on a copy).
+(e.g., gated walk preconditions that propagate on a copy).
 
 #### `register-dynamic-object`
 `(register-dynamic-object <symbol> <type>)` registers a new object at runtime

@@ -5,7 +5,7 @@
 ;;; spare box2 (an alternative, longer way to depress the plate).  loft declares no
 ;;; has-elevation fact, so it floats at floor-blower's default landing elevation of 10.
 ;;; Expected minimum solution (4 steps): pickup-box box1, put-box box1 on fan1 (the gears
-;;; are not yet turning, so it rests there), move to lower2, step-on plate1 -- the agent's
+;;; are not yet turning, so it rests there), walk to lower2, step-on plate1 -- the agent's
 ;;; weight depresses the plate, setting the gears turning; the mounted fan blows and
 ;;; launches box1 to loft.
 
@@ -45,7 +45,7 @@
 (include-tech floor-blower)
 (include-tech box)
 (include-tech step)
-(include-tech accessibility)
+(include-tech walkability)
 
 
 ;;;; INITIALIZATION ;;;;

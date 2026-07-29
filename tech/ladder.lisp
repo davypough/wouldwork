@@ -2,7 +2,7 @@
 
 ;;; Ladder technology: one-way climbing over a ladder-like object.  A directed climb edge
 ;;; (climb-via>) carries the agent from its current location to the edge's destination when
-;;; every enabling implement is usable.  Unlike walking (accessibility), climb edges are not
+;;; every enabling implement is usable.  Unlike walking (walkability), climb edges are not
 ;;; folded into the reachable-set closure; they are explicit ladder actions.
 ;;;
 ;;; REQUIRES:

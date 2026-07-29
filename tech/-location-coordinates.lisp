@@ -2,7 +2,7 @@
 
 ;;; Location-coordinates substrate: the fixed 2D placement of a location, as its own
 ;;; capability independent of walking, beams, or anything else.  Owns LOCATION-COORDS>
-;;; so that accessibility-tech's own coordinate-driven WALK-VIA derivation and beam-
+;;; so that walkability-tech's own coordinate-driven WALK-VIA derivation and beam-
 ;;; crossing-tech's -beam-coordinates substrate share one source of truth for where each
 ;;; location is, without either technology depending on the other.  A problem that only
 ;;; needs walking between locations, with no transmitters/receivers/connectors, never

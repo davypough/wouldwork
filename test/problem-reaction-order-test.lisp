@@ -68,7 +68,7 @@
 ;;; interval: ffan1 is still blowing and still aims at pad1, so nothing is dropped back.
 ;;;
 ;;; The puzzle.  Everything happens at pad0, so no walking is involved and no WALK-VIA is
-;;; authored -- ACCESSIBILITY is included only because both existing blower tests include
+;;; authored -- WALKABILITY is included only because both existing blower tests include
 ;;; it and the nested substrates expect it.  Expected minimum solution (3 steps): pickup
 ;;; box1, put it on ffan1, and step onto plate1, whose depression turns both sets of gears
 ;;; at once.  Stepping on the plate first works equally well and is the same length.  Both
@@ -113,7 +113,7 @@
 (include-tech wall-blower)   ;update-wall-blower-status!; sweep-occupants-away!
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step-on; step-off
-(include-tech accessibility) ;walk-via; accessible; move
+(include-tech walkability)  ;walk-via; walkable-locations; walkable; walk
 
 
 ;;;; INITIALIZATION ;;;;

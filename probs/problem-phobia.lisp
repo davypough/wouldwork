@@ -54,7 +54,7 @@
 (include-tech gate)
 (include-tech beam-relay)
 (include-tech visibility)
-(include-tech accessibility)
+(include-tech walkability)
 
 
 ;;;; HEURISTIC ;;;;
@@ -164,7 +164,7 @@
   ;; Air-stream barriers are DERIVED, not authored: each wall-gears' band runs from the
   ;; solid backstop behind its fan through its has-position swept location to its
   ;; aimed-at> destination, 3 units wide by default (override with a (stream-width
-  ;; gears w) fact) -- see -stream-passability and -accessibility-coordinates.  The
+  ;; gears w) fact) -- see -stream-passability and -walkability-coordinates.  The
   ;; swept location is standable only while its stream is off (every edge to it is
   ;; gears-gated); each zone flanking a band's side curtains instead gets a free
   ;; one-way walk-via> ride edge to the stream's destination -- step in laterally and

@@ -8,7 +8,7 @@
 ;;;   types     : location
 ;;;   nested    : -reachability (identity-default reachable query overridden here);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
-;;;               accessibility (via -passability), visibility, beam-direct, and
+;;;               walkability (via -passability), visibility, beam-direct, and
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it
 ;;; PROVIDES:
 ;;;   relations : (reach-via location $list location)

@@ -23,7 +23,7 @@
 ;;;
 ;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENTS --
 ;;; derived from raw 2D segment geometry by nested -beam-los-coordinates (entirely inert
-;;; otherwise), mirroring accessibility's own nested -accessibility-coordinates deriving
+;;; otherwise), mirroring walkability's own nested -walkability-coordinates deriving
 ;;; WALK-VIA.  This file owns the los relations, so it owns their coordinate derivation too;
 ;;; beam-direct, beam-relay, and beam-crossing all consume sightlines through the visible
 ;;; interface without nesting the derivation themselves (beam-crossing's own
@@ -40,7 +40,7 @@
 ;;;   nested    : -visibility (fixture, apparatus, and the null-default visible/beam-visible
 ;;;               interface);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
-;;;               accessibility (via -passability), reachability, beam-direct, and
+;;;               walkability (via -passability), reachability, beam-direct, and
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it;
 ;;;               -beam-los-coordinates (BEAM-ENDPOINT type; APPARATUS-COORDS>,
 ;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS;

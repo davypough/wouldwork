@@ -29,10 +29,10 @@
 ;;;               BEAM-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENTS, GATE-SEGMENTS,
 ;;;               BOUNDARY-WALL, and LOS derivation);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
-;;;               accessibility (via -passability), reachability, visibility, and
+;;;               walkability (via -passability), reachability, visibility, and
 ;;;               beam-direct, which all nest -gate instead of hand-declaring it
 ;;;   types     : transmitter  --  declared optional here; other techs (gate,
-;;;               accessibility, visibility, reachability, beam-direct, -beam-substrate,
+;;;               walkability, visibility, reachability, beam-direct, -beam-substrate,
 ;;;               beam-relay, etc.) independently declare their own transmitter-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,

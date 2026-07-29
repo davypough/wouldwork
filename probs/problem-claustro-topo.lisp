@@ -57,7 +57,7 @@
 (include-tech jammer)
 (include-tech box)
 (include-tech jump)
-(include-tech accessibility)
+(include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
 (include-tech ladder)
@@ -105,14 +105,14 @@
   ;; Boundary wall.  The final point connects back to the first.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS folds each polygon edge into its wall list, so a sightline that
   ;; would have to cut outside this silhouette is blocked exactly like a wall-segment.  Not
-  ;; currently consulted by accessibility's own coordinate derivation (walk-via).
+  ;; currently consulted by walkability's own coordinate derivation (walk-via).
   (boundary-wall
     ((0 10) (11 10) (11 5) (16 5)
      (16 0) (33 0) (33 17) (0 17)))
 
   ;; Opaque internal wall, interrupted by a visibility-transparent,
   ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo.lisp
-  ;; (same segment declared there) so LOS/accessibility derivations here see it too.
+  ;; (same segment declared there) so LOS/walkability derivations here see it too.
   ;; wall4 and wall5 are the ground-level footprint of the raised slab that location12,
   ;; location13, gate8, and gate9 sit on (elevation 2): east edge between location12 and
   ;; location10, west edge between location13 and location11, sealing against the

@@ -22,7 +22,7 @@ Settle this before transcribing anything; it changes what Sections 1–3 can con
 
 **Does the spec assert `wall-segments`?**
 
-- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-accessibility-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `wall-segments`, `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
+- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `wall-segments`, `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
 - **No — hand-authored.** The spec states its edges directly. Transcribe them.
 
 Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* hand-authored sightline relations in its own older vocabulary (`los0`/`los1`, `visible0`/`visible1`, `accessible0`/`accessible1`). Transcribe whatever that file actually declares; do not translate it into `tech/` names.
@@ -35,7 +35,7 @@ Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* han
 
 1. **Transcribe, don't recall.** Every structural fact in Sections 1–7 comes verbatim from the current file, or from the load printout where the fact is derived. Cite line numbers where it aids the transcription check.
 2. **Spec stays authoritative.** The reference is a *derived* aid, not ground truth. On any conflict, the spec wins — fix the reference, never the other way around.
-3. **Keep the capability families separate.** Movement (accessibility), sight (visibility), and reach (reachability) are distinct graphs with distinct passability rules. Never merge them; a fact true in one is routinely false in the others. In particular: movement is agent-dependent, reach and sight are not; and a screen or ladder that a walking agent can pass empty-handed blocks reach absolutely.
+3. **Keep the capability families separate.** Walking (walkability), sight (visibility), and reach (reachability) are distinct graphs with distinct passability rules. Never merge them; a fact true in one is routinely false in the others. In particular: walking is agent-dependent, reach and sight are not; and a screen or ladder that a walking agent can pass empty-handed blocks reach absolutely.
 4. **Separate what the spec states from what it cannot.** In a coordinate-derived spec, geometry *is* spec fact — record positions and segments in Sections 1–3 like any other declaration. Reserve Section 8 for what genuinely cannot be read off the spec: an unstated adjacency, a diagram-only feature, an intended-but-unmodeled relationship. If the spec has no geometry at all, then wall sides and sightline plausibility do belong in Section 8, as readings of the diagram flagged for confirmation.
 5. **Compute the start state once.** Hand-run the derivation cascade (the `define-update` functions, in `propagate-consequences!` order) over the init facts and record the actual initial derived vector — open gates, active receivers, crossing states. Don't leave it implicit. Note that on a tech-based spec this driver is usually *derived from splice order* rather than authored, so read the technology include order to get the sequence right.
 6. **Words, not symbols, in legends.** Use tokens like `clear` / `(occluders…)` / `none`. Bare symbols (—, ·) render inconsistently and invite transcription drift.
@@ -51,12 +51,13 @@ Open with a **header block**: source filename; authoring path (coordinate-derive
 
 Then the sections below. Treat them as a **template**: drop any the problem doesn't exercise, and add problem-specific ones where a derived layer doesn't fit the headings.
 
-### 1. Accessibility (movement) network
+### 1. Walkability network
 
-From `walk-via`, `walk-via>`, `jump-via`, `jump-via>`, `climb-via>`, and the passability queries `obstacle-clear` / `all-clear` (in `tech/-passability.lisp`), consumed by `accessible` and `one-step-accessible`.
+From `walk-via`, `walk-via>`, and the passability queries `obstacle-clear` / `all-clear` (in `tech/-passability.lisp`), consumed by `walkable-locations`, `walkable`, and `one-step-walkable`. Keep the separate `jump-via`, `jump-via>`, and `climb-via>` locomotion edges outside this walking network.
 
 - **The clause convention, stated once.** These `$list` values are **DNF door-clause lists**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
-- **Each edge** with its clause list. Mark direction: `walk-via` and `jump-via` are symmetric; `walk-via>`, `jump-via>`, and `climb-via>` are directional, and the reverse direction may have a different clause list or none.
+- **Each walking edge** with its clause list. Mark direction: `walk-via` is symmetric; `walk-via>` is directional, and the reverse direction may have a different clause list or none.
+- **Separate locomotion edges.** Record `jump-via` / `jump-via>` and `climb-via>` separately; they are not members of the walking closure.
 - **The per-kind passability rule** for each obstacle kind the spec actually uses, read from `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **gears** item is an air-stream crossing, passable unless a blowing fan is mounted.
 - **Air streams, if present.** They are derived, not authored: each wall-gears' band runs from the solid backstop behind its fan, through its `has-position` swept location, to its `aimed-at>` destination, 3 units wide unless `stream-width` overrides. The swept location is standable exactly while the stream is off.
 - **Flag any location with no walk edge at all**, and any location reachable only by a directional edge.

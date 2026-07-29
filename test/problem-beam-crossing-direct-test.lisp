@@ -21,7 +21,7 @@
 ;;; in UPDATE-CROSSING-STATUS! settles on the first pass.  The goal is deliberately
 ;;; independent of the receivers.
 ;;;
-;;; Expected minimum solution (1 step): move agent1 loc1 -> loc2.
+;;; Expected minimum solution (1 step): walk agent1 loc1 -> loc2.
 ;;;
 ;;; REPL check, after loading:
 ;;;   (length (get-current-crossings *start-state*))  =>  1
@@ -59,8 +59,8 @@
 ;;;; TECHNOLOGY INCLUDES ;;;;
 ;;;; beam-direct supplies COUPLED/BEAM-VIA and the direct arrival and cut-liveness hooks;
 ;;;; beam-crossing supplies the crossing machinery and, through its nested
-;;;; -beam-crossing-coordinates, the derivation under test.  accessibility is here only to
-;;;; give the agent a MOVE action so the problem has something to search.
+;;;; -beam-crossing-coordinates, the derivation under test.  walkability is here only to
+;;;; give the agent a WALK action so the problem has something to search.
 ;;;;
 ;;;; visibility is not optional here even though this problem has no sightlines to speak
 ;;;; of.  beam-crossing nests -beam-crossing-coordinates, which nests -beam-los-coordinates,
@@ -74,7 +74,7 @@
 
 (include-tech beam-direct)
 (include-tech beam-crossing)
-(include-tech accessibility)
+(include-tech walkability)
 (include-tech visibility)
 
 

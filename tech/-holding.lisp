@@ -2,7 +2,7 @@
 
 ;;; Holding substrate: what an agent carries.  This file owns the cargo type composition and
 ;;; the (holding ...) relation, declared identically by every tech file that reads or writes
-;;; it -- box, jammer, and accessibility -- so consumers nest-include this file instead
+;;; it -- box, jammer, and walkability -- so consumers nest-include this file instead
 ;;; of each re-declaring the same union and relation.
 ;;;
 ;;; PROVIDES:

@@ -2,7 +2,7 @@
 
 ;;; Location substrate: what "being at a location" means for any movable object.  This file
 ;;; owns the mobile-object type composition and the (has-location ...) relation, declared
-;;; identically by every tech file that reads or writes it -- box, jammer, accessibility,
+;;; identically by every tech file that reads or writes it -- box, jammer, walkability,
 ;;; ladder, and beam-direct -- so consumers nest-include this file instead of each
 ;;; re-declaring the same union and relation.
 ;;;

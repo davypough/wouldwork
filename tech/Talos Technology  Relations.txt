@@ -69,6 +69,12 @@ gears: it is standable exactly while the stream is off.  The front curtain
 grants no ride -- walking in against the flow is an ordinary gears-gated
 crossing.
 
+walkable (?agent ?from ?to) is the Boolean predicate parallel to visible and
+reachable.  walkable-locations (?agent ?from) computes the full walking
+closure once for callers such as walk and beam-relay; one-step-walkable is
+the per-edge predicate used to build that closure.  None of these includes
+step, jump, or ladder transitions.
+
 Air streams are derived, not authored: each wall-gears' band runs from the
 solid backstop behind its fan through its has-position swept location to its
 aimed-at> destination, 3 units wide unless a stream-width fact overrides.
@@ -93,13 +99,13 @@ while lethal; lethal is dynamic, asserted only by the owning threat
 technology's own status update (gun's update-gun-status! for gun instances).
 safe (?location) is true unless some currently-lethal threat threatens that
 location.  jump's jump-to and ladder's use-ladder check it directly at their
-own precondition, excluding an unsafe destination outright.  accessibility
-instead gates it inside one-step-accessible, the per-hop predicate
-accessible's BFS uses to expand its closure: move is not a single hop -- it
+own precondition, excluding an unsafe destination outright.  walkability
+instead gates it inside one-step-walkable, the per-hop predicate
+walkable-locations' BFS uses to expand its closure: walk is not a single hop -- it
 offers any node in the whole closure as a one-shot destination -- so checking
-safety only at move's chosen destination would let an agent skip straight
+safety only at walk's chosen destination would let an agent skip straight
 past an armed threat to a safe location beyond it.  Gating it in
-one-step-accessible excludes an unsafe location as a through-node as well as
+one-step-walkable excludes an unsafe location as a through-node as well as
 an endpoint, so it can neither be walked into nor walked past.
 The three blower updates do not check it themselves -- their physics stay
 unconditional -- because a forced relocation has no precondition to gate in

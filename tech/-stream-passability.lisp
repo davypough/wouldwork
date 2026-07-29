@@ -8,18 +8,18 @@
 ;;; stream with it automatically, since the check is keyed by the fixed gears rather
 ;;; than the portable fan.
 ;;;
-;;; Also supplies the stream geometry to -accessibility-coordinates' derivation by
-;;; redefining ACCESSIBILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
+;;; Also supplies the stream geometry to -walkability-coordinates' derivation by
+;;; redefining WALKABILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
 ;;; the gears' HAS-POSITION location (the swept location), the AIMED-AT> destination,
 ;;; both locations' LOCATION-COORDS> coordinates, and the stream's width -- 3 units
 ;;; by default, overridable per gears with a (STREAM-WIDTH gears w) fact, the same
 ;;; default-with-override convention as elevation.  The derivation turns each spec
 ;;; into a barred band: center line from the backstop wall behind the fan to the
-;;; destination, widened by half the width each side -- see -accessibility-
+;;; destination, widened by half the width each side -- see -walkability-
 ;;; coordinates.lisp's header for the band, curtain, and ride semantics.
 ;;;
 ;;; Layering: -passability cannot own the OBSTACLE-CLEAR branch itself, and
-;;; -accessibility-coordinates cannot gather the specs itself -- BLOWING, MOUNTED-ON,
+;;; -walkability-coordinates cannot gather the specs itself -- BLOWING, MOUNTED-ON,
 ;;; HAS-POSITION, and AIMED-AT> belong to -gears-fan, which walking must not depend
 ;;; on.  So this file, nested by wall-blower (the only mounting whose stream runs
 ;;; horizontally across walkable ground), nests all the owners and REDEFINES both
@@ -30,17 +30,17 @@
 ;;; REQUIRES:
 ;;;   nested    : -passability (obstacle-clear's gate/screen/ladder branches, all-clear);
 ;;;               -gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
-;;;               -accessibility-coordinates (the derivation and the stream-specs default)
+;;;               -walkability-coordinates (the derivation and the stream-specs default)
 ;;; PROVIDES:
 ;;;   relations : (stream-width wall-gears $rational)  --  optional per-gears override
 ;;;               of the 3-unit default stream width
 ;;;   queries   : obstacle-clear  --  redefinition adding the gears branch;
-;;;               accessibility-coordinates-stream-specs  --  redefinition gathering
+;;;               walkability-coordinates-stream-specs  --  redefinition gathering
 ;;;               one spec per wall-gears
 
 (include-tech -passability)
 (include-tech -gears-fan)
-(include-tech -accessibility-coordinates)
+(include-tech -walkability-coordinates)
 
 (in-package :ww)
 
@@ -66,9 +66,9 @@
                        (eql $mount-gears ?obstacle)))))))
 
 
-(define-query accessibility-coordinates-stream-specs ()
+(define-query walkability-coordinates-stream-specs ()
   ;; One (gears swept-location destination sx sy dx dy width) spec per wall-gears, for
-  ;; -accessibility-coordinates' band derivation.  Missing position, aim, or
+  ;; -walkability-coordinates' band derivation.  Missing position, aim, or
   ;; coordinates error immediately -- a wall fan without a located stream is an
   ;; authoring mistake in a coordinate-driven problem.  Only called by
   ;; DERIVE-WALK-VIA-FROM-SEGMENTS, so a problem without segment geometry (hand-

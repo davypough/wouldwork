@@ -11,7 +11,7 @@
 ;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENTS and derive.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
-;;; (nested from -location-coordinates, shared with accessibility-tech's own coordinate
+;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
 ;;; substrate, so a location's position is entered once even when a problem uses both
 ;;; capabilities) for location endpoints, and APPARATUS-COORDS> (declared here) for
 ;;; transmitter/receiver/gun endpoints only -- a problem with pure location-to-location
@@ -33,7 +33,7 @@
 ;;; the first -- each polygon edge is folded into the wall list too, so a sightline that would
 ;;; have to leave the map's own silhouette is blocked the same as any other wall; unlike
 ;;; WALL-SEGMENTS/GATE-SEGMENTS, BOUNDARY-WALL is consulted only here, not by
-;;; -accessibility-coordinates.lisp's own WALK-VIA derivation.
+;;; -walkability-coordinates.lisp's own WALK-VIA derivation.
 ;;;
 ;;; The location<->apparatus and location<->location branches additionally test every other
 ;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the
@@ -69,7 +69,7 @@
 ;;;               reaching this file through -beam-crossing-coordinates must still include
 ;;;               visibility for these relations to exist
 ;;; PROVIDES:
-;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with accessibility, so
+;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with walkability, so
 ;;;               a location's coordinates are entered once regardless of which
 ;;;               capabilities the problem uses)
 ;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
@@ -268,8 +268,10 @@
   ;; between BEAM's two endpoints and its perpendicular distance from that line is within
   ;; TOLERANCE -- strict at BEAM's own endpoints exactly like BEAM-COORDINATES-OBSTACLE-
   ;; INTERSECTION-PARAMETER's own wall/gate test: a location standing at (or beyond) either
-  ;; endpoint is never its own occluder.  Compares squared distances throughout to stay in
-  ;; exact rational arithmetic.
+  ;; endpoint is never its own occluder.  Coincident 2D endpoints have no interior horizontal
+  ;; segment, so no location can occlude between them; this occurs legitimately when two
+  ;; locations represent different elevations at the same map coordinates.  Compares squared
+  ;; distances throughout to stay in exact rational arithmetic.
   (let* ((position1 (beam-coordinates-position (first beam) positions))
          (position2 (beam-coordinates-position (second beam) positions))
          (x1 (first position1))
@@ -277,15 +279,17 @@
          (x2 (first position2))
          (y2 (second position2))
          (x3 (first location-position))
-         (y3 (second location-position))
-         (parameter (beam-coordinates-projection-parameter x1 y1 x2 y2 x3 y3)))
-    (and (< 0 parameter 1)
-         (let* ((nearest-x (+ x1 (* parameter (- x2 x1))))
-                (nearest-y (+ y1 (* parameter (- y2 y1))))
-                (offset-x (- x3 nearest-x))
-                (offset-y (- y3 nearest-y))
-                (distance-squared (+ (* offset-x offset-x) (* offset-y offset-y))))
-           (<= distance-squared (* tolerance tolerance))))))
+         (y3 (second location-position)))
+    (unless (and (= x1 x2) (= y1 y2))
+      (let ((parameter
+              (beam-coordinates-projection-parameter x1 y1 x2 y2 x3 y3)))
+        (and (< 0 parameter 1)
+             (let* ((nearest-x (+ x1 (* parameter (- x2 x1))))
+                    (nearest-y (+ y1 (* parameter (- y2 y1))))
+                    (offset-x (- x3 nearest-x))
+                    (offset-y (- y3 nearest-y))
+                    (distance-squared (+ (* offset-x offset-x) (* offset-y offset-y))))
+               (<= distance-squared (* tolerance tolerance))))))))
 
 
 ;;;; QUERY FUNCTIONS ;;;;

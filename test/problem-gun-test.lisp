@@ -4,11 +4,12 @@
 ;;; positioned via LOS rather than HAS-POSITION -- nothing can occupy its mounting point --
 ;;; with no controller wired to it, so it defaults armed (lethal): uncontrolled guns are
 ;;; always on, the same default -gears-fan uses for turning.  gun1 threatens watched, the
-;;; only walking route from start to goal.  move is not a single hop -- accessible's BFS
-;;; walks the whole closure, and move offers any node in it as a one-shot destination -- so
-;;; safety is gated inside one-step-accessible, excluding watched as a through-node as well
-;;; as an endpoint: while gun1 is armed, goal never enters accessible's reachable set at
-;;; all, not even via a direct move that would otherwise skip past watched.
+;;; only walking route from start to goal.  walk is not a single hop --
+;;; walkable-locations' BFS walks the whole closure, and walk offers any node in it as a
+;;; one-shot destination -- so safety is gated inside one-step-walkable, excluding watched
+;;; as a through-node as well as an endpoint: while gun1 is armed, goal never enters the
+;;; walkable-locations set at all, not even via a direct walk that would otherwise skip past
+;;; watched.
 ;;;
 ;;; Jamming a gun is a line-of-sight check only now (jam-target's gun branch reads
 ;;; visible/los-to-apparatus, exactly like a gate, with no has-position/eql shortcut), so
@@ -19,7 +20,7 @@
 ;;; hand-list sightlines, or vice versa.
 ;;;
 ;;; Expected minimum solution (3 steps): pickup-jammer jammer1, jam-target gun1 (at start,
-;;; via the hand-authored sightline), move start->goal.
+;;; via the hand-authored sightline), walk start->goal.
 
 
 (in-package :ww)
@@ -52,7 +53,7 @@
 
 (include-tech gun)
 (include-tech jammer)
-(include-tech accessibility)
+(include-tech walkability)
 (include-tech visibility)
 
 
