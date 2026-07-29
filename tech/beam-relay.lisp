@@ -15,7 +15,10 @@
 ;;;   nested     : -beam-substrate (beam relations, receiver update, and peer hooks);
 ;;;                -placement (placement-options, place-held-object!; also brings in
 ;;;                support occupancy, location, position, height, elevation, and holding);
-;;;                -visibility (null-default visible interface);
+;;;                -visibility (null-default visible/beam-visible interface);
+;;;                -support-elevation (occupant-elevation, read directly for a connector's
+;;;                own current beam-anchor height); -elevation (fixture-elevation, read
+;;;                directly for a transmitter/receiver's own beam-anchor height);
 ;;;                -accessibility (identity-default accessible query; overridden by
 ;;;                accessibility when that technology is included);
 ;;;                -reachability (identity-default reachable query; overridden by
@@ -23,7 +26,7 @@
 ;;;                -pickup (pickup-clear, shared with box and jammer)
 ;;;   parameter  : *max-pairings*
 ;;;   extension  : visibility overrides -visibility's null defaults with authored live and
-;;;                potential LOS
+;;;                potential LOS, and beam-visible with the elevation-aware occlusion check
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-connector-status! -> update-receiver-status!
 ;;; PROVIDES:
@@ -37,8 +40,8 @@
 ;;;                resolve compatibly
 ;;;   relations  : paired, color
 ;;;   queries    : relay-beam-reaches-receiver, compute-connector-lighting,
-;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
-;;;                connectable-location, connectable-terminus
+;;;                beam-anchor-elevation, relay-beam-live-for-cutting,
+;;;                beam-relay-source-distance, connectable-location, connectable-terminus
 ;;;   updates    : update-connector-status!
 ;;;   actions    : pickup-connector, put-connector, connect-connector
 
@@ -46,6 +49,8 @@
 (include-tech -beam-substrate)
 (include-tech -placement)
 (include-tech -visibility)
+(include-tech -support-elevation)
+(include-tech -elevation)
 (include-tech -accessibility)
 (include-tech -reachability)
 (include-tech -pickup)
@@ -151,7 +156,9 @@
 
 (define-query relay-beam-reaches-receiver (?receiver receiver)
   ;; A receiver lights by relay when a lit connector is paired to it with clear visibility.
-  ;; beam-cut is a no-op unless beam-crossing is included.
+  ;; beam-visible tests the connector's own current elevation against the receiver's fixed
+  ;; fixture-elevation, elevation-aware where visible alone is not.  beam-cut is a no-op
+  ;; unless beam-crossing is included.
   (do (assign $reaches nil)
       (doall (?c connector)
         (if (and (paired ?c ?receiver)
@@ -159,7 +166,8 @@
                  (bind (has-chroma ?receiver $required-hue))
                  (eql $c-hue $required-hue)
                  (bind (has-location ?c $c-loc))
-                 (visible $c-loc ?receiver)
+                 (beam-visible $c-loc (occupant-elevation ?c)
+                                ?receiver (fixture-elevation ?receiver))
                  (not (beam-cut $c-loc ?receiver)))
           (assign $reaches t)))
       $reaches))
@@ -167,8 +175,11 @@
 
 (define-query compute-connector-lighting (?active)
   ;; BFS from every transmitter over the pairing graph, returning lit connectors as
-  ;; ($connector $hue $distance) records.  If beam-crossing is included, ?active is the
-  ;; candidate crossing set used by beam-cut-in; otherwise the cut hook is a no-op.
+  ;; ($connector $hue $distance) records.  beam-visible tests ?c's own current elevation
+  ;; against $src-obj's -- a transmitter's fixture-elevation or a source connector's own
+  ;; occupant-elevation, resolved by beam-anchor-elevation -- elevation-aware where visible
+  ;; alone is not.  If beam-crossing is included, ?active is the candidate crossing set used
+  ;; by beam-cut-in; otherwise the cut hook is a no-op.
   (do (assign $lit nil)
       (assign $lit-locations nil)
       (assign $visited nil)
@@ -191,7 +202,9 @@
                                       (assign $src-dist (fourth $source-rec))
                                       (if (and (or (paired ?c $src-obj)
                                                    (paired $src-obj ?c))
-                                               (visible $c-loc $src-anchor)
+                                               (beam-visible $c-loc (occupant-elevation ?c)
+                                                              $src-anchor
+                                                              (beam-anchor-elevation $src-obj))
                                                (not (beam-cut-in $src-anchor $c-loc ?active)))
                                         (do (if (not (member $src-hue $hues))
                                               (assign $hues (cons $src-hue $hues)))
@@ -215,6 +228,14 @@
                   (if (not $frontier)
                     (return t)))
       $lit))
+
+
+(define-query beam-anchor-elevation (?anchor (either transmitter connector))
+  ;; compute-connector-lighting's frontier anchors are either a transmitter (its own fixed
+  ;; fixture-elevation) or a previously-lit connector (its own current occupant-elevation).
+  (if (transmitter ?anchor)
+    (fixture-elevation ?anchor)
+    (occupant-elevation ?anchor)))
 
 
 (define-query relay-beam-live-for-cutting (?from ?to ?lighting)

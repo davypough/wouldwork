@@ -553,11 +553,11 @@ would overwrite the previous value during install-init."
 (defun check-init-list-contents (literals)
   "Checks domain-specific element types inside DEFINE-INIT list values."
   (check-init-list-relation-items-have-types
-    literals 'los-to-apparatus '(gate))
+    literals 'los-to-apparatus '(gate location))
   (check-init-list-relation-items-have-types
     literals 'los-to-target '(gate))
   (check-init-list-relation-items-have-types
-    literals 'los-to-location '(gate))
+    literals 'los-to-location '(gate location))
   (check-init-list-relation-items-have-types
     literals 'reach-via '(gate))
   (check-init-list-relation-items-have-types

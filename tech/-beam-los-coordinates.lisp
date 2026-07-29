@@ -35,6 +35,18 @@
 ;;; WALL-SEGMENTS/GATE-SEGMENTS, BOUNDARY-WALL is consulted only here, not by
 ;;; -accessibility-coordinates.lisp's own WALK-VIA derivation.
 ;;;
+;;; The location<->apparatus and location<->location branches additionally test every other
+;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the
+;;; candidate onto the beam's line and accepts it iff that projection falls strictly between
+;;; the beam's own two endpoints (a location never occludes a beam it terminates) and its
+;;; perpendicular distance from the line is within *BEAM-OCCLUSION-TOLERANCE* (declared below;
+;;; default 1/2, a half-unit radius; a problem overrides it with its own DEFPARAMETER).  A
+;;; qualifying location is appended to the occluder list as a bare location name, exactly like
+;;; a qualifying gate; distances are compared squared throughout to stay in exact rational
+;;; arithmetic.  The location<->gate (LOS-TO-TARGET) and location<->gun branches deliberately
+;;; do not gain this test -- nothing but jam-target ever reads either, and a jammer's line to
+;;; its target is not blocked by intervening objects, by design.
+;;;
 ;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver gun location) -- the
 ;;; composite every consuming query/init-action here iterates over.  A problem may also declare it
 ;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
@@ -60,6 +72,9 @@
 ;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with accessibility, so
 ;;;               a location's coordinates are entered once regardless of which
 ;;;               capabilities the problem uses)
+;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
+;;;               core wouldwork setting, so it lives here rather than in ww-settings.lisp;
+;;;               a problem overrides it with its own DEFPARAMETER
 ;;;   types     : beam-endpoint (either transmitter receiver gun location); jammer and gun
 ;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
 ;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
@@ -70,6 +85,15 @@
 ;;;               asserts wall-segments gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;;               derived automatically instead of hand-authoring them; boundary-wall
 ;;;               additionally folds its polygon edges into that derivation's wall list
+;;;   queries   : beam-coordinates-endpoint-xy, beam-coordinates-elevation-at -- live
+;;;               (query-time, not just init-time) coordinate lookup and interpolation,
+;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
+;;;               location occluder exactly as for a derived one, so a problem that hand-
+;;;               authors LOS-TO-APPARATUS/LOS-TO-LOCATION directly (bypassing WALL-SEGMENTS
+;;;               derivation) can still list a location as an occluder -- it still needs
+;;;               LOCATION-COORDS>/APPARATUS-COORDS> asserted for that location and for both
+;;;               of the beam's own endpoints, even though DERIVE-LOS-FROM-SEGMENTS itself
+;;;               never runs; BEAM-COORDINATES-ENDPOINT-XY errors by name if one is missing
 ;;;   init      : derive-los-from-segments
 
 (include-tech -location-coordinates)
@@ -89,6 +113,12 @@
   (wall-segments $list)
   (gate-segments $list)
   (boundary-wall $list))  ;closed polygon ((x1 y1) (x2 y2) ... (xn yn)); last point wraps to first
+
+
+(defvar *beam-occlusion-tolerance* 1/2
+  "Maximum perpendicular distance a location may sit off a beam's exact line and still
+   count as a candidate occluder there (BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM). Default is
+   a half-unit radius. Problem files can override this.")
 
 
 ;;;; GEOMETRY HELPERS ;;;;
@@ -210,6 +240,54 @@
             collect (first gate))))
 
 
+(defun beam-coordinates-location-occluders (beam positions locations tolerance)
+  ;; Every other location whose position lies within TOLERANCE of BEAM's interior --
+  ;; strictly between its two endpoints.  A location that is itself one of BEAM's own two
+  ;; endpoints is skipped outright, the same way BEAM-COORDINATES-LOS-OCCLUDERS skips a
+  ;; gate against a beam it is itself an endpoint of.
+  (loop for location in locations
+        unless (member location beam :test #'eql)
+          append (when (beam-coordinates-location-occludes-beam
+                         beam positions (beam-coordinates-position location positions)
+                         tolerance)
+                   (list location))))
+
+
+(defun beam-coordinates-projection-parameter (x1 y1 x2 y2 x3 y3)
+  ;; (x3,y3)'s own orthogonal projection parameter onto the line from (x1,y1) to (x2,y2) --
+  ;; 0 at the first point, 1 at the second.  Shared by the init-time occlusion test
+  ;; (BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM, below) and the live elevation interpolation a
+  ;; beam or sightline consumer performs at query time (BEAM-COORDINATES-ELEVATION-AT).
+  (let ((dx (- x2 x1))
+        (dy (- y2 y1)))
+    (/ (+ (* (- x3 x1) dx) (* (- y3 y1) dy)) (+ (* dx dx) (* dy dy)))))
+
+
+(defun beam-coordinates-location-occludes-beam (beam positions location-position tolerance)
+  ;; True iff LOCATION-POSITION's own orthogonal projection onto BEAM's line falls strictly
+  ;; between BEAM's two endpoints and its perpendicular distance from that line is within
+  ;; TOLERANCE -- strict at BEAM's own endpoints exactly like BEAM-COORDINATES-OBSTACLE-
+  ;; INTERSECTION-PARAMETER's own wall/gate test: a location standing at (or beyond) either
+  ;; endpoint is never its own occluder.  Compares squared distances throughout to stay in
+  ;; exact rational arithmetic.
+  (let* ((position1 (beam-coordinates-position (first beam) positions))
+         (position2 (beam-coordinates-position (second beam) positions))
+         (x1 (first position1))
+         (y1 (second position1))
+         (x2 (first position2))
+         (y2 (second position2))
+         (x3 (first location-position))
+         (y3 (second location-position))
+         (parameter (beam-coordinates-projection-parameter x1 y1 x2 y2 x3 y3)))
+    (and (< 0 parameter 1)
+         (let* ((nearest-x (+ x1 (* parameter (- x2 x1))))
+                (nearest-y (+ y1 (* parameter (- y2 y1))))
+                (offset-x (- x3 nearest-x))
+                (offset-y (- y3 nearest-y))
+                (distance-squared (+ (* offset-x offset-x) (* offset-y offset-y))))
+           (<= distance-squared (* tolerance tolerance))))))
+
+
 ;;;; QUERY FUNCTIONS ;;;;
 
 
@@ -226,6 +304,40 @@
             (push (list ?endpoint $x $y) $positions)
             (error "No APPARATUS-COORDS> is defined for beam endpoint ~A." ?endpoint))))
       $positions))
+
+
+(define-query beam-coordinates-endpoint-xy (?endpoint (either fixture location))
+  ;; ?endpoint's own live coordinates, routed the same way BEAM-COORDINATES-ENDPOINT-
+  ;; POSITIONS routes them at init time: LOCATION-COORDS> for a location, APPARATUS-COORDS>
+  ;; for a fixture.  Errors by name if the fact is missing, exactly like that init-time
+  ;; sibling -- a bare BIND left unguarded here would instead leave $x/$y nil and only fail
+  ;; later, confusingly, inside BEAM-COORDINATES-PROJECTION-PARAMETER's arithmetic.  A
+  ;; hand-authored location occluder needs coordinates for itself and both of its beam's
+  ;; endpoints, not just for the LOS pair the fact itself names.
+  (if (location ?endpoint)
+    (do (or (bind (location-coords> ?endpoint $x $y))
+            (error "No LOCATION-COORDS> is defined for location ~A." ?endpoint))
+        (values $x $y))
+    (do (or (bind (apparatus-coords> ?endpoint $x $y))
+            (error "No APPARATUS-COORDS> is defined for beam endpoint ~A." ?endpoint))
+        (values $x $y))))
+
+
+(define-query beam-coordinates-elevation-at (?occluder ?from ?near-elevation ?to ?far-elevation)
+  ;; Bare parameter list, not the fully-typed pre-param style: ?occluder/?from/?to mix
+  ;; location and fixture objects with plain rational elevation values, and
+  ;; check-precondition-parameters requires every parameter typed or none of them --
+  ;; mirroring beam-relay.lisp's own relay-beam-live-for-cutting/beam-relay-source-distance.
+  ;;
+  ;; The beam's own interpolated elevation at ?occluder's position along the line from ?from
+  ;; to ?to -- linear between ?near-elevation (at ?from) and ?far-elevation (at ?to), weighted
+  ;; by ?occluder's own live projection parameter on that line.  Read by visibility.lisp's
+  ;; beam-visible for a location occluder it has already confirmed qualifies.
+  (do (mv-assign ($x1 $y1) (beam-coordinates-endpoint-xy ?from))
+      (mv-assign ($x2 $y2) (beam-coordinates-endpoint-xy ?to))
+      (mv-assign ($x3 $y3) (beam-coordinates-endpoint-xy ?occluder))
+      (assign $parameter (beam-coordinates-projection-parameter $x1 $y1 $x2 $y2 $x3 $y3))
+      (+ ?near-elevation (* $parameter (- ?far-elevation ?near-elevation)))))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -255,6 +367,12 @@
   ;; ESTABLISH-BEAM-COORDINATES reads LOS-TO-APPARATUS/LOS-TO-LOCATION to enumerate its own
   ;; beam set.  Ends with its own CONVERT-DATABASES-TO-INTEGERS for the same reason that
   ;; init-action does -- so the facts asserted here are visible to its own later BIND calls.
+  ;;
+  ;; The location<->apparatus and location<->location branches additionally append every
+  ;; other location that occludes the beam within *BEAM-OCCLUSION-TOLERANCE* (default 0,
+  ;; exact collinearity); the location<->gate and location<->gun branches deliberately do
+  ;; not, since only jam-target ever reads those two, and a jammer's line to its target is
+  ;; not blocked by intervening objects.
   0
   ()
   (bind (wall-segments $walls))
@@ -268,20 +386,33 @@
         (assign $positions (beam-coordinates-endpoint-positions))
         (assign $target-positions
                 (append (beam-coordinates-gate-positions $gates) $positions))
+        (assign $locations (gethash 'location *types*))
         (doall (?location location)
           (doall (?transmitter transmitter)
             (do (assign $occluders
                         (beam-coordinates-los-occluders
                           (list ?transmitter ?location) $positions $all-walls $gates))
                 (if (not (eql $occluders :blocked))
-                  (los-to-apparatus ?location $occluders ?transmitter)))))
+                  (do (assign $location-occluders
+                              (beam-coordinates-location-occluders
+                                (list ?transmitter ?location) $positions $locations
+                                *beam-occlusion-tolerance*))
+                      (los-to-apparatus ?location
+                                        (append $occluders $location-occluders)
+                                        ?transmitter))))))
         (doall (?location location)
           (doall (?receiver receiver)
             (do (assign $occluders
                         (beam-coordinates-los-occluders
                           (list ?location ?receiver) $positions $all-walls $gates))
                 (if (not (eql $occluders :blocked))
-                  (los-to-apparatus ?location $occluders ?receiver)))))
+                  (do (assign $location-occluders
+                              (beam-coordinates-location-occluders
+                                (list ?location ?receiver) $positions $locations
+                                *beam-occlusion-tolerance*))
+                      (los-to-apparatus ?location
+                                        (append $occluders $location-occluders)
+                                        ?receiver))))))
         (if (exists (?j jammer) t)
           (do (doall (?location location)
                 (doall (?gate gate)
@@ -305,5 +436,11 @@
                           (beam-coordinates-los-occluders
                             (list ?source ?destination) $positions $all-walls $gates))
                   (if (not (eql $occluders :blocked))
-                    (los-to-location ?source $occluders ?destination))))))
+                    (do (assign $location-occluders
+                                (beam-coordinates-location-occluders
+                                  (list ?source ?destination) $positions $locations
+                                  *beam-occlusion-tolerance*))
+                        (los-to-location ?source
+                                          (append $occluders $location-occluders)
+                                          ?destination)))))))
         (convert-databases-to-integers))))

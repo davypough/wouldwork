@@ -12,7 +12,8 @@
 ;;;              declared optional.  gun joins both unions as a point fixture exactly like
 ;;;              transmitter/receiver -- jam-target's LOS check reads it through visible,
 ;;;              not through has-position, so nothing can ever occupy a gun's position.
-;;;   queries  : visible, potentially-visible  --  null defaults, overridden by visibility
+;;;   queries  : visible, potentially-visible, beam-visible  --  null defaults, overridden
+;;;              by visibility
 
 (in-package :ww)
 
@@ -31,3 +32,7 @@
 
 (define-query potentially-visible (?location location ?object (either fixture location))
   (do ?location ?object nil))
+
+
+(define-query beam-visible (?location ?near-elevation ?object ?far-elevation)
+  (do ?location ?near-elevation ?object ?far-elevation nil))

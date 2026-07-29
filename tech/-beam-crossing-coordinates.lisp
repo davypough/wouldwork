@@ -31,7 +31,11 @@
 ;;; entirely by -beam-los-coordinates, so it never becomes a beam to split in the first place.
 ;;; Without a populated CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
-;;; along its full geometric length even after the gate closes.
+;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
+;;; LOCATION occluder list may also carry location entries (-beam-los-coordinates' own
+;;; location-occlusion test); DERIVE-CROSSINGS-BEFORE-GATE's three loops below skip any
+;;; occluder that is not a gate, since a location entry has no GATE-SEGMENTS record to split
+;;; a beam's crossing set at.
 ;;;
 ;;; Self-contained; spliced by (include-tech -beam-crossing-coordinates), nested from
 ;;; beam-crossing.
@@ -370,43 +374,46 @@
           (doall (?transmitter transmitter)
             (if (bind (los-to-apparatus ?location $beam-gates ?transmitter))
               (ww-loop for $gate-name in $beam-gates
-                       do (assign $gate-record (assoc $gate-name $gates))
-                          (assign $gate-parameter
-                                  (beam-coordinates-obstacle-intersection-parameter
-                                    (list ?transmitter ?location) $positions $gate-record))
-                          (assign $split
-                                  (beam-coordinates-split-crossings-at-parameter
-                                    (list ?transmitter ?location) $records $gate-parameter))
-                          (crossings-before-gate>
-                            ?transmitter (car $split) $gate-name ?location)))))
+                       do (if (gate $gate-name)
+                            (do (assign $gate-record (assoc $gate-name $gates))
+                                (assign $gate-parameter
+                                        (beam-coordinates-obstacle-intersection-parameter
+                                          (list ?transmitter ?location) $positions $gate-record))
+                                (assign $split
+                                        (beam-coordinates-split-crossings-at-parameter
+                                          (list ?transmitter ?location) $records $gate-parameter))
+                                (crossings-before-gate>
+                                  ?transmitter (car $split) $gate-name ?location)))))))
         (doall (?location location)
           (doall (?receiver receiver)
             (if (bind (los-to-apparatus ?location $beam-gates ?receiver))
               (ww-loop for $gate-name in $beam-gates
-                       do (assign $gate-record (assoc $gate-name $gates))
-                          (assign $gate-parameter
-                                  (beam-coordinates-obstacle-intersection-parameter
-                                    (list ?location ?receiver) $positions $gate-record))
-                          (assign $split
-                                  (beam-coordinates-split-crossings-at-parameter
-                                    (list ?location ?receiver) $records $gate-parameter))
-                          (crossings-before-gate>
-                            ?location (car $split) $gate-name ?receiver)))))
+                       do (if (gate $gate-name)
+                            (do (assign $gate-record (assoc $gate-name $gates))
+                                (assign $gate-parameter
+                                        (beam-coordinates-obstacle-intersection-parameter
+                                          (list ?location ?receiver) $positions $gate-record))
+                                (assign $split
+                                        (beam-coordinates-split-crossings-at-parameter
+                                          (list ?location ?receiver) $records $gate-parameter))
+                                (crossings-before-gate>
+                                  ?location (car $split) $gate-name ?receiver)))))))
         (doall (?source location)
           (doall (?destination location)
             (if (and (member ?destination
                              (rest (member ?source (gethash 'location *types*))))
                      (bind (los-to-location ?source $beam-gates ?destination)))
               (ww-loop for $gate-name in $beam-gates
-                       do (assign $gate-record (assoc $gate-name $gates))
-                          (assign $gate-parameter
-                                  (beam-coordinates-obstacle-intersection-parameter
-                                    (list ?source ?destination) $positions $gate-record))
-                          (assign $split
-                                  (beam-coordinates-split-crossings-at-parameter
-                                    (list ?source ?destination) $records $gate-parameter))
-                          (crossings-before-gate>
-                            ?source (car $split) $gate-name ?destination)
-                          (crossings-before-gate>
-                            ?destination (cdr $split) $gate-name ?source)))))
+                       do (if (gate $gate-name)
+                            (do (assign $gate-record (assoc $gate-name $gates))
+                                (assign $gate-parameter
+                                        (beam-coordinates-obstacle-intersection-parameter
+                                          (list ?source ?destination) $positions $gate-record))
+                                (assign $split
+                                        (beam-coordinates-split-crossings-at-parameter
+                                          (list ?source ?destination) $records $gate-parameter))
+                                (crossings-before-gate>
+                                  ?source (car $split) $gate-name ?destination)
+                                (crossings-before-gate>
+                                  ?destination (cdr $split) $gate-name ?source)))))))
         (convert-databases-to-integers))))

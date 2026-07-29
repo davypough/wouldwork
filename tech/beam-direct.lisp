@@ -7,51 +7,44 @@
 ;;; overrides the direct arrival and cut-liveness hooks, adding the direct-only wiring
 ;;; (coupled, beam-via).  The shared interface (has-chroma/active relations, the receiver-status
 ;;; driver, the arrival/cut orchestrators, and the null-object hook defaults) lives in
-;;; -beam-substrate.  A problem that would rather author 2D positions than hand-list
-;;; sightline occluders gets that derivation from visibility-tech, which nests
-;;; -beam-los-coordinates (the owner of the los relations owns their coordinate
-;;; derivation); this file no longer nests it itself.  A problem with two direct beams
-;;; that can cross also includes beam-crossing alongside beam-direct.
+;;; -beam-substrate.  The elevation-aware occlusion test itself -- the beam-blocker type and
+;;; the vertical-span check -- lives in -beam-occlusion, so the same primitive is available to
+;;; any other beam or sightline capability that needs it; visibility is a second consumer once
+;;; its own occluder lists gain location entries alongside gates.  A problem that would rather
+;;; author 2D positions than hand-list sightline occluders gets that derivation from
+;;; visibility-tech, which nests -beam-los-coordinates (the owner of the los relations owns
+;;; their coordinate derivation); this file no longer nests it itself.  A problem with two
+;;; direct beams that can cross also includes beam-crossing alongside beam-direct.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-direct).
 ;;;
 ;;; REQUIRES:
 ;;;   types : location, hue, agent  --  transmitter, receiver, box, jammer, connector, and
 ;;;           plate are declared optional here (define-optional-types); gate comes from
-;;;           nested -gate.  Box/jammer/connector are beam blockers; plate may appear as a
-;;;           non-raising support.
-;;;   nested : -location (mobile-object, (has-location ...)); -support-occupancy
-;;;            (support-occupant, support, (on ...)); -height (heighted-object, has-height,
-;;;            declared-height); -elevation (elevated-object, has-elevation,
-;;;            fixture-elevation, location-elevation); -gate (gate optional type, (open gate)
-;;;            relation) -- shared with gate, accessibility (via -passability), reachability,
-;;;            visibility, and beam-crossing, which all nest -gate instead of hand-declaring it
+;;;           nested -gate; beam-blocker (either agent box jammer connector) comes from
+;;;           nested -beam-occlusion.  Plate may appear as a non-raising support.
+;;;   nested : -beam-occlusion (beam-blocker type, beam-blocker-occludes-location);
+;;;            -elevation (elevated-object, has-elevation, fixture-elevation,
+;;;            location-elevation); -gate (gate optional type, (open gate) relation) --
+;;;            shared with gate, accessibility (via -passability), reachability,
+;;;            visibility, and beam-crossing, which all nest -gate instead of
+;;;            hand-declaring it
 ;;; PROVIDES:
-;;;   types     : beam-blocker (either agent box jammer connector)  --  sole consumer; not
-;;;               declared elsewhere
-;;;               transmitter, receiver  --  declared optional here; other techs
+;;;   types     : transmitter, receiver  --  declared optional here; other techs
 ;;;               (-beam-substrate, beam-relay, beam-crossing, visibility, gate, etc.)
 ;;;               independently declare their own transmitter-alias/receiver-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : coupled, beam-via
 ;;;   queries   : direct-beam-reaches-receiver, direct-beam-elevation, beam-clear,
-;;;               beam-blocker-base-elevation, beam-blocker-top-elevation
-;;;               (reads -height.lisp's declared-height for a blocker's default unit height),
-;;;               beam-blocker-intersects-beam, direct-beam-live-for-cutting
-;;;               (overriding -beam-substrate null-object defaults)
+;;;               direct-beam-live-for-cutting (overriding -beam-substrate null-object
+;;;               defaults)
 
 (include-tech -beam-substrate)
-(include-tech -location)
-(include-tech -support-occupancy)
-(include-tech -height)
+(include-tech -beam-occlusion)
 (include-tech -elevation)
 (include-tech -gate)
 
 (in-package :ww)
-
-
-(define-types
-  beam-blocker (either agent box jammer connector))  ;what can block/occlude a beam path; sole consumer of this type
 
 
 (define-optional-types transmitter receiver box jammer connector plate)
@@ -86,38 +79,12 @@
 
 (define-query beam-clear (?from transmitter ?obstacle (either gate location) ?to receiver)
   ;; A corridor obstacle is clear iff it is an open gate, or -- being a corridor
-  ;; location -- has no beam-blocking object whose vertical span intersects this beam.
+  ;; location -- carries no beam-blocking object whose vertical span intersects this
+  ;; beam's elevation.  The occlusion test itself is -beam-occlusion's shared primitive,
+  ;; also used by visibility for sightline occluders.
   (if (gate ?obstacle)
     (open ?obstacle)
-    (not (exists (?obj beam-blocker)
-           (and (has-location ?obj ?obstacle)
-                (beam-blocker-intersects-beam ?obj ?from ?to))))))
-
-
-(define-query beam-blocker-intersects-beam
-    (?blocker beam-blocker ?from transmitter ?to receiver)
-  (do (assign $beam-level (direct-beam-elevation ?from ?to))
-      (assign $base-level (beam-blocker-base-elevation ?blocker))
-      (assign $top-level (beam-blocker-top-elevation ?blocker))
-      (and (<= $base-level $beam-level)
-           (<= $beam-level $top-level))))
-
-
-(define-query beam-blocker-base-elevation (?blocker beam-blocker)
-  ;; A blocker resting on a box starts at that box's top; otherwise it starts at its
-  ;; location floor.  Plate support does not raise the blocker above the location floor.
-  (if (and (bind (on ?blocker $support))
-           (box $support))
-    (beam-blocker-top-elevation $support)
-    (do (bind (has-location ?blocker $location))
-        (location-elevation $location))))
-
-
-(define-query beam-blocker-top-elevation (?blocker beam-blocker)
-  ;; Blocker's own default unit height comes from -height.lisp's shared declared-height,
-  ;; mirroring box/agent/jammer's default of 1 unless declared otherwise.
-  (+ (beam-blocker-base-elevation ?blocker)
-     (declared-height ?blocker)))
+    (not (beam-blocker-occludes-location ?obstacle (direct-beam-elevation ?from ?to)))))
 
 
 (define-query direct-beam-live-for-cutting (?from transmitter ?to receiver)
