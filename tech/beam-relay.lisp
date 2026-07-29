@@ -238,9 +238,14 @@
     (occupant-elevation ?anchor)))
 
 
-(define-query relay-beam-live-for-cutting (?from ?to ?lighting)
+(define-query relay-beam-live-for-cutting
+    (?from (either transmitter location)
+     ?to (either receiver location)
+     ?lighting)
   ;; Relay beams cut crossings once emitted.  The outbound sightline is not tested here;
   ;; arrival gates lighting in compute-connector-lighting, not cutting.
+  ;; ?from/?to are Wouldwork objects; ?lighting is a computed Lisp association list and is
+  ;; therefore deliberately untyped.
   (or (and (transmitter ?from)
            (exists (?c connector)
              (and (has-location ?c ?to)
@@ -257,7 +262,8 @@
                             (paired ?c ?c2)))))))))
 
 
-(define-query beam-relay-source-distance (?from ?lighting)
+(define-query beam-relay-source-distance (?from location ?lighting)
+  ;; ?from is a connector's Wouldwork location; ?lighting is computed Lisp data.
   (do (assign $distance most-positive-fixnum)
       (doall (?c connector)
         (if (has-location ?c ?from)
@@ -274,13 +280,15 @@
               (bind (color ?other $hue))))))
 
 
-(define-query connectable-terminus (?pairing-vantages
-                                    ?placement-location
-                                    ?connector
-                                    ?terminus)
+(define-query connectable-terminus
+    (?pairing-vantages
+     ?placement-location location
+     ?connector connector
+     ?terminus terminus)
   ;; Pairing selection uses potential LOS from any currently accessible vantage.  Accessibility
   ;; respects current walking obstacles; potential LOS ignores the open state of its own gate
   ;; occluders.  Exact placement and live visible checks subsequently determine active beams.
+  ;; ?pairing-vantages is a computed Lisp list; the other parameters are planning objects.
   (ww-loop for $vantage in ?pairing-vantages
            thereis
              (or (and (or (transmitter ?terminus)

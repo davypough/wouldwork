@@ -67,9 +67,9 @@
 
 (defun check-query/update-function (fn-name args body)
   "Detects an error in the supplied arguments to a user-defined
-   query or update function--eg, (?queen $row $col).
-   Per-parameter shape validation (legacy bare ?vars vs. a fully-typed pre-param-style
-   list) is handled by DISSECT-QUERY-PARAMS, called separately by the installer."
+   query or update function--eg, (?location location ?elevation).
+   Per-parameter shape and type validation is handled by DISSECT-QUERY-PARAMS,
+   called separately by the installer."
   (check-type fn-name symbol)
   (check-type args list)
   (check-type body list))
@@ -207,28 +207,70 @@
              relation-name))))
 
 
+(defun query/update-type-member-p (value type-spec)
+  "Whether VALUE is an instance of the Wouldwork object TYPE-SPEC."
+  (let ((instances
+          (if (and (consp type-spec)
+                   (eq (first type-spec) 'either))
+            (mapcan (lambda (type)
+                      (copy-list (gethash type *types*)))
+                    (rest type-spec))
+            (copy-list (gethash type-spec *types*)))))
+    (member value (remove nil instances) :test #'equal)))
+
+
 (defun check-query/update-call (fn-call)
   "Checks the validity of a call to a query or update function
    during translation--eg, (cleartop? ?block).
    When the callee has declared parameter types (:param-types, set by
-   DISSECT-QUERY-PARAMS at install time), also cross-checks each ?var argument's
-   declared type (from *VAR-TYPE-ENV*) against the callee's declared type at that
-   argument position -- lenient, as usual, when either side is undeclared."
+   DISSECT-QUERY-PARAMS at install time), cross-checks each ?var argument's
+   declared type and each literal object's membership against the callee's
+   declared type at that position. Computed expressions remain permissive
+   because their result type is not generally known during translation."
   (check-type fn-call cons)
   (check-type (car fn-call) symbol)
-  (let ((callee-param-types (get (car fn-call) :param-types)))
+  (let ((callee-param-types (get (car fn-call) :param-types))
+        (all-object-values
+          (reduce #'union (alexandria:hash-table-values *types*))))
     (iter (for arg in (cdr fn-call))
           (for position from 0)
-          (or (and (?varp arg)
-                   (type-specs-compatible-p (cdr (assoc arg *var-type-env*))
-                                            (nth position callee-param-types)))
-              ($varp arg)
-              (member arg (reduce #'union (alexandria:hash-table-values *types*)))  ;arg is a value of a type
-              (numberp arg)
-              (characterp arg)
-              (stringp arg)
-              (translatable-expression-form-p arg)
-              (error "Found a malformed query or update argument ~A in ~A" arg fn-call)))))
+          (for parameter-type = (nth position callee-param-types))
+          (cond ((?varp arg)
+                 (unless (type-specs-compatible-p
+                           (cdr (assoc arg *var-type-env*))
+                           parameter-type)
+                   (error "The ?variable ~A is not compatible with parameter type ~A ~
+                           at position ~A of ~A"
+                          arg parameter-type position fn-call)))
+                (($varp arg))
+                ((and parameter-type (atom arg))
+                 (unless (query/update-type-member-p arg parameter-type)
+                   (error "The literal argument ~A is not an instance of parameter type ~A ~
+                           at position ~A of ~A"
+                          arg parameter-type position fn-call)))
+                ((and parameter-type
+                      (consp arg)
+                      (eq (first arg) 'quote)
+                      (= (length arg) 2))
+                 (unless (query/update-type-member-p (second arg) parameter-type)
+                   (error "The literal argument ~A is not an instance of parameter type ~A ~
+                           at position ~A of ~A"
+                          (second arg) parameter-type position fn-call)))
+                ((and (null parameter-type)
+                      (or (member arg all-object-values)
+                          (numberp arg)
+                          (characterp arg)
+                          (stringp arg)
+                          (keywordp arg)
+                          (member arg '(nil t)))))
+                ((translatable-expression-form-p arg))
+                (parameter-type
+                 (error "The argument ~A cannot be validated as parameter type ~A ~
+                         at position ~A of ~A"
+                        arg parameter-type position fn-call))
+                (t
+                 (error "Found a malformed query or update argument ~A in ~A"
+                        arg fn-call))))))
 
 
 (defun check-variable-names (action-name pre-param-?vars precondition effect all-detected-vars)

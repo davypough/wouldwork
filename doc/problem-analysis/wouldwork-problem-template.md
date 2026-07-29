@@ -268,11 +268,14 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
 
 | Prefix | Meaning | Scope |
 |--------|---------|-------|
-| `?var` | Parameter variable | Bound by quantifier headers or action parameters |
+| `?var` | Parameter variable | Bound by action/quantifier domains or passed to a query/update |
 | `$var` | Local/scratch variable | Bound by `setq`, `bind`, `let`, `mvsetq` |
 
-- `?variables` are typed — they iterate over type instances.
-- `$variables` are untyped — they hold computed values.
+- Action and quantifier `?variables` have domains and iterate over their instances.
+- Query/update `?variables` may independently declare a Wouldwork object type, but
+  they are passed by the caller rather than instantiated by the function.
+- `$variables` hold local or computed Lisp values. They are not permitted as
+  query/update formal parameters.
 
 
 ### 1.7 Query Functions (`define-query`)
@@ -280,11 +283,33 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
 Read-only functions that examine state. Cannot modify the database.
 
 ```lisp
-(define-query <name> (<args>)
+(define-query <name>
+    (?object <object-type>
+     ?value
+     ?other-object (either <object-type-1> <object-type-2>))
   <body>)    ; MUST be a single expression — use (do ...) to group multiple statements
 ```
 
-- Args are `?variables` passed by the caller.
+- Every formal parameter is a `?variable`; `$variables` are not allowed here.
+- Each parameter may independently be followed by a Wouldwork object type or an
+  inline `(either ...)` object type. Typed and untyped parameters may appear in
+  any order.
+- Type object parameters when doing so states a useful requirement. Leave
+  computed Lisp values—numbers, strings, lists, hash tables, booleans, and
+  `nil`—untyped. Wouldwork does not currently accept Lisp type declarations in
+  query/update signatures.
+- These annotations validate compatible uses and calls. They do not enumerate,
+  convert, or otherwise change the value supplied by the caller.
+- A literal planning object supplied by a caller must belong to the declared
+  type. A computed expression remains permissible when its result type cannot
+  be established while the problem is translated.
+- Action parameter headers (`standard`, `combination`, etc.) and query-valued
+  action domains do not belong in a query/update signature.
+- An empty optional object type is still a valid annotation. The function is
+  installed normally; an action or quantifier that enumerates that type simply
+  produces no calls. This permits a typed null-default technology hook to remain
+  present and return its neutral result when the corresponding capability has no
+  objects in the current problem.
 - **Single-expression body:** The body must be exactly one expression. To
   execute multiple statements, wrap them in `(do ...)`.
 - Body is translated in `pre` (precondition/read) context.
@@ -297,10 +322,23 @@ Read-only functions that examine state. Cannot modify the database.
 
 Example:
 ```lisp
-(define-query cleartop? (?block)
+(define-query cleartop? (?block block)
   (not (exists (?b block)
          (on ?b ?block))))
 ```
+
+Mixed object/value example:
+```lisp
+(define-query beam-visible
+    (?location location
+     ?near-elevation
+     ?object (either apparatus location)
+     ?far-elevation)
+  ...)
+```
+
+Here `?location` and `?object` are planning objects. The two elevations are
+computed numeric values, so they deliberately have no Wouldwork object type.
 
 
 ### 1.8 Update Functions (`define-update`)
@@ -308,10 +346,12 @@ Example:
 Functions that modify the database (assert/retract relations).
 
 ```lisp
-(define-update <name> (<args>)
+(define-update <name> (<parameters>)
   <body>)    ; MUST be a single expression — use (do ...) to group multiple statements
 ```
 
+- Parameter lists use exactly the same `?variable` and optional Wouldwork
+  object-type syntax as queries. Computed Lisp-value parameters remain untyped.
 - **Single-expression body:** The body must be exactly one expression. To
   execute multiple statements, wrap them in `(do ...)`.
 - Body is translated in `eff` (effect/write) context.

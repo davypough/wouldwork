@@ -36,10 +36,11 @@
   (climb-via> location $list location))  ;directed climb edge; $list = enabling means
 
 
-(define-query one-way-clear (?agent ?means)
+(define-query one-way-clear (?agent agent ?means)
   ;; Every implement enabling a one-way edge must be usable by ?agent.  Delegates to
   ;; passability's shared all-clear over the edge's means list, so use-ladder can
-  ;; guard the hop without re-deriving passability inline.
+  ;; guard the hop without re-deriving passability inline. ?means is computed Lisp list
+  ;; data rather than one planning object.
   (all-clear ?agent ?means))
 
 

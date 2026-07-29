@@ -19,9 +19,9 @@
 (define-optional-types screen ladder)
 
 
-(define-query all-clear (?agent ?obstacles)
+(define-query all-clear (?agent agent ?obstacles)
   ;; The empty list is clear.  Otherwise every listed obstacle or enabling
-  ;; implement must be usable by the agent.
+  ;; implement must be usable by the agent. ?obstacles is computed Lisp list data.
   (ww-loop for $obstacle in ?obstacles
            always (obstacle-clear ?agent $obstacle)))
 

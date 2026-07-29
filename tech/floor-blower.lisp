@@ -85,7 +85,7 @@
               (drop-occupants! ?g $destination))))))
 
 
-(define-update blow-occupants-away! (?fan ?gears)
+(define-update blow-occupants-away! (?fan fan ?gears floor-gears)
   ;; Launch every occupant resting on ?fan -- agent, box, jammer, or connector -- to
   ;; ?gears' aimed-at> destination via relocate-stack!, each box's riders traveling still
   ;; stacked.  A jamming jammer or a paired connector stays jamming/paired through the
@@ -103,7 +103,7 @@
                 (relocate-stack! ?x $destination)))))))
 
 
-(define-update drop-occupants! (?gears ?destination)
+(define-update drop-occupants! (?gears floor-gears ?destination location)
   ;; The air stream sustaining ?destination has stopped: every occupant hovering there
   ;; falls to the ground at ?gears' own location, landing on nothing; a jamming jammer or
   ;; paired connector stays jamming/paired through the fall, its effect re-derived by

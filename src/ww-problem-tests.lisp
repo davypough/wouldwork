@@ -208,6 +208,29 @@
   (run-test-problems))
 
 
+(defun test-talos ()
+  "Stage and solve every problem file in the test directory.
+   Completion without an error is success."
+  (let ((problem-files
+          (sort (directory (merge-pathnames "problem-*.lisp"
+                                            (get-test-folder-path)))
+                #'string-lessp
+                :key #'file-namestring)))
+    (cleanup-test-files)
+    (unwind-protect
+      (progn
+        (dolist (problem-file problem-files)
+          (let ((problem-name (parse-problem-name (file-namestring problem-file)))
+                (problem-path (format nil "test/~A" (file-namestring problem-file))))
+            (print-test-header problem-name "TALOS")
+            (%stage problem-path)
+            (ww-solve)))
+        (format t "~%Completed all ~D Talos test problems.~%" (length problem-files))
+        t)
+      (cleanup-test-files)
+      (stage blocks3))))
+
+
 (defun write-hash-table-to-file (hash-table filename)
   (with-open-file (out filename :direction :output :if-exists :supersede)
     (with-standard-io-syntax

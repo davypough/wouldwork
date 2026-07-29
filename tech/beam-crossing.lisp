@@ -134,7 +134,12 @@
       $active))
 
 
-(define-query beam-reaches-crossing (?from ?to ?xing ?active ?lighting)
+(define-query beam-reaches-crossing
+    (?from beam-endpoint
+     ?to beam-endpoint
+     ?xing crossing
+     ?active
+     ?lighting)
   ;; Resolve the live orientation first.  Fixed direct beams are live only in their
   ;; natural transmitter -> receiver orientation; relay beams are supplied by beam-relay.
   (do (assign $reaches nil)
@@ -207,7 +212,7 @@
    never needs to be recomputed.")
 
 
-(define-query beam-crossing-endpoints (?xing)
+(define-query beam-crossing-endpoints (?xing crossing)
   ;; Returns (values from1 to1 from2 to2) for ?xing -- the two beams that meet there --
   ;; equivalent to (bind (beam-crossing> ?xing from1 to1 from2 to2)), but derived from
   ;; CROSSINGS-ALONG-BEAM> regardless of whether BEAM-CROSSING> itself was ever authored.
@@ -257,7 +262,7 @@
       $beams))
 
 
-(define-query beam-crossing-beams-for-crossing (?crossing ?beams)
+(define-query beam-crossing-beams-for-crossing (?crossing crossing ?beams)
   ;; The canonical beams (drawn from ?beams) whose crossings-along-beam> list contains
   ;; ?crossing.  Correctly-authored data yields exactly two.
   (do (assign $containing nil)
@@ -270,13 +275,13 @@
       $containing))
 
 
-(define-query crossing-reaches (?xing ?active ?lighting)
+(define-query crossing-reaches (?xing crossing ?active ?lighting)
   (do (mv-assign ($f1 $t1 $f2 $t2) (beam-crossing-endpoints ?xing))
       (and (beam-reaches-crossing $f1 $t1 ?xing ?active ?lighting)
            (beam-reaches-crossing $f2 $t2 ?xing ?active ?lighting))))
 
 
-(define-query crossing-priority (?xing ?lighting)
+(define-query crossing-priority (?xing crossing ?lighting)
   (do (mv-assign ($f1 $t1 $f2 $t2) (beam-crossing-endpoints ?xing))
       (assign $d1 (beam-source-distance $f1 ?lighting))
       (assign $d2 (beam-source-distance $f2 ?lighting))
@@ -285,7 +290,7 @@
         $d1)))
 
 
-(define-query beam-source-distance (?from ?lighting)
+(define-query beam-source-distance (?from beam-endpoint ?lighting)
   (if (transmitter ?from)
     0
     (beam-relay-source-distance ?from ?lighting)))
@@ -297,7 +302,9 @@
                 always (member $crossing ?right))))
 
 
-(define-query beam-cut (?from ?to)
+(define-query beam-cut
+    (?from (either transmitter location)
+     ?to (either receiver location))
   ;; True iff some committed crossing on this directed beam currently cuts it.
   (do (assign $cut nil)
       (if (bind (crossings-along-beam> ?from $ids ?to))
@@ -307,7 +314,10 @@
       $cut))
 
 
-(define-query beam-cut-in (?from ?to ?active)
+(define-query beam-cut-in
+    (?from (either transmitter location)
+     ?to (either receiver location)
+     ?active)
   ;; Candidate-set analog of beam-cut.
   (do (assign $cut nil)
       (if (bind (crossings-along-beam> ?from $ids ?to))

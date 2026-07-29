@@ -306,14 +306,14 @@
       $positions))
 
 
-(define-query beam-coordinates-endpoint-xy (?endpoint (either fixture location))
+(define-query beam-coordinates-endpoint-xy (?endpoint beam-endpoint)
   ;; ?endpoint's own live coordinates, routed the same way BEAM-COORDINATES-ENDPOINT-
   ;; POSITIONS routes them at init time: LOCATION-COORDS> for a location, APPARATUS-COORDS>
-  ;; for a fixture.  Errors by name if the fact is missing, exactly like that init-time
-  ;; sibling -- a bare BIND left unguarded here would instead leave $x/$y nil and only fail
-  ;; later, confusingly, inside BEAM-COORDINATES-PROJECTION-PARAMETER's arithmetic.  A
-  ;; hand-authored location occluder needs coordinates for itself and both of its beam's
-  ;; endpoints, not just for the LOS pair the fact itself names.
+  ;; for a non-location beam endpoint.  Errors by name if the fact is missing, exactly like
+  ;; that init-time sibling -- a bare BIND left unguarded here would instead leave $x/$y nil
+  ;; and only fail later, confusingly, inside BEAM-COORDINATES-PROJECTION-PARAMETER's
+  ;; arithmetic.  A hand-authored location occluder needs coordinates for itself and both
+  ;; of its beam's endpoints, not just for the LOS pair the fact itself names.
   (if (location ?endpoint)
     (do (or (bind (location-coords> ?endpoint $x $y))
             (error "No LOCATION-COORDS> is defined for location ~A." ?endpoint))
@@ -323,11 +323,14 @@
         (values $x $y))))
 
 
-(define-query beam-coordinates-elevation-at (?occluder ?from ?near-elevation ?to ?far-elevation)
-  ;; Bare parameter list, not the fully-typed pre-param style: ?occluder/?from/?to mix
-  ;; location and fixture objects with plain rational elevation values, and
-  ;; check-precondition-parameters requires every parameter typed or none of them --
-  ;; mirroring beam-relay.lisp's own relay-beam-live-for-cutting/beam-relay-source-distance.
+(define-query beam-coordinates-elevation-at
+    (?occluder location
+     ?from beam-endpoint
+     ?near-elevation
+     ?to beam-endpoint
+     ?far-elevation)
+  ;; The occluder and endpoints are Wouldwork objects. Elevations are computed Lisp values
+  ;; and therefore deliberately have no Wouldwork object type.
   ;;
   ;; The beam's own interpolated elevation at ?occluder's position along the line from ?from
   ;; to ?to -- linear between ?near-elevation (at ?from) and ?far-elevation (at ?to), weighted

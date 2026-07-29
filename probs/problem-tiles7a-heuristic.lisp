@@ -54,12 +54,12 @@
                           (< (cdr a) (cdr b)))))))
 
 
-(define-query movable ($real-pre-emptys)
+(define-query movable (?real-pre-emptys)
   ;Every pre-coord is empty.
   (do (bind (emptys $emptys))
       (every (lambda (coord)
                (member coord $emptys :test #'equal))
-             $real-pre-emptys)))
+             ?real-pre-emptys)))
       
 
 (defun real-coords (row col coords)

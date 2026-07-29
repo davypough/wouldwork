@@ -15,7 +15,7 @@
 ;;;   driver    : propagate-consequences! must call update-receiver-status!  (hue, transmitter,
 ;;;               and receiver are declared optional here via define-optional-types)
 ;;; PROVIDES:
-;;;   types     : hue, transmitter, receiver  --  declared optional here; other techs
+;;;   types     : hue, transmitter, receiver, location  --  declared optional here; other techs
 ;;;               (beam-relay, beam-direct, gate, visibility, etc.) independently declare
 ;;;               their own hue-alias/transmitter-alias/receiver-alias for their own
 ;;;               pre-params; the bare and aliased forms resolve compatibly
@@ -33,7 +33,7 @@
 (in-package :ww)
 
 
-(define-optional-types hue transmitter receiver)
+(define-optional-types hue transmitter receiver location)
 
 
 (define-dynamic-relations
@@ -57,13 +57,19 @@
       (relay-beam-reaches-receiver ?receiver)))
 
 
-(define-query beam-live-for-cutting (?from ?to ?lighting)
+(define-query beam-live-for-cutting
+    (?from (either transmitter location)
+     ?to (either receiver location)
+     ?lighting)
   (or (direct-beam-live-for-cutting ?from ?to)
       (relay-beam-live-for-cutting ?from ?to ?lighting)))
 
 
 ;;;; NULL-OBJECT DEFAULT HOOKS ;;;;
 ;;;; Each is overridden by the capability that owns it; absent capabilities keep the default.
+;;;; An optional type with no objects does not remove or skip one of these definitions. The
+;;;; hook remains callable and returns its neutral result. Only an action or quantifier that
+;;;; enumerates the empty type produces no instantiations/calls.
 
 
 (define-query direct-beam-reaches-receiver (?receiver receiver)
@@ -78,15 +84,23 @@
   (do ?from ?to nil))
 
 
-(define-query relay-beam-live-for-cutting (?from ?to ?lighting)
+(define-query relay-beam-live-for-cutting
+    (?from (either transmitter location)
+     ?to (either receiver location)
+     ?lighting)
   (do ?from ?to ?lighting nil))
 
 
-(define-query beam-cut (?from ?to)
+(define-query beam-cut
+    (?from (either transmitter location)
+     ?to (either receiver location))
   (do ?from ?to nil))
 
 
-(define-query beam-cut-in (?from ?to ?active)
+(define-query beam-cut-in
+    (?from (either transmitter location)
+     ?to (either receiver location)
+     ?active)
   (do ?from ?to ?active nil))
 
 
@@ -98,5 +112,5 @@
   (do ?active nil))
 
 
-(define-query beam-relay-source-distance (?from ?lighting)
+(define-query beam-relay-source-distance (?from location ?lighting)
   (do ?from ?lighting most-positive-fixnum))

@@ -196,8 +196,8 @@
 
 (define-types
   field (compute *sorted-field-names*)
-  word (compute *sorted-words*)                        
-  field-id (compute +field-ids+))
+  word (compute *sorted-words*)
+  crossword-field-id (compute +field-ids+))
 
 
 (define-dynamic-relations
@@ -211,8 +211,8 @@
 (define-static-relations
   (crosscuts field $list)
   (field-id field $fixnum)
-  (value field-id $fixnum)
-  (weight field-id $fixnum))
+  (value crossword-field-id $fixnum)
+  (weight crossword-field-id $fixnum))
 
 
 (define-query get-remaining-fields? ()
@@ -248,15 +248,15 @@
 ;-------------- bounding ----------------------
 
 
-(define-query compute-bounds? ($used-field-ids)  ;sorted increasing
+(define-query compute-bounds? (?used-field-ids)  ;sorted increasing
   ;Computes cost and upper bounds for a state
-  (do (setf $capacity *num-fields*)                                              ;(ut::prt $used-field-ids $capacity)
-      (setf $max-field-id (or (car (last $used-field-ids)) 0))                   ;(ut::prt $max-field-id)
-      (if (= (length $used-field-ids) $max-field-id)
+  (do (setf $capacity *num-fields*)                                              ;(ut::prt ?used-field-ids $capacity)
+      (setf $max-field-id (or (car (last ?used-field-ids)) 0))                   ;(ut::prt $max-field-id)
+      (if (= (length ?used-field-ids) $max-field-id)
         (setf $missing-field-ids nil)
         (do (setf $initial-field-ids (cdr (alexandria:iota (1+ $max-field-id)))) ;(ut::prt $initial-field-ids)
             (setf $missing-field-ids
-                  (nreverse (set-difference $initial-field-ids $used-field-ids)))))
+                  (nreverse (set-difference $initial-field-ids ?used-field-ids)))))
       (setf $all-field-ids +field-ids+)                                           ;(ut::prt $missing-field-ids $all-field-ids)
       (setf $wt 0 $cost 0 $upper 0)
       (ww-loop for $field-id in $all-field-ids do  ;run thru all field-ids until capacity exceeded
@@ -310,9 +310,9 @@
           $word-string))
 
 
-(define-query word-compatible? ($word $field)
-   (and (bind (text $field $field-string))
-        (setf $word-string (string $word))
+(define-query word-compatible? (?word ?field)
+   (and (bind (text ?field $field-string))
+        (setf $word-string (string ?word))
         (= (length $word-string) (length $field-string))
         (every (lambda (char1 char2)
                   (or (char= char1 char2)
@@ -320,19 +320,19 @@
                $word-string $field-string)))
 
 
-(define-query crosscuts-compatible? ($word $field $used-field-ids-ht)  
+(define-query crosscuts-compatible? (?word ?field ?used-field-ids-ht)
   (let ()
     (declare (special $new-cross-fills))
-    (and (bind (crosscuts $field $crosscuts))  ;(ut::prt $word $field)
+    (and (bind (crosscuts ?field $crosscuts))  ;(ut::prt ?word ?field)
          (ww-loop for ($cross-field $cross-index $word-index) on $crosscuts by #'cdddr
            always (do (bind (text $cross-field $cross-str))
                       (setf $new-cross-str  ;replace one letter from word-string into cross-str
-                            (replace (copy-seq $cross-str) (string $word) 
+                            (replace (copy-seq $cross-str) (string ?word)
                                      :start1 $cross-index :start2 $word-index :end2 (1+ $word-index)))  ;(ut::prt $cross-str $new-cross-str)
                       (if (string= $new-cross-str $cross-str)  ;no change?
                         t  ;returns true
                         (if (dictionary-compatible $new-cross-str)
-                          (if (not (gethash $cross-field $used-field-ids-ht))  ;field not already filled in
+                          (if (not (gethash $cross-field ?used-field-ids-ht))  ;field not already filled in
                             (push (list $cross-field $new-cross-str) $new-cross-fills)))))))))  ;returns true
 
 

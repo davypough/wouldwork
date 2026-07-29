@@ -30,7 +30,7 @@
 (define-optional-types fan)
 
 
-(define-query placement-options (?agent agent ?location location ?self)
+(define-query placement-options (?agent agent ?location location ?self cargo)
   ;; Every plate/fan/box/ground placement at ?location currently legal for ?agent,
   ;; excluding ?self as a candidate support (relevant only when ?self can itself be a box
   ;; or fan; harmless otherwise, since ?self can never be eql to a differently-typed
@@ -59,7 +59,9 @@
       $places))
 
 
-(define-update place-held-object! (?agent ?object ?location ?place)
+(define-update place-held-object!
+    (?agent agent ?object cargo ?location location ?place)
+  ;; ?place is either a support object or the Lisp marker GROUND, so it remains untyped.
   (do (not (holding ?agent ?object))
       (has-location ?object ?location)
       (if (not (eql ?place 'ground))

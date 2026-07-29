@@ -336,23 +336,23 @@ file        #states     states/sec      time    best
 ;------------------------- action rule -----------------------
 
 
-(define-query word-compatible? ($word-string $field)
-   (and (bind (text $field $field-string))
-        ;(= (length $word-string) (length $field-string))
+(define-query word-compatible? (?word-string ?field)
+   (and (bind (text ?field $field-string))
+        ;(= (length ?word-string) (length $field-string))
         (every (lambda (char1 char2)
                   (or (char= char1 char2)
                       (char= char2 #\?)))
-               $word-string $field-string)))
+               ?word-string $field-string)))
 
 
-(define-update update-crosscuts! ($field $word-string)
-  (do (bind (crosscuts $field $crosscuts))  
+(define-update update-crosscuts! (?field ?word-string)
+  (do (bind (crosscuts ?field $crosscuts))
       (ww-loop for ($cross-field $cross-index $word-string-index) on $crosscuts by #'cdddr
         do (bind (text $cross-field $cross-str))
            (setf $cross-char (char $cross-str $cross-index))
            (if (char= $cross-char #\?)
              (do (setf $new-cross-str  ;replace one letter from word-string into cross-str
-                       (replace (copy-seq $cross-str) $word-string 
+                       (replace (copy-seq $cross-str) ?word-string
                                 :start1 $cross-index :start2 $word-string-index :end2 (1+ $word-string-index)))
                  (text $cross-field $new-cross-str))))))
  

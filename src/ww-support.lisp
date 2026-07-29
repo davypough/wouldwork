@@ -566,23 +566,51 @@
           types))
 
 
+(defun query/update-parameter-type-p (item)
+  "Whether ITEM is a Wouldwork object type allowed in a query/update signature."
+  (or (nth-value 1 (gethash item *types*))
+      (and (consp item)
+           (eq (first item) 'either)
+           (consp (rest item))
+           (every (lambda (type)
+                    (nth-value 1 (gethash type *types*)))
+                  (rest item)))))
+
+
+(defun dissect-query-params-tail (remaining variables types)
+  "Parse REMAINING query/update signature items into aligned VARIABLES and TYPES."
+  (when (null remaining)
+    (return-from dissect-query-params-tail
+      (values (nreverse variables) (nreverse types))))
+  (let ((parameter (first remaining)))
+    (unless (?varp parameter)
+      (error "Expecting a ?variable in a query/update parameter list, found ~A in ~A"
+             parameter remaining))
+    (let ((next (second remaining)))
+      (cond ((null (rest remaining))
+             (dissect-query-params-tail nil
+                                        (cons parameter variables)
+                                        (cons nil types)))
+            ((query/update-parameter-type-p next)
+             (dissect-query-params-tail (cddr remaining)
+                                        (cons parameter variables)
+                                        (cons next types)))
+            ((?varp next)
+             (dissect-query-params-tail (rest remaining)
+                                        (cons parameter variables)
+                                        (cons nil types)))
+            (t
+             (error "Expecting a ?variable or Wouldwork object type after ~A, found ~A in ~A"
+                    parameter next remaining))))))
+
+
 (defun dissect-query-params (args)
-  "Parses a define-query/define-update parameter list, which may be a legacy bare
-   list of ?vars or $vars (eg, (?box) or ($knapsack-item-ids)) or a fully-typed
-   pre-param-style list mirroring an action's pre-params (eg, (?box box-alias)).
-   Returns two values: the flat list of ?vars/$vars to use as the generated
-   function's actual lambda-list parameters, and the parallel flat list of
-   declared types -- for extending *VAR-TYPE-ENV* and for callee-side
-   call-argument checking -- or NIL for the legacy case, where no types are
-   declared."
-  (if (every #'varp args)
-    (values args nil)  ;legacy: bare ?vars and/or $vars, no declared types
-    (let ((headed-args (if (member (first args) *parameter-headers*)
-                          args
-                          (cons 'standard args))))
-      (check-precondition-parameters headed-args)
-      (multiple-value-bind (?vars types) (dissect-pre-params headed-args)
-        (values (alexandria:flatten ?vars) (flatten-param-types types))))))
+  "Parse a DEFINE-QUERY/DEFINE-UPDATE signature.
+   Every formal parameter is a ?variable optionally followed by a Wouldwork object
+   type or an inline (EITHER ...) object type. Returns the formal variables and a
+   positionally aligned type list containing NIL for each untyped parameter."
+  (check-type args list)
+  (dissect-query-params-tail args nil nil))
 
 
 (defun dissect-eff-params (eff-parameter-list)

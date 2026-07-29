@@ -153,7 +153,7 @@
           (not (blowing ?f))))))
 
 
-(define-update relocate-stack! (?base ?destination)
+(define-update relocate-stack! (?base support-occupant ?destination location)
   ;; Move ?base and, transitively, every occupant stacked above it to ?destination.
   ;; Breadth-first over the (on ...) links, so arbitrary stack depth needs no recursion.
   (do (assign $moving (list ?base))
@@ -209,7 +209,8 @@
       $landing))
 
 
-(define-update land-on-support! (?base ?destination ?required-elevation)
+(define-update land-on-support!
+    (?base support-occupant ?destination location ?required-elevation)
   ;; Rest ?base, already moved to ?destination by relocate-stack!, on the first
   ;; landing-support match there (excluding ?base itself), or leave it resting on bare
   ;; ground (relocate-stack!'s default) if none matches.

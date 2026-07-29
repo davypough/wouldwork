@@ -70,7 +70,7 @@
       (sweep-occupants-away! $gears))))
 
 
-(define-update sweep-occupants-away! (?gears)
+(define-update sweep-occupants-away! (?gears wall-gears)
   ;; Blow every occupant of ?gears' faced location whose body the stream strikes -- an
   ;; object standing at elevation $standing with height $height is blown iff
   ;; $standing < stream <= $standing + $height -- to the aimed-at> destination.  A blown

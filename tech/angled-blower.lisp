@@ -65,7 +65,7 @@
       (arc-occupants-away! ?f $gears))))
 
 
-(define-update arc-occupants-away! (?fan ?gears)
+(define-update arc-occupants-away! (?fan fan ?gears angled-gears)
   ;; Launch every occupant resting on ?fan -- agent, box, jammer, or connector -- to
   ;; ?gears' aimed-at> destination via relocate-stack!, each box's riders traveling still
   ;; stacked.  land-on-support! then rests the base on its destination's landing-support

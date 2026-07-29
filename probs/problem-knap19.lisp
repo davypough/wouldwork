@@ -77,14 +77,14 @@
   (weight item-id $fixnum))  ;weight of an item-id
 
 
-(define-query compute-bounds? ($item-ids)
+(define-query compute-bounds? (?item-ids)
   ;Computes cost and upper bounds for a state
   (do (bind (capacity $capacity))   ;(ut::prt state)
-      (setf $max-item-id (or (car (last $item-ids)) 0))
-      (if (= (length $item-ids) $max-item-id)
+      (setf $max-item-id (or (car (last ?item-ids)) 0))
+      (if (= (length ?item-ids) $max-item-id)
         (setf $missing-item-ids nil)
         (do (setf $initial-item-ids (cdr (alexandria:iota (1+ $max-item-id))))
-            (setf $missing-item-ids (set-difference $initial-item-ids $item-ids))))  ;(ut::prt $all-item-ids $missing-item-ids)
+            (setf $missing-item-ids (set-difference $initial-item-ids ?item-ids))))  ;(ut::prt $all-item-ids $missing-item-ids)
       (setf $all-item-ids (gethash 'item-id *types*))
       (setf $wt 0 $cost 0 $upper 0)
       (ww-loop for $item-id in $all-item-ids do  ;run thru all item-ids until capacity exceeded

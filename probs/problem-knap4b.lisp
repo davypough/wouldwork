@@ -50,12 +50,12 @@
   (id-weight item-id $fixnum))
 
 
-(define-query compute-bounds? ($knapsack-item-ids)
+(define-query compute-bounds? (?knapsack-item-ids)
   ;Computes cost and upper bounds 
   (do (bind (capacity $knapsack-capacity))   ;(ut::prt state)
-      (setf $max-item-id (or (car (last $knapsack-item-ids)) 0))
+      (setf $max-item-id (or (car (last ?knapsack-item-ids)) 0))
       (setf $wt 0 $cost 0 $upper 0)
-      (ww-loop for $item-id in (append $knapsack-item-ids
+      (ww-loop for $item-id in (append ?knapsack-item-ids
                                  (loop for id from (1+ $max-item-id) to *num-items*
                                        collect id))
         do (bind (id-weight $item-id $item-weight))

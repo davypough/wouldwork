@@ -492,8 +492,8 @@
 
 (defun install-query (name args body)
   "Revised query function installation with read-only semantics.
-   ARGS may be a legacy bare ?var list or a fully-typed pre-param-style list
-   mirroring an action's pre-params."
+   Every parameter in ARGS is a ?variable optionally followed by a Wouldwork
+   object type."
   (format t "~&Installing ~A query-fn..." name)
   (check-query/update-function name args body)
   (pushnew name *query-names*)
@@ -527,8 +527,8 @@
 
 (defun install-update (name args body)
   "Installs a user-defined update function.
-   ARGS may be a legacy bare ?var list or a fully-typed pre-param-style list
-   mirroring an action's pre-params.
+   Every parameter in ARGS is a ?variable optionally followed by a Wouldwork
+   object type.
    Update functions translate according to current *algorithm* setting.
    Init-action processing (do-init-action-updates) handles both formats:
    - Depth-first: changes as hash-table with integer keys

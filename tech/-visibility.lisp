@@ -13,7 +13,9 @@
 ;;;              transmitter/receiver -- jam-target's LOS check reads it through visible,
 ;;;              not through has-position, so nothing can ever occupy a gun's position.
 ;;;   queries  : visible, potentially-visible, beam-visible  --  null defaults, overridden
-;;;              by visibility
+;;;              by visibility. Their typed object parameters remain valid when an optional
+;;;              type has no objects: the query is still installed and its null body returns
+;;;              NIL; only iteration over that empty type produces no calls.
 
 (in-package :ww)
 
@@ -34,5 +36,11 @@
   (do ?location ?object nil))
 
 
-(define-query beam-visible (?location ?near-elevation ?object ?far-elevation)
+(define-query beam-visible
+    (?location location
+     ?near-elevation
+     ?object (either apparatus location)
+     ?far-elevation)
+  ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
+  ;; therefore deliberately have no Wouldwork object type.
   (do ?location ?near-elevation ?object ?far-elevation nil))

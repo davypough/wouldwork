@@ -84,11 +84,13 @@
                 always (if (gate $o) (visible-clear $o) t))))
 
 
-(define-query beam-visible (?location ?near-elevation ?object ?far-elevation)
-  ;; Bare parameter list, not the fully-typed pre-param style: ?location/?object mix
-  ;; location and fixture objects with plain rational elevation values, and
-  ;; check-precondition-parameters requires every parameter typed or none of them --
-  ;; mirroring beam-relay.lisp's own relay-beam-live-for-cutting/beam-relay-source-distance.
+(define-query beam-visible
+    (?location location
+     ?near-elevation
+     ?object (either apparatus location)
+     ?far-elevation)
+  ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
+  ;; therefore deliberately have no Wouldwork object type.
   ;;
   ;; Elevation-aware sibling of visible, for a relay hop whose two live endpoint elevations
   ;; the caller already knows -- occupant-elevation of the specific connector at each end, or
