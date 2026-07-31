@@ -16,11 +16,12 @@
 
 (in-package :ww)
 
-(ww-set *problem-name* propagation-mixed-candidate-test)
+(ww-set *problem-name* engine-propagation-mixed-candidate-test)
 (ww-set *problem-type* planning)
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 1)
+(setf *expected-min-length* 0)
 
 
 ;;;; TYPES ;;;;

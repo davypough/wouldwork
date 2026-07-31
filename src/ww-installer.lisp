@@ -594,7 +594,8 @@
                                         (if (member (first pre-params) *parameter-headers*)
                                           pre-params
                                           (cons 'standard pre-params))))))
-    (let ((uninstantiable (check-action-parameter-instantiability name pre-param-types)))
+    (let ((uninstantiable (union (check-action-parameter-instantiability name pre-param-types)
+                                  (check-precondition-type-instantiability precondition))))
       (if uninstantiable
         (format t "skipped (no instances for type~P: ~{~A~^, ~})~%"
                 (length uninstantiable) uninstantiable)
@@ -613,7 +614,8 @@
                                         (if (member (first pre-params) *parameter-headers*)
                                           pre-params
                                           (cons 'standard pre-params))))))
-    (let ((uninstantiable (check-action-parameter-instantiability name pre-param-types)))
+    (let ((uninstantiable (union (check-action-parameter-instantiability name pre-param-types)
+                                  (check-precondition-type-instantiability precondition))))
       (if uninstantiable
         (format t "skipped (no instances for type~P: ~{~A~^, ~})~%"
                 (length uninstantiable) uninstantiable)
@@ -685,23 +687,8 @@
                                               (if (equal evaluation '((nil)))
                                                 '(nil)
                                                 evaluation)))
-                       :precondition-lambda `(lambda (state &rest args)
-                                               ,(format nil "~A precondition" name)
-                                               (declare (ignorable state))
-                                               (destructuring-bind ,pre-param-?vars args
-                                                 (let ,pre-$vars
-                                                   (declare (ignorable ,@pre-$vars))
-                                                   ,(if (eql (car precondition) 'let)
-                                                      `(let ,(second precondition)
-                                                         ,(third precondition)
-                                                         (when ,(translate (fourth precondition) 'pre)
-                                                           ,(if eff-args
-                                                              `(list ,@eff-args)
-                                                              `t)))
-                                                      `(when ,(translate precondition 'pre)
-                                                         ,(if eff-args
-                                                            `(list ,@eff-args)
-                                                            `t))))))
+                       :precondition-lambda (build-precondition-lambda
+                                              name precondition pre-param-?vars pre-$vars eff-args)
                        :effect-variables eff-param-vars  ;pure var list, connectives stripped
                        :effect-format eff-params  ;annotated list w/ connectives, display only
                        :effect-lambda `(lambda (state ,@eff-args)
@@ -719,6 +706,28 @@
         (setf (action.effect-adds action)
               (extract-effect-modified-relations effect))
         action))))
+
+
+(defun build-precondition-lambda (name precondition pre-param-?vars pre-$vars eff-args)
+  "Builds the (lambda (state &rest args) ...) precondition-checking form for action NAME.
+   Must be called with *var-type-env* already extended for PRE-PARAM-?VARS, since
+   TRANSLATE consults it -- CREATE-ACTION does this via its enclosing LET*.  Factored
+   out of CREATE-ACTION so mutation-testing code (ww-problem-tests.lisp) can rebuild a
+   precondition-lambda from a hand-edited PRECONDITION using the same logic, instead of
+   a second, drifting copy."
+  `(lambda (state &rest args)
+     ,(format nil "~A precondition" name)
+     (declare (ignorable state))
+     (destructuring-bind ,pre-param-?vars args
+       (let ,pre-$vars
+         (declare (ignorable ,@pre-$vars))
+         ,(if (eql (car precondition) 'let)
+            `(let ,(second precondition)
+               ,(third precondition)
+               (when ,(translate (fourth precondition) 'pre)
+                 ,(if eff-args `(list ,@eff-args) `t)))
+            `(when ,(translate precondition 'pre)
+               ,(if eff-args `(list ,@eff-args) `t)))))))
 
 
 (defun extract-effect-modified-relations (effect-form)

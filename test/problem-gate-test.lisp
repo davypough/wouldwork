@@ -19,6 +19,7 @@
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 1)
+(setf *expected-min-length* 0)
 
 
 ;;;; TYPES ;;;;

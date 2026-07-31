@@ -763,16 +763,19 @@
 
 
 (defun tech-action-uninstantiable-p (form)
-  "True when the action FORM defines has a parameter type with no instances, so
-   INSTALL-ACTION skipped it.  Recomputed here from the source form rather than looked
-   up, because a skipped action never reaches *ACTIONS* and leaves nothing to consult."
-  (let ((pre-params (fourth form)))
-    (check-action-parameter-instantiability
-      (second form)
-      (nth-value 1 (dissect-pre-params
-                     (if (member (first pre-params) *parameter-headers*)
-                       pre-params
-                       (cons 'standard pre-params)))))))
+  "True when the action FORM defines has a parameter type with no instances, or its
+   precondition has a top-level type test that can never be satisfied, so INSTALL-ACTION
+   skipped it.  Recomputed here from the source form rather than looked up, because a
+   skipped action never reaches *ACTIONS* and leaves nothing to consult."
+  (let ((pre-params (fourth form))
+        (precondition (fifth form)))
+    (or (check-action-parameter-instantiability
+          (second form)
+          (nth-value 1 (dissect-pre-params
+                         (if (member (first pre-params) *parameter-headers*)
+                           pre-params
+                           (cons 'standard pre-params)))))
+        (check-precondition-type-instantiability precondition))))
 
 
 (defun update-quantifies-only-over-empty-types-p (name)

@@ -26,11 +26,13 @@
 
 (in-package :ww)
 
-(ww-set *problem-name* propagation-inconsistent-successor-test)
+(ww-set *problem-name* engine-propagation-inconsistent-successor-test)
 (ww-set *problem-type* planning)
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 2)
+
+(setf *expected-min-length* 2)
 
 
 ;;;; TYPES AND TECHNOLOGY INCLUDE ;;;;

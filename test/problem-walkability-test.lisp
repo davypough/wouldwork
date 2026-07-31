@@ -24,6 +24,8 @@
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 1)
 
+(setf *expected-min-length* 1)
+
 (define-types
   agent (main-agent holding-agent supported-agent isolated-agent)
   location (main-start main-mid main-goal

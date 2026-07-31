@@ -10,6 +10,8 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
+;;;   nested    : -placement (holding, occupant-elevation, within-agent-vertical-reach);
+;;;               -reachability (reachable)
 ;;; PROVIDES:
 ;;;   query     : pickup-clear  --  true when ?agent, currently at ?a-location, may
 ;;;               pick up ?object, currently at ?object-location

@@ -208,14 +208,477 @@
   (run-test-problems))
 
 
-(defun test-talos ()
+(defvar *expected-min-length* nil
+  "Test-only.  When a test/problem-*.lisp file sets this (plain SETF, not WW-SET --
+   it is test metadata, not a search-control parameter, and must not be persisted to
+   vals.lisp), TEST-TALOS requires the solved plan to have exactly this length under
+   min-length search.  NIL performs no check.")
+
+
+;;; MUTATION VALIDATION ;;;
+
+;;; Supports TEST-TALOS :VALIDATE T: a small, hand-maintained table of deliberate
+;;; mutations, each confirming that one specific negative check actually has teeth --
+;;; the automated form of temporarily re-breaking a fix to confirm its test goes red.
+;;; Nothing can auto-derive which line of a tech/ file a given assertion guards, so
+;;; this can't be fully automatic; each case names a function, a broken version of it,
+;;; and the one test file expected to fail when that version is installed.
+
+
+(defstruct mutation-case
+  target-name    ;symbol whose symbol-function gets temporarily swapped
+  install-thunk  ;0-arg function whose call installs the broken version
+  test-file      ;the one test/problem-*.lisp file expected to then fail
+  note)          ;what real bug this simulates
+
+
+(defmacro with-broken-function ((name install-form) &body body)
+  "Temporarily rebind NAME's symbol-function for the duration of BODY.  INSTALL-FORM
+   performs the replacement -- for a DEFINE-QUERY/DEFINE-UPDATE target this is an
+   INSTALL-QUERY/INSTALL-UPDATE call followed by COMPILE, exactly mirroring how
+   COMPILE-ALL-FUNCTIONS installs the real one, since COMPILE's effect on a named
+   function is itself to rebind its symbol-function.  The original definition is
+   saved before INSTALL-FORM runs and restored by UNWIND-PROTECT once BODY completes
+   or signals, so a crash mid-run never leaves NAME's broken version bound in the
+   image."
+  `(let* ((target ,name)
+          (original (symbol-function target)))
+     (unwind-protect
+       (progn ,install-form ,@body)
+       (setf (symbol-function target) original))))
+
+
+(defun rebuild-action-precondition (action-name new-precondition)
+  "Test-only.  Recompiles ACTION-NAME's precondition function from NEW-PRECONDITION, a
+   hand-edited variant of its own :precondition-form, using BUILD-PRECONDITION-LAMBDA --
+   the same entry point CREATE-ACTION uses -- so a mutation case can swap in a broken
+   inline precondition clause the same way an INSTALL-QUERY-based case swaps in a broken
+   query body.  Re-derives PRE-PARAM-?VARS/TYPES fresh from the action's own stored,
+   unmutated :PRECONDITION-PARAMS, but reuses its ORIGINAL PRE-$VARS (filtered from
+   :PRECONDITION-VARIABLES) and EFF-ARGS unchanged: the precondition-lambda's success
+   return value, (list ,@eff-args), must destructure into the already-compiled, untouched
+   EFFECT-LAMBDA with the same variable set and order, so EFF-ARGS cannot be recomputed
+   from the (possibly narrower) mutated form without desyncing that contract."
+  (let* ((action (find action-name *actions* :key #'action.name))
+         (pre-params (action.precondition-params action)))
+    (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params pre-params)
+      (let* ((flat-pre-param-?vars (alexandria:flatten pre-param-?vars))
+             (*var-type-env* (append (mapcar #'cons flat-pre-param-?vars (flatten-param-types pre-param-types))
+                                      *var-type-env*))
+             (pre-$vars (remove-if-not #'$varp (action.precondition-variables action)))
+             (pre-special-$vars (get-special-vars (action.precondition-form action)))
+             (eff-args (append flat-pre-param-?vars pre-$vars pre-special-$vars)))
+        (compile (action.pre-defun-name action)
+                 (subst-int-code
+                   (build-precondition-lambda action-name new-precondition pre-param-?vars pre-$vars eff-args)))))))
+
+
+(defparameter *mutation-cases*
+  (list
+    (make-mutation-case
+      :target-name 'obstacle-clear
+      :test-file "problem-ladder-test.lisp"
+      :note "Simulates dropping the not-holding guard on ladder's own OBSTACLE-CLEAR
+             branch -- eg a refactor that copies screen's clause and forgets it for
+             ladder.  Carrying-agent's negative probe (ladder use while carrying)
+             should then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'obstacle-clear
+            '(?agent agent ?obstacle (either gate screen ladder gears))
+            '(or (and (gate ?obstacle) (open ?obstacle))
+                 (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
+                 (ladder ?obstacle)
+                 (and (gears ?obstacle) (stream-obstacle-clear ?obstacle))))
+          (compile 'obstacle-clear (subst-int-code (symbol-value 'obstacle-clear)))))
+    (make-mutation-case
+      :target-name 'safe
+      :test-file "problem-jump-test.lisp"
+      :note "Simulates the destination-safety check being disabled entirely -- eg a
+             stray debugging override left in place.  The goal directly asserts
+             (not (safe unsafe-goal)), so this should make the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'safe '(?location location) '(not nil))
+          (compile 'safe (subst-int-code (symbol-value 'safe)))))
+    (make-mutation-case
+      :target-name 'arbitrate-crossings
+      :test-file "problem-beam-crossing-cascade-test.lisp"
+      :note "Simulates losing the numeric priority branch, degrading to the
+             alphabetical-only tie-break the file's own header documents as
+             insufficient for this four-way loop."
+      :install-thunk
+        (lambda ()
+          (install-query 'arbitrate-crossings '(?candidate)
+            '(do (assign $kept nil)
+                 (assign $remaining ?candidate)
+                 (ww-loop for $round from 1 to (length ?candidate)
+                          do (assign $lighting (compute-relay-lighting $kept))
+                             (assign $best nil)
+                             (doall (?x (get-current-crossings))
+                               (if (and (member ?x $remaining)
+                                        (crossing-reaches ?x $kept $lighting))
+                                 (if (or (not $best)
+                                         (string< (symbol-name ?x) (symbol-name $best)))
+                                   (assign $best ?x))))
+                             (if (not $best)
+                               (return t)
+                               (do (assign $kept (cons $best $kept))
+                                   (assign $remaining (remove $best $remaining)))))
+                 $kept))
+          (compile 'arbitrate-crossings
+                   (subst-int-code (symbol-value 'arbitrate-crossings)))))
+    (make-mutation-case
+      :target-name 'obstacle-clear
+      :test-file "problem-ladder-test.lisp"
+      :note "Simulates dropping the open-gate guard on OBSTACLE-CLEAR's gate branch --
+             eg a refactor that treats gate like ladder/screen and forgets gate must
+             also be open.  Gate-agent's negative probe (closed gate should block the
+             flat conjunction) should then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'obstacle-clear
+            '(?agent agent ?obstacle (either gate screen ladder gears))
+            '(or (gate ?obstacle)
+                 (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
+                 (and (ladder ?obstacle) (not (bind (holding ?agent $any-held-object))))
+                 (and (gears ?obstacle) (stream-obstacle-clear ?obstacle))))
+          (compile 'obstacle-clear (subst-int-code (symbol-value 'obstacle-clear)))))
+    (make-mutation-case
+      :target-name 'jump-elevation-reachable
+      :test-file "problem-jump-test.lisp"
+      :note "Simulates the upward-height restriction being dropped entirely -- eg an
+             off-by-something that always passes.  The goal directly asserts
+             (not (jump-elevation-reachable boundary-agent 5)), a static fact
+             independent of any plan, so this should make the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'jump-elevation-reachable '(?agent agent ?target-elevation) '(not nil))
+          (compile 'jump-elevation-reachable
+                   (subst-int-code (symbol-value 'jump-elevation-reachable)))))
+    (make-mutation-case
+      :target-name 'same-crossing-set
+      :test-file "problem-beam-crossing-cascade-test.lisp"
+      :note "Simulates dropping the length check from the fixpoint/oscillation
+             comparison, leaving only the subset check.  On this geometry, round 2's
+             empty NEXT set is then wrongly seen as equal to round 1's four-crossing
+             ACTIVE set, so UPDATE-CROSSING-STATUS! resolves immediately with zero
+             active crossings instead of continuing through oscillation detection to
+             ARBITRATE-CROSSINGS.  Reachable via the same recomputation helper as the
+             arbitrate-crossings case above."
+      :install-thunk
+        (lambda ()
+          (install-query 'same-crossing-set '(?left ?right)
+            '(ww-loop for $crossing in ?left always (member $crossing ?right)))
+          (compile 'same-crossing-set
+                   (subst-int-code (symbol-value 'same-crossing-set)))))
+    (make-mutation-case
+      :target-name 'use-ladder-pre-fn
+      :test-file "problem-ladder-test.lisp"
+      :note "Simulates dropping USE-LADDER's not-already-supported guard -- eg a refactor
+             that assumes ground-only movement never needs re-checking support.
+             Supported-agent's negative probe (already on a support-box) should then
+             wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'use-ladder
+            '(and (bind (has-location ?agent $a-location))
+                  (bind (has-position ?ladder $ladder-location))
+                  (eql $a-location $ladder-location)
+                  (bind (climb-via> $a-location $means ?destination))
+                  (member ?ladder $means)
+                  (one-way-clear ?agent $means)
+                  (safe ?destination)))))
+    (make-mutation-case
+      :target-name 'use-ladder-pre-fn
+      :test-file "problem-ladder-test.lisp"
+      :note "Simulates dropping USE-LADDER's exact-positioning check -- eg a refactor
+             that assumes an edge's climb-via> origin implies the agent is at the ladder
+             itself.  Misplaced-agent's negative probe (ladder fixed elsewhere) should
+             then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'use-ladder
+            '(and (bind (has-location ?agent $a-location))
+                  (not (bind (on ?agent $anyplace)))
+                  (bind (has-position ?ladder $ladder-location))
+                  (bind (climb-via> $a-location $means ?destination))
+                  (member ?ladder $means)
+                  (one-way-clear ?agent $means)
+                  (safe ?destination)))))
+    (make-mutation-case
+      :target-name 'use-ladder-pre-fn
+      :test-file "problem-ladder-test.lisp"
+      :note "Simulates dropping USE-LADDER's means-membership check -- eg a refactor
+             that assumes any correctly-positioned ladder at the edge's origin must be
+             one of its enabling means.  Unlisted-agent's negative probe (ladder6
+             positioned correctly but absent from the edge's means list) should then
+             wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'use-ladder
+            '(and (bind (has-location ?agent $a-location))
+                  (not (bind (on ?agent $anyplace)))
+                  (bind (has-position ?ladder $ladder-location))
+                  (eql $a-location $ladder-location)
+                  (bind (climb-via> $a-location $means ?destination))
+                  (one-way-clear ?agent $means)
+                  (safe ?destination)))))
+    (make-mutation-case
+      :target-name 'walk-pre-fn
+      :test-file "problem-walkability-test.lisp"
+      :note "Simulates dropping WALK's not-already-supported guard -- eg a refactor that
+             assumes the derived walkable-locations closure alone gates movement.
+             Supported-agent's negative probe (already on a support-box) should then
+             wrongly produce a successor, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'walk
+            '(and (bind (has-location ?agent $a-location))
+                  (assign $walkable-locations (walkable-locations ?agent $a-location))))))
+    (make-mutation-case
+      :target-name 'step-on-pre-fn
+      :test-file "problem-step-test.lisp"
+      :note "Simulates dropping STEP-ON's not-already-supported guard -- eg a refactor
+             that assumes exact colocation and CLEARTOP are the only requirements.
+             Supported-agent's negative probe (already on current-plate, alternate-plate
+             clear and colocated) should then wrongly pass, making the goal
+             unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'step-on
+            '(and (bind (has-location ?agent $a-location))
+                  (or (and (plate ?fixture)
+                           (bind (has-position ?fixture $f-location)))
+                      (and (fan ?fixture)
+                           (bind (mounted-on ?fixture $gears))
+                           (bind (has-location ?fixture $f-location))))
+                  (eql $a-location $f-location)
+                  (cleartop ?fixture)))))
+    (make-mutation-case
+      :target-name 'step-on-pre-fn
+      :test-file "problem-step-test.lisp"
+      :note "Simulates dropping STEP-ON's exact-colocation check -- eg a refactor that
+             assumes any clear steppable fixture of the right kind is close enough.
+             Loose-agent's negative probe (remote-plate positioned elsewhere) should
+             then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'step-on
+            '(and (bind (has-location ?agent $a-location))
+                  (not (bind (on ?agent $anyplace)))
+                  (or (and (plate ?fixture)
+                           (bind (has-position ?fixture $f-location)))
+                      (and (fan ?fixture)
+                           (bind (mounted-on ?fixture $gears))
+                           (bind (has-location ?fixture $f-location))))
+                  (cleartop ?fixture)))))
+    (make-mutation-case
+      :target-name 'pickup-fan-pre-fn
+      :test-file "problem-gears-fan-test.lisp"
+      :note "Simulates dropping PICKUP-FAN's not-welded guard -- eg a refactor that
+             treats welding as purely a display/consequence detail rather than a
+             pickup blocker.  The welded-fan negative probe (otherwise clear and
+             reachable) should then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'pickup-fan
+            '(and (bind (has-location ?agent $a-location))
+                  (or (and (bind (has-location ?fan $fan-location))
+                           (cleartop ?fan)
+                           (pickup-clear ?agent $a-location ?fan $fan-location))
+                      (and (bind (mounted-on ?fan $w-gears))
+                           (wall-gears $w-gears)
+                           (not (bind (holding ?agent $any-held)))
+                           (bind (has-position $w-gears $fan-location))
+                           (reachable $fan-location $a-location)
+                           (within-agent-vertical-reach ?agent (gears-elevation $w-gears))))))))
+    (make-mutation-case
+      :target-name 'mount-fan-pre-fn
+      :test-file "problem-gears-fan-test.lisp"
+      :note "Simulates dropping MOUNT-FAN's not-already-occupied guard -- eg a refactor
+             that assumes reach and vertical clearance alone determine a legal mount.
+             The occupied-gears negative probe (already carrying gear-occupant-fan)
+             should then wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'mount-fan
+            '(and (holding ?agent ?fan)
+                  (bind (has-location ?agent $a-location))
+                  (bind (has-position ?gears $g-location))
+                  (reachable $g-location $a-location)
+                  (within-agent-vertical-reach ?agent (gears-elevation ?gears))))))
+    (make-mutation-case
+      :target-name 'jam-target-pre-fn
+      :test-file "problem-jammer-test.lisp"
+      :note "Simulates dropping JAM-TARGET's JAM-DISALLOWED> guard -- eg a refactor that
+             assumes reach and visibility alone determine a legal jam placement.  The
+             disallowed-agent negative probe (geometrically and visually legal, but an
+             authored JAM-DISALLOWED> fact names this exact triple) should then wrongly
+             pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'jam-target
+            '(and (bind (holding ?agent $any-jammer))
+                  (jammer $any-jammer)
+                  (bind (has-location ?agent $a-location))
+                  (reachable ?location $a-location)
+                  (or (and (or (gate ?target) (gun ?target))
+                           (visible ?location ?target))
+                      (and (or (floor-gears ?target) (wall-gears ?target))
+                           (bind (has-position ?target $t-location))
+                           (or (eql ?location $t-location)
+                               (visible ?location $t-location))))
+                  (assign $places (placement-options ?agent ?location $any-jammer))))))
+    (make-mutation-case
+      :target-name 'step-off-pre-fn
+      :test-file "problem-step-test.lisp"
+      :note "Simulates dropping STEP-OFF's STEPPABLE type guard -- eg a refactor that
+             assumes anything an agent can be ON is a valid step-off target, blurring
+             the line with jump's box-drop.  The box-agent negative probe (resting on
+             a box, not a steppable) should then wrongly pass, making the goal
+             unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (rebuild-action-precondition 'step-off
+            '(and (bind (on ?agent $fixture))
+                  (bind (has-location ?agent $a-location))))))
+    (make-mutation-case
+      :target-name 'visible-clear
+      :test-file "problem-visibility-test.lisp"
+      :note "Simulates dropping VISIBLE-CLEAR's open-state check -- eg a refactor that
+             conflates the operational gate-transparency test with POTENTIALLY-VISIBLE's
+             structural one.  Cascades into VISIBLE and BEAM-VISIBLE, whose own
+             closed-gate negative probes (mixed-site, blocked-target-site, blocked-left/
+             right) would then also wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'visible-clear '(?occluder gate) '(gate ?occluder))
+          (compile 'visible-clear (subst-int-code (symbol-value 'visible-clear)))))
+    (make-mutation-case
+      :target-name 'reachable-clear
+      :test-file "problem-reachability-test.lisp"
+      :note "Simulates dropping REACHABLE-CLEAR's open-state check -- eg a refactor that
+             treats any gate barrier as passable regardless of its current state.
+             Cascades into REACHABLE, whose own closed-gate and mixed-edge negative
+             probes would then also wrongly pass, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-query 'reachable-clear '(?barrier gate) '(gate ?barrier))
+          (compile 'reachable-clear (subst-int-code (symbol-value 'reachable-clear)))))
+    (make-mutation-case
+      :target-name 'update-gate-status!
+      :test-file "problem-jammer-test.lisp"
+      :note "Simulates dropping UPDATE-GATE-STATUS!'s jamming override -- eg a refactor
+             that treats jamming as purely a display/consequence detail rather than a
+             standing force-open.  Uses the jammer lifecycle test rather than gate.lisp's
+             own dedicated zero-action test, since that one's only OPEN derivation runs
+             inside its init-action's own PROPAGATE-CHANGES! and is unreachable by a
+             post-stage swap; here JAM-TARGET's own PROPAGATE-CHANGES! call fires during
+             solving.  With jamming disabled, gate-target -- otherwise uncontrolled --
+             never opens, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-update 'update-gate-status! '()
+            '(doall (?gate gate)
+               (do (assign $control-on nil)
+                   (if (bind (controls $clauses ?gate $mode))
+                     (do (assign $any-clause-on
+                           (ww-loop for $clause in $clauses
+                                    thereis (ww-loop for $c in $clause
+                                                     always (energized $c))))
+                         (if (eql $mode 'normal)
+                           (assign $control-on $any-clause-on)
+                           (if (eql $mode 'inverted)
+                             (assign $control-on (not $any-clause-on))))))
+                   (if $control-on
+                     (open ?gate)
+                     (not (open ?gate))))))
+          (compile 'update-gate-status!
+                   (subst-int-code (symbol-value 'update-gate-status!)))))
+    (make-mutation-case
+      :target-name 'update-gun-status!
+      :test-file "problem-gun-test.lisp"
+      :note "Simulates dropping UPDATE-GUN-STATUS!'s not-jammed override -- eg a refactor
+             that treats jamming as purely a display/consequence detail rather than a
+             lethality override.  With jamming disabled, gun1 -- uncontrolled and
+             therefore armed by default -- stays permanently lethal, so WATCHED never
+             becomes safe and WALK can never cross it, making the goal unsatisfiable."
+      :install-thunk
+        (lambda ()
+          (install-update 'update-gun-status! '()
+            '(doall (?gun gun)
+               (do (assign $control-on t)
+                   (if (bind (controls $clauses ?gun $mode))
+                     (do (assign $any-clause-on
+                           (ww-loop for $clause in $clauses
+                                    thereis (ww-loop for $c in $clause
+                                                     always (energized $c))))
+                         (if (eql $mode 'normal)
+                           (assign $control-on $any-clause-on)
+                           (if (eql $mode 'inverted)
+                             (assign $control-on (not $any-clause-on))))))
+                   (if $control-on
+                     (lethal ?gun)
+                     (not (lethal ?gun))))))
+          (compile 'update-gun-status!
+                   (subst-int-code (symbol-value 'update-gun-status!)))))))
+
+
+(defun run-mutation-case (case)
+  "Stage CASE's test file, install its broken function, solve, and confirm the
+   solve now fails -- via no solution, a wrong solved length, or a Lisp error, any of
+   which means a real version of this bug would turn TEST-TALOS's ordinary sweep red.
+   Staging itself runs unprotected, same as the ordinary sweep, so a staging error
+   still halts the run immediately; only the post-stage solve is wrapped, since that
+   is where an ill-formed mutation could plausibly signal instead of cleanly failing.
+   Returns T if the mutation was detected (the check has teeth), NIL if it was not
+   (a surviving mutant)."
+  (let* ((problem-name (parse-problem-name (mutation-case-test-file case)))
+         (problem-path (format nil "test/~A" (mutation-case-test-file case))))
+    (print-test-header problem-name "VALIDATE")
+    (format t "Breaking ~A -- ~A~%" (mutation-case-target-name case) (mutation-case-note case))
+    (setf *expected-min-length* nil)
+    (%stage problem-path)
+    (with-broken-function ((mutation-case-target-name case)
+                            (funcall (mutation-case-install-thunk case)))
+      (handler-case
+        (progn
+          (ww-solve)
+          (cond
+            ((not *solution-paths*)
+              (format t "~%Mutation detected: no solution found.~%")
+              t)
+            ((and *expected-min-length*
+                  (eq *solution-type* 'min-length)
+                  (/= (solution.depth (first *solution-paths*)) *expected-min-length*))
+              (format t "~%Mutation detected: solved at the wrong length.~%")
+              t)
+            (t
+              (format t "~%SURVIVING MUTANT: ~A still solves correctly with ~A broken.~%"
+                      problem-name (mutation-case-target-name case))
+              nil)))
+        (error (e)
+          (format t "~%Mutation detected: signaled an error instead of solving: ~A~%" e)
+          t)))))
+
+
+(defun test-talos (&key validate)
   "Stage and solve every problem file in the test directory.
-   Completion of every file with at least one solution and no error is success."
+   A file that solves without error but reaches no solution, or whose solved
+   length does not match its own *EXPECTED-MIN-LENGTH* (when set, under
+   min-length search), is recorded as a failure and the run continues; a
+   genuine Lisp error still halts the run immediately, as it does for TEST and
+   TEST-BT.  A final summary lists every failed problem.
+   With :VALIDATE T, also steps through *MUTATION-CASES* after the normal sweep --
+   see RUN-MUTATION-CASE and the MUTATION VALIDATION section above."
   (let ((problem-files
           (sort (directory (merge-pathnames "problem-*.lisp"
                                             (get-test-folder-path)))
                 #'string-lessp
-                :key #'file-namestring)))
+                :key #'file-namestring))
+        failed-problems
+        surviving-mutants)
     (cleanup-test-files)
     (unwind-protect
       (progn
@@ -223,15 +686,41 @@
           (let ((problem-name (parse-problem-name (file-namestring problem-file)))
                 (problem-path (format nil "test/~A" (file-namestring problem-file))))
             (print-test-header problem-name "TALOS")
+            (setf *expected-min-length* nil)
             (%stage problem-path)
             (ww-solve)
-            (unless *solution-paths*
-              (error "Talos test ~A completed without a solution."
-                     problem-name))))
-        (format t "~%Completed all ~D Talos test problems.~%" (length problem-files))
-        t)
-      (cleanup-test-files)
-      (stage blocks3))))
+            (cond
+              ((not *solution-paths*)
+                (format t "~%Talos test ~A completed without a solution.~%"
+                        problem-name)
+                (push problem-name failed-problems))
+              ((and *expected-min-length*
+                    (eq *solution-type* 'min-length)
+                    (/= (solution.depth (first *solution-paths*))
+                        *expected-min-length*))
+                (format t "~%Talos test ~A solved at length ~D, expected ~D.~%"
+                        problem-name
+                        (solution.depth (first *solution-paths*))
+                        *expected-min-length*)
+                (push problem-name failed-problems)))))
+        (when validate
+          (format t "~%~%Validating check teeth (~D mutation case~:P)...~%"
+                  (length *mutation-cases*))
+          (dolist (case *mutation-cases*)
+            (unless (run-mutation-case case)
+              (push (mutation-case-test-file case) surviving-mutants))))
+        (format t "~%~%Final Summary:~%")
+        (format t "Total Talos test problems run: ~D~%" (length problem-files))
+        (format t "Test failures: ~D~%" (length failed-problems))
+        (format t "Failed problems: ~A~%" (reverse failed-problems))
+        (when validate
+          (format t "Mutation cases run: ~D~%" (length *mutation-cases*))
+          (format t "Surviving mutants: ~D~%" (length surviving-mutants))
+          (format t "Surviving mutant files: ~A~%" (reverse surviving-mutants)))
+        (format t "Overall: ~:[FAILED~;PASSED~]~%"
+                (and (null failed-problems) (null surviving-mutants)))
+        (and (null failed-problems) (null surviving-mutants)))
+      (cleanup-test-files))))
 
 
 (defun write-hash-table-to-file (hash-table filename)
@@ -404,7 +893,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-start-is-goal-test.lisp")
+        (%stage "test/problem-engine-start-is-goal-test.lisp")
         (run-start-is-goal-case 'depth-first 'graph 0 'first 1 :terminal t)
         (run-start-is-goal-case 'depth-first 'graph 0 'min-length 1 :terminal t)
         (run-start-is-goal-case 'depth-first 'graph 0 'min-time 1 :terminal t)

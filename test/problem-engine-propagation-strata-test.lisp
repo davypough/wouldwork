@@ -1,4 +1,4 @@
-;;; Filename: problem-propagation-strata-test.lisp
+;;; Filename: problem-engine-propagation-strata-test.lisp
 
 ;;; Targeted exercise for src/ww-propagation-order.lisp: the smallest problem whose
 ;;; MASTER PROPAGATION DRIVER carries six derivations and one reaction, assembled from
@@ -88,7 +88,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* propagation-strata-test)
+(ww-set *problem-name* engine-propagation-strata-test)
 
 (ww-set *problem-type* planning)
 
@@ -97,6 +97,8 @@
 (ww-set *tree-or-graph* graph)
 
 (ww-set *depth-cutoff* 3)
+
+(setf *expected-min-length* 3)
 
 
 (defparameter *max-pairings* 2)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)

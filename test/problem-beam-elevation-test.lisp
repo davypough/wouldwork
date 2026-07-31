@@ -62,6 +62,8 @@
 
 (ww-set *depth-cutoff* 1)
 
+(setf *expected-min-length* 1)
+
 
 (defparameter *max-pairings* 2)  ;connector2/4 each pair to a connector and receiver
 

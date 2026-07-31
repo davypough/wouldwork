@@ -2,7 +2,7 @@
 
 Supporting documentation for Wouldwork. The *Wouldwork User Manual* in the project root is the primary reference for using the system; these are supplementary — engine internals, authoring and analysis procedures, applicability guidance, and per-problem working notes.
 
-Two other documentation homes sit outside this directory: `tech/README.html` is authoritative for the Talos technology library, and `tech/Talos Technology  Relations.txt` is the current relation inventory.
+Two other documentation homes sit outside this directory: `tech/README.html` is authoritative for the Talos technology library, and `tech/Talos Technology  Summary.txt` is the current relation inventory.
 
 ---
 
@@ -29,7 +29,7 @@ These form a sequence: write → normalize → diagnose.
 
 ### `search-strategies/` — making a hard problem tractable
 
-`README.md` indexes the strategies against the Manual's Part 3 list. `heuristics.md` and `relaxation.md` cover the two most easily confused, with applicability criteria and worked examples. A heuristic changes exploration *order*; a relaxation changes which states are *legal* and requires goal post-validation.
+`heuristics.md` and `relaxation.md` cover the two most easily confused strategies from the Manual's Part 3 list, with applicability criteria and worked examples. A heuristic changes exploration *order*; a relaxation changes which states are *legal* and requires goal post-validation.
 
 ### `problems/` — per-problem working notes
 

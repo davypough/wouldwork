@@ -857,7 +857,29 @@
       (check-types pre-param-types))
     (nreverse uninstantiable-types)))
 
-        
+
+(defun check-precondition-type-instantiability (precondition)
+  "Returns a list of static type names named by a top-level (TYPE $VAR) conjunct of
+   PRECONDITION's outermost AND that have zero declared instances.  Such a conjunct
+   tests type membership of an already-bound $-variable (typically from a preceding
+   BIND) rather than declaring a formal parameter, but it is just as much a hard
+   requirement: if TYPE has no instances the conjunct can never be true for any
+   binding, so the whole action can never fire.  Only conjuncts directly inside the
+   outermost AND are examined -- one nested inside OR or EXISTS is not a hard
+   requirement, since a different branch may still succeed."
+  (let ((uninstantiable-types nil))
+    (when (and (consp precondition) (eq (first precondition) 'and))
+      (dolist (conjunct (rest precondition))
+        (when (and (consp conjunct)
+                   (= (length conjunct) 2)
+                   (symbolp (first conjunct))
+                   ($varp (second conjunct)))
+          (multiple-value-bind (instances exists-p) (gethash (first conjunct) *types*)
+            (when (and exists-p (null instances))
+              (pushnew (first conjunct) uninstantiable-types))))))
+    (nreverse uninstantiable-types)))
+
+
 (defun check-predicate (proposition)
   "Detects an error in the use of an unknown predicate."
   (or (nth-value 1 (gethash (car proposition) *relations*))

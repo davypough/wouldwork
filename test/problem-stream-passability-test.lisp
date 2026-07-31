@@ -28,6 +28,8 @@
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 1)
 
+(setf *expected-min-length* 1)
+
 
 ;;;; TYPES ;;;;
 

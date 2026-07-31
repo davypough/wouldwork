@@ -1,4 +1,4 @@
-;;; Filename: problem-start-is-goal-test.lisp
+;;; Filename: problem-engine-start-is-goal-test.lisp
 
 ;;; Focused search-lifecycle problem.  The initial position satisfies the goal, and two
 ;;; one-step actions reach distinct goal states with lower/higher values for the broader
@@ -13,7 +13,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* start-is-goal-test)
+(ww-set *problem-name* engine-start-is-goal-test)
 
 (ww-set *problem-type* planning)
 

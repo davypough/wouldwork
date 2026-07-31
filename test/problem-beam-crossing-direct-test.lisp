@@ -34,6 +34,8 @@
 
 (ww-set *depth-cutoff* 1)
 
+(setf *expected-min-length* 0)
+
 
 ;;;; TYPES ;;;;
 ;;;; Ahead of the technology includes, as always -- a DOALL over a bare type name is

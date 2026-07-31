@@ -32,23 +32,26 @@
 
 (ww-set *depth-cutoff* 4)
 
+(setf *expected-min-length* 4)
+
 
 ;;;; TYPES ;;;;
 
 
 (define-types
-  agent (gate-agent wall-agent floor-agent lifecycle-agent)
+  agent (gate-agent wall-agent floor-agent lifecycle-agent disallowed-agent)
   location (gate-site
             wall-vantage
             wall-gears-site
             floor-site
             lifecycle-agent-site
-            lifecycle-gears-site)
-  jammer (gate-jammer wall-jammer floor-jammer lifecycle-jammer)
+            lifecycle-gears-site
+            disallowed-site)
+  jammer (gate-jammer wall-jammer floor-jammer lifecycle-jammer disallowed-jammer)
   gate (gate-target)
   plate (gate-plate lifecycle-plate)
   wall-gears (wall-target lifecycle-target)
-  floor-gears (floor-target)
+  floor-gears (floor-target disallowed-gears)
   fan (lifecycle-fan))
 
 
@@ -97,7 +100,15 @@
   (has-position lifecycle-target lifecycle-gears-site)
   (mounted-on lifecycle-fan lifecycle-target)
   (welded lifecycle-fan lifecycle-target)
-  (reach-via lifecycle-agent-site () lifecycle-gears-site))
+  (reach-via lifecycle-agent-site () lifecycle-gears-site)
+
+  ;; Disallowed-pairing negative probe: geometrically and visually legal (placement
+  ;; exactly at the gears' own has-position location), but an authored JAM-DISALLOWED>
+  ;; fact blocks this exact agent/placement/target triple.
+  (has-location disallowed-agent disallowed-site)
+  (holding disallowed-agent disallowed-jammer)
+  (has-position disallowed-gears disallowed-site)
+  (jam-disallowed> disallowed-site disallowed-site disallowed-gears))
 
 
 (define-init-action initialize-derived-state
@@ -117,6 +128,13 @@
        (not (exists (?other target)
               (and (different ?other ?intended)
                    (jamming ?jammer ?other))))))
+
+
+(defun jammer-action-applicable-p (state action-name args)
+  "Whether the installed jammer action accepts ARGS in STATE."
+  (let ((action (find action-name *actions* :key #'action.name)))
+    (and (member args (get-precondition-args action state) :test #'equal)
+         (apply (action.pre-defun-name action) state args))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -178,7 +196,16 @@
     ;; Important cross-lane absences.
     (not (jamming gate-jammer wall-target))
     (not (jamming wall-jammer floor-target))
-    (not (jamming floor-jammer gate-target))))
+    (not (jamming floor-jammer gate-target))
+
+    ;; An otherwise legal target/placement pairing is blocked by an authored
+    ;; JAM-DISALLOWED> fact naming this exact agent-location/placement/target triple.
+    (has-location disallowed-agent disallowed-site)
+    (holding disallowed-agent disallowed-jammer)
+    (has-position disallowed-gears disallowed-site)
+    (jam-disallowed> disallowed-site disallowed-site disallowed-gears)
+    (not (jammer-action-applicable-p
+           state 'jam-target '(disallowed-agent disallowed-gears disallowed-site)))))
 
 
 (define-goal

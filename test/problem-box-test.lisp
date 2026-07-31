@@ -22,6 +22,7 @@
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 3)
+(setf *expected-min-length* 3)
 
 (define-types
   agent (lifecycle-agent plate-agent occupied-agent high-agent holding-agent

@@ -1,4 +1,4 @@
-;;; Filename: problem-query-update-parameter-tests.lisp
+;;; Filename: problem-engine-query-update-parameter-tests.lisp
 
 ;;; Focused tests for the DEFINE-QUERY/DEFINE-UPDATE parameter-list language:
 ;;;
@@ -12,13 +12,13 @@
 ;;;
 ;;; Run from the Wouldwork REPL with:
 ;;;
-;;;   (stage query-update-parameter-tests)
+;;;   (stage engine-query-update-parameter-tests)
 ;;;   (solve)
 ;;;
 (in-package :ww)
 
 
-(ww-set *problem-name* query-update-parameter-tests)
+(ww-set *problem-name* engine-query-update-parameter-tests)
 
 (ww-set *problem-type* planning)
 

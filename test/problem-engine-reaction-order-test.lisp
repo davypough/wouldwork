@@ -1,4 +1,4 @@
-;;; Filename: problem-reaction-order-test.lisp
+;;; Filename: problem-engine-reaction-order-test.lisp
 
 ;;; Two reactions in one derived driver, chained in both directions in a problem small
 ;;; enough to solve.  The characterization goal checks the driver structure and the
@@ -38,7 +38,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* reaction-order-test)
+(ww-set *problem-name* engine-reaction-order-test)
 
 (ww-set *problem-type* planning)
 
@@ -47,6 +47,8 @@
 (ww-set *tree-or-graph* graph)
 
 (ww-set *depth-cutoff* 3)
+
+(setf *expected-min-length* 3)
 
 
 ;;;; TYPES ;;;;

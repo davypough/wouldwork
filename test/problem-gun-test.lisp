@@ -33,6 +33,8 @@
 
 (ww-set *depth-cutoff* 4)
 
+(setf *expected-min-length* 4)
+
 
 ;;;; TYPES ;;;;
 
