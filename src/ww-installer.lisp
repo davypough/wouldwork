@@ -392,8 +392,9 @@
 
 
 (defun prescan-problem-relation-signatures (forms)
-  ;; INCONSISTENT-STATE is the planner's own relation, not a problem's: PROPAGATE-CHANGES!
-  ;; asserts it when the fixpoint fails to converge, and INIT-START-STATE tests for it.
+  ;; INCONSISTENT-STATE is the planner's generic rejection marker, not a problem relation:
+  ;; propagation uses it for failed convergence, while invariant updates use it for states
+  ;; that must not survive.  Initialization and successor generation both reject the marker.
   ;; It has to be in *RELATIONS* before anything is translated, or TRANSLATE reads
   ;; (INCONSISTENT-STATE) as a call to an unrecognized function.  It used to be registered
   ;; inside INSTALL-DYNAMIC-RELATIONS, which made its availability depend on a

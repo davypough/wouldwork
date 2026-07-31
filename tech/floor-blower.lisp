@@ -1,7 +1,7 @@
 ;;; Filename: floor-blower.lisp
 
 ;;; Floor-blower technology: the floor mounting of the shared gears/fan machinery (see
-;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
+;;; gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
 ;;; wiring, the turning/blowing derivation, and the fan actions).  Floor gears are a
 ;;; flush floor fixture; their mounted fan is a floor object with a has-location, so it
 ;;; is steppable (step.lisp) and a placement target (-placement), its zero-thickness top
@@ -28,8 +28,8 @@
 ;;; hovering occupants at the gears' location.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  floor-gears and fan come from nested -gears-fan
-;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
+;;;   types     : agent, location  --  floor-gears and fan come from nested gears-fan
+;;;   nested    : gears-fan (types, mounted-on, aimed-at>, turning/blowing,
 ;;;               gears-elevation, update-gears-status!, relocate-stack!, fan actions;
 ;;;               nests -support-occupancy, -location, -position, -elevation, -controls,
 ;;;               -placement, -reachability, and -pickup)
@@ -42,7 +42,7 @@
 ;;;   updates   : update-floor-blower-status!, blow-occupants-away!, drop-occupants!
 
 (include-tech -propagation)
-(include-tech -gears-fan)
+(include-tech gears-fan)
 
 (in-package :ww)
 

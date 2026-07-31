@@ -2,11 +2,12 @@
 
 ;;; Gun technology: a stationary automated turret that makes its authored THREATENS
 ;;; locations lethal while armed.  Armed state is derived each propagation pass exactly
-;;; like -gears-fan's turning: lethal <=> (uncontrolled OR control-on) AND NOT jammed --
+;;; like gears-fan's turning: lethal <=> (uncontrolled OR control-on) AND NOT jammed --
 ;;; an uncontrolled gun is armed by default, matching the turret fiction (compare gate,
 ;;; which defaults closed); jamming always overrides toward safe, the same polarity as
 ;;; gears' jam-forces-stopped.  A gun may be wired to receivers/plates via -controls
-;;; exactly like a gate or gears.  Positioned as a point fixture exactly like a
+;;; exactly like a gate or gears.  It has zero physical height and is positioned as a
+;;; functional point fixture exactly like a
 ;;; transmitter or receiver (-visibility's apparatus/fixture unions, -beam-los-
 ;;; coordinates' apparatus-coords>) rather than with HAS-POSITION: nothing can ever
 ;;; occupy a gun's mounting point, since it isn't a location at all.  Jammed via
@@ -48,7 +49,7 @@
 (define-update update-gun-status! ()
   ;; lethal <=> (uncontrolled OR control-on) AND NOT jammed.  control-on (normal) iff some
   ;; DNF clause has every member energized; inverted negates that aggregate -- computed
-  ;; exactly as gate.lisp's update-gate-status! and -gears-fan's update-gears-status!
+  ;; exactly as gate.lisp's update-gate-status! and gears-fan's update-gears-status!
   ;; compute it.  Uncontrolled guns default armed, the same default gears use, since a
   ;; bare turret is a threat until something disables it.  Change detection is automatic,
   ;; so an unchanged re-assert is silent.

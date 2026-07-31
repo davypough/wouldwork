@@ -15,7 +15,8 @@
 ;;;               -- shared with gate, reachability, visibility, beam-direct, and
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it);
 ;;;               -elevation ((has-elevation ...), location-elevation)
-;;;               -walkability (identity-default walkable-locations/walkable interface);
+;;;               -walkability (WALK-VIA/WALK-VIA> topology relations and the
+;;;               identity-default walkable-locations/walkable interface);
 ;;;               -walkability-coordinates (optional coordinate-based WALK-VIA/WALK-VIA>
 ;;;               derivation from WALL/GATE/WINDOW/SCREEN-SEGMENTS, BOUNDARY-WALL, and
 ;;;               derived air-stream bands);
@@ -26,7 +27,8 @@
 ;;;               --  all shared via nested include-tech rather than local declaration
 ;;; PROVIDES:
 ;;;   relations : (walk-via location $list location), (walk-via> location $list location)
-;;;               --  $list is a DNF clause list: () direct, else OR over clauses, AND within
+;;;               -- from nested -walkability; $list is a DNF clause list: () direct,
+;;;               else OR over clauses, AND within
 ;;;   queries   : walkable-locations (overrides -walkability), walkable (from -walkability),
 ;;;               one-step-walkable
 ;;;   action    : walk
@@ -40,11 +42,6 @@
 (include-tech -threat)
 
 (in-package :ww)
-
-
-(define-static-relations
-  (walk-via location $list location)  ;symmetric walking edge; $list = DNF door clauses: () direct, else OR over clauses, AND within, e.g. ((gate1) (gate2 gate3))
-  (walk-via> location $list location))  ;directional walking edge, same $list convention; emitted by -walkability-coordinates for rides into a stream's destination (inbound widened by side-curtain rides, outbound ordinary)
 
 
 (define-action walk

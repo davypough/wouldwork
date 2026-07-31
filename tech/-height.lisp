@@ -7,14 +7,16 @@
 ;;; so consumers nest-include this file instead of each re-declaring the same union, relation,
 ;;; or default-fallback query.
 ;;;
-;;; declared-height's default of 1 covers box, agent, jammer, and beam-direct's beam-blocker
-;;; (agent/box/jammer/connector); it is NOT used for barrier clearance -- fences, gates,
+;;; declared-height's default of 1 covers box, agent, jammer, connector, and repeater.
+;;; A repeater's height follows its mounting axis: vertical for a floor-repeater and
+;;; horizontal for a wall-repeater.  It is NOT used for barrier clearance -- fences, gates,
 ;;; screens, and walls use capability-specific defaults instead.
 ;;;
 ;;; PROVIDES:
-;;;   type     : heighted-object (either box fence gate agent screen wall jammer connector)  --  what
-;;;              can have a declared height; subtypes absent from the problem's own
-;;;              define-types resolve to nil, a no-op
+;;;   types    : repeater (either floor-repeater wall-repeater);
+;;;              heighted-object (either box fence gate agent screen wall jammer connector
+;;;              repeater) -- what can have a declared height; optional subtypes absent
+;;;              from the problem resolve to nil, a no-op
 ;;;   relation : (has-height heighted-object $fixnum)
 ;;;   query    : declared-height  --  declared value or a fixed default of 1; not for
 ;;;              fence/gate/screen/wall barrier-clearance height
@@ -22,11 +24,12 @@
 (in-package :ww)
 
 
-(define-optional-types wall)
+(define-optional-types wall floor-repeater wall-repeater)
 
 
 (define-types
-  heighted-object (either box fence gate agent screen wall jammer connector))  ;what can have a declared height
+  repeater (either floor-repeater wall-repeater)
+  heighted-object (either box fence gate agent screen wall jammer connector repeater))
 
 
 (define-static-relations
@@ -34,9 +37,8 @@
 
 
 (define-query declared-height (?object heighted-object)
-  ;; Declared physical height of a box/agent/jammer/connector, or 1 (the historical
-  ;; assumed unit height) when undeclared.  Barrier clearance uses its own kind-specific
-  ;; defaults rather than this query.
+  ;; Declared physical height, or 1 when undeclared.  Barrier clearance uses its own
+  ;; kind-specific defaults rather than this query.
   (if (bind (has-height ?object $h))
     $h
     1))

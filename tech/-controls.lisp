@@ -2,21 +2,24 @@
 
 ;;; Controls substrate: the shared DNF controller wiring for controlled devices (gates and
 ;;; gears) and the energized query that evaluates a single controller.  Owned in one
-;;; place so gate.lisp and -gears-fan.lisp nest this file instead of each declaring
+;;; place so gate.lisp and gears-fan.lisp nest this file instead of each declaring
 ;;; controls/energized; both previously lived in gate.lisp.  Each consuming tech still
 ;;; evaluates its own DNF aggregate in its own update, because the uncontrolled default
 ;;; differs by device (an uncontrolled gate reduces to open <=> jammed; uncontrolled
 ;;; gears turn all the time).
 ;;;
 ;;; REQUIRES:
-;;;   nested    : -beam-substrate ((active receiver))
+;;;   nested    : -beam-substrate ((active receiver)) -- pulls in the full receiver machinery
+;;;               even in a receiver-free problem (e.g. blower-only or gun-only, reached
+;;;               through gears-fan); harmless and expected, since update-receiver-status!
+;;;               quantifies over an empty receiver type there and report-inert-techs names it
 ;;;   conditional relations:
 ;;;               depressed (plate), guarded by plate  --  owned by plate.lisp; translation
 ;;;               removes the guarded reference when the plate type is empty
 ;;; PROVIDES:
 ;;;   types     : gate, floor-gears, wall-gears, angled-gears, plate, receiver, mode, gun --
 ;;;               declared optional here.  The gears leaf types appear directly (not via
-;;;               the gears union) because this file splices before -gears-fan installs
+;;;               the gears union) because this file splices before gears-fan installs
 ;;;               the union; gun likewise appears directly since gun.lisp nests this file
 ;;;               rather than the other way around.
 ;;;   relations : (controls $list (either gate floor-gears wall-gears angled-gears gun)

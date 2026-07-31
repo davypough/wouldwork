@@ -13,7 +13,7 @@
 ;;;               plate, mode, and receiver come from nested -controls; gate itself comes
 ;;;               from nested -gate
 ;;;   nested    : -controls ((controls ...), energized; nests -beam-substrate for
-;;;               (active receiver))  --  shared with the blower techs' gears (-gears-fan);
+;;;               (active receiver))  --  shared with the blower techs' gears (gears-fan);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with
 ;;;               walkability (via -passability), reachability, visibility, beam-direct,
 ;;;               beam-crossing, and -passability, which all nest -gate instead of

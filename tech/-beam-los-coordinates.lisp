@@ -14,7 +14,7 @@
 ;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
 ;;; substrate, so a location's position is entered once even when a problem uses both
 ;;; capabilities) for location endpoints, and APPARATUS-COORDS> (declared here) for
-;;; transmitter/receiver/gun endpoints only -- a problem with pure location-to-location
+;;; transmitter/receiver/repeater/gun functional points -- a problem with pure location-to-location
 ;;; beams and no fixtures never needs APPARATUS-COORDS> at all.  A gun's LOS-TO-
 ;;; APPARATUS entries are derived the same way a receiver's are (gated on a jammer
 ;;; being present, like LOS-TO-TARGET, since nothing but jam-target ever reads them).
@@ -47,7 +47,7 @@
 ;;; do not gain this test -- nothing but jam-target ever reads either, and a jammer's line to
 ;;; its target is not blocked by intervening objects, by design.
 ;;;
-;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver gun location) -- the
+;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver repeater gun location) -- the
 ;;; composite every consuming query/init-action here iterates over.  A problem may also declare it
 ;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
 ;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
@@ -61,7 +61,7 @@
 ;;; parent techs the problem lists first.
 ;;;
 ;;; REQUIRES:
-;;;   types     : location  --  declared by the problem; transmitter, receiver, gun
+;;;   types     : location  --  declared by the problem; transmitter, receiver, repeater, gun
 ;;;               declared optional by -visibility/-beam-substrate, sibling nested
 ;;;               includes of the parent techs
 ;;;   relations : los-to-apparatus, los-to-target, los-to-location  --  declared by
@@ -75,12 +75,14 @@
 ;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
 ;;;               core wouldwork setting, so it lives here rather than in ww-settings.lisp;
 ;;;               a problem overrides it with its own DEFPARAMETER
-;;;   types     : beam-endpoint (either transmitter receiver gun location); jammer and gun
+;;;   types     : beam-endpoint (either transmitter receiver repeater gun location);
+;;;               jammer and gun
 ;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
 ;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
-;;;   relations : apparatus-coords> (transmitter/receiver/gun), wall-segments,
+;;;   relations : apparatus-coords> (transmitter/receiver/repeater/gun functional point),
+;;;               wall-segments,
 ;;;               gate-segments, boundary-wall -- all default to no facts; a problem that
 ;;;               asserts wall-segments gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;;               derived automatically instead of hand-authoring them; boundary-wall
@@ -101,15 +103,16 @@
 (in-package :ww)
 
 
+(define-optional-types jammer gun floor-repeater wall-repeater)
+
+
 (define-types
-  beam-endpoint (either transmitter receiver gun location))  ;a fixture, or a connector's location
-
-
-(define-optional-types jammer gun)
+  repeater (either floor-repeater wall-repeater)
+  beam-endpoint (either transmitter receiver repeater gun location))
 
 
 (define-static-relations
-  (apparatus-coords> (either transmitter receiver gun) $rational $rational)
+  (apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
   (wall-segments $list)
   (gate-segments $list)
   (boundary-wall $list))  ;closed polygon ((x1 y1) (x2 y2) ... (xn yn)); last point wraps to first
@@ -297,7 +300,7 @@
 
 (define-query beam-coordinates-endpoint-positions ()
   ;; Routes each beam-endpoint to its owning position relation: LOCATION-COORDS> for a
-  ;; location, APPARATUS-COORDS> (transmitter/receiver only) for everything else.
+  ;; location, APPARATUS-COORDS> (transmitter/receiver/repeater/gun) for everything else.
   (do (assign $positions nil)
       (doall (?endpoint beam-endpoint)
         (if (location ?endpoint)
@@ -420,6 +423,19 @@
                       (los-to-apparatus ?location
                                         (append $occluders $location-occluders)
                                         ?receiver))))))
+        (doall (?location location)
+          (doall (?repeater repeater)
+            (do (assign $occluders
+                        (beam-coordinates-los-occluders
+                          (list ?location ?repeater) $positions $all-walls $gates))
+                (if (not (eql $occluders :blocked))
+                  (do (assign $location-occluders
+                              (beam-coordinates-location-occluders
+                                (list ?location ?repeater) $positions $locations
+                                *beam-occlusion-tolerance*))
+                      (los-to-apparatus ?location
+                                        (append $occluders $location-occluders)
+                                        ?repeater))))))
         (if (exists (?j jammer) t)
           (do (doall (?location location)
                 (doall (?gate gate)

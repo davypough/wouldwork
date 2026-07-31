@@ -210,7 +210,7 @@
 
 (defun test-talos ()
   "Stage and solve every problem file in the test directory.
-   Completion without an error is success."
+   Completion of every file with at least one solution and no error is success."
   (let ((problem-files
           (sort (directory (merge-pathnames "problem-*.lisp"
                                             (get-test-folder-path)))
@@ -224,7 +224,10 @@
                 (problem-path (format nil "test/~A" (file-namestring problem-file))))
             (print-test-header problem-name "TALOS")
             (%stage problem-path)
-            (ww-solve)))
+            (ww-solve)
+            (unless *solution-paths*
+              (error "Talos test ~A completed without a solution."
+                     problem-name))))
         (format t "~%Completed all ~D Talos test problems.~%" (length problem-files))
         t)
       (cleanup-test-files)

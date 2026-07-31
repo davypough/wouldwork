@@ -1,17 +1,16 @@
 ;;; Filename: problem-wall-blower-test.lisp
 
-;;; Minimal wall-blower (wall-gears + fan) exercise.  near holds the agent and the
-;;; control plate; mid is the location faced by wgears1 (mounted on mid's wall at the
-;;; default stream elevation 1) and holds box1; far is the air stream's aimed-at>
-;;; destination, an ordinary ground location, and also holds plate2 -- a flush,
-;;; elevation-0 support with nothing controlled by it, placed there only to exercise
-;;; sweep-occupants-away!'s new landing-on-a-support behavior.  fan1 starts mounted on
-;;; wgears1, hanging with no has-location.  Expected minimum solution (1 step): step-on
-;;; plate1 -- the agent's weight depresses the plate, setting the gears turning; the
-;;; mounted fan blows and sweeps box1 from mid to far, landing on plate2 (its top is
-;;; flush with far's floor elevation) instead of bare ground, so the resulting state has
-;;; both (has-location box1 far) and (depressed plate2).  A second, longer route (walking
-;;; to mid) would instead sweep the agent itself to far, which does not achieve the goal.
+;;; Wall-blower (wall-gears + fan) regression.  near holds the agent and control plate;
+;;; mid is the location faced by wgears1 at its default stream elevation 1 and holds
+;;; box1; far is the air stream's destination and holds plate2, whose top is flush with
+;;; far's elevation-0 floor.  fan1 starts mounted on wgears1, hanging with no location.
+;;;
+;;; Expected minimum solution (1 step): step-on agent1 plate1.  The agent's weight
+;;; depresses plate1, setting the gears turning and the mounted fan blowing.  The stream
+;;; meets the unit-height box at its inclusive upper boundary, sweeps it from mid to far,
+;;; and lands it on plate2 rather than bare ground.  The goal checks that whole lifecycle:
+;;; both plate states, turning/blowing, wall mounting, the fan's absent location, the
+;;; box's relocation and support, and the agent's unchanged location.
 
 
 (in-package :ww)
@@ -25,7 +24,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 6)
+(ww-set *depth-cutoff* 1)
 
 
 ;;;; TYPES ;;;;
@@ -47,9 +46,7 @@
 
 (include-tech plate)
 (include-tech wall-blower)
-(include-tech box)
 (include-tech step)
-(include-tech walkability)
 
 
 ;;;; INITIALIZATION ;;;;
@@ -69,12 +66,9 @@
   ;; The fan starts mounted on the wall gears (an attachment, not an (on ...) fact).
   (mounted-on fan1 wgears1)
 
-  ;; Walking topology; all locations are ordinary ground (elevation 0), and wgears1
-  ;; declares no has-elevation, so its stream works at the default elevation 1.
-  (walk-via near () mid)
-  (walk-via mid () far)
-
-  ;; Gears control and air-stream destination
+  ;; All locations are ordinary ground (elevation 0), and wgears1 declares no
+  ;; has-elevation, so its stream works at the default elevation 1.
+  ;; Gears control and air-stream destination:
   (controls ((plate1)) wgears1 normal)
   (aimed-at> wgears1 far)
 )
@@ -89,9 +83,23 @@
 )
 
 
-;;;; GOAL ;;;;
+;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+
+
+(define-query wall-blower-scenario-valid ()
+  (and (has-location agent1 near)
+       (on agent1 plate1)
+       (depressed plate1)
+       (turning wgears1)
+       (blowing fan1)
+       (mounted-on fan1 wgears1)
+       (not (exists (?location location)
+              (has-location fan1 ?location)))
+       (not (has-location box1 mid))
+       (has-location box1 far)
+       (on box1 plate2)
+       (depressed plate2)))
 
 
 (define-goal
-  (has-location box1 far)
-)
+  (wall-blower-scenario-valid))

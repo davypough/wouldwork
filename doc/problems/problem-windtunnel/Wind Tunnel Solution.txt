@@ -1,0 +1,156 @@
+WIND TUNNEL SOLUTION
+
+INITIAL CONDITIONS
+connector1 is in area1
+agent1 is in area1
+plate1 is off
+fan1 is off
+gate1 is closed
+gate2 is closed
+receiver1 is inactive
+repeater1 is inactive
+
+RECORDING PHASE (agent1- SCRIPTING)
+ agent1 starts recorder1
+ agent1- pauses
+ agent1- moves to area2
+ agent1- toggles plate1 (plate1 is on, fan1 is on, gate1 is open)
+ agent1- pauses
+ agent1- toggles plate1 (plate1 is off, fan1 is off, gate1 is closed)
+ agent1- moves to area1
+ agent1- picks up connector1-
+ agent1- moves to area3
+ agent1- connects connector1- to repeater1 and receiver1
+ agent1- pauses
+ agent1- moves to area1
+ agent1- stops recorder1
+
+PLAYBACK PHASE (AGENT + AGENT-)
+PLAYBACK INITS: agent1 in area1
+                agent1- in area1
+                connector1 in area1
+                connector1- in area1
+                fan1 is off
+                plate1 is off
+                gate1 is closed
+                gate2 is closed
+                receiver1 is inactive
+playback begins (from agent1 starts recorder1)
+ agent1- pauses
+   agent1 picks up connector1
+   agent1 connects connector1 to transmitter1 and repeater1
+   agent1 moves to area2
+   agent1 toggles plate1 (plate1 is on, fan1 is on, gate1 is open)
+   agent1 moves to area1
+   agent1 resumes agent1-
+ agent1- moves to area2
+ agent1- toggles plate1 (plate1 is off, fan1 is off, gate1 is closed)
+ agent1- pauses
+   agent1 moves to area4
+   agent1 resumes agent1-
+ agent1- toggles plate1 (plate1 is on, fan1 is on, gate1 is open)
+ agent1- moves to area1
+ agent1- picks up connector1-
+ agent1- moves to area3
+ agent1- connects connector1- to repeater1 and receiver1 (gate2 is open)
+ agent1- pauses
+   agent1 moves to area4
+   agent1 moves to area5
+   agent1 resumes agent1-
+ agent1- moves to area1
+ agent1- stops recorder1
+
+
+(validate-solution :verbose  ;15 actions
+(pickup-connector agent1 connector1 area1)
+(connect-to-2-terminus agent1 connector1 transmitter1 repeater1 area1)
+(move agent1 area1 area2)
+(toggle-plate agent1 plate1)
+(move agent1* area1 area2)
+(toggle-plate agent1* plate1)
+(move agent1 area2 area3)
+(move agent1 area3 area4)
+(toggle-plate agent1* plate1)
+(move agent1* area2 area1)
+(pickup-connector agent1* connector1* area1)
+(move agent1* area1 area2)
+(move agent1* area2 area3)
+(connect-to-2-terminus agent1* connector1* repeater1 receiver1 area3)
+(move agent1 area4 area5))
+
+
+Playback Solution from Wouldwork (with added pause & resume)
+(pause)
+(pickup-connector agent1 connector1 area1)
+(connect-to-2-terminus agent1 connector1 transmitter1 repeater1 area1)
+(move agent1 area1 area2)
+(toggle-plate agent1 plate1)
+(resume)
+(move agent1* area1 area2)
+(toggle-plate agent1* plate1)
+(pause)
+(move agent1 area2 area3)
+(move agent1 area3 area4)
+(resume)
+(toggle-plate agent1* plate1)
+(move agent1* area2 area1)
+(pickup-connector agent1* connector1* area1)
+(move agent1* area1 area2)
+(move agent1* area2 area3)
+(connect-to-2-terminus agent1* connector1* repeater1 receiver1 area3)
+(pause)
+(move agent1 area4 area5)
+
+
+Recorder Solution Extracting agent1* Actions
+(start-recorder)
+(pause)  ;from first in playback
+(move agent1* area1 area2)
+(toggle-plate agent1* plate1)
+(pause)
+(toggle-plate agent1* plate1)
+(move agent1* area2 area1)
+(pickup-connector agent1* connector1* area1)
+(move agent1* area1 area2)
+(move agent1* area2 area3)
+(connect-to-2-terminus agent1* connector1* repeater1 receiver1 area3)
+(pause)
+(stop-recorder)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Better Solution
+
+Playback
+(pause)
+1.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 AREA1)
+2.0 (CONNECT-TO-2-TERMINUS AGENT1 CONNECTOR1 REPEATER1 TRANSMITTER1 AREA1)
+3.0 (MOVE AGENT1 AREA1 AREA2)
+4.0 (TOGGLE-PLATE AGENT1 PLATE1)
+(resume)
+5.0 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* AREA1)
+6.0 (MOVE AGENT1* AREA1 AREA2)
+7.0 (TOGGLE-PLATE AGENT1* PLATE1)
+(pause)
+8.0 (MOVE AGENT1 AREA2 AREA3)
+9.0 (MOVE AGENT1 AREA3 AREA4)
+(resume)
+10.0 (TOGGLE-PLATE AGENT1* PLATE1)
+11.0 (MOVE AGENT1* AREA2 AREA3)
+12.0 (CONNECT-TO-2-TERMINUS AGENT1* CONNECTOR1* REPEATER1 RECEIVER1 AREA3)
+(pause)
+13.0 (MOVE AGENT1 AREA4 AREA5)
+
+Record
+(start-recorder)
+(pause)  1.0 -> 4.0
+5.0 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* AREA1)
+6.0 (MOVE AGENT1* AREA1 AREA2)
+7.0 (TOGGLE-PLATE AGENT1* PLATE1)
+(pause)  8.0 -> 9.0
+10.0 (TOGGLE-PLATE AGENT1* PLATE1)
+11.0 (MOVE AGENT1* AREA2 AREA3)
+12.0 (CONNECT-TO-2-TERMINUS AGENT1* CONNECTOR1* REPEATER1 RECEIVER1 AREA3)
+(pause)  13.0
+(stop-recorder)

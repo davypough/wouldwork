@@ -11,7 +11,7 @@
 ;;;              identically by box, jammer, walkability, and ladder
 ;;;              support (either plate box fan)  --  also declared identically by
 ;;;              box, jammer, walkability, and ladder.  Gears are not a support: only
-;;;              a fan can occupy them, via -gears-fan's (mounted-on ...) attachment
+;;;              a fan can occupy them, via gears-fan's (mounted-on ...) attachment
 ;;;              rather than (on ...)
 ;;;   relation : (on support-occupant $support)  --  also declared identically by box,
 ;;;              jammer, walkability, and ladder; multiple techs both read

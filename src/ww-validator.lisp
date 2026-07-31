@@ -231,7 +231,9 @@
   (check-type (car fn-call) symbol)
   (let ((callee-param-types (get (car fn-call) :param-types))
         (all-object-values
-          (reduce #'union (alexandria:hash-table-values *types*))))
+          (reduce #'union
+                  (alexandria:hash-table-values *types*)
+                  :initial-value nil)))
     (iter (for arg in (cdr fn-call))
           (for position from 0)
           (for parameter-type = (nth position callee-param-types))

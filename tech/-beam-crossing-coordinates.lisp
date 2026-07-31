@@ -178,10 +178,10 @@
 
 
 (define-query beam-coordinates-potential-beams ()
-  ;; Canonical deterministic order: transmitter -> location, then location -> receiver,
-  ;; then location -> location in declared type order (los-to-location is symmetric at
-  ;; runtime, so the type-order test avoids counting each L-L pair twice), and finally the
-  ;; direct transmitter -> receiver beams.  The three location families come from the
+  ;; Canonical deterministic order: transmitter -> location, location -> receiver,
+  ;; location -> repeater, then location -> location in declared type order
+  ;; (los-to-location is symmetric at runtime, so the type-order test avoids counting each
+  ;; L-L pair twice), and finally the fixed COUPLED beams.  The location families come from the
   ;; derived LOS relations, which already exclude anything a wall blocks; direct beams have
   ;; no LOS fact to enumerate from -- their existence is authored as COUPLED -- so they are
   ;; appended from BEAM-COORDINATES-COUPLED-BEAMS instead.  Appended last so that adding
@@ -196,6 +196,10 @@
         (doall (?receiver receiver)
           (if (bind (los-to-apparatus ?location $gates ?receiver))
             (push (list ?location ?receiver) $beams))))
+      (doall (?location location)
+        (doall (?repeater repeater)
+          (if (bind (los-to-apparatus ?location $gates ?repeater))
+            (push (list ?location ?repeater) $beams))))
       (doall (?source location)
         (doall (?destination location)
           (if (and (member ?destination
@@ -209,14 +213,10 @@
 
 
 (defun beam-coordinates-coupled-beams ()
-  ;; The direct transmitter -> receiver beams a problem authored with beam-direct's COUPLED,
+  ;; The fixed directional beams a problem authored with COUPLED,
   ;; read straight out of *STATIC-DB* rather than through a WW query.  Deliberately not a
-  ;; DEFINE-QUERY: COUPLED is declared by beam-direct.lisp, which a problem including
-  ;; beam-crossing need not include (corner-topo does not), and there is no optional-relation
-  ;; mechanism the way DEFINE-OPTIONAL-TYPES covers types.  Scanning the database instead
-  ;; keeps this file free of any declaration dependency on beam-direct and makes the whole
-  ;; feature inert exactly when it should be: with no beam-direct, COUPLED is simply never a
-  ;; key, and this returns nil.
+  ;; DEFINE-QUERY: scanning keeps the crossing numbering deterministic and independent of
+  ;; query translation.
   ;;
   ;; Sorted by endpoint name because hash iteration order is unspecified, and this order
   ;; feeds the crossing1, crossing2, ... assignment -- which has to be reproducible across

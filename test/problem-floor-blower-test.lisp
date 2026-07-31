@@ -1,13 +1,20 @@
 ;;; Filename: problem-floor-blower-test.lisp
 
-;;; Minimal floor-blower (gears + fan) exercise.  lower1 holds the agent, box1, and the
-;;; plate-controlled gears1 with fan1 pre-mounted; lower2 holds the control plate and a
-;;; spare box2 (an alternative, longer way to depress the plate).  loft declares no
-;;; has-elevation fact, so it floats at floor-blower's default landing elevation of 10.
-;;; Expected minimum solution (4 steps): pickup-box box1, put-box box1 on fan1 (the gears
-;;; are not yet turning, so it rests there), walk to lower2, step-on plate1 -- the agent's
-;;; weight depresses the plate, setting the gears turning; the mounted fan blows and
-;;; launches box1 to loft.
+;;; Combined floor-blower regression.  Four independent networks exercise:
+;;;
+;;;   1. Uncontrolled gears1 launches box1 from fan1 to explicitly elevated loft1 while
+;;;      box2 rides along still stacked; the unsupported stack remains hovering because
+;;;      fan1 keeps blowing toward that destination.
+;;;   2. Uncontrolled gears2 blows through fan2, but loose fan3 resting on fan2 is too
+;;;      flat to launch: it is toppled onto base2's ground instead.
+;;;   3. Plate-controlled gears3 stays off, so box3 at loft3 falls to base3 even though
+;;;      fan4 remains mounted.
+;;;   4. Uncontrolled gears4 turns, but with no mounted fan its box4 likewise falls from
+;;;      loft4 to base4.
+;;;
+;;; The zero-action goal characterizes the derived start state after ordinary propagation,
+;;; covering sustained hover, stack transport, fan immunity, power-off drop, fan-removal
+;;; drop, and an explicit destination elevation in one staging/solve run.
 
 
 (in-package :ww)
@@ -21,7 +28,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 8)
+(ww-set *depth-cutoff* 1)
 
 
 ;;;; TYPES ;;;;
@@ -29,12 +36,12 @@
 
 (define-types
   agent (agent1)
-  location (lower1 lower2 loft)
+  location (idle base1 loft1 base2 loft2 base3 loft3 base4 loft4)
   plate (plate1)
-  box (box1 box2)
-  floor-gears (gears1)
-  fan (fan1)
-  mode (normal inverted)
+  box (box1 box2 box3 box4)
+  floor-gears (gears1 gears2 gears3 gears4)
+  fan (fan1 fan2 fan3 fan4)
+  mode (normal)
 )
 
 
@@ -43,35 +50,52 @@
 
 (include-tech plate)
 (include-tech floor-blower)
-(include-tech box)
-(include-tech step)
-(include-tech walkability)
 
 
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
-  ;; Movable objects
-  (has-location agent1 lower1)
-  (has-location box1 lower1)
-  (has-location box2 lower2)
-  (has-location fan1 lower1)
+  (has-location agent1 idle)
 
-  ;; Fixed-position objects
-  (has-position plate1 lower2)
-  (has-position gears1 lower1)
-
-  ;; The fan starts mounted on the gears (an attachment, not an (on ...) support fact).
+  ;; Active launch with a stacked rider.  loft1's explicit elevation overrides the
+  ;; floor-blower default of 10.
+  (has-location box1 base1)
+  (has-location box2 base1)
+  (has-location fan1 base1)
+  (has-position gears1 base1)
   (mounted-on fan1 gears1)
+  (on box1 fan1)
+  (on box2 box1)
+  (has-elevation loft1 7)
+  (aimed-at> gears1 loft1)
 
-  ;; Walking topology; lower1 and lower2 default to ground elevation 0.
-  ;; loft declares no elevation, so it takes floor-blower's default of 10.
-  (walk-via lower1 () lower2)
+  ;; Fan immunity.  fan2 blows, but fan3 is only toppled off its top at base2.
+  (has-location fan2 base2)
+  (has-location fan3 base2)
+  (has-position gears2 base2)
+  (mounted-on fan2 gears2)
+  (on fan3 fan2)
+  (has-elevation loft2 8)
+  (aimed-at> gears2 loft2)
 
-  ;; Gears control and air-stream destination
-  (controls ((plate1)) gears1 normal)
-  (aimed-at> gears1 loft)
+  ;; Power-off drop.  Nothing rests on plate1, so normal control leaves gears3 stopped
+  ;; and the unsupported box at loft3 falls back to the gears' location.
+  (has-location box3 loft3)
+  (has-location fan4 base3)
+  (has-position plate1 base3)
+  (has-position gears3 base3)
+  (mounted-on fan4 gears3)
+  (has-elevation loft3 9)
+  (controls ((plate1)) gears3 normal)
+  (aimed-at> gears3 loft3)
+
+  ;; Fan-removal drop.  gears4 is uncontrolled and therefore turns, but no fan is
+  ;; mounted on it, so nothing sustains box4 at loft4.
+  (has-location box4 loft4)
+  (has-position gears4 base4)
+  (has-elevation loft4 11)
+  (aimed-at> gears4 loft4)
 )
 
 
@@ -84,9 +108,47 @@
 )
 
 
-;;;; GOAL ;;;;
+;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+
+
+(define-query floor-blower-scenarios-valid ()
+  (and
+    ;; Sustained, explicitly elevated stack hover.
+    (= (location-elevation loft1) 7)
+    (turning gears1)
+    (blowing fan1)
+    (mounted-on fan1 gears1)
+    (has-location fan1 base1)
+    (not (has-location box1 base1))
+    (has-location box1 loft1)
+    (has-location box2 loft1)
+    (not (exists (?support support)
+           (on box1 ?support)))
+    (on box2 box1)
+
+    ;; Loose fan immunity.
+    (turning gears2)
+    (blowing fan2)
+    (not (blowing fan3))
+    (has-location fan3 base2)
+    (not (has-location fan3 loft2))
+    (not (on fan3 fan2))
+
+    ;; Power-off drop.
+    (not (depressed plate1))
+    (not (turning gears3))
+    (not (blowing fan4))
+    (mounted-on fan4 gears3)
+    (not (has-location box3 loft3))
+    (has-location box3 base3)
+
+    ;; Missing-fan drop despite turning gears.
+    (turning gears4)
+    (not (exists (?fan fan)
+           (mounted-on ?fan gears4)))
+    (not (has-location box4 loft4))
+    (has-location box4 base4)))
 
 
 (define-goal
-  (has-location box1 loft)
-)
+  (floor-blower-scenarios-valid))

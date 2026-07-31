@@ -195,15 +195,12 @@
 
 
 (defun validate-start-state-consistency ()
-  "Checks if start state contains inconsistent-state marker.
-   Errors out if initial state failed to converge."
+  "Errors if initialization produced the INCONSISTENT-STATE marker."
   (when (gethash (convert-to-integer-memoized '(inconsistent-state))
                  (problem-state.idb *start-state*))
     (error "~%FATAL ERROR: Initial state is inconsistent.~%~
-            Receiver state convergence failed during initialization.~%~
-            The system could not stabilize in ~A iterations.~%~
-            Cannot begin planning from an oscillating state."
-           10)))  ;; Or reference the max-iterations value
+            An initialization update marked the state inconsistent.~%~
+            Cannot begin planning from an inconsistent state.")))
 
 
 (defun ensure-start-state-synchronized ()

@@ -1,34 +1,36 @@
 ;;; Filename: problem-propagation-strata-test.lisp
 
 ;;; Targeted exercise for src/ww-propagation-order.lisp: the smallest problem whose
-;;; MASTER PROPAGATION DRIVER carries five derivations and one reaction, assembled from
-;;; a plate, a relayed beam, a controlled gate, and a wall blower.
+;;; MASTER PROPAGATION DRIVER carries six derivations and one reaction, assembled from
+;;; a plate, a relayed beam, a controlled gate, a wall blower, and walkability's threat
+;;; safety check.
 ;;;
 ;;; Why this problem exists.  PHOBIA is the only full problem with a reaction, and its
-;;; derivations condense to {connector receiver gate} then gears -- two strata, the first
+;;; derivations condense to {gate relay receiver} then gears -- two strata, the first
 ;;; of which has nothing ahead of it.  The two blower tests are reaction-bearing but
 ;;; single-technology, so their graphs have almost nothing to condense.  Here
 ;;; UPDATE-PLATE-STATUS! reads only (on ...), which no derivation writes, so once the
 ;;; reaction is set aside it becomes a genuine leading stratum and
-;;; REPORT-DERIVATION-STRATA has three strata to report:
+;;; REPORT-DERIVATION-STRATA has four strata to report:
 ;;;
 ;;;   {update-plate-status!}
-;;;     then {update-connector-status! update-receiver-status! update-gate-status!}
+;;;     then {update-gate-status! update-relay-status! update-receiver-status!}
 ;;;       then {update-gears-status!}
+;;;         then {enforce-threat-safety!}
 ;;;
-;;; That is the second data point Phase 2 -- moving reactions out of PROPAGATE-CHANGES!'s
-;;; fixpoint -- needs before it can be judged.  Run (report-derived-driver) by hand after
-;;; staging and read its "derivation strata:" line; INIT never calls it.  It replaced
-;;; REPORT-DERIVATION-STRATA, which read the authored driver this problem no longer has.
+;;; The characterization query checks that structure automatically, including the exact
+;;; candidate set, derived order, strata, and installed driver body.  REPORT-DERIVED-DRIVER
+;;; remains useful for inspection, but passing this problem no longer depends on reading
+;;; its output by hand.
 ;;;
-;;; With the reaction left in the graph, every update collapses into one component, the
-;;; same way PHOBIA's do and for the same reason: SWEEP-OCCUPANTS-AWAY! writes
-;;; HAS-LOCATION and (on ...), which UPDATE-CONNECTOR-STATUS! and UPDATE-PLATE-STATUS!
-;;; both read, closing the cycle
+;;; With the reaction left in the graph, the five core derivations and reaction collapse
+;;; into one component, the same way PHOBIA's do and for the same reason:
+;;; SWEEP-OCCUPANTS-AWAY! writes HAS-LOCATION and (on ...), which
+;;; UPDATE-RELAY-STATUS! and UPDATE-PLATE-STATUS! both read, closing the cycle
 ;;; plate -> gate -> connector -> receiver -> gears -> blower -> plate.  So no
-;;; component-boundary note can fire here, and the reaction rule is the only check with
-;;; anything to say -- which is precisely the argument the file header of
-;;; ww-propagation-order.lisp makes for why a component test alone would be useless.
+;;; component-boundary note can fire for that core chain, and the reaction rule is the
+;;; only check with anything to say there.  ENFORCE-THREAT-SAFETY! remains an independent
+;;; derivation, contributed by walkability.
 ;;;
 ;;; Two deliberate perturbations, for confirming the checks still fire.  Phase 3 stage 5
 ;;; deleted this problem's authored driver, so both now require restoring one first: paste
@@ -39,11 +41,12 @@
 ;;;
 ;;;   (define-update propagate-consequences! ()
 ;;;     (let ((*propagated-state-changed* nil))
-;;;       (update-connector-status!)
-;;;       (update-receiver-status!)
 ;;;       (update-plate-status!)
 ;;;       (update-gate-status!)
+;;;       (update-relay-status!)
+;;;       (update-receiver-status!)
 ;;;       (update-gears-status!)
+;;;       (enforce-threat-safety!)
 ;;;       (update-wall-blower-status!)
 ;;;       *propagated-state-changed*))
 ;;;
@@ -93,7 +96,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 6)
+(ww-set *depth-cutoff* 3)
 
 
 (defparameter *max-pairings* 2)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
@@ -123,7 +126,7 @@
 
 (include-tech plate)         ;depressed; update-plate-status!
 (include-tech gate)          ;controls; energized; update-gate-status!
-(include-tech beam-relay)    ;paired; color; update-connector-status!; update-receiver-status!
+(include-tech beam-relay)    ;paired; color; update-relay-status!; update-receiver-status!
 (include-tech wall-blower)   ;turning; blowing; update-gears-status!; update-wall-blower-status!
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step-on; step-off
@@ -188,9 +191,66 @@
 )
 
 
-;;;; GOAL ;;;;
+;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+
+
+(defun propagation-strata-structure-valid-p ()
+  (let* ((expected-order
+           '(update-plate-status!
+             update-gate-status!
+             update-relay-status!
+             update-receiver-status!
+             update-gears-status!
+             enforce-threat-safety!
+             update-wall-blower-status!))
+         (expected-strata
+           '((update-plate-status!)
+             (update-gate-status!
+              update-relay-status!
+              update-receiver-status!)
+             (update-gears-status!)
+             (enforce-threat-safety!)))
+         (candidates
+           (remove-if #'update-quantifies-only-over-empty-types-p
+                      (driver-candidate-updates)))
+         (gate-sets
+           (multiple-value-list
+             (propagation-relation-sets 'update-gate-status!)))
+         (gears-sets
+           (multiple-value-list
+             (propagation-relation-sets 'update-gears-status!)))
+         (gate-reads (first gate-sets))
+         (gears-reads (first gears-sets)))
+    (multiple-value-bind (derived component-alist strata)
+        (derived-propagation-order candidates)
+      (declare (ignore component-alist))
+      (and (subsetp candidates expected-order :test #'eq)
+           (subsetp expected-order candidates :test #'eq)
+           (equal derived expected-order)
+           (equal strata expected-strata)
+           (equal (get 'propagate-consequences! :raw-body)
+                  (derived-propagation-driver-body expected-order))
+           (gethash 'depressed gate-reads)
+           (gethash 'depressed gears-reads)
+           (not (gethash 'jamming gate-reads))
+           (not (gethash 'jamming gears-reads))))))
+
+
+(define-query propagation-strata-scenario-valid ()
+  (and (propagation-strata-structure-valid-p)
+       (has-location agent1 east)
+       (not (on agent1 plate1))
+       (depressed plate1)
+       (or (on connector1 plate1)
+           (on box1 plate1))
+       (color connector1 blue)
+       (active receiver1)
+       (open gate1)
+       (turning wgears1)
+       (blowing fan1)
+       (mounted-on fan1 wgears1)
+       (welded fan1 wgears1)))
 
 
 (define-goal
-  (has-location agent1 east)
-)
+  (propagation-strata-scenario-valid))

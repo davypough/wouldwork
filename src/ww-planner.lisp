@@ -15,6 +15,25 @@
               (problem-state.instantiations state))))
 
 
+(defun apply-depth-first-init-delta (state baseline-idb changes)
+  "Apply one complete init-action result as changes relative to BASELINE-IDB."
+  (let ((state-idb (problem-state.idb state)))
+    (maphash (lambda (key val)
+               (declare (ignore val))
+               (unless (nth-value 1 (gethash key changes))
+                 (remhash key state-idb)
+                 (remhash (convert-to-proposition key) *db*)))
+             baseline-idb)
+    (maphash (lambda (key val)
+               (multiple-value-bind (old-val present-p)
+                   (gethash key baseline-idb)
+                 (unless (and present-p (equalp old-val val))
+                   (setf (gethash key state-idb) val)
+                   (setf (gethash (convert-to-proposition key) *db*) val))))
+             changes)
+    (setf (problem-state.idb-hash state) nil)))
+
+
 (defun do-init-action-updates (state)
   "Checks precondition of each init-action and applies updates.
    For backtracking algorithm, uses incremental updates within each assert."
@@ -38,26 +57,19 @@
         
         ;; Process each precondition result
         (dolist (pre-result pre-results)
-          (let ((updated-dbs
-                  (if (eql pre-result t)
-                      (funcall eff-fn state)
-                      (apply eff-fn state pre-result))))
+          (let* ((baseline-idb (copy-idb (problem-state.idb state)))
+                 (updated-dbs
+                   (if (eql pre-result t)
+                       (funcall eff-fn state)
+                       (apply eff-fn state pre-result))))
             
             (dolist (updated-db updated-dbs)
               (let ((changes (update.changes updated-db)))
                 (etypecase changes
                   (hash-table
-                   ;; Depth-first algorithm: changes contains integer keys → values
-                   (maphash (lambda (key val)
-                              (let ((proposition (convert-to-proposition key)))
-                                (if (gethash (car proposition) *relations*)
-                                  (progn
-                                    (setf (gethash proposition *db*) val)
-                                    (setf (gethash key (problem-state.idb state)) val))
-                                  (progn
-                                    (setf (gethash proposition *static-db*) val)
-                                    (setf (gethash key (problem-state.idb state)) val)))))
-                            changes))
+                   ;; Depth-first changes is a complete copied state.  Apply only its
+                   ;; delta so separate ASSERT results combine without losing removals.
+                   (apply-depth-first-init-delta state baseline-idb changes))
                   (list
                    ;; Backtracking algorithm: changes contains (forward-list inverse-list)
                    ;; Apply forward operations sequentially to state database

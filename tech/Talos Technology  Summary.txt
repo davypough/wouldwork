@@ -1,0 +1,138 @@
+TALOS TECHNOLOGY SUMMARY
+
+1. Base Types
+
+agent
+angled-gears
+box
+connector
+crossing
+fan
+fence
+floor-gears
+floor-repeater
+gate
+gun
+hue
+jammer
+ladder
+location
+mode
+plate
+receiver
+screen
+transmitter
+wall
+wall-gears
+wall-repeater
+window
+
+2. Composite Types
+
+apparatus (either transmitter receiver repeater gun)
+beam-endpoint (either transmitter receiver repeater gun location)
+cargo (either box jammer connector fan)
+elevated-object (either location gate screen fence wall transmitter receiver wall-gears repeater)
+fixed-beam-source (either transmitter repeater)
+fixed-beam-target (either repeater receiver)
+fixed-position-object (either plate ladder floor-gears wall-gears angled-gears)
+gears (either floor-gears wall-gears angled-gears)
+heighted-object (either box fence gate agent screen wall jammer connector repeater)
+mobile-object (either agent box jammer connector fan)
+relay (either connector repeater)
+repeater (either floor-repeater wall-repeater)
+support (either plate box fan)
+support-occupant (either agent box jammer connector fan)
+target (either gate floor-gears wall-gears gun)
+terminus (either transmitter receiver connector repeater)
+threat (either gun)
+
+3. Dynamic Relations
+
+(active receiver)
+(blowing fan)
+(color relay $hue)
+(crossing-active crossing)
+(depressed plate)
+(has-location mobile-object $location)
+(holding agent $cargo)
+(jamming jammer $target)
+(lethal threat)
+(mounted-on fan $gears)
+(on support-occupant $support)
+(open gate)
+(paired connector terminus)  ;undirected; stored connector-first
+(turning gears)
+
+4. Static Relations
+
+(aimed-at> gears $location)
+(apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
+(beam-crossing> crossing $beam-endpoint $beam-endpoint $beam-endpoint $beam-endpoint)
+(beam-via fixed-beam-source $list fixed-beam-target)
+(boundary-wall $list)  ;used by both LOS and walk-via derivation
+(climb-via> location $list location)
+(controls $list (either gate floor-gears wall-gears angled-gears) $mode)
+(coupled fixed-beam-source fixed-beam-target)  ;directional; fixed couplings unlimited
+(crossings-along-beam> beam-endpoint $list beam-endpoint)
+(crossings-before-gate> beam-endpoint $list gate beam-endpoint)
+(current-crossings> $list)
+(gate-segments $list)
+(has-chroma (either transmitter receiver) $hue)
+(has-elevation elevated-object $fixnum)
+(has-height heighted-object $fixnum)
+(has-position fixed-position-object $location)
+(jam-disallowed> location location target)
+(jump-via location $list location)
+(jump-via> location $list location)
+(location-coords> location $rational $rational)
+(los-to-apparatus location $list apparatus)
+(los-to-location location $list location)
+(los-to-target location $list gate)
+(reach-via location $list location)
+(screen-segments $list)
+(stream-width wall-gears $rational)  ;default 3 units
+(threatens threat $list)
+(walk-via location $list location)
+(walk-via> location $list location)
+(wall-segments $list)
+(welded fan $gears)
+(window-segments $list)
+
+5. Actions
+
+(connect-connector ">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
+(jam-target ">" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
+(jump-to ">" ?agent "at" $a-location "jumps onto" $place)
+(mount-fan ">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
+(pickup-box ">" ?agent "picks up" ?box "at" $box-location "from" $a-location)
+(pickup-connector ">" ?agent "picks up" ?connector "at" $a-location)
+(pickup-fan ">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
+(pickup-jammer ">" ?agent "picks up" ?jammer "at" $a-location)
+(put-box ">" ?agent "puts" ?box "on" $place "at" ?location)
+(put-connector ">" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
+(put-fan ">" ?agent "puts" ?fan "on" $place "at" ?location)
+(step-off ">" ?agent "at" $a-location "steps off" $fixture)
+(step-on ">" ?agent "at" $a-location "steps onto" ?fixture)
+(use-ladder ">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" ?destination)
+(walk ">" ?agent "walks from" $a-location "to" $dest)
+
+6. Default Type Heights
+
+agent 1
+box 1
+connector 1
+fence 2
+gate 3
+jammer 1
+repeater 1
+screen 3
+wall 3
+
+7. Default Type Elevations
+
+floor-repeater 0 (base; beam anchor = base + height)
+receiver 1
+transmitter 1
+wall-repeater 1
+

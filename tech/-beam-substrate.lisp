@@ -2,12 +2,10 @@
 
 ;;; Beam substrate: the shared interface every beam capability programs against.  It owns
 ;;; the receiver-status driver, the direct/relay arrival and cut-liveness orchestrators,
-;;; the transmitter/receiver has-chroma and receiver-active relations, and a null-object default for every
-;;; pluggable hook.  beam-direct, beam-relay, and beam-crossing each (include-tech -beam-substrate)
-;;; and override only their own slots, so they compose in any combination -- and any single
-;;; capability remains independent of the others.  The null defaults make absent capabilities
-;;; resolve to "contributes nothing": no direct arrival, no relay arrival, no cuts, an empty
-;;; crossing set, no connector lighting.
+;;; transmitter/receiver has-chroma and receiver-active relations, fixed coupling relations,
+;;; and a null-object default for every pluggable hook.  beam-direct, beam-relay, and
+;;; beam-crossing each include it and override only their own slots, so they compose in any
+;;; combination.  Absent capabilities contribute no arrival, cuts, or relay lighting.
 ;;;
 ;;; Self-contained; spliced by (include-tech -beam-substrate).
 ;;;
@@ -15,17 +13,19 @@
 ;;;   driver    : propagate-consequences! must call update-receiver-status!  (hue, transmitter,
 ;;;               and receiver are declared optional here via define-optional-types)
 ;;; PROVIDES:
-;;;   types     : hue, transmitter, receiver, location  --  declared optional here; other techs
+;;;   types     : repeater, fixed-beam-source, fixed-beam-target, beam-node; hue,
+;;;               transmitter, receiver, location, floor-repeater, and wall-repeater are
+;;;               declared optional here; other techs
 ;;;               (beam-relay, beam-direct, gate, visibility, etc.) independently declare
 ;;;               their own hue-alias/transmitter-alias/receiver-alias for their own
 ;;;               pre-params; the bare and aliased forms resolve compatibly
-;;;   relations : (active receiver), has-chroma
+;;;   relations : (active receiver), has-chroma, coupled, beam-via
 ;;;   queries   : beam-reaches-receiver, beam-live-for-cutting,
 ;;;               plus null-object defaults for direct-beam-reaches-receiver,
 ;;;               relay-beam-reaches-receiver, direct-beam-live-for-cutting,
 ;;;               relay-beam-live-for-cutting, beam-cut, beam-cut-in,
-;;;               current-crossing-set, compute-connector-lighting,
-;;;               beam-relay-source-distance
+;;;               fixed-beam-corridor-clear, current-crossing-set,
+;;;               compute-relay-lighting, beam-relay-source-distance
 ;;;   update    : update-receiver-status!
 
 (include-tech -propagation)
@@ -33,7 +33,15 @@
 (in-package :ww)
 
 
-(define-optional-types hue transmitter receiver location)
+(define-optional-types
+  hue transmitter receiver location floor-repeater wall-repeater)
+
+
+(define-types
+  repeater (either floor-repeater wall-repeater)
+  fixed-beam-source (either transmitter repeater)
+  fixed-beam-target (either repeater receiver)
+  beam-node (either transmitter receiver repeater location))
 
 
 (define-dynamic-relations
@@ -41,7 +49,9 @@
 
 
 (define-static-relations
-  (has-chroma (either transmitter receiver) $hue))  ;a transmitter/receiver's fixed hue, read by direct and relay
+  (has-chroma (either transmitter receiver) $hue)
+  (coupled fixed-beam-source fixed-beam-target)
+  (beam-via fixed-beam-source $list fixed-beam-target))
 
 
 (define-update update-receiver-status! ()
@@ -58,8 +68,8 @@
 
 
 (define-query beam-live-for-cutting
-    (?from (either transmitter location)
-     ?to (either receiver location)
+    (?from beam-node
+     ?to beam-node
      ?lighting)
   (or (direct-beam-live-for-cutting ?from ?to)
       (relay-beam-live-for-cutting ?from ?to ?lighting)))
@@ -80,26 +90,26 @@
   (do ?receiver nil))
 
 
-(define-query direct-beam-live-for-cutting (?from transmitter ?to receiver)
+(define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)
   (do ?from ?to nil))
 
 
 (define-query relay-beam-live-for-cutting
-    (?from (either transmitter location)
-     ?to (either receiver location)
+    (?from beam-node
+     ?to beam-node
      ?lighting)
   (do ?from ?to ?lighting nil))
 
 
 (define-query beam-cut
-    (?from (either transmitter location)
-     ?to (either receiver location))
+    (?from beam-node
+     ?to beam-node)
   (do ?from ?to nil))
 
 
 (define-query beam-cut-in
-    (?from (either transmitter location)
-     ?to (either receiver location)
+    (?from beam-node
+     ?to beam-node
      ?active)
   (do ?from ?to ?active nil))
 
@@ -108,9 +118,13 @@
   nil)
 
 
-(define-query compute-connector-lighting (?active)
+(define-query fixed-beam-corridor-clear (?from beam-node ?to beam-node)
+  (do ?from ?to nil))
+
+
+(define-query compute-relay-lighting (?active)
   (do ?active nil))
 
 
-(define-query beam-relay-source-distance (?from location ?lighting)
+(define-query beam-relay-source-distance (?from beam-node ?lighting)
   (do ?from ?lighting most-positive-fixnum))

@@ -22,7 +22,7 @@
 ;;;               transmitter is declared optional here (define-optional-types); gate comes
 ;;;               from nested -gate
 ;;;   driver    : propagate-consequences! must call update-crossing-status! before
-;;;               update-connector-status! and/or update-receiver-status!
+;;;               update-relay-status! and/or update-receiver-status!
 ;;; PROVIDES:
 ;;;   nested    : -beam-crossing-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM>/
 ;;;               CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
@@ -172,7 +172,7 @@
 
 
 (define-query compute-active-crossings (?active)
-  (do (assign $lighting (compute-connector-lighting ?active))
+  (do (assign $lighting (compute-relay-lighting ?active))
       (assign $next nil)
       (doall (?x (get-current-crossings))
         (if (crossing-reaches ?x ?active $lighting)
@@ -185,7 +185,7 @@
   (do (assign $kept nil)
       (assign $remaining ?candidate)
       (ww-loop for $round from 1 to (length ?candidate)
-               do (assign $lighting (compute-connector-lighting $kept))
+               do (assign $lighting (compute-relay-lighting $kept))
                   (assign $best nil)
                   (assign $best-priority most-positive-fixnum)
                   (doall (?x (get-current-crossings))
@@ -303,8 +303,8 @@
 
 
 (define-query beam-cut
-    (?from (either transmitter location)
-     ?to (either receiver location))
+    (?from beam-node
+     ?to beam-node)
   ;; True iff some committed crossing on this directed beam currently cuts it.
   (do (assign $cut nil)
       (if (bind (crossings-along-beam> ?from $ids ?to))
@@ -315,8 +315,8 @@
 
 
 (define-query beam-cut-in
-    (?from (either transmitter location)
-     ?to (either receiver location)
+    (?from beam-node
+     ?to beam-node
      ?active)
   ;; Candidate-set analog of beam-cut.
   (do (assign $cut nil)

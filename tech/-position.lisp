@@ -11,7 +11,7 @@
 ;;;              angled-gears)  --  what can be positioned at a fixed location; subtypes
 ;;;              absent from the problem's own define-types resolve to nil, a no-op.  The
 ;;;              gears leaf types appear directly because this file splices before
-;;;              -gears-fan installs the gears union.
+;;;              gears-fan installs the gears union.
 ;;;   relation : (has-position fixed-position-object $location)
 
 (in-package :ww)

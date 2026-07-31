@@ -7,11 +7,11 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : fixture (either gate transmitter receiver gun), apparatus (either
-;;;              transmitter receiver gun); gate, transmitter, receiver, and gun are
-;;;              declared optional.  gun joins both unions as a point fixture exactly like
-;;;              transmitter/receiver -- jam-target's LOS check reads it through visible,
-;;;              not through has-position, so nothing can ever occupy a gun's position.
+;;;   types    : fixture (either gate transmitter receiver repeater gun), apparatus (either
+;;;              transmitter receiver repeater gun); gate, transmitter, receiver, repeater,
+;;;              and gun are optional.  APPARATUS-COORDS> names each apparatus's functional
+;;;              point: beam emission/reception/relay for beam apparatus, and the
+;;;              firing/targeting point for a gun.
 ;;;   queries  : visible, potentially-visible, beam-visible  --  null defaults, overridden
 ;;;              by visibility. Their typed object parameters remain valid when an optional
 ;;;              type has no objects: the query is still installed and its null body returns
@@ -20,12 +20,17 @@
 (in-package :ww)
 
 
-(define-optional-types gate transmitter receiver gun)
+(define-optional-types
+  gate transmitter receiver gun floor-repeater wall-repeater)
 
 
 (define-types
-  fixture (either gate transmitter receiver gun)
-  apparatus (either transmitter receiver gun))  ;a transmitter, receiver, or gun; los-to-apparatus's target type
+  repeater (either floor-repeater wall-repeater))
+
+
+(define-types
+  fixture (either gate transmitter receiver repeater gun)
+  apparatus (either transmitter receiver repeater gun))
 
 
 (define-query visible (?location location ?object (either fixture location))

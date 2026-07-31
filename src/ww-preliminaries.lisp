@@ -106,7 +106,7 @@
    it.  A receiver-free blower problem is the case that forced the distinction:
    -beam-substrate contributes only update-receiver-status!, which quantifies solely over
    an empty receiver type and so is genuinely inert there -- but it arrives through
-   -controls and -gears-fan beneath floor-blower and wall-blower, several levels below
+   -controls and gears-fan beneath floor-blower and wall-blower, several levels below
    anything the problem wrote.  The technology worth naming in such a report is always the
    one the problem included: were beam-relay included in a connector-free problem,
    beam-relay itself is inert and is reported.")
@@ -119,7 +119,7 @@
 
    Read by driver-candidate-updates, which needs the opposite of what report-inert-techs
    needs.  update-gears-status! and update-receiver-status! reach a blower problem only
-   through -gears-fan and -beam-substrate, several levels below anything the problem wrote,
+   through gears-fan and -beam-substrate, several levels below anything the problem wrote,
    yet both belong in its propagation driver.  A candidate set built from
    *included-tech-names* would silently omit them.
 

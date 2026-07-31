@@ -49,15 +49,16 @@
   ;; traversal destination.  The one-way edge starts at the agent's current location; the
   ;; agent must be standing at the ladder's fixed location to climb it, not merely within reach.
   1
-  (?agent agent ?ladder ladder)
+  (?agent agent ?ladder ladder ?destination location)
   (and (bind (has-location ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (bind (has-position ?ladder $ladder-location))
        (eql $a-location $ladder-location)
-       (bind (climb-via> $a-location $means $dest))
+       (bind (climb-via> $a-location $means ?destination))
        (member ?ladder $means)
        (one-way-clear ?agent $means)
-       (safe $dest))
-  (">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" $dest)
-  (assert (has-location ?agent $dest)
+       (safe ?destination))
+  (">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location
+       "to go to" ?destination)
+  (assert (has-location ?agent ?destination)
           (finally (propagate-changes!))))

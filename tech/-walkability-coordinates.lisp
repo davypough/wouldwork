@@ -2,10 +2,10 @@
 
 ;;; Walkability coordinates substrate: derives WALK-VIA (and, for rides into an
 ;;; air stream's destination, WALK-VIA>) from raw segment geometry, for a problem that
-;;; would rather author 2D positions than hand-list which locations can walk to which.  Nested under
-;;; walkability-tech, so it is always present wherever (include-tech walkability) is
-;;; used; entirely inert unless the problem actually asserts WALL-SEGMENTS or
-;;; BOUNDARY-WALL -- a problem that hand-authors WALK-VIA directly is unaffected.
+;;; would rather author 2D positions than hand-list which locations can walk to which.
+;;; Nested under public walkability and under -stream-passability; entirely inert unless
+;;; the problem actually asserts WALL-SEGMENTS or BOUNDARY-WALL -- a problem that
+;;; hand-authors WALK-VIA directly is unaffected.
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
 ;;; segment and boundary edge is axis-aligned (a diagonal one is an authoring mistake,
@@ -79,7 +79,8 @@
 ;;;   types     : location  --  declared by the problem, as walkability itself already
 ;;;               requires; screen declared optional by nested -passability, spliced by
 ;;;               walkability.lisp before this file
-;;;   nested    : -location-coordinates (LOCATION-COORDS>)
+;;;   nested    : -walkability (WALK-VIA/WALK-VIA> topology relations);
+;;;               -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
 ;;;   relations : wall-segments, gate-segments, window-segments, screen-segments,
 ;;;               boundary-wall  --  default to no facts; a problem that asserts
@@ -89,6 +90,7 @@
 ;;;               redefined by -stream-passability where wall blowers exist
 ;;;   init      : derive-walk-via-from-segments
 
+(include-tech -walkability)
 (include-tech -location-coordinates)
 
 (in-package :ww)

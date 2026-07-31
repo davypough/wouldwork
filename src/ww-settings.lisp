@@ -411,7 +411,7 @@
   "List of invariant query functions to check on every state.")
 
 (sb-ext:defglobal *inconsistent-states-dropped* 0
-  "Count of successor states dropped due to convergence failure.")
+  "Count of generated successors discarded for carrying the INCONSISTENT-STATE marker.")
 (declaim (type fixnum *inconsistent-states-dropped*))
 
 

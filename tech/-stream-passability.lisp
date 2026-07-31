@@ -1,12 +1,12 @@
 ;;; Filename: -stream-passability.lisp
 
 ;;; Stream passability substrate: the walking-side model of a wall fan's air stream.
-;;; Extends -passability.lisp's OBSTACLE-CLEAR with a GEARS branch, so a derived
-;;; WALK-VIA/WALK-VIA> clause may name wall-gears as a conditional door -- the stream
-;;; bars a walking crossing exactly while a blowing fan is mounted on the gears; vacant
-;;; or stopped gears are clear, and a fan carried away or remounted elsewhere takes its
-;;; stream with it automatically, since the check is keyed by the fixed gears rather
-;;; than the portable fan.
+;;; Overrides -passability.lisp's STREAM-OBSTACLE-CLEAR hook: gears pass unless a
+;;; blowing fan is mounted on them, so a derived WALK-VIA/WALK-VIA> clause may name
+;;; wall-gears as a conditional door -- the stream bars a walking crossing exactly
+;;; while a blowing fan is mounted; vacant or stopped gears are clear, and a fan
+;;; carried away or remounted elsewhere takes its stream with it automatically,
+;;; since the check is keyed by the fixed gears rather than the portable fan.
 ;;;
 ;;; Also supplies the stream geometry to -walkability-coordinates' derivation by
 ;;; redefining WALKABILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
@@ -18,28 +18,28 @@
 ;;; destination, widened by half the width each side -- see -walkability-
 ;;; coordinates.lisp's header for the band, curtain, and ride semantics.
 ;;;
-;;; Layering: -passability cannot own the OBSTACLE-CLEAR branch itself, and
-;;; -walkability-coordinates cannot gather the specs itself -- BLOWING, MOUNTED-ON,
-;;; HAS-POSITION, and AIMED-AT> belong to -gears-fan, which walking must not depend
-;;; on.  So this file, nested by wall-blower (the only mounting whose stream runs
-;;; horizontally across walkable ground), nests all the owners and REDEFINES both
-;;; functions whole.  Nesting a file guarantees its original definitions always splice
-;;; before this one regardless of the problem's include order, so these redefinitions
-;;; always win (a later DEFINE-QUERY for the same name overwrites the earlier).
+;;; Layering: -walkability-coordinates cannot gather the specs itself -- HAS-POSITION
+;;; and AIMED-AT> belong to gears-fan, which walking must not depend on.  So this
+;;; file, nested by wall-blower (the only mounting whose stream runs horizontally
+;;; across walkable ground), nests gears-fan and REDEFINES WALKABILITY-COORDINATES-
+;;; STREAM-SPECS whole, the same way it overrides STREAM-OBSTACLE-CLEAR by name --
+;;; nesting a file guarantees its original definitions always splice before this one
+;;; regardless of the problem's include order, so a later DEFINE-QUERY for the same
+;;; name always wins.
 ;;;
 ;;; REQUIRES:
-;;;   nested    : -passability (obstacle-clear's gate/screen/ladder branches, all-clear);
-;;;               -gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
+;;;   nested    : -passability (stream-obstacle-clear's null default, all-clear);
+;;;               gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
 ;;;               -walkability-coordinates (the derivation and the stream-specs default)
 ;;; PROVIDES:
 ;;;   relations : (stream-width wall-gears $rational)  --  optional per-gears override
 ;;;               of the 3-unit default stream width
-;;;   queries   : obstacle-clear  --  redefinition adding the gears branch;
+;;;   queries   : stream-obstacle-clear  --  overrides -passability's null default;
 ;;;               walkability-coordinates-stream-specs  --  redefinition gathering
 ;;;               one spec per wall-gears
 
 (include-tech -passability)
-(include-tech -gears-fan)
+(include-tech gears-fan)
 (include-tech -walkability-coordinates)
 
 (in-package :ww)
@@ -49,21 +49,13 @@
   (stream-width wall-gears $rational))  ;optional; a wall fan's air stream is 3 units wide unless overridden
 
 
-(define-query obstacle-clear (?agent agent ?obstacle (either gate screen ladder gears))
-  ;; An open gate passes.  A screen or ladder passes only when the agent is
-  ;; empty-handed.  Gears pass unless a blowing fan is mounted on them -- their air
-  ;; stream is the barrier, so vacant or stopped gears bar nothing.
-  (or (and (gate ?obstacle)
-           (open ?obstacle))
-      (and (screen ?obstacle)
-           (not (bind (holding ?agent $any-held-object))))
-      (and (ladder ?obstacle)
-           (not (bind (holding ?agent $any-held-object))))
-      (and (gears ?obstacle)
-           (not (exists (?f fan)
-                  (and (blowing ?f)
-                       (bind (mounted-on ?f $mount-gears))
-                       (eql $mount-gears ?obstacle)))))))
+(define-query stream-obstacle-clear (?obstacle gears)
+  ;; Gears pass unless a blowing fan is mounted on them -- their air stream is the
+  ;; barrier, so vacant or stopped gears bar nothing.
+  (not (exists (?f fan)
+         (and (blowing ?f)
+              (bind (mounted-on ?f $mount-gears))
+              (eql $mount-gears ?obstacle)))))
 
 
 (define-query walkability-coordinates-stream-specs ()

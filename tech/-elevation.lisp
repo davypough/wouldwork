@@ -3,16 +3,20 @@
 ;;; Elevation substrate: the fixed vertical level of a location's own floor, a fixed
 ;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Locations and barrier
 ;;; fixtures default to base elevation 0; transmitter and receiver beam anchors default to
-;;; elevation 1.  Nondefault objects assert an explicit fact.  Declared identically by
-;;; every tech file that reads it, so consumers nest-include this file instead of each
-;;; re-declaring the relation and queries.
+;;; elevation 1.  A floor-repeater's declared elevation is its base level (default 0) and
+;;; its anchor adds its declared height; a wall-repeater's declared elevation is directly
+;;; its mounting/anchor level (default 1).  Nondefault objects assert an explicit fact.
 ;;;
 ;;; PROVIDES:
+;;;   nested   : -height (repeater, declared-height)
 ;;;   types    : elevated-object (either location gate screen fence wall transmitter
-;;;              receiver wall-gears)  --  wall-gears may declare the stream elevation of
-;;;              their mounted fan (default 1, via -gears-fan's gears-elevation)
+;;;              receiver wall-gears repeater)  --  wall-gears may declare the stream
+;;;              elevation of their mounted fan (default 1, via gears-fan's gears-elevation)
 ;;;   relation : (has-elevation elevated-object $fixnum)
-;;;   queries  : object-elevation, location-elevation, fixture-elevation
+;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
+;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
+
+(include-tech -height)
 
 (in-package :ww)
 
@@ -21,7 +25,8 @@
 
 
 (define-types
-  elevated-object (either location gate screen fence wall transmitter receiver wall-gears))
+  elevated-object
+    (either location gate screen fence wall transmitter receiver wall-gears repeater))
 
 
 (define-static-relations
@@ -40,13 +45,46 @@
   (object-elevation ?location))
 
 
-(define-query fixture-elevation (?fixture (either gate transmitter receiver))
-  ;; Declared fixed-fixture level.  Gates use base elevation 0 by default; transmitters and
-  ;; receivers use beam-anchor elevation 1.  These roles have different physical meanings,
-  ;; so fixture cannot have one universal omitted-value default.
-  (if (bind (has-elevation ?fixture $level))
-    $level
-    (if (or (transmitter ?fixture)
-            (receiver ?fixture))
-      1
-      0)))
+(define-query repeater-mount-elevation (?repeater repeater)
+  ;; HAS-ELEVATION names the base level of a floor repeater and the mounting/anchor level
+  ;; of a wall repeater.  The omitted-value default therefore depends on orientation.
+  (do (assign $floor-mounted (floor-repeater ?repeater))
+      (assign $wall-mounted (wall-repeater ?repeater))
+      (if (eql $floor-mounted $wall-mounted)
+        (error "~%Repeater must have exactly one mounting orientation.~%~
+                Repeater: ~S"
+               ?repeater))
+      (if (bind (has-elevation ?repeater $level))
+        $level
+        (if $floor-mounted 0 1))))
+
+
+(define-query repeater-anchor-elevation (?repeater repeater)
+  ;; A floor repeater stands vertically, so its tip is one declared height above its base.
+  ;; A wall repeater extends horizontally, leaving its tip at its mounting elevation.
+  (if (floor-repeater ?repeater)
+    (+ (repeater-mount-elevation ?repeater)
+       (declared-height ?repeater))
+    (repeater-mount-elevation ?repeater)))
+
+
+(define-query fixture-elevation (?fixture (either gate transmitter receiver repeater))
+  ;; Declared fixed-fixture level.  Gates use base elevation 0, transmitter/receiver anchors
+  ;; default to 1, and repeaters use their mounting-dependent anchor rule.
+  (if (repeater ?fixture)
+    (repeater-anchor-elevation ?fixture)
+    (if (bind (has-elevation ?fixture $level))
+      $level
+      (if (or (transmitter ?fixture)
+              (receiver ?fixture))
+        1
+        0))))
+
+
+(define-query apparatus-anchor-elevation
+    (?apparatus (either transmitter receiver repeater))
+  ;; The vertical coordinate paired with APPARATUS-COORDS>'s horizontal functional point.
+  ;; Transmitters and receivers are point apparatus; repeaters apply their mounting rule.
+  (if (repeater ?apparatus)
+    (repeater-anchor-elevation ?apparatus)
+    (fixture-elevation ?apparatus)))

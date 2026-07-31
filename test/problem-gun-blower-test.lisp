@@ -1,18 +1,21 @@
 ;;; Filename: problem-gun-blower-test.lisp
 
-;;; Exercises -threat's enforce-threat-safety! backstop, not walkability's precondition
-;;; check: gears1 is uncontrolled (always turning, -gears-fan's own default), so fan1 is
-;;; already blowing once mounted -- stepping onto it launches the agent to loft with no
-;;; walk/jump/ladder precondition involved at all.  gun1 is a point fixture (positioned via
-;;; LOS, not has-position) and threatens loft.  While gun1 is armed, the step-on child state
-;;; that would land the agent at loft is generated and then dropped as inconsistent-state,
-;;; so step-on becomes a dead end from the unjammed state -- there is no successor at all
-;;; through it, not a refusal to launch.  Jamming a gun is a line-of-sight check only
-;;; (jam-target's gun branch reads visible/los-to-apparatus, exactly like a gate), so
-;;; visibility is included and the sightline from lower1 to gun1 is hand-authored directly
-;;; -- (los-to-apparatus lower1 () gun1) -- rather than derived from wall-segments.
-;;; Expected minimum solution (3 steps): pickup-jammer jammer1, jam-target gun1 (at lower1,
-;;; via the hand-authored sightline), step-on fan1.
+;;; Gun/blower regression for -threat's post-effect safety backstop.  Both gears are
+;;; uncontrolled (always turning, gears-fan's own default), so their mounted fans blow from
+;;; initialization.  Stepping onto either fan launches its agent with no walk/jump/ladder
+;;; destination precondition.
+;;;
+;;; The planning lane makes loft safe first: agent1 picks up jammer1, jams gun1 through a
+;;; hand-authored clear sightline, then steps on fan1 and is launched.  Its characterization
+;;; checks the complete resulting state, not just arrival at loft.
+;;;
+;;; The isolated negative lane leaves gun2 armed over loft2.  Its STEP-ON precondition is
+;;; valid, but the forced landing must be marked inconsistent by enforce-threat-safety! and
+;;; discarded by generate-children.  The goal probes that installed transition directly,
+;;; so a broken backstop cannot pass by returning the previously possible one-step solution.
+;;;
+;;; Expected minimum solution (3 steps): pickup-jammer jammer1; jam-target gun1 at lower1;
+;;; step-on fan1.
 
 
 (in-package :ww)
@@ -26,19 +29,19 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 8)
+(ww-set *depth-cutoff* 3)
 
 
 ;;;; TYPES ;;;;
 
 
 (define-types
-  agent (agent1)
-  location (lower1 loft)
+  agent (agent1 agent2)
+  location (lower1 loft lower2 loft2)
   jammer (jammer1)
-  gun (gun1)
-  floor-gears (gears1)
-  fan (fan1)
+  gun (gun1 gun2)
+  floor-gears (gears1 gears2)
+  fan (fan1 fan2)
 )
 
 
@@ -56,29 +59,23 @@
 
 
 (define-init
-  ;; Movable objects
+  ;; Positive planning lane.
   (has-location agent1 lower1)
   (has-location jammer1 lower1)
   (has-location fan1 lower1)
-
-  ;; Fixed-position objects; gears1 sits at lower1.
   (has-position gears1 lower1)
-
-  ;; gun1's sightline from lower1, hand-authored directly: an empty occluder list is a
-  ;; direct, always-clear line.
   (los-to-apparatus lower1 () gun1)
-
-  ;; The fan starts mounted on the gears (an attachment, not an (on ...) support fact).
-  ;; gears1 is uncontrolled, so it is turning from t=0 -- the fan blows as soon as
-  ;; something rests on it, with no plate/receiver wiring needed.
   (mounted-on fan1 gears1)
-
-  ;; gun1's kill zone; loft declares no elevation, so it floats at floor-blower's default
-  ;; hover elevation of 10.
   (threatens gun1 (loft))
-
-  ;; Air-stream destination.
   (aimed-at> gears1 loft)
+
+  ;; Isolated negative lane.  gun2 has no jamming sightline and remains armed.
+  (has-location agent2 lower2)
+  (has-location fan2 lower2)
+  (has-position gears2 lower2)
+  (mounted-on fan2 gears2)
+  (threatens gun2 (loft2))
+  (aimed-at> gears2 loft2)
 )
 
 
@@ -91,9 +88,52 @@
 )
 
 
-;;;; GOAL ;;;;
+;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+
+
+(defun gun-blower-unsafe-step-rejected-p (state agent fixture)
+  "Whether an applicable STEP-ON has no legitimate child from STATE."
+  (let* ((action (find 'step-on *actions* :key #'action.name))
+         (args (list agent fixture))
+         (precondition-result
+           (and (member args (get-precondition-args action state) :test #'equal)
+                (apply (action.pre-defun-name action) state args))))
+    (and precondition-result
+         (let ((saved-dropped-count *inconsistent-states-dropped*))
+           (unwind-protect
+             (let ((*actions* (list action)))
+               (null (generate-children
+                       (make-node :state state :depth 0))))
+             (setf *inconsistent-states-dropped* saved-dropped-count))))))
+
+
+(define-query gun-blower-scenarios-valid ()
+  (and
+    ;; The positive lane completed a safe forced launch and retains its supporting state.
+    (has-location agent1 loft)
+    (not (on agent1 fan1))
+    (has-location jammer1 lower1)
+    (jamming jammer1 gun1)
+    (not (holding agent1 jammer1))
+    (not (lethal gun1))
+    (safe loft)
+    (turning gears1)
+    (blowing fan1)
+    (mounted-on fan1 gears1)
+    (= (location-elevation loft) 10)
+
+    ;; The isolated unjammed lane remains ready to launch, but its real STEP-ON transition
+    ;; must have no legitimate successor because gun2 makes loft2 unsafe.
+    (has-location agent2 lower2)
+    (not (on agent2 fan2))
+    (lethal gun2)
+    (not (safe loft2))
+    (turning gears2)
+    (blowing fan2)
+    (mounted-on fan2 gears2)
+    (= (location-elevation loft2) 10)
+    (gun-blower-unsafe-step-rejected-p state 'agent2 'fan2)))
 
 
 (define-goal
-  (has-location agent1 loft)
-)
+  (gun-blower-scenarios-valid))

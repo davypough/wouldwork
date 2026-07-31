@@ -39,7 +39,34 @@
 
 (defun check-init-physical-consistency (literals)
   (check-init-object-placement-consistency literals)
+  (check-init-repeater-consistency literals)
   (check-init-list-contents literals))
+
+
+(defun check-init-repeater-consistency (literals)
+  "Checks repeater mounting, and coordinates when that capability is installed."
+  (let ((coordinates-required (init-relation-signature 'apparatus-coords>))
+        (coordinate-literals
+          (positive-init-literals-with-relation 'apparatus-coords> literals)))
+    (dolist (repeater (remove nil (gethash 'repeater *types*)))
+      (let ((floor-mounted (init-type-member-p repeater 'floor-repeater))
+            (wall-mounted (init-type-member-p repeater 'wall-repeater))
+            (coordinate-count
+              (count repeater coordinate-literals
+                     :key (lambda (literal)
+                            (second (init-literal-proposition literal))))))
+        (when (eql floor-mounted wall-mounted)
+          (error "~%Repeater must have exactly one mounting orientation.~%~
+                  Repeater: ~S~%~
+                  FLOOR-REPEATER: ~S~%~
+                  WALL-REPEATER:  ~S"
+                 repeater floor-mounted wall-mounted))
+        (when (and coordinates-required
+                   (/= coordinate-count 1))
+          (error "~%Repeater must have exactly one APPARATUS-COORDS> functional point.~%~
+                  Repeater: ~S~%~
+                  Coordinate facts: ~D"
+                 repeater coordinate-count))))))
 
 
 (defun check-init-connector-consistency (literals)
@@ -444,7 +471,8 @@ would overwrite the previous value during install-init."
             (when connector-location
               (cond
                 ((or (init-type-member-p terminus 'transmitter)
-                     (init-type-member-p terminus 'receiver))
+                     (init-type-member-p terminus 'receiver)
+                     (init-type-member-p terminus 'repeater))
                  (init-check-paired-apparatus-sightline
                    literal connector terminus literals))
                 ((init-type-member-p terminus 'connector)
@@ -746,96 +774,76 @@ would overwrite the previous value during install-init."
     chromas))
 
 
-(defun init-elevation-map (literals)
-  (let ((elevations (make-hash-table :test #'equal)))
-    (dolist (literal (init-literals-with-relation 'has-elevation literals))
-      (destructuring-bind (object level)
-          (rest (init-literal-proposition literal))
-        (setf (gethash object elevations) level)))
-    elevations))
-
-
-(defun init-elevation-level (object elevations)
-  (gethash object elevations 0))
-
-
-(defun init-coupled-p (transmitter receiver literals)
+(defun init-coupled-p (source destination literals)
   (some (lambda (literal)
-          (destructuring-bind (coupled-transmitter coupled-receiver)
+          (destructuring-bind (coupled-source coupled-destination)
               (rest (init-literal-proposition literal))
-            (and (eql transmitter coupled-transmitter)
-                 (eql receiver coupled-receiver))))
+            (and (eql source coupled-source)
+                 (eql destination coupled-destination))))
         (init-literals-with-relation 'coupled literals)))
 
 
-(defun init-beam-via-p (transmitter receiver literals)
+(defun init-beam-via-p (source destination literals)
   (some (lambda (literal)
-          (destructuring-bind (beam-transmitter obstacles beam-receiver)
+          (destructuring-bind (beam-source obstacles beam-destination)
               (rest (init-literal-proposition literal))
             (declare (ignore obstacles))
-            (and (eql transmitter beam-transmitter)
-                 (eql receiver beam-receiver))))
+            (and (eql source beam-source)
+                 (eql destination beam-destination))))
         (init-literals-with-relation 'beam-via literals)))
 
 
 (defun check-init-coupled-beam-consistency (literals)
-  "Checks that coupled transmitter/receiver beams have matching chroma and corridors."
-  (let ((chromas (init-chroma-map literals))
-        (elevations (init-elevation-map literals)))
+  "Checks directional fixed-apparatus beam declarations and their corridors."
+  (let ((chromas (init-chroma-map literals)))
     (dolist (literal (init-literals-with-relation 'coupled literals))
-      (destructuring-bind (transmitter receiver)
+      (destructuring-bind (source destination)
           (rest (init-literal-proposition literal))
-        (let ((transmitter-hue (gethash transmitter chromas))
-              (receiver-hue (gethash receiver chromas))
-              (transmitter-elevation (init-elevation-level transmitter elevations))
-              (receiver-elevation (init-elevation-level receiver elevations)))
-          (unless transmitter-hue
+        (let ((source-hue (gethash source chromas))
+              (destination-hue (gethash destination chromas)))
+          (when (and (init-type-member-p source 'transmitter)
+                     (not source-hue))
             (error "~%COUPLED transmitter has no HAS-CHROMA entry.~%~
                     Literal:     ~S~%~
                     Transmitter: ~S"
-                   literal transmitter))
-          (unless receiver-hue
+                   literal source))
+          (when (and (init-type-member-p destination 'receiver)
+                     (not destination-hue))
             (error "~%COUPLED receiver has no HAS-CHROMA entry.~%~
                     Literal: ~S~%~
                     Receiver: ~S"
-                   literal receiver))
-          (unless (eql transmitter-hue receiver-hue)
+                   literal destination))
+          (when (and (init-type-member-p source 'transmitter)
+                     (init-type-member-p destination 'receiver)
+                     (not (eql source-hue destination-hue)))
             (error "~%COUPLED endpoints have mismatched HAS-CHROMA values.~%~
                     Literal:         ~S~%~
                     Transmitter hue: ~S~%~
                     Receiver hue:    ~S"
-                   literal transmitter-hue receiver-hue))
-          (unless (= transmitter-elevation receiver-elevation)
-            (error "~%COUPLED endpoints have mismatched HAS-ELEVATION values.~%~
-                    Direct beams are currently horizontal; give both endpoints the same ~
-                    has-elevation value or omit both for ground level.~%~
-                    Literal:                    ~S~%~
-                    Transmitter has-elevation:  ~S~%~
-                    Receiver has-elevation:     ~S"
-                   literal transmitter-elevation receiver-elevation))
-          (unless (init-beam-via-p transmitter receiver literals)
+                   literal source-hue destination-hue))
+          (unless (init-beam-via-p source destination literals)
             (error "~%COUPLED pair has no matching BEAM-VIA corridor.~%~
                     Literal:       ~S~%~
                     Expected beam: (BEAM-VIA ~S ... ~S)"
-                   literal transmitter receiver))))))
+                   literal source destination))))))
   (dolist (literal (init-literals-with-relation 'beam-via literals))
-    (destructuring-bind (transmitter obstacles receiver)
+    (destructuring-bind (source obstacles destination)
         (rest (init-literal-proposition literal))
       (declare (ignore obstacles))
-      (unless (init-coupled-p transmitter receiver literals)
+      (unless (init-coupled-p source destination literals)
         (error "~%BEAM-VIA corridor has no matching COUPLED pair.~%~
                 Literal:        ~S~%~
                 Expected pair:  (COUPLED ~S ~S)"
-               literal transmitter receiver)))))
+               literal source destination)))))
 
 
 (defun init-valid-directed-beam-p (source destination)
-  (or (and (init-type-member-p source 'transmitter)
-           (or (init-type-member-p destination 'receiver)
-               (init-type-member-p destination 'location)))
-      (and (init-type-member-p source 'location)
-           (or (init-type-member-p destination 'receiver)
-               (init-type-member-p destination 'location)))))
+  (and (or (init-type-member-p source 'transmitter)
+           (init-type-member-p source 'repeater)
+           (init-type-member-p source 'location))
+       (or (init-type-member-p destination 'repeater)
+           (init-type-member-p destination 'receiver)
+           (init-type-member-p destination 'location))))
 
 
 (defun init-first-matching-list-value (relation literals test)
@@ -846,36 +854,31 @@ would overwrite the previous value during install-init."
 
 
 (defun init-occluders-for-directed-beam (source destination literals)
-  (cond
-    ((and (init-type-member-p source 'location)
-          (init-type-member-p destination 'location))
-     (init-first-matching-list-value
-       'los-to-location literals
-       (lambda (prop)
-         (or (and (eql (second prop) source)
-                  (eql (fourth prop) destination))
-             (and (eql (second prop) destination)
-                  (eql (fourth prop) source))))))
-    ((init-type-member-p source 'location)
-     (init-first-matching-list-value
-       'los-to-apparatus literals
-       (lambda (prop)
-         (and (eql (second prop) source)
-              (eql (fourth prop) destination)))))
-    ((and (init-type-member-p source 'transmitter)
-          (init-type-member-p destination 'receiver))
-     (init-first-matching-list-value
-       'beam-via literals
-       (lambda (prop)
-         (and (eql (second prop) source)
-              (eql (fourth prop) destination)))))
-    ((and (init-type-member-p source 'transmitter)
-          (init-type-member-p destination 'location))
-     (init-first-matching-list-value
-       'los-to-apparatus literals
-       (lambda (prop)
-         (and (eql (second prop) destination)
-              (eql (fourth prop) source)))))))
+  (let ((source-location-p (init-type-member-p source 'location))
+        (destination-location-p (init-type-member-p destination 'location)))
+    (cond
+      ((and source-location-p destination-location-p)
+       (init-first-matching-list-value
+         'los-to-location literals
+         (lambda (prop)
+           (or (and (eql (second prop) source)
+                    (eql (fourth prop) destination))
+               (and (eql (second prop) destination)
+                    (eql (fourth prop) source))))))
+      ((or source-location-p destination-location-p)
+       (let ((location (if source-location-p source destination))
+             (apparatus (if source-location-p destination source)))
+         (init-first-matching-list-value
+           'los-to-apparatus literals
+           (lambda (prop)
+             (and (eql (second prop) location)
+                  (eql (fourth prop) apparatus))))))
+      (t
+       (init-first-matching-list-value
+         'beam-via literals
+         (lambda (prop)
+           (and (eql (second prop) source)
+                (eql (fourth prop) destination))))))))
 
 
 (defun init-defined-beam-crossings (literals)

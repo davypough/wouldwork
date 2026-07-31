@@ -1,49 +1,34 @@
 ;;; Filename: beam-relay.lisp
 
-;;; Relay beam technology: movable connectors that can relay beam color through authored
-;;; visibility.  A peer over -beam-substrate, adding only connector-specific behavior;
-;;; it does NOT pull in the direct beam line, so a problem wanting both a direct
-;;; transmitter -> receiver line and connectors must include beam-direct as well.  If
-;;; beam-crossing is also included, connector lighting and receiver activation respect
-;;; crossing cuts through the beam-cut / beam-cut-in hooks.
+;;; Relay beam technology: movable connectors and fixed repeaters propagate beam color
+;;; through one graph.  Connector links are dynamic PAIRED facts and require authored live
+;;; visibility; fixed apparatus links are directional COUPLED facts and use BEAM-VIA
+;;; corridors.  A relay lights only when every source reaching it in the same propagation
+;;; layer carries one hue.  Conflicting hues leave it unlit.
 ;;;
-;;; Self-contained; spliced by (include-tech beam-relay).
+;;; Connectors retain their pickup/placement/pairing actions.  Repeaters have no
+;;; HAS-LOCATION and no actions; repeater.lisp assembles this peer with beam-direct and
+;;; visibility so fixed corridors and apparatus sightlines are live.
 ;;;
 ;;; REQUIRES:
-;;;   types      : agent, location  --  plate, box, hue, connector, transmitter, and
-;;;                receiver are declared optional here (define-optional-types)
-;;;   nested     : -beam-substrate (beam relations, receiver update, and peer hooks);
-;;;                -placement (placement-options, place-held-object!; also brings in
-;;;                support occupancy, location, position, height, elevation, and holding);
-;;;                -visibility (null-default visible/beam-visible interface);
-;;;                -support-elevation (occupant-elevation, read directly for a connector's
-;;;                own current beam-anchor height); -elevation (fixture-elevation, read
-;;;                directly for a transmitter/receiver's own beam-anchor height);
-;;;                -walkability (identity-default walkable-locations/walkable queries;
-;;;                walkable-locations is overridden by walkability when that technology
-;;;                is included);
-;;;                -reachability (identity-default reachable query; overridden by
-;;;                reachability when that technology is included);
-;;;                -pickup (pickup-clear, shared with box and jammer)
-;;;   parameter  : *max-pairings*
-;;;   extension  : visibility overrides -visibility's null defaults with authored live and
-;;;                potential LOS, and beam-visible with the elevation-aware occlusion check
+;;;   types      : agent, location -- connector/transmitter/receiver/repeater and related
+;;;                leaf types are optional through the nested roles
+;;;   nested     : -beam-substrate (beam relations and hooks); -placement;
+;;;                -visibility (null defaults); -support-elevation; -elevation;
+;;;                -walkability; -reachability; -pickup
+;;;   parameter  : *max-pairings* -- connector pairings only; fixed couplings are unlimited
 ;;;   driver     : propagate-consequences! must call
-;;;                  update-connector-status! -> update-receiver-status!
+;;;                  update-relay-status! -> update-receiver-status!
 ;;; PROVIDES:
-;;;   types      : terminus (either transmitter receiver connector)  --  what a connector
-;;;                can pair/connect to; owned here so problems using beam-relay need only
-;;;                declare the leaf object types they instantiate
-;;;                plate, box, hue, connector, transmitter, receiver  --  declared optional
-;;;                here; other techs (plate, gate, jammer, box, barrier, -beam-substrate,
-;;;                beam-direct, beam-crossing, visibility, etc.) independently declare their
-;;;                own -alias forms for their own pre-params; the bare and aliased forms
-;;;                resolve compatibly
+;;;   types      : relay (either connector repeater);
+;;;                terminus (either transmitter receiver connector repeater)
 ;;;   relations  : paired, color
-;;;   queries    : relay-beam-reaches-receiver, compute-connector-lighting,
-;;;                beam-anchor-elevation, relay-beam-live-for-cutting,
-;;;                beam-relay-source-distance, connectable-location, connectable-terminus
-;;;   updates    : update-connector-status!
+;;;   queries    : relay-beam-reaches-receiver, compute-relay-lighting,
+;;;                relay-anchor, beam-anchor-elevation, relay-linked,
+;;;                relay-link-clear, paired-relay-visible,
+;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
+;;;                connectable-location, connectable-terminus
+;;;   updates    : update-relay-status!
 ;;;   actions    : pickup-connector, put-connector, connect-connector
 
 (include-tech -propagation)
@@ -60,7 +45,8 @@
 
 
 (define-types
-  terminus (either transmitter receiver connector))  ;what a connector can pair/connect to
+  relay (either connector repeater)
+  terminus (either transmitter receiver connector repeater))
 
 
 (define-optional-types plate box hue connector transmitter receiver)
@@ -68,7 +54,7 @@
 
 (define-dynamic-relations
   (paired connector terminus)
-  (color connector $hue))
+  (color relay $hue))
 
 
 ;;;; ACTIONS ;;;;
@@ -142,136 +128,219 @@
 ;;;; UPDATE FUNCTIONS ;;;;
 
 
-(define-update update-connector-status! ()
-  (do (assign $lighting (compute-connector-lighting (current-crossing-set)))
-      (doall (?c connector)
-        (do (assign $record (assoc ?c $lighting))
+(define-update update-relay-status! ()
+  (do (assign $lighting (compute-relay-lighting (current-crossing-set)))
+      (doall (?relay relay)
+        (do (assign $record (assoc ?relay $lighting))
             (if $record
-              (color ?c (second $record))
-              (if (bind (color ?c $old-hue))
-                (not (color ?c $old-hue))))))))
+              (color ?relay (second $record))
+              (if (bind (color ?relay $old-hue))
+                (not (color ?relay $old-hue))))))))
 
 
 ;;;; QUERY FUNCTIONS ;;;;
 
 
 (define-query relay-beam-reaches-receiver (?receiver receiver)
-  ;; A receiver lights by relay when a lit connector is paired to it with clear visibility.
-  ;; beam-visible tests the connector's own current elevation against the receiver's fixed
-  ;; fixture-elevation, elevation-aware where visible alone is not.  beam-cut is a no-op
-  ;; unless beam-crossing is included.
   (do (assign $reaches nil)
-      (doall (?c connector)
-        (if (and (paired ?c ?receiver)
-                 (bind (color ?c $c-hue))
+      (doall (?relay relay)
+        (if (and (bind (color ?relay $relay-hue))
                  (bind (has-chroma ?receiver $required-hue))
-                 (eql $c-hue $required-hue)
-                 (bind (has-location ?c $c-loc))
-                 (beam-visible $c-loc (occupant-elevation ?c)
-                                ?receiver (fixture-elevation ?receiver))
-                 (not (beam-cut $c-loc ?receiver)))
+                 (eql $relay-hue $required-hue)
+                 (or (and (connector ?relay)
+                          (paired ?relay ?receiver)
+                          (bind (has-location ?relay $location))
+                          (beam-visible
+                            $location (beam-anchor-elevation ?relay)
+                            ?receiver (fixture-elevation ?receiver))
+                          (not (beam-cut $location ?receiver)))
+                     (and (repeater ?relay)
+                          (coupled ?relay ?receiver)
+                          (fixed-beam-corridor-clear ?relay ?receiver)
+                          (not (beam-cut ?relay ?receiver)))))
           (assign $reaches t)))
       $reaches))
 
 
-(define-query compute-connector-lighting (?active)
-  ;; BFS from every transmitter over the pairing graph, returning lit connectors as
-  ;; ($connector $hue $distance) records.  beam-visible tests ?c's own current elevation
-  ;; against $src-obj's -- a transmitter's fixture-elevation or a source connector's own
-  ;; occupant-elevation, resolved by beam-anchor-elevation -- elevation-aware where visible
-  ;; alone is not.  If beam-crossing is included, ?active is the candidate crossing set used
-  ;; by beam-cut-in; otherwise the cut hook is a no-op.
+(define-query compute-relay-lighting (?active)
+  ;; Breadth-first propagation from every transmitter.  Each lighting record is
+  ;; (relay hue distance); frontier records additionally carry the relay's beam endpoint.
   (do (assign $lit nil)
       (assign $lit-locations nil)
       (assign $visited nil)
       (assign $frontier nil)
-      (doall (?tr transmitter)
-        (if (bind (has-chroma ?tr $tr-hue))
-          (assign $frontier (cons (list ?tr ?tr $tr-hue 0) $frontier))))
+      (doall (?transmitter transmitter)
+        (if (bind (has-chroma ?transmitter $hue))
+          (assign $frontier
+                  (cons (list ?transmitter ?transmitter $hue 0) $frontier))))
       (ww-loop for $pass from 1 to 99
                do (assign $next-frontier nil)
-                  (doall (?c connector)
-                    (if (and (not (member ?c $visited))
-                             (bind (has-location ?c $c-loc)))
-                      (do (assign $hues nil)
-                          (assign $reach-hue nil)
-                          (assign $reach-dist nil)
-                          (ww-loop for $source-rec in $frontier
-                                   do (assign $src-obj (first $source-rec))
-                                      (assign $src-anchor (second $source-rec))
-                                      (assign $src-hue (third $source-rec))
-                                      (assign $src-dist (fourth $source-rec))
-                                      (if (and (or (paired ?c $src-obj)
-                                                   (paired $src-obj ?c))
-                                               (beam-visible $c-loc (occupant-elevation ?c)
-                                                              $src-anchor
-                                                              (beam-anchor-elevation $src-obj))
-                                               (not (beam-cut-in $src-anchor $c-loc ?active)))
-                                        (do (if (not (member $src-hue $hues))
-                                              (assign $hues (cons $src-hue $hues)))
-                                            (assign $reach-hue $src-hue)
-                                            (assign $reach-dist (1+ $src-dist)))))
-                          (if $hues
-                            (do (assign $visited (cons ?c $visited))
-                                (if (and (not (cdr $hues))
-                                         (not (member $c-loc $lit-locations)))
-                                  (do (assign $lit
-                                              (cons (list ?c $reach-hue $reach-dist) $lit))
-                                      (assign $lit-locations
-                                              (cons $c-loc $lit-locations))
-                                      (assign $next-frontier
-                                              (cons (list ?c
-                                                          $c-loc
-                                                          $reach-hue
-                                                          $reach-dist)
-                                                    $next-frontier)))))))))
+                  (doall (?target relay)
+                    (if (not (member ?target $visited))
+                      (do (assign $target-anchor (relay-anchor ?target))
+                          (if $target-anchor
+                            (do (assign $hues nil)
+                                (assign $reach-hue nil)
+                                (assign $reach-distance nil)
+                                (ww-loop for $source-record in $frontier
+                                         do (assign $source (first $source-record))
+                                            (assign $source-anchor
+                                                    (second $source-record))
+                                            (assign $source-hue (third $source-record))
+                                            (assign $source-distance
+                                                    (fourth $source-record))
+                                            (if (relay-link-clear
+                                                  $source $source-anchor
+                                                  ?target $target-anchor ?active)
+                                              (do (if (not (member $source-hue $hues))
+                                                    (assign $hues
+                                                            (cons $source-hue $hues)))
+                                                  (assign $reach-hue $source-hue)
+                                                  (assign $reach-distance
+                                                          (1+ $source-distance)))))
+                                (if $hues
+                                  (do (assign $visited (cons ?target $visited))
+                                      (if (and (not (cdr $hues))
+                                               (or (repeater ?target)
+                                                   (not (member
+                                                          $target-anchor
+                                                          $lit-locations))))
+                                        (do (assign $lit
+                                                    (cons
+                                                      (list ?target
+                                                            $reach-hue
+                                                            $reach-distance)
+                                                      $lit))
+                                            (if (connector ?target)
+                                              (assign $lit-locations
+                                                      (cons
+                                                        $target-anchor
+                                                        $lit-locations)))
+                                            (assign $next-frontier
+                                                    (cons
+                                                      (list ?target
+                                                            $target-anchor
+                                                            $reach-hue
+                                                            $reach-distance)
+                                                      $next-frontier)))))))))))
                   (assign $frontier $next-frontier)
                   (if (not $frontier)
                     (return t)))
       $lit))
 
 
-(define-query beam-anchor-elevation (?anchor (either transmitter connector))
-  ;; compute-connector-lighting's frontier anchors are either a transmitter (its own fixed
-  ;; fixture-elevation) or a previously-lit connector (its own current occupant-elevation).
-  (if (transmitter ?anchor)
-    (fixture-elevation ?anchor)
-    (occupant-elevation ?anchor)))
+(define-query relay-anchor (?relay relay)
+  ;; Movable connectors beam from their current location; fixed repeaters are apparatus
+  ;; endpoints in their own right.
+  (if (connector ?relay)
+    (do (bind (has-location ?relay $location))
+        $location)
+    ?relay))
+
+
+(define-query beam-anchor-elevation
+    (?anchor (either transmitter receiver relay))
+  (cond ((or (transmitter ?anchor)
+             (receiver ?anchor))
+         (fixture-elevation ?anchor))
+        ((connector ?anchor)
+         (+ (occupant-elevation ?anchor)
+            (declared-height ?anchor)))
+        (t
+         (repeater-anchor-elevation ?anchor))))
+
+
+(define-query relay-linked
+    (?source (either transmitter relay) ?target relay)
+  ;; PAIRED is structurally undirected but is always stored with a connector first.
+  ;; COUPLED is directional and can target only a repeater or receiver.
+  (if (connector ?target)
+    (or (paired ?target ?source)
+        (and (connector ?source)
+             (paired ?source ?target)))
+    (or (coupled ?source ?target)
+        (and (connector ?source)
+             (paired ?source ?target)))))
+
+
+(define-query relay-link-clear
+    (?source (either transmitter relay)
+     ?source-anchor beam-node
+     ?target relay
+     ?target-anchor beam-node
+     ?active)
+  (and (relay-linked ?source ?target)
+       (if (coupled ?source ?target)
+         (fixed-beam-corridor-clear ?source ?target)
+         (paired-relay-visible
+           ?source ?source-anchor ?target ?target-anchor))
+       (not (beam-cut-in ?source-anchor ?target-anchor ?active))))
+
+
+(define-query paired-relay-visible
+    (?source (either transmitter relay)
+     ?source-anchor beam-node
+     ?target relay
+     ?target-anchor beam-node)
+  ;; A paired link always has at least one connector.  BEAM-VISIBLE is location-first, so
+  ;; orient the test from whichever endpoint is the connector.
+  (if (connector ?target)
+    (beam-visible
+      ?target-anchor (beam-anchor-elevation ?target)
+      ?source-anchor (beam-anchor-elevation ?source))
+    (do (connector ?source)
+        (beam-visible
+          ?source-anchor (beam-anchor-elevation ?source)
+          ?target-anchor (beam-anchor-elevation ?target)))))
 
 
 (define-query relay-beam-live-for-cutting
-    (?from (either transmitter location)
-     ?to (either receiver location)
-     ?lighting)
-  ;; Relay beams cut crossings once emitted.  The outbound sightline is not tested here;
-  ;; arrival gates lighting in compute-connector-lighting, not cutting.
-  ;; ?from/?to are Wouldwork objects; ?lighting is a computed Lisp association list and is
-  ;; therefore deliberately untyped.
+    (?from beam-node ?to beam-node ?lighting)
+  ;; Arrival/visibility gates whether a relay becomes lit.  Once lit, its outbound segment
+  ;; is live for crossing analysis; fixed coupled segments additionally require their
+  ;; authored corridor to be clear.
   (or (and (transmitter ?from)
-           (exists (?c connector)
-             (and (has-location ?c ?to)
-                  (paired ?c ?from))))
-      (exists (?c connector)
-        (and (has-location ?c ?from)
-             (assoc ?c ?lighting)
-             (or (and (receiver ?to)
-                      (paired ?c ?to))
-                 (exists (?c2 connector)
-                   (and (has-location ?c2 ?to)
-                        (different ?c2 ?c)
-                        (or (paired ?c2 ?c)
-                            (paired ?c ?c2)))))))))
+           (location ?to)
+           (exists (?connector connector)
+             (and (has-location ?connector ?to)
+                  (paired ?connector ?from))))
+      (and (repeater ?from)
+           (assoc ?from ?lighting)
+           (or (and (or (repeater ?to) (receiver ?to))
+                    (fixed-beam-corridor-clear ?from ?to))
+               (and (location ?to)
+                    (exists (?connector connector)
+                      (and (has-location ?connector ?to)
+                           (paired ?connector ?from))))))
+      (and (location ?from)
+           (exists (?connector connector)
+             (and (has-location ?connector ?from)
+                  (assoc ?connector ?lighting)
+                  (or (and (receiver ?to)
+                           (paired ?connector ?to))
+                      (and (repeater ?to)
+                           (paired ?connector ?to))
+                      (and (location ?to)
+                           (exists (?other connector)
+                             (and (different ?other ?connector)
+                                  (has-location ?other ?to)
+                                  (or (paired ?other ?connector)
+                                      (paired ?connector ?other)))))))))))
 
 
-(define-query beam-relay-source-distance (?from location ?lighting)
-  ;; ?from is a connector's Wouldwork location; ?lighting is computed Lisp data.
-  (do (assign $distance most-positive-fixnum)
-      (doall (?c connector)
-        (if (has-location ?c ?from)
-          (do (assign $record (assoc ?c ?lighting))
-              (if $record
-                (assign $distance (third $record))))))
-      $distance))
+(define-query beam-relay-source-distance (?from beam-node ?lighting)
+  (if (repeater ?from)
+    (do (assign $record (assoc ?from ?lighting))
+        (if $record (third $record) most-positive-fixnum))
+    (if (location ?from)
+      (do (assign $distance most-positive-fixnum)
+          (doall (?connector connector)
+            (if (has-location ?connector ?from)
+              (do (assign $record (assoc ?connector ?lighting))
+                  (if $record
+                    (assign $distance (third $record))))))
+          $distance)
+      most-positive-fixnum)))
 
 
 (define-query connectable-location (?connector connector ?location location)
@@ -286,17 +355,16 @@
      ?placement-location location
      ?connector connector
      ?terminus terminus)
-  ;; Pairing selection uses potential LOS from any currently walkable vantage.  Walkability
-  ;; respects current walking obstacles; potential LOS ignores the open state of its own gate
-  ;; occluders.  Exact placement and live visible checks subsequently determine active beams.
-  ;; ?pairing-vantages is a computed Lisp list; the other parameters are planning objects.
+  ;; Pairing selection uses structural LOS from any currently walkable vantage.  Exact
+  ;; placement and live visibility subsequently determine whether the beam carries color.
   (ww-loop for $vantage in ?pairing-vantages
            thereis
              (or (and (or (transmitter ?terminus)
-                          (receiver ?terminus))
+                          (receiver ?terminus)
+                          (repeater ?terminus))
                       (potentially-visible $vantage ?terminus))
                  (and (connector ?terminus)
                       (different ?terminus ?connector)
-                      (bind (has-location ?terminus $t-loc))
-                      (different ?placement-location $t-loc)
-                      (potentially-visible $vantage $t-loc)))))
+                      (bind (has-location ?terminus $terminus-location))
+                      (different ?placement-location $terminus-location)
+                      (potentially-visible $vantage $terminus-location)))))

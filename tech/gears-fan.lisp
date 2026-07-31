@@ -1,4 +1,4 @@
-;;; Filename: -gears-fan.lisp
+;;; Filename: gears-fan.lisp
 
 ;;; Gears/fan substrate: the shared machinery every blower technology programs against,
 ;;; modeled on -beam-substrate's peer-substrate pattern.  A blower is a fan mounted on a
@@ -67,9 +67,11 @@
 ;;;   query     : gears-elevation  --  the working height of a mounted fan: wall gears'
 ;;;               declared has-elevation or 1 (matching transmitter/receiver anchors);
 ;;;               floor gears' floor elevation
+;;;               stack-rider  --  true when a candidate is directly or transitively
+;;;               stacked above a given base
 ;;;               landing-support  --  the first clear plate/floor-mounted-fan/box at a
-;;;               location whose top matches a required elevation (nil accepts any), no
-;;;               agent or reach gate
+;;;               location whose top matches a required elevation (nil accepts any),
+;;;               excluding the relocated base and its riders; no agent or reach gate
 ;;;   updates   : update-gears-status! (state only), relocate-stack!, land-on-support!
 ;;;               (rests a relocated object on its destination's landing-support match;
 ;;;               read by wall-blower's sweep and angled-blower's arc)
@@ -167,19 +169,39 @@
                   (assign $moving $next))))
 
 
+(define-query stack-rider (?candidate support-occupant ?base support-occupant)
+  ;; True when ?candidate's downward support chain reaches ?base.  Landing selection
+  ;; uses this after relocate-stack!, while every original (on ...) link within the moved
+  ;; stack is still intact.  An already-cyclic authored chain is an inconsistent state,
+  ;; not a search condition to tolerate.
+  (do (assign $current ?candidate)
+      (assign $seen nil)
+      (ww-loop
+        do (if (member $current $seen)
+             (error "~%Support cycle encountered while checking landing support.~%~
+                     Candidate: ~S~%Base: ~S"
+                    ?candidate ?base))
+           (assign $seen (cons $current $seen))
+           (if (not (bind (on $current $support)))
+             (return nil))
+           (if (eql $support ?base)
+             (return t))
+           (if (not (support-occupant $support))
+             (return nil))
+           (assign $current $support))))
+
+
 (define-query landing-support (?location location ?self support-occupant ?required-elevation)
   ;; The first clear plate, floor-mounted fan, or box at ?location whose top matches
-  ;; ?required-elevation, excluding ?self as a candidate, scanned in that plate/fan/box
-  ;; order, or nil if none does -- nil for ?required-elevation accepts any candidate's
-  ;; elevation.  The ?self exclusion matters only when ?self is itself a box: by the time
-  ;; land-on-support! calls this, relocate-stack! has already moved ?self to ?location, so
-  ;; without the exclusion a relocated box could be offered as its own landing support
-  ;; (harmless for plate/fan candidates, since ?self can never be eql to a
-  ;; differently-typed one -- the same reasoning -placement's placement-options already
-  ;; documents for its own ?self parameter).  Shared by wall-blower's flush-only landing
-  ;; and angled-blower's any-elevation landing, via land-on-support!.  Unlike
-  ;; -placement's placement-options, this carries no agent or vertical-reach gate: it is
-  ;; read by a physical consequence, not an agent's manipulation choice.
+  ;; ?required-elevation, excluding ?self and every object stacked above it, scanned in
+  ;; plate/fan/box order, or nil if none does -- nil for ?required-elevation accepts any
+  ;; candidate's elevation.  relocate-stack! has already moved the entire stack here but
+  ;; preserved its internal (on ...) links; without stack-rider's exclusion a clear rider
+  ;; could be selected under its own base, creating a support cycle.  Shared by
+  ;; wall-blower's flush-only landing and angled-blower's any-elevation landing, via
+  ;; land-on-support!.  Unlike -placement's placement-options, this carries no agent or
+  ;; vertical-reach gate: it is read by a physical consequence, not an agent's
+  ;; manipulation choice.
   (do (assign $landing nil)
       (doall (?plate plate)
         (if (and (not $landing)
@@ -192,6 +214,7 @@
       (doall (?fan fan)
         (if (and (not $landing)
                  (different ?fan ?self)
+                 (not (stack-rider ?fan ?self))
                  (bind (mounted-on ?fan $gears))
                  (has-location ?fan ?location)
                  (cleartop ?fan)
@@ -201,6 +224,7 @@
       (doall (?box box)
         (if (and (not $landing)
                  (different ?box ?self)
+                 (not (stack-rider ?box ?self))
                  (has-location ?box ?location)
                  (cleartop ?box)
                  (or (not ?required-elevation)

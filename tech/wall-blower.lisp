@@ -1,13 +1,13 @@
 ;;; Filename: wall-blower.lisp
 
 ;;; Wall-blower technology: the wall mounting of the shared gears/fan machinery (see
-;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
+;;; gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
 ;;; wiring, the turning/blowing derivation, and the fan actions).  Wall gears are fixed
 ;;; on a wall of their has-position location -- the location the fan faces and sweeps --
 ;;; at the stream elevation given by gears-elevation (declared has-elevation or 1).  A
 ;;; wall-mounted fan hangs with NO has-location, so nothing can stand or rest on it and
 ;;; it is invisible to step and placement; the agent mounts and dismounts it with
-;;; -gears-fan's mount-fan and pickup-fan, reaching to the stream elevation.
+;;; gears-fan's mount-fan and pickup-fan, reaching to the stream elevation.
 ;;;
 ;;; While the fan blows, its air stream sweeps the faced location horizontally at the
 ;;; stream elevation: an object standing at elevation s with height h is blown iff
@@ -37,8 +37,8 @@
 ;;; fan's flush top) are fine and settle within the cap (10 iterations).
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  wall-gears and fan come from nested -gears-fan
-;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
+;;;   types     : agent, location  --  wall-gears and fan come from nested gears-fan
+;;;   nested    : gears-fan (types, mounted-on, aimed-at>, turning/blowing,
 ;;;               gears-elevation, landing-support, land-on-support!,
 ;;;               update-gears-status!, relocate-stack!, fan actions; nests
 ;;;               -support-occupancy, -location, -position, -elevation, -controls,
@@ -51,7 +51,7 @@
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
 
 (include-tech -propagation)
-(include-tech -gears-fan)
+(include-tech gears-fan)
 (include-tech -stream-passability)
 
 (in-package :ww)

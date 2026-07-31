@@ -29,7 +29,9 @@
   real-connector  (connector1)
   ghost-connector (connector1*)
   connector       (either real-connector ghost-connector)
-  repeater        (repeater1)
+  floor-repeater  (repeater1)
+  wall-repeater   ()
+  repeater        (either floor-repeater wall-repeater)
   relay           (either connector repeater)
   transmitter     (transmitter1)
   receiver        (receiver1)
@@ -68,6 +70,7 @@
 
 (define-static-relations
   (coords> (either area fixture) $fixnum $fixnum)  ;the (x,y) position
+  (apparatus-coords> repeater $fixnum $fixnum)  ;repeater functional-point coords, checked by check-init-repeater-consistency
   (controls (either receiver plate) (either gate blower))
   (blows> blower $area $area)
   (gate-segment> gate $fixnum $fixnum $fixnum $fixnum)
@@ -1069,6 +1072,7 @@
   (coords> transmitter1 19 19)
   (coords> plate1 11 14)
   (coords> repeater1 3 8)
+  (apparatus-coords> repeater1 3 8)
   (coords> blower1 23 8)
   (coords> receiver1 21 0)
   (controls plate1 gate1)

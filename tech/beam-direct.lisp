@@ -1,58 +1,35 @@
 ;;; Filename: beam-direct.lisp
 
-;;; Direct beam technology: fixed transmitter -> receiver beams with authored corridor
-;;; occluders.  Location occluders are elevation-aware: an object blocks only if its vertical
-;;; span intersects the fixed transmitter/receiver beam elevation.  A peer capability over
-;;; -beam-substrate -- it includes -beam-substrate and
-;;; overrides the direct arrival and cut-liveness hooks, adding the direct-only wiring
-;;; (coupled, beam-via).  The shared interface (has-chroma/active relations, the receiver-status
-;;; driver, the arrival/cut orchestrators, and the null-object hook defaults) lives in
-;;; -beam-substrate.  The elevation-aware occlusion test itself -- the beam-blocker type and
-;;; the vertical-span check -- lives in -beam-occlusion, so the same primitive is available to
-;;; any other beam or sightline capability that needs it; visibility is a second consumer once
-;;; its own occluder lists gain location entries alongside gates.  A problem that would rather
-;;; author 2D positions than hand-list sightline occluders gets that derivation from
-;;; visibility-tech, which nests -beam-los-coordinates (the owner of the los relations owns
-;;; their coordinate derivation); this file no longer nests it itself.  A problem with two
-;;; direct beams that can cross also includes beam-crossing alongside beam-direct.
+;;; Fixed coupled beam technology.  It activates direct transmitter -> receiver links and
+;;; supplies shared corridor clearance for every directional fixed link whose endpoints are
+;;; transmitter/repeater -> repeater/receiver.  Location occluders are elevation-aware,
+;;; interpolating between unequal endpoint anchors when visibility supplies coordinates.
+;;; A problem with crossing fixed beams includes beam-crossing alongside this technology.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-direct).
 ;;;
 ;;; REQUIRES:
-;;;   types : location, hue, agent  --  transmitter, receiver, box, jammer, connector, and
-;;;           plate are declared optional here (define-optional-types); gate comes from
-;;;           nested -gate; beam-blocker (either agent box jammer connector) comes from
-;;;           nested -beam-occlusion.  Plate may appear as a non-raising support.
-;;;   nested : -beam-occlusion (beam-blocker type, beam-blocker-occludes-location);
-;;;            -elevation (elevated-object, has-elevation, fixture-elevation,
-;;;            location-elevation); -gate (gate optional type, (open gate) relation) --
-;;;            shared with gate, walkability (via -passability), reachability,
-;;;            visibility, and beam-crossing, which all nest -gate instead of
-;;;            hand-declaring it
+;;;   types  : location, hue, agent -- transmitter, receiver, repeaters, box, jammer,
+;;;            connector, and plate are optional through the nested roles
+;;;   nested : -beam-substrate (coupled, beam-via, receiver and beam hooks);
+;;;            -beam-occlusion (beam-blocker-occludes-location);
+;;;            -elevation (apparatus-anchor-elevation);
+;;;            -beam-interpolation (horizontal default, overridden by visibility for
+;;;            sloped beams); -gate (open)
 ;;; PROVIDES:
-;;;   types     : transmitter, receiver  --  declared optional here; other techs
-;;;               (-beam-substrate, beam-relay, beam-crossing, visibility, gate, etc.)
-;;;               independently declare their own transmitter-alias/receiver-alias
-;;;               for their own pre-params; the bare and aliased forms resolve compatibly
-;;;   relations : coupled, beam-via
-;;;   queries   : direct-beam-reaches-receiver, direct-beam-elevation, beam-clear,
-;;;               direct-beam-live-for-cutting (overriding -beam-substrate null-object
-;;;               defaults)
+;;;   queries : direct-beam-reaches-receiver, fixed-beam-elevation-at, beam-clear,
+;;;             fixed-beam-corridor-clear, direct-beam-live-for-cutting
 
 (include-tech -beam-substrate)
 (include-tech -beam-occlusion)
 (include-tech -elevation)
+(include-tech -beam-interpolation)
 (include-tech -gate)
 
 (in-package :ww)
 
 
 (define-optional-types transmitter receiver box jammer connector plate)
-
-
-(define-static-relations
-  (coupled transmitter receiver)  ;static beam source -> target pairing
-  (beam-via transmitter $list receiver))  ;direct beam corridor: open gates and clear locations
 
 
 (define-query direct-beam-reaches-receiver (?receiver receiver)
@@ -62,36 +39,43 @@
                  (bind (has-chroma ?t $source-hue))
                  (bind (has-chroma ?receiver $required-hue))
                  (eql $source-hue $required-hue)
-                 (bind (beam-via ?t $obstacles ?receiver))
-                 (ww-loop for $o in $obstacles
-                          always (beam-clear ?t $o ?receiver))
+                 (fixed-beam-corridor-clear ?t ?receiver)
                  (not (beam-cut ?t ?receiver)))
           (assign $reaches t)))
       $reaches))
 
 
-(define-query direct-beam-elevation (?from transmitter ?to receiver)
-  ;; Direct beams are currently horizontal.  Init validation rejects mismatched endpoint
-  ;; elevations, so either endpoint gives the same beam level here.
-  (do ?to
-      (fixture-elevation ?from)))
+(define-query fixed-beam-elevation-at
+    (?from fixed-beam-source ?obstacle location ?to fixed-beam-target)
+  (do (assign $from-elevation (apparatus-anchor-elevation ?from))
+      (assign $to-elevation (apparatus-anchor-elevation ?to))
+      (beam-elevation-at-location
+        ?obstacle ?from $from-elevation ?to $to-elevation)))
 
 
-(define-query beam-clear (?from transmitter ?obstacle (either gate location) ?to receiver)
-  ;; A corridor obstacle is clear iff it is an open gate, or -- being a corridor
-  ;; location -- carries no beam-blocking object whose vertical span intersects this
-  ;; beam's elevation.  The occlusion test itself is -beam-occlusion's shared primitive,
-  ;; also used by visibility for sightline occluders.
+(define-query beam-clear
+    (?from fixed-beam-source
+     ?obstacle (either gate location)
+     ?to fixed-beam-target)
+  ;; Closed gates block outright.  A location blocks only when one of its beam-blocking
+  ;; occupants spans the fixed beam's interpolated elevation there.
   (if (gate ?obstacle)
     (open ?obstacle)
-    (not (beam-blocker-occludes-location ?obstacle (direct-beam-elevation ?from ?to)))))
+    (not (beam-blocker-occludes-location
+           ?obstacle (fixed-beam-elevation-at ?from ?obstacle ?to)))))
 
 
-(define-query direct-beam-live-for-cutting (?from transmitter ?to receiver)
-  ;; Cutting depends on emitted light, not arrival at the final receiver.  For a direct
-  ;; transmitter -> receiver beam, emission is live whenever the authored corridor clears.
-  (and (transmitter ?from)
-       (receiver ?to)
+(define-query fixed-beam-corridor-clear (?from beam-node ?to beam-node)
+  (and (or (transmitter ?from) (repeater ?from))
+       (or (repeater ?to) (receiver ?to))
+       (coupled ?from ?to)
        (bind (beam-via ?from $obstacles ?to))
        (ww-loop for $o in $obstacles
                 always (beam-clear ?from $o ?to))))
+
+
+(define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)
+  ;; A transmitter emits every coupled fixed beam whose authored corridor is clear.
+  ;; Repeater-origin beams are gated by relay lighting in beam-relay's liveness hook.
+  (and (transmitter ?from)
+       (fixed-beam-corridor-clear ?from ?to)))

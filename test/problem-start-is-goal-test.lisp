@@ -1,7 +1,13 @@
 ;;; Filename: problem-start-is-goal-test.lisp
 
-;;; Focused search-lifecycle problem.  The initial position satisfies the goal,
-;;; and two one-step actions reach distinct goal states with lower/higher values.
+;;; Focused search-lifecycle problem.  The initial position satisfies the goal, and two
+;;; one-step actions reach distinct goal states with lower/higher values for the broader
+;;; non-FIRST lifecycle matrix in TEST-START-IS-GOAL.
+;;;
+;;; In this file's focused FIRST configuration, only the initialized center may be
+;;; accepted.  START-IS-GOAL-VALID signals if the search evaluates either one-step state
+;;; as a possible fallback goal, so a broken start-state check cannot still appear to
+;;; solve the problem at depth 1.
 
 
 (in-package :ww)
@@ -50,7 +56,14 @@
   (start-goal-position start-goal-center))
 
 
+(define-query start-is-goal-valid ()
+  (if (start-goal-position start-goal-center)
+    t
+    (if (eql *solution-type* 'first)
+      (error "FIRST search expanded past the already-satisfied start-state goal.")
+      (or (start-goal-position start-goal-low)
+          (start-goal-position start-goal-high)))))
+
+
 (define-goal
-  (or (start-goal-position start-goal-center)
-      (start-goal-position start-goal-low)
-      (start-goal-position start-goal-high)))
+  (start-is-goal-valid))

@@ -1,10 +1,8 @@
 ;;; Filename: visibility.lisp
 
-;;; Visibility background capability: whether a fixture or another location is in sight from a
-;;; location.  In this file, a fixture is a fixed LOS object: a gate, transmitter, or
-;;; receiver.  Sightlines are split by consuming role, not just by object kind: LOS-TO-
-;;; APPARATUS covers an apparatus (transmitter or receiver), the beam endpoints beam-relay/
-;;; beam-direct pair or relay to; LOS-TO-TARGET covers gate, what jammer's jam-target aims at
+;;; Visibility background capability: whether a fixture or another location is in sight from
+;;; a location.  LOS-TO-APPARATUS covers point apparatus (transmitter, receiver, repeater,
+;;; or gun); LOS-TO-TARGET covers gate, what jammer's jam-target aims at
 ;;; (a gears jam target instead resolves through its HAS-POSITION location's ordinary
 ;;; LOS-TO-LOCATION entry -- gears hang at a location, not along a segment -- so
 ;;; LOS-TO-TARGET remains gate-only).
@@ -17,8 +15,8 @@
 ;;; potentially-visible both rely on.  BEAM-VISIBLE is the elevation-aware sibling beam-relay's
 ;;; own hops use instead: given both endpoints' live elevations, it additionally blocks on a
 ;;; location occluder whose beam-blocker spans the beam's own interpolated elevation there
-;;; (-beam-occlusion's beam-blocker-occludes-location, -beam-los-coordinates' live
-;;; beam-coordinates-elevation-at).  Never consulted for a jammer target, matching how a
+;;; (-beam-occlusion's beam-blocker-occludes-location, -beam-interpolation's live
+;;; beam-elevation-at-location).  Never consulted for a jammer target, matching how a
 ;;; location occluder never appears in LOS-TO-TARGET's own entries.
 ;;;
 ;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENTS --
@@ -45,6 +43,7 @@
 ;;;               -beam-los-coordinates (BEAM-ENDPOINT type; APPARATUS-COORDS>,
 ;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS;
 ;;;               live BEAM-COORDINATES-ELEVATION-AT);
+;;;               -beam-interpolation (the sloped-beam elevation hook);
 ;;;               -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)
 ;;; PROVIDES:
 ;;;   relations : (los-to-apparatus location $list apparatus)  -- $list items are gate or
@@ -58,6 +57,7 @@
 (include-tech -visibility)
 (include-tech -gate)
 (include-tech -beam-los-coordinates)
+(include-tech -beam-interpolation)
 (include-tech -beam-occlusion)
 
 (in-package :ww)
@@ -93,8 +93,7 @@
   ;; therefore deliberately have no Wouldwork object type.
   ;;
   ;; Elevation-aware sibling of visible, for a relay hop whose two live endpoint elevations
-  ;; the caller already knows -- occupant-elevation of the specific connector at each end, or
-  ;; fixture-elevation for a transmitter/receiver.  No los-to-target branch here: a jammer
+  ;; the caller already knows.  No los-to-target branch here: a jammer
   ;; target never carries a location occluder to test in the first place, so this query is
   ;; simply never the right one for jam-target to call.  A gate occluder is covered by the
   ;; visible call; a location occluder additionally blocks iff some beam-blocker there spans
@@ -106,8 +105,20 @@
                 always (or (gate $o)
                            (not (beam-blocker-occludes-location
                                   $o
-                                  (beam-coordinates-elevation-at
+                                  (beam-elevation-at-location
                                     $o ?location ?near-elevation ?object ?far-elevation)))))))
+
+
+(define-query beam-elevation-at-location
+    (?location location
+     ?from beam-node
+     ?near-elevation
+     ?to beam-node
+     ?far-elevation)
+  (if (= ?near-elevation ?far-elevation)
+    ?near-elevation
+    (beam-coordinates-elevation-at
+      ?location ?from ?near-elevation ?to ?far-elevation)))
 
 
 (define-query potentially-visible (?location location ?object (either fixture location))

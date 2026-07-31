@@ -7,10 +7,13 @@
 ;;;   - the returned type list stays positionally aligned, using NIL for an untyped slot
 ;;;   - action-domain headers and query-valued domains do not belong in function signatures
 ;;;   - $variables remain runtime/local variables, not query/update formal parameters
+;;;   - a nonempty typed update accepts, executes, and records a correctly typed call
+;;;   - the same update rejects a literal belonging to a different object type
 ;;;
 ;;; Run from the Wouldwork REPL with:
 ;;;
-;;;   (run query-update-parameter-tests)
+;;;   (stage query-update-parameter-tests)
+;;;   (solve)
 ;;;
 (in-package :ww)
 
@@ -42,7 +45,8 @@
 
 (define-dynamic-relations
   (query-parameter-tests-ready)
-  (query-parameter-tests-passed))
+  (query-parameter-tests-passed)
+  (query-parameter-object-update-ran query-parameter-test-object-a))
 
 
 (define-static-relations
@@ -146,6 +150,8 @@
   (check-query/update-call
     '(query-parameter-object-hook
        (identity query-parameter-test-a1)))
+  (check-query/update-call
+    '(query-parameter-object-update! query-parameter-test-a1))
   t)
 
 
@@ -190,6 +196,11 @@
         '(query-parameter-object-hook
            'query-parameter-test-b1))))
   (query-parameter-check-error
+    "A typed update rejects a literal belonging to a different object type."
+    (lambda ()
+      (check-query/update-call
+        '(query-parameter-object-update! query-parameter-test-b1))))
+  (query-parameter-check-error
     "An empty optional type has no literal object, including NIL."
     (lambda ()
       (check-query/update-call
@@ -210,6 +221,12 @@
     (?object query-parameter-test-empty ?value)
   ;; Likewise for an update; only enumeration over the empty type would skip a call.
   (do ?object ?value nil))
+
+
+(define-update query-parameter-object-update!
+    (?object query-parameter-test-object-a)
+  ;; The action below executes this valid nonempty typed call; the goal observes its write.
+  (query-parameter-object-update-ran ?object))
 
 
 (define-query query-parameter-boolean-hook (?value)
@@ -252,7 +269,8 @@
   ()
   (query-parameter-tests-ready)
   ()
-  (assert (query-parameter-tests-passed)
+  (assert (query-parameter-object-update! query-parameter-test-a1)
+          (query-parameter-tests-passed)
           (not (query-parameter-tests-ready))))
 
 
@@ -268,4 +286,5 @@
 
 
 (define-goal
-  (query-parameter-tests-passed))
+  (and (query-parameter-tests-passed)
+       (query-parameter-object-update-ran query-parameter-test-a1)))

@@ -1266,7 +1266,7 @@
             (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)
             *num-backtracks*))
   (when (> *inconsistent-states-dropped* 0)
-    (format t "~%~%Abandoned ~D inconsistent state~:P due to convergence failure (non-terminating cyclical states)."
+    (format t "~%~%Abandoned ~D inconsistent state~:P."
             *inconsistent-states-dropped*))
   (when (> *lower-bound-pruned* 0)
     (format t "~2%min-steps-remaining? pruned ~:D node~:P, ~,1F% of total states."
