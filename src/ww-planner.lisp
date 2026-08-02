@@ -59,9 +59,10 @@
         (dolist (pre-result pre-results)
           (let* ((baseline-idb (copy-idb (problem-state.idb state)))
                  (updated-dbs
-                   (if (eql pre-result t)
-                       (funcall eff-fn state)
-                       (apply eff-fn state pre-result))))
+                   (let ((*applying-init-action* t))
+                     (if (eql pre-result t)
+                         (funcall eff-fn state)
+                         (apply eff-fn state pre-result)))))
             
             (dolist (updated-db updated-dbs)
               (let ((changes (update.changes updated-db)))

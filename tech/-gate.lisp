@@ -11,7 +11,12 @@
 ;;;   types     : (none bare)
 ;;; PROVIDES:
 ;;;   types     : gate  --  declared optional here
+;;;   nested    : -recording-shadow-policy (neutral recording-side state hooks)
 ;;;   relations : (open gate)  --  asserted only by gate.lisp's update-gate-status!
+;;;   query     : gate-open-for-object -- playback state normally, recording state for a
+;;;               recording-shadow object
+
+(include-tech -recording-shadow-policy)
 
 (in-package :ww)
 
@@ -21,3 +26,9 @@
 
 (define-dynamic-relations
   (open gate))
+
+
+(define-query gate-open-for-object (?object ?gate gate)
+  (if (recording-shadow-object ?object)
+    (recording-shadow-gate-open ?gate)
+    (open ?gate)))

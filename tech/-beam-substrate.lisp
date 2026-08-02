@@ -21,10 +21,14 @@
 ;;;               pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : (active receiver), has-chroma, coupled, beam-via
 ;;;   queries   : beam-reaches-receiver, beam-live-for-cutting,
+;;;               recording-shadow-beam-reaches-receiver,
 ;;;               plus null-object defaults for direct-beam-reaches-receiver,
 ;;;               relay-beam-reaches-receiver, direct-beam-live-for-cutting,
 ;;;               relay-beam-live-for-cutting, beam-cut, beam-cut-in,
-;;;               fixed-beam-corridor-clear, current-crossing-set,
+;;;               recording-shadow-direct-beam-reaches-receiver,
+;;;               recording-shadow-relay-beam-reaches-receiver,
+;;;               fixed-beam-corridor-clear, fixed-beam-corridor-clear-for-object,
+;;;               current-crossing-set,
 ;;;               compute-relay-lighting, beam-relay-source-distance
 ;;;   update    : update-receiver-status!
 
@@ -67,6 +71,11 @@
       (relay-beam-reaches-receiver ?receiver)))
 
 
+(define-query recording-shadow-beam-reaches-receiver (?receiver receiver)
+  (or (recording-shadow-direct-beam-reaches-receiver ?receiver)
+      (recording-shadow-relay-beam-reaches-receiver ?receiver)))
+
+
 (define-query beam-live-for-cutting
     (?from beam-node
      ?to beam-node
@@ -87,6 +96,14 @@
 
 
 (define-query relay-beam-reaches-receiver (?receiver receiver)
+  (do ?receiver nil))
+
+
+(define-query recording-shadow-direct-beam-reaches-receiver (?receiver receiver)
+  (do ?receiver nil))
+
+
+(define-query recording-shadow-relay-beam-reaches-receiver (?receiver receiver)
   (do ?receiver nil))
 
 
@@ -120,6 +137,11 @@
 
 (define-query fixed-beam-corridor-clear (?from beam-node ?to beam-node)
   (do ?from ?to nil))
+
+
+(define-query fixed-beam-corridor-clear-for-object
+    (?view ?from beam-node ?to beam-node)
+  (do ?view ?from ?to nil))
 
 
 (define-query compute-relay-lighting (?active)

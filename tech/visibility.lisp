@@ -13,7 +13,7 @@
 ;;; *beam-occlusion-tolerance*); VISIBLE itself always treats a location occluder as clear --
 ;;; it stays the agent-independent, endpoint-elevation-blind structural check jam-target and
 ;;; potentially-visible both rely on.  BEAM-VISIBLE is the elevation-aware sibling beam-relay's
-;;; own hops use instead: given both endpoints' live elevations, it additionally blocks on a
+;;; own hops use instead; BEAM-VISIBLE-FOR-OBJECT is its actor/view-aware form.  Given both endpoints' live elevations, it additionally blocks on a
 ;;; location occluder whose beam-blocker spans the beam's own interpolated elevation there
 ;;; (-beam-occlusion's beam-blocker-occludes-location, -beam-interpolation's live
 ;;; beam-elevation-at-location).  Never consulted for a jammer target, matching how a
@@ -98,15 +98,34 @@
   ;; simply never the right one for jam-target to call.  A gate occluder is covered by the
   ;; visible call; a location occluder additionally blocks iff some beam-blocker there spans
   ;; the beam's own interpolated elevation at that point.
-  (and (visible ?location ?object)
+  (beam-visible-for-object
+    nil ?location ?near-elevation ?object ?far-elevation))
+
+
+(define-query beam-visible-for-object
+    (?view
+     ?location location
+     ?near-elevation
+     ?object (either apparatus location)
+     ?far-elevation)
+  ;; A beam's recording view uses recording-side gate transparency and excludes mapped
+  ;; live blockers.  The ordinary NIL view retains the shared playback environment.
+  (and
        (or (bind (los-to-apparatus ?location $occluders ?object))
            (bind (los-to-location ?location $occluders ?object)))
        (ww-loop for $o in $occluders
-                always (or (gate $o)
-                           (not (beam-blocker-occludes-location
-                                  $o
-                                  (beam-elevation-at-location
-                                    $o ?location ?near-elevation ?object ?far-elevation)))))))
+                always
+                  (if (gate $o)
+                    (gate-open-for-object ?view $o)
+                    (not (if (recording-shadow-object ?view)
+                           (beam-blocker-occludes-location-for-object
+                             ?view $o
+                             (beam-elevation-at-location
+                               $o ?location ?near-elevation ?object ?far-elevation))
+                           (beam-blocker-occludes-location
+                             $o
+                             (beam-elevation-at-location
+                               $o ?location ?near-elevation ?object ?far-elevation))))))))
 
 
 (define-query beam-elevation-at-location

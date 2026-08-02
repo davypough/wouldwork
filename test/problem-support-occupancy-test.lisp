@@ -36,7 +36,7 @@
 
 (define-types
   agent (lifecycle-agent)
-  plate (lifecycle-plate clear-plate occupied-plate)
+  pressure-plate (lifecycle-plate clear-plate occupied-plate)
   box (lifecycle-box clear-box occupied-box)
   jammer (plate-jammer)
   connector (box-connector)

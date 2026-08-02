@@ -44,7 +44,7 @@
 (define-types
   agent (agent1)
   location (idle control-site lifecycle-site jammer-site)
-  plate (on-plate-a on-plate-b off-plate lifecycle-plate)
+  pressure-plate (on-plate-a on-plate-b off-plate lifecycle-plate)
   box (weight-a weight-b lifecycle-weight)
   receiver (inactive-receiver)
   gate (normal-on-gate normal-off-gate
@@ -55,8 +55,7 @@
         empty-clause-normal-gate empty-clause-inverted-gate
         uncontrolled-gate jammed-inverted-gate
         lifecycle-normal-gate lifecycle-inverted-gate)
-  jammer (test-jammer)
-  mode (normal inverted))
+  jammer (test-jammer))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;

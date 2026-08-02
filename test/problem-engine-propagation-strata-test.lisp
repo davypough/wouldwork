@@ -11,12 +11,11 @@
 ;;; single-technology, so their graphs have almost nothing to condense.  Here
 ;;; UPDATE-PLATE-STATUS! reads only (on ...), which no derivation writes, so once the
 ;;; reaction is set aside it becomes a genuine leading stratum and
-;;; REPORT-DERIVATION-STRATA has four strata to report:
+;;; REPORT-DERIVATION-STRATA has three strata to report:
 ;;;
 ;;;   {update-plate-status!}
 ;;;     then {update-gate-status! update-relay-status! update-receiver-status!}
 ;;;       then {update-gears-status!}
-;;;         then {enforce-threat-safety!}
 ;;;
 ;;; The characterization query checks that structure automatically, including the exact
 ;;; candidate set, derived order, strata, and installed driver body.  REPORT-DERIVED-DRIVER
@@ -46,8 +45,8 @@
 ;;;       (update-relay-status!)
 ;;;       (update-receiver-status!)
 ;;;       (update-gears-status!)
-;;;       (enforce-threat-safety!)
 ;;;       (update-wall-blower-status!)
+;;;       (enforce-threat-safety!)
 ;;;       *propagated-state-changed*))
 ;;;
 ;;;   - move UPDATE-GEARS-STATUS! below UPDATE-WALL-BLOWER-STATUS!.  The blower is a
@@ -110,7 +109,7 @@
 (define-types
   agent (agent1)
   location (west mid east)
-  plate (plate1)
+  pressure-plate (plate1)
   box (box1)
   connector (connector1)
   transmitter (transmitter1)
@@ -119,7 +118,6 @@
   wall-gears (wgears1)
   fan (fan1)
   hue (blue)
-  mode (normal inverted)
 )
 
 
@@ -203,15 +201,14 @@
              update-relay-status!
              update-receiver-status!
              update-gears-status!
-             enforce-threat-safety!
-             update-wall-blower-status!))
+             update-wall-blower-status!
+             enforce-threat-safety!))
          (expected-strata
            '((update-plate-status!)
              (update-gate-status!
               update-relay-status!
               update-receiver-status!)
-             (update-gears-status!)
-             (enforce-threat-safety!)))
+             (update-gears-status!)))
          (candidates
            (remove-if #'update-quantifies-only-over-empty-types-p
                       (driver-candidate-updates)))

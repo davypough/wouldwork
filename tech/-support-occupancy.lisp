@@ -16,7 +16,11 @@
 ;;;   relation : (on support-occupant $support)  --  also declared identically by box,
 ;;;              jammer, walkability, and ladder; multiple techs both read
 ;;;              and write it
+;;;   nested   : -interaction-policy (neutral support-use-allowed hook)
 ;;;   query    : cleartop
+
+(include-tech -plate-types)
+(include-tech -interaction-policy)
 
 (in-package :ww)
 

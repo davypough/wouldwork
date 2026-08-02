@@ -118,6 +118,7 @@
   (do (doall (?box box)
         (if (and (has-location ?box $a-location)
                  (cleartop ?box)
+                 (support-use-allowed ?agent ?box)
                  (not (on ?agent ?box))
                  (jump-elevation-reachable
                    ?agent (support-top-elevation ?box)))
@@ -138,6 +139,7 @@
                      (bind (jump-via> $a-location $features $to-location)))
                  (jump-path-clear ?agent $features)
                  (cleartop ?landing-box)
+                 (support-use-allowed ?agent ?landing-box)
                  (jump-elevation-reachable
                    ?agent (support-top-elevation ?landing-box))
                  (safe $to-location))

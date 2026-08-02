@@ -1,12 +1,11 @@
 ;;; Filename: -stream-passability.lisp
 
 ;;; Stream passability substrate: the walking-side model of a wall fan's air stream.
-;;; Overrides -passability.lisp's STREAM-OBSTACLE-CLEAR hook: gears pass unless a
-;;; blowing fan is mounted on them, so a derived WALK-VIA/WALK-VIA> clause may name
-;;; wall-gears as a conditional door -- the stream bars a walking crossing exactly
-;;; while a blowing fan is mounted; vacant or stopped gears are clear, and a fan
-;;; carried away or remounted elsewhere takes its stream with it automatically,
-;;; since the check is keyed by the fixed gears rather than the portable fan.
+;;; Overrides -passability.lisp's actor-aware STREAM-OBSTACLE-CLEAR hook: gears pass
+;;; unless a fan is mounted and those gears turn in the walking agent's environmental
+;;; view.  Ordinary actors read playback TURNING; recorder ghosts read the recording
+;;; shadow.  Vacant or stopped gears are clear, and a fan carried away or remounted
+;;; elsewhere takes its stream with it automatically.
 ;;;
 ;;; Also supplies the stream geometry to -walkability-coordinates' derivation by
 ;;; redefining WALKABILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
@@ -30,17 +29,20 @@
 ;;; REQUIRES:
 ;;;   nested    : -passability (stream-obstacle-clear's null default, all-clear);
 ;;;               gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
-;;;               -walkability-coordinates (the derivation and the stream-specs default)
+;;;               -walkability-coordinates (the derivation and the stream-specs default);
+;;;               -walk-recording-policy (neutral deferred-walk hooks)
 ;;; PROVIDES:
 ;;;   relations : (stream-width wall-gears $rational)  --  optional per-gears override
 ;;;               of the 3-unit default stream width
 ;;;   queries   : stream-obstacle-clear  --  overrides -passability's null default;
+;;;               deferred-walk-obstacle, recording-walk-obstacle-present -- overrides;
 ;;;               walkability-coordinates-stream-specs  --  redefinition gathering
 ;;;               one spec per wall-gears
 
 (include-tech -passability)
 (include-tech gears-fan)
 (include-tech -walkability-coordinates)
+(include-tech -walk-recording-policy)
 
 (in-package :ww)
 
@@ -49,12 +51,25 @@
   (stream-width wall-gears $rational))  ;optional; a wall fan's air stream is 3 units wide unless overridden
 
 
-(define-query stream-obstacle-clear (?obstacle gears)
-  ;; Gears pass unless a blowing fan is mounted on them -- their air stream is the
-  ;; barrier, so vacant or stopped gears bar nothing.
+(define-query stream-obstacle-clear (?agent agent ?obstacle gears)
+  ;; A mounted fan bars this actor exactly when the gears turn in that actor's view.
   (not (exists (?f fan)
-         (and (blowing ?f)
-              (bind (mounted-on ?f $mount-gears))
+         (and (bind (mounted-on ?f $mount-gears))
+              (eql $mount-gears ?obstacle)
+              (gears-turning-for-object ?agent ?obstacle)))))
+
+
+(define-query deferred-walk-obstacle (?obstacle)
+  ;; A wall stream's state during real playback depends on the completed recording.
+  (wall-gears ?obstacle))
+
+
+(define-query recording-walk-obstacle-present (?obstacle)
+  ;; Mounting is shared state in the Windtunnel recorder scope; its welded wall fans
+  ;; remain attached throughout recording and playback.
+  (and (wall-gears ?obstacle)
+       (exists (?fan fan)
+         (and (bind (mounted-on ?fan $mount-gears))
               (eql $mount-gears ?obstacle)))))
 
 

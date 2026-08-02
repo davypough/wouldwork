@@ -13,11 +13,13 @@
 ;;;               even in a receiver-free problem (e.g. blower-only or gun-only, reached
 ;;;               through gears-fan); harmless and expected, since update-receiver-status!
 ;;;               quantifies over an empty receiver type there and report-inert-techs names it
-;;;   conditional relations:
-;;;               depressed (plate), guarded by plate  --  owned by plate.lisp; translation
-;;;               removes the guarded reference when the plate type is empty
+;;;   conditional relations, owned by plate.lisp:
+;;;               depressed (pressure-plate), guarded by pressure-plate
+;;;               latched (toggle-plate), guarded by toggle-plate
+;;;               Translation removes either guarded reference when its leaf type is empty.
 ;;; PROVIDES:
-;;;   types     : gate, floor-gears, wall-gears, angled-gears, plate, receiver, mode, gun --
+;;;   types     : mode (normal inverted), owned here; plate comes from -plate-types;
+;;;               gate, floor-gears, wall-gears, angled-gears, receiver, and gun are
 ;;;               declared optional here.  The gears leaf types appear directly (not via
 ;;;               the gears union) because this file splices before gears-fan installs
 ;;;               the union; gun likewise appears directly since gun.lisp nests this file
@@ -26,22 +28,39 @@
 ;;;               $mode)  --  $list = DNF OR-list of AND-lists of controllers
 ;;;               (receiver/plate); mode: normal | inverted
 ;;;   query     : energized
+;;;
+;;; DEFINE-INIT VALIDATION:
+;;;   - the DNF value and every clause must be lists
+;;;   - every clause member must be a receiver or plate
+;;;   - a controlled device may have only one CONTROLS fact
+;;;   - only NORMAL and INVERTED modes are supported
+;;;   - () and (()) are both valid and intentionally distinct
 
+(include-tech -plate-types)
 (include-tech -beam-substrate)
 
 (in-package :ww)
 
 
-(define-optional-types gate floor-gears wall-gears angled-gears plate receiver mode gun)
+(define-optional-types gate floor-gears wall-gears angled-gears receiver gun)
+
+
+(define-types
+  mode (normal inverted))
 
 
 (define-static-relations
-  (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode))  ;$list = DNF OR-list of AND-lists of controllers (receiver/plate); mode: normal | inverted
+  ;; $list is a DNF OR-list of AND-lists.  The init validator checks its nested
+  ;; controller types because a fluent list value cannot express them in this signature.
+  (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode))
 
 
 (define-query energized (?controller (either receiver plate))
-  ;; A controller drives its output when on: a receiver when active, a plate when depressed.
+  ;; A receiver follows its beam state.  A pressure plate follows current physical pressure;
+  ;; a toggle plate follows its remembered latch instead.
   (or (and (receiver ?controller)
            (active ?controller))
-      (and (plate ?controller)
-           (depressed ?controller))))
+      (and (pressure-plate ?controller)
+           (depressed ?controller))
+      (and (toggle-plate ?controller)
+           (latched ?controller))))

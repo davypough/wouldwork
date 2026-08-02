@@ -9,9 +9,8 @@
 ;;; jamming and its support.
 ;;;
 ;;; REQUIRES (supplied by other techs):
-;;;   types     : agent, location  --  plate, jammer, and box are declared optional here
-;;;               (define-optional-types), so a problem lacking any of them need not
-;;;               declare it
+;;;   types     : agent, location; plate comes from nested -plate-types, while jammer
+;;;               and box are declared optional here
 ;;;   nested    : -placement (placement-options, place-held-object!; also brings in
 ;;;               support occupancy, location, position, height, elevation, and holding);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
@@ -22,10 +21,7 @@
 ;;;   driver    : propagate-changes! (master); (jamming ...) is consumed by gate's
 ;;;               update-gate-status!
 ;;; PROVIDES:
-;;;   types     : plate, jammer, box  --  declared optional here; other techs (plate, gate,
-;;;               box, barrier, beam-relay, walkability, ladder, etc.) still declare their
-;;;               own plate-alias/box-alias forms for their own pre-params; the bare and
-;;;               aliased forms resolve compatibly
+;;;   types     : jammer, box -- declared optional here
 ;;;               target (either gate floor-gears wall-gears gun)  --  what a jammer can
 ;;;               jam; connector pairings use beam-relay's terminus instead
 ;;;   relations : (jamming jammer $target)
@@ -44,7 +40,7 @@
   target (either gate floor-gears wall-gears gun))  ;what a jammer can jam: a gate (forced open), gears (forced stopped), or a gun (forced safe); connector pairings use terminus
 
 
-(define-optional-types plate jammer box floor-gears wall-gears gun)
+(define-optional-types jammer box floor-gears wall-gears gun)
 
 
 (define-dynamic-relations

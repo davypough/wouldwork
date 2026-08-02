@@ -39,11 +39,10 @@
 (define-types
   agent (agent1)
   location (idle base1 loft1 base2 loft2 base3 loft3 base4 loft4)
-  plate (plate1)
+  pressure-plate (plate1)
   box (box1 box2 box3 box4)
   floor-gears (gears1 gears2 gears3 gears4)
   fan (fan1 fan2 fan3 fan4)
-  mode (normal)
 )
 
 

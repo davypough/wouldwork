@@ -17,8 +17,10 @@
 ;;;            -beam-interpolation (horizontal default, overridden by visibility for
 ;;;            sloped beams); -gate (open)
 ;;; PROVIDES:
-;;;   queries : direct-beam-reaches-receiver, fixed-beam-elevation-at, beam-clear,
-;;;             fixed-beam-corridor-clear, direct-beam-live-for-cutting
+;;;   queries : direct-beam-reaches-receiver, recording-shadow-direct-beam-reaches-receiver,
+;;;             fixed-beam-elevation-at, beam-clear, beam-clear-for-object,
+;;;             fixed-beam-corridor-clear, fixed-beam-corridor-clear-for-object,
+;;;             direct-beam-live-for-cutting
 
 (include-tech -beam-substrate)
 (include-tech -beam-occlusion)
@@ -29,7 +31,7 @@
 (in-package :ww)
 
 
-(define-optional-types transmitter receiver box jammer connector plate)
+(define-optional-types transmitter receiver box jammer connector)
 
 
 (define-query direct-beam-reaches-receiver (?receiver receiver)
@@ -42,6 +44,22 @@
                  (fixed-beam-corridor-clear ?t ?receiver)
                  (not (beam-cut ?t ?receiver)))
           (assign $reaches t)))
+      $reaches))
+
+
+(define-query recording-shadow-direct-beam-reaches-receiver (?receiver receiver)
+  (do (assign $reaches nil)
+      (doall (?view mobile-object)
+        (if (recording-shadow-object ?view)
+          (doall (?transmitter transmitter)
+            (if (and (coupled ?transmitter ?receiver)
+                     (bind (has-chroma ?transmitter $source-hue))
+                     (bind (has-chroma ?receiver $required-hue))
+                     (eql $source-hue $required-hue)
+                     (fixed-beam-corridor-clear-for-object
+                       ?view ?transmitter ?receiver)
+                     (not (beam-cut ?transmitter ?receiver)))
+              (assign $reaches t)))))
       $reaches))
 
 
@@ -59,19 +77,35 @@
      ?to fixed-beam-target)
   ;; Closed gates block outright.  A location blocks only when one of its beam-blocking
   ;; occupants spans the fixed beam's interpolated elevation there.
+  (beam-clear-for-object nil ?from ?obstacle ?to))
+
+
+(define-query beam-clear-for-object
+    (?view
+     ?from fixed-beam-source
+     ?obstacle (either gate location)
+     ?to fixed-beam-target)
   (if (gate ?obstacle)
-    (open ?obstacle)
-    (not (beam-blocker-occludes-location
-           ?obstacle (fixed-beam-elevation-at ?from ?obstacle ?to)))))
+    (gate-open-for-object ?view ?obstacle)
+    (not (if (recording-shadow-object ?view)
+           (beam-blocker-occludes-location-for-object
+             ?view ?obstacle (fixed-beam-elevation-at ?from ?obstacle ?to))
+           (beam-blocker-occludes-location
+             ?obstacle (fixed-beam-elevation-at ?from ?obstacle ?to))))))
 
 
 (define-query fixed-beam-corridor-clear (?from beam-node ?to beam-node)
+  (fixed-beam-corridor-clear-for-object nil ?from ?to))
+
+
+(define-query fixed-beam-corridor-clear-for-object
+    (?view ?from beam-node ?to beam-node)
   (and (or (transmitter ?from) (repeater ?from))
        (or (repeater ?to) (receiver ?to))
        (coupled ?from ?to)
        (bind (beam-via ?from $obstacles ?to))
        (ww-loop for $o in $obstacles
-                always (beam-clear ?from $o ?to))))
+                always (beam-clear-for-object ?view ?from $o ?to))))
 
 
 (define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)

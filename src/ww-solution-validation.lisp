@@ -7,6 +7,171 @@
 (in-package :ww)
 
 
+;;; ==================== Reusable Validation Results ====================
+
+
+(defstruct action-sequence-validation
+  "Result of replaying an action sequence from an explicit initial state."
+  success-p
+  final-state
+  action-count
+  failure-index
+  failure-action
+  failure-reason
+  goal-checked-p
+  goal-satisfied-p)
+
+
+(defun normalize-validation-actions (action-list)
+  "Return plain action forms from ACTION-LIST.
+
+ACTION-LIST may contain plain forms or timestamped solution moves.  State snapshots
+interleaved with timestamped moves are ignored."
+  (let ((first-entry (first action-list)))
+    (if (and (consp first-entry)
+             (numberp (first first-entry))
+             (consp (second first-entry)))
+      (mapcar #'second
+              (remove-if-not (lambda (entry)
+                               (and (consp entry)
+                                    (numberp (first entry))
+                                    (consp (second entry))))
+                             action-list))
+      action-list)))
+
+
+(defun validate-action-sequence (initial-state action-list &key goal-test verbose)
+  "Replay ACTION-LIST from INITIAL-STATE and return an ACTION-SEQUENCE-VALIDATION.
+
+The supplied state is never modified.  GOAL-TEST, when supplied, is called on the final
+state and recorded separately from action executability.  VERBOSE prints per-action state
+transitions for the interactive VALIDATE-SOLUTION interface."
+  (declare (type problem-state initial-state))
+  (let* ((actions (normalize-validation-actions action-list))
+         (action-count (length actions))
+         (current-state (copy-problem-state initial-state)))
+    (loop for tail on actions
+          for action-form = (first tail)
+          for next-action-form = (second tail)
+          for index from 1
+          do (when verbose
+               (format t "~%--- Action ~D: ~S ---~%" index action-form))
+             (multiple-value-bind (new-state success-p failure-reason)
+                 (apply-action-to-state
+                   action-form current-state next-action-form verbose)
+               (unless success-p
+                 (return-from validate-action-sequence
+                   (make-action-sequence-validation
+                     :success-p nil
+                     :final-state current-state
+                     :action-count action-count
+                     :failure-index index
+                     :failure-action action-form
+                     :failure-reason failure-reason
+                     :goal-checked-p (not (null goal-test))
+                     :goal-satisfied-p nil)))
+               (when verbose
+                 (format t "Action ~D succeeded.~%" index)
+                 (format t "Resulting state:~%")
+                 (display-validation-state new-state))
+               (setf current-state new-state)))
+    (make-action-sequence-validation
+      :success-p t
+      :final-state current-state
+      :action-count action-count
+      :goal-checked-p (not (null goal-test))
+      :goal-satisfied-p (and goal-test (funcall goal-test current-state)))))
+
+
+(defun reset-candidate-solution-validation-statistics ()
+  "Reset the candidate-validation counters for a new search."
+  (bt:with-lock-held (*solution-validation-lock*)
+    (setf *nominal-solution-candidates* 0
+          *accepted-solution-candidates* 0
+          *rejected-solution-candidates* 0)
+    (clrhash *solution-validator-rejections*)))
+
+
+(defun solution-validator-diagnostic-category (validator diagnostic)
+  "Return a stable report key for VALIDATOR's DIAGNOSTIC."
+  (cond
+    ((and (listp diagnostic)
+          (keywordp (first diagnostic)))
+     (list validator
+           (or (getf diagnostic :phase) :unspecified)
+           (or (getf diagnostic :reason) :unspecified)))
+    ((symbolp diagnostic)
+     (list validator :unspecified (or diagnostic :unspecified)))
+    (t
+     (list validator :unspecified :uncategorized))))
+
+
+(defun record-candidate-solution-validation (valid-p validator diagnostic)
+  "Record one complete candidate-validation result."
+  (bt:with-lock-held (*solution-validation-lock*)
+    (incf *nominal-solution-candidates*)
+    (if valid-p
+      (incf *accepted-solution-candidates*)
+      (progn
+        (incf *rejected-solution-candidates*)
+        (incf
+          (gethash
+            (solution-validator-diagnostic-category validator diagnostic)
+            *solution-validator-rejections*
+            0)
+          1)))))
+
+
+(defun candidate-solution-valid-p (path goal-state)
+  "Run every problem-local solution validator on PATH and GOAL-STATE.
+
+Returns three values: validity, the rejecting validator symbol, and its diagnostic value.
+With no registered validators every candidate is valid.  Every completed check contributes
+to the search's candidate-validation diagnostics."
+  (unless *solution-validators*
+    (return-from candidate-solution-valid-p (values t nil nil)))
+  (dolist (validator *solution-validators*)
+    (multiple-value-bind (valid-p diagnostic)
+        (funcall (symbol-function validator) *start-state* path goal-state)
+      (unless valid-p
+        (record-candidate-solution-validation nil validator diagnostic)
+        (return-from candidate-solution-valid-p
+          (values nil validator diagnostic)))))
+  (record-candidate-solution-validation t nil nil)
+  (values t nil nil))
+
+
+(defun solution-validator-rejection-rows ()
+  "Return rejection counts in stable report order."
+  (let (rows)
+    (bt:with-lock-held (*solution-validation-lock*)
+      (maphash
+        (lambda (category count)
+          (push (cons category count) rows))
+        *solution-validator-rejections*))
+    (sort rows #'string<
+          :key (lambda (row)
+                 (prin1-to-string (car row))))))
+
+
+(defun print-candidate-solution-validation-statistics
+    (&optional (stream *standard-output*))
+  "Print grouped candidate-validation diagnostics for the completed search."
+  (when *solution-validators*
+    (format stream "~2%Candidate solution validation:")
+    (format stream "~%  Nominal goal paths checked = ~:D"
+            *nominal-solution-candidates*)
+    (format stream "~%  Accepted = ~:D" *accepted-solution-candidates*)
+    (format stream "~%  Rejected = ~:D" *rejected-solution-candidates*)
+    (if (zerop *nominal-solution-candidates*)
+      (format stream "~%  No path reached the problem goal.")
+      (dolist (row (solution-validator-rejection-rows))
+        (destructuring-bind ((validator phase reason) . count) row
+          (format stream "~%  ~A / ~A / ~A = ~:D"
+                  validator phase reason count))))
+    (terpri stream)))
+
+
 ;;; ==================== Main Interface ====================
 
 
@@ -47,56 +212,27 @@
      - Plain actions: ((ACTION arg1 arg2) (ACTION2 arg1) ...)
      - Timestamped actions: ((1.0 (ACTION arg1 arg2)) (2.0 (ACTION2 arg1)) ...)
    If VERBOSE is true, shows diagnostic output for each action."
-  (when (null action-list)
-    (format t "~%No actions provided to validate.~%")
-    (return-from %validate-solution nil))
-  
-  ;; Normalize timestamped action lists to plain action lists,
-  ;; filtering out interleaved state snapshots if present.
-  (let ((first-entry (first action-list)))
-    (when (and (consp first-entry)
-               (numberp (first first-entry))
-               (consp (second first-entry)))
-      (setf action-list
-            (mapcar #'second
-                    (remove-if-not (lambda (entry)
-                                    (and (consp entry)
-                                         (numberp (first entry))
-                                         (consp (second entry))))
-                                  action-list)))))
-  
-  ;; Initialize working state from *start-state*
-  (let ((current-state (copy-problem-state *start-state*))
-        (action-count (length action-list)))
-    
+  (let* ((actions (normalize-validation-actions action-list))
+         (action-count (length actions)))
     (format t "~%Validating ~D action~:P...~2%" action-count)
     (when verbose
       (format t "Start state:~%")
-      (display-validation-state current-state))
-    
-    ;; Process each action in sequence
-    (loop for action-form in action-list
-          for next-action-form in (append (rest action-list) '(nil))  ; nil marks last action
-          for index from 1
-          do (when verbose
-               (format t "~%--- Action ~D: ~S ---~%" index action-form))
-             (multiple-value-bind (new-state success-p failure-reason)
-                 (apply-action-to-state action-form current-state next-action-form verbose)
-               (if success-p
-                   ;; Action succeeded - update current state
-                   (progn
-                     (when verbose
-                       (format t "Action ~D succeeded.~%" index)
-                       (format t "Resulting state:~%")
-                       (display-validation-state new-state))
-                     (setf current-state new-state))
-                   ;; Action failed - report and return
-                   (progn
-                     (report-validation-failure index action-form failure-reason current-state)
-                     (return-from %validate-solution nil)))))
-    
-    ;; All actions succeeded - check goal
-    (check-validation-result current-state action-count)))
+      (display-validation-state *start-state*))
+    (let ((result
+            (validate-action-sequence
+              *start-state* actions
+              :goal-test (and (fboundp 'goal-fn) (symbol-function 'goal-fn))
+              :verbose verbose)))
+      (if (action-sequence-validation-success-p result)
+        (check-validation-result
+          (action-sequence-validation-final-state result) action-count)
+        (progn
+          (report-validation-failure
+            (action-sequence-validation-failure-index result)
+            (action-sequence-validation-failure-action result)
+            (action-sequence-validation-failure-reason result)
+            (action-sequence-validation-final-state result))
+          nil)))))
 
 
 (defun apply-action-to-state (action-form state next-action-form &optional verbose)
@@ -147,7 +283,12 @@
       
       ;; Find any passing precondition, execute effect, collect instantiations
       (dolist (pre-args precondition-args)
-        (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
+        ;; Preconditions and effects may bind or otherwise mutate their state argument.
+        ;; Probe each candidate on a private copy, then apply the selected update to a
+        ;; fresh copy of the caller's state.
+        (let* ((trial-state (copy-problem-state state))
+               (pre-result
+                 (apply (action.pre-defun-name action) trial-state pre-args)))
           (when pre-result
             ;; Save first passing for diagnostics
             (unless first-passing-pre-result
@@ -156,8 +297,9 @@
             
             ;; Execute effect to get updated-dbs
             (let ((updated-dbs (if (eql pre-result t)
-                                   (funcall (action.eff-defun-name action) state)
-                                   (apply (action.eff-defun-name action) state pre-result))))
+                                 (funcall (action.eff-defun-name action) trial-state)
+                                 (apply (action.eff-defun-name action)
+                                        trial-state pre-result))))
               
               ;; Check each update's instantiations for match
               (dolist (update updated-dbs)

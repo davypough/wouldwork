@@ -13,6 +13,8 @@
 ;;;              -- $list is a DNF clause list: () direct, else OR over clauses, AND within
 ;;;   queries  : walkable-locations  --  identity default, overridden by walkability
 ;;;              walkable            --  Boolean membership in that closure
+;;;   functions: canonical minimal-family union/product helpers shared by coordinate
+;;;              derivation and optional runtime route analysis
 
 (in-package :ww)
 
@@ -28,3 +30,63 @@
 
 (define-query walkable (?agent agent ?from location ?to location)
   (member ?to (walkable-locations ?agent ?from)))
+
+
+;;;; MINIMAL WALK-OBSTACLE FAMILIES ;;;;
+;;;; Shared by coordinate topology derivation and optional runtime routes.  A
+;;;; family is an antichain of obstacle sets: OR over clauses, AND within each clause.
+
+
+(defun walkability-family-union (family1 family2)
+  ;; Alternative routes: all clauses of both, minimized and canonicalized.
+  (walkability-minimize-family (append family1 family2)))
+
+
+(defun walkability-family-product (family1 family2)
+  ;; Consecutive route sections: conjoin every left clause with every right clause.
+  (walkability-minimize-family
+    (loop for clause1 in family1
+          append (loop for clause2 in family2
+                       collect (append clause1 clause2)))))
+
+
+(defun walkability-family-add-obstacle (family obstacle)
+  ;; Path extension by one obstacle, retained for the coordinate zone graph.
+  (walkability-minimize-family
+    (mapcar (lambda (clause) (cons obstacle clause)) family)))
+
+
+(defun walkability-minimize-family (family)
+  ;; Canonical clauses, duplicates removed, and every nonminimal superset discarded.
+  (let* ((clauses (remove-duplicates
+                    (mapcar #'walkability-canonical-clause family)
+                    :test #'equal))
+         (minimal (remove-if (lambda (clause)
+                               (some (lambda (other)
+                                       (and (not (equal other clause))
+                                            (subsetp other clause)))
+                                     clauses))
+                             clauses)))
+    (sort (copy-list minimal) #'walkability-clause-precedes-p)))
+
+
+(defun walkability-canonical-clause (clause)
+  (sort (copy-list (remove-duplicates clause)) #'string< :key #'symbol-name))
+
+
+(defun walkability-clause-precedes-p (clause1 clause2)
+  (cond ((/= (length clause1) (length clause2))
+         (< (length clause1) (length clause2)))
+        (t (loop for obstacle1 in clause1
+                 for obstacle2 in clause2
+                 unless (eq obstacle1 obstacle2)
+                   return (string< (symbol-name obstacle1)
+                                   (symbol-name obstacle2))
+                 finally (return nil)))))
+
+
+(defun walkability-normalize-family (family)
+  ;; WALK-VIA represents the family containing one empty clause as NIL.
+  (if (equal family '(nil))
+    nil
+    family))

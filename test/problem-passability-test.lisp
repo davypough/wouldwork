@@ -72,11 +72,11 @@
 (define-query passability-scenarios-valid ()
   (and
     ;; The default hook is neutral and independent of an agent's cargo state.
-    (stream-obstacle-clear neutral-gears)
+    (stream-obstacle-clear empty-agent neutral-gears)
     (obstacle-clear empty-agent neutral-gears)
     (obstacle-clear carrying-agent neutral-gears)
 
-    ;; ALL-CLEAR routes every bare gears item through the same neutral hook.
+    ;; ALL-CLEAR routes every bare gears item through the same actor-aware neutral hook.
     (all-clear empty-agent '(neutral-gears))
     (all-clear carrying-agent '(neutral-gears))
     (all-clear

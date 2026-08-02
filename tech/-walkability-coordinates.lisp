@@ -9,7 +9,8 @@
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
 ;;; segment and boundary edge is axis-aligned (a diagonal one is an authoring mistake,
-;;; caught here).  The segments' own coordinates induce a coordinate-compressed
+;;; caught during initialization validation; the derivation also checks its own
+;;; invariant).  The segments' own coordinates induce a coordinate-compressed
 ;;; arrangement: a grid of cells whose edge-intervals are each classified from the
 ;;; segments covering them -- solid (wall/window/boundary), a single named door
 ;;; (gate/screen/stream curtain), or open.  Two doors covering one interval, or a
@@ -101,7 +102,7 @@
   (gate-segments $list)
   (window-segments $list)
   (screen-segments $list)
-  (boundary-wall $list))  ;closed polygon ((x1 y1) (x2 y2) ... (xn yn)); last point wraps to first
+  (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
 
 
 ;;;; DERIVATION CORE ;;;;
@@ -160,17 +161,17 @@
         (let ((fam (gethash (list za zb) families)))
           (when fam
             (setf connected t)
-            (setf base (walkability-coordinates-family-union base fam))))))
+            (setf base (walkability-family-union base fam))))))
     (when connected
       (let ((into-b (walkability-coordinates-ride-augmented-family
                       base (second entry-a) (third entry-b) families))
             (into-a (walkability-coordinates-ride-augmented-family
                       base (second entry-b) (third entry-a) families)))
         (if (equal into-a into-b)
-          (list :sym (walkability-coordinates-normalize-family into-a))
+          (list :sym (walkability-normalize-family into-a))
           (list :dir
-                (walkability-coordinates-normalize-family into-b)
-                (walkability-coordinates-normalize-family into-a)))))))
+                (walkability-normalize-family into-b)
+                (walkability-normalize-family into-a)))))))
 
 
 (defun walkability-coordinates-ride-augmented-family (base source-zones ride-zones families)
@@ -184,7 +185,7 @@
       (dolist (ride-zone ride-zones)
         (let ((fam (gethash (list source-zone ride-zone) families)))
           (when fam
-            (setf family (walkability-coordinates-family-union family fam))))))
+            (setf family (walkability-family-union family fam))))))
     family))
 
 
@@ -423,8 +424,8 @@
         (let ((from-family (gethash (first direction) fams)))
           (when from-family
             (let* ((to (second direction))
-                   (candidate (walkability-coordinates-family-add-door from-family door))
-                   (merged (walkability-coordinates-family-union
+                   (candidate (walkability-family-add-obstacle from-family door))
+                   (merged (walkability-family-union
                              (gethash to fams) candidate)))
               (when (> (length merged) 32)
                 (error "The minimal door-set family between two zones exceeds 32 ~
@@ -435,65 +436,15 @@
     changed))
 
 
-(defun walkability-coordinates-family-union (family1 family2)
-  ;; Alternative routes: all clauses of both, minimized and canonicalized.
-  (walkability-coordinates-minimize-family (append family1 family2)))
-
-
-(defun walkability-coordinates-family-add-door (family door)
-  ;; Path extension: DOOR conjoined into every clause, then re-minimized (adding a shared
-  ;; door can make formerly incomparable clauses comparable).
-  (walkability-coordinates-minimize-family
-    (mapcar (lambda (clause) (cons door clause)) family)))
-
-
-(defun walkability-coordinates-minimize-family (family)
-  ;; Antichain reduction to canonical form: canonical clauses, duplicates removed, any
-  ;; clause with a proper subset present removed, clauses sorted by length then
-  ;; lexicographically.
-  (let* ((clauses (remove-duplicates
-                    (mapcar #'walkability-coordinates-canonical-clause family)
-                    :test #'equal))
-         (minimal (remove-if (lambda (clause)
-                               (some (lambda (other)
-                                       (and (not (equal other clause))
-                                            (subsetp other clause)))
-                                     clauses))
-                             clauses)))
-    (sort (copy-list minimal) #'walkability-coordinates-clause-precedes-p)))
-
-
-(defun walkability-coordinates-canonical-clause (clause)
-  ;; Doors within a clause in symbol-name order, duplicates removed.
-  (sort (copy-list (remove-duplicates clause)) #'string< :key #'symbol-name))
-
-
-(defun walkability-coordinates-clause-precedes-p (clause1 clause2)
-  ;; Canonical clause order: shorter first, then element-wise symbol-name order.
-  (cond ((/= (length clause1) (length clause2))
-         (< (length clause1) (length clause2)))
-        (t (loop for door1 in clause1
-                 for door2 in clause2
-                 unless (eq door1 door2)
-                   return (string< (symbol-name door1) (symbol-name door2))
-                 finally (return nil)))))
-
-
-(defun walkability-coordinates-normalize-family (family)
-  ;; The family of one empty clause is the direct/unguarded value ().
-  (if (equal family '(nil))
-    nil
-    family))
-
-
 ;;;; ARRANGEMENT GEOMETRY ;;;;
 
 
 (defun walkability-coordinates-boundary-segments (points)
-  ;; The closed polygon's edges as pseudo-segments (:boundary x1 y1 x2 y2); the last
-  ;; point wraps to the first.  Every edge must be axis-aligned.
+  ;; The explicitly closed polygon's consecutive edges as pseudo-segments
+  ;; (:boundary x1 y1 x2 y2).  BOUNDARY-WALL validation requires axis alignment;
+  ;; repeat the check here as an invariant of this rectangular-cell arrangement.
   (when points
-    (loop for (p1 p2) on (append points (list (first points)))
+    (loop for (p1 p2) on points
           while p2
           unless (or (= (first p1) (first p2)) (= (second p1) (second p2)))
             do (error "Boundary edge ~A -> ~A is not axis-aligned." p1 p2)

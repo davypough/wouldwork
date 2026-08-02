@@ -7,6 +7,11 @@
 ;;; negative receiver cases while the conditional plate branch remains absent.
 ;;; Public gate, gears, and gun behavior must not leak into this shared role.
 ;;;
+;;; Direct validation probes additionally characterize malformed outer and inner
+;;; DNF lists, invalid controller members, duplicate wiring for one target, and an
+;;; unsupported mode.  The staged facts preserve both legal empty boundaries: ()
+;;; has no clauses, while (()) has one vacuously true clause.
+;;;
 ;;; The planner's initial and final dynamic states contain exactly
 ;;; (ACTIVE ACTIVE-RECEIVER).  No planning action is defined, so the expected
 ;;; minimum path length is 0.
@@ -30,8 +35,7 @@
   floor-gears (sample-floor-gears)
   wall-gears (sample-wall-gears)
   angled-gears (sample-angled-gears)
-  gun (sample-gun)
-  mode (normal inverted))
+  gun (sample-gun))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
@@ -85,7 +89,8 @@
       (not (member 'update-gate-status! *update-names*))
       (not (member 'update-gears-status! *update-names*))
       (not (member 'update-gun-status! *update-names*))
-      (null (gethash 'plate *types*))
+      (equal (gethash 'mode *types*) '(normal inverted))
+      (null (remove nil (gethash 'plate *types*)))
       (not (nth-value 1 (gethash 'depressed *relations*)))
       (not (nth-value 1 (gethash 'depressed *static-relations*)))
       (not (nth-value 1 (gethash 'open *relations*)))
@@ -96,6 +101,55 @@
       (null *actions*)
       (equal (database state) '((active active-receiver)))
       (not (state-is-inconsistent state)))))
+
+
+(setf
+  (symbol-function 'controls-substrate-error-contains-p)
+  (lambda (thunk expected-text)
+    (let ((condition
+            (handler-case
+              (progn
+                (funcall thunk)
+                nil)
+              (error (error-condition)
+                error-condition))))
+      (and condition
+           (not
+             (null
+               (search expected-text
+                       (princ-to-string condition))))))))
+
+
+(setf
+  (symbol-function 'controls-substrate-validation-valid-p)
+  (lambda ()
+    (and
+      (funcall (symbol-function 'controls-substrate-error-contains-p)
+        (lambda ()
+          (check-init-controls-list-contents
+            '((controls active-receiver sample-gate normal))))
+        "must use a DNF list")
+      (funcall (symbol-function 'controls-substrate-error-contains-p)
+        (lambda ()
+          (check-init-controls-list-contents
+            '((controls (active-receiver) sample-gate normal))))
+        "must use a DNF list")
+      (funcall (symbol-function 'controls-substrate-error-contains-p)
+        (lambda ()
+          (check-init-controls-list-contents
+            '((controls ((sample-gate)) sample-floor-gears normal))))
+        "Invalid item in DEFINE-INIT list")
+      (funcall (symbol-function 'controls-substrate-error-contains-p)
+        (lambda ()
+          (check-init-duplicate-fluent-keys
+            '((controls ((active-receiver)) sample-gate normal)
+              (controls ((inactive-receiver)) sample-gate inverted))))
+        "Duplicate DEFINE-INIT fluent key")
+      (funcall (symbol-function 'controls-substrate-error-contains-p)
+        (lambda ()
+          (check-init-controls-modes
+            '((controls ((active-receiver)) sample-gate toggle))))
+        "unsupported mode"))))
 
 
 ;;;; CHARACTERIZATION QUERIES AND GOAL ;;;;
@@ -135,7 +189,10 @@
     (not (energized inactive-receiver))
 
     ;; No public consumer or conditional plate behavior may leak into the role.
-    (controls-substrate-metadata-valid-p state)))
+    (controls-substrate-metadata-valid-p state)
+
+    ;; Every malformed declaration boundary is rejected by the shared init validator.
+    (controls-substrate-validation-valid-p)))
 
 
 (define-goal

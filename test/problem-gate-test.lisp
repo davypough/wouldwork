@@ -26,8 +26,7 @@
 
 
 (define-types
-  gate (normal-gate stale-uncontrolled-gate stale-false-normal-gate)
-  mode (normal))
+  gate (normal-gate stale-uncontrolled-gate stale-false-normal-gate))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;

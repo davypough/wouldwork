@@ -5,13 +5,14 @@
 ;;; converged physical state rather than relying on the historical experiment this file
 ;;; originally described.
 ;;;
-;;; The retained driver candidates are three derivations followed by two reactions:
+;;; The retained driver candidates are two state derivations, two physical reactions,
+;;; and the final safety backstop:
 ;;;
 ;;;   update-plate-status!
 ;;;   update-gears-status!
-;;;   enforce-threat-safety!
 ;;;   update-floor-blower-status!
 ;;;   update-wall-blower-status!
+;;;   enforce-threat-safety!
 ;;;
 ;;; UPDATE-RECEIVER-STATUS! is contributed through -controls but is removed because
 ;;; RECEIVER is empty.  The structural check verifies the exact candidate set, derived
@@ -57,12 +58,11 @@
 (define-types
   agent (agent1)
   location (pad0 pad1 far reverse-source reverse-fan reverse-far)
-  plate (plate1)
+  pressure-plate (plate1)
   box (box1 box2)
   floor-gears (fgears1 fgears2)
   wall-gears (wgears1 wgears2)
   fan (ffan1 ffan2 wfan1 wfan2)
-  mode (normal inverted)
 )
 
 
@@ -140,13 +140,13 @@
   (multiple-value-bind (reads writes base-facts adjacency components)
       (propagation-graph expected-order)
     (declare (ignore adjacency components))
-    (let ((floor-reads (aref reads 3))
-          (floor-writes (aref writes 3))
-          (wall-reads (aref reads 4))
-          (wall-writes (aref writes 4)))
+    (let ((floor-reads (aref reads 2))
+          (floor-writes (aref writes 2))
+          (wall-reads (aref reads 3))
+          (wall-writes (aref writes 3)))
       (and (equal (loop for index below (length expected-order)
                         collect (not (null (aref base-facts index))))
-                  '(nil nil nil t t))
+                  '(nil nil t t t))
            (gethash 'has-location floor-reads)
            (gethash 'on floor-reads)
            (gethash 'has-location floor-writes)
@@ -161,13 +161,12 @@
   (let* ((expected-order
            '(update-plate-status!
              update-gears-status!
-             enforce-threat-safety!
              update-floor-blower-status!
-             update-wall-blower-status!))
+             update-wall-blower-status!
+             enforce-threat-safety!))
          (expected-strata
            '((update-plate-status!)
-             (update-gears-status!)
-             (enforce-threat-safety!)))
+             (update-gears-status!)))
          (candidates
            (remove-if #'update-quantifies-only-over-empty-types-p
                       (driver-candidate-updates))))

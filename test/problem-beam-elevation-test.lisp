@@ -80,7 +80,6 @@
   box (box1 box2 box3 box4)
   gate (gate1 gate2)
   hue (blue red)
-  mode (normal)
 )
 
 

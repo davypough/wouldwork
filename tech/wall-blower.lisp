@@ -9,8 +9,9 @@
 ;;; it is invisible to step and placement; the agent mounts and dismounts it with
 ;;; gears-fan's mount-fan and pickup-fan, reaching to the stream elevation.
 ;;;
-;;; While the fan blows, its air stream sweeps the faced location horizontally at the
-;;; stream elevation: an object standing at elevation s with height h is blown iff
+;;; While the fan's gears turn in an object's environmental view, its air stream sweeps
+;;; the faced location horizontally at the stream elevation: an object standing at
+;;; elevation s with height h is blown iff
 ;;; s < stream <= s + h -- the stream must strike its body.  With unit heights, gears at
 ;;; elevation 1 blow anything standing on the floor, while gears at elevation 2 pass
 ;;; over the floor and blow only objects standing at elevation 1 (e.g. on a box top).  A
@@ -46,7 +47,8 @@
 ;;;               (obstacle-clear's gears branch and the derived air-stream walking
 ;;;               bands, with stream-width's 3-unit default)
 ;;;   driver    : the master propagate-consequences! must call
-;;;               update-wall-blower-status! after update-gears-status!
+;;;               update-wall-blower-status! after update-gears-status! and any
+;;;               recording-side gears derivation
 ;;; PROVIDES:
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
 
@@ -58,14 +60,15 @@
 
 
 (define-update update-wall-blower-status! ()
-  ;; Wall-mounting consequences of the blowing state that update-gears-status! derived:
-  ;; every blowing wall-mounted fan sweeps its gears' faced location at stream level.
+  ;; Every mounted wall fan offers its sweep.  SWEEP-OCCUPANTS-AWAY! decides separately
+  ;; for each occupant whether these gears turn in that object's playback or recording
+  ;; view.  This is necessary even when ordinary BLOWING is false: a recorder ghost may
+  ;; still see the recording-side fan as active.
   ;; Sweeping removes every struck occupant from that location, so the fixpoint
   ;; terminates for acyclic destination chains.  Change detection is automatic, so an
   ;; unchanged re-assert is silent.
   (doall (?f fan)
-    (if (and (blowing ?f)
-             (bind (mounted-on ?f $gears))
+    (if (and (bind (mounted-on ?f $gears))
              (wall-gears $gears))
       (sweep-occupants-away! $gears))))
 
@@ -92,7 +95,8 @@
       (doall (?x support-occupant)
         (if (and (not (fan ?x))  ;a fan is zero-thickness: no stream ever strikes it
                  (bind (has-location ?x $x-location))
-                 (eql $x-location $swept))
+                 (eql $x-location $swept)
+                 (gears-turning-for-object ?x ?gears))
           (do (assign $standing (occupant-elevation ?x))
               (assign $height (declared-height ?x))
               (if (and (< $standing $stream)

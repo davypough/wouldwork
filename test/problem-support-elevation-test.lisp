@@ -40,7 +40,7 @@
 (define-types
   agent (stack-agent ground-agent)
   location (stack-site default-site raised-ground-site)
-  plate (base-plate)
+  pressure-plate (base-plate)
   box (base-box upper-box ground-box)
   fan (middle-fan ground-fan))
 

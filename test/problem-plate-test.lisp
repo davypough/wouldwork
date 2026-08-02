@@ -37,8 +37,8 @@
 
 (define-types
   agent (agent-occupant)
-  plate (agent-plate box-plate jammer-plate connector-plate fan-plate
-         stale-clear-plate ordinary-clear-plate)
+  pressure-plate (agent-plate box-plate jammer-plate connector-plate fan-plate
+                  stale-clear-plate ordinary-clear-plate)
   box (box-occupant)
   jammer (jammer-occupant)
   connector (connector-occupant)

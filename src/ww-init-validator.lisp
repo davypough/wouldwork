@@ -11,6 +11,7 @@
   (check-init-general-consistency literals)
   (check-init-segment-consistency literals)
   (check-init-physical-consistency literals)
+  (check-init-recorder-consistency literals)
   (check-init-connector-consistency literals)
   (check-init-control-and-beam-consistency literals)
   (check-init-crossing-consistency literals))
@@ -30,11 +31,61 @@
    record, so no typed segment token silently contributes no geometry.  Also checks
    that every wall-gears' derivable air stream is well-posed in a coordinate-driven
    problem, and that STREAM-WIDTH overrides are sound."
+  (check-init-boundary-walls literals)
   (check-init-segment-records-well-formed literals)
   (check-init-segment-names-unique literals)
   (check-init-segment-names-typed literals)
   (check-init-segment-types-covered literals)
   (check-init-stream-consistency literals))
+
+
+(defun check-init-boundary-walls (literals)
+  "Checks BOUNDARY-WALL point lists independently of any geometry consumer.
+   A boundary has at least four explicitly authored edges and closes by repeating
+   its first point as its final point.  Every edge is horizontal or vertical, matching
+   the shared coordinate-geometry contract used by the segment relations."
+  (dolist (literal (positive-init-literals-with-relation 'boundary-wall literals))
+    (init-check-boundary-wall
+      literal
+      (second (init-literal-proposition literal)))))
+
+
+(defun init-check-boundary-wall (literal points)
+  (unless (and (listp points)
+               (>= (length points) 5))
+    (error "~%BOUNDARY-WALL must contain at least four edges and an explicit closing point.~%~
+            Literal: ~S~%~
+            Points:  ~S"
+           literal points))
+  (dolist (point points)
+    (unless (and (listp point)
+                 (= (length point) 2)
+                 (every #'rationalp point))
+      (error "~%Malformed point in BOUNDARY-WALL.~%~
+              Literal: ~S~%~
+              Point:   ~S~%~
+              Expected shape: (x y), with rational coordinates."
+             literal point)))
+  (unless (equal (first points) (car (last points)))
+    (error "~%BOUNDARY-WALL must repeat its first point as its final point.~%~
+            Literal:     ~S~%~
+            First point: ~S~%~
+            Final point: ~S"
+           literal (first points) (car (last points))))
+  (loop for (point1 point2) on points
+        while point2
+        when (equal point1 point2)
+          do (error "~%BOUNDARY-WALL contains a zero-length edge.~%~
+                     Literal: ~S~%~
+                     Point:   ~S"
+                    literal point1)
+        unless (or (= (first point1) (first point2))
+                   (= (second point1) (second point2)))
+          do (error "~%BOUNDARY-WALL contains an edge that is not axis-aligned.~%~
+                     Literal: ~S~%~
+                     Edge:    ~S -> ~S~%~
+                     Edges must be horizontal or vertical."
+                    literal point1 point2)))
 
 
 (defun check-init-physical-consistency (literals)
@@ -67,6 +118,135 @@
                   Repeater: ~S~%~
                   Coordinate facts: ~D"
                  repeater coordinate-count))))))
+
+
+(defun check-init-recorder-consistency (literals)
+  "Checks recorder mappings and cross-layer initial interactions."
+  (let ((live-objects (make-hash-table :test #'equal))
+        (ghost-objects (make-hash-table :test #'equal)))
+    (dolist (literal
+              (positive-init-literals-with-relation 'recording-copy> literals))
+      (destructuring-bind (live ghost)
+          (rest (init-literal-proposition literal))
+        (when (eql live ghost)
+          (error "~%RECORDING-COPY> maps an object to itself.~%~
+                  Literal: ~S~%~
+                  Object:  ~S"
+                 literal live))
+        (when (gethash live live-objects)
+          (error "~%RECORDING-COPY> repeats a live object.~%~
+                  Literal:    ~S~%~
+                  Live object: ~S"
+                 literal live))
+        (when (gethash ghost ghost-objects)
+          (error "~%RECORDING-COPY> repeats a ghost object.~%~
+                  Literal:     ~S~%~
+                  Ghost object: ~S"
+                 literal ghost))
+        (when (or (gethash live ghost-objects)
+                  (gethash ghost live-objects))
+          (error "~%RECORDING-COPY> uses an object on both live and ghost sides.~%~
+                  Literal:     ~S~%~
+                  Live object:  ~S~%~
+                  Ghost object: ~S"
+                 literal live ghost))
+        (unless (init-recording-copy-compatible-p live ghost)
+          (error "~%RECORDING-COPY> connects incompatible object categories.~%~
+                  Literal:     ~S~%~
+                  Live object:  ~S~%~
+                  Ghost object: ~S"
+                 literal live ghost))
+        (setf (gethash live live-objects) t)
+        (setf (gethash ghost ghost-objects) t)))
+    (when (init-relation-signature 'recording-copy>)
+      (init-check-recording-holdings literals live-objects ghost-objects)
+      (init-check-recording-supports literals live-objects ghost-objects)
+      (init-check-recording-pairings literals live-objects ghost-objects)
+      (init-check-recording-wall-gears-controls literals))))
+
+
+(defun init-recording-copy-compatible-p (live ghost)
+  (some (lambda (category)
+          (and (init-type-member-p live category)
+               (init-type-member-p ghost category)))
+        (gethash 'mobile-object *type-components*)))
+
+
+(defun init-recording-side (object live-objects ghost-objects)
+  (cond ((gethash object live-objects) 'live)
+        ((gethash object ghost-objects) 'ghost)))
+
+
+(defun init-same-recording-side-p (object1 object2 live-objects ghost-objects)
+  (let ((side1 (init-recording-side object1 live-objects ghost-objects))
+        (side2 (init-recording-side object2 live-objects ghost-objects)))
+    (and side1 (eql side1 side2))))
+
+
+(defun init-check-recording-holdings (literals live-objects ghost-objects)
+  (dolist (literal (positive-init-literals-with-relation 'holding literals))
+    (destructuring-bind (agent object)
+        (rest (init-literal-proposition literal))
+      (unless (init-same-recording-side-p
+                agent object live-objects ghost-objects)
+        (error "~%HOLDING crosses recording layers or uses an unmapped object.~%~
+                Literal: ~S~%~
+                Agent:   ~S~%~
+                Object:  ~S"
+               literal agent object)))))
+
+
+(defun init-check-recording-supports (literals live-objects ghost-objects)
+  (dolist (literal (init-binary-on-literals literals))
+    (destructuring-bind (occupant support)
+        (rest (init-literal-proposition literal))
+      (when (and (init-type-member-p support 'mobile-object)
+                 (not (init-same-recording-side-p
+                        occupant support live-objects ghost-objects)))
+        (error "~%ON crosses recording layers or uses an unmapped mobile support.~%~
+                Literal:  ~S~%~
+                Occupant: ~S~%~
+                Support:  ~S"
+               literal occupant support)))))
+
+
+(defun init-check-recording-pairings (literals live-objects ghost-objects)
+  (dolist (literal (positive-init-literals-with-relation 'paired literals))
+    (destructuring-bind (connector terminus)
+        (rest (init-literal-proposition literal))
+      (let ((connector-side
+              (init-recording-side connector live-objects ghost-objects))
+            (terminus-side
+              (init-recording-side terminus live-objects ghost-objects)))
+        (unless (and connector-side
+                     (or (not (init-type-member-p terminus 'connector))
+                         (and terminus-side
+                              (or (eql connector-side 'live)
+                                  (and (eql connector-side 'ghost)
+                                       (eql terminus-side 'ghost))))))
+          (error "~%PAIRED violates recorder connector isolation.~%~
+                  Literal:  ~S~%~
+                  Connector: ~S~%~
+                  Terminus:  ~S"
+                 literal connector terminus))))))
+
+
+(defun init-check-recording-wall-gears-controls (literals)
+  "Rejects control sources that Stage 3's recording shadow cannot derive."
+  (when (init-dnf-controls-relation-p)
+    (dolist (literal (positive-init-literals-with-relation 'controls literals))
+      (destructuring-bind (clauses controlled-object mode)
+          (rest (init-literal-proposition literal))
+        (declare (ignore mode))
+        (when (init-type-member-p controlled-object 'wall-gears)
+          (dolist (clause clauses)
+            (dolist (controller clause)
+              (unless (init-type-member-p controller 'plate)
+                (error "~%Recording-side wall-gears controls support only plates.~%~
+                        Literal:          ~S~%~
+                        Wall gears:       ~S~%~
+                        Unsupported item: ~S"
+                       literal controlled-object controller)))))))))
 
 
 (defun check-init-connector-consistency (literals)

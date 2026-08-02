@@ -12,8 +12,8 @@
 ;;; destination during the ensuing propagation.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  plate and fan are declared optional here
-;;;               (define-optional-types)
+;;;   types     : agent, location; plate comes from nested -plate-types and fan is
+;;;               declared optional here
 ;;;   nested    : -support-occupancy ((on ...), cleartop); -location ((has-location ...));
 ;;;               -position ((has-position ...))
 ;;;   conditional relations:
@@ -31,7 +31,7 @@
 (in-package :ww)
 
 
-(define-optional-types plate fan)
+(define-optional-types fan)
 
 
 (define-types
@@ -52,7 +52,8 @@
                 (bind (mounted-on ?fixture $gears))
                 (bind (has-location ?fixture $f-location))))
        (eql $a-location $f-location)
-       (cleartop ?fixture))
+       (cleartop ?fixture)
+       (support-use-allowed ?agent ?fixture))
   (">" ?agent "at" $a-location "steps onto" ?fixture)
   (assert (on ?agent ?fixture)
           (finally (propagate-changes!))))

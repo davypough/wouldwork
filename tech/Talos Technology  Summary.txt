@@ -75,7 +75,7 @@ threat (either gun)
 (apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
 (beam-crossing> crossing $beam-endpoint $beam-endpoint $beam-endpoint $beam-endpoint)
 (beam-via fixed-beam-source $list fixed-beam-target)
-(boundary-wall $list)  ;used by both LOS and walk-via derivation
+(boundary-wall $list)  ;axis-aligned point list, explicitly closed by repeating the first point; used by LOS and walk-via derivation
 (climb-via> location $list location)
 (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode)
 (coupled fixed-beam-source fixed-beam-target)  ;directional; fixed couplings unlimited
@@ -140,4 +140,3 @@ floor-repeater 0 (base; beam anchor = base + height)
 receiver 1
 transmitter 1
 wall-repeater 1
-

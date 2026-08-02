@@ -1,40 +1,47 @@
 ;;; Filename: plate.lisp
 
-;;; Plate technology: pressure plates that depress under any movable object resting on them.
+;;; Plate technology: plates physically depress under any movable object resting on them.
+;;; Toggle plates additionally remember each clear-to-depressed transition.
 ;;;
 ;;; REQUIRES:
-;;;   type   : plate  --  declared optional here via define-optional-types, so a problem
-;;;            with no plate instances need not declare plate itself
+;;;   types  : pressure-plate, toggle-plate, and their plate union, from -plate-types
 ;;;   nested : -support-occupancy (support-occupant, support, on, cleartop)
+;;;   special: *applying-init-action* (engine) distinguishes initial-state construction
+;;;            from transitions during search
 ;;;   driver : the master propagate-consequences! must call update-plate-status!
 ;;; PROVIDES:
-;;;   type     : plate  --  declared optional here (define-optional-types); a problem with no
-;;;              plates need not declare it.  Other techs (gate, jammer, box, beam-relay) still
-;;;              declare their own plate-alias (either plate) for their own pre-params -- the
-;;;              two names resolve compatibly and do not conflict.
-;;;   relation : (depressed plate)  --  read by gate's energized
+;;;   types    : pressure-plate, toggle-plate, plate -- from -plate-types
+;;;   relations: (depressed plate)       -- current physical pressure
+;;;              (latched toggle-plate)  -- remembered toggle output
 ;;;   update   : update-plate-status!
 
+(include-tech -plate-types)
 (include-tech -propagation)
 (include-tech -support-occupancy)
 
 (in-package :ww)
 
 
-(define-optional-types plate)
-
-
 (define-dynamic-relations
-  (depressed plate))
+  (depressed plate)
+  (latched toggle-plate))
 
 
 (define-update update-plate-status! ()
-  ;; A plate is depressed iff something rests on it.  Occupancy is delegated to the
-  ;; query cleartop, so this update stays independent of the problem's support-occupant
-  ;; roster (claustro3 inlined (either agent box jammer connector) here instead).  Sets or
-  ;; clears (depressed ?p); change detection is automatic, so an unchanged re-assert is silent
-  ;; and does not extend the fixpoint.
+  ;; A plate is depressed iff something rests on it.  During initial-state construction,
+  ;; existing occupancy establishes that physical baseline without changing a toggle
+  ;; plate's authored latch state.  Thereafter a toggle plate flips its latch only on the
+  ;; physical transition from clear to depressed.  Additional occupants arriving while
+  ;; it remains depressed, and occupants leaving while another remains, do not flip the
+  ;; latch.  Occupancy is delegated to CLEARTOP, keeping this update independent of the
+  ;; problem's support-occupant roster.
   (doall (?p plate)
     (if (cleartop ?p)
       (not (depressed ?p))
-      (depressed ?p))))
+      (do (if (and (not *applying-init-action*)
+                   (toggle-plate ?p)
+                   (not (depressed ?p)))
+            (if (latched ?p)
+              (not (latched ?p))
+              (latched ?p)))
+          (depressed ?p)))))

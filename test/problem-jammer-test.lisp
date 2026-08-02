@@ -49,7 +49,7 @@
             disallowed-site)
   jammer (gate-jammer wall-jammer floor-jammer lifecycle-jammer disallowed-jammer)
   gate (gate-target)
-  plate (gate-plate lifecycle-plate)
+  pressure-plate (gate-plate lifecycle-plate)
   wall-gears (wall-target lifecycle-target)
   floor-gears (floor-target disallowed-gears)
   fan (lifecycle-fan))

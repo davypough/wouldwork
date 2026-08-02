@@ -16,7 +16,7 @@
 ;;; PROVIDES:
 ;;;   types     : screen, ladder, gears  --  declared optional; gears is a bare
 ;;;               reservation, populated for real only when gears-fan is also loaded
-;;;   queries   : obstacle-clear, all-clear, and a null-object default for
+;;;   queries   : obstacle-clear, all-clear, and an actor-aware null-object default for
 ;;;               stream-obstacle-clear (overridden by -stream-passability)
 
 (include-tech -holding)
@@ -41,13 +41,13 @@
   ;; passes everything until a technology like -stream-passability overrides it with
   ;; real stream logic.
   (or (and (gate ?obstacle)
-           (open ?obstacle))
+           (gate-open-for-object ?agent ?obstacle))
       (and (screen ?obstacle)
            (not (bind (holding ?agent $any-held-object))))
       (and (ladder ?obstacle)
            (not (bind (holding ?agent $any-held-object))))
       (and (gears ?obstacle)
-           (stream-obstacle-clear ?obstacle))))
+           (stream-obstacle-clear ?agent ?obstacle))))
 
 
 ;;;; NULL-OBJECT DEFAULT HOOK ;;;;
@@ -56,5 +56,5 @@
 ;;;; branch never actually binds and this default is never called.
 
 
-(define-query stream-obstacle-clear (?obstacle gears)
-  (do ?obstacle t))
+(define-query stream-obstacle-clear (?agent agent ?obstacle gears)
+  (do ?agent ?obstacle t))

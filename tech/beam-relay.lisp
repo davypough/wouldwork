@@ -23,9 +23,12 @@
 ;;;   types      : relay (either connector repeater);
 ;;;                terminus (either transmitter receiver connector repeater)
 ;;;   relations  : paired, color
-;;;   queries    : relay-beam-reaches-receiver, compute-relay-lighting,
+;;;   queries    : relay-beam-reaches-receiver,
+;;;                recording-shadow-relay-beam-reaches-receiver,
+;;;                compute-relay-lighting, compute-relay-lighting-for-object,
 ;;;                relay-anchor, beam-anchor-elevation, relay-linked,
-;;;                relay-link-clear, paired-relay-visible,
+;;;                relay-link-clear, relay-link-clear-for-object,
+;;;                paired-relay-visible, paired-relay-visible-for-object,
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
 ;;;                connectable-location, connectable-terminus
 ;;;   updates    : update-relay-status!
@@ -49,7 +52,7 @@
   terminus (either transmitter receiver connector repeater))
 
 
-(define-optional-types plate box hue connector transmitter receiver)
+(define-optional-types box hue connector transmitter receiver)
 
 
 (define-dynamic-relations
@@ -105,12 +108,14 @@
        (connectable-location $connector ?location)
        (assign $places (placement-options ?agent ?location $connector))
        (assign $pairing-vantages (walkable-locations ?agent $a-location))
-       (exists (?t terminus)
-         (connectable-terminus $pairing-vantages ?location $connector ?t)))
+        (exists (?t terminus)
+          (connectable-terminus
+            ?agent $pairing-vantages ?location $connector ?t)))
   (">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
   (do (assign $connectable nil)
       (doall (?terminus terminus)
-        (if (connectable-terminus $pairing-vantages ?location $connector ?terminus)
+        (if (connectable-terminus
+              ?agent $pairing-vantages ?location $connector ?terminus)
           (assign $connectable (cons ?terminus $connectable))))
       (ww-loop for $selected-termini in
                  (rest (subsets-up-to $connectable *max-pairings*))
@@ -162,7 +167,36 @@
       $reaches))
 
 
+(define-query recording-shadow-relay-beam-reaches-receiver (?receiver receiver)
+  (do (assign $reaches nil)
+      (doall (?view mobile-object)
+        (if (recording-shadow-object ?view)
+          (do (assign $lighting (compute-relay-lighting-for-object ?view nil))
+              (doall (?relay relay)
+                (if (and (relay-available-for-object ?view ?relay)
+                         (assign $record (assoc ?relay $lighting))
+                         $record
+                         (bind (has-chroma ?receiver $required-hue))
+                         (eql (second $record) $required-hue)
+                         (or (and (connector ?relay)
+                                  (paired ?relay ?receiver)
+                                  (bind (has-location ?relay $location))
+                                  (beam-visible-for-object
+                                    ?view $location (beam-anchor-elevation ?relay)
+                                    ?receiver (fixture-elevation ?receiver)))
+                             (and (repeater ?relay)
+                                  (coupled ?relay ?receiver)
+                                  (fixed-beam-corridor-clear-for-object
+                                    ?view ?relay ?receiver))))
+                  (assign $reaches t))))))
+      $reaches))
+
+
 (define-query compute-relay-lighting (?active)
+  (compute-relay-lighting-for-object nil ?active))
+
+
+(define-query compute-relay-lighting-for-object (?view ?active)
   ;; Breadth-first propagation from every transmitter.  Each lighting record is
   ;; (relay hue distance); frontier records additionally carry the relay's beam endpoint.
   (do (assign $lit nil)
@@ -176,7 +210,8 @@
       (ww-loop for $pass from 1 to 99
                do (assign $next-frontier nil)
                   (doall (?target relay)
-                    (if (not (member ?target $visited))
+                    (if (and (relay-available-for-object ?view ?target)
+                             (not (member ?target $visited)))
                       (do (assign $target-anchor (relay-anchor ?target))
                           (if $target-anchor
                             (do (assign $hues nil)
@@ -189,8 +224,8 @@
                                             (assign $source-hue (third $source-record))
                                             (assign $source-distance
                                                     (fourth $source-record))
-                                            (if (relay-link-clear
-                                                  $source $source-anchor
+                                            (if (relay-link-clear-for-object
+                                                  ?view $source $source-anchor
                                                   ?target $target-anchor ?active)
                                               (do (if (not (member $source-hue $hues))
                                                     (assign $hues
@@ -227,6 +262,11 @@
                   (if (not $frontier)
                     (return t)))
       $lit))
+
+
+(define-query relay-available-for-object (?view ?relay relay)
+  (or (not (recording-shadow-object ?view))
+      (recording-shadow-object-present ?relay)))
 
 
 (define-query relay-anchor (?relay relay)
@@ -269,11 +309,22 @@
      ?target relay
      ?target-anchor beam-node
      ?active)
+  (relay-link-clear-for-object
+    nil ?source ?source-anchor ?target ?target-anchor ?active))
+
+
+(define-query relay-link-clear-for-object
+    (?view
+     ?source (either transmitter relay)
+     ?source-anchor beam-node
+     ?target relay
+     ?target-anchor beam-node
+     ?active)
   (and (relay-linked ?source ?target)
        (if (coupled ?source ?target)
-         (fixed-beam-corridor-clear ?source ?target)
-         (paired-relay-visible
-           ?source ?source-anchor ?target ?target-anchor))
+         (fixed-beam-corridor-clear-for-object ?view ?source ?target)
+         (paired-relay-visible-for-object
+           ?view ?source ?source-anchor ?target ?target-anchor))
        (not (beam-cut-in ?source-anchor ?target-anchor ?active))))
 
 
@@ -282,15 +333,25 @@
      ?source-anchor beam-node
      ?target relay
      ?target-anchor beam-node)
+  (paired-relay-visible-for-object
+    nil ?source ?source-anchor ?target ?target-anchor))
+
+
+(define-query paired-relay-visible-for-object
+    (?view
+     ?source (either transmitter relay)
+     ?source-anchor beam-node
+     ?target relay
+     ?target-anchor beam-node)
   ;; A paired link always has at least one connector.  BEAM-VISIBLE is location-first, so
   ;; orient the test from whichever endpoint is the connector.
   (if (connector ?target)
-    (beam-visible
-      ?target-anchor (beam-anchor-elevation ?target)
+    (beam-visible-for-object
+      ?view ?target-anchor (beam-anchor-elevation ?target)
       ?source-anchor (beam-anchor-elevation ?source))
     (do (connector ?source)
-        (beam-visible
-          ?source-anchor (beam-anchor-elevation ?source)
+        (beam-visible-for-object
+          ?view ?source-anchor (beam-anchor-elevation ?source)
           ?target-anchor (beam-anchor-elevation ?target)))))
 
 
@@ -351,20 +412,22 @@
 
 
 (define-query connectable-terminus
-    (?pairing-vantages
+    (?agent agent
+     ?pairing-vantages
      ?placement-location location
      ?connector connector
      ?terminus terminus)
   ;; Pairing selection uses structural LOS from any currently walkable vantage.  Exact
   ;; placement and live visibility subsequently determine whether the beam carries color.
-  (ww-loop for $vantage in ?pairing-vantages
-           thereis
-             (or (and (or (transmitter ?terminus)
-                          (receiver ?terminus)
-                          (repeater ?terminus))
-                      (potentially-visible $vantage ?terminus))
-                 (and (connector ?terminus)
-                      (different ?terminus ?connector)
-                      (bind (has-location ?terminus $terminus-location))
-                      (different ?placement-location $terminus-location)
-                      (potentially-visible $vantage $terminus-location)))))
+  (and (connector-pairing-allowed ?agent ?connector ?terminus)
+       (ww-loop for $vantage in ?pairing-vantages
+                thereis
+                  (or (and (or (transmitter ?terminus)
+                               (receiver ?terminus)
+                               (repeater ?terminus))
+                           (potentially-visible $vantage ?terminus))
+                      (and (connector ?terminus)
+                           (different ?terminus ?connector)
+                           (bind (has-location ?terminus $terminus-location))
+                           (different ?placement-location $terminus-location)
+                           (potentially-visible $vantage $terminus-location))))))

@@ -19,7 +19,7 @@
 (in-package :ww)
 
 
-(define-optional-types plate box fan)
+(define-optional-types box fan)
 
 
 (define-query support-top-elevation (?support support)

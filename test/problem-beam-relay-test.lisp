@@ -54,7 +54,7 @@
   agent (relay-agent put-agent)
   location (origin target old-view incoming-site
             put-origin put-site lit-site dark-site)
-  plate (old-plate put-plate)
+  pressure-plate (old-plate put-plate)
   connector (lifecycle-connector incoming-connector placement-connector
              lit-blocker-connector dark-connector target-unlit-connector)
   transmitter (old-source new-source decoy-source invisible-source blocker-source)
@@ -193,17 +193,17 @@
     (not (visible origin decoy-source))
     (not (open closed-gate))
     (connectable-terminus
-      '(origin) target lifecycle-connector new-source)
+      relay-agent '(origin) target lifecycle-connector new-source)
     (connectable-terminus
-      '(origin) target lifecycle-connector new-receiver)
+      relay-agent '(origin) target lifecycle-connector new-receiver)
     (connectable-terminus
-      '(origin) target lifecycle-connector decoy-source)
+      relay-agent '(origin) target lifecycle-connector decoy-source)
     (not (connectable-terminus
-           '(origin) target lifecycle-connector invisible-source))
+           relay-agent '(origin) target lifecycle-connector invisible-source))
     (not (connectable-terminus
-           '(origin) target lifecycle-connector lifecycle-connector))
+           relay-agent '(origin) target lifecycle-connector lifecycle-connector))
     (not (connectable-terminus
-           '(origin) target lifecycle-connector target-unlit-connector))))
+           relay-agent '(origin) target lifecycle-connector target-unlit-connector))))
 
 
 (define-goal

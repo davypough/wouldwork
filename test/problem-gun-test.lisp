@@ -47,9 +47,8 @@
   jammer (jammer1 jammer2)
   gun (gun1 gun2 gun3 gun4 gun5 gun6 gun7)
   gate (gate1)
-  plate (plate1 plate2 plate3 plate4)
+  pressure-plate (plate1 plate2 plate3 plate4)
   box (weight1 weight2)
-  mode (normal inverted)
 )
 
 

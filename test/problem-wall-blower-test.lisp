@@ -35,11 +35,10 @@
 (define-types
   agent (agent1)
   location (near mid far)
-  plate (plate1 plate2)
+  pressure-plate (plate1 plate2)
   box (box1)
   wall-gears (wgears1)
   fan (fan1)
-  mode (normal inverted)
 )
 
 

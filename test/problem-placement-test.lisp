@@ -43,15 +43,14 @@
   location (lifecycle-origin lifecycle-target matrix-site control-site
             boundary-origin upper-boundary lower-boundary
             too-high-boundary too-low-boundary)
-  plate (control-plate clear-matrix-plate occupied-matrix-plate
-         upper-boundary-plate lower-boundary-plate
-         too-high-plate too-low-plate)
+  pressure-plate (control-plate clear-matrix-plate occupied-matrix-plate
+                  upper-boundary-plate lower-boundary-plate
+                  too-high-plate too-low-plate)
   box (lifecycle-box matrix-probe-box boundary-probe-box
        clear-support-box occupied-support-box)
   floor-gears (lifecycle-gears clear-fan-gears occupied-fan-gears)
   wall-gears (wall-fan-gears)
-  fan (lifecycle-fan clear-floor-fan occupied-floor-fan loose-fan wall-fan)
-  mode (normal))
+  fan (lifecycle-fan clear-floor-fan occupied-floor-fan loose-fan wall-fan))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;

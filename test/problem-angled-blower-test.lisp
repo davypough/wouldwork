@@ -39,11 +39,10 @@
   location
     (control5 source1 raised1 source2 bare2 source3 relay3 final3
      source4 ignored4 source5 delivered5)
-  plate (plate1)
+  pressure-plate (plate1)
   box (box1 box2 box3 box4 box5 box6)
   angled-gears (gears1 gears2 gears3 gears4 gears5 gears6)
   fan (fan1 fan2 fan3 fan4 fan5 fan6 fan7)
-  mode (inverted)
 )
 
 

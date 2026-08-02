@@ -174,6 +174,55 @@
 (sb-ext:defglobal *solution-paths* nil
   "Holds all solution paths found during search.")
 
+(sb-ext:defglobal *solution-report-printers* nil
+  "Problem-local functions called after Wouldwork prints a solution.")
+
+
+(sb-ext:defglobal *solution-validators* nil
+  "Problem-local functions that must accept a candidate path before it is a solution.")
+
+
+(sb-ext:defglobal *nominal-solution-candidates* 0
+  "Number of paths that satisfied the problem goal and were submitted to validators.")
+
+
+(sb-ext:defglobal *accepted-solution-candidates* 0
+  "Number of nominal solution paths accepted by every registered validator.")
+
+
+(sb-ext:defglobal *rejected-solution-candidates* 0
+  "Number of nominal solution paths rejected by a registered validator.")
+
+
+(sb-ext:defglobal *solution-validator-rejections*
+  (make-hash-table :test #'equal)
+  "Counts rejected candidate paths by validator, diagnostic phase, and reason.")
+
+
+(defun register-solution-validator (validator)
+  "Register a function symbol that validates a complete candidate path.
+
+The function receives START-STATE, PATH, and GOAL-STATE.  It returns true to accept the
+candidate.  A false result may be accompanied by a second diagnostic value.  A plist with
+:PHASE and :REASON fields produces the most useful grouped search report.  Validators must
+treat their arguments as read-only and be safe to call concurrently."
+  (unless (and (symbolp validator) (fboundp validator))
+    (error "Solution validator must name a defined function: ~S" validator))
+  (unless (member validator *solution-validators*)
+    (setf *solution-validators*
+          (append *solution-validators* (list validator))))
+  validator)
+
+
+(defun register-solution-report-printer (printer)
+  "Register a function symbol to print a supplement after each displayed solution."
+  (unless (and (symbolp printer) (fboundp printer))
+    (error "Solution report printer must name a defined function: ~S" printer))
+  (unless (member printer *solution-report-printers*)
+    (setf *solution-report-printers*
+          (append *solution-report-printers* (list printer))))
+  printer)
+
 (sb-ext:defglobal *average-branching-factor* 0.0
   "Average branching factor so far during search (shared).")
 
@@ -394,6 +443,11 @@
   "Dirty flag set by add-prop/del-prop (when *detect-propagated-changes* is T) on a
    real database mutation. A propagation pass binds it to NIL, runs its derivations,
    and returns it to signal whether another convergence pass is needed.")
+
+(defvar *applying-init-action* nil
+  "Dynamically true while an init-action effect constructs the initial world state.
+   Stateful propagation may use this to establish its physical baseline without
+   interpreting already-authored initial facts as transitions that happen during search.")
 
 (defvar *idb-hash-acc* nil
   "When non-nil during effect application, holds the running XOR hash of the integer

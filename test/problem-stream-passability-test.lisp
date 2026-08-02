@@ -38,11 +38,10 @@
   agent (test-agent)
   location (lower-swept lower-destination lower-side
             upper-swept upper-destination upper-side)
-  plate (upper-control-plate)
+  pressure-plate (upper-control-plate)
   wall-gears (lower-gears upper-gears)
   fan (lower-fan upper-fan)
-  wall (backstop lane-separator lower-ride-cap upper-ride-cap)
-  mode (normal))
+  wall (backstop lane-separator lower-ride-cap upper-ride-cap))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -84,7 +83,7 @@
   ;; The lane separator joins it to the right boundary.  Each ride cap joins
   ;; the tested upper side curtain's front endpoint to the right boundary.
   (boundary-wall
-    ((0 0) (14 0) (14 12) (0 12)))
+    ((0 0) (14 0) (14 12) (0 12) (0 0)))
 
   (wall-segments
     ((backstop 2 0 2 12)
@@ -149,7 +148,7 @@
     (welded lower-fan lower-gears)
     (turning lower-gears)
     (blowing lower-fan)
-    (not (stream-obstacle-clear lower-gears))
+    (not (stream-obstacle-clear test-agent lower-gears))
     (not (obstacle-clear test-agent lower-gears))
 
     ;; The upper attachment persists, but loss of plate control stops the stream
@@ -158,7 +157,7 @@
     (welded upper-fan upper-gears)
     (not (turning upper-gears))
     (not (blowing upper-fan))
-    (stream-obstacle-clear upper-gears)
+    (stream-obstacle-clear test-agent upper-gears)
     (obstacle-clear test-agent upper-gears)
 
     ;; Wall-mounted fans never acquire ordinary locations.

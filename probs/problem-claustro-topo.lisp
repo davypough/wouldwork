@@ -36,14 +36,13 @@
   window (window1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
             location9 location10 location11 location12 location13)
-  plate (plate1 plate2 plate3)
+  pressure-plate (plate1 plate2 plate3)
   box (box1 box2)
   jammer (jammer1 jammer2)
   transmitter (transmitter1)
   receiver (receiver1)
   ladder (ladder1)
   hue (blue)
-  mode (normal inverted toggle)
 )
 
 
@@ -102,13 +101,13 @@
   (has-chroma receiver1 blue)
   (coupled transmitter1 receiver1)
 
-  ;; Boundary wall.  The final point connects back to the first.  tech/-beam-los-coordinates.lisp's
+  ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS folds each polygon edge into its wall list, so a sightline that
   ;; would have to cut outside this silhouette is blocked exactly like a wall-segment.  Not
   ;; currently consulted by walkability's own coordinate derivation (walk-via).
   (boundary-wall
     ((0 10) (11 10) (11 5) (16 5)
-     (16 0) (33 0) (33 17) (0 17)))
+     (16 0) (33 0) (33 17) (0 17) (0 10)))
 
   ;; Opaque internal wall, interrupted by a visibility-transparent,
   ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo.lisp

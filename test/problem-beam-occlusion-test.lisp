@@ -46,7 +46,7 @@
   box (default-box tall-box connector-support-box)
   jammer (lifecycle-jammer)
   connector (supported-connector)
-  plate (unused-plate)
+  pressure-plate (unused-plate)
   fan (unused-fan))
 
 

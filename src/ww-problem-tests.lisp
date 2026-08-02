@@ -289,7 +289,7 @@
             '(or (and (gate ?obstacle) (open ?obstacle))
                  (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
                  (ladder ?obstacle)
-                 (and (gears ?obstacle) (stream-obstacle-clear ?obstacle))))
+                 (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle))))
           (compile 'obstacle-clear (subst-int-code (symbol-value 'obstacle-clear)))))
     (make-mutation-case
       :target-name 'safe
@@ -342,7 +342,7 @@
             '(or (gate ?obstacle)
                  (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
                  (and (ladder ?obstacle) (not (bind (holding ?agent $any-held-object))))
-                 (and (gears ?obstacle) (stream-obstacle-clear ?obstacle))))
+                 (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle))))
           (compile 'obstacle-clear (subst-int-code (symbol-value 'obstacle-clear)))))
     (make-mutation-case
       :target-name 'jump-elevation-reachable
@@ -915,6 +915,201 @@
         (run-start-is-goal-case 'depth-first 'graph 2 'max-value 3
                                 :expected-value 10)
         (format t "~2&All start-is-goal cases passed.~%")
+        t)
+    (cleanup-test-files)
+    (stage blocks3)))
+
+
+;;; CANDIDATE SOLUTION VALIDATOR TEST ;;;
+
+
+(defun check-solution-validator-test (condition control &rest args)
+  "Signal a focused candidate-validator test failure unless CONDITION is true."
+  (unless condition
+    (error "~A" (apply #'format nil control args)))
+  t)
+
+
+(defun solution-validator-accepted-goal-p (state)
+  "Return true when STATE contains the repaired test goal."
+  (member '(validator-at validator-accepted)
+          (list-database (problem-state.idb state))
+          :test #'equal))
+
+
+(defun run-solution-validator-case
+    (algorithm tree-or-graph threads solution-type)
+  "Run one search configuration and require the rejected depth-one goal to be repaired."
+  (setf *algorithm* algorithm
+        *tree-or-graph* tree-or-graph
+        *threads* threads
+        *solution-type* solution-type
+        *depth-cutoff* 2
+        *randomize-search* nil
+        *branch* -1
+        *symmetry-pruning* nil
+        *debug* 0
+        *probe* nil
+        *auto-wait* nil)
+  (ww-solve)
+  (check-solution-validator-test
+    (= *nominal-solution-candidates*
+       (+ *accepted-solution-candidates* *rejected-solution-candidates*))
+    "Candidate-validation totals do not balance: ~D checked, ~D accepted, ~D rejected."
+    *nominal-solution-candidates*
+    *accepted-solution-candidates*
+    *rejected-solution-candidates*)
+  (check-solution-validator-test
+    (plusp *accepted-solution-candidates*)
+    "The accepted candidate was not counted.")
+  (check-solution-validator-test
+    (plusp
+      (gethash
+        '(accept-only-repaired-validator :unspecified :repair-required)
+        *solution-validator-rejections*
+        0))
+    "The rejected candidate diagnostic was not grouped by validator and reason.")
+  (let ((report
+          (with-output-to-string (stream)
+            (print-candidate-solution-validation-statistics stream))))
+    (check-solution-validator-test
+      (and (search "Candidate solution validation:" report)
+           (search "Nominal goal paths checked" report)
+           (search "REPAIR-REQUIRED" report))
+      "The candidate-validation report is incomplete:~%~A"
+      report))
+  (check-solution-validator-test
+    *solution-paths*
+    "No validated solution for ~A/~A with ~D thread~:P and solution type ~A."
+    algorithm tree-or-graph threads solution-type)
+  (dolist (solution *solution-paths*)
+    (check-solution-validator-test
+      (= (solution.depth solution) 2)
+      "A rejected candidate was recorded at depth ~D: ~S"
+      (solution.depth solution) (solution.path solution))
+    (check-solution-validator-test
+      (solution-validator-accepted-goal-p (solution.goal solution))
+      "A recorded solution does not contain the repaired goal: ~S"
+      (list-database (problem-state.idb (solution.goal solution)))))
+  (format t "~&Passed solution-validator case: ~A / ~A / ~D thread~:P / ~A~%"
+          algorithm tree-or-graph threads solution-type)
+  t)
+
+
+(defun test-solution-validator ()
+  "Verify candidate validation, rejected-goal expansion, and reusable action replay."
+  (cleanup-test-files)
+  (unwind-protect
+      (progn
+        (%stage "test/problem-engine-solution-validator-test.lisp")
+        (reset-candidate-solution-validation-statistics)
+        (let ((empty-report
+                (with-output-to-string (stream)
+                  (print-candidate-solution-validation-statistics stream))))
+          (check-solution-validator-test
+            (search "No path reached the problem goal." empty-report)
+            "The zero-candidate validation report is incomplete:~%~A"
+            empty-report))
+        (let ((result
+                (validate-action-sequence
+                  *start-state*
+                  '((advance-to-rejected-goal)
+                    (repair-rejected-goal))
+                  :goal-test #'solution-validator-accepted-goal-p)))
+          (check-solution-validator-test
+            (action-sequence-validation-success-p result)
+            "The reusable action-sequence validator rejected the valid repair path: ~S"
+            (action-sequence-validation-failure-reason result))
+          (check-solution-validator-test
+            (action-sequence-validation-goal-satisfied-p result)
+            "The reusable action-sequence validator did not recognize the repaired goal."))
+        (run-solution-validator-case 'depth-first 'graph 0 'min-length)
+        (run-solution-validator-case 'backtracking 'tree 0 'first)
+        (run-solution-validator-case 'depth-first 'graph 2 'min-length)
+        (run-solution-validator-case 'depth-first 'graph 0 'all-paths)
+        (format t "~2&All candidate solution-validator cases passed.~%")
+        t)
+    (cleanup-test-files)
+    (stage blocks3)))
+
+
+;;; RECORDER SNAPSHOT-RESET VALIDATION TEST ;;;
+
+
+(defun test-recorder-playback-validation ()
+  "Verify exact recording validation and snapshot-reset playback semantics."
+  (cleanup-test-files)
+  (unwind-protect
+      (progn
+        (%stage "test/problem-recorder-playback-validation-test.lisp")
+        (let* ((valid-path
+                 '((1.0 (finish-while-plate-clear live-agent))
+                   (2.0 (step-on ghost-agent recorder-site plate1))
+                   (3.0 (step-off ghost-agent recorder-site plate1))))
+               (invalid-playback-path
+                 '((1.0 (step-on ghost-agent recorder-site plate1))
+                   (2.0 (finish-while-plate-clear live-agent))
+                   (3.0 (step-off ghost-agent recorder-site plate1))))
+               (away-stop-path
+                 '((1.0 (finish-while-plate-clear live-agent))
+                   (2.0 (walk ghost-agent recorder-site away-site))))
+               (stranded-stop-path
+                 '((1.0 (finish-while-plate-clear live-agent))
+                   (2.0 (walk ghost-agent recorder-site stranded-site))))
+               (recording-validation
+                 (validate-action-sequence
+                   *start-state*
+                   '((step-on ghost-agent recorder-site plate1)
+                     (step-off ghost-agent recorder-site plate1)))))
+          (check-solution-validator-test
+            (action-sequence-validation-success-p recording-validation)
+            "The ghost-only recording sequence failed: ~S"
+            (action-sequence-validation-failure-reason recording-validation))
+          (check-solution-validator-test
+            (member '(recording-latched plate1)
+                    (list-database
+                      (problem-state.idb
+                        (action-sequence-validation-final-state
+                          recording-validation)))
+                    :test #'equal)
+            "The recording-final latch did not differ from the initial snapshot.")
+          (multiple-value-bind (valid-p diagnostic)
+              (validate-recorder-solution *start-state* valid-path *start-state*)
+            (check-solution-validator-test
+              valid-p
+              "Snapshot-reset playback was rejected: ~S"
+              diagnostic))
+          (multiple-value-bind (valid-p diagnostic)
+              (validate-recorder-solution
+                *start-state* invalid-playback-path *start-state*)
+            (check-solution-validator-test
+              (and (not valid-p)
+                   (eql (getf diagnostic :phase) :playback)
+                   (eql (getf diagnostic :reason) :action-failed))
+              "An invalid exact playback was not diagnosed correctly: ~S"
+              diagnostic))
+          (multiple-value-bind (valid-p diagnostic)
+              (validate-recorder-solution
+                *start-state* away-stop-path *start-state*)
+            (check-solution-validator-test
+              valid-p
+              "A recording ending within walking range of its recorder was rejected: ~S"
+              diagnostic))
+          (multiple-value-bind (valid-p diagnostic)
+              (validate-recorder-solution
+                *start-state* stranded-stop-path *start-state*)
+            (check-solution-validator-test
+              (and (not valid-p)
+                   (eql (getf diagnostic :phase) :recording)
+                   (eql (getf diagnostic :reason) :agents-cannot-close))
+              "A stranded ghost agent was not diagnosed correctly: ~S"
+              diagnostic)))
+        (ww-solve)
+        (check-solution-validator-test
+          (and *solution-paths*
+               (= (solution.depth (first *solution-paths*)) 1))
+          "The focused recorder search did not find its validated one-step solution.")
+        (format t "~2&All recorder snapshot-reset validation cases passed.~%")
         t)
     (cleanup-test-files)
     (stage blocks3)))

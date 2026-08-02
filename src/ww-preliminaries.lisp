@@ -32,6 +32,8 @@
 (defparameter *lock* (bt:make-lock))  ;for general thread protection
 (defparameter *search-lock*  (bt:make-lock "ww-search-lock"))
 (defparameter *integer-lock* (bt:make-lock "ww-integer-lock"))
+(defparameter *solution-validation-lock*
+  (bt:make-lock "ww-solution-validation-lock"))
 
 
 (defvar *debug* 0
@@ -511,6 +513,12 @@
     (setf *init-actions* nil))
   (when (and (boundp '*happening-names*) (listp *happening-names*))
     (setf *happening-names* nil))
+  (when (and (boundp '*solution-report-printers*)
+             (listp *solution-report-printers*))
+    (setf *solution-report-printers* nil))
+  (when (and (boundp '*solution-validators*)
+             (listp *solution-validators*))
+    (setf *solution-validators* nil))
   ;; Reset object index counter
   (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
     (setf *last-object-index* 0)))

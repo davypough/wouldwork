@@ -34,13 +34,12 @@
          loose-agent wall-agent box-agent)
   location (boarding-site leaving-site fan-site control-site occupied-site
             supported-site loose-site remote-site wall-site box-site)
-  plate (boarding-plate leaving-plate fan-control-plate occupied-plate
-         current-plate alternate-plate remote-plate)
+  pressure-plate (boarding-plate leaving-plate fan-control-plate occupied-plate
+                  current-plate alternate-plate remote-plate)
   box (plate-blocker nonsteppable-box box-support)
   floor-gears (floor-gears1)
   wall-gears (wall-gears1)
-  fan (floor-fan loose-fan wall-fan)
-  mode (normal))
+  fan (floor-fan loose-fan wall-fan))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;

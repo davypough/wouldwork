@@ -77,7 +77,6 @@
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3)
   hue         (blue red)
-  mode        (normal inverted toggle)  ;controller mode; corner uses only normal
   beam-endpoint (either transmitter receiver location)  ;a fixture, or a connector's location
 )
 
@@ -120,14 +119,14 @@
   (has-chroma receiver2 red)
   (has-chroma receiver3 blue)
 
-  ;; Boundary wall.  The final point connects back to the first.  tech/-beam-los-coordinates.lisp's
+  ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS folds each polygon edge into its wall list, so a sightline that
   ;; would have to cut outside this silhouette is blocked exactly like a wall-segment.  Not
   ;; currently consulted by walkability's own coordinate derivation (walk-via).  This
   ;; rectangle fully encloses the map and is convex, so it's functionally inert here (a
   ;; straight line between two interior points of a convex boundary wall can never cross it).
   (boundary-wall
-    ((0 0) (12 0) (12 11) (0 11)))
+    ((0 0) (12 0) (12 11) (0 11) (0 0)))
 
 
   ;; Raw wall/gate/window segment geometry -- drives DERIVE-LOS-FROM-SEGMENTS (tech/-beam-los-

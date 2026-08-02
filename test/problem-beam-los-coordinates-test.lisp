@@ -89,7 +89,7 @@
   ;; boundary.  Above y=72, the notch between x=2 and x=8 separates two arms.
   (boundary-wall
     ((-2 -2) (12 -2) (12 82) (8 82)
-     (8 72) (2 72) (2 82) (-2 82)))
+     (8 72) (2 72) (2 82) (-2 82) (-2 -2)))
 
   ;; The first segment crosses its lane in the interior.  The second begins
   ;; exactly on its lane, exercising the inclusive wall-endpoint convention.
@@ -137,6 +137,44 @@
   (apparatus-coords> open-gate-receiver 10 40)
   (apparatus-coords> gate-corner-receiver 10 50)
   (apparatus-coords> test-gun 10 68))
+
+
+;;;; BOUNDARY VALIDATION CHARACTERIZATION ;;;;
+
+
+(setf
+  (symbol-function 'beam-boundary-validation-valid-p)
+  (lambda ()
+    (and
+      ;; Four explicitly authored, axis-aligned edges are sufficient.
+      (null
+        (check-init-boundary-walls
+          '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (0 0))))))
+      ;; Omitting the repeated starting point must fail before geometry derivation.
+      (let ((condition
+              (handler-case
+                (progn
+                  (check-init-boundary-walls
+                    '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (-1 1)))))
+                  nil)
+                (error (error-condition)
+                  error-condition))))
+        (and condition
+             (search "must repeat its first point"
+                     (princ-to-string condition))))
+      ;; Diagonal edges are rejected by the shared declaration validator, even
+      ;; when the problem would otherwise use the boundary only for beam geometry.
+      (let ((condition
+              (handler-case
+                (progn
+                  (check-init-boundary-walls
+                    '((boundary-wall ((0 0) (2 0) (2 1) (1 2) (0 0)))))
+                  nil)
+                (error (error-condition)
+                  error-condition))))
+        (and condition
+             (search "not axis-aligned"
+                     (princ-to-string condition)))))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -215,7 +253,11 @@
 
     ;; The state itself is unchanged by this zero-action characterization.
     (has-location idle-agent idle)
-    (not (has-location derivation-enabler idle))))
+    (not (has-location derivation-enabler idle))
+
+    ;; Shared validation accepts a closed orthogonal boundary and rejects open or
+    ;; diagonal boundaries.
+    (funcall (symbol-function 'beam-boundary-validation-valid-p))))
 
 
 (define-goal

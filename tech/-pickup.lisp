@@ -11,7 +11,8 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location
 ;;;   nested    : -placement (holding, occupant-elevation, within-agent-vertical-reach);
-;;;               -reachability (reachable)
+;;;               -reachability (reachable); -interaction-policy arrives through
+;;;               -placement's support substrate (object-manipulation-allowed)
 ;;; PROVIDES:
 ;;;   query     : pickup-clear  --  true when ?agent, currently at ?a-location, may
 ;;;               pick up ?object, currently at ?object-location
@@ -23,6 +24,7 @@
 
 
 (define-query pickup-clear (?agent agent ?a-location location ?object cargo ?object-location location)
-  (and (not (bind (holding ?agent $any-held-object)))
+  (and (object-manipulation-allowed ?agent ?object)
+       (not (bind (holding ?agent $any-held-object)))
        (reachable ?object-location ?a-location)
        (within-agent-vertical-reach ?agent (occupant-elevation ?object))))

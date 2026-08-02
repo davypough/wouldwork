@@ -171,14 +171,27 @@
                             ((bt-choice-inconsistent-p choice)
                              (increment-global *inconsistent-states-dropped* 1))
                             ;; Solution found at current level - register and handle continuation
-                            ((is-complete-solution)
-                             (register-solution-bt (1+ level))
-                             (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
-                             (when (> *debug* 0)
-                               (finish-output))
-                             (setf found-a-solution t)
-                             (when (solution-count-reached-p)
-                               (return-from backtrack t)))
+                             ((is-complete-solution)
+                              (let ((candidate-path (reconstruct-solution-path)))
+                                (if (candidate-solution-valid-p
+                                      candidate-path *backtrack-state*)
+                                  (progn
+                                    (register-solution-bt (1+ level) candidate-path)
+                                    (narrate-bt
+                                      "Solution found ***"
+                                      (first *choice-stack*) (1+ level))
+                                    (when (> *debug* 0)
+                                      (finish-output))
+                                    (setf found-a-solution t)
+                                    (when (solution-count-reached-p)
+                                      (return-from backtrack t)))
+                                  ;; The state goal is only a rejected prefix.  Later
+                                  ;; actions may make the complete path valid.
+                                  (let ((deeper-result (backtrack (1+ level))))
+                                    (when deeper-result
+                                      (setf found-a-solution t)
+                                      (when (solution-count-reached-p)
+                                        (return-from backtrack t)))))))
                             ;; No solution yet - continue recursive exploration
                             (t
                              (let ((deeper-result (backtrack (1+ level))))
@@ -393,10 +406,9 @@
   nil)
 
 
-(defun register-solution-bt (level)
+(defun register-solution-bt (level &optional (solution-path (reconstruct-solution-path)))
   "Register a solution found via backtracking using the choice stack"
   (let* ((solution-depth (length *choice-stack*))
-         (solution-path (reconstruct-solution-path))
          (solution (make-solution
                      :depth solution-depth
                      :time (problem-state.time *backtrack-state*)

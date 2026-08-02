@@ -29,8 +29,8 @@
 ;;; COORDINATES-OBSTACLE-INTERSECTION-PARAMETER).  A gate has no APPARATUS-COORDS> of its
 ;;; own -- it is authored as an extended segment, not a point endpoint -- so its LOS-TO-TARGET
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
-;;; problem also asserts BOUNDARY-WALL -- a closed polygon, its final point wrapping back to
-;;; the first -- each polygon edge is folded into the wall list too, so a sightline that would
+;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
+;;; repeats its first -- each consecutive polygon edge is folded into the wall list too, so a sightline that would
 ;;; have to leave the map's own silhouette is blocked the same as any other wall; unlike
 ;;; WALL-SEGMENTS/GATE-SEGMENTS, BOUNDARY-WALL is consulted only here, not by
 ;;; -walkability-coordinates.lisp's own WALK-VIA derivation.
@@ -115,7 +115,7 @@
   (apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
   (wall-segments $list)
   (gate-segments $list)
-  (boundary-wall $list))  ;closed polygon ((x1 y1) (x2 y2) ... (xn yn)); last point wraps to first
+  (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
 
 
 (defvar *beam-occlusion-tolerance* 1/2
@@ -153,13 +153,13 @@
 
 
 (defun beam-coordinates-boundary-segments (boundary-points)
-  ;; Converts a BOUNDARY-WALL point list ((x1 y1) (x2 y2) ... (xn yn)) into wall-shaped
-  ;; (name x1 y1 x2 y2) records, one per polygon edge, wrapping the final point back to
-  ;; the first.  Fed into DERIVE-LOS-FROM-SEGMENTS below as unconditional LOS blockers
+  ;; Converts an explicitly closed BOUNDARY-WALL point list into wall-shaped
+  ;; (name x1 y1 x2 y2) records, one per consecutive polygon edge.  Fed into
+  ;; DERIVE-LOS-FROM-SEGMENTS below as unconditional LOS blockers
   ;; alongside WALL-SEGMENTS: a sightline that would have to leave the map's own
   ;; silhouette is never a real beam.  A wall's name is never read by BEAM-COORDINATES-
   ;; LOS-OCCLUDERS (only a gate's is), so a plain edge index suffices.
-  (loop for (point1 point2) on (append boundary-points (list (first boundary-points)))
+  (loop for (point1 point2) on boundary-points
         while point2
         for edge-index from 1
         collect (list edge-index

@@ -29,7 +29,8 @@
 ;;;               location-elevation); -controls ((controls ...), energized);
 ;;;               -placement (placement-options, place-held-object!; nests
 ;;;               -support-elevation and -holding); -reachability (reachable);
-;;;               -pickup (pickup-clear)
+;;;               -pickup (pickup-clear); -recording-shadow-policy (neutral state-view
+;;;               hooks, overridden by recorder)
 ;;;   conditional relations:
 ;;;               jamming (jammer), guarded by an exists over jammer (gate.lisp's pattern):
 ;;;               a jamming jammer forces gears stopped in update-gears-status!; jammer is
@@ -67,6 +68,8 @@
 ;;;   query     : gears-elevation  --  the working height of a mounted fan: wall gears'
 ;;;               declared has-elevation or 1 (matching transmitter/receiver anchors);
 ;;;               floor gears' floor elevation
+;;;               gears-turning-for-object -- ordinary turning state except that recorder
+;;;               ghosts use recording-side wall-gears state
 ;;;               stack-rider  --  true when a candidate is directly or transitively
 ;;;               stacked above a given base
 ;;;               landing-support  --  the first clear plate/floor-mounted-fan/box at a
@@ -86,6 +89,7 @@
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -pickup)
+(include-tech -recording-shadow-policy)
 
 (in-package :ww)
 
@@ -120,6 +124,12 @@
       1)
     (do (bind (has-position ?gears $location))
         (location-elevation $location))))
+
+
+(define-query gears-turning-for-object (?object ?gears gears)
+  (if (recording-shadow-object ?object)
+    (recording-shadow-turning ?gears)
+    (turning ?gears)))
 
 
 (define-update update-gears-status! ()
@@ -208,6 +218,7 @@
                  (different ?plate ?self)
                  (has-position ?plate ?location)
                  (cleartop ?plate)
+                 (support-use-allowed ?self ?plate)
                  (or (not ?required-elevation)
                      (eql (support-top-elevation ?plate) ?required-elevation)))
           (assign $landing ?plate)))
@@ -218,6 +229,7 @@
                  (bind (mounted-on ?fan $gears))
                  (has-location ?fan ?location)
                  (cleartop ?fan)
+                 (support-use-allowed ?self ?fan)
                  (or (not ?required-elevation)
                      (eql (support-top-elevation ?fan) ?required-elevation)))
           (assign $landing ?fan)))
@@ -227,6 +239,7 @@
                  (not (stack-rider ?box ?self))
                  (has-location ?box ?location)
                  (cleartop ?box)
+                 (support-use-allowed ?self ?box)
                  (or (not ?required-elevation)
                      (eql (support-top-elevation ?box) ?required-elevation)))
           (assign $landing ?box)))
@@ -261,8 +274,9 @@
                 (cleartop ?fan)
                 (pickup-clear ?agent $a-location ?fan $fan-location))
            (and (bind (mounted-on ?fan $w-gears))
-                (wall-gears $w-gears)
-                (not (bind (holding ?agent $any-held)))
+                 (wall-gears $w-gears)
+                 (object-manipulation-allowed ?agent ?fan)
+                 (not (bind (holding ?agent $any-held)))
                 (bind (has-position $w-gears $fan-location))
                 (reachable $fan-location $a-location)
                 (within-agent-vertical-reach ?agent (gears-elevation $w-gears)))))
@@ -302,6 +316,7 @@
   1
   (?agent agent ?fan fan ?gears gears)
   (and (holding ?agent ?fan)
+       (object-manipulation-allowed ?agent ?fan)
        (bind (has-location ?agent $a-location))
        (bind (has-position ?gears $g-location))
        (reachable $g-location $a-location)

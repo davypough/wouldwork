@@ -12,8 +12,8 @@
 ;;;              and gun are optional.  APPARATUS-COORDS> names each apparatus's functional
 ;;;              point: beam emission/reception/relay for beam apparatus, and the
 ;;;              firing/targeting point for a gun.
-;;;   queries  : visible, potentially-visible, beam-visible  --  null defaults, overridden
-;;;              by visibility. Their typed object parameters remain valid when an optional
+;;;   queries  : visible, potentially-visible, beam-visible, beam-visible-for-object  --
+;;;              null defaults, overridden by visibility. Their typed object parameters remain valid when an optional
 ;;;              type has no objects: the query is still installed and its null body returns
 ;;;              NIL; only iteration over that empty type produces no calls.
 
@@ -49,3 +49,12 @@
   ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
   ;; therefore deliberately have no Wouldwork object type.
   (do ?location ?near-elevation ?object ?far-elevation nil))
+
+
+(define-query beam-visible-for-object
+    (?view
+     ?location location
+     ?near-elevation
+     ?object (either apparatus location)
+     ?far-elevation)
+  (do ?view ?location ?near-elevation ?object ?far-elevation nil))

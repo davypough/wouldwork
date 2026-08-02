@@ -48,7 +48,7 @@
             angled-mounting-site
             wall-mounting-site wall-mounting-fixture-site
             remote-site unused-destination)
-  plate (placement-plate off-plate)
+  pressure-plate (placement-plate off-plate)
   box (occupant-box)
   floor-gears (floor-pickup-gears welded-gears occupied-fan-gears
                 occupied-gears remote-gears)
@@ -56,8 +56,7 @@
   angled-gears (angled-mounting-gears)
   fan (fan-to-place floor-pickup-fan wall-pickup-fan
        angled-mounting-fan wall-mounting-fan
-       welded-fan occupied-fan gear-occupant-fan)
-  mode (normal))
+       welded-fan occupied-fan gear-occupant-fan))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;

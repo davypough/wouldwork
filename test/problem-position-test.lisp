@@ -4,14 +4,14 @@
 ;;; matrix gives every FIXED-POSITION-OBJECT leaf one positioned fixture and one
 ;;; fixture with no authored HAS-POSITION fact:
 ;;;
-;;;   plate, ladder, floor-gears, wall-gears, and angled-gears.
+;;;   plate, ladder, floor-gears, wall-gears, angled-gears, and recorder.
 ;;;
 ;;; The positioned plate and ladder deliberately share one location, proving that
 ;;; fixed placement is functional by object rather than exclusive by location.
 ;;; The characterization also verifies the static relation schema, exact type
 ;;; composition, wrong-type rejection, and duplicate fluent-key inconsistency.
 ;;;
-;;; Initial and final dynamic states are empty.  The five authored static positions
+;;; Initial and final dynamic states are empty.  The six authored static positions
 ;;; remain unchanged.  Expected minimum path length: zero.
 
 (in-package :ww)
@@ -34,12 +34,13 @@
 
 
 (define-types
-  location (shared-site floor-site wall-site angled-site alternate-site)
-  plate (positioned-plate unpositioned-plate)
+  location (shared-site floor-site wall-site angled-site recorder-site alternate-site)
+  pressure-plate (positioned-plate unpositioned-plate)
   ladder (positioned-ladder unpositioned-ladder)
   floor-gears (positioned-floor-gears unpositioned-floor-gears)
   wall-gears (positioned-wall-gears unpositioned-wall-gears)
-  angled-gears (positioned-angled-gears unpositioned-angled-gears))
+  angled-gears (positioned-angled-gears unpositioned-angled-gears)
+  recorder (positioned-recorder unpositioned-recorder))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
@@ -56,7 +57,8 @@
   (has-position positioned-ladder shared-site)
   (has-position positioned-floor-gears floor-site)
   (has-position positioned-wall-gears wall-site)
-  (has-position positioned-angled-gears angled-site))
+  (has-position positioned-angled-gears angled-site)
+  (has-position positioned-recorder recorder-site))
 
 
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
@@ -75,11 +77,12 @@
                   positioned-ladder unpositioned-ladder
                   positioned-floor-gears unpositioned-floor-gears
                   positioned-wall-gears unpositioned-wall-gears
-                  positioned-angled-gears unpositioned-angled-gears)))
+                  positioned-angled-gears unpositioned-angled-gears
+                  positioned-recorder unpositioned-recorder)))
           (and
             (equal
               (gethash 'fixed-position-object *type-components*)
-              '(plate ladder floor-gears wall-gears angled-gears))
+              '(plate ladder floor-gears wall-gears angled-gears recorder))
             (null
               (set-exclusive-or
                 (gethash 'fixed-position-object *types*)
@@ -165,6 +168,7 @@
     (positioned-exactly positioned-floor-gears floor-site)
     (positioned-exactly positioned-wall-gears wall-site)
     (positioned-exactly positioned-angled-gears angled-site)
+    (positioned-exactly positioned-recorder recorder-site)
 
     ;; No default or alternate position is invented for any omitted fixture.
     (not
@@ -185,10 +189,14 @@
       (bind
         (has-position
           unpositioned-angled-gears $unpositioned-angled-location)))
+    (not
+      (bind
+        (has-position
+          unpositioned-recorder $unpositioned-recorder-location)))
     (not (has-position positioned-plate alternate-site))
     (not (has-position positioned-ladder alternate-site))
 
-    ;; Installed metadata verifies the exact ten-object union (excluding locations);
+    ;; Installed metadata verifies the exact twelve-object union (excluding locations);
     ;; authoring failures complete the substrate contract.
     (position-schema-valid-p)
     (invalid-position-object-rejected-p)

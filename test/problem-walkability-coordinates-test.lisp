@@ -12,6 +12,8 @@
 ;;; locations exercise valid placement exactly on an uncovered induced grid line and
 ;;; at an unambiguous induced grid vertex.  With only GATE-A open, an empty-handed
 ;;; agent crosses the second partition through SCREEN-A, while a holding agent cannot.
+;;; A direct geometry probe confirms that the rectangular-cell derivation preserves
+;;; the shared BOUNDARY-WALL axis-alignment invariant internally.
 ;;;
 ;;; The goal directly characterizes initialization-derived state; no action is needed.
 ;;; Expected minimum path length: 0.
@@ -63,7 +65,7 @@
 
   ;; The final point closes the rectangle back to (0 0).
   (boundary-wall
-    ((0 0) (12 0) (12 8) (0 8)))
+    ((0 0) (12 0) (12 8) (0 8) (0 0)))
 
   ;; Each vertical partition touches both boundary edges exactly.  Door segments
   ;; fill every deliberate gap between its solid pieces.
@@ -108,6 +110,25 @@
   (always-true)
   ()
   (assert (propagate-changes!)))
+
+
+;;;; CONSUMER-SPECIFIC BOUNDARY VALIDATION ;;;;
+
+
+(setf
+  (symbol-function 'walkability-diagonal-boundary-rejected-p)
+  (lambda ()
+    (let ((condition
+            (handler-case
+              (progn
+                (walkability-coordinates-boundary-segments
+                  '((0 0) (2 0) (1 1) (0 0)))
+                nil)
+              (error (error-condition)
+                error-condition))))
+      (and condition
+           (search "not axis-aligned"
+                   (princ-to-string condition))))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -211,7 +232,11 @@
     (one-step-walkable holding-agent left-start middle)
     (not (one-step-walkable holding-agent middle right-goal))
     (not (walkable holding-agent left-start right-goal))
-    (not (walkable holding-agent left-start sealed-site))))
+    (not (walkable holding-agent left-start sealed-site))
+
+    ;; The public declaration validator rejects this triangle first; this direct probe
+    ;; confirms that the rectangular consumer also preserves its own invariant.
+    (funcall (symbol-function 'walkability-diagonal-boundary-rejected-p))))
 
 
 (define-goal

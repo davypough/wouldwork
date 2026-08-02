@@ -274,6 +274,7 @@
     (setf *unique-solution-states* nil)
     (setf *best-states* (list *start-state*))
     (setf *solution-count* 0)
+    (reset-candidate-solution-validation-statistics)
     (setf *upper-bound* 1000000)
     (setf *search-tree* nil)
     (setf *start-time* (get-internal-real-time))
@@ -285,12 +286,15 @@
     (setf *lower-bound-pruned* 0)
     (setf *shutdown-requested* nil)
     (clrhash *prop-key-cache*)
-    (let ((start-goal-p (goal (node.state start-node))))
-      (when start-goal-p
+    (let* ((start-goal-p (goal (node.state start-node)))
+           (accepted-start-goal-p
+             (and start-goal-p
+                  (candidate-solution-valid-p nil (node.state start-node)))))
+      (when accepted-start-goal-p
         (register-solution start-node))
-      (unless (and start-goal-p
-                   (or (solution-count-reached-p)
-                       (member *solution-type* '(min-length min-time))))
+      (unless (and accepted-start-goal-p
+                    (or (solution-count-reached-p)
+                        (member *solution-type* '(min-length min-time))))
         (if (> *threads* 0)
           (if (eql *algorithm* 'backtracking)
             (error "Parallel processing not supported with backtracking algorithm")
@@ -647,15 +651,27 @@
             (increment-global *bound-pruned* 1)
             (next-iteration)))  ;throw out state if can't better best solution so far
         (when (goal succ-state)
-          (if *hybrid-mode*
-              (defer-hybrid-goal current-node succ-state)
-              (register-solution
-                (make-node :state succ-state
-                           :depth succ-depth
-                           :parent current-node)))
-          (if (solution-count-reached-p)  ; was (eql *solution-type* 'first)
-            (return-from process-successors '(first))
-            (next-iteration)))
+          (let ((goal-node
+                  (make-node :state succ-state
+                             :depth succ-depth
+                             :parent current-node)))
+            (cond
+              (*hybrid-mode*
+               (defer-hybrid-goal current-node succ-state)
+               ;; Hybrid paths are complete only after the parent DAG is closed.  With
+               ;; validators active, retain nominal goal states as ordinary successors so
+               ;; a rejected goal prefix can be repaired by later actions.
+               (unless *solution-validators*
+                 (next-iteration)))
+              ((candidate-solution-valid-p
+                 (candidate-path-to-goal-node goal-node) succ-state)
+               (register-solution goal-node)
+               (if (solution-count-reached-p)
+                 (return-from process-successors '(first))
+                 (next-iteration)))
+              (t
+               (narrate "Candidate goal rejected by solution validator"
+                        succ-state succ-depth)))))
         (unless (boundp 'goal-fn)
           (process-min-max-value succ-state))
         (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
@@ -1178,6 +1194,22 @@
             path))))
 
 
+(defun candidate-path-to-goal-node (goal-node)
+  "Return the complete candidate path represented by GOAL-NODE."
+  (declare (type node goal-node))
+  (let* ((goal-state (node.state goal-node))
+         (nominal-path (record-solution-path goal-node)))
+    (if (or (zerop (node.depth goal-node))
+            (= (hash-table-count *state-codes*) 0))
+      nominal-path
+      (append nominal-path
+              (reverse
+                (gethash
+                  (funcall (symbol-function 'encode-state)
+                           (list-database (problem-state.idb goal-state)))
+                  *state-codes*))))))
+
+
 (defun enumerate-paths-to-node (node)
   "Enumerates all paths from the start node to NODE.
    Returns a list of paths, where each path is a list of (action instantiations) moves.
@@ -1274,6 +1306,7 @@
             (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
+  (print-candidate-solution-validation-statistics)
   (let ((sym-stats (format-symmetry-statistics)))
     (when sym-stats
       (format t "~%~A~%" sym-stats)))
@@ -1393,14 +1426,7 @@
              :depth state-depth
              :time (problem-state.time goal-state)
              :value (problem-state.value goal-state)
-             :path (let ((nominal-path (record-solution-path goal-node)))
-                     (if (or (zerop state-depth)
-                             (= (hash-table-count *state-codes*) 0))  ;if in backward search
-                       nominal-path
-                       (append nominal-path 
-                               (reverse (gethash (funcall (symbol-function 'encode-state)
-                                                           (list-database (problem-state.idb goal-state)))
-                                                  *state-codes*)))))
+             :path (candidate-path-to-goal-node goal-node)
              :goal goal-state)))
     (let ((ctrl-str (if (zerop state-depth)
                         "Start state satisfies goal; recorded zero-action solution at depth = ~:D"
@@ -1458,7 +1484,9 @@
 
 (defun printout-solution (soln)
   (declare (type solution soln))
-  (printout-solution-with-states soln))
+  (printout-solution-with-states soln)
+  (dolist (printer *solution-report-printers*)
+    (funcall (symbol-function printer) soln)))
 
 
 (defun printout-solution-with-states (soln)
@@ -1481,7 +1509,7 @@
              (display-form (cons (car action-form)
                                  (merge-effect-format (car action-form)
                                                       (cdr action-form))))
-             (new-state (replay-action-to-state action-form current-state)))     ;replay uses pure action-form
+              (new-state (apply-action-to-state action-form current-state nil nil)))
         (write (list (first item) display-form) :pretty t :escape nil)           ; connectives, unquoted
         (terpri)
         (cond (new-state
@@ -1526,64 +1554,6 @@
   (format t "likely a bug in the action's precondition or effect form.~%")
   (format t "Display halted; subsequent steps cannot be reconstructed.~%")
   (format t "============================================================~%"))
-
-
-(defun replay-action-to-state (action-form state)
-  "Replay a single action from a solution path to state.
-   Returns the new state, or NIL if replay fails.
-   ACTION-FORM is (action-name arg1 arg2 ...) from solution path.
-   STATE is the current problem-state.
-   Unlike apply-action-to-state, this trusts the solution is valid and
-   selects the correct effect by matching update.instantiations."
-  (let* ((action-name (first action-form))
-         (provided-args (rest action-form))
-         (action (find action-name *actions* :key #'action.name)))
-    ;; Handle WAIT action: duration is informational, not an effect variable
-    (when (eql action-name 'wait)
-      (let ((wait-duration (first provided-args))
-            (new-state (copy-problem-state state)))
-        (incf (problem-state.time new-state) wait-duration)
-        (setf (problem-state.name new-state) 'wait)
-        ;; Process happenings so exogenous events advance during the wait
-        (when *happening-names*
-          (let ((net-state (amend-happenings state new-state)))
-            (when net-state
-              (setf new-state net-state))))
-        (return-from replay-action-to-state new-state)))
-    (unless action
-      (return-from replay-action-to-state nil))
-    ;; Get precondition argument combinations
-    (let ((precondition-args (if (action.dynamic action)
-                                  (eval-instantiated-spec (action.precondition-type-inst action) state)
-                                  (action.precondition-args action))))
-      ;; Find any passing precondition and execute effect
-      (dolist (pre-args precondition-args)
-        ;; Effects can mutate the state while generating updates, so probe each
-        ;; precondition/effect on a trial copy to keep replay deterministic.
-        (let* ((trial-state (copy-problem-state state))
-               (pre-result (apply (action.pre-defun-name action) trial-state pre-args)))
-          (when pre-result
-            ;; Execute effect to get all possible updates
-            (let ((updated-dbs (nreverse (if (eql pre-result t)
-                                           (funcall (action.eff-defun-name action) trial-state)
-                                           (apply (action.eff-defun-name action) trial-state pre-result)))))
-              ;; Find update with matching instantiations
-              (dolist (update updated-dbs)
-                (when (equal (update.instantiations update) provided-args)
-                  ;; Found the matching effect - apply it
-                  (let ((new-state (copy-problem-state state)))
-                    (apply-update-to-state new-state update action)
-                    ;; Apply followups if any
-                    (when (update.followups update)
-                      (apply-followups new-state update))
-                    ;; Process happenings if present
-                    (when *happening-names*
-                      (let ((net-state (amend-happenings state new-state)))
-                        (when net-state
-                          (setf new-state net-state))))
-                    (return-from replay-action-to-state new-state))))))))
-      ;; No matching update found
-      nil)))
 
 
 (defun print-search-progress ()
@@ -1811,17 +1781,18 @@
                            :value (problem-state.value goal-state)
                            :path full-path
                            :goal goal-state)))
-          (push-global solution *solution-paths*)
-          (with-search-structures-lock
-            (let ((existing
-                    (find goal-idb *unique-solution-states*
-                          :key (lambda (soln)
-                                 (problem-state.idb (solution.goal soln)))
-                          :test #'equalp)))
-              (cond (existing
-                    ;; Replace if new solution is better
-                     (when (solution-better-p solution existing)
-                       (setf *unique-solution-states*
-                             (substitute solution existing *unique-solution-states*))))
-                    (t
-                     (push-global solution *unique-solution-states*))))))))))
+          (when (candidate-solution-valid-p full-path goal-state)
+            (push-global solution *solution-paths*)
+            (with-search-structures-lock
+              (let ((existing
+                      (find goal-idb *unique-solution-states*
+                            :key (lambda (soln)
+                                   (problem-state.idb (solution.goal soln)))
+                            :test #'equalp)))
+                (cond (existing
+                       ;; Replace if new solution is better
+                        (when (solution-better-p solution existing)
+                          (setf *unique-solution-states*
+                                (substitute solution existing *unique-solution-states*))))
+                      (t
+                       (push-global solution *unique-solution-states*)))))))))))

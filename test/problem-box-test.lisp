@@ -29,7 +29,7 @@
          probe-agent blocked-rider probe-rider)
   location (source-site target-site plate-site occupied-site high-site
             holding-site probe-origin probe-site too-high-site)
-  plate (put-plate)
+  pressure-plate (put-plate)
   box (moving-box source-box target-box plate-box blocked-box high-support
        high-box already-held-box loose-box probe-box clear-probe-support
        occupied-probe-support))

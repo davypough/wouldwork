@@ -6,17 +6,15 @@
 ;;; state of its own.  Agent jumping and support changes belong to the separate jump technology.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  plate and box are declared optional here
-;;;               (define-optional-types), so a problem lacking either need not declare it
+;;;   types     : agent, location; plate comes from nested -plate-types and box is
+;;;               declared optional here
 ;;;   nested    : -placement (placement-options, place-held-object!; also brings in
 ;;;               support occupancy, location, position, height, elevation, and holding);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -pickup (pickup-clear, shared with jammer and beam-relay)
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
-;;;   types     : plate, box  --  declared optional here; other techs (plate, gate, jammer,
-;;;               barrier, beam-relay, etc.) still declare their own plate-alias/box-alias
-;;;               forms for their own pre-params; the bare and aliased forms resolve compatibly
+;;;   types     : box -- declared optional here
 ;;;   actions   : pickup-box, put-box
 
 (include-tech -placement)
@@ -26,7 +24,7 @@
 (in-package :ww)
 
 
-(define-optional-types plate box)
+(define-optional-types box)
 
 
 (define-action pickup-box

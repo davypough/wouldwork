@@ -77,16 +77,25 @@
                     (return-from process-succ))
                   ;; Goal check during task generation
                   (when (goal succ-state)
-                    ;; Register solution immediately (serial, no locking needed)
-                    (register-solution
-                      (make-node :state succ-state
-                                 :depth (1+ (node.depth node))
-                                 :parent node))
-                    (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
-                    ;; Early termination: found requested number of solutions during task gen
-                    (format t "~&Solution found during task generation!~%")
-                    (return-from generate-root-tasks nil))
-                    (return-from process-succ))
+                    (let ((goal-node
+                            (make-node :state succ-state
+                                       :depth (1+ (node.depth node))
+                                       :parent node)))
+                      (cond
+                        (*hybrid-mode*
+                         (defer-hybrid-goal node succ-state)
+                         (unless *solution-validators*
+                           (return-from process-succ)))
+                        ((candidate-solution-valid-p
+                           (candidate-path-to-goal-node goal-node) succ-state)
+                         ;; Task generation is serial, so ordinary registration is safe.
+                         (register-solution goal-node)
+                         (when (solution-count-reached-p)
+                           (format t "~&Solution found during task generation!~%")
+                           (return-from generate-root-tasks nil))
+                         (return-from process-succ))))
+                    ;; A rejected nominal goal remains eligible for task generation.
+                    )
                   
                   ;; Tree search: check for cycle on current path
                   (when (eql *tree-or-graph* 'tree)
@@ -289,12 +298,23 @@
         
         ;; Goal check (before duplicate detection - goals always processed)
         (when (goal succ-state)
-          (if *hybrid-mode*                                                ; hybrid defers for path enumeration
-              (defer-hybrid-goal current-node succ-state)
-              (register-parallel-solution current-node succ-state worker-id))
-          (when (solution-count-reached-p)  ; was (eql *solution-type* 'first)
-            (return-from worker-process-successors-phase1 'first-found))
-          (return-from process-one))
+          (cond
+            (*hybrid-mode*
+             (defer-hybrid-goal current-node succ-state)
+             ;; Validators run on complete paths after the hybrid parent DAG closes.
+             ;; Keep nominal goals expandable in case later actions repair the plan.
+             (unless *solution-validators*
+               (return-from process-one)))
+            ((candidate-solution-valid-p
+               (append (record-solution-path current-node)
+                       (list (record-move succ-state)))
+               succ-state)
+             (register-parallel-solution current-node succ-state worker-id)
+             (when (solution-count-reached-p)
+               (return-from worker-process-successors-phase1 'first-found))
+             (return-from process-one)))
+          ;; A rejected nominal goal falls through to ordinary successor handling.
+          )
         
         ;; Best-state tracking for goalless problems
         (unless (boundp 'goal-fn)
