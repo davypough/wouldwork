@@ -66,5 +66,50 @@
   (assert (has-location ?agent goal-site)))
 
 
+(define-test-claim recorder-playback-validation-contract
+  (let ((recording-validation
+          (validate-action-sequence
+            *start-state*
+            '((step-on ghost-agent recorder-site plate1)
+              (step-off ghost-agent recorder-site plate1)))))
+    (and (action-sequence-validation-success-p recording-validation)
+         (member '(recording-latched plate1)
+                 (list-database
+                   (problem-state.idb
+                     (action-sequence-validation-final-state
+                       recording-validation)))
+                 :test #'equal)))
+  (validate-recorder-solution
+    *start-state*
+    '((1.0 (finish-while-plate-clear live-agent))
+      (2.0 (step-on ghost-agent recorder-site plate1))
+      (3.0 (step-off ghost-agent recorder-site plate1)))
+    *start-state*)
+  (multiple-value-bind (valid-p diagnostic)
+      (validate-recorder-solution
+        *start-state*
+        '((1.0 (step-on ghost-agent recorder-site plate1))
+          (2.0 (finish-while-plate-clear live-agent))
+          (3.0 (step-off ghost-agent recorder-site plate1)))
+        *start-state*)
+    (and (not valid-p)
+         (eql (getf diagnostic :phase) :playback)
+         (eql (getf diagnostic :reason) :action-failed)))
+  (validate-recorder-solution
+    *start-state*
+    '((1.0 (finish-while-plate-clear live-agent))
+      (2.0 (walk ghost-agent recorder-site away-site)))
+    *start-state*)
+  (multiple-value-bind (valid-p diagnostic)
+      (validate-recorder-solution
+        *start-state*
+        '((1.0 (finish-while-plate-clear live-agent))
+          (2.0 (walk ghost-agent recorder-site stranded-site)))
+        *start-state*)
+    (and (not valid-p)
+         (eql (getf diagnostic :phase) :recording)
+         (eql (getf diagnostic :reason) :agents-cannot-close))))
+
+
 (define-goal
   (has-location live-agent goal-site))

@@ -141,9 +141,8 @@ is unresolved.
   proposal a second time before presenting it.
 - I reload with `(progn (ql:quickload :wouldwork) (in-package :ww))` after file changes.
 - Tests are `(test-talos)`, `(test-talos :validate t)`, `(test-bt)`,
-  `(test-start-is-goal)`, `(test-solution-validator)`,
-  `(test-recorder-playback-validation)`, `(test-characterization)`. I run them; tell me
-  which to run.
+  `(test-start-is-goal)`, `(test-solution-validator)`, `(test-characterization)`. I run
+  them; tell me which to run.
 
 ## Context: what the previous session did
 
