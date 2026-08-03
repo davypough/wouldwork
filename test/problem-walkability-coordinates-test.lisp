@@ -115,20 +115,13 @@
 ;;;; CONSUMER-SPECIFIC BOUNDARY VALIDATION ;;;;
 
 
-(setf
-  (symbol-function 'walkability-diagonal-boundary-rejected-p)
-  (lambda ()
-    (let ((condition
-            (handler-case
-              (progn
-                (walkability-coordinates-boundary-segments
-                  '((0 0) (2 0) (1 1) (0 0)))
-                nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (search "not axis-aligned"
-                   (princ-to-string condition))))))
+(define-test-claim walkability-diagonal-boundary-rejected
+  (expect-condition
+    (lambda ()
+      (walkability-coordinates-boundary-segments
+        '((0 0) (2 0) (1 1) (0 0))))
+    'error
+    :containing "not axis-aligned"))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -232,11 +225,7 @@
     (one-step-walkable holding-agent left-start middle)
     (not (one-step-walkable holding-agent middle right-goal))
     (not (walkable holding-agent left-start right-goal))
-    (not (walkable holding-agent left-start sealed-site))
-
-    ;; The public declaration validator rejects this triangle first; this direct probe
-    ;; confirms that the rectangular consumer also preserves its own invariant.
-    (funcall (symbol-function 'walkability-diagonal-boundary-rejected-p))))
+    (not (walkable holding-agent left-start sealed-site))))
 
 
 (define-goal

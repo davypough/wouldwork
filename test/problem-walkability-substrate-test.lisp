@@ -52,13 +52,10 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(setf
-  (symbol-function 'walkability-substrate-state-valid-p)
-  (lambda (state)
-    (and
-      (null *actions*)
-      (null (database state))
-      (not (state-is-inconsistent state)))))
+(define-test-claim walkability-substrate-schema
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 (define-query substrate-walk-via-family-is
@@ -115,10 +112,7 @@
       (walkable-locations second-agent isolated-site)
       '(isolated-site))
     (walkable second-agent isolated-site isolated-site)
-    (not (walkable second-agent isolated-site origin))
-
-    ;; The role technology has no actions or dynamic state of its own.
-    (walkability-substrate-state-valid-p state)))
+    (not (walkable second-agent isolated-site origin))))
 
 
 (define-goal

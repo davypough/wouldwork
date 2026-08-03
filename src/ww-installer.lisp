@@ -320,6 +320,21 @@
   t)
 
 
+(defmacro define-derived-relations (&rest relations)
+  "Mark dynamic RELATIONS as computed initial state rather than authored input."
+  `(install-derived-relations ',relations))
+
+
+(defun install-derived-relations (relations)
+  "Register dynamic RELATIONS whose facts DEFINE-INIT must not author."
+  (dolist (relation relations)
+    (check-type relation symbol)
+    (unless (nth-value 1 (gethash relation *relations*))
+      (error "Derived relation must name a declared dynamic relation: ~S" relation))
+    (setf (gethash relation *derived-relations*) t))
+  t)
+
+
 (defmacro define-static-relations (&rest relations)
   `(install-static-relations ',relations))
 
@@ -808,6 +823,25 @@
                                                      (cddr lambda-expr)))))
     (when ignores
       (push `(declare (ignorable ,@ignores)) (cddr lambda-expr)))))
+
+
+(defmacro define-init-check-helper (name lambda-list &body body)
+  "Define a problem-local helper removed with its initialization checks."
+  `(define-problem-helper ,name ,lambda-list
+     ,@body))
+
+
+(defmacro define-init-check (name (literals) &body body)
+  "Define and register a technology-owned check over raw DEFINE-INIT LITERALS."
+  (let* ((metadata (when (and (consp (first body))
+                              (eql (caar body) :consumes))
+                     (first body)))
+         (check-body (if metadata (rest body) body))
+         (consumed-types (rest metadata)))
+    `(progn
+       (defun ,name (,literals)
+         ,@check-body)
+       (register-init-check ',name ',consumed-types))))
 
 
 (defmacro define-init (&rest literals)

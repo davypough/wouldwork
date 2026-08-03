@@ -2,7 +2,7 @@
 
 ;;; Jammer technology: a carried jammer that, when placed at a location with line of sight
 ;;; to a target, jams it.  Jamming forces a gate open (gate's update-gate-status!), forces
-;;; gears stopped (gears-fan's update-gears-status!), and forces a gun safe (gun's
+;;; gears stopped (-gears-fan's update-gears-status!), and forces a gun safe (gun's
 ;;; update-gun-status!) -- the same override with opposite polarity in each case: a jam
 ;;; always disables the barrier or threat.  A placed jammer is movable cargo: it may rest
 ;;; on a plate (depressing it) or a clear box top, and picking it up clears both its

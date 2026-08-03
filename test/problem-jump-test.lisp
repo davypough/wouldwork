@@ -155,7 +155,7 @@
 ;;;; GENERATED-CHILD CHARACTERIZATION ;;;;
 
 
-(defun jump-child-matches-p (child required-facts absent-facts)
+(define-test-helper jump-child-matches-p (child required-facts absent-facts)
   (let ((facts (database child)))
     (and (every (lambda (fact)
                   (member fact facts :test #'equal))
@@ -165,7 +165,7 @@
                  absent-facts))))
 
 
-(defun jump-transition-scenarios-valid-p (state)
+(define-test-helper jump-transition-scenarios-valid-p (state)
   "Characterize positive and negative JUMP-TO successors from STATE."
   (let ((action (find 'jump-to *actions* :key #'action.name))
         (saved-dropped-count *inconsistent-states-dropped*))
@@ -305,3 +305,20 @@
 
 (define-goal
   (jump-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-query-mutation jump-safe-always-true safe
+  (?location location)
+  (not nil)
+  "Disables destination safety.  The unsafe landing probe must then make this
+   characterization fail.")
+
+
+(define-query-mutation jump-unbounded-elevation jump-elevation-reachable
+  (?agent agent ?target-elevation)
+  (not nil)
+  "Drops the upward-height restriction.  The just-over-boundary probe must then
+   make this characterization fail.")

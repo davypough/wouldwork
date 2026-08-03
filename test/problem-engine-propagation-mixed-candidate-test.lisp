@@ -37,61 +37,41 @@
 (include-tech gate)
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-mixed-candidate-metadata-valid-p)
-  (lambda (state)
-    (let* ((candidates (driver-candidate-updates))
-           (kept
-             (remove-if
-               #'update-quantifies-only-over-empty-types-p
-               candidates))
-           (expected-order '(update-gate-status!))
-           (before (database state)))
-      (and
-        ;; The nested beam role still contributes its update before filtering.
-        (equal
-          candidates
-          '(update-receiver-status! update-gate-status!))
-
-        ;; Exactly the empty RECEIVER candidate is inert.
-        (update-quantifies-only-over-empty-types-p
-          'update-receiver-status!)
-        (not
-          (update-quantifies-only-over-empty-types-p
-            'update-gate-status!))
-        (equal kept expected-order)
-        (equal (derived-propagation-order kept) expected-order)
-
-        ;; A nonempty retained order must replace the sentinel with the exact
-        ;; generated driver body.
-        (not
-          (equal
-            (get 'propagate-consequences! :raw-body)
-            *propagation-driver-sentinel*))
-        (equal
-          (get 'propagate-consequences! :raw-body)
-          (derived-propagation-driver-body expected-order))
-
-        ;; The type populations establish the filtering boundary.
-        (equal (gethash 'gate *types*) '(sample-gate))
-        (nth-value 1 (gethash 'receiver *types*))
-        (null (gethash 'receiver *types*))
-
-        ;; The installed driver must be callable and preserve this neutral
-        ;; state rather than reaching the sentinel.
-        (funcall
-          (symbol-function 'propagate-changes!)
-          state)
-        (equal (database state) before)
-
-        ;; No unrelated mechanism can satisfy the zero-step goal.
-        (null *init-actions*)
-        (null *actions*)
-        (null (database state))
-        (not (state-is-inconsistent state))))))
+(define-test-claim propagation-mixed-candidate-contract
+  (equal
+    (driver-candidate-updates)
+    '(update-receiver-status! update-gate-status!))
+  (update-quantifies-only-over-empty-types-p 'update-receiver-status!)
+  (not (update-quantifies-only-over-empty-types-p 'update-gate-status!))
+  (equal
+    (remove-if
+      #'update-quantifies-only-over-empty-types-p
+      (driver-candidate-updates))
+    '(update-gate-status!))
+  (equal
+    (derived-propagation-order '(update-gate-status!))
+    '(update-gate-status!))
+  (not
+    (equal
+      (get 'propagate-consequences! :raw-body)
+      *propagation-driver-sentinel*))
+  (equal
+    (get 'propagate-consequences! :raw-body)
+    (derived-propagation-driver-body '(update-gate-status!)))
+  (expect-type-instances 'gate '(sample-gate))
+  (expect-empty-type 'receiver)
+  (let* ((trial (copy-problem-state *start-state*))
+         (before (database trial)))
+    (and
+      (funcall 'propagate-changes! trial)
+      (equal (database trial) before)))
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -105,8 +85,7 @@
         (controls
           $unexpected-clauses
           sample-gate
-          $unexpected-mode)))
-    (propagation-mixed-candidate-metadata-valid-p state)))
+          $unexpected-mode)))))
 
 
 (define-goal

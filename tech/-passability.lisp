@@ -7,7 +7,7 @@
 ;;; obstacle kind through a null-object default hook, STREAM-OBSTACLE-CLEAR, so a
 ;;; technology like -stream-passability can override just that one slot instead of
 ;;; redefining OBSTACLE-CLEAR whole -- the same pattern -beam-substrate uses for its
-;;; peers.  GEARS itself is declared optional here without nesting gears-fan, so a
+;;; peers.  GEARS itself is declared optional here without nesting -gears-fan, so a
 ;;; walking-only problem never pulls in mounting machinery it doesn't use.
 ;;;
 ;;; REQUIRES:
@@ -15,7 +15,7 @@
 ;;;   nested    : -holding (cargo, holding); -gate (gate optional type, (open gate) relation)
 ;;; PROVIDES:
 ;;;   types     : screen, ladder, gears  --  declared optional; gears is a bare
-;;;               reservation, populated for real only when gears-fan is also loaded
+;;;               reservation, populated for real only when -gears-fan is also loaded
 ;;;   queries   : obstacle-clear, all-clear, and an actor-aware null-object default for
 ;;;               stream-obstacle-clear (overridden by -stream-passability)
 

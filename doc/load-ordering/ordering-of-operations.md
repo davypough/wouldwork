@@ -126,11 +126,14 @@ semantic consequence. All installers named below live in `ww-installer.lisp`.
 | `define-types` | `install-types` | Evaluates a leading backquote or `(compute <form>)` **once, here**; `check-type-signature-consistency` enforces cross-file agreement; asserts `(something X)` and `(type X)` into `*static-db*` |
 | `define-optional-types` | `install-optional-types` | Fills the type only if `*type-signatures*` has no real entry — order-independent w.r.t. a real `define-types` |
 | `define-dynamic-relations` / `define-static-relations` | — | Full installation (signatures were already pre-scanned) |
+| `define-derived-relations` | `install-derived-relations` | Marks declared dynamic relations as computed initial state that `define-init` must not author |
+| `define-init-check` | `register-init-check` | Defines and registers a technology-owned raw-literal check; optional `(:consumes ...)` metadata credits types used only inside untyped list payloads |
+| `define-init-check-helper` | `register-init-check-function` | Defines a problem-local Lisp helper and records it for removal at the next stage |
 | `define-query` | `install-query` | **Calls `(translate body 'pre)` immediately** |
 | `define-update` | `install-update` | **Calls `(translate body 'eff)` immediately**, in both the `$vars` and the no-`$vars` branch |
 | `define-action` | `install-action` | Translates precondition and effect |
 | `define-init-action` | `install-init-action` | Translates; **skips the init-action entirely** if `check-action-parameter-instantiability` finds a pre-param type with no instances |
-| `define-init` | `install-init` | Asserts the problem's initial facts |
+| `define-init` | `install-init` | Checks engine invariants and every registered technology check over the complete raw literal set, then asserts the initial facts |
 | `define-goal` | — | Builds `goal-fn` |
 
 The single most consequential fact in this document: **`install-query` and `install-update` call
@@ -144,6 +147,11 @@ here, ahead of the technology includes."*
 
 **Freezes:** every translated query, update, action, and init-action body — including all static
 `doall` domains. Also the full type extensions, once `install-types` has run.
+
+Raw initialization validation belongs to this load phase, not to `init()`: it finishes before the
+initial database exists and before any init-action or search can run. A standalone problem with no
+technology includes receives only the engine checks; including a technology also includes the
+semantic checks that technology owns.
 
 ---
 

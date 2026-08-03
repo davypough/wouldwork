@@ -7,9 +7,9 @@
 ;;;
 ;;; Five plates begin occupied by the five support-occupant leaf types: agent, box,
 ;;; jammer, connector, and fan.  Their DEPRESSED facts are omitted so initialization
-;;; must derive them.  A sixth plate begins clear but deliberately carries a stale
-;;; DEPRESSED fact, which initialization must retract.  A seventh plate begins clear
-;;; and undepressed, checking the already-consistent negative case.
+;;; must derive them.  The test initialization action injects a stale DEPRESSED fact for
+;;; a sixth, clear plate immediately before propagation, which must retract it.  A seventh
+;;; plate begins clear and undepressed, checking the already-consistent negative case.
 ;;;
 ;;; The goal directly verifies every ON fact, exact single-support ownership, CLEARTOP,
 ;;; and DEPRESSED result after the ordinary propagation init action.  No manipulation
@@ -60,11 +60,7 @@
   (on box-occupant box-plate)
   (on jammer-occupant jammer-plate)
   (on connector-occupant connector-plate)
-  (on fan-occupant fan-plate)
-
-  ;; Negative/retraction matrix: both plates are clear.  The first deliberately
-  ;; starts with stale derived state; the second is already consistent.
-  (depressed stale-clear-plate))
+  (on fan-occupant fan-plate))
 
 
 (define-init-action initialize-derived-state
@@ -72,7 +68,11 @@
   ()
   (always-true)
   ()
-  (assert (propagate-changes!)))
+  (assert
+    ;; Negative/retraction matrix: both plates begin clear.  Inject stale internal
+    ;; state for the first immediately before the behavior under test.
+    (depressed stale-clear-plate)
+    (propagate-changes!)))
 
 
 ;;;; CHARACTERIZATION HELPERS ;;;;

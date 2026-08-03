@@ -194,7 +194,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(defun propagation-strata-structure-valid-p ()
+(define-test-helper propagation-strata-structure-valid-p ()
   (let* ((expected-order
            '(update-plate-status!
              update-gate-status!
@@ -235,9 +235,12 @@
            (not (gethash 'jamming gears-reads))))))
 
 
+(define-test-claim propagation-strata-structure
+  (propagation-strata-structure-valid-p))
+
+
 (define-query propagation-strata-scenario-valid ()
-  (and (propagation-strata-structure-valid-p)
-       (has-location agent1 east)
+  (and (has-location agent1 east)
        (not (on agent1 plate1))
        (depressed plate1)
        (or (on connector1 plate1)

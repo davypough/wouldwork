@@ -51,6 +51,9 @@
 (include-tech recorder)
 
 
+(enable-recorder-solution)
+
+
 ;;;; INITIALIZATION ;;;;
 
 
@@ -113,9 +116,6 @@
 
 
 ;;;; GOAL ;;;;
-
-
-(register-solution-validator 'validate-recorder-solution)
 
 
 (define-goal

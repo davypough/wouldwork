@@ -7,7 +7,7 @@
 ;;; jammer back up from goal.  That last pickup clears the jam and rearms gun1; the final
 ;;; characterization checks that watched is again unsafe and absent from walkable-locations,
 ;;; so a broken threat-safety filter cannot pass merely by producing a shorter walk.
-;;; Uncontrolled guns default on, matching the default turning behavior of gears-fan.
+;;; Uncontrolled guns default on, matching the default turning behavior of -gears-fan.
 ;;;
 ;;; Independent zero-action scenarios verify normal and inverted plate control in both
 ;;; states, plus a shared location threatened by two guns: jamming one does not make the
@@ -126,7 +126,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(defun jam-target-applicable-p (state agent target location)
+(define-test-helper jam-target-applicable-p (state agent target location)
   "Whether the installed JAM-TARGET action accepts this exact parameter tuple in STATE."
   (let* ((action (find 'jam-target *actions* :key #'action.name))
          (args (list agent target location)))
@@ -177,3 +177,26 @@
 
 (define-goal
   (gun-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-update-mutation gun-update-ignores-jamming update-gun-status!
+  ()
+  (doall (?gun gun)
+    (do (assign $control-on t)
+        (if (bind (controls $clauses ?gun $mode))
+          (do (assign $any-clause-on
+                (ww-loop for $clause in $clauses
+                         thereis (ww-loop for $c in $clause
+                                          always (energized $c))))
+              (if (eql $mode 'normal)
+                (assign $control-on $any-clause-on)
+                (if (eql $mode 'inverted)
+                  (assign $control-on (not $any-clause-on))))))
+        (if $control-on
+          (lethal ?gun)
+          (not (lethal ?gun)))))
+  "Drops UPDATE-GUN-STATUS!'s not-jammed override.  GUN1 must then remain lethal
+   throughout and make this characterization fail.")

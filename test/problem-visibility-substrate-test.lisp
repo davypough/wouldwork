@@ -39,52 +39,36 @@
 (include-tech -visibility)
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'visibility-substrate-metadata-valid-p)
-  (lambda (state)
-    (and
-      (equal
-        (gethash 'repeater *type-components*)
-        '(floor-repeater wall-repeater))
-      (equal
-        (gethash 'fixture *type-components*)
-        '(gate transmitter receiver repeater gun))
-      (equal
-        (gethash 'apparatus *type-components*)
-        '(transmitter receiver repeater gun))
-      (equal
-        (gethash 'repeater *types*)
-        '(sample-floor-repeater sample-wall-repeater))
-      (equal
-        (gethash 'fixture *types*)
-        '(sample-gate
-          sample-transmitter
-          sample-receiver
-          sample-floor-repeater
-          sample-wall-repeater
-          sample-gun))
-      (equal
-        (gethash 'apparatus *types*)
-        '(sample-transmitter
-          sample-receiver
-          sample-floor-repeater
-          sample-wall-repeater
-          sample-gun))
-      (zerop (hash-table-count *static-relations*))
-      (= (hash-table-count *relations*) 1)
-      (nth-value 1 (gethash 'inconsistent-state *relations*))
-      (member 'visible *query-names*)
-      (member 'potentially-visible *query-names*)
-      (member 'beam-visible *query-names*)
-      (not (member 'visible-clear *query-names*))
-      (not (member 'beam-elevation-at-location *query-names*))
-      (null *init-actions*)
-      (null *actions*)
-      (null (database state))
-      (not (state-is-inconsistent state)))))
+(define-test-claim visibility-substrate-schema
+  (expect-type-components 'repeater '(floor-repeater wall-repeater))
+  (expect-type-components
+    'fixture '(gate transmitter receiver repeater gun))
+  (expect-type-components
+    'apparatus '(transmitter receiver repeater gun))
+  (expect-type-instances
+    'repeater '(sample-floor-repeater sample-wall-repeater))
+  (expect-type-instances
+    'fixture
+    '(sample-gate sample-transmitter sample-receiver
+      sample-floor-repeater sample-wall-repeater sample-gun))
+  (expect-type-instances
+    'apparatus
+    '(sample-transmitter sample-receiver
+      sample-floor-repeater sample-wall-repeater sample-gun))
+  (expect-relations :static '())
+  (expect-relations :dynamic '(inconsistent-state))
+  (expect-registered :query 'visible)
+  (expect-registered :query 'potentially-visible)
+  (expect-registered :query 'beam-visible)
+  (expect-not-registered :query 'visible-clear)
+  (expect-not-registered :query 'beam-elevation-at-location)
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 (define-query visibility-substrate-fixture-type-valid
@@ -150,10 +134,7 @@
 
     ;; Locations are valid targets too, including a reflexive sightline request.
     (visibility-substrate-location-neutral near-site)
-    (visibility-substrate-location-neutral far-site)
-
-    ;; No public visibility layer or stateful behavior may leak into the role.
-    (visibility-substrate-metadata-valid-p state)))
+    (visibility-substrate-location-neutral far-site)))
 
 
 (define-goal

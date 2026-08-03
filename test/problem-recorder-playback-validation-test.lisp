@@ -35,6 +35,9 @@
 (include-tech walkability)
 
 
+(enable-recorder-solution)
+
+
 (define-init
   (recording-copy> live-agent ghost-agent)
   (has-location live-agent recorder-site)
@@ -61,9 +64,6 @@
        (not (latched plate1)))
   (">" ?agent "finishes while plate1 retains its restored initial value")
   (assert (has-location ?agent goal-site)))
-
-
-(register-solution-validator 'validate-recorder-solution)
 
 
 (define-goal

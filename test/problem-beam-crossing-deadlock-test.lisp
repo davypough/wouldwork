@@ -85,36 +85,27 @@
 )
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'beam-crossing-deadlock-valid-p)
-  (lambda (state)
-    (let* ((before (database state))
-           (trial (copy-problem-state state))
-           (result
-             (funcall
-               (symbol-function 'update-crossing-status!)
-               trial)))
-      (and
-        ;; The isolated copy deadlocks: three beams, no self-consistent choice.
-        (null result)
-        (state-is-inconsistent trial)
-
-        ;; The real planner state is untouched by the copy's failed derivation.
-        (equal (database state) before)
-        (not (state-is-inconsistent state))
-        (null *actions*)))))
+(define-test-claim beam-crossing-deadlock-contract
+  (let* ((before (database *start-state*))
+         (trial (copy-problem-state *start-state*))
+         (result
+           (funcall 'update-crossing-status! trial)))
+    (and
+      (null result)
+      (state-is-inconsistent trial)
+      (equal (database *start-state*) before)
+      (not (state-is-inconsistent *start-state*))))
+  (expect-registrations :action '()))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query beam-crossing-deadlock-scenario-valid ()
-  (and
-    (= (length (get-current-crossings)) 3)
-    (beam-crossing-deadlock-valid-p state)))
+  (= (length (get-current-crossings)) 3))
 
 
 (define-goal

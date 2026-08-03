@@ -11,7 +11,7 @@
 ;;;   nested   : -height (repeater, declared-height)
 ;;;   types    : elevated-object (either location gate screen fence wall transmitter
 ;;;              receiver wall-gears repeater)  --  wall-gears may declare the stream
-;;;              elevation of their mounted fan (default 1, via gears-fan's gears-elevation)
+;;;              elevation of their mounted fan (default 1, via -gears-fan's gears-elevation)
 ;;;   relation : (has-elevation elevated-object $fixnum)
 ;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
 ;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation

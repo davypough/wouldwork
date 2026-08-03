@@ -13,8 +13,8 @@
 ;;;              -- $list is a DNF clause list: () direct, else OR over clauses, AND within
 ;;;   queries  : walkable-locations  --  identity default, overridden by walkability
 ;;;              walkable            --  Boolean membership in that closure
-;;;   functions: canonical minimal-family union/product helpers shared by coordinate
-;;;              derivation and optional runtime route analysis
+;;;   functions: canonical minimal-family algebra used by the coordinate zone-graph
+;;;              derivation in -walkability-coordinates
 
 (in-package :ww)
 
@@ -22,6 +22,16 @@
 (define-static-relations
   (walk-via location $list location)  ;symmetric walking edge; $list = DNF door clauses: () direct, else OR over clauses, AND within, e.g. ((gate1) (gate2 gate3))
   (walk-via> location $list location))  ;directional walking edge, same $list convention; emitted by -walkability-coordinates for rides into a stream's destination (inbound widened by side-curtain rides, outbound ordinary)
+
+
+(define-init-check walkability-init-check (literals)
+  (:consumes gate screen ladder gears)
+  (dolist (relation '(walk-via walk-via>))
+    (dolist (literal (init-literals-with-relation relation literals))
+      (init-check-dnf-list-items-have-types
+        literal
+        (third (init-literal-proposition literal))
+        '(gate screen ladder gears)))))
 
 
 (define-query walkable-locations (?agent agent ?from location)
@@ -40,14 +50,6 @@
 (defun walkability-family-union (family1 family2)
   ;; Alternative routes: all clauses of both, minimized and canonicalized.
   (walkability-minimize-family (append family1 family2)))
-
-
-(defun walkability-family-product (family1 family2)
-  ;; Consecutive route sections: conjoin every left clause with every right clause.
-  (walkability-minimize-family
-    (loop for clause1 in family1
-          append (loop for clause2 in family2
-                       collect (append clause1 clause2)))))
 
 
 (defun walkability-family-add-obstacle (family obstacle)

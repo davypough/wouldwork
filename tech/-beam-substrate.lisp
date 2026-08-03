@@ -33,6 +33,7 @@
 ;;;   update    : update-receiver-status!
 
 (include-tech -propagation)
+(include-tech -beam-substrate-init-checks)
 
 (in-package :ww)
 
@@ -50,6 +51,10 @@
 
 (define-dynamic-relations
   (active receiver))
+
+
+(define-derived-relations
+  active)
 
 
 (define-static-relations

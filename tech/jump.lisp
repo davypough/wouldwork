@@ -46,6 +46,14 @@
   (jump-via> location $list location))  ;directed jump edge; $list = path features
 
 
+(define-init-check jump-init-check (literals)
+  (:consumes gate screen fence wall)
+  (check-init-list-relation-items-have-types
+    literals 'jump-via '(gate screen fence wall))
+  (check-init-list-relation-items-have-types
+    literals 'jump-via> '(gate screen fence wall)))
+
+
 (define-query jump-elevation-reachable (?agent agent ?target-elevation)
   ;; Downward and level jumps are unrestricted.  An upward landing may be no more than the
   ;; agent's declared height above its current standing elevation.

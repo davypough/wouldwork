@@ -97,7 +97,7 @@
   ()
   (assert (propagate-changes!)))
 
-(defun box-action-applicable-p (state action-name args)
+(define-test-helper box-action-applicable-p (state action-name args)
   "Whether the installed box action produces a successor for ARGS in STATE."
   (let ((action (find action-name *actions* :key #'action.name)))
     (when (member args (get-precondition-args action state) :test #'equal)

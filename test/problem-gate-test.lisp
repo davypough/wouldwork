@@ -58,20 +58,16 @@
     (propagate-changes!)))
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'gate-test-metadata-valid-p)
-  (lambda (state)
-    (and
-      (member 'update-gate-status! *update-names*)
-      (null (gethash 'jammer *types*))
-      (not (nth-value 1 (gethash 'jamming *relations*)))
-      (not (nth-value 1 (gethash 'jamming *static-relations*)))
-      (null *actions*)
-      (equal (database state) '((open normal-gate)))
-      (not (state-is-inconsistent state)))))
+(define-test-claim gate-schema
+  (expect-registered :update 'update-gate-status!)
+  (expect-empty-type 'jammer)
+  (expect-relation-absent 'jamming)
+  (expect-registrations :action '())
+  (equal (database *start-state*) '((open normal-gate)))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -94,11 +90,7 @@
 
     ;; A recognized NORMAL control with no DNF clauses also normalizes closed.
     (controls () stale-false-normal-gate normal)
-    (not (open stale-false-normal-gate))
-
-    ;; The metadata helper also requires the complete dynamic database to
-    ;; contain no OPEN fact other than NORMAL-GATE.
-    (gate-test-metadata-valid-p state)))
+    (not (open stale-false-normal-gate))))
 
 
 (define-goal

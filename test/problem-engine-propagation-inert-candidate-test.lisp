@@ -32,71 +32,53 @@
 ;;;; SENTINEL CONDITION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'inert-candidate-driver-signals-p)
-  (lambda (state)
-    (let ((before (database state))
-          (condition nil))
-      (setf condition
-        (handler-case
-            (progn
-              (funcall
-                (symbol-function 'propagate-changes!)
-                state)
-              nil)
-          (error (error-condition)
-            error-condition)))
-      (and
-        condition
-        (search
-          "still holding tech/-propagation.lisp's sentinel body"
-          (princ-to-string condition))
-        (equal (database state) before)
-        (not (state-is-inconsistent state))))))
+(define-test-helper inert-candidate-driver-signals-p (state)
+  (let ((before (database state))
+        (condition nil))
+    (setf condition
+      (handler-case
+          (progn
+            (funcall
+              'propagate-changes!
+              state)
+            nil)
+        (error (error-condition)
+          error-condition)))
+    (and
+      condition
+      (search
+        "still holding tech/-propagation.lisp's sentinel body"
+        (princ-to-string condition))
+      (equal (database state) before)
+      (not (state-is-inconsistent state)))))
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-inert-candidate-metadata-valid-p)
-  (lambda (state)
-    (let ((candidates (driver-candidate-updates)))
-      (and
-        ;; Candidate discovery must see the substrate update before filtering.
-        (equal candidates '(update-receiver-status!))
-        (update-quantifies-only-over-empty-types-p
-          'update-receiver-status!)
-        (null
-          (remove-if
-            #'update-quantifies-only-over-empty-types-p
-            candidates))
-
-        ;; An all-inert candidate set must not displace the loud sentinel.
-        (equal
-          (get 'propagate-consequences! :raw-body)
-          *propagation-driver-sentinel*)
-        (null (authored-propagation-driver-body))
-
-        ;; The exact boundary is an installed but empty optional RECEIVER type.
-        (nth-value 1 (gethash 'receiver *types*))
-        (null (gethash 'receiver *types*))
-
-        ;; No authored state or action can make the zero-step goal pass
-        ;; independently of the propagation metadata being characterized.
-        (null *init-actions*)
-        (null *actions*)
-        (null (database state))
-        (not (state-is-inconsistent state))))))
+(define-test-claim propagation-inert-candidate-contract
+  (equal (driver-candidate-updates) '(update-receiver-status!))
+  (update-quantifies-only-over-empty-types-p 'update-receiver-status!)
+  (null
+    (remove-if
+      #'update-quantifies-only-over-empty-types-p
+      (driver-candidate-updates)))
+  (equal
+    (get 'propagate-consequences! :raw-body)
+    *propagation-driver-sentinel*)
+  (null (authored-propagation-driver-body))
+  (expect-empty-type 'receiver)
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query propagation-inert-candidate-scenarios-valid ()
-  (and
-    (inert-candidate-driver-signals-p state)
-    (propagation-inert-candidate-metadata-valid-p state)))
+  (inert-candidate-driver-signals-p state))
 
 
 (define-goal

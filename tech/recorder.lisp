@@ -11,46 +11,53 @@
 ;;; type while remaining fixed in this problem.  An unmapped object is therefore neither a
 ;;; live recording object nor a ghost recording object.
 ;;;
-;;; A recording is closed by walking back to a recorder and stopping it, which gives a
-;;; problem two sensible places to stop searching.  The default is to stop when the problem's
-;;; own goal is met, leaving the ghost wherever its last useful action left it; the recording
-;;; is still performable because the ghost can walk back afterward, and the report supplies
-;;; that return trip.  A problem that would rather see the return spelled out in the solution
-;;; path adds GHOST-STOPS-RECORDER as a goal conjunct and pays the extra actions.
-;;; VALIDATE-RECORDER-SOLUTION enforces only the weaker of the two -- a validator vetoes
-;;; every candidate, so it must admit both styles -- and RECORDING-AGENT-CAN-CLOSE is that
-;;; weaker rule.  A ghost already standing on a recorder satisfies it trivially, so the
-;;; conjunct strengthens the goal without ever contradicting the validator.
+;;; This file is the identity substrate and the recording-side state machine.  Everything
+;;; that runs once per completed candidate path instead of once per propagation pass --
+;;; solution validation and the two-phase report -- lives in nested -recorder-solution.lisp,
+;;; which reads identity but none of the recording state derived here.  A problem still
+;;; writes only (include-tech recorder) and gets both.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -location (mobile-object); -position (recorder has-position role and plate
 ;;;            types); -support-occupancy (on); -propagation; -interaction-policy
 ;;;            (neutral action hooks); -recording-shadow-policy (neutral state-view hooks);
 ;;;            -controls (controller wiring and receiver beam substrate); -gate
-;;;            (actor-aware gate view); -walkability (walkable-locations -- the identity
-;;;            default reduces RECORDING-AGENT-CAN-CLOSE to standing on the recorder, which
-;;;            is the right reading for a problem with no walking technology)
+;;;            (actor-aware gate view); -recorder-solution (validation and report)
 ;;; PROVIDES:
 ;;;   type     : recorder (optional)
 ;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object)
 ;;;              recording-depressed, recording-latched, recording-turning,
 ;;;              recording-active, recording-open
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
-;;;              ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
-;;;              recording-agent-return-route, recording-agent-at-recorder;
+;;;              recording-control-on (recording-side twin of -controls' control-on);
 ;;;              recorder overrides object-manipulation-allowed, support-use-allowed,
 ;;;              connector-pairing-allowed, recording-shadow-object, and
 ;;;              recording-shadow-turning, recording-shadow-gate-open
 ;;;   updates  : update-recording-plate-status!, update-recording-receiver-status!,
 ;;;              update-recording-gate-status!, update-recording-gears-status!
-;;;   functions: validate-recorder-solution, build-recorder-report,
-;;;              print-recorder-report (registered as the problem's post-solution report
-;;;              printer)
 ;;;
 ;;; The recording shadow covers the Windtunnel controls: plates, wall gears, gates, and
 ;;; direct or relay-fed gate receivers.  Recording beam evaluation excludes mapped live
-;;; objects and uses recording-side gate transparency.  Beam crossings and jamming remain
-;;; outside this Windtunnel-scoped model.  There are no searched recorder controls.
+;;; objects and uses recording-side gate transparency.  There are no searched recorder
+;;; controls.
+;;;
+;;; Two combinations lie outside the shadow, and both are refused at init rather than
+;;; approximated at runtime, so an unsupported problem fails where it is authored instead
+;;; of solving to a quietly wrong answer.  INIT-CHECK-RECORDING-WALL-GEARS-CONTROLS rejects
+;;; a wall-gears device controlled by anything but a plate.  INIT-CHECK-RECORDING-JAMMERS
+;;; rejects a problem that has jammers at all, because the recording gate and gears updates
+;;; carry no jam term where their playback counterparts do.  Beam crossings are likewise
+;;; unmodeled here.
+;;;
+;;; Recording-side jamming is wanted eventually, and is smaller than it looks.  JAMMING is
+;;; asserted by JAM-TARGET rather than derived by an update, so it needs no parallel
+;;; RECORDING-JAMMING relation and no parallel update: a query filtering JAMMING to ghost
+;;; jammers -- the same ghost filter RECORDING-PLATE-OCCUPIED already applies to occupants
+;;; -- supplies the recording-side reading, and the two updates gain the disjunct and the
+;;; negated conjunct their playback counterparts carry.  The real work is upstream:
+;;; JAM-TARGET tests its sightline with VISIBLE, the actor-blind form, so a ghost jamming
+;;; through a gate would read playback openness.  That call has to route through the
+;;; actor-aware view the beam queries already use before the shadow can be trusted.
 
 (include-tech -location)
 (include-tech -position)
@@ -60,7 +67,8 @@
 (include-tech -recording-shadow-policy)
 (include-tech -controls)
 (include-tech -gate)
-(include-tech -walkability)
+(include-tech -recorder-solution)
+(include-tech -recorder-init-checks)
 
 (in-package :ww)
 
@@ -78,6 +86,14 @@
   (recording-turning wall-gears)
   (recording-active receiver)
   (recording-open gate))
+
+
+(define-derived-relations
+  recording-depressed
+  recording-latched
+  recording-turning
+  recording-active
+  recording-open)
 
 
 (define-query live-recording-object (?object mobile-object)
@@ -164,55 +180,6 @@
            (recording-latched ?controller))))
 
 
-(define-query ghost-stops-recorder ()
-  ;; Optional goal conjunct.  Every mapped ghost agent has walked back to a recorder, so the
-  ;; return trip appears in the solution path and its length counts toward min-length.  A
-  ;; problem that omits this conjunct stops at its own goal and lets the report supply the
-  ;; return instead.  Place it after the problem's own goal literals: the conjunction is
-  ;; evaluated in order, so this walks the ghost roster only on states that already qualify.
-  (forall (?agent agent)
-    (or (not (ghost-recording-object ?agent))
-        (recording-agent-at-recorder ?agent))))
-
-
-(define-query recording-agent-can-close (?agent agent)
-  ;; The recording remains closable: some recorder's location lies in ?agent's current
-  ;; walking closure, which for a ghost is computed against recording-side gate and gears
-  ;; state.  An agent resting on a support steps off before walking, and a step-off is not
-  ;; itself a walking obstacle, so support occupancy is not consulted here.
-  (do (bind (has-location ?agent $agent-location))
-      (assign $reachable (walkable-locations ?agent $agent-location))
-      (exists (?recorder recorder)
-        (exists (?location location)
-          (and (has-position ?recorder ?location)
-               (member ?location $reachable))))))
-
-
-(define-query recording-agent-return-route (?agent agent)
-  ;; (?agent from to) for the walk that closes ?agent's recording, or nil when ?agent
-  ;; already stands on a recorder and no return trip is outstanding.  Consumed by the
-  ;; report, which appends the walk a goal-terminated search stopped short of.
-  (do (bind (has-location ?agent $agent-location))
-      (assign $outstanding (not (recording-agent-at-recorder ?agent)))
-      (assign $reachable (walkable-locations ?agent $agent-location))
-      (assign $route nil)
-      (doall (?recorder recorder)
-        (doall (?location location)
-          (if (and $outstanding
-                   (not $route)
-                   (has-position ?recorder ?location)
-                   (member ?location $reachable))
-            (assign $route (list ?agent $agent-location ?location)))))
-      $route))
-
-
-(define-query recording-agent-at-recorder (?agent agent)
-  (exists (?recorder recorder)
-    (exists (?location location)
-      (and (has-position ?recorder ?location)
-           (has-location ?agent ?location)))))
-
-
 (define-update update-recording-plate-status! ()
   ;; The recording view contains only mapped ghost occupants.  During initialization its
   ;; toggle latch starts from the authored playback latch; afterward it changes only on a
@@ -241,238 +208,43 @@
       (not (recording-active ?receiver)))))
 
 
+(define-query recording-control-on (?device ?uncontrolled-default)
+  ;; The recording-side twin of -controls' CONTROL-ON: identical DNF polarity and the same
+  ;; uncontrolled-default argument, reading ghost-only controller state.  It is a separate
+  ;; query rather than a view argument to CONTROL-ON so that the two read sets stay
+  ;; disjoint for WW-PROPAGATION-ORDER's walker -- see -controls.lisp's header.
+  (do (assign $control-on ?uncontrolled-default)
+      (if (bind (controls $clauses ?device $mode))
+        (do (assign $any-clause-on
+              (ww-loop for $clause in $clauses
+                       thereis
+                         (ww-loop for $controller in $clause
+                                  always
+                                    (recording-controller-energized $controller))))
+            (if (eql $mode 'normal)
+              (assign $control-on $any-clause-on)
+              (if (eql $mode 'inverted)
+                (assign $control-on (not $any-clause-on))))))
+      $control-on))
+
+
 (define-update update-recording-gate-status! ()
   ;; Recording gates use the ordinary DNF polarity, but their controllers read ghost-only
-  ;; plates and receivers.  Windtunnel has no gate jamming; recording-side jamming is not
-  ;; approximated here.
+  ;; plates and receivers.  No jam disjunct here, matching the recording shadow's declared
+  ;; scope -- see the header; INIT-CHECK-RECORDING-JAMMERS rejects the combination outright
+  ;; rather than letting a ghost jammer be silently ignored.
   (doall (?gate gate)
-    (do (assign $control-on nil)
-        (if (bind (controls $clauses ?gate $mode))
-          (do (assign $any-clause-on
-                (ww-loop for $clause in $clauses
-                         thereis
-                           (ww-loop for $controller in $clause
-                                    always
-                                      (recording-controller-energized $controller))))
-              (if (eql $mode 'normal)
-                (assign $control-on $any-clause-on)
-                (if (eql $mode 'inverted)
-                  (assign $control-on (not $any-clause-on))))))
-        (if $control-on
-          (recording-open ?gate)
-          (not (recording-open ?gate))))))
+    (if (recording-control-on ?gate nil)
+      (recording-open ?gate)
+      (not (recording-open ?gate)))))
 
 
 (define-update update-recording-gears-status! ()
-  ;; Windtunnel's recording-side output: uncontrolled wall gears turn; controlled wall
-  ;; gears evaluate their DNF against recording-side plate state.  Receiver-controlled
-  ;; wall gears remain outside this Windtunnel-scoped recording shadow.
+  ;; Uncontrolled wall gears turn; controlled wall gears evaluate their DNF against
+  ;; recording-side plate state.  The plate-only restriction is authored wiring, not state,
+  ;; so INIT-CHECK-RECORDING-WALL-GEARS-CONTROLS enforces it once at init rather than on
+  ;; every propagation pass.
   (doall (?gears wall-gears)
-    (do (assign $control-on t)
-        (if (bind (controls $clauses ?gears $mode))
-          (do (assign $any-clause-on
-                (ww-loop for $clause in $clauses
-                         thereis
-                           (ww-loop for $controller in $clause
-                                    always
-                                      (if (plate $controller)
-                                        (recording-controller-energized $controller)
-                                        (error
-                                          "Recording-side wall-gears controls support only plates: ~S"
-                                          $controller)))))
-              (if (eql $mode 'normal)
-                (assign $control-on $any-clause-on)
-                (if (eql $mode 'inverted)
-                  (assign $control-on (not $any-clause-on))))))
-        (if $control-on
-          (recording-turning ?gears)
-          (not (recording-turning ?gears))))))
-
-
-;;;; TWO-PHASE SOLUTION REPORT ;;;;
-
-
-(defun recorder-report-agent (move)
-  "Return the single agent named by a recorded solution MOVE."
-  (unless (and (listp move)
-               (= (length move) 2)
-               (listp (second move)))
-    (error "Malformed recorder solution move: ~S" move))
-  (let ((agents
-          (remove-duplicates
-            (remove-if-not
-              (lambda (argument)
-                (member argument (gethash 'agent *types*)))
-              (rest (second move))))))
-    (unless (= (length agents) 1)
-      (error "Recorder report move must name exactly one agent: ~S" move))
-    (first agents)))
-
-
-(defun recorder-report-agent-side (state agent)
-  "Classify AGENT through RECORDING-COPY>, using STATE for the compiled queries."
-  (cond
-    ((funcall (symbol-function 'live-recording-object) state agent)
-     :live)
-    ((funcall (symbol-function 'ghost-recording-object) state agent)
-     :ghost)
-    (t
-     (error "Recorder report agent is not mapped by RECORDING-COPY>: ~S" agent))))
-
-
-(defun recorder-report-move-side (state move)
-  (recorder-report-agent-side state (recorder-report-agent move)))
-
-
-(defun recorder-path-moves-on-side (state integrated-path side)
-  "Return the moves performed by SIDE in INTEGRATED-PATH."
-  (remove-if-not
-    (lambda (move)
-      (eql side (recorder-report-move-side state move)))
-    integrated-path))
-
-
-(defun recorder-recording-agents (state)
-  "Return the mapped ghost agents that can act during recording."
-  (remove-if-not
-    (lambda (agent)
-      (funcall (symbol-function 'ghost-recording-object) state agent))
-    (gethash 'agent *types*)))
-
-
-(defun recorder-action-failure-diagnostic (phase validation)
-  (list :phase phase
-        :reason :action-failed
-        :step (action-sequence-validation-failure-index validation)
-        :action (action-sequence-validation-failure-action validation)
-        :detail (action-sequence-validation-failure-reason validation)))
-
-
-(defun validate-recorder-solution (start-state integrated-path goal-state)
-  "Validate recording and playback under the recorder's snapshot-reset semantics.
-
-The recording is the ghost-only subsequence replayed from START-STATE.  Every mapped ghost
-agent must still be able to reach a recorder when it ends -- the weaker of the two
-termination rules, so that a search stopping at the problem's own goal and a search
-carrying GHOST-STOPS-RECORDER as a goal conjunct are both admissible.  Playback then
-restores START-STATE and replays the complete integrated path under the ordinary action
-rules."
-  (declare (ignore goal-state))
-  (let* ((ghost-path
-           (recorder-path-moves-on-side start-state integrated-path :ghost))
-         (recording-validation
-           (validate-action-sequence start-state ghost-path)))
-    (unless (action-sequence-validation-success-p recording-validation)
-      (return-from validate-recorder-solution
-        (values nil
-                (recorder-action-failure-diagnostic
-                  :recording recording-validation))))
-    (let* ((recording-state
-             (action-sequence-validation-final-state recording-validation))
-           (recording-agents (recorder-recording-agents recording-state))
-           (stranded-agents
-             (remove-if
-               (lambda (agent)
-                 (funcall (symbol-function 'recording-agent-can-close)
-                          recording-state agent))
-               recording-agents)))
-      (when (null recording-agents)
-        (return-from validate-recorder-solution
-          (values nil '(:phase :recording :reason :no-recording-agent))))
-      (when stranded-agents
-        (return-from validate-recorder-solution
-          (values nil
-                  (list :phase :recording
-                        :reason :agents-cannot-close
-                        :agents stranded-agents)))))
-    (let ((playback-validation
-            (validate-action-sequence
-              start-state integrated-path
-              :goal-test (symbol-function 'goal-fn))))
-      (unless (action-sequence-validation-success-p playback-validation)
-        (return-from validate-recorder-solution
-          (values nil
-                  (recorder-action-failure-diagnostic
-                    :playback playback-validation))))
-      (unless (action-sequence-validation-goal-satisfied-p playback-validation)
-        (return-from validate-recorder-solution
-          (values nil '(:phase :playback :reason :goal-not-satisfied))))
-      (values t nil))))
-
-
-(defun recorder-recording-sequence (state integrated-path)
-  "Extract ghost moves, replace each live-action block with one PAUSE marker, and close with
-whatever return walk the searched path stopped short of."
-  (let ((sequence (list '(start-recorder)))
-        (previous-side nil))
-    (dolist (move integrated-path)
-      (let ((side (recorder-report-move-side state move)))
-        (when (and (eql side :live)
-                   (not (eql previous-side :live)))
-          (setf sequence (nconc sequence (list '(pause)))))
-        (when (eql side :ghost)
-          (setf sequence (nconc sequence (list move))))
-        (setf previous-side side)))
-    (nconc sequence (recorder-return-walks state) (list '(stop-recorder)))))
-
-
-(defun recorder-return-walks (state)
-  "Return one (WALK agent from to) marker per ghost agent still away from a recorder.
-
-STATE is the completed integrated state.  A ghost's location there, and the recording-side
-gate and gears state its walking closure is computed against, are the same as at the end of
-the ghost-only recording, so no second replay is needed.  A path that already carries the
-return -- the GHOST-STOPS-RECORDER goal style -- yields no markers.  These are report
-markers, not planner actions, and carry no step number for that reason."
-  (loop for agent in (recorder-recording-agents state)
-        for route = (funcall (symbol-function 'recording-agent-return-route) state agent)
-        when route
-          collect (cons 'walk route)))
-
-
-(defun recorder-playback-sequence (state integrated-path)
-  "Retain the integrated moves, pausing live blocks and resuming following ghost blocks."
-  (let ((sequence nil)
-        (previous-side nil))
-    (dolist (move integrated-path sequence)
-      (let ((side (recorder-report-move-side state move)))
-        (when (not (eql side previous-side))
-          (cond
-            ((eql side :live)
-             (setf sequence (nconc sequence (list '(pause)))))
-            ((eql previous-side :live)
-             (setf sequence (nconc sequence (list '(resume)))))))
-        (setf sequence (nconc sequence (list move)))
-        (setf previous-side side)))))
-
-
-(defun build-recorder-report (&optional (solution (first *solution-paths*)))
-  "Build recording/playback sequences for a completed integrated SOLUTION.
-
-The returned plist retains the original path under :INTEGRATED and provides the derived
-sequences under :RECORDING and :PLAYBACK.  Report markers are not planner actions."
-  (unless solution
-    (error "No completed solution is available for a recorder report."))
-  (unless (solution-p solution)
-    (error "Recorder report requires a SOLUTION, not ~S" solution))
-  (let ((path (solution.path solution))
-        (state (solution.goal solution)))
-    (list :integrated path
-          :recording (recorder-recording-sequence state path)
-          :playback (recorder-playback-sequence state path))))
-
-
-(defun print-recorder-report
-    (&optional (solution (first *solution-paths*)) (stream *standard-output*))
-  "Print and return the two-phase report derived from SOLUTION."
-  (let ((report (build-recorder-report solution)))
-    (format stream "~&~%Recording phase:~%")
-    (dolist (entry (getf report :recording))
-      (format stream "~S~%" entry))
-    (format stream "~&Playback phase:~%")
-    (dolist (entry (getf report :playback))
-      (format stream "~S~%" entry))
-    report))
-
-
-(register-solution-report-printer 'print-recorder-report)
+    (if (recording-control-on ?gears t)
+      (recording-turning ?gears)
+      (not (recording-turning ?gears)))))

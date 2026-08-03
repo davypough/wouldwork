@@ -58,7 +58,7 @@
 
 (include-tech plate)
 (include-tech box)
-(include-tech gears-fan)
+(include-tech -gears-fan)
 (include-tech reachability)
 
 

@@ -7,7 +7,7 @@
 ;;; every carried-object technology that must choose where a held object comes to rest:
 ;;; box, jammer, beam-relay, and floor-blower's fan.  Declared identically by each until
 ;;; now; this file owns it once.  Mounting a fan on gears is an attachment, not a support
-;;; placement, so it is gears-fan's own mount-fan action rather than a case here.
+;;; placement, so it is -gears-fan's own mount-fan action rather than a case here.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location

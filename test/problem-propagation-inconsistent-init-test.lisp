@@ -36,37 +36,31 @@
 (include-tech -propagation)
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-inconsistent-init-valid-p)
-  (lambda (state)
-    (let* ((before (database state))
-           (trial (copy-problem-state state)))
-      (setf (gethash *inconsistent-state-key* (problem-state.idb trial)) t)
-      (let* ((*start-state* trial)
-             (condition
-               (handler-case
-                   (progn (validate-start-state-consistency) nil)
-                 (error (error-condition) error-condition))))
-        (and
-          ;; VALIDATE-START-STATE-CONSISTENCY signals the documented fatal error.
-          condition
-          (search "Initial state is inconsistent" (princ-to-string condition))
-
-          ;; The isolated probe must not leak into the real planner state.
-          (equal (database state) before)
-          (not (state-is-inconsistent state))
-          (null *init-actions*)
-          (null *actions*))))))
+(define-test-claim propagation-inconsistent-init-contract
+  (let* ((real-start-state *start-state*)
+         (before (database real-start-state))
+         (trial (copy-problem-state real-start-state)))
+    (setf (gethash *inconsistent-state-key* (problem-state.idb trial)) t)
+    (let ((*start-state* trial))
+      (and
+        (expect-condition
+          (lambda () (validate-start-state-consistency))
+          'error
+          :containing "Initial state is inconsistent")
+        (equal (database real-start-state) before)
+        (not (state-is-inconsistent real-start-state)))))
+  (expect-registrations :init-action '())
+  (expect-registrations :action '()))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query propagation-inconsistent-init-scenarios-valid ()
-  (and (propagation-inconsistent-init-valid-p state)))
+  (not (inconsistent-state)))
 
 
 (define-goal

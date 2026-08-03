@@ -1,7 +1,7 @@
 ;;; Filename: problem-gun-blower-test.lisp
 
 ;;; Gun/blower regression for -threat's post-effect safety backstop.  Both gears are
-;;; uncontrolled (always turning, gears-fan's own default), so their mounted fans blow from
+;;; uncontrolled (always turning, -gears-fan's own default), so their mounted fans blow from
 ;;; initialization.  Stepping onto either fan launches its agent with no walk/jump/ladder
 ;;; destination precondition.
 ;;;
@@ -93,7 +93,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(defun gun-blower-unsafe-step-rejected-p (state agent fixture)
+(define-test-helper gun-blower-unsafe-step-rejected-p (state agent fixture)
   "Whether an applicable STEP-ON has no legitimate child from STATE."
   (let* ((action (find 'step-on *actions* :key #'action.name))
          (args (list agent fixture))

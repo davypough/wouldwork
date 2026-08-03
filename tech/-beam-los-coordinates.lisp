@@ -99,6 +99,7 @@
 ;;;   init      : derive-los-from-segments
 
 (include-tech -location-coordinates)
+(include-tech -segment-init-checks)
 
 (in-package :ww)
 

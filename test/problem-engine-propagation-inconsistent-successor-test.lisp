@@ -119,7 +119,7 @@
 ;;;; GENERATED-CHILD CHARACTERIZATION ;;;;
 
 
-(defun propagation-inconsistent-shortcut-rejected-p (state probe)
+(define-test-helper propagation-inconsistent-shortcut-rejected-p (state probe)
   "Whether an applicable shortcut is discarded without changing STATE."
   (let* ((action
            (find 'take-invalid-shortcut *actions* :key #'action.name))

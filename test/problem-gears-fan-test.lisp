@@ -158,7 +158,7 @@
 ;;;; ACTION-PRECONDITION CHARACTERIZATION ;;;;
 
 
-(defun fan-action-applicable-p (state action-name args)
+(define-test-helper fan-action-applicable-p (state action-name args)
   "Whether the installed fan action accepts ARGS in STATE."
   (let ((action (find action-name *actions* :key #'action.name)))
     (and (member args (get-precondition-args action state) :test #'equal)
@@ -271,3 +271,33 @@
 
 (define-goal
   (gears-fan-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-action-precondition-mutation pickup-fan-allows-welded pickup-fan
+  (and (bind (has-location ?agent $a-location))
+       (or (and (bind (has-location ?fan $fan-location))
+                (cleartop ?fan)
+                (pickup-clear ?agent $a-location ?fan $fan-location))
+           (and (bind (mounted-on ?fan $w-gears))
+                (wall-gears $w-gears)
+                (not (bind (holding ?agent $any-held)))
+                (bind (has-position $w-gears $fan-location))
+                (reachable $fan-location $a-location)
+                (within-agent-vertical-reach
+                  ?agent
+                  (gears-elevation $w-gears)))))
+  "Drops PICKUP-FAN's not-welded guard.  The welded-fan probe must then make
+   this characterization fail.")
+
+
+(define-action-precondition-mutation mount-fan-allows-occupied-gears mount-fan
+  (and (holding ?agent ?fan)
+       (bind (has-location ?agent $a-location))
+       (bind (has-position ?gears $g-location))
+       (reachable $g-location $a-location)
+       (within-agent-vertical-reach ?agent (gears-elevation ?gears)))
+  "Drops MOUNT-FAN's vacancy guard.  The occupied-gears probe must then make
+   this characterization fail.")

@@ -89,7 +89,7 @@
   (has-location live-support-box place-site)
   (has-location ghost-support-box place-site)
 
-  ;; Physical landing matrix used by gears-fan's shared landing-support query.
+  ;; Physical landing matrix used by -gears-fan's shared landing-support query.
   (has-location live-landing-box landing-site)
   (has-location ghost-landing-box landing-site)
 
@@ -109,25 +109,13 @@
 ;;;; CHARACTERIZATION HELPERS ;;;;
 
 
-(defun recorder-isolation-action-applicable-p (state action-name args)
+(define-test-helper recorder-isolation-action-applicable-p (state action-name args)
   (let ((action (find action-name *actions* :key #'action.name)))
     (and (member args (get-precondition-args action state) :test #'equal)
          (apply (action.pre-defun-name action) state args))))
 
 
-(defun recorder-isolation-error-contains-p (operation expected-text)
-  (let ((condition
-          (handler-case
-              (progn
-                (funcall operation)
-                nil)
-            (error (error-condition)
-              error-condition))))
-    (and condition
-         (not (null (search expected-text (princ-to-string condition)))))))
-
-
-(defun recorder-isolation-mappings ()
+(define-test-helper recorder-isolation-mappings ()
   '((recording-copy> live-pickup-agent ghost-pickup-agent)
     (recording-copy> live-place-agent ghost-place-agent)
     (recording-copy> live-pair-agent ghost-pair-agent)
@@ -139,99 +127,114 @@
     (recording-copy> live-target-connector ghost-target-connector)))
 
 
-(defun recorder-isolation-validation-valid-p ()
-  (and
-    (recorder-isolation-error-contains-p
-      (lambda ()
-        (check-init-recorder-consistency
-          (append (recorder-isolation-mappings)
-                  '((holding live-pickup-agent ghost-pickup-box)))))
-      "HOLDING crosses recording layers")
-    (recorder-isolation-error-contains-p
-      (lambda ()
-        (check-init-recorder-consistency
-          (append (recorder-isolation-mappings)
-                  '((on live-pickup-box ghost-support-box)))))
-      "ON crosses recording layers")
-    (recorder-isolation-error-contains-p
-      (lambda ()
-        (check-init-recorder-consistency
-          (append (recorder-isolation-mappings)
-                  '((paired ghost-pair-connector live-target-connector)))))
-      "PAIRED violates recorder connector isolation")
-    (not
-      (handler-case
-          (progn
-            (check-init-recorder-consistency
-              (append (recorder-isolation-mappings)
-                      '((paired live-pair-connector ghost-target-connector))))
-            nil)
-        (error () t)))))
+(define-test-claim recorder-isolation-validation
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append (recorder-isolation-mappings)
+                '((holding live-pickup-agent ghost-pickup-box)))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "HOLDING crosses recording layers"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append (recorder-isolation-mappings)
+                '((on live-pickup-box ghost-support-box)))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "ON crosses recording layers"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append (recorder-isolation-mappings)
+                '((paired ghost-pair-connector live-target-connector)))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "PAIRED violates recorder connector isolation"
+    :check 'recorder-init-check)
+  (null
+    (validate-init-literals
+      (append (recorder-isolation-mappings)
+              '((paired live-pair-connector ghost-target-connector)))
+      :checks '(recorder-init-check))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(define-query recorder-isolation-scenarios-valid ()
+;;;; One named query per theme rather than a single conjunction, so a regression narrows to
+;;;; a handful of clauses and each theme can be exercised on its own at the repl, eg
+;;;; (funcall 'recorder-isolation-placement-valid *start-state*).
+
+
+(define-query recorder-isolation-pickup-valid ()
+  ;; Generic pickup action: same-side legal, both cross-layer directions illegal.
+  (and (recorder-isolation-action-applicable-p
+         state 'pickup-box '(live-pickup-agent live-pickup-box))
+       (not (recorder-isolation-action-applicable-p
+              state 'pickup-box '(live-pickup-agent ghost-pickup-box)))
+       (recorder-isolation-action-applicable-p
+         state 'pickup-box '(ghost-pickup-agent ghost-pickup-box))
+       (not (recorder-isolation-action-applicable-p
+              state 'pickup-box '(ghost-pickup-agent live-pickup-box)))))
+
+
+(define-query recorder-isolation-placement-valid ()
+  ;; Placement retains shared ground/plate but filters mobile supports by layer.
   (do (assign $live-places
         (placement-options live-place-agent place-site live-place-connector))
       (assign $ghost-places
         (placement-options ghost-place-agent place-site ghost-place-connector))
-      (and
-        ;; Generic pickup action: same-side legal, both cross-layer directions illegal.
-        (recorder-isolation-action-applicable-p
-          state 'pickup-box '(live-pickup-agent live-pickup-box))
-        (not (recorder-isolation-action-applicable-p
-               state 'pickup-box '(live-pickup-agent ghost-pickup-box)))
-        (recorder-isolation-action-applicable-p
-          state 'pickup-box '(ghost-pickup-agent ghost-pickup-box))
-        (not (recorder-isolation-action-applicable-p
-               state 'pickup-box '(ghost-pickup-agent live-pickup-box)))
+      (and (member 'ground $live-places)
+           (member 'shared-plate $live-places)
+           (member 'live-support-box $live-places)
+           (not (member 'ghost-support-box $live-places))
+           (member 'ground $ghost-places)
+           (member 'shared-plate $ghost-places)
+           (member 'ghost-support-box $ghost-places)
+           (not (member 'live-support-box $ghost-places)))))
 
-        ;; Placement retains shared ground/plate but filters mobile supports by layer.
-        (member 'ground $live-places)
-        (member 'shared-plate $live-places)
-        (member 'live-support-box $live-places)
-        (not (member 'ghost-support-box $live-places))
-        (member 'ground $ghost-places)
-        (member 'shared-plate $ghost-places)
-        (member 'ghost-support-box $ghost-places)
-        (not (member 'live-support-box $ghost-places))
 
-        ;; Environmental landings use the same mobile-support isolation.
-        (eql (landing-support landing-site live-pickup-box nil)
-             'live-landing-box)
-        (eql (landing-support landing-site ghost-pickup-box nil)
-             'ghost-landing-box)
+(define-query recorder-isolation-landing-valid ()
+  ;; Environmental landings use the same mobile-support isolation.
+  (and (eql (landing-support landing-site live-pickup-box nil)
+            'live-landing-box)
+       (eql (landing-support landing-site ghost-pickup-box nil)
+            'ghost-landing-box)))
 
-        ;; Live playback may use either connector layer.  Ghost recording may use only
-        ;; ghost movable connectors.  Fixed transmitter apparatus is shared.
-        (connectable-terminus
-          live-pair-agent '(pair-origin) pair-origin
-          live-pair-connector live-target-connector)
-        (connectable-terminus
-          live-pair-agent '(pair-origin) pair-origin
-          live-pair-connector ghost-target-connector)
-        (connectable-terminus
-          ghost-pair-agent '(pair-origin) pair-origin
-          ghost-pair-connector ghost-target-connector)
-        (not (connectable-terminus
-               ghost-pair-agent '(pair-origin) pair-origin
-               ghost-pair-connector live-target-connector))
-        (connectable-terminus
-          live-pair-agent '(pair-origin) pair-origin
-          live-pair-connector shared-transmitter)
-        (connectable-terminus
-          ghost-pair-agent '(pair-origin) pair-origin
-          ghost-pair-connector shared-transmitter)
-        (recorder-isolation-action-applicable-p
-          state 'connect-connector '(live-pair-agent pair-origin))
-        (recorder-isolation-action-applicable-p
-          state 'connect-connector '(ghost-pair-agent pair-origin))
 
-        ;; Cross-fact validation rejects malformed authored starting states.
-        (recorder-isolation-validation-valid-p))))
+(define-query recorder-isolation-pairing-valid ()
+  ;; Live playback may use either connector layer.  Ghost recording may use only ghost
+  ;; movable connectors.  Fixed transmitter apparatus is shared.
+  (and (connectable-terminus
+         live-pair-agent '(pair-origin) pair-origin
+         live-pair-connector live-target-connector)
+       (connectable-terminus
+         live-pair-agent '(pair-origin) pair-origin
+         live-pair-connector ghost-target-connector)
+       (connectable-terminus
+         ghost-pair-agent '(pair-origin) pair-origin
+         ghost-pair-connector ghost-target-connector)
+       (not (connectable-terminus
+              ghost-pair-agent '(pair-origin) pair-origin
+              ghost-pair-connector live-target-connector))
+       (connectable-terminus
+         live-pair-agent '(pair-origin) pair-origin
+         live-pair-connector shared-transmitter)
+       (connectable-terminus
+         ghost-pair-agent '(pair-origin) pair-origin
+         ghost-pair-connector shared-transmitter)
+       (recorder-isolation-action-applicable-p
+         state 'connect-connector '(live-pair-agent pair-origin))
+       (recorder-isolation-action-applicable-p
+         state 'connect-connector '(ghost-pair-agent pair-origin))))
 
 
 (define-goal
-  (recorder-isolation-scenarios-valid))
+  (and (recorder-isolation-pickup-valid)
+       (recorder-isolation-placement-valid)
+       (recorder-isolation-landing-valid)
+       (recorder-isolation-pairing-valid)))

@@ -73,83 +73,69 @@
     (active active-receiver)))
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIMS ;;;;
 
 
-(setf
-  (symbol-function 'controls-substrate-metadata-valid-p)
-  (lambda (state)
-    (and
-      (nth-value 1 (gethash 'active *relations*))
-      (not (nth-value 1 (gethash 'active *static-relations*)))
-      (nth-value 1 (gethash 'controls *static-relations*))
-      (not (nth-value 1 (gethash 'controls *relations*)))
-      (member 'energized *query-names*)
-      (member 'update-receiver-status! *update-names*)
-      (not (member 'update-gate-status! *update-names*))
-      (not (member 'update-gears-status! *update-names*))
-      (not (member 'update-gun-status! *update-names*))
-      (equal (gethash 'mode *types*) '(normal inverted))
-      (null (remove nil (gethash 'plate *types*)))
-      (not (nth-value 1 (gethash 'depressed *relations*)))
-      (not (nth-value 1 (gethash 'depressed *static-relations*)))
-      (not (nth-value 1 (gethash 'open *relations*)))
-      (not (nth-value 1 (gethash 'turning *relations*)))
-      (equal
-        (mapcar #'action.name *init-actions*)
-        '(initialize-controls-substrate-state))
-      (null *actions*)
-      (equal (database state) '((active active-receiver)))
-      (not (state-is-inconsistent state)))))
+(define-test-claim controls-substrate-schema
+  (expect-relation-kind 'active :dynamic)
+  (expect-relation-kind 'controls :static)
+  (expect-registered :query 'energized)
+  (expect-registered :update 'update-receiver-status!)
+  (expect-not-registered :update 'update-gate-status!)
+  (expect-not-registered :update 'update-gears-status!)
+  (expect-not-registered :update 'update-gun-status!)
+  (expect-type-instances 'mode '(normal inverted))
+  (expect-empty-type 'plate)
+  (expect-relation-absent 'depressed)
+  (expect-relation-absent 'open :dynamic)
+  (expect-relation-absent 'turning :dynamic)
+  (expect-registrations
+    :init-action '(initialize-controls-substrate-state))
+  (expect-registrations :action '())
+  (equal (database *start-state*) '((active active-receiver)))
+  (not (state-is-inconsistent *start-state*)))
 
 
-(setf
-  (symbol-function 'controls-substrate-error-contains-p)
-  (lambda (thunk expected-text)
-    (let ((condition
-            (handler-case
-              (progn
-                (funcall thunk)
-                nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (not
-             (null
-               (search expected-text
-                       (princ-to-string condition))))))))
-
-
-(setf
-  (symbol-function 'controls-substrate-validation-valid-p)
-  (lambda ()
-    (and
-      (funcall (symbol-function 'controls-substrate-error-contains-p)
-        (lambda ()
-          (check-init-controls-list-contents
-            '((controls active-receiver sample-gate normal))))
-        "must use a DNF list")
-      (funcall (symbol-function 'controls-substrate-error-contains-p)
-        (lambda ()
-          (check-init-controls-list-contents
-            '((controls (active-receiver) sample-gate normal))))
-        "must use a DNF list")
-      (funcall (symbol-function 'controls-substrate-error-contains-p)
-        (lambda ()
-          (check-init-controls-list-contents
-            '((controls ((sample-gate)) sample-floor-gears normal))))
-        "Invalid item in DEFINE-INIT list")
-      (funcall (symbol-function 'controls-substrate-error-contains-p)
-        (lambda ()
-          (check-init-duplicate-fluent-keys
-            '((controls ((active-receiver)) sample-gate normal)
-              (controls ((inactive-receiver)) sample-gate inverted))))
-        "Duplicate DEFINE-INIT fluent key")
-      (funcall (symbol-function 'controls-substrate-error-contains-p)
-        (lambda ()
-          (check-init-controls-modes
-            '((controls ((active-receiver)) sample-gate toggle))))
-        "unsupported mode"))))
+(define-test-claim controls-substrate-validation
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((controls active-receiver sample-gate normal))
+        :checks '(controls-init-check)))
+    'init-check-failure
+    :containing "must use a DNF list"
+    :check 'controls-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((controls (active-receiver) sample-gate normal))
+        :checks '(controls-init-check)))
+    'init-check-failure
+    :containing "must use a DNF list"
+    :check 'controls-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((controls ((sample-gate)) sample-floor-gears normal))
+        :checks '(controls-init-check)))
+    'init-check-failure
+    :containing "Invalid item"
+    :check 'controls-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((controls ((active-receiver)) sample-gate normal)
+          (controls ((inactive-receiver)) sample-gate inverted))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key")
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((controls ((active-receiver)) sample-gate toggle))
+        :checks '(controls-init-check)))
+    'init-check-failure
+    :containing "unsupported mode"
+    :check 'controls-init-check))
 
 
 ;;;; CHARACTERIZATION QUERIES AND GOAL ;;;;
@@ -186,13 +172,7 @@
     (active active-receiver)
     (energized active-receiver)
     (not (active inactive-receiver))
-    (not (energized inactive-receiver))
-
-    ;; No public consumer or conditional plate behavior may leak into the role.
-    (controls-substrate-metadata-valid-p state)
-
-    ;; Every malformed declaration boundary is rejected by the shared init validator.
-    (controls-substrate-validation-valid-p)))
+    (not (energized inactive-receiver))))
 
 
 (define-goal

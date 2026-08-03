@@ -56,14 +56,11 @@
 ;;;; LAYERING CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'passability-neutral-layering-valid-p)
-  (lambda ()
-    (and
-      (equal (gethash 'gears *types*) '(neutral-gears))
-      (not (nth-value 1 (gethash 'mounted-on *relations*)))
-      (not (nth-value 1 (gethash 'turning *relations*)))
-      (not (nth-value 1 (gethash 'blowing *relations*))))))
+(define-test-claim passability-neutral-layering
+  (expect-type-instances 'gears '(neutral-gears))
+  (expect-relation-absent 'mounted-on)
+  (expect-relation-absent 'turning)
+  (expect-relation-absent 'blowing))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -93,10 +90,7 @@
     (holding carrying-agent carried-connector)
     (not
       (bind
-        (holding empty-agent $unexpected-cargo)))
-
-    ;; The passability substrate retains its intended dependency boundary.
-    (passability-neutral-layering-valid-p)))
+        (holding empty-agent $unexpected-cargo)))))
 
 
 (define-goal

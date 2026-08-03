@@ -24,6 +24,12 @@
   (reach-via location $list location))  ;reach edge (eg through a wall opening); $list = barrier gates that must be open
 
 
+(define-init-check reachability-init-check (literals)
+  (:consumes gate)
+  (check-init-list-relation-items-have-types
+    literals 'reach-via '(gate)))
+
+
 (define-query reachable (?location1 location ?location2 location)
   ;; Within reach iff the same location, or a reach edge joins them with every barrier open.
   ;; Agent-independent; reach-via is symmetric (both endpoints are locations).

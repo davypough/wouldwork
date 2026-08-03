@@ -10,6 +10,8 @@
 ;;;              absent from the problem's own define-types resolve to nil, a no-op
 ;;;   relation : (holding agent $cargo)
 
+(include-tech -physical-init-checks)
+
 (in-package :ww)
 
 

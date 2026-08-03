@@ -626,7 +626,7 @@
 (defun consumed-type-names ()
   "EQ hash table of every type name reachable from a relation signature, a query or
    update parameter list, an action parameter list, a quantifier domain inside any body,
-   or the named-segment convention.  Expanded transitively through *TYPE-COMPONENTS* so
+   or initialization-check metadata.  Expanded transitively through *TYPE-COMPONENTS* so
    a composite consumes its members -- AGENT counts as consumed via BEAM-BLOCKER =
    (EITHER AGENT BOX JAMMER CONNECTOR)."
   (let ((consumed (make-hash-table :test #'eq)))
@@ -646,7 +646,10 @@
       (mark-consumed-quantifier-domains (action.precondition-form action) consumed)
       (mark-consumed-quantifier-domains (action.effect-form action) consumed))
     (mark-consumed-quantifier-domains (get 'goal-fn :form) consumed)
-    (mark-consumed-segment-types consumed)
+    (dolist (check *init-checks*)
+      (mark-consumed-type-spec
+        (get check :init-check-consumed-types)
+        consumed))
     consumed))
 
 
@@ -666,19 +669,6 @@
            (mark-consumed-type-spec (second form) consumed))
          (mark-consumed-quantifier-domains (car form) consumed)
          (mark-consumed-quantifier-domains (cdr form) consumed))))
-
-
-(defun mark-consumed-segment-types (consumed)
-  "Marks the object type behind each named-segment relation the problem actually declares.
-   WALL-SEGMENTS and its siblings carry an untyped $list, so nothing in the signature
-   names WALL or WINDOW; the pairing lives in WW-INIT-VALIDATOR's
-   INIT-SEGMENT-RELATION-TYPES, which validates every record name against its type and is
-   therefore the consumer.  Marking is conditional on the relation being declared here, so
-   a problem with no segment geometry still reports an unused WINDOW."
-  (dolist (entry (init-segment-relation-types))
-    (when (or (gethash (car entry) *relations*)
-              (gethash (car entry) *static-relations*))
-      (mark-consumed-type-spec (cdr entry) consumed))))
 
 
 (defun mark-consumed-type-spec (spec consumed)

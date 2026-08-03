@@ -38,30 +38,16 @@
   ()
   (assert (propagate-changes!)))
 
-(setf
-  (symbol-function 'threat-neutral-schema-valid-p)
-  (lambda ()
-    (multiple-value-bind (threatens-signature threatens-static-p)
-        (gethash 'threatens *static-relations*)
-      (multiple-value-bind (lethal-signature lethal-dynamic-p)
-          (gethash 'lethal *relations*)
-        (and
-          (equal (gethash 'threat *type-components*) '(gun))
-          (equal (gethash 'threat *types*) '(nil))
-          (null (gethash 'gun *types*))
-          threatens-static-p
-          (equal threatens-signature '(threat list))
-          (equal (gethash 'threatens *fluent-relation-indices*) '(2))
-          lethal-dynamic-p
-          (equal lethal-signature '(threat))
-          (not (nth-value 1 (gethash 'lethal *static-relations*)))
-          (not (nth-value 1 (gethash 'controls *static-relations*)))
-          (not (nth-value 1 (gethash 'jamming *relations*))))))))
-
-(setf
-  (symbol-function 'threat-state-consistent-p)
-  (lambda (state)
-    (not (state-is-inconsistent state))))
+(define-test-claim threat-neutral-schema
+  (expect-type-components 'threat '(gun))
+  (expect-empty-type 'threat)
+  (expect-empty-type 'gun)
+  (expect-relation-schema
+    'threatens :static '(threat list) :fluent-indices '(2))
+  (expect-relation-schema 'lethal :dynamic '(threat))
+  (expect-relation-absent 'controls :static)
+  (expect-relation-absent 'jamming :dynamic)
+  (not (state-is-inconsistent *start-state*)))
 
 (define-query threat-scenarios-valid ()
   (and
@@ -77,9 +63,7 @@
            (lethal ?candidate)))
     (not (exists (?candidate threat)
            (bind (threatens ?candidate
-                            $unexpected-threatened-locations))))
-    (threat-state-consistent-p state)
-    (threat-neutral-schema-valid-p)))
+                            $unexpected-threatened-locations))))))
 
 (define-goal
   (threat-scenarios-valid))

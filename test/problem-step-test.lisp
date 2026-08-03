@@ -46,7 +46,7 @@
 
 
 (include-tech plate)
-(include-tech gears-fan)
+(include-tech -gears-fan)
 (include-tech step)
 
 
@@ -116,7 +116,7 @@
 ;;;; ACTION-PRECONDITION CHARACTERIZATION ;;;;
 
 
-(defun step-action-applicable-p (state action-name args)
+(define-test-helper step-action-applicable-p (state action-name args)
   "Whether the installed step action accepts ARGS in STATE."
   (let ((action (find action-name *actions* :key #'action.name)))
     (and (member args (get-precondition-args action state) :test #'equal)
@@ -215,3 +215,39 @@
 
 (define-goal
   (step-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-action-precondition-mutation step-on-allows-supported-agent step-on
+  (and (bind (has-location ?agent $a-location))
+       (or (and (plate ?fixture)
+                (bind (has-position ?fixture $f-location)))
+           (and (fan ?fixture)
+                (bind (mounted-on ?fixture $gears))
+                (bind (has-location ?fixture $f-location))))
+       (eql $a-location $f-location)
+       (cleartop ?fixture))
+  "Drops STEP-ON's ground-only guard.  The supported-agent probe must then make
+   this characterization fail.")
+
+
+(define-action-precondition-mutation step-on-ignores-location step-on
+  (and (bind (has-location ?agent $a-location))
+       (not (bind (on ?agent $anyplace)))
+       (or (and (plate ?fixture)
+                (bind (has-position ?fixture $f-location)))
+           (and (fan ?fixture)
+                (bind (mounted-on ?fixture $gears))
+                (bind (has-location ?fixture $f-location))))
+       (cleartop ?fixture))
+  "Drops STEP-ON's exact-colocation check.  The remote-plate probe must then
+   make this characterization fail.")
+
+
+(define-action-precondition-mutation step-off-allows-any-support step-off
+  (and (bind (on ?agent $fixture))
+       (bind (has-location ?agent $a-location)))
+  "Drops STEP-OFF's steppable-type guard.  The box-support probe must then make
+   this characterization fail.")

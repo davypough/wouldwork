@@ -17,7 +17,7 @@
 ;;;   nested    : -support-occupancy ((on ...), cleartop); -location ((has-location ...));
 ;;;               -position ((has-position ...))
 ;;;   conditional relations:
-;;;               mounted-on (fan), guarded by fan  --  owned by gears-fan.lisp;
+;;;               mounted-on (fan), guarded by fan  --  owned by -gears-fan.lisp;
 ;;;               translation removes the guarded reference when the fan type is empty
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:

@@ -47,6 +47,7 @@
 (include-tech -beam-substrate)
 (include-tech -beam-crossing-coordinates)
 (include-tech -gate)
+(include-tech -beam-crossing-init-checks)
 
 (in-package :ww)
 
@@ -56,6 +57,10 @@
 
 (define-dynamic-relations
   (crossing-active crossing))
+
+
+(define-derived-relations
+  crossing-active)
 
 
 (define-static-relations

@@ -176,12 +176,11 @@
   (assert (propagate-changes!)))
 
 
-;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+;;;; CHARACTERIZATION CLAIM, QUERY, AND GOAL ;;;;
 
 
-(defun repeaters-are-fixed-p ()
-  (null (intersection (gethash 'repeater *types*)
-                      (gethash 'mobile-object *types*))))
+(define-test-claim repeater-type-boundary
+  (expect-types-disjoint 'repeater 'mobile-object))
 
 
 (define-query repeater-crossing-scenario-valid ()
@@ -202,7 +201,6 @@
 (define-query repeater-scenarios-valid ()
   (and (= (repeater-anchor-elevation floor-repeater1) 5)
        (= (repeater-anchor-elevation wall-repeater1) 1)
-       (repeaters-are-fixed-p)
        (color floor-repeater1 amber)
        (active floor-receiver)
        (color wall-repeater1 violet)

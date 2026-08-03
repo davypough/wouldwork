@@ -53,49 +53,37 @@
   (pass-count 0))
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-convergence-limit-valid-p)
-  (lambda (state)
-    (let* ((before (database state))
-           (trial (copy-problem-state state))
-           (result
-             (funcall
-               (symbol-function 'propagate-changes!)
-               trial)))
-      (and
-        ;; Ten changing passes exhaust the loop and report failure.
-        (null result)
-        (state-is-inconsistent trial)
-        (equal
-          (database trial)
-          '((inconsistent-state)
-            (pass-count 10)))
-
-        ;; The authored consequence driver contains only the deliberate
-        ;; nonconvergent update.
-        (equal
-          (authored-propagation-order
-            (authored-propagation-driver-body))
-          '(increment-pass-count!))
-
-        ;; The isolated run must not leak into the real planner state.
-        (equal before '((pass-count 0)))
-        (equal (database state) before)
-        (not (state-is-inconsistent state))
-        (null *init-actions*)
-        (null *actions*)))))
+(define-test-claim propagation-convergence-limit-contract
+  (let* ((before (database *start-state*))
+         (trial (copy-problem-state *start-state*))
+         (result
+           (funcall 'propagate-changes! trial)))
+    (and
+      (null result)
+      (state-is-inconsistent trial)
+      (equal
+        (database trial)
+        '((inconsistent-state)
+          (pass-count 10)))
+      (equal before '((pass-count 0)))
+      (equal (database *start-state*) before)
+      (not (state-is-inconsistent *start-state*))))
+  (equal
+    (authored-propagation-order
+      (authored-propagation-driver-body))
+    '(increment-pass-count!))
+  (expect-registrations :init-action '())
+  (expect-registrations :action '()))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query propagation-convergence-limit-scenarios-valid ()
-  (and
-    (pass-count 0)
-    (propagation-convergence-limit-valid-p state)))
+  (pass-count 0))
 
 
 (define-goal

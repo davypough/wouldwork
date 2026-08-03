@@ -61,7 +61,7 @@
 (include-tech plate)
 (include-tech jammer)
 (include-tech gate)
-(include-tech gears-fan)
+(include-tech -gears-fan)
 (include-tech reachability)
 (include-tech visibility)
 
@@ -130,7 +130,7 @@
                    (jamming ?jammer ?other))))))
 
 
-(defun jammer-action-applicable-p (state action-name args)
+(define-test-helper jammer-action-applicable-p (state action-name args)
   "Whether the installed jammer action accepts ARGS in STATE."
   (let ((action (find action-name *actions* :key #'action.name)))
     (and (member args (get-precondition-args action state) :test #'equal)
@@ -210,3 +210,43 @@
 
 (define-goal
   (jammer-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-action-precondition-mutation jam-target-ignores-disallowed jam-target
+  (and (bind (holding ?agent $any-jammer))
+       (jammer $any-jammer)
+       (bind (has-location ?agent $a-location))
+       (reachable ?location $a-location)
+       (or (and (or (gate ?target) (gun ?target))
+                (visible ?location ?target))
+           (and (or (floor-gears ?target) (wall-gears ?target))
+                (bind (has-position ?target $t-location))
+                (or (eql ?location $t-location)
+                    (visible ?location $t-location))))
+       (assign $places
+               (placement-options ?agent ?location $any-jammer)))
+  "Drops JAM-TARGET's authored disallowance guard.  The disallowed pairing probe
+   must then make this characterization fail.")
+
+
+(define-update-mutation gate-update-ignores-jamming update-gate-status!
+  ()
+  (doall (?gate gate)
+    (do (assign $control-on nil)
+        (if (bind (controls $clauses ?gate $mode))
+          (do (assign $any-clause-on
+                (ww-loop for $clause in $clauses
+                         thereis (ww-loop for $c in $clause
+                                          always (energized $c))))
+              (if (eql $mode 'normal)
+                (assign $control-on $any-clause-on)
+                (if (eql $mode 'inverted)
+                  (assign $control-on (not $any-clause-on))))))
+        (if $control-on
+          (open ?gate)
+          (not (open ?gate)))))
+  "Drops UPDATE-GATE-STATUS!'s jamming override.  GATE-TARGET must then remain
+   closed and make this characterization fail.")

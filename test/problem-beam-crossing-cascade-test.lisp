@@ -58,12 +58,9 @@
 ;;; plan step).  Expected minimum path length: zero.
 ;;;
 ;;; A CHARACTERIZATION HELPER below re-derives the crossing-active facts on a copy of
-;;; state via a direct funcall on UPDATE-CROSSING-STATUS!, mirroring
+;;; state via UPDATE-CROSSING-STATUS!, mirroring
 ;;; problem-beam-crossing-deadlock-test.lisp's own idiom, rather than trusting only the
-;;; facts the init-action already baked in.  This makes ARBITRATE-CROSSINGS' priority
-;;; branch reachable by a symbol-function swap installed after staging completes --
-;;; the init-action's own propagate-changes! call runs inside %stage itself, before any
-;;; such swap could take effect.
+;;; facts the init-action already baked in.
 
 (in-package :ww)
 
@@ -153,19 +150,23 @@
 ;;;; CHARACTERIZATION HELPER ;;;;
 
 
-(defun beam-crossing-cascade-recomputed-valid-p (state)
+(define-test-helper beam-crossing-cascade-recomputed-valid-p (state)
   "Confirm that re-running UPDATE-CROSSING-STATUS! on a copy of STATE reproduces the
    same crossing-active facts the init-action already established, and leaves the real
    STATE untouched.  A broken ARBITRATE-CROSSINGS changes the kept set on
    recomputation -- either landing on a different but self-consistent set, or failing
    its own re-validation and marking the copy inconsistent -- so either symptom is
-   caught here without needing to predict which one occurs."
+  caught here without needing to predict which one occurs."
   (let* ((before (database state))
          (trial (copy-problem-state state)))
-    (funcall (symbol-function 'update-crossing-status!) trial)
+    (funcall 'update-crossing-status! trial)
     (and (equal (database trial) before)
          (not (state-is-inconsistent trial))
          (equal (database state) before))))
+
+
+(define-test-claim beam-crossing-cascade-recomputation
+  (beam-crossing-cascade-recomputed-valid-p *start-state*))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -183,9 +184,40 @@
     (not (active receiver-sw))
     (not (active receiver-se))
     (not (active receiver-ne))
-    (not (active receiver-nw))
-    (beam-crossing-cascade-recomputed-valid-p state)))
+    (not (active receiver-nw))))
 
 
 (define-goal
   (beam-crossing-cascade-scenario-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-query-mutation beam-crossing-alphabetical-arbitration arbitrate-crossings
+  (?candidate)
+  (do (assign $kept nil)
+      (assign $remaining ?candidate)
+      (ww-loop for $round from 1 to (length ?candidate)
+               do (assign $lighting (compute-relay-lighting $kept))
+                  (assign $best nil)
+                  (doall (?x (get-current-crossings))
+                    (if (and (member ?x $remaining)
+                             (crossing-reaches ?x $kept $lighting))
+                      (if (or (not $best)
+                              (string< (symbol-name ?x) (symbol-name $best)))
+                        (assign $best ?x))))
+                  (if (not $best)
+                    (return t)
+                    (do (assign $kept (cons $best $kept))
+                        (assign $remaining (remove $best $remaining)))))
+      $kept)
+  "Drops numeric crossing priority and retains only alphabetical arbitration.
+   The four-way cascade must then make this characterization fail.")
+
+
+(define-query-mutation beam-crossing-subset-equality same-crossing-set
+  (?left ?right)
+  (ww-loop for $crossing in ?left always (member $crossing ?right))
+  "Drops the crossing-set length check.  The oscillating empty/full sequence must
+   then make this characterization fail.")

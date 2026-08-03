@@ -12,6 +12,8 @@
 ;;;              nil, a no-op
 ;;;   relation : (has-location mobile-object $location)
 
+(include-tech -physical-init-checks)
+
 (in-package :ww)
 
 

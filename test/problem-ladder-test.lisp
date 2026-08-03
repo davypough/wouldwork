@@ -120,7 +120,7 @@
 ;;;; ACTION-PRECONDITION CHARACTERIZATION ;;;;
 
 
-(defun use-ladder-applicable-p (state agent ladder destination)
+(define-test-helper use-ladder-applicable-p (state agent ladder destination)
   "Whether the installed USE-LADDER action accepts this exact parameter tuple in STATE."
   (let* ((action (find 'use-ladder *actions* :key #'action.name))
          (args (list agent ladder destination)))
@@ -201,3 +201,62 @@
 
 (define-goal
   (ladder-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-query-mutation ladder-obstacle-allows-carrying obstacle-clear
+  (?agent agent ?obstacle (either gate screen ladder gears))
+  (or (and (gate ?obstacle) (open ?obstacle))
+      (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
+      (ladder ?obstacle)
+      (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle)))
+  "Drops the not-holding guard from ladder passability.  The carrying-agent
+   probe must then make this characterization fail.")
+
+
+(define-query-mutation ladder-obstacle-ignores-closed-gate obstacle-clear
+  (?agent agent ?obstacle (either gate screen ladder gears))
+  (or (gate ?obstacle)
+      (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
+      (and (ladder ?obstacle) (not (bind (holding ?agent $any-held-object))))
+      (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle)))
+  "Drops the open-state guard from gate passability.  The closed-gate probe
+   must then make this characterization fail.")
+
+
+(define-action-precondition-mutation use-ladder-allows-supported-agent use-ladder
+  (and (bind (has-location ?agent $a-location))
+       (bind (has-position ?ladder $ladder-location))
+       (eql $a-location $ladder-location)
+       (bind (climb-via> $a-location $means ?destination))
+       (member ?ladder $means)
+       (one-way-clear ?agent $means)
+       (safe ?destination))
+  "Drops USE-LADDER's ground-only guard.  The supported-agent probe must then
+   make this characterization fail.")
+
+
+(define-action-precondition-mutation use-ladder-ignores-position use-ladder
+  (and (bind (has-location ?agent $a-location))
+       (not (bind (on ?agent $anyplace)))
+       (bind (has-position ?ladder $ladder-location))
+       (bind (climb-via> $a-location $means ?destination))
+       (member ?ladder $means)
+       (one-way-clear ?agent $means)
+       (safe ?destination))
+  "Drops USE-LADDER's exact-positioning check.  The misplaced-agent probe must
+   then make this characterization fail.")
+
+
+(define-action-precondition-mutation use-ladder-ignores-means-membership use-ladder
+  (and (bind (has-location ?agent $a-location))
+       (not (bind (on ?agent $anyplace)))
+       (bind (has-position ?ladder $ladder-location))
+       (eql $a-location $ladder-location)
+       (bind (climb-via> $a-location $means ?destination))
+       (one-way-clear ?agent $means)
+       (safe ?destination))
+  "Drops USE-LADDER's means-membership check.  The unlisted-agent probe must
+   then make this characterization fail.")

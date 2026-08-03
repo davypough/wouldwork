@@ -27,6 +27,10 @@
   (latched toggle-plate))
 
 
+(define-derived-relations
+  depressed)
+
+
 (define-update update-plate-status! ()
   ;; A plate is depressed iff something rests on it.  During initial-state construction,
   ;; existing occupancy establishes that physical baseline without changing a toggle

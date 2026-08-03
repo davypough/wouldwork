@@ -43,6 +43,7 @@
 (include-tech -walkability)
 (include-tech -reachability)
 (include-tech -pickup)
+(include-tech -beam-relay-init-checks)
 
 (in-package :ww)
 
@@ -58,6 +59,10 @@
 (define-dynamic-relations
   (paired connector terminus)
   (color relay $hue))
+
+
+(define-derived-relations
+  color)
 
 
 ;;;; ACTIONS ;;;;

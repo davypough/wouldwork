@@ -36,6 +36,12 @@
   (climb-via> location $list location))  ;directed climb edge; $list = enabling means
 
 
+(define-init-check ladder-init-check (literals)
+  (:consumes gate screen ladder)
+  (check-init-list-relation-items-have-types
+    literals 'climb-via> '(gate screen ladder)))
+
+
 (define-query one-way-clear (?agent agent ?means)
   ;; Every implement enabling a one-way edge must be usable by ?agent.  Delegates to
   ;; passability's shared all-clear over the edge's means list, so use-ladder can

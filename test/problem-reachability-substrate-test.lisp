@@ -32,22 +32,18 @@
 (include-tech -reachability)
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'reachability-substrate-metadata-valid-p)
-  (lambda (state)
-    (and
-      (member 'reachable *query-names*)
-      (not (member 'reachable-clear *query-names*))
-      (zerop (hash-table-count *static-relations*))
-      (= (hash-table-count *relations*) 1)
-      (nth-value 1 (gethash 'inconsistent-state *relations*))
-      (null *init-actions*)
-      (null *actions*)
-      (null (database state))
-      (not (state-is-inconsistent state)))))
+(define-test-claim reachability-substrate-schema
+  (expect-registered :query 'reachable)
+  (expect-not-registered :query 'reachable-clear)
+  (expect-relations :static '())
+  (expect-relations :dynamic '(inconsistent-state))
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -66,10 +62,7 @@
     (not (reachable first-site isolated-site))
     (not (reachable isolated-site first-site))
     (not (reachable second-site isolated-site))
-    (not (reachable isolated-site second-site))
-
-    ;; No public extension or stateful behavior may leak into the role.
-    (reachability-substrate-metadata-valid-p state)))
+    (not (reachable isolated-site second-site))))
 
 
 (define-goal

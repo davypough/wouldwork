@@ -69,6 +69,15 @@
   (los-to-location location $list location))  ;symmetric per-pair occluders for location-to-location sightlines
 
 
+(define-init-check visibility-init-check (literals)
+  (check-init-list-relation-items-have-types
+    literals 'los-to-apparatus '(gate location))
+  (check-init-list-relation-items-have-types
+    literals 'los-to-target '(gate))
+  (check-init-list-relation-items-have-types
+    literals 'los-to-location '(gate location)))
+
+
 (define-query visible (?location location ?object (either fixture location))
   ;; A sightline must exist (an empty occluder list is a direct, always-clear line); it is
   ;; clear iff every occluder gate is open.  Agent-independent and endpoint-elevation-blind:

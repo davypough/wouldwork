@@ -122,14 +122,15 @@ Sections appear in this canonical order:
 3. `define-types` (object types and instances) — and `define-optional-types`
 4. `include-tech` directives — **Path A only; must come after `define-types`**
 5. `define-dynamic-relations` (state relations that change)
-6. `define-static-relations` (state relations that don't change)
-7. Query functions (`define-query`)
-8. Update functions (`define-update`)
-9. Actions (`define-action`)
-10. `define-happening` / `define-patroller` (exogenous events), if any
-11. `define-init` (initial state assertions)
-12. `define-init-action` (derivations run once at initialization), if any
-13. `define-goal` (goal condition)
+6. `define-derived-relations` (dynamic relations computed during initialization), if any
+7. `define-static-relations` (state relations that don't change)
+8. Query functions (`define-query`)
+9. Update functions (`define-update`)
+10. Actions (`define-action`)
+11. `define-happening` / `define-patroller` (exogenous events), if any
+12. `define-init` (initial state assertions)
+13. `define-init-action` (derivations run once at initialization), if any
+14. `define-goal` (goal condition)
 
 Only one of these orderings is a hard requirement rather than a convention:
 **`define-types` must precede every `include-tech` directive.** Section 1.5 explains
@@ -210,6 +211,21 @@ Relations that change during search. Stored in the mutable state database (IDB).
   Use `bind` to retrieve. A relation can have multiple fluent args.
 - `(inconsistent-state)` is a built-in nullary dynamic relation. Asserting it
   causes Wouldwork to prune the current search branch.
+
+#### Derived Relations (`define-derived-relations`)
+
+Dynamic relations whose initial values are computed by initialization and propagation:
+
+```lisp
+(define-derived-relations
+  active
+  open
+  color)
+```
+
+Each name must already be declared as a dynamic relation somewhere in the assembled
+problem. A derived relation may be asserted and retracted by initialization actions and
+updates, but must not appear positively or negatively in `define-init`.
 
 #### Static Relations (`define-static-relations`)
 
@@ -482,7 +498,16 @@ Asserts the initial state — both dynamic and static relations:
 
 - If a relation name is in `define-dynamic-relations`, it goes to the dynamic DB.
 - If a relation name is in `define-static-relations`, it goes to the static DB.
+- If a dynamic relation is named by `define-derived-relations`, omit it from
+  `define-init`; initialization actions and propagation establish its value.
 - `(not (...))` retracts a relation (rarely needed in init).
+
+`install-init` validates the complete raw literal set before asserting any of it. The engine
+rejects storage-level contradictions such as duplicate fluent keys and authored derived facts;
+each included technology registers its own semantic checks for the relations it owns. Consequently
+all syntax and semantic specification failures are reported while staging, before init-actions or
+search begin. A standalone problem that includes no technologies does not inherit Talos-specific
+rules.
 
 `define-init-action` runs a derivation once during initialization — computing static
 facts from raw geometry, for instance. Two cautions: init-actions fire in file/splice

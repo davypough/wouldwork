@@ -51,107 +51,119 @@
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'recorder-schema-valid-p)
-  (lambda ()
-    (multiple-value-bind (static-signature staticp)
-        (gethash 'recording-copy> *static-relations*)
-      (multiple-value-bind (dynamic-signature dynamicp)
-          (gethash 'recording-copy> *relations*)
-        (declare (ignore dynamic-signature))
-        (and
-          staticp
-          (equal static-signature '(mobile-object mobile-object))
-          (not dynamicp)
-          (equal
-            (gethash 'recording-copy> *fluent-relation-indices*)
-            '(2))
-          (equal
-            (gethash 'fixed-position-object *type-components*)
-            '(plate ladder floor-gears wall-gears angled-gears recorder))
-          (member 'recorder1 (gethash 'fixed-position-object *types*)))))))
+(define-test-claim recorder-schema
+  (expect-relation-schema
+    'recording-copy> :static '(mobile-object mobile-object)
+    :fluent-indices '(2))
+  ;; Membership, not the full union roster: another technology may add a fixed kind.
+  (expect-type-component 'fixed-position-object 'recorder)
+  (expect-type-instance 'fixed-position-object 'recorder1)
+  (expect-registrations :solution-validator nil)
+  (expect-registrations :solution-printer nil))
 
 
-(setf
-  (symbol-function 'recorder-error-contains-p)
-  (lambda (operation expected-text)
-    (let ((condition
-            (handler-case
-                (progn
-                  (funcall operation)
-                  nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (not
-             (null
-               (search expected-text
-                       (princ-to-string condition))))))))
+(define-test-claim recorder-validation
+  (expect-condition
+    (lambda ()
+      (check-proposition '(recording-copy> recorder1 ghost-agent)))
+    'error
+    :containing "not of specified type MOBILE-OBJECT")
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent ghost-agent)
+          (recording-copy> live-agent other-ghost-agent))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key")
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent ghost-agent)
+          (recording-copy> other-live-agent ghost-agent))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "repeats a ghost object"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent live-agent))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "maps an object to itself"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent ghost-agent)
+          (recording-copy> ghost-agent third-agent))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "both live and ghost sides"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent ghost-connector))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "incompatible object categories"
+    :check 'recorder-init-check)
+  ;; This scope check reads the installed type table, so the probe temporarily supplies
+  ;; the otherwise absent jammer type and restores the table before the claim returns.
+  (expect-condition
+    (lambda ()
+      (unwind-protect
+          (progn
+            (setf (gethash 'jammer *types*) '(probe-jammer))
+            (validate-init-literals nil :checks '(recorder-init-check)))
+        (remhash 'jammer *types*)))
+    'init-check-failure
+    :containing "does not yet support recording-side jamming"
+    :check 'recorder-init-check))
 
 
-(setf
-  (symbol-function 'recorder-validation-valid-p)
-  (lambda ()
-    (and
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-proposition
-            '(recording-copy> recorder1 ghost-agent)))
-        "not of specified type MOBILE-OBJECT")
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-init-duplicate-fluent-keys
-            '((recording-copy> live-agent ghost-agent)
-              (recording-copy> live-agent other-ghost-agent))))
-        "Duplicate DEFINE-INIT fluent key")
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-init-recorder-consistency
-            '((recording-copy> live-agent ghost-agent)
-              (recording-copy> other-live-agent ghost-agent))))
-        "repeats a ghost object")
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-init-recorder-consistency
-            '((recording-copy> live-agent live-agent))))
-        "maps an object to itself")
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-init-recorder-consistency
-            '((recording-copy> live-agent ghost-agent)
-              (recording-copy> ghost-agent third-agent))))
-        "both live and ghost sides")
-      (funcall (symbol-function 'recorder-error-contains-p)
-        (lambda ()
-          (check-init-recorder-consistency
-            '((recording-copy> live-agent ghost-connector))))
-        "incompatible object categories"))))
+;;;; CHARACTERIZATION QUERIES AND GOAL ;;;;
+;;;; One named query per theme rather than a single conjunction, so a regression narrows to
+;;;; a handful of clauses and each theme can be exercised on its own at the repl, eg
+;;;; (funcall 'recorder-side-classification-valid *start-state*).
 
 
-;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+(define-query recorder-mapping-valid ()
+  ;; RECORDING-COPY> holds as authored and is directional: the reverse pair is not a fact.
+  (and (recording-copy> live-agent ghost-agent)
+       (recording-copy> live-connector ghost-connector)
+       (not (recording-copy> ghost-agent live-agent))))
 
 
-(define-query recorder-scenarios-valid ()
-  (and
-    (recording-copy> live-agent ghost-agent)
-    (recording-copy> live-connector ghost-connector)
-    (not (recording-copy> ghost-agent live-agent))
-    (live-recording-object live-agent)
-    (live-recording-object live-connector)
-    (not (ghost-recording-object live-agent))
-    (ghost-recording-object ghost-agent)
-    (ghost-recording-object ghost-connector)
-    (not (live-recording-object ghost-agent))
-    (not (live-recording-object unmapped-fan))
-    (not (ghost-recording-object unmapped-fan))
-    (has-position recorder1 recorder-site)
-    (not (has-position recorder1 alternate-site))
-    (not (bind
-           (has-position
-             unpositioned-recorder $unpositioned-recorder-location)))
-    (recorder-schema-valid-p)
-    (recorder-validation-valid-p)))
+(define-query recorder-side-classification-valid ()
+  ;; Each mapped object classifies onto exactly one recording side.
+  (and (live-recording-object live-agent)
+       (live-recording-object live-connector)
+       (not (ghost-recording-object live-agent))
+       (ghost-recording-object ghost-agent)
+       (ghost-recording-object ghost-connector)
+       (not (live-recording-object ghost-agent))))
+
+
+(define-query recorder-unmapped-object-valid ()
+  ;; MOBILE-OBJECT membership alone assigns no side: the unmapped fan is neither live nor
+  ;; ghost, which is what makes the mapping authoritative rather than exhaustive.
+  (and (not (live-recording-object unmapped-fan))
+       (not (ghost-recording-object unmapped-fan))))
+
+
+(define-query recorder-position-valid ()
+  ;; HAS-POSITION is functional over recorders, and a recorder may have none at all.
+  (and (has-position recorder1 recorder-site)
+       (not (has-position recorder1 alternate-site))
+       (not (bind
+              (has-position
+                unpositioned-recorder $unpositioned-recorder-location)))))
 
 
 (define-goal
-  (recorder-scenarios-valid))
+  (and (recorder-mapping-valid)
+       (recorder-side-classification-valid)
+       (recorder-unmapped-object-valid)
+       (recorder-position-valid)))

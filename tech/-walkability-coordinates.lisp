@@ -93,6 +93,7 @@
 
 (include-tech -walkability)
 (include-tech -location-coordinates)
+(include-tech -segment-init-checks)
 
 (in-package :ww)
 

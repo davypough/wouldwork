@@ -77,7 +77,7 @@
   ()
   (assert (propagate-changes!)))
 
-(defun walk-action-produces-successor-p (state agent)
+(define-test-helper walk-action-produces-successor-p (state agent)
   "Whether the installed WALK action produces a successor for AGENT in STATE."
   (let* ((action (find 'walk *actions* :key #'action.name))
          (args (list agent)))
@@ -155,3 +155,14 @@
 
 (define-goal
   (walkability-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-action-precondition-mutation walk-allows-supported-agent walk
+  (and (bind (has-location ?agent $a-location))
+       (assign $walkable-locations
+               (walkable-locations ?agent $a-location)))
+  "Drops WALK's ground-only guard.  The supported-agent probe must then make
+   this characterization fail.")

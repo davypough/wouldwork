@@ -54,7 +54,7 @@
       (validator-at validator-accepted)))
 
 
-(defun accept-only-repaired-validator (start-state path goal-state)
+(define-test-helper accept-only-repaired-validator (start-state path goal-state)
   "Accept only the repaired goal, returning a diagnostic for the rejected prefix."
   (declare (ignore start-state path))
   (if (member '(validator-at validator-accepted)

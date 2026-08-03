@@ -1,4 +1,4 @@
-;;; Filename: gears-fan.lisp
+;;; Filename: -gears-fan.lisp
 
 ;;; Gears/fan substrate: the shared machinery every blower technology programs against,
 ;;; modeled on -beam-substrate's peer-substrate pattern.  A blower is a fan mounted on a
@@ -107,6 +107,11 @@
   (blowing fan))  ;derived each pass; a fan blows iff it is mounted on turning gears
 
 
+(define-derived-relations
+  turning
+  blowing)
+
+
 (define-static-relations
   (aimed-at> gears $location)  ;fixed destination the air stream carries an occupant to
   (welded fan $gears))  ;the fan is permanently attached to these gears and cannot be separated; declare alongside the init's (mounted-on ...)
@@ -133,31 +138,21 @@
 
 
 (define-update update-gears-status! ()
-  ;; Pass 1: turning <=> (uncontrolled OR control-on) AND not jammed, with control-on
-  ;; computed exactly as gate.lisp's update-gate-status! computes it: some DNF clause has
-  ;; every member energized (normal); inverted negates that aggregate.  A jamming jammer
-  ;; forces gears stopped -- the polarity mirror of gate's jam-forces-open: a jam always
-  ;; disables the barrier.  Pass 2: a fan blows iff it is mounted on turning gears.  Pure
-  ;; state derivation only: what blowing does (launching, sweeping, dropping) is
+  ;; Pass 1: turning <=> control-on AND not jammed, with -controls' shared CONTROL-ON
+  ;; supplying the DNF aggregate and a T uncontrolled default, so gears nothing controls
+  ;; turn all the time.  A jamming jammer forces gears stopped -- the polarity mirror of
+  ;; gate's jam-forces-open: a jam always disables the barrier.  Pass 2: a fan blows iff it
+  ;; is mounted on turning gears.  Pure state derivation only: what blowing does
+  ;; (launching, sweeping, dropping) is
   ;; mounting-specific and owned by each mounting tech's own consequences update, which
   ;; the driver calls after this one.  Change detection is automatic, so an unchanged
   ;; re-assert is silent.
   (do (doall (?g gears)
-        (do (assign $control-on t)  ;uncontrolled gears are always on
-            (if (bind (controls $clauses ?g $mode))
-              (do (assign $any-clause-on
-                    (ww-loop for $clause in $clauses
-                             thereis (ww-loop for $c in $clause
-                                              always (energized $c))))
-                  (if (eql $mode 'normal)
-                    (assign $control-on $any-clause-on)
-                    (if (eql $mode 'inverted)
-                      (assign $control-on (not $any-clause-on))))))
-            (if (and $control-on
-                     (not (exists (?j jammer)
-                            (jamming ?j ?g))))
-              (turning ?g)
-              (not (turning ?g)))))
+        (if (and (control-on ?g t)
+                 (not (exists (?j jammer)
+                        (jamming ?j ?g))))
+          (turning ?g)
+          (not (turning ?g))))
       (doall (?f fan)
         (if (and (bind (mounted-on ?f $gears))
                  (turning $gears))

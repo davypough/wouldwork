@@ -142,39 +142,27 @@
 ;;;; BOUNDARY VALIDATION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'beam-boundary-validation-valid-p)
-  (lambda ()
-    (and
-      ;; Four explicitly authored, axis-aligned edges are sufficient.
-      (null
-        (check-init-boundary-walls
-          '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (0 0))))))
-      ;; Omitting the repeated starting point must fail before geometry derivation.
-      (let ((condition
-              (handler-case
-                (progn
-                  (check-init-boundary-walls
-                    '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (-1 1)))))
-                  nil)
-                (error (error-condition)
-                  error-condition))))
-        (and condition
-             (search "must repeat its first point"
-                     (princ-to-string condition))))
-      ;; Diagonal edges are rejected by the shared declaration validator, even
-      ;; when the problem would otherwise use the boundary only for beam geometry.
-      (let ((condition
-              (handler-case
-                (progn
-                  (check-init-boundary-walls
-                    '((boundary-wall ((0 0) (2 0) (2 1) (1 2) (0 0)))))
-                  nil)
-                (error (error-condition)
-                  error-condition))))
-        (and condition
-             (search "not axis-aligned"
-                     (princ-to-string condition)))))))
+(define-test-claim beam-boundary-validation
+  (null
+    (validate-init-literals
+      '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (0 0))))
+      :checks '(segment-geometry-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((boundary-wall ((0 0) (2 0) (2 1) (0 1) (-1 1))))
+        :checks '(segment-geometry-init-check)))
+    'init-check-failure
+    :containing "must repeat its first point"
+    :check 'segment-geometry-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((boundary-wall ((0 0) (2 0) (2 1) (1 2) (0 0))))
+        :checks '(segment-geometry-init-check)))
+    'init-check-failure
+    :containing "not axis-aligned"
+    :check 'segment-geometry-init-check))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -253,11 +241,7 @@
 
     ;; The state itself is unchanged by this zero-action characterization.
     (has-location idle-agent idle)
-    (not (has-location derivation-enabler idle))
-
-    ;; Shared validation accepts a closed orthogonal boundary and rejects open or
-    ;; diagonal boundaries.
-    (funcall (symbol-function 'beam-boundary-validation-valid-p))))
+    (not (has-location derivation-enabler idle))))
 
 
 (define-goal

@@ -29,64 +29,53 @@
 ;;;; SENTINEL CONDITION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'empty-propagation-driver-signals-p)
-  (lambda (state)
-    (let ((before (database state))
-          (condition nil))
-      (setf condition
-        (handler-case
-            (progn
-              (funcall
-                (symbol-function 'propagate-changes!)
-                state)
-              nil)
-          (error (error-condition)
-            error-condition)))
-      (and
-        condition
-        (search
-          "still holding tech/-propagation.lisp's sentinel body"
-          (princ-to-string condition))
-        (equal (database state) before)
-        (not (state-is-inconsistent state))))))
-
-
-;;;; CHARACTERIZATION HELPERS ;;;;
-
-
-(setf
-  (symbol-function 'propagation-substrate-metadata-valid-p)
-  (lambda (state)
+(define-test-helper empty-propagation-driver-signals-p (state)
+  (let ((before (database state))
+        (condition nil))
+    (setf condition
+      (handler-case
+          (progn
+            (funcall
+              'propagate-changes!
+              state)
+            nil)
+        (error (error-condition)
+          error-condition)))
     (and
-      (equal
-        *update-names*
-        '(propagate-changes! propagate-consequences!))
-      (null (driver-candidate-updates))
-      (equal
-        (get 'propagate-consequences! :raw-body)
-        *propagation-driver-sentinel*)
-      (null (authored-propagation-driver-body))
-      (zerop (hash-table-count *types*))
-      (= (hash-table-count *relations*) 1)
-      (nth-value 1 (gethash 'inconsistent-state *relations*))
-      (zerop (hash-table-count *static-relations*))
-      (null *init-actions*)
-      (null *actions*)
-      (null (database state))
+      condition
+      (search
+        "still holding tech/-propagation.lisp's sentinel body"
+        (princ-to-string condition))
+      (equal (database state) before)
       (not (state-is-inconsistent state)))))
+
+
+;;;; CHARACTERIZATION CLAIM ;;;;
+
+
+(define-test-claim propagation-substrate-schema
+  (expect-registrations
+    :update '(propagate-changes! propagate-consequences!))
+  (null (driver-candidate-updates))
+  (equal
+    (get 'propagate-consequences! :raw-body)
+    *propagation-driver-sentinel*)
+  (null (authored-propagation-driver-body))
+  (expect-types '())
+  (expect-relations :dynamic '(inconsistent-state))
+  (expect-relations :static '())
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query propagation-substrate-scenarios-valid ()
-  (and
-    ;; The empty order remains explicit and fails before doing any state work.
-    (empty-propagation-driver-signals-p state)
-
-    ;; No driver candidate, authored replacement, or stateful behavior leaks in.
-    (propagation-substrate-metadata-valid-p state)))
+  ;; The empty order remains explicit and fails before doing any state work.
+  (empty-propagation-driver-signals-p state))
 
 
 (define-goal

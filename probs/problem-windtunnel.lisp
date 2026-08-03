@@ -70,7 +70,7 @@
 
 (define-static-relations
   (coords> (either area fixture) $fixnum $fixnum)  ;the (x,y) position
-  (apparatus-coords> repeater $fixnum $fixnum)  ;repeater functional-point coords, checked by check-init-repeater-consistency
+  (apparatus-coords> repeater $fixnum $fixnum)  ;repeater functional-point coordinates
   (controls (either receiver plate) (either gate blower))
   (blows> blower $area $area)
   (gate-segment> gate $fixnum $fixnum $fixnum $fixnum)

@@ -32,7 +32,7 @@
 (include-tech plate)
 (include-tech step)
 (include-tech gate)
-(include-tech gears-fan)
+(include-tech -gears-fan)
 
 (define-dynamic-relations
   (current-phase test-phase))

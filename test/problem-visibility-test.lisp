@@ -172,3 +172,13 @@
 
 (define-goal
   (visibility-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-query-mutation visible-clear-ignores-gate-state visible-clear
+  (?occluder gate)
+  (gate ?occluder)
+  "Drops VISIBLE-CLEAR's open-state check.  The closed-gate visibility probes
+   must then make this characterization fail.")

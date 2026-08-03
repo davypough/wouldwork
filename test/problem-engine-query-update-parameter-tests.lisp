@@ -57,19 +57,19 @@
 ;;;; PARAMETER-LIST TESTS ;;;;
 
 
-(defun query-parameter-parse-values (parameters)
+(define-test-helper query-parameter-parse-values (parameters)
   "Return DISSECT-QUERY-PARAMS' two values as a list for convenient comparison."
   (multiple-value-list (dissect-query-params parameters)))
 
 
-(defun query-parameter-check-equal (description expected actual)
+(define-test-helper query-parameter-check-equal (description expected actual)
   "Signal a focused test failure unless EXPECTED and ACTUAL are EQUAL."
   (unless (equal expected actual)
     (error "~A~%Expected: ~S~%Actual:   ~S" description expected actual))
   t)
 
 
-(defun query-parameter-check-error (description thunk)
+(define-test-helper query-parameter-check-error (description thunk)
   "Signal a focused test failure unless THUNK signals an error."
   (let ((condition
           (handler-case
@@ -80,7 +80,7 @@
     t))
 
 
-(defun run-query-parameter-success-tests ()
+(define-test-helper run-query-parameter-success-tests ()
   "Exercise every accepted query/update signature shape."
   (query-parameter-check-equal
     "An empty signature has no variables or type slots."
@@ -155,7 +155,7 @@
   t)
 
 
-(defun run-query-parameter-rejection-tests ()
+(define-test-helper run-query-parameter-rejection-tests ()
   "Exercise forms that do not belong in query/update signatures."
   (query-parameter-check-error
     "A $variable is not a query/update formal parameter."
@@ -250,7 +250,7 @@
   (do ?object t))
 
 
-(defun run-query-update-parameter-tests ()
+(define-test-helper run-query-update-parameter-tests ()
   "Run the focused specification tests for query/update parameter lists."
   (run-query-parameter-success-tests)
   (run-query-parameter-rejection-tests)
@@ -258,7 +258,8 @@
   t)
 
 
-(run-query-update-parameter-tests)
+(define-test-claim query-update-parameter-contract
+  (run-query-update-parameter-tests))
 
 
 ;;;; ACTION ;;;;

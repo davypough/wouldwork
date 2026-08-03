@@ -55,68 +55,27 @@
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'location-coordinates-schema-valid-p)
-  (lambda ()
-    (multiple-value-bind (static-signature staticp)
-        (gethash 'location-coords> *static-relations*)
-      (multiple-value-bind (dynamic-signature dynamicp)
-          (gethash 'location-coords> *relations*)
-        (declare (ignore dynamic-signature))
-        (and staticp
-             (equal static-signature '(location rational rational))
-             (not dynamicp)
-             (equal
-               (gethash 'location-coords> *fluent-relation-indices*)
-               '(2 3)))))))
-
-
-(setf
-  (symbol-function 'location-coordinates-error-contains-p)
-  (lambda (operation expected-text)
-    (let ((condition
-            (handler-case
-                (progn
-                  (funcall operation)
-                  nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (not
-             (null
-               (search expected-text
-                       (princ-to-string condition))))))))
-
-
-(setf
-  (symbol-function 'invalid-location-coordinate-object-rejected-p)
-  (lambda ()
-    (location-coordinates-error-contains-p
-      (lambda ()
-        (check-proposition
-          '(location-coords> 0 0 0)))
-      "not of specified type LOCATION")))
-
-
-(setf
-  (symbol-function 'invalid-location-coordinate-number-rejected-p)
-  (lambda ()
-    (location-coordinates-error-contains-p
-      (lambda ()
-        (check-proposition
-          '(location-coords> origin 1.0 0)))
-      "not of specified type RATIONAL")))
-
-
-(setf
-  (symbol-function 'duplicate-location-coordinate-rejected-p)
-  (lambda ()
-    (location-coordinates-error-contains-p
-      (lambda ()
-        (check-init-duplicate-fluent-keys
-          '((location-coords> origin 0 0)
-            (location-coords> origin 1 1))))
-      "Duplicate DEFINE-INIT fluent key")))
+(define-test-claim location-coordinates-contract
+  (expect-relation-schema
+    'location-coords> :static '(location rational rational)
+    :fluent-indices '(2 3))
+  (expect-condition
+    (lambda ()
+      (check-proposition '(location-coords> 0 0 0)))
+    'error
+    :containing "not of specified type LOCATION")
+  (expect-condition
+    (lambda ()
+      (check-proposition '(location-coords> origin 1.0 0)))
+    'error
+    :containing "not of specified type RATIONAL")
+  (expect-condition
+    (lambda ()
+      (check-init-duplicate-fluent-keys
+        '((location-coords> origin 0 0)
+          (location-coords> origin 1 1))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key"))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -151,13 +110,7 @@
           (location-coords>
             unpositioned $unpositioned-x $unpositioned-y)))
       (not (location-coords> origin 1 0))
-      (not (location-coords> fractional -7/3 11/4))
-
-      ;; The installed relation and its authoring failures are the behavior under test.
-      (location-coordinates-schema-valid-p)
-      (invalid-location-coordinate-object-rejected-p)
-      (invalid-location-coordinate-number-rejected-p)
-      (duplicate-location-coordinate-rejected-p))))
+      (not (location-coords> fractional -7/3 11/4)))))
 
 
 (define-goal

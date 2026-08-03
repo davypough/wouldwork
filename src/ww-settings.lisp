@@ -314,6 +314,10 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Dynamic relations.")
 
+(sb-ext:defglobal *derived-relations*
+  (make-hash-table :test #'eq :size 32 :rehash-threshold 1.0)
+  "Dynamic relations whose initial facts are computed rather than authored.")
+
 (sb-ext:defglobal *static-relations* (make-hash-table :test #'eq :synchronized (> *threads* 0))
   "Static relations.")
 
@@ -380,6 +384,19 @@ treat their arguments as read-only and be safe to call concurrently."
 
 (sb-ext:defglobal *init-actions* nil
   "List of all initialization actions.")
+
+
+(sb-ext:defglobal *init-checks* nil
+  "Technology-owned functions that validate raw DEFINE-INIT literals.")
+
+(sb-ext:defglobal *problem-function-names* nil
+  "Problem-local Lisp functions removed when another problem is staged.")
+
+(sb-ext:defglobal *test-claims* nil
+  "Named characterization claims registered by the staged test problem.")
+
+(sb-ext:defglobal *test-mutations* nil
+  "Deliberately broken definitions registered by the staged test problem.")
 
 (sb-ext:defglobal *happening-names* nil
   "The list of objects having exogenous events.")

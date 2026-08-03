@@ -2,7 +2,7 @@
 
 ;;; Gun technology: a stationary automated turret that makes its authored THREATENS
 ;;; locations lethal while armed.  Armed state is derived each propagation pass exactly
-;;; like gears-fan's turning: lethal <=> (uncontrolled OR control-on) AND NOT jammed --
+;;; like -gears-fan's turning: lethal <=> (uncontrolled OR control-on) AND NOT jammed --
 ;;; an uncontrolled gun is armed by default, matching the turret fiction (compare gate,
 ;;; which defaults closed); jamming always overrides toward safe, the same polarity as
 ;;; gears' jam-forces-stopped.  A gun may be wired to receivers/plates via -controls
@@ -46,26 +46,18 @@
 (define-optional-types jammer)
 
 
+(define-derived-relations
+  lethal)
+
+
 (define-update update-gun-status! ()
-  ;; lethal <=> (uncontrolled OR control-on) AND NOT jammed.  control-on (normal) iff some
-  ;; DNF clause has every member energized; inverted negates that aggregate -- computed
-  ;; exactly as gate.lisp's update-gate-status! and gears-fan's update-gears-status!
-  ;; compute it.  Uncontrolled guns default armed, the same default gears use, since a
-  ;; bare turret is a threat until something disables it.  Change detection is automatic,
-  ;; so an unchanged re-assert is silent.
+  ;; lethal <=> control-on AND NOT jammed, with -controls' shared CONTROL-ON supplying the
+  ;; DNF aggregate.  The T uncontrolled default arms a bare turret, the same default gears
+  ;; use, since a turret nothing controls is a threat until something disables it.  Change
+  ;; detection is automatic, so an unchanged re-assert is silent.
   (doall (?gun gun)
-    (do (assign $control-on t)  ;uncontrolled guns are always armed
-        (if (bind (controls $clauses ?gun $mode))
-          (do (assign $any-clause-on
-                (ww-loop for $clause in $clauses
-                         thereis (ww-loop for $c in $clause
-                                          always (energized $c))))
-              (if (eql $mode 'normal)
-                (assign $control-on $any-clause-on)
-                (if (eql $mode 'inverted)
-                  (assign $control-on (not $any-clause-on))))))
-        (if (and $control-on
-                 (not (exists (?j jammer)
-                        (jamming ?j ?gun))))
-          (lethal ?gun)
-          (not (lethal ?gun))))))
+    (if (and (control-on ?gun t)
+             (not (exists (?j jammer)
+                    (jamming ?j ?gun))))
+      (lethal ?gun)
+      (not (lethal ?gun)))))

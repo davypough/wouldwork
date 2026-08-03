@@ -108,7 +108,7 @@
    it.  A receiver-free blower problem is the case that forced the distinction:
    -beam-substrate contributes only update-receiver-status!, which quantifies solely over
    an empty receiver type and so is genuinely inert there -- but it arrives through
-   -controls and gears-fan beneath floor-blower and wall-blower, several levels below
+   -controls and -gears-fan beneath floor-blower and wall-blower, several levels below
    anything the problem wrote.  The technology worth naming in such a report is always the
    one the problem included: were beam-relay included in a connector-free problem,
    beam-relay itself is inert and is reported.")
@@ -121,7 +121,7 @@
 
    Read by driver-candidate-updates, which needs the opposite of what report-inert-techs
    needs.  update-gears-status! and update-receiver-status! reach a blower problem only
-   through gears-fan and -beam-substrate, several levels below anything the problem wrote,
+   through -gears-fan and -beam-substrate, several levels below anything the problem wrote,
    yet both belong in its propagation driver.  A candidate set built from
    *included-tech-names* would silently omit them.
 
@@ -449,6 +449,8 @@
     (clrhash *type-signatures*))
   (when (and (boundp '*type-components*) (hash-table-p *type-components*))
     (clrhash *type-components*))
+  (when (and (boundp '*derived-relations*) (hash-table-p *derived-relations*))
+    (clrhash *derived-relations*))
   (when (and (boundp '*constant-integers*) (hash-table-p *constant-integers*))
     (clrhash *constant-integers*))
   (when (and (boundp '*symmetrics*) (hash-table-p *symmetrics*))
@@ -493,7 +495,17 @@
           (append (when (and (boundp '*query-names*) (listp *query-names*))
                     (copy-list *query-names*))
                   (when (and (boundp '*update-names*) (listp *update-names*))
-                    (copy-list *update-names*)))))
+                    (copy-list *update-names*))
+                  (when (and (boundp '*problem-function-names*)
+                             (listp *problem-function-names*))
+                    (copy-list *problem-function-names*))
+                  ;; Clean functions registered by the pre-Stage-4 lifecycle once
+                  ;; when this revision is first reloaded into an existing image.
+                  (when (and (boundp '*init-check-function-names*)
+                             (listp
+                               (symbol-value '*init-check-function-names*)))
+                    (copy-list
+                      (symbol-value '*init-check-function-names*))))))
     (dolist (function-name (delete-duplicates old-function-names))
       (when (fboundp function-name)
         (fmakunbound function-name))
@@ -501,7 +513,8 @@
         (makunbound function-name))
       (remprop function-name :raw-body)
       (remprop function-name :raw-args)
-      (remprop function-name :param-types)))
+      (remprop function-name :param-types)
+      (remprop function-name :init-check-consumed-types)))
   ;; Reset lists that accumulate problem definitions
   (when (and (boundp '*query-names*) (listp *query-names*))
     (setf *query-names* nil))
@@ -511,6 +524,17 @@
     (setf *actions* nil))
   (when (and (boundp '*init-actions*) (listp *init-actions*))
     (setf *init-actions* nil))
+  (when (and (boundp '*init-checks*) (listp *init-checks*))
+    (setf *init-checks* nil))
+  (when (and (boundp '*problem-function-names*)
+             (listp *problem-function-names*))
+    (setf *problem-function-names* nil))
+  (when (boundp '*init-check-function-names*)
+    (makunbound '*init-check-function-names*))
+  (when (and (boundp '*test-claims*) (listp *test-claims*))
+    (setf *test-claims* nil))
+  (when (and (boundp '*test-mutations*) (listp *test-mutations*))
+    (setf *test-mutations* nil))
   (when (and (boundp '*happening-names*) (listp *happening-names*))
     (setf *happening-names* nil))
   (when (and (boundp '*solution-report-printers*)

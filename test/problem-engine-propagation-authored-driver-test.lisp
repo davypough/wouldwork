@@ -61,54 +61,46 @@
     (propagate-changes!)))
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-authored-driver-metadata-valid-p)
-  (lambda (state)
-    (let* ((expected-body
-             '(let ((*propagated-state-changed* nil))
-                (update-gate-status!)
-                (do *propagated-state-changed*)))
-           (generated-body
-             (derived-propagation-driver-body
-               '(update-gate-status!)))
-           (candidates (driver-candidate-updates))
-           (kept
-             (remove-if
-               #'update-quantifies-only-over-empty-types-p
-               candidates))
-           (raw-body
-             (get 'propagate-consequences! :raw-body)))
-      (and
-        ;; A generated replacement was available, so preservation is meaningful.
-        (equal
-          candidates
-          '(update-receiver-status! update-gate-status!))
-        (equal kept '(update-gate-status!))
-
-        ;; The later problem definition must survive initialization verbatim.
-        (equal raw-body expected-body)
-        (equal (authored-propagation-driver-body) expected-body)
-        (equal
-          (authored-propagation-order raw-body)
-          '(update-gate-status!))
-        (not (equal raw-body *propagation-driver-sentinel*))
-        (not (equal raw-body generated-body))
-
-        ;; The empty receiver branch remains absent from both the authored order
-        ;; and the resulting state.
-        (nth-value 1 (gethash 'receiver *types*))
-        (null (gethash 'receiver *types*))
-
-        ;; The stale OPEN witness was removed and no unrelated behavior remains.
-        (equal
-          (mapcar #'action.name *init-actions*)
-          '(initialize-authored-driver-state))
-        (null *actions*)
-        (null (database state))
-        (not (state-is-inconsistent state))))))
+(define-test-claim propagation-authored-driver-contract
+  (equal
+    (driver-candidate-updates)
+    '(update-receiver-status! update-gate-status!))
+  (equal
+    (remove-if
+      #'update-quantifies-only-over-empty-types-p
+      (driver-candidate-updates))
+    '(update-gate-status!))
+  (equal
+    (get 'propagate-consequences! :raw-body)
+    '(let ((*propagated-state-changed* nil))
+       (update-gate-status!)
+       (do *propagated-state-changed*)))
+  (equal
+    (authored-propagation-driver-body)
+    '(let ((*propagated-state-changed* nil))
+       (update-gate-status!)
+       (do *propagated-state-changed*)))
+  (equal
+    (authored-propagation-order
+      (get 'propagate-consequences! :raw-body))
+    '(update-gate-status!))
+  (not
+    (equal
+      (get 'propagate-consequences! :raw-body)
+      *propagation-driver-sentinel*))
+  (not
+    (equal
+      (get 'propagate-consequences! :raw-body)
+      (derived-propagation-driver-body '(update-gate-status!))))
+  (expect-empty-type 'receiver)
+  (expect-registrations
+    :init-action '(initialize-authored-driver-state))
+  (expect-registrations :action '())
+  (null (database *start-state*))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -122,8 +114,7 @@
         (controls
           $unexpected-clauses
           stale-gate
-          $unexpected-mode)))
-    (propagation-authored-driver-metadata-valid-p state)))
+          $unexpected-mode)))))
 
 
 (define-goal

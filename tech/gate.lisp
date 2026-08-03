@@ -13,7 +13,7 @@
 ;;;               plate, mode, and receiver come from nested -controls; gate itself comes
 ;;;               from nested -gate
 ;;;   nested    : -controls ((controls ...), energized; nests -beam-substrate for
-;;;               (active receiver))  --  shared with the blower techs' gears (gears-fan);
+;;;               (active receiver))  --  shared with the blower techs' gears (-gears-fan);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with
 ;;;               walkability (via -passability), reachability, visibility, beam-direct,
 ;;;               beam-crossing, and -passability, which all nest -gate instead of
@@ -41,25 +41,19 @@
 (define-optional-types jammer)
 
 
+(define-derived-relations
+  open)
+
+
 (define-update update-gate-status! ()
-  ;; open <=> jammed OR control-on.  control-on (normal) iff some DNF clause has every member
-  ;; energized; inverted negates that aggregate.  Jamming is the leading disjunct, so it
-  ;; overrides an inverted force-close.  Uncontrolled gates reduce to open <=> jammed, which
-  ;; is how jam-driven opening is realized.  Change detection is automatic, so an unchanged
+  ;; open <=> jammed OR control-on, with -controls' shared CONTROL-ON supplying the DNF
+  ;; aggregate.  Jamming is the leading disjunct, so it overrides an inverted force-close.
+  ;; The NIL uncontrolled default reduces an uncontrolled gate to open <=> jammed, which is
+  ;; how jam-driven opening is realized.  Change detection is automatic, so an unchanged
   ;; re-assert is silent.
   (doall (?gate gate)
-    (do (assign $control-on nil)
-        (if (bind (controls $clauses ?gate $mode))
-          (do (assign $any-clause-on
-                (ww-loop for $clause in $clauses
-                         thereis (ww-loop for $c in $clause
-                                          always (energized $c))))
-              (if (eql $mode 'normal)
-                (assign $control-on $any-clause-on)
-                (if (eql $mode 'inverted)
-                  (assign $control-on (not $any-clause-on))))))
-        (if (or (exists (?j jammer)
-                  (jamming ?j ?gate))
-                $control-on)
-          (open ?gate)
-          (not (open ?gate))))))
+    (if (or (exists (?j jammer)
+              (jamming ?j ?gate))
+            (control-on ?gate nil))
+      (open ?gate)
+      (not (open ?gate)))))

@@ -4,10 +4,10 @@
 ;;; with no public direct, relay, or crossing capability installed.
 ;;;
 ;;; The characterization verifies the complete BEAM-NODE/fixed-endpoint type
-;;; composition and every neutral hook.  One deliberately stale ACTIVE receiver
-;;; is authored before initialization; the substrate's derived propagation driver
-;;; must call UPDATE-RECEIVER-STATUS! and remove it because neither arrival hook
-;;; reaches any receiver.  The planner start and final states are therefore empty.
+;;; composition and every neutral hook.  The test initialization action injects one
+;;; deliberately stale ACTIVE receiver immediately before propagation; the substrate's
+;;; derived driver must remove it because neither arrival hook reaches any receiver.
+;;; The planner start and final states are therefore empty.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -44,13 +44,17 @@
 (include-tech -beam-substrate)
 
 
+(define-static-relations
+  (beam-substrate-test-marker location))
+
+
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
-  ;; This stale derived fact must not survive the ordinary initialization
-  ;; propagation pass when both arrival contributors are neutral.
-  (active stale-receiver))
+  ;; DEFINE-INIT requires a literal.  This explicit absence leaves the start state
+  ;; empty without authoring the derived ACTIVE relation.
+  (not (beam-substrate-test-marker sample-location)))
 
 
 (define-init-action initialize-derived-state
@@ -59,6 +63,8 @@
   (always-true)
   ()
   (assert
+    ;; Inject stale internal state immediately before the behavior under test.
+    (active stale-receiver)
     (propagate-changes!)))
 
 

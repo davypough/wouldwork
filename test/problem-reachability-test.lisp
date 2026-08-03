@@ -123,3 +123,13 @@
 
 (define-goal
   (reachability-scenarios-valid))
+
+
+;;;; MUTATION CHARACTERIZATION ;;;;
+
+
+(define-query-mutation reachable-clear-ignores-gate-state reachable-clear
+  (?barrier gate)
+  (gate ?barrier)
+  "Drops REACHABLE-CLEAR's open-state check.  The closed-gate reachability probes
+   must then make this characterization fail.")

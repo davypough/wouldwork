@@ -44,41 +44,36 @@
 (include-tech -beam-interpolation)
 
 
+(define-static-relations
+  (beam-interpolation-test-marker location))
+
+
 ;;;; INITIALIZATION ;;;;
 
 
 (define-init
   ;; DEFINE-INIT requires a literal.  This explicit absence leaves the dynamic
   ;; start state empty and contributes no interpolation input.
-  (not (active sample-receiver)))
+  (not (beam-interpolation-test-marker sample-location)))
 
 
 ;;;; CONDITION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'default-sloped-beam-rejected-p)
-  (lambda (state)
-    (let ((condition
-            (handler-case
-                (progn
-                  (funcall
-                    (symbol-function 'beam-elevation-at-location)
-                    state
-                    'sample-location
-                    'sample-transmitter
-                    1
-                    'sample-receiver
-                    2)
-                  nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (not
-             (null
-               (search
-                 "A sloped fixed beam requires visibility's coordinate interpolation."
-                 (princ-to-string condition))))))))
+(define-test-claim default-sloped-beam-rejected
+  (expect-condition
+    (lambda ()
+      (funcall
+        'beam-elevation-at-location
+        *start-state*
+        'sample-location
+        'sample-transmitter
+        1
+        'sample-receiver
+        2))
+    'error
+    :containing
+    "A sloped fixed beam requires visibility's coordinate interpolation."))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -116,10 +111,7 @@
     (not (coupled sample-transmitter sample-receiver))
     (not (bind
            (beam-via
-             sample-transmitter $unexpected-obstacles sample-receiver)))
-
-    ;; Unequal elevations must never be silently treated as horizontal.
-    (default-sloped-beam-rejected-p state)))
+             sample-transmitter $unexpected-obstacles sample-receiver)))))
 
 
 (define-goal

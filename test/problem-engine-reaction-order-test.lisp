@@ -136,7 +136,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(defun reaction-order-relations-valid-p (expected-order)
+(define-test-helper reaction-order-relations-valid-p (expected-order)
   (multiple-value-bind (reads writes base-facts adjacency components)
       (propagation-graph expected-order)
     (declare (ignore adjacency components))
@@ -157,7 +157,7 @@
            (gethash 'on wall-writes)))))
 
 
-(defun reaction-order-structure-valid-p ()
+(define-test-helper reaction-order-structure-valid-p ()
   (let* ((expected-order
            '(update-plate-status!
              update-gears-status!
@@ -182,10 +182,12 @@
            (reaction-order-relations-valid-p expected-order)))))
 
 
-(define-query reaction-order-scenarios-valid ()
-  (and (reaction-order-structure-valid-p)
+(define-test-claim reaction-order-structure
+  (reaction-order-structure-valid-p))
 
-       ;; Shared activation lifecycle.
+
+(define-query reaction-order-scenarios-valid ()
+  (and ;; Shared activation lifecycle.
        (has-location agent1 pad0)
        (on agent1 plate1)
        (depressed plate1)

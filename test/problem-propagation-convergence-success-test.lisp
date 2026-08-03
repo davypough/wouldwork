@@ -58,49 +58,38 @@
   (pass-count 0))
 
 
-;;;; CHARACTERIZATION HELPER ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'propagation-convergence-success-valid-p)
-  (lambda (state)
-    (let* ((before (database state))
-           (before-value (problem-state.value state))
-           (trial (copy-problem-state state))
-           (result
-             (funcall
-               (symbol-function 'propagate-changes!)
-               trial)))
-      (and
-        ;; Three changing passes followed by one unchanged pass converge.
-        result
-        (equal (database trial) '((pass-count 3)))
-        (= (problem-state.value trial) 4)
-        (not (state-is-inconsistent trial))
-
-        ;; The authored consequence driver contains only the bounded update.
-        (equal
-          (authored-propagation-order
-            (authored-propagation-driver-body))
-          '(increment-pass-count-until-three!))
-
-        ;; The isolated run must not leak into the real planner state.
-        (equal before '((pass-count 0)))
-        (equal (database state) before)
-        (= before-value 0)
-        (= (problem-state.value state) before-value)
-        (not (state-is-inconsistent state))
-        (null *init-actions*)
-        (null *actions*)))))
+(define-test-claim propagation-convergence-success-contract
+  (let* ((before (database *start-state*))
+         (before-value (problem-state.value *start-state*))
+         (trial (copy-problem-state *start-state*))
+         (result
+           (funcall 'propagate-changes! trial)))
+    (and
+      result
+      (equal (database trial) '((pass-count 3)))
+      (= (problem-state.value trial) 4)
+      (not (state-is-inconsistent trial))
+      (equal before '((pass-count 0)))
+      (equal (database *start-state*) before)
+      (= before-value 0)
+      (= (problem-state.value *start-state*) before-value)
+      (not (state-is-inconsistent *start-state*))))
+  (equal
+    (authored-propagation-order
+      (authored-propagation-driver-body))
+    '(increment-pass-count-until-three!))
+  (expect-registrations :init-action '())
+  (expect-registrations :action '()))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query propagation-convergence-success-scenarios-valid ()
-  (and
-    (pass-count 0)
-    (propagation-convergence-success-valid-p state)))
+  (pass-count 0))
 
 
 (define-goal

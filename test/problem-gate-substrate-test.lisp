@@ -39,29 +39,23 @@
   (open authored-open-gate))
 
 
-;;;; CHARACTERIZATION HELPERS ;;;;
+;;;; CHARACTERIZATION CLAIM ;;;;
 
 
-(setf
-  (symbol-function 'gate-substrate-metadata-valid-p)
-  (lambda (state)
-    (and
-      (equal
-        (gethash 'gate *types*)
-        '(authored-open-gate default-closed-gate))
-      (nth-value 1 (gethash 'open *relations*))
-      (not (nth-value 1 (gethash 'open *static-relations*)))
-      (= (hash-table-count *relations*) 2)
-      (= (hash-table-count *static-relations*) 2)
-      (nth-value 1 (gethash 'gate *static-relations*))
-      (nth-value 1 (gethash 'always-true *static-relations*))
-      (not (member 'update-gate-status! *update-names*))
-      (not (nth-value 1 (gethash 'controls *static-relations*)))
-      (null (gethash 'jammer *types*))
-      (null *init-actions*)
-      (null *actions*)
-      (equal (database state) '((open authored-open-gate)))
-      (not (state-is-inconsistent state)))))
+(define-test-claim gate-substrate-schema
+  (expect-type-instances
+    'gate
+    '(authored-open-gate default-closed-gate))
+  (expect-type-absent 'jammer)
+  (expect-relation-schema 'open :dynamic '(gate))
+  (expect-relations :dynamic '(inconsistent-state open))
+  (expect-relations :static '(gate always-true))
+  (expect-relation-absent 'controls)
+  (expect-not-registered :update 'update-gate-status!)
+  (expect-registrations :init-action '())
+  (expect-registrations :action '())
+  (equal (database *start-state*) '((open authored-open-gate)))
+  (not (state-is-inconsistent *start-state*)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -82,10 +76,7 @@
 
     ;; Authored dynamic membership is preserved; absence remains closed.
     (open authored-open-gate)
-    (not (open default-closed-gate))
-
-    ;; No public gate machinery or additional dynamic state may leak in.
-    (gate-substrate-metadata-valid-p state)))
+    (not (open default-closed-gate))))
 
 
 (define-goal

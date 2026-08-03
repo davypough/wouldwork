@@ -18,9 +18,9 @@
 ;;; coordinates.lisp's header for the band, curtain, and ride semantics.
 ;;;
 ;;; Layering: -walkability-coordinates cannot gather the specs itself -- HAS-POSITION
-;;; and AIMED-AT> belong to gears-fan, which walking must not depend on.  So this
+;;; and AIMED-AT> belong to -gears-fan, which walking must not depend on.  So this
 ;;; file, nested by wall-blower (the only mounting whose stream runs horizontally
-;;; across walkable ground), nests gears-fan and REDEFINES WALKABILITY-COORDINATES-
+;;; across walkable ground), nests -gears-fan and REDEFINES WALKABILITY-COORDINATES-
 ;;; STREAM-SPECS whole, the same way it overrides STREAM-OBSTACLE-CLEAR by name --
 ;;; nesting a file guarantees its original definitions always splice before this one
 ;;; regardless of the problem's include order, so a later DEFINE-QUERY for the same
@@ -28,21 +28,19 @@
 ;;;
 ;;; REQUIRES:
 ;;;   nested    : -passability (stream-obstacle-clear's null default, all-clear);
-;;;               gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
-;;;               -walkability-coordinates (the derivation and the stream-specs default);
-;;;               -walk-recording-policy (neutral deferred-walk hooks)
+;;;               -gears-fan (gears types, mounted-on, blowing, has-position, aimed-at>);
+;;;               -walkability-coordinates (the derivation and the stream-specs default)
 ;;; PROVIDES:
 ;;;   relations : (stream-width wall-gears $rational)  --  optional per-gears override
 ;;;               of the 3-unit default stream width
 ;;;   queries   : stream-obstacle-clear  --  overrides -passability's null default;
-;;;               deferred-walk-obstacle, recording-walk-obstacle-present -- overrides;
 ;;;               walkability-coordinates-stream-specs  --  redefinition gathering
 ;;;               one spec per wall-gears
 
 (include-tech -passability)
-(include-tech gears-fan)
+(include-tech -gears-fan)
 (include-tech -walkability-coordinates)
-(include-tech -walk-recording-policy)
+(include-tech -stream-passability-init-checks)
 
 (in-package :ww)
 
@@ -57,20 +55,6 @@
          (and (bind (mounted-on ?f $mount-gears))
               (eql $mount-gears ?obstacle)
               (gears-turning-for-object ?agent ?obstacle)))))
-
-
-(define-query deferred-walk-obstacle (?obstacle)
-  ;; A wall stream's state during real playback depends on the completed recording.
-  (wall-gears ?obstacle))
-
-
-(define-query recording-walk-obstacle-present (?obstacle)
-  ;; Mounting is shared state in the Windtunnel recorder scope; its welded wall fans
-  ;; remain attached throughout recording and playback.
-  (and (wall-gears ?obstacle)
-       (exists (?fan fan)
-         (and (bind (mounted-on ?fan $mount-gears))
-              (eql $mount-gears ?obstacle)))))
 
 
 (define-query walkability-coordinates-stream-specs ()

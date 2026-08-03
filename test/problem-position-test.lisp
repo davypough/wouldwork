@@ -64,85 +64,38 @@
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
 
 
-(setf
-  (symbol-function 'position-schema-valid-p)
-  (lambda ()
-    (multiple-value-bind (static-signature staticp)
-        (gethash 'has-position *static-relations*)
-      (multiple-value-bind (dynamic-signature dynamicp)
-          (gethash 'has-position *relations*)
-        (declare (ignore dynamic-signature))
-        (let ((expected-instances
-                '(positioned-plate unpositioned-plate
-                  positioned-ladder unpositioned-ladder
-                  positioned-floor-gears unpositioned-floor-gears
-                  positioned-wall-gears unpositioned-wall-gears
-                  positioned-angled-gears unpositioned-angled-gears
-                  positioned-recorder unpositioned-recorder)))
-          (and
-            (equal
-              (gethash 'fixed-position-object *type-components*)
-              '(plate ladder floor-gears wall-gears angled-gears recorder))
-            (null
-              (set-exclusive-or
-                (gethash 'fixed-position-object *types*)
-                expected-instances))
-            staticp
-            (equal
-              static-signature
-              '(fixed-position-object location))
-            (not dynamicp)
-            (equal
-              (gethash 'has-position *fluent-relation-indices*)
-              '(2))))))))
-
-
-(setf
-  (symbol-function 'position-error-contains-p)
-  (lambda (operation expected-text)
-    (let ((condition
-            (handler-case
-                (progn
-                  (funcall operation)
-                  nil)
-              (error (error-condition)
-                error-condition))))
-      (and condition
-           (not
-             (null
-               (search expected-text
-                       (princ-to-string condition))))))))
-
-
-(setf
-  (symbol-function 'invalid-position-object-rejected-p)
-  (lambda ()
-    (position-error-contains-p
-      (lambda ()
-        (check-proposition
-          '(has-position 0 shared-site)))
-      "not of specified type FIXED-POSITION-OBJECT")))
-
-
-(setf
-  (symbol-function 'invalid-position-location-rejected-p)
-  (lambda ()
-    (position-error-contains-p
-      (lambda ()
-        (check-proposition
-          '(has-position positioned-plate 0)))
-      "not of specified type LOCATION")))
-
-
-(setf
-  (symbol-function 'duplicate-position-rejected-p)
-  (lambda ()
-    (position-error-contains-p
-      (lambda ()
-        (check-init-duplicate-fluent-keys
-          '((has-position positioned-plate shared-site)
-            (has-position positioned-plate alternate-site))))
-      "Duplicate DEFINE-INIT fluent key")))
+(define-test-claim position-contract
+  (expect-type-components
+    'fixed-position-object
+    '(plate ladder floor-gears wall-gears angled-gears recorder))
+  (expect-type-instances
+    'fixed-position-object
+    '(positioned-plate unpositioned-plate
+      positioned-ladder unpositioned-ladder
+      positioned-floor-gears unpositioned-floor-gears
+      positioned-wall-gears unpositioned-wall-gears
+      positioned-angled-gears unpositioned-angled-gears
+      positioned-recorder unpositioned-recorder))
+  (expect-relation-schema
+    'has-position :static '(fixed-position-object location)
+    :fluent-indices '(2))
+  (expect-condition
+    (lambda ()
+      (check-proposition '(has-position 0 shared-site)))
+    'error
+    :containing "not of specified type FIXED-POSITION-OBJECT")
+  (expect-condition
+    (lambda ()
+      (check-proposition '(has-position positioned-plate 0)))
+    'error
+    :containing "not of specified type LOCATION")
+  (expect-condition
+    (lambda ()
+      (check-init-duplicate-fluent-keys
+        '((has-position positioned-plate shared-site)
+          (has-position positioned-plate alternate-site))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key"))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -194,14 +147,7 @@
         (has-position
           unpositioned-recorder $unpositioned-recorder-location)))
     (not (has-position positioned-plate alternate-site))
-    (not (has-position positioned-ladder alternate-site))
-
-    ;; Installed metadata verifies the exact twelve-object union (excluding locations);
-    ;; authoring failures complete the substrate contract.
-    (position-schema-valid-p)
-    (invalid-position-object-rejected-p)
-    (invalid-position-location-rejected-p)
-    (duplicate-position-rejected-p)))
+    (not (has-position positioned-ladder alternate-site))))
 
 
 (define-goal
