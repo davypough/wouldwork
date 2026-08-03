@@ -41,7 +41,7 @@
 ;;; beam-crossing.
 ;;;
 ;;; REQUIRES:
-;;;   nested    : -beam-los-coordinates (BEAM-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
+;;;   nested    : -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
 ;;;               POSITION>; LOS-TO-APPARATUS/LOS-TO-LOCATION, hand-authored or derived)
 ;;;   relations : crossings-along-beam>, crossings-before-gate>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
@@ -301,7 +301,7 @@
   ;; *STATIC-IDB* and find no crossings at all.
   0
   ()
-  (or (exists (?e beam-endpoint) (bind (apparatus-coords> ?e $x $y)))
+  (or (exists (?e los-endpoint) (bind (apparatus-coords> ?e $x $y)))
       (exists (?e location) (bind (location-coords> ?e $x $y))))
   ()
   (assert

@@ -4,7 +4,7 @@
 ;;; complete matrix gives every ELEVATED-OBJECT leaf one explicit-elevation
 ;;; fixture and one fixture with no authored HAS-ELEVATION fact:
 ;;;
-;;;   location, gate, screen, fence, wall, transmitter, receiver, wall-gears,
+;;;   location, gate, screen, wall, transmitter, receiver, wall-gears,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
 ;;; The characterization goal verifies exact authored bindings, the generic
@@ -44,7 +44,6 @@
   location (explicit-location default-location)
   gate (explicit-gate default-gate)
   screen (explicit-screen default-screen)
-  fence (explicit-fence default-fence)
   wall (explicit-wall default-wall)
   transmitter (explicit-transmitter default-transmitter)
   receiver (explicit-receiver default-receiver)
@@ -67,7 +66,6 @@
   (has-elevation explicit-location 2)
   (has-elevation explicit-gate 3)
   (has-elevation explicit-screen 4)
-  (has-elevation explicit-fence 5)
   (has-elevation explicit-wall 6)
   (has-elevation explicit-transmitter 7)
   (has-elevation explicit-receiver 8)
@@ -109,7 +107,6 @@
     (explicit-elevation-valid explicit-location 2)
     (explicit-elevation-valid explicit-gate 3)
     (explicit-elevation-valid explicit-screen 4)
-    (explicit-elevation-valid explicit-fence 5)
     (explicit-elevation-valid explicit-wall 6)
     (explicit-elevation-valid explicit-transmitter 7)
     (explicit-elevation-valid explicit-receiver 8)
@@ -120,7 +117,6 @@
     (default-elevation-valid default-location)
     (default-elevation-valid default-gate)
     (default-elevation-valid default-screen)
-    (default-elevation-valid default-fence)
     (default-elevation-valid default-wall)
     (default-elevation-valid default-transmitter)
     (default-elevation-valid default-receiver)

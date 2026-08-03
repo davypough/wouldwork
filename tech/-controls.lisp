@@ -9,8 +9,9 @@
 ;;; replaced (an uncontrolled gate reduces to open <=> jammed; uncontrolled gears and guns
 ;;; run until something disables them).
 ;;;
-;;; Recorder's recording-side aggregate is deliberately a separate query in recorder.lisp
-;;; rather than a view argument here.  WW-PROPAGATION-ORDER's walker recurses into query
+;;; Recorder's recording-side aggregate is deliberately a separate query in
+;;; -recorder-controls-shadow.lisp rather than a view argument here.
+;;; WW-PROPAGATION-ORDER's walker recurses into query
 ;;; bodies to compute each update's read set, and prunes only tests STATIC-FORM-TRUTH can
 ;;; decide; a view passed as a query parameter is not one, so a single body branching on it
 ;;; would credit UPDATE-GATE-STATUS! with reading RECORDING-LATCHED and

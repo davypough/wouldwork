@@ -1467,21 +1467,6 @@
                (push-global solution *unique-solution-states*)))))))
 
 
-(defun solution-better-p (new-soln old-soln)
-  "Returns T if NEW-SOLN is better than OLD-SOLN based on *solution-type*."
-  (case *solution-type*  ; ecase -> case to allow otherwise clause
-    ((min-length first every all-paths)
-     (< (solution.depth new-soln) (solution.depth old-soln)))
-    (min-time
-     (< (solution.time new-soln) (solution.time old-soln)))
-    (min-value
-     (< (solution.value new-soln) (solution.value old-soln)))
-    (max-value
-     (> (solution.value new-soln) (solution.value old-soln)))
-    (otherwise  ; fixnum case - prefer shorter depth
-     (< (solution.depth new-soln) (solution.depth old-soln)))))
-
-
 (defun printout-solution (soln)
   (declare (type solution soln))
   (printout-solution-with-states soln)
@@ -1727,10 +1712,21 @@
 
 (defun ww-solve ()
   "Runs a branch & bound search on the problem specification."
-  (if (> *threads* 0)
-    (format t "~%working with ~D thread(s)...~2%" *threads*)
-    (format t "~%working...~2%"))
-  (time (dfs))
+  ;; A prior result stops being a continuation candidate as soon as another search starts.
+  ;; Clear here rather than relying on DFS, whose initial-invariant failure exits before
+  ;; DFS's own search-statistics reset.
+  (setf *solution-paths* nil
+        *solutions-valid* nil)
+  (let ((completed nil))
+    (unwind-protect
+        (progn
+          (if (> *threads* 0)
+            (format t "~%working with ~D thread(s)...~2%" *threads*)
+            (format t "~%working...~2%"))
+          (time (dfs))
+          (setf completed t))
+      (setf *solutions-valid*
+            (and completed (not (null *solution-paths*))))))
   (in-package :ww))
 
 

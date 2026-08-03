@@ -14,7 +14,7 @@
 ;;;   nested    : -placement (placement-options, place-held-object!; also brings in
 ;;;               support occupancy, location, position, height, elevation, and holding);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
-;;;               -visibility (null-default visible interface); -pickup (pickup-clear,
+;;;               -visibility (null-default visible-for-object interface); -pickup (pickup-clear,
 ;;;               shared with box and beam-relay)  --  all shared via nested include-tech
 ;;;               rather than local declaration
 ;;;   extension : visibility overrides -visibility's null default with authored LOS
@@ -82,11 +82,11 @@
        ;; ordinary LOS-TO-LOCATION entry instead -- or trivially when the jammer is placed
        ;; at the gears' own location.
        (or (and (or (gate ?target) (gun ?target))
-                (visible ?location ?target))
+                (visible-for-object ?agent ?location ?target))
            (and (or (floor-gears ?target) (wall-gears ?target))
                 (bind (has-position ?target $t-location))
                 (or (eql ?location $t-location)
-                    (visible ?location $t-location))))
+                    (visible-for-object ?agent ?location $t-location))))
        (not (jam-disallowed> $a-location ?location ?target))
        (assign $places (placement-options ?agent ?location $any-jammer)))
   (">" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)

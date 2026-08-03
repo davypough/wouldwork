@@ -47,7 +47,7 @@
 ;;; do not gain this test -- nothing but jam-target ever reads either, and a jammer's line to
 ;;; its target is not blocked by intervening objects, by design.
 ;;;
-;;; Declares BEAM-ENDPOINT itself, as (either transmitter receiver repeater gun location) -- the
+;;; Declares LOS-ENDPOINT itself, as (either transmitter receiver repeater gun location) -- the
 ;;; composite every consuming query/init-action here iterates over.  A problem may also declare it
 ;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
 ;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
@@ -75,7 +75,7 @@
 ;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
 ;;;               core wouldwork setting, so it lives here rather than in ww-settings.lisp;
 ;;;               a problem overrides it with its own DEFPARAMETER
-;;;   types     : beam-endpoint (either transmitter receiver repeater gun location);
+;;;   types     : los-endpoint (either transmitter receiver repeater gun location);
 ;;;               jammer and gun
 ;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
 ;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
@@ -109,7 +109,7 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater)
-  beam-endpoint (either transmitter receiver repeater gun location))
+  los-endpoint (either transmitter receiver repeater gun location))
 
 
 (define-static-relations
@@ -219,7 +219,7 @@
 
 
 (defun beam-coordinates-los-occluders (beam positions walls gates)
-  ;; Tests BEAM -- a (source destination) beam-endpoint pair -- against the problem's
+  ;; Tests BEAM -- a (source destination) los-endpoint pair -- against the problem's
   ;; WALL-SEGMENTS and GATE-SEGMENTS.  Returns the keyword :BLOCKED if any wall blocks
   ;; BEAM's interior -- including at the wall's own corner, since walls are tested with
   ;; ENDPOINTS-BLOCK true -- meaning no LOS fact should be asserted for it at all;
@@ -300,10 +300,10 @@
 
 
 (define-query beam-coordinates-endpoint-positions ()
-  ;; Routes each beam-endpoint to its owning position relation: LOCATION-COORDS> for a
+  ;; Routes each los-endpoint to its owning position relation: LOCATION-COORDS> for a
   ;; location, APPARATUS-COORDS> (transmitter/receiver/repeater/gun) for everything else.
   (do (assign $positions nil)
-      (doall (?endpoint beam-endpoint)
+      (doall (?endpoint los-endpoint)
         (if (location ?endpoint)
           (if (bind (location-coords> ?endpoint $x $y))
             (push (list ?endpoint $x $y) $positions)
@@ -314,7 +314,7 @@
       $positions))
 
 
-(define-query beam-coordinates-endpoint-xy (?endpoint beam-endpoint)
+(define-query beam-coordinates-endpoint-xy (?endpoint los-endpoint)
   ;; ?endpoint's own live coordinates, routed the same way BEAM-COORDINATES-ENDPOINT-
   ;; POSITIONS routes them at init time: LOCATION-COORDS> for a location, APPARATUS-COORDS>
   ;; for a non-location beam endpoint.  Errors by name if the fact is missing, exactly like
@@ -333,9 +333,9 @@
 
 (define-query beam-coordinates-elevation-at
     (?occluder location
-     ?from beam-endpoint
+     ?from los-endpoint
      ?near-elevation
-     ?to beam-endpoint
+     ?to los-endpoint
      ?far-elevation)
   ;; The occluder and endpoints are Wouldwork objects. Elevations are computed Lisp values
   ;; and therefore deliberately have no Wouldwork object type.

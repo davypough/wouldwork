@@ -56,11 +56,9 @@
 ;;;; name into a literal domain at that point, so a type declared below the includes would
 ;;;; reach every tech query as an empty domain.  That failure is silent, not an error.
 ;;;; Every composite type that a consuming tech file needs (mobile-object, cargo,
-;;;; support-occupant, support, target, fixed-position-object) is declared identically
-;;;; inside that tech file instead, so no tech file depends on a type declaration living in
-;;;; the problem.  beam-endpoint is declared by -beam-los-coordinates.lisp too; the
-;;;; duplicate here is harmless because CHECK-TYPE-SIGNATURE-CONSISTENCY requires both to
-;;;; resolve to the same instance list.  terminus is owned by beam-relay.
+;;;; support-occupant, support, target, fixed-position-object, los-endpoint) is declared
+;;;; identically inside that tech file instead, so no tech file depends on a type
+;;;; declaration living in the problem.  terminus is owned by beam-relay.
 ;;;; crossing is deliberately absent: the pool is minted at init time by
 ;;;; -beam-crossing-coordinates.lisp's ESTABLISH-BEAM-COORDINATES, one crossing per computed
 ;;;; intersection, and published as CURRENT-CROSSINGS> for beam-crossing.lisp's
@@ -77,7 +75,6 @@
   transmitter (transmitter1 transmitter2)
   receiver    (receiver1 receiver2 receiver3)
   hue         (blue red)
-  beam-endpoint (either transmitter receiver location)  ;a fixture, or a connector's location
 )
 
 

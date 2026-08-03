@@ -1,6 +1,7 @@
 ;;; Filename: -recorder-init-checks.lisp
 
-;;; Initialization validation for recorder identity and recording-layer isolation.
+;;; Initialization validation for -recorder-core identity, recording-layer isolation, and
+;;; the explicitly supported set of shadow components assembled by recorder.lisp.
 
 
 (in-package :ww)
@@ -8,7 +9,7 @@
 
 (define-init-check recorder-init-check (literals)
   (check-init-recorder-consistency literals)
-  (init-check-recording-jammers))
+  (init-check-recorder-supported-scope))
 
 
 (define-init-check-helper check-init-recorder-consistency (literals)
@@ -50,9 +51,12 @@
         (setf (gethash live live-objects) t)
         (setf (gethash ghost ghost-objects) t)))
     (when (init-relation-signature 'recording-copy>)
+      (init-check-recording-locations literals live-objects ghost-objects)
       (init-check-recording-holdings literals live-objects ghost-objects)
       (init-check-recording-supports literals live-objects ghost-objects)
       (init-check-recording-pairings literals live-objects ghost-objects)
+      (init-check-recording-jamming-facts literals live-objects ghost-objects)
+      (init-check-recording-mapped-wall-fans live-objects ghost-objects)
       (init-check-recording-wall-gears-controls literals))))
 
 
@@ -72,6 +76,22 @@
   (let ((side1 (init-recording-side object1 live-objects ghost-objects))
         (side2 (init-recording-side object2 live-objects ghost-objects)))
     (and side1 (eql side1 side2))))
+
+
+(define-init-check-helper init-check-recording-locations
+    (literals live-objects ghost-objects)
+  "Requires every located mobile object to have an explicit recording side."
+  (dolist (literal (positive-init-literals-with-relation 'has-location literals))
+    (destructuring-bind (object location)
+        (rest (init-literal-proposition literal))
+      (declare (ignore location))
+      (when (and (init-type-member-p object 'mobile-object)
+                 (not (init-recording-side object live-objects ghost-objects)))
+        (fail-init-check nil "~%HAS-LOCATION gives an unmapped mobile object physical state.~%~
+                Literal: ~S~%~
+                Object:  ~S~%~
+                Every located mobile object in a recorder problem needs a RECORDING-COPY> pair."
+               literal object)))))
 
 
 (define-init-check-helper init-check-recording-holdings (literals live-objects ghost-objects)
@@ -122,6 +142,19 @@
                  literal connector terminus))))))
 
 
+(define-init-check-helper init-check-recording-mapped-wall-fans
+    (live-objects ghost-objects)
+  "Rejects movable fan copies while wall-fan presence is not recording-view aware."
+  (when (and (init-relation-signature 'mounted-on)
+             (init-type-instances 'wall-gears))
+    (dolist (fan (init-type-instances 'fan))
+      (when (or (gethash fan live-objects)
+                (gethash fan ghost-objects))
+        (fail-init-check nil "~%Recorder technology does not yet support mapped wall-fan mounting.~%~
+                Fan: ~S"
+               fan)))))
+
+
 (define-init-check-helper init-check-recording-wall-gears-controls (literals)
   "Rejects control sources that Stage 3's recording shadow cannot derive."
   (when (init-dnf-controls-relation-p)
@@ -140,10 +173,48 @@
                        literal controlled-object controller)))))))))
 
 
-(define-init-check-helper init-check-recording-jammers ()
-  "Reject jammers until recorder technology models recording-side jamming."
-  (when (init-type-instances 'jammer)
+(define-init-check-helper init-check-recording-jamming-facts
+    (literals live-objects ghost-objects)
+  "Requires every initially active jammer to have an explicit recording side."
+  (dolist (literal (positive-init-literals-with-relation 'jamming literals))
+    (destructuring-bind (jammer target)
+        (rest (init-literal-proposition literal))
+      (declare (ignore target))
+      (unless (init-recording-side jammer live-objects ghost-objects)
+        (fail-init-check nil "~%JAMMING uses an unmapped jammer in a recorder problem.~%~
+                Literal: ~S~%~
+                Jammer:  ~S~%~
+                Every active jammer needs a RECORDING-COPY> pair."
+               literal jammer)))))
+
+
+(define-init-check-helper init-check-recorder-unsupported-type (type capability)
+  "Rejects instances of TYPE while CAPABILITY has no recording-side model."
+  (let ((instances (init-type-instances type)))
+    (when instances
+      (fail-init-check nil "~%Recorder technology does not yet support ~A.~%~
+              Type:   ~S~%~
+              Object: ~S"
+             capability type (first instances)))))
+
+
+(define-init-check-helper init-check-recording-threats ()
+  "Rejects threats until lethal state and safety are recording-view aware."
+  (if (init-type-instances 'threat)
+    (init-check-recorder-unsupported-type 'threat "recording-side threats")
+    (init-check-recorder-unsupported-type 'gun "recording-side threats")))
+
+
+(define-init-check-helper init-check-recording-beam-crossings ()
+  "Rejects the beam-crossing peer until crossing and cut state have a recording view."
+  (when (init-relation-signature 'crossings-along-beam>)
     (fail-init-check nil
-      "Recorder technology does not yet support recording-side jamming.")))
+      "Recorder technology does not yet support recording-side beam crossings.")))
 
 
+(define-init-check-helper init-check-recorder-supported-scope ()
+  "Rejects installed objects and capabilities outside the recorder shadow."
+  (init-check-recorder-unsupported-type 'floor-gears "recording-side floor blowers")
+  (init-check-recorder-unsupported-type 'angled-gears "recording-side angled blowers")
+  (init-check-recording-threats)
+  (init-check-recording-beam-crossings))

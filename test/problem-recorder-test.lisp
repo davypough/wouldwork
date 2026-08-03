@@ -108,18 +108,6 @@
         :checks '(recorder-init-check)))
     'init-check-failure
     :containing "incompatible object categories"
-    :check 'recorder-init-check)
-  ;; This scope check reads the installed type table, so the probe temporarily supplies
-  ;; the otherwise absent jammer type and restores the table before the claim returns.
-  (expect-condition
-    (lambda ()
-      (unwind-protect
-          (progn
-            (setf (gethash 'jammer *types*) '(probe-jammer))
-            (validate-init-literals nil :checks '(recorder-init-check)))
-        (remhash 'jammer *types*)))
-    'init-check-failure
-    :containing "does not yet support recording-side jamming"
     :check 'recorder-init-check))
 
 

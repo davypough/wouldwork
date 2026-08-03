@@ -190,7 +190,7 @@
   ;; needed: if the stream stopped, drop-occupants! would return the agent to location10
   ;; before any goal check.
   (holding agent1 connector2)  ;first subgoal
-  ;(has-location agent1 location11)
+  ;(has-location agent1 location11)  ;final goal
 )
 
 

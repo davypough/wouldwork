@@ -9,17 +9,17 @@
 ;;;
 ;;; declared-height's default of 1 covers box, agent, jammer, connector, and repeater.
 ;;; A repeater's height follows its mounting axis: vertical for a floor-repeater and
-;;; horizontal for a wall-repeater.  It is NOT used for barrier clearance -- fences, gates,
+;;; horizontal for a wall-repeater.  It is NOT used for barrier clearance -- gates,
 ;;; screens, and walls use capability-specific defaults instead.
 ;;;
 ;;; PROVIDES:
 ;;;   types    : repeater (either floor-repeater wall-repeater);
-;;;              heighted-object (either box fence gate agent screen wall jammer connector
+;;;              heighted-object (either box gate agent screen wall jammer connector
 ;;;              repeater) -- what can have a declared height; optional subtypes absent
 ;;;              from the problem resolve to nil, a no-op
 ;;;   relation : (has-height heighted-object $fixnum)
 ;;;   query    : declared-height  --  declared value or a fixed default of 1; not for
-;;;              fence/gate/screen/wall barrier-clearance height
+;;;              gate/screen/wall barrier-clearance height
 
 (in-package :ww)
 
@@ -29,7 +29,7 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater)
-  heighted-object (either box fence gate agent screen wall jammer connector repeater))
+  heighted-object (either box gate agent screen wall jammer connector repeater))
 
 
 (define-static-relations

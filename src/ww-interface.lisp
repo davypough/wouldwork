@@ -420,10 +420,15 @@ is staged again.
 
 
 (defun solve ()
-  (cond (*final-goal*  ;mid-chain: continue toward original goal
-         (continue-from-solution *final-goal*)
-         (ww-solve))
-        (t (ww-solve))))
+  (if *final-goal*
+    (progn
+      ;; Mid-chain: consume the last subgoal result and reinstate the original goal.
+      (continue-from-solution *final-goal*)
+      (ww-solve)
+      (when *solutions-valid*
+        (setf *final-goal* nil))
+      *solution-paths*)
+    (ww-solve)))
 
 
 (defun list-all-problems (&optional (prettyp nil))

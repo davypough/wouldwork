@@ -17,7 +17,7 @@
 ;;;   types     : crossing is declared optional by the nested -beam-crossing-coordinates
 ;;;               substrate and stays empty; the pool is minted at init time and reached
 ;;;               through CURRENT-CROSSINGS>/GET-CURRENT-CROSSINGS rather than through the
-;;;               type extension, so no problem declares it; beam-endpoint is declared by the nested
+;;;               type extension, so no problem declares it; los-endpoint is declared by the nested
 ;;;               -beam-los-coordinates substrate (via -beam-crossing-coordinates);
 ;;;               transmitter is declared optional here (define-optional-types); gate comes
 ;;;               from nested -gate
@@ -26,7 +26,7 @@
 ;;; PROVIDES:
 ;;;   nested    : -beam-crossing-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM>/
 ;;;               CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
-;;;               BEAM-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENTS, GATE-SEGMENTS,
+;;;               LOS-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENTS, GATE-SEGMENTS,
 ;;;               BOUNDARY-WALL, and LOS derivation);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
 ;;;               walkability (via -passability), reachability, visibility, and
@@ -64,9 +64,9 @@
 
 
 (define-static-relations
-  (beam-crossing> crossing $beam-endpoint $beam-endpoint $beam-endpoint $beam-endpoint)
-  (crossings-along-beam> beam-endpoint $list beam-endpoint)
-  (crossings-before-gate> beam-endpoint $list gate beam-endpoint)
+  (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
+  (crossings-along-beam> los-endpoint $list los-endpoint)
+  (crossings-before-gate> los-endpoint $list gate los-endpoint)
   (current-crossings> $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
 
 
@@ -140,8 +140,8 @@
 
 
 (define-query beam-reaches-crossing
-    (?from beam-endpoint
-     ?to beam-endpoint
+    (?from los-endpoint
+     ?to los-endpoint
      ?xing crossing
      ?active
      ?lighting)
@@ -250,11 +250,11 @@
   ;; Every (from . to) pair with an authored CROSSINGS-ALONG-BEAM> entry, keeping only one
   ;; direction for beams authored bidirectionally.  Bidirectional authoring (both (from to)
   ;; and (to from) present) is detected structurally -- by the presence of the reverse
-  ;; entry -- rather than by endpoint type, so this works for any beam-endpoint composition
+  ;; entry -- rather than by endpoint type, so this works for any los-endpoint composition
   ;; a problem declares.  Errors if a bidirectional pair's two authored lists disagree.
   (do (assign $beams nil)
-      (doall (?from beam-endpoint)
-        (doall (?to beam-endpoint)
+      (doall (?from los-endpoint)
+        (doall (?to los-endpoint)
           (if (bind (crossings-along-beam> ?from $ids ?to))
             (do (assign $mirrored (bind (crossings-along-beam> ?to $reverse-ids ?from)))
                 (if (or (not $mirrored)
@@ -295,7 +295,7 @@
         $d1)))
 
 
-(define-query beam-source-distance (?from beam-endpoint ?lighting)
+(define-query beam-source-distance (?from los-endpoint ?lighting)
   (if (transmitter ?from)
     0
     (beam-relay-source-distance ?from ?lighting)))

@@ -1,0 +1,128 @@
+;;; Filename: -recorder-core.lisp
+
+;;; Recorder identity and cross-layer interaction policy.  RECORDING-COPY> explicitly maps
+;;; each live mobile object to the ghost that replays it.  The relation is directional and
+;;; functional from live to ghost; recorder initialization adds the one-to-one, disjoint,
+;;; and leaf-category-compatible invariants.
+;;;
+;;; This file deliberately owns no apparatus shadow state and no propagation update.  It
+;;; identifies the recording view, selects which mapped objects existed in that view, and
+;;; keeps shared manipulation actions within the appropriate layer.  Capability-specific
+;;; state lives in the -recorder-*-shadow components assembled by recorder.lisp.  The core
+;;; does own their lifecycle registry: each stateful component registers how its own shadow
+;;; is reset and, when necessary, seeded at a chained-cycle boundary.
+;;;
+;;; REQUIRES:
+;;;   nested : -location (mobile-object); -position (recorder has-position role);
+;;;            -interaction-policy (neutral action hooks); -recording-shadow-policy
+;;;            (neutral environmental-view hooks)
+;;; PROVIDES:
+;;;   type     : recorder, connector (optional)
+;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object)
+;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
+;;;              overrides recording-shadow-object, recording-shadow-object-present,
+;;;              object-manipulation-allowed, support-use-allowed, and
+;;;              connector-pairing-allowed
+;;;   functions: register-recorder-shadow-lifecycle,
+;;;              clear-recorder-shadow-relation!
+
+(include-tech -location)
+(include-tech -position)
+(include-tech -interaction-policy)
+(include-tech -recording-shadow-policy)
+
+(in-package :ww)
+
+
+(define-optional-types recorder connector)
+
+
+(define-static-relations
+  (recording-copy> mobile-object $mobile-object))
+
+
+(defvar *recorder-shadow-lifecycles* nil
+  "Registered (COMPONENT RESETTER SEEDER) callbacks in component assembly order.")
+
+;; A staged recorder problem reloads this file in the same Lisp image.  Clear registrations
+;; from the preceding problem before this recorder assembly registers its own components.
+(setf *recorder-shadow-lifecycles* nil)
+
+
+(defun register-recorder-shadow-lifecycle (component resetter &optional seeder)
+  "Register COMPONENT's reset callback and optional seed callback for cycle preparation."
+  (when (assoc component *recorder-shadow-lifecycles*)
+    (error "Recorder shadow lifecycle registered twice for ~S." component))
+  (setf *recorder-shadow-lifecycles*
+        (append *recorder-shadow-lifecycles*
+                (list (list component resetter seeder))))
+  component)
+
+
+(defun clear-recorder-shadow-relation! (state relation)
+  "Remove every proposition for RELATION from STATE's dynamic database."
+  (let ((idb (problem-state.idb state)))
+    (dolist (proposition (list-database idb))
+      (when (eql (first proposition) relation)
+        (delete-proposition proposition idb))))
+  (setf (problem-state.idb-hash state) nil)
+  state)
+
+
+(define-query live-recording-object (?object mobile-object)
+  (exists (?ghost mobile-object)
+    (recording-copy> ?object ?ghost)))
+
+
+(define-query ghost-recording-object (?object mobile-object)
+  (exists (?live mobile-object)
+    (recording-copy> ?live ?object)))
+
+
+(define-query same-recording-side (?object1 mobile-object ?object2 mobile-object)
+  (or (and (live-recording-object ?object1)
+           (live-recording-object ?object2))
+      (and (ghost-recording-object ?object1)
+           (ghost-recording-object ?object2))))
+
+
+(define-query recording-shadow-object (?object)
+  (and (mobile-object ?object)
+       (ghost-recording-object ?object)))
+
+
+(define-query recording-shadow-object-present (?object)
+  ;; Fixed apparatus and genuinely unmapped objects exist in both views.  Of each mapped
+  ;; pair, only the ghost copy existed while the recording was made.
+  (or (not (mobile-object ?object))
+      (ghost-recording-object ?object)
+      (and (not (live-recording-object ?object))
+           (not (ghost-recording-object ?object)))))
+
+
+(define-query object-manipulation-allowed (?actor ?object)
+  ;; Recorder participants may manipulate only mapped objects on their own side.
+  (and (mobile-object ?actor)
+       (mobile-object ?object)
+       (same-recording-side ?actor ?object)))
+
+
+(define-query support-use-allowed (?occupant ?support)
+  ;; Fixed supports such as plates are shared environmental apparatus.  A mobile support
+  ;; (box or floor-mounted fan) is usable only by an occupant on the same recording side.
+  (or (not (mobile-object ?support))
+      (and (mobile-object ?occupant)
+           (same-recording-side ?occupant ?support))))
+
+
+(define-query connector-pairing-allowed (?actor ?connector ?terminus)
+  ;; Fixed beam apparatus is shared.  During playback a live connector may use either
+  ;; layer's connector as a terminus, while a ghost connector may depend only on another
+  ;; ghost connector -- never on a live movable connector absent from its recording.
+  (and (object-manipulation-allowed ?actor ?connector)
+       (or (not (connector ?terminus))
+           (and (live-recording-object ?actor)
+                (or (live-recording-object ?terminus)
+                    (ghost-recording-object ?terminus)))
+           (and (ghost-recording-object ?actor)
+                (ghost-recording-object ?terminus)))))

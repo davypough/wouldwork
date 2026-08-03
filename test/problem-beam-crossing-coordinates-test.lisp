@@ -114,12 +114,12 @@
 
 
 (define-query crossings-along-present
-    (?from beam-endpoint ?to beam-endpoint)
+    (?from los-endpoint ?to los-endpoint)
   (bind (crossings-along-beam> ?from $crossings ?to)))
 
 
 (define-query gate-split-present
-    (?from beam-endpoint ?to beam-endpoint)
+    (?from los-endpoint ?to los-endpoint)
   (exists (?gate gate)
     (bind (crossings-before-gate> ?from $crossings ?gate ?to))))
 

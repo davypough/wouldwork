@@ -176,6 +176,37 @@
   (goal (make-problem-state) :type problem-state))
 
 
+(defun solution-better-p (new-solution old-solution)
+  "Whether NEW-SOLUTION is preferred to OLD-SOLUTION for *SOLUTION-TYPE*."
+  (case *solution-type*
+    ((min-length first every all-paths)
+     (< (solution.depth new-solution) (solution.depth old-solution)))
+    (min-time
+     (< (solution.time new-solution) (solution.time old-solution)))
+    (min-value
+     (< (solution.value new-solution) (solution.value old-solution)))
+    (max-value
+     (> (solution.value new-solution) (solution.value old-solution)))
+    (otherwise
+     ;; A positive integer requests that many solutions; continuation uses the shortest.
+     (< (solution.depth new-solution) (solution.depth old-solution)))))
+
+
+(defun copy-solution-deeply (solution)
+  "Copy SOLUTION, including its path and final problem state."
+  (make-solution
+    :depth (solution.depth solution)
+    :time (solution.time solution)
+    :value (solution.value solution)
+    :path (copy-tree (solution.path solution))
+    :goal (copy-problem-state (solution.goal solution))))
+
+
+(defun copy-solutions-deeply (solutions)
+  "Return independent copies of every solution in SOLUTIONS."
+  (mapcar #'copy-solution-deeply solutions))
+
+
 (defstruct (node (:conc-name node.)
              (:print-function
                (lambda (node stream depth)

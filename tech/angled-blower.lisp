@@ -10,8 +10,8 @@
 ;;; While the fan blows, its air stream launches every occupant resting on it -- agent,
 ;;; box, jammer, or connector -- along a 45-degree parabolic arc to the gears' aimed-at>
 ;;; destination, a box's stack riding along still stacked.  Unlike floor-blower's vertical
-;;; launch, this is a one-shot delivery, not a sustained hover: the arc clears any wall or
-;;; fence standing between pad and destination (no obstacle-clear/passability check is
+;;; launch, this is a one-shot delivery, not a sustained hover: the arc clears any wall
+;;; standing between pad and destination (no obstacle-clear/passability check is
 ;;; modeled for it -- the whole point of the arc is that it flies over what a horizontal
 ;;; stream could not), and once the object lands it stays landed, even if the gears later
 ;;; stop turning or the fan is lifted away.  land-on-support! rests it on the first

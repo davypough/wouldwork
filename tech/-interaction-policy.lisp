@@ -1,9 +1,8 @@
 ;;; Filename: -interaction-policy.lisp
 
 ;;; Interaction-policy hooks.  Shared actions call these neutral interfaces without knowing
-;;; whether a recorder is present.  The recorder technology overrides them after nesting this
-;;; file, so include-tech deduplication preserves the overrides regardless of public include
-;;; order.
+;;; whether a recorder is present.  -recorder-core overrides them after nesting this file,
+;;; so include-tech deduplication preserves the overrides regardless of public include order.
 ;;;
 ;;; PROVIDES:
 ;;;   queries : object-manipulation-allowed  -- actor may pick up, carry, place, or mount object

@@ -58,7 +58,6 @@
   connector (blocking-connector)
   gate (default-gate)
   screen (cargo-screen passable-screen)
-  fence (default-fence)
   wall (vault-wall default-wall)
   gun (unsafe-gun))
 
@@ -109,13 +108,12 @@
   (jump-via> carry-start (cargo-screen) carry-goal)
 
   ;; Exact-boundary query probe: standing elevation 2 plus agent height 2 reaches 4, but
-  ;; not 5.  default-fence also has top elevation 4 (base 2 + default height 2).
+  ;; not 5.
   (has-location boundary-agent boundary-site)
   (has-height boundary-agent 2)
   (has-location boundary-box boundary-site)
   (has-height boundary-box 2)
   (on boundary-agent boundary-box)
-  (has-elevation default-fence 2)
 
   ;; An empty-handed agent ignores a default-height screen even though height 3 exceeds its
   ;; own height 1.  This probe remains stationary; the goal inspects the generated child.
@@ -257,7 +255,7 @@
     (holding carrying-agent carried-box)
     (not (exists (?location location)
            (has-location carried-box ?location)))
-    (not (jump-feature-passable carrying-agent cargo-screen))
+    (not (vaultable-object-passable carrying-agent cargo-screen))
     (= (jump-required-clearance-height carrying-agent '(cargo-screen)) 2)
     (jump-path-clear carrying-agent '(cargo-screen))
 
@@ -269,25 +267,22 @@
     (jump-path-clear boundary-agent '(vault-wall))
     (not (jump-path-clear tall-box-probe-agent '(vault-wall)))
 
-    ;; Barrier defaults, explicit override, top elevation, feature typing, and maximum
+    ;; Barrier default, explicit override, top elevation, feature typing, and maximum
     ;; non-passable height.  The passable screen contributes nothing to the mixed list.
-    (= (jump-barrier-height default-fence) 2)
     (= (jump-barrier-height default-gate) 3)
     (= (jump-barrier-height passable-screen) 3)
     (= (jump-barrier-height default-wall) 3)
     (= (jump-barrier-height vault-wall) 2)
-    (= (jump-barrier-top-elevation default-fence) 4)
     (= (jump-barrier-top-elevation vault-wall) 4)
-    (jump-feature-list '(passable-screen default-wall default-fence))
-    (jump-feature-passable screen-probe-agent passable-screen)
-    (not (jump-feature-passable screen-probe-agent default-gate))
-    (not (jump-feature-passable screen-probe-agent default-fence))
-    (not (jump-feature-passable screen-probe-agent default-wall))
+    (vaultable-object-list '(passable-screen default-wall))
+    (vaultable-object-passable screen-probe-agent passable-screen)
+    (not (vaultable-object-passable screen-probe-agent default-gate))
+    (not (vaultable-object-passable screen-probe-agent default-wall))
     (not (jump-required-clearance-height
            screen-probe-agent '(passable-screen)))
     (= (jump-required-clearance-height
-         screen-probe-agent '(passable-screen default-wall default-fence))
-       4)
+         screen-probe-agent '(passable-screen default-wall))
+       3)
 
     ;; Threat state and occupied-top setup remain present for the generated-child probes.
     (lethal unsafe-gun)

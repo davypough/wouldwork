@@ -1,9 +1,9 @@
 ;;; Filename: -recording-shadow-policy.lisp
 
 ;;; Neutral hooks for selecting an object's environmental state view.  Ordinary problems
-;;; use only shared playback state.  Recorder overrides these hooks so ghost objects read
-;;; the narrowly scoped recording-side gears, gate, and beam state maintained by
-;;; recorder.lisp and the beam peers.
+;;; use only shared playback state.  -recorder-core selects the recording objects and their
+;;; presence, while the gate and wall-gears shadow components override their capability
+;;; hooks.  Beam peers consume those selections for recording-side beam state.
 ;;;
 ;;; PROVIDES:
 ;;;   queries : recording-shadow-object          -- object uses recording-side physics

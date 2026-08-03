@@ -4,7 +4,7 @@
 ;;; matrix gives every HEIGHTED-OBJECT leaf one explicit-height fixture and one
 ;;; fixture with no authored HAS-HEIGHT fact:
 ;;;
-;;;   agent, box, jammer, connector, fence, gate, screen, wall,
+;;;   agent, box, jammer, connector, gate, screen, wall,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
 ;;; Distinct explicit values verify exact binding and DECLARED-HEIGHT lookup.  The
@@ -38,7 +38,6 @@
   box (explicit-box default-box)
   jammer (explicit-jammer default-jammer)
   connector (explicit-connector default-connector)
-  fence (explicit-fence default-fence)
   gate (explicit-gate default-gate)
   screen (explicit-screen default-screen)
   wall (explicit-wall default-wall)
@@ -62,7 +61,6 @@
   (has-height explicit-box 2)
   (has-height explicit-jammer 3)
   (has-height explicit-connector 4)
-  (has-height explicit-fence 5)
   (has-height explicit-gate 6)
   (has-height explicit-screen 7)
   (has-height explicit-wall 8)
@@ -101,7 +99,6 @@
     (explicit-height-valid explicit-box 2)
     (explicit-height-valid explicit-jammer 3)
     (explicit-height-valid explicit-connector 4)
-    (explicit-height-valid explicit-fence 5)
     (explicit-height-valid explicit-gate 6)
     (explicit-height-valid explicit-screen 7)
     (explicit-height-valid explicit-wall 8)
@@ -113,7 +110,6 @@
     (default-height-valid default-box)
     (default-height-valid default-jammer)
     (default-height-valid default-connector)
-    (default-height-valid default-fence)
     (default-height-valid default-gate)
     (default-height-valid default-screen)
     (default-height-valid default-wall)

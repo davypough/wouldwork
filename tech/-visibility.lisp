@@ -12,10 +12,12 @@
 ;;;              and gun are optional.  APPARATUS-COORDS> names each apparatus's functional
 ;;;              point: beam emission/reception/relay for beam apparatus, and the
 ;;;              firing/targeting point for a gun.
-;;;   queries  : visible, potentially-visible, beam-visible, beam-visible-for-object  --
-;;;              null defaults, overridden by visibility. Their typed object parameters remain valid when an optional
-;;;              type has no objects: the query is still installed and its null body returns
-;;;              NIL; only iteration over that empty type produces no calls.
+;;;   queries  : visible, visible-for-object, potentially-visible, beam-visible,
+;;;              beam-visible-for-object -- null defaults, overridden by visibility.
+;;;              The FOR-OBJECT forms select actor/view-specific gate state.  Their typed
+;;;              object parameters remain valid when an optional type has no objects: the
+;;;              query is still installed and its null body returns NIL; only iteration
+;;;              over that empty type produces no calls.
 
 (in-package :ww)
 
@@ -35,6 +37,11 @@
 
 (define-query visible (?location location ?object (either fixture location))
   (do ?location ?object nil))
+
+
+(define-query visible-for-object
+    (?view ?location location ?object (either fixture location))
+  (do ?view ?location ?object nil))
 
 
 (define-query potentially-visible (?location location ?object (either fixture location))

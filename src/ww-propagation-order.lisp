@@ -657,9 +657,9 @@
   "Marks the type spec of every DOALL, EXISTS, or FORALL parameter list anywhere in FORM.
    A type used only as an iteration domain inside a body is consumed just as surely as
    one named in a relation signature, and nothing in any signature or parameter list says
-   so -- BEAM-ENDPOINT reaches the problem solely through -BEAM-LOS-COORDINATES'
-   (DOALL (?ENDPOINT BEAM-ENDPOINT) ...) and -BEAM-CROSSING-COORDINATES'
-   (EXISTS (?E BEAM-ENDPOINT) ...)."
+   so -- LOS-ENDPOINT reaches the problem solely through -BEAM-LOS-COORDINATES'
+   (DOALL (?ENDPOINT LOS-ENDPOINT) ...) and -BEAM-CROSSING-COORDINATES'
+   (EXISTS (?E LOS-ENDPOINT) ...)."
   (cond ((atom form)
          nil)
         ((eq (car form) 'quote)

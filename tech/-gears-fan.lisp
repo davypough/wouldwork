@@ -30,7 +30,7 @@
 ;;;               -placement (placement-options, place-held-object!; nests
 ;;;               -support-elevation and -holding); -reachability (reachable);
 ;;;               -pickup (pickup-clear); -recording-shadow-policy (neutral state-view
-;;;               hooks, overridden by recorder)
+;;;               hooks, overridden by recorder's capability-specific shadows)
 ;;;   conditional relations:
 ;;;               jamming (jammer), guarded by an exists over jammer (gate.lisp's pattern):
 ;;;               a jamming jammer forces gears stopped in update-gears-status!; jammer is
@@ -49,7 +49,7 @@
 ;;;               -location          : mobile-object includes fan
 ;;;               -holding           : cargo includes fan
 ;;;               -support-elevation : a fan is a movable, zero-thickness support
-;;;               step.lisp          : steppable (either plate fan); reads mounted-on,
+;;;               step.lisp          : steppable-object (either plate fan); reads mounted-on,
 ;;;                                    guarded by fan
 ;;;   driver    : the master propagate-consequences! must call update-gears-status!
 ;;;               after update-receiver-status! and update-plate-status!, and each

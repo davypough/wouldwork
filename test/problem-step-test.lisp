@@ -249,5 +249,5 @@
 (define-action-precondition-mutation step-off-allows-any-support step-off
   (and (bind (on ?agent $fixture))
        (bind (has-location ?agent $a-location)))
-  "Drops STEP-OFF's steppable-type guard.  The box-support probe must then make
+  "Drops STEP-OFF's steppable-object-type guard.  The box-support probe must then make
    this characterization fail.")

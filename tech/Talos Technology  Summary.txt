@@ -8,7 +8,6 @@ box
 connector
 crossing
 fan
-fence
 floor-gears
 floor-repeater
 gate
@@ -31,26 +30,26 @@ window
 
 apparatus (either transmitter receiver repeater gun)
 beam-blocker (either agent box jammer connector)
-beam-endpoint (either transmitter receiver repeater gun location)
+los-endpoint (either transmitter receiver repeater gun location)
 beam-node (either transmitter receiver repeater location)
 cargo (either box jammer connector fan)
-elevated-object (either location gate screen fence wall transmitter receiver wall-gears repeater)
+elevated-object (either location gate screen wall transmitter receiver wall-gears repeater)
 fixed-beam-source (either transmitter repeater)
-fixed-beam-target (either repeater receiver)
+fixed-beam-sink (either repeater receiver)
 fixed-position-object (either plate ladder floor-gears wall-gears angled-gears)
-fixture (either gate transmitter receiver repeater gun)
+fixture (either gate transmitter receiver repeater gun)  ;ie, an apparatus or gate
 gears (either floor-gears wall-gears angled-gears)
-heighted-object (either box fence gate agent screen wall jammer connector repeater)
-jump-feature (either gate screen fence wall)
+heighted-object (either box gate agent screen wall jammer connector repeater)
 mobile-object (either agent box jammer connector fan)
 relay (either connector repeater)
 repeater (either floor-repeater wall-repeater)
-steppable (either plate fan)
+steppable-object (either plate fan)
 support (either plate box fan)
 support-occupant (either agent box jammer connector fan)
 target (either gate floor-gears wall-gears gun)
 terminus (either transmitter receiver connector repeater)
 threat (either gun)
+vaultable-object (either gate screen wall)
 
 3. Dynamic Relations
 
@@ -73,14 +72,14 @@ threat (either gun)
 
 (aimed-at> gears $location)
 (apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
-(beam-crossing> crossing $beam-endpoint $beam-endpoint $beam-endpoint $beam-endpoint)
-(beam-via fixed-beam-source $list fixed-beam-target)
+(beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
+(beam-via fixed-beam-source $list fixed-beam-sink)
 (boundary-wall $list)  ;axis-aligned point list, explicitly closed by repeating the first point; used by LOS and walk-via derivation
 (climb-via> location $list location)
 (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode)
-(coupled fixed-beam-source fixed-beam-target)  ;directional; fixed couplings unlimited
-(crossings-along-beam> beam-endpoint $list beam-endpoint)
-(crossings-before-gate> beam-endpoint $list gate beam-endpoint)
+(coupled fixed-beam-source fixed-beam-sink)  ;directional; fixed couplings unlimited
+(crossings-along-beam> los-endpoint $list los-endpoint)
+(crossings-before-gate> los-endpoint $list gate los-endpoint)
 (current-crossings> $list)
 (gate-segments $list)
 (has-chroma (either transmitter receiver) $hue)
@@ -127,7 +126,6 @@ threat (either gun)
 agent 1
 box 1
 connector 1
-fence 2
 gate 3
 jammer 1
 repeater 1

@@ -64,7 +64,7 @@
 
 
 (define-query fixed-beam-elevation-at
-    (?from fixed-beam-source ?obstacle location ?to fixed-beam-target)
+    (?from fixed-beam-source ?obstacle location ?to fixed-beam-sink)
   (do (assign $from-elevation (apparatus-anchor-elevation ?from))
       (assign $to-elevation (apparatus-anchor-elevation ?to))
       (beam-elevation-at-location
@@ -74,7 +74,7 @@
 (define-query beam-clear
     (?from fixed-beam-source
      ?obstacle (either gate location)
-     ?to fixed-beam-target)
+     ?to fixed-beam-sink)
   ;; Closed gates block outright.  A location blocks only when one of its beam-blocking
   ;; occupants spans the fixed beam's interpolated elevation there.
   (beam-clear-for-object nil ?from ?obstacle ?to))
@@ -84,7 +84,7 @@
     (?view
      ?from fixed-beam-source
      ?obstacle (either gate location)
-     ?to fixed-beam-target)
+     ?to fixed-beam-sink)
   (if (gate ?obstacle)
     (gate-open-for-object ?view ?obstacle)
     (not (if (recording-shadow-object ?view)

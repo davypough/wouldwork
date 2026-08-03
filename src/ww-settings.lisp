@@ -174,12 +174,29 @@
 (sb-ext:defglobal *solution-paths* nil
   "Holds all solution paths found during search.")
 
+(sb-ext:defglobal *solutions-valid* nil
+  "Whether *solution-paths* came from a search that completed normally.")
+
 (sb-ext:defglobal *solution-report-printers* nil
   "Problem-local functions called after Wouldwork prints a solution.")
 
 
 (sb-ext:defglobal *solution-validators* nil
   "Problem-local functions that must accept a candidate path before it is a solution.")
+
+
+(sb-ext:defglobal *goal-chaining-checkpoint-extensions* nil
+  "Registered (NAME SNAPSHOTTER RESTORER) extensions for goal-chaining undo state.")
+
+
+(defun register-goal-chaining-checkpoint-extension (name snapshotter restorer)
+  "Register problem-local checkpoint state without specializing UNDO-CHECKPOINT."
+  (when (assoc name *goal-chaining-checkpoint-extensions*)
+    (error "Goal-chaining checkpoint extension registered twice: ~S" name))
+  (setf *goal-chaining-checkpoint-extensions*
+        (append *goal-chaining-checkpoint-extensions*
+                (list (list name snapshotter restorer))))
+  name)
 
 
 (sb-ext:defglobal *nominal-solution-candidates* 0

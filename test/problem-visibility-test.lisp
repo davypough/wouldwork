@@ -117,6 +117,7 @@
 
     (potentially-visible apparatus-direct-site direct-receiver)
     (visible apparatus-direct-site direct-receiver)
+    (visible-for-object idle-agent apparatus-direct-site direct-receiver)
 
     (potentially-visible apparatus-open-site open-receiver)
     (visible apparatus-open-site open-receiver)
@@ -124,18 +125,23 @@
 
     (potentially-visible apparatus-mixed-site mixed-receiver)
     (not (visible apparatus-mixed-site mixed-receiver))
+    (not (visible-for-object idle-agent apparatus-mixed-site mixed-receiver))
     (not (beam-visible apparatus-mixed-site 1 mixed-receiver 1))
 
     (potentially-visible target-direct-site direct-target-gate)
     (visible target-direct-site direct-target-gate)
+    (visible-for-object idle-agent target-direct-site direct-target-gate)
 
     (potentially-visible target-blocked-site blocked-target-gate)
     (not (visible target-blocked-site blocked-target-gate))
+    (not (visible-for-object idle-agent target-blocked-site blocked-target-gate))
 
     (potentially-visible clear-left clear-right)
     (potentially-visible clear-right clear-left)
     (visible clear-left clear-right)
     (visible clear-right clear-left)
+    (visible-for-object idle-agent clear-left clear-right)
+    (visible-for-object idle-agent clear-right clear-left)
 
     (potentially-visible open-left open-right)
     (potentially-visible open-right open-left)
@@ -146,6 +152,8 @@
     (potentially-visible blocked-right blocked-left)
     (not (visible blocked-left blocked-right))
     (not (visible blocked-right blocked-left))
+    (not (visible-for-object idle-agent blocked-left blocked-right))
+    (not (visible-for-object idle-agent blocked-right blocked-left))
 
     (potentially-visible beam-source beam-receiver)
     (visible beam-source beam-receiver)

@@ -3,12 +3,12 @@
 ;;; Solution-time recorder services: candidate validation and the two-phase report.  Nested
 ;;; by recorder.lisp, which makes the services available; an integrated recorder problem
 ;;; activates both with ENABLE-RECORDER-SOLUTION.  Nothing here is a substrate hook, and
-;;; nothing here reads recording-side state.  The split is along that dependency:
-;;; recorder.lisp derives RECORDING-DEPRESSED, RECORDING-LATCHED,
-;;; RECORDING-TURNING, RECORDING-ACTIVE and RECORDING-OPEN during propagation, while this
-;;; file runs once per completed candidate path and touches none of them.  What it does read
-;;; is identity -- LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location,
-;;; position, and the walking closure.
+;;; nothing here reads recording-side state.  The recorder shadow components derive
+;;; RECORDING-DEPRESSED, RECORDING-LATCHED, RECORDING-TURNING, RECORDING-ACTIVE and
+;;; RECORDING-OPEN during propagation, while this file runs once per completed candidate
+;;; path and touches none of them.  What it does read is identity from -recorder-core --
+;;; LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location, position, and the
+;;; walking closure.
 ;;;
 ;;; A recording is closed by walking back to a recorder and stopping it, which gives a
 ;;; problem two sensible places to stop searching.  The default is to stop when the problem's
@@ -26,7 +26,7 @@
 ;;;            -walkability (walkable-locations -- the identity default reduces
 ;;;            RECORDING-AGENT-CAN-CLOSE to standing on the recorder, which is the right
 ;;;            reading for a problem with no walking technology)
-;;;   soft   : recorder.lisp's identity queries, resolved after splicing
+;;;   soft   : -recorder-core's identity queries, assembled by recorder.lisp
 ;;; PROVIDES:
 ;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
 ;;;              recording-agent-return-route, recording-agent-at-recorder

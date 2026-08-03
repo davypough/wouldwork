@@ -21,7 +21,7 @@
 ;;;               translation removes the guarded reference when the fan type is empty
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
-;;;   types     : steppable (either plate fan)
+;;;   types     : steppable-object (either plate fan)
 ;;;   actions   : step-on, step-off
 
 (include-tech -support-occupancy)
@@ -35,7 +35,7 @@
 
 
 (define-types
-  steppable (either plate fan))
+  steppable-object (either plate fan))
 
 
 (define-action step-on
@@ -43,7 +43,7 @@
   ;; is fixed (has-position); a fan is movable (has-location) and qualifies only while it
   ;; is mounted on gears, which keeps its top flush with the floor.
   1
-  (?agent agent ?fixture steppable)
+  (?agent agent ?fixture steppable-object)
   (and (bind (has-location ?agent $a-location))
        (not (bind (on ?agent $anyplace)))
        (or (and (plate ?fixture)
@@ -67,7 +67,7 @@
   1
   (?agent agent)
   (and (bind (on ?agent $fixture))
-       (steppable $fixture)
+       (steppable-object $fixture)
        (bind (has-location ?agent $a-location)))
   (">" ?agent "at" $a-location "steps off" $fixture)
   (assert (not (on ?agent $fixture))

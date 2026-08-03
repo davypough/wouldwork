@@ -61,8 +61,10 @@
   (expect-relations :static '())
   (expect-relations :dynamic '(inconsistent-state))
   (expect-registered :query 'visible)
+  (expect-registered :query 'visible-for-object)
   (expect-registered :query 'potentially-visible)
   (expect-registered :query 'beam-visible)
+  (expect-registered :query 'beam-visible-for-object)
   (expect-not-registered :query 'visible-clear)
   (expect-not-registered :query 'beam-elevation-at-location)
   (expect-registrations :init-action '())
@@ -89,6 +91,7 @@
     (?object fixture)
   (and
     (not (visible near-site ?object))
+    (not (visible-for-object nil near-site ?object))
     (not (potentially-visible near-site ?object))))
 
 
@@ -97,16 +100,21 @@
   (and
     (visibility-substrate-fixture-neutral ?object)
     (not (beam-visible near-site 0 ?object 0))
-    (not (beam-visible near-site -1 ?object 3/2))))
+    (not (beam-visible near-site -1 ?object 3/2))
+    (not (beam-visible-for-object nil near-site 0 ?object 0))
+    (not (beam-visible-for-object nil near-site -1 ?object 3/2))))
 
 
 (define-query visibility-substrate-location-neutral
     (?object location)
   (and
     (not (visible near-site ?object))
+    (not (visible-for-object nil near-site ?object))
     (not (potentially-visible near-site ?object))
     (not (beam-visible near-site 0 ?object 0))
-    (not (beam-visible near-site -1 ?object 3/2))))
+    (not (beam-visible near-site -1 ?object 3/2))
+    (not (beam-visible-for-object nil near-site 0 ?object 0))
+    (not (beam-visible-for-object nil near-site -1 ?object 3/2))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;

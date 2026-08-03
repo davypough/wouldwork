@@ -76,14 +76,14 @@
   (and
     (beam-node ?object)
     (fixed-beam-source ?object)
-    (not (fixed-beam-target ?object))))
+    (not (fixed-beam-sink ?object))))
 
 
 (define-query beam-substrate-receiver-type-valid
     (?object receiver)
   (and
     (beam-node ?object)
-    (fixed-beam-target ?object)
+    (fixed-beam-sink ?object)
     (not (fixed-beam-source ?object))))
 
 
@@ -95,7 +95,7 @@
     (not (wall-repeater ?object))
     (beam-node ?object)
     (fixed-beam-source ?object)
-    (fixed-beam-target ?object)))
+    (fixed-beam-sink ?object)))
 
 
 (define-query beam-substrate-wall-repeater-type-valid
@@ -106,7 +106,7 @@
     (not (floor-repeater ?object))
     (beam-node ?object)
     (fixed-beam-source ?object)
-    (fixed-beam-target ?object)))
+    (fixed-beam-sink ?object)))
 
 
 (define-query beam-substrate-location-type-valid
@@ -114,19 +114,19 @@
   (and
     (beam-node ?object)
     (not (fixed-beam-source ?object))
-    (not (fixed-beam-target ?object))))
+    (not (fixed-beam-sink ?object))))
 
 
 (define-query beam-substrate-type-scenarios-valid ()
   (and
-    ;; Transmitters emit fixed beams but cannot be their fixed target.
+    ;; Transmitters emit fixed beams but cannot be their fixed sink.
     (beam-substrate-transmitter-type-valid sample-transmitter)
 
     ;; Receivers terminate fixed beams but cannot be their fixed source.
     (beam-substrate-receiver-type-valid stale-receiver)
     (beam-substrate-receiver-type-valid clean-receiver)
 
-    ;; Both mounting orientations are repeaters, nodes, sources, and targets.
+    ;; Both mounting orientations are repeaters, nodes, sources, and sinks.
     (beam-substrate-floor-repeater-type-valid sample-floor-repeater)
     (beam-substrate-wall-repeater-type-valid sample-wall-repeater)
 

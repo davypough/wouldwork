@@ -7,23 +7,23 @@
 ;;; tops only (mounting and dismounting flush supports like plates and gears-mounted fans
 ;;; belongs to the step technology; a fan resting on a box top is not a jump landing).
 ;;; Open gates and passable screens impose no clearance requirement.  Closed gates,
-;;; non-passable screens, fences, and walls must be within vaulting reach; a multi-feature
+;;; non-passable screens, and walls must be within vaulting reach; a multi-feature
 ;;; jump must clear the highest feature that is not currently passable.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  box, fence, and wall are declared optional here
+;;;   types     : agent, location  --  box and wall are declared optional here
 ;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
 ;;;               support-top-elevation, and occupant-elevation); -passability
 ;;;               (holding and obstacle-clear); -threat (safe -- true unless an armed gun
 ;;;               or other threat endangers the landing location)
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
-;;;   types     : box, fence, wall  --  declared optional; jumping remains usable without them
-;;;               jump-feature (either gate screen fence wall)
+;;;   types     : box, wall  --  declared optional; jumping remains usable without them
+;;;               vaultable-object (either gate screen wall)
 ;;;   relations : (jump-via location $list location)
 ;;;               (jump-via> location $list location)
-;;;   queries   : jump-elevation-reachable, jump-feature-passable, jump-barrier-height,
-;;;               jump-barrier-top-elevation, jump-feature-list,
+;;;   queries   : jump-elevation-reachable, vaultable-object-passable, jump-barrier-height,
+;;;               jump-barrier-top-elevation, vaultable-object-list,
 ;;;               jump-required-clearance-height, jump-path-clear
 ;;;   action    : jump-to
 
@@ -34,11 +34,11 @@
 (in-package :ww)
 
 
-(define-optional-types box fence wall)
+(define-optional-types box wall)
 
 
 (define-types
-  jump-feature (either gate screen fence wall))
+  vaultable-object (either gate screen wall))
 
 
 (define-static-relations
@@ -47,11 +47,11 @@
 
 
 (define-init-check jump-init-check (literals)
-  (:consumes gate screen fence wall)
+  (:consumes gate screen wall)
   (check-init-list-relation-items-have-types
-    literals 'jump-via '(gate screen fence wall))
+    literals 'jump-via '(gate screen wall))
   (check-init-list-relation-items-have-types
-    literals 'jump-via> '(gate screen fence wall)))
+    literals 'jump-via> '(gate screen wall)))
 
 
 (define-query jump-elevation-reachable (?agent agent ?target-elevation)
@@ -61,33 +61,30 @@
       (declared-height ?agent)))
 
 
-(define-query jump-feature-passable (?agent agent ?feature jump-feature)
+(define-query vaultable-object-passable (?agent agent ?feature vaultable-object)
   ;; Gates and screens may be crossed without vaulting when their ordinary passability rule
-  ;; permits it.  Fences and walls always require clearance.
+  ;; permits it.  Walls always require clearance.
   (or (and (gate ?feature)
            (obstacle-clear ?agent ?feature))
       (and (screen ?feature)
            (obstacle-clear ?agent ?feature))))
 
 
-(define-query jump-barrier-height (?feature jump-feature)
-  ;; Explicit heights override the defaults: fences are height 2; gates, screens, and walls
-  ;; are height 3.
+(define-query jump-barrier-height (?feature vaultable-object)
+  ;; Explicit heights override the default of 3 for gates, screens, and walls.
   (if (bind (has-height ?feature $height))
     $height
-    (if (fence ?feature)
-      2
-      3)))
+    3))
 
 
-(define-query jump-barrier-top-elevation (?feature jump-feature)
+(define-query jump-barrier-top-elevation (?feature vaultable-object)
   (+ (object-elevation ?feature)
      (jump-barrier-height ?feature)))
 
 
-(define-query jump-feature-list (?features)
+(define-query vaultable-object-list (?features)
   (ww-loop for $feature in ?features
-           always (jump-feature $feature)))
+           always (vaultable-object $feature)))
 
 
 (define-query jump-required-clearance-height (?agent agent ?features)
@@ -96,7 +93,7 @@
   ;; are currently passable or the edge has no features.
   (do (assign $required nil)
       (ww-loop for $feature in ?features
-               do (if (not (jump-feature-passable ?agent $feature))
+               do (if (not (vaultable-object-passable ?agent $feature))
                     (do (assign $top (jump-barrier-top-elevation $feature))
                         (assign $required
                                 (if $required
@@ -106,7 +103,7 @@
 
 
 (define-query jump-path-clear (?agent agent ?features)
-  (and (jump-feature-list ?features)
+  (and (vaultable-object-list ?features)
        (assign $required
                (jump-required-clearance-height ?agent ?features))
        (or (not $required)

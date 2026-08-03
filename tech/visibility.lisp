@@ -10,10 +10,12 @@
 ;;; own location via LOS-TO-LOCATION instead.  A sightline must exist in the los tables and is
 ;;; clear iff every occluder gate is open.  A LOS-TO-APPARATUS/LOS-TO-LOCATION occluder list may
 ;;; also carry location entries (-beam-los-coordinates' own location-occlusion test, within
-;;; *beam-occlusion-tolerance*); VISIBLE itself always treats a location occluder as clear --
-;;; it stays the agent-independent, endpoint-elevation-blind structural check jam-target and
-;;; potentially-visible both rely on.  BEAM-VISIBLE is the elevation-aware sibling beam-relay's
-;;; own hops use instead; BEAM-VISIBLE-FOR-OBJECT is its actor/view-aware form.  Given both endpoints' live elevations, it additionally blocks on a
+;;; *beam-occlusion-tolerance*); VISIBLE itself always treats a location occluder as clear.
+;;; VISIBLE is the ordinary playback view; VISIBLE-FOR-OBJECT selects gate openness for an
+;;; actor's playback or recording view.  POTENTIALLY-VISIBLE remains actor-independent
+;;; because it ignores current gate state.  BEAM-VISIBLE is the elevation-aware sibling
+;;; beam-relay's own hops use instead; BEAM-VISIBLE-FOR-OBJECT is its actor/view-aware form.
+;;; Given both endpoints' live elevations, it additionally blocks on a
 ;;; location occluder whose beam-blocker spans the beam's own interpolated elevation there
 ;;; (-beam-occlusion's beam-blocker-occludes-location, -beam-interpolation's live
 ;;; beam-elevation-at-location).  Never consulted for a jammer target, matching how a
@@ -40,7 +42,7 @@
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
 ;;;               walkability (via -passability), reachability, beam-direct, and
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it;
-;;;               -beam-los-coordinates (BEAM-ENDPOINT type; APPARATUS-COORDS>,
+;;;               -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>,
 ;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS;
 ;;;               live BEAM-COORDINATES-ELEVATION-AT);
 ;;;               -beam-interpolation (the sloped-beam elevation hook);
@@ -51,8 +53,9 @@
 ;;;               (los-to-target location $list gate)  -- $list items are gate names only,
 ;;;               (los-to-location location $list location)  -- $list items are gate or
 ;;;               location names
-;;;   queries   : visible and potentially-visible (override -visibility's null defaults),
-;;;               beam-visible (overrides -visibility's null default), visible-clear
+;;;   queries   : visible, visible-for-object, and potentially-visible (override
+;;;               -visibility's null defaults), beam-visible and beam-visible-for-object
+;;;               (override -visibility's null defaults), visible-clear
 
 (include-tech -visibility)
 (include-tech -gate)
@@ -79,18 +82,26 @@
 
 
 (define-query visible (?location location ?object (either fixture location))
+  (visible-for-object nil ?location ?object))
+
+
+(define-query visible-for-object
+    (?view ?location location ?object (either fixture location))
   ;; A sightline must exist (an empty occluder list is a direct, always-clear line); it is
-  ;; clear iff every occluder gate is open.  Agent-independent and endpoint-elevation-blind:
-  ;; a location occluder is always clear here.  ?object is an apparatus (los-to-apparatus), a
-  ;; jammer target (los-to-target), or another location (los-to-location); at most one
-  ;; matches, so try all three in turn.  beam-visible is the elevation-aware sibling that
-  ;; additionally tests a location occluder, for the one consuming role (beam-relay's hops)
-  ;; that has both endpoints' live elevations to test it with.
+  ;; clear iff every occluder gate is open in ?view's environmental layer.  The NIL view
+  ;; used by VISIBLE reads ordinary playback state.  Endpoint-elevation-blind: a location
+  ;; occluder is always clear here.  ?object is an apparatus (los-to-apparatus), a jammer
+  ;; target (los-to-target), or another location (los-to-location); at most one matches,
+  ;; so try all three in turn.  BEAM-VISIBLE-FOR-OBJECT is the elevation-aware sibling that
+  ;; additionally tests a location occluder, for consuming roles that carry both endpoints'
+  ;; live elevations.
   (and (or (bind (los-to-apparatus ?location $occluders ?object))
            (bind (los-to-target ?location $occluders ?object))
            (bind (los-to-location ?location $occluders ?object)))
        (ww-loop for $o in $occluders
-                always (if (gate $o) (visible-clear $o) t))))
+                always (if (gate $o)
+                         (gate-open-for-object ?view $o)
+                         t))))
 
 
 (define-query beam-visible
@@ -159,9 +170,8 @@
 
 
 (define-query visible-clear (?occluder gate)
-  ;; Gate transparency for one occluder.  The intervening-occupied-location branch visible
-  ;; and beam-visible each dispatch around directly, rather than through this query, since a
-  ;; location occluder's elevation-aware test needs the beam's own interpolated elevation at
-  ;; that point -- visible-clear's single-occluder signature has nowhere to carry that.
+  ;; Ordinary playback transparency for one gate occluder.  Actor-aware consumers use
+  ;; GATE-OPEN-FOR-OBJECT directly because this query's single-occluder signature has no
+  ;; view parameter.
   (and (gate ?occluder)
        (open ?occluder)))

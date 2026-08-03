@@ -13,7 +13,7 @@
 ;;;   driver    : propagate-consequences! must call update-receiver-status!  (hue, transmitter,
 ;;;               and receiver are declared optional here via define-optional-types)
 ;;; PROVIDES:
-;;;   types     : repeater, fixed-beam-source, fixed-beam-target, beam-node; hue,
+;;;   types     : repeater, fixed-beam-source, fixed-beam-sink, beam-node; hue,
 ;;;               transmitter, receiver, location, floor-repeater, and wall-repeater are
 ;;;               declared optional here; other techs
 ;;;               (beam-relay, beam-direct, gate, visibility, etc.) independently declare
@@ -45,7 +45,7 @@
 (define-types
   repeater (either floor-repeater wall-repeater)
   fixed-beam-source (either transmitter repeater)
-  fixed-beam-target (either repeater receiver)
+  fixed-beam-sink (either repeater receiver)
   beam-node (either transmitter receiver repeater location))
 
 
@@ -59,8 +59,8 @@
 
 (define-static-relations
   (has-chroma (either transmitter receiver) $hue)
-  (coupled fixed-beam-source fixed-beam-target)
-  (beam-via fixed-beam-source $list fixed-beam-target))
+  (coupled fixed-beam-source fixed-beam-sink)
+  (beam-via fixed-beam-source $list fixed-beam-sink))
 
 
 (define-update update-receiver-status! ()

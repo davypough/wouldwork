@@ -221,11 +221,11 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (or (and (or (gate ?target) (gun ?target))
-                (visible ?location ?target))
+                (visible-for-object ?agent ?location ?target))
            (and (or (floor-gears ?target) (wall-gears ?target))
                 (bind (has-position ?target $t-location))
                 (or (eql ?location $t-location)
-                    (visible ?location $t-location))))
+                    (visible-for-object ?agent ?location $t-location))))
        (assign $places
                (placement-options ?agent ?location $any-jammer)))
   "Drops JAM-TARGET's authored disallowance guard.  The disallowed pairing probe

@@ -1,184 +1,190 @@
 ;;; Filename: ww-goal-chaining.lisp
 
-;;; Goal chaining capability for solving sequential subgoals.
+;;; Goal chaining capability for serial, sequential subgoals.  Each operation selects the
+;;; preceding search's canonical solution, deep-copies its goal state into the next search
+;;; baseline, and replaces the ordinary per-search solution results.  A deep undo checkpoint
+;;; restores the complete preceding session.  A normal no-solution result deliberately leaves
+;;; the prepared baseline available for a retry; WW-UNDO rolls the operation back instead.
+;;;
+;;; This generic substrate retains neither segment history nor cumulative metrics, and it does
+;;; not optimize or backtrack across subgoal boundaries.  Specialized continuation policies can
+;;; register checkpoint extensions for their own history, as recorder cycle chaining does.
 
 (in-package :ww)
 
 
 (defstruct undo-checkpoint
-  "Saved state for goal-chaining undo."
-  start-state          ; Deep copy of *start-state*
-  goal)                ; User's *goal* specification
+  "Complete planning-session snapshot for one goal-chaining operation."
+  start-state
+  goal
+  goal-function-bound-p
+  final-goal
+  solution-paths
+  solutions-valid
+  extension-states)
 
 
 (defparameter *undo-stack* nil
-  "Stack of undo checkpoints. Each entry is a snapshot of the planning state.")
-
-
-(defparameter *solutions-valid* nil
-  "Indicates whether *solution-paths* contains a completed, valid solution set.")
+  "Stack of independent planning-session snapshots.")
 
 
 (defvar *final-goal* nil
-  "Snapshot of the originally installed goal, captured on first solve-subgoal
-   call so that (solve) can reinstate it after a chain of subgoals.
-   Cleared on refresh.")
-
-
-;; ============================================================
+  "Originally installed goal, restored by SOLVE after intermediate subgoals.")
 
 
 (defmacro solve-subgoal (goal-form)
-  `(let ((completed nil))
-     ;; Prepare planning state (push undo, install goal, etc.)
-     (continue-from-solution ',goal-form)
-     ;; Clear any prior solutions before solving
-     (setf *solution-paths* nil
-           *solutions-valid* nil)
-     (unwind-protect
-         (progn
-           ;; ---- RUN SOLVER ----
-           (ww-solve)  ;direct solver call; solve's *final-goal* wrapper would re-install the original goal
-           ;; Mark success only if we actually got solutions
-           (when *solution-paths*
-             (setf *solutions-valid* t))
-           (setf completed t))
-       ;; ---- CLEANUP (runs on Ctrl-C or error) ----
-       (unless completed
-         (setf *solution-paths* nil
-               *solutions-valid* nil)
-         (format t "~&Solve interrupted. Use (ww-undo) to revert.~%")))))
+  `(solve-subgoal-form ',goal-form))
+
+
+(defun capture-goal-chaining-extension-states ()
+  "Capture every registered extension and retain the restorer with its snapshot."
+  (loop for (name snapshotter restorer) in *goal-chaining-checkpoint-extensions*
+        collect (list name restorer (funcall (symbol-function snapshotter)))))
+
+
+(defun restore-goal-chaining-extension-states (states)
+  "Restore checkpoint extension STATES captured by SAVE-UNDO-CHECKPOINT."
+  (dolist (state states)
+    (funcall (symbol-function (second state)) (third state)))
+  t)
+
+
+(defun solve-subgoal-form (goal-form)
+  "Solve GOAL-FORM as one subgoal and retain an undo checkpoint.
+
+The preceding valid solution, when present, supplies the new start state.  A normal
+no-solution result leaves that prepared start state available for a retry; WW-UNDO restores
+the complete pre-call session, including the preceding solutions."
+  (let ((completed nil)
+        (undo-stack-before *undo-stack*))
+    (unwind-protect
+        (progn
+          (continue-from-solution goal-form)
+          ;; Call WW-SOLVE directly: SOLVE would replace this subgoal with *FINAL-GOAL*.
+          (ww-solve)
+          (setf completed t)
+          (unless *solutions-valid*
+            (format t "~&Subgoal produced no solution. Retry from the current state, ~
+                       or use (ww-undo) to restore the preceding result.~%"))
+          *solution-paths*)
+      (unless completed
+        (setf *solution-paths* nil
+              *solutions-valid* nil)
+        (if (eq *undo-stack* undo-stack-before)
+          (format t "~&Subgoal solve stopped before the planning state changed.~%")
+          (format t "~&Subgoal solve interrupted. Use (ww-undo) to restore the ~
+                     preceding result.~%"))))))
+
+
+(defun install-compiled-goal (goal-form)
+  "Install GOAL-FORM and compile the translated GOAL-FN immediately."
+  (install-goal goal-form)
+  (when (boundp 'goal-fn)
+    (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+  goal-form)
 
 
 (defun continue-from-solution (goal-form)
-  "Prepare the system to solve a new subgoal, either by continuing from a
-   previous solution or by overriding the goal before the first solve."
-  ;; Capture the original final goal only once
-  (unless *final-goal*
-    (setf *final-goal* *goal*))
-  ;; Save undo checkpoint BEFORE any mutation
+  "Prepare a subgoal, continuing from the preceding valid solution when present."
+  (validate-continuation-preconditions)
+  ;; The checkpoint must precede both final-goal capture and start-state replacement.
   (save-undo-checkpoint)
-  (if (and *solutions-valid* *solution-paths*)
-      ;; --- Continuation branch ---
-      (progn
-        (update-start-state-from-goal (extract-goal-state-from-solution))
-        (install-goal goal-form)
-        (when (boundp 'goal-fn)
-          (compile 'goal-fn
-                   (subst-int-code (symbol-value 'goal-fn))))
-        (format t "~&Continuing from previous solution...~%"))
-      ;; --- First subgoal / fresh attempt ---
-      (progn
-        ;; Do NOT modify *start-state*
-        (install-goal goal-form)
-        (when (boundp 'goal-fn)
-          (compile 'goal-fn
-                   (subst-int-code (symbol-value 'goal-fn))))
-        (format t "~&Ready to solve subgoal.~%")))
-  ;; Prior solutions are now consumed (continuation) or were absent (fresh);
-  ;; either way invalidate so the next call doesn't reuse stale state.
-  (setf *solutions-valid* nil))
+  (unless *final-goal*
+    (setf *final-goal* (copy-tree *goal*)))
+  (if *solutions-valid*
+    (progn
+      (update-start-state-from-goal (extract-goal-state-from-solution))
+      (install-compiled-goal goal-form)
+      (format t "~&Continuing from previous solution...~%"))
+    (progn
+      (install-compiled-goal goal-form)
+      (format t "~&Ready to solve subgoal.~%")))
+  ;; The prior solution has now either supplied the baseline or was ineligible.
+  (setf *solutions-valid* nil)
+  *start-state*)
 
 
 (defun validate-continuation-preconditions ()
-  "Verify system state allows continuation."
-  (when (> *threads* 0)
+  "Verify that the current planning session can begin a continuation operation."
+  (unless (zerop *threads*)
     (error "Goal chaining requires single-threaded mode. ~
             Set (ww-set *threads* 0) before using solve-subgoal."))
-  ;(unless (and (boundp '*solution-paths*) *solution-paths*)
-  ;  (error "No solution exists to continue from. ~
-  ;          First run (solve) successfully, then use (solve-subgoal <new-goal>)."))
   (unless (boundp 'goal-fn)
-    (error "No goal function currently defined.")))
+    (error "No goal function currently defined."))
+  (when (and *solutions-valid* (null *solution-paths*))
+    (error "*SOLUTIONS-VALID* is true but *SOLUTION-PATHS* is empty."))
+  t)
+
+
+(defun select-continuation-solution (&optional (solutions *solution-paths*))
+  "Select SOLUTIONS' canonical member using the search's own preference rule."
+  (unless solutions
+    (error "No completed solution is available for continuation."))
+  (reduce
+    (lambda (best candidate)
+      (if (solution-better-p candidate best) candidate best))
+    solutions))
 
 
 (defun extract-goal-state-from-solution ()
-  "Extract the final goal state from most recent solution based on *solution-type*."
-  (let ((solution (case *solution-type*
-                    ((first min-length) 
-                     ;; Find minimum depth solution
-                     (reduce (lambda (s1 s2)
-                               (if (< (solution.depth s1) (solution.depth s2)) s1 s2))
-                             *solution-paths*))
-                    (min-time
-                     ;; Find minimum time solution
-                     (reduce (lambda (s1 s2)
-                               (if (< (solution.time s1) (solution.time s2)) s1 s2))
-                             *solution-paths*))
-                    (min-value
-                     ;; Find minimum value solution
-                     (reduce (lambda (s1 s2)
-                               (if (< (solution.value s1) (solution.value s2)) s1 s2))
-                             *solution-paths*))
-                    (max-value
-                     ;; Find maximum value solution
-                     (reduce (lambda (s1 s2)
-                               (if (> (solution.value s1) (solution.value s2)) s1 s2))
-                             *solution-paths*))
-                    (every
-                     ;; For 'every', use minimum depth as canonical choice
-                     (reduce (lambda (s1 s2)
-                               (if (< (solution.depth s1) (solution.depth s2)) s1 s2))
-                             *solution-paths*))
-                    (t 
-                     ;; Default: first solution in list
-                     (first *solution-paths*)))))
-    (unless solution
-      (error "Could not extract solution from *solution-paths*."))
-    (let ((goal-state (solution.goal solution)))
-      ;; Validate state consistency before using
-      (when (gethash 'inconsistent-state (problem-state.idb goal-state))
-        (error "Cannot continue from inconsistent goal state."))
-      goal-state)))
+  "Return the consistent final state of the canonical preceding solution."
+  (let ((goal-state
+          (solution.goal (select-continuation-solution))))
+    (when (state-is-inconsistent goal-state)
+      (error "Cannot continue from inconsistent goal state."))
+    goal-state))
 
 
 (defun update-start-state-from-goal (goal-state)
-  "Update *start-state* with all components from goal-state.
-   Preserves temporal continuity: time, happenings, databases."
+  "Replace *START-STATE* with an independent continuation copy of GOAL-STATE."
   (declare (type problem-state goal-state))
-  ;; Update basic state components
-  (setf (problem-state.name *start-state*) 'continuation)
-  (setf (problem-state.instantiations *start-state*) nil)
-  ;; Preserve temporal state
-  (setf (problem-state.time *start-state*) 
-        (problem-state.time goal-state))
-  (setf (problem-state.value *start-state*) 
-        (problem-state.value goal-state))
-  (setf (problem-state.heuristic *start-state*) 
-        (problem-state.heuristic goal-state))
-  ;; Preserve happenings - deep copy to avoid aliasing
-  ;; This maintains temporal continuity with exogenous events
-  (setf (problem-state.happenings *start-state*) 
-        (copy-tree (problem-state.happenings goal-state)))
-  ;; Copy databases - both proposition state and happening events
-  (setf (problem-state.idb *start-state*) 
-        (copy-idb (problem-state.idb goal-state)))
-  (setf (problem-state.hidb *start-state*) 
-        (copy-idb (problem-state.hidb goal-state)))
-  (setf (problem-state.idb-hash *start-state*) 
-        (problem-state.idb-hash goal-state)))
+  (let ((continuation (copy-problem-state goal-state)))
+    (setf (problem-state.name continuation) 'continuation
+          (problem-state.instantiations continuation) nil
+          *start-state* continuation)))
 
 
 (defun save-undo-checkpoint ()
-  "Push the current planning state onto the undo stack."
-  (push (list :start-state *start-state*
-              :goal *goal*
-              :final-goal *final-goal*)
-        *undo-stack*))
+  "Push an independent snapshot of the current goal-chaining session."
+  (push
+    (make-undo-checkpoint
+      :start-state (copy-problem-state *start-state*)
+      :goal (copy-tree *goal*)
+      :goal-function-bound-p (boundp 'goal-fn)
+      :final-goal (copy-tree *final-goal*)
+      :solution-paths (copy-solutions-deeply *solution-paths*)
+      :solutions-valid *solutions-valid*
+      :extension-states (capture-goal-chaining-extension-states))
+    *undo-stack*))
+
+
+(defun restore-checkpoint-goal (checkpoint)
+  "Restore both the user goal and the executable GOAL-FN from CHECKPOINT."
+  (if (undo-checkpoint-goal-function-bound-p checkpoint)
+    (install-compiled-goal (copy-tree (undo-checkpoint-goal checkpoint)))
+    (progn
+      (setf *goal* (copy-tree (undo-checkpoint-goal checkpoint)))
+      (when (boundp 'goal-fn)
+        (makunbound 'goal-fn))
+      (when (fboundp 'goal-fn)
+        (fmakunbound 'goal-fn))
+      (remprop 'goal-fn :form))))
 
 
 (defun ww-undo ()
-  "Undo the most recent solve-subgoal by restoring the previous planning state."
+  "Undo one goal-chaining operation by restoring its complete session snapshot."
   (if (null *undo-stack*)
-      (format t "~&Nothing to undo.~%")
-      (let ((checkpoint (pop *undo-stack*)))
-        (setf *start-state* (getf checkpoint :start-state))
-        (setf *goal*        (getf checkpoint :goal))
-        (setf *final-goal*  (getf checkpoint :final-goal))
-        ;; Clear solver artifacts
-        (when (boundp '*solution-paths*)
-          (setf *solution-paths* nil))
-        (setf *solutions-valid* nil)
-        (format t "~&Reverted to previous state.~2%")
-        (format t "Current State: ~%~A~%" *start-state*)
-        (format t "Current Goal: ~%~A~2%" *goal*))))
+    (format t "~&Nothing to undo.~%")
+    (let ((checkpoint (first *undo-stack*)))
+      (setf *start-state* (undo-checkpoint-start-state checkpoint)
+            *final-goal* (copy-tree (undo-checkpoint-final-goal checkpoint))
+            *solution-paths* (undo-checkpoint-solution-paths checkpoint)
+            *solutions-valid* (undo-checkpoint-solutions-valid checkpoint))
+      (restore-goal-chaining-extension-states
+        (undo-checkpoint-extension-states checkpoint))
+      (restore-checkpoint-goal checkpoint)
+      (pop *undo-stack*)
+      (format t "~&Reverted to previous state.~2%")
+      (format t "Current State: ~%~A~%" *start-state*)
+      (format t "Current Goal: ~%~A~2%" *goal*)
+      t)))

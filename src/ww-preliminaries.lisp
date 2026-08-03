@@ -543,6 +543,11 @@
   (when (and (boundp '*solution-validators*)
              (listp *solution-validators*))
     (setf *solution-validators* nil))
+  (when (and (boundp '*goal-chaining-checkpoint-extensions*)
+             (listp *goal-chaining-checkpoint-extensions*))
+    (setf *goal-chaining-checkpoint-extensions* nil))
+  (when (boundp '*solutions-valid*)
+    (setf *solutions-valid* nil))
   ;; Reset object index counter
   (when (and (boundp '*last-object-index*) (integerp *last-object-index*))
     (setf *last-object-index* 0)))
