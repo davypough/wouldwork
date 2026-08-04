@@ -1,7 +1,7 @@
 ;;; Filename: problem-beam-crossing-cascade-test.lisp
 
 ;;; Dedicated zero-action regression for beam-crossing's own cascading arbitration --
-;;; COMPUTE-ACTIVE-CROSSINGS' fixpoint and ARBITRATE-CROSSINGS' priority tie-break --
+;;; COMPUTE-ACTIVE-BEAM-CROSSINGS' fixpoint and ARBITRATE-BEAM-CROSSINGS' priority tie-break --
 ;;; which no existing test reaches, since every other beam-crossing fixture has at most
 ;;; one crossing whose two beams have nothing else in their way.
 ;;;
@@ -17,21 +17,21 @@
 ;;; Tracing UPDATE-CROSSING-STATUS! by hand: computing from no assumptions at all finds
 ;;; every crossing reachable, and computing again from that full set blocks all four --
 ;;; an exact repeat of the empty set two passes back, so the fixpoint loop detects a
-;;; genuine oscillation and calls ARBITRATE-CROSSINGS on the full four.
+;;; genuine oscillation and calls ARBITRATE-BEAM-CROSSINGS on the full four.
 ;;;
 ;;; An earlier version of this file made all four beams plain direct links, so every
-;;; crossing tied at priority zero and ARBITRATE-CROSSINGS fell back to its alphabetical
+;;; crossing tied at priority zero and ARBITRATE-BEAM-CROSSINGS fell back to its alphabetical
 ;;; tie-break alone -- and that fallback cannot resolve this shape.  The two
 ;;; lowest-numbered crossings are always the two corners of whichever beam sorts first
 ;;; alphabetically, and those two corners always share that beam, so they always have
-;;; exactly one direct block edge between them.  ARBITRATE-CROSSINGS only checks blocking
+;;; exactly one direct block edge between them.  ARBITRATE-BEAM-CROSSINGS only checks blocking
 ;;; going forward: it keeps the lower-numbered corner in round one and never revisits it
 ;;; once the higher-numbered one is kept too, so both ride into the kept set even though
 ;;; one truly excludes the other.  Hand-tracing every distinct edge orientation confirms
 ;;; this is a structural limit of the alphabetical fallback for a four-way loop, not a
 ;;; quirk of one naming choice -- and staging that all-direct version confirms it in
 ;;; practice: it reaches VALIDATE-START-STATE-CONSISTENCY's "Initial state is
-;;; inconsistent" error, because the three-crossing set ARBITRATE-CROSSINGS greedily
+;;; inconsistent" error, because the three-crossing set ARBITRATE-BEAM-CROSSINGS greedily
 ;;; keeps does not survive its own re-validation.
 ;;;
 ;;; The SOUTHEAST beam is therefore relayed through REPEATER-SE, planted at (10,5),
@@ -39,7 +39,7 @@
 ;;; NORTHEAST corner at (10,10).  BEAM-RELAY-SOURCE-DISTANCE now reads 1 for the segment
 ;;; leaving the repeater, so the NORTHEAST corner (the far end of the relayed leg)
 ;;; carries priority 1 while the other three crossings stay at priority 0.  Retracing
-;;; ARBITRATE-CROSSINGS: round one still keeps NORTHWEST (tied at 0, alphabetically first
+;;; ARBITRATE-BEAM-CROSSINGS: round one still keeps NORTHWEST (tied at 0, alphabetically first
 ;;; among the three still at priority 0).  Round two compares the two crossings still
 ;;; reachable -- NORTHEAST at priority 1 and SOUTHEAST at priority 0 -- and keeps
 ;;; SOUTHEAST on the numeric branch, not the alphabetical one.  Round three finds nothing
@@ -153,7 +153,7 @@
 (define-test-helper beam-crossing-cascade-recomputed-valid-p (state)
   "Confirm that re-running UPDATE-CROSSING-STATUS! on a copy of STATE reproduces the
    same crossing-active facts the init-action already established, and leaves the real
-   STATE untouched.  A broken ARBITRATE-CROSSINGS changes the kept set on
+   STATE untouched.  A broken ARBITRATE-BEAM-CROSSINGS changes the kept set on
    recomputation -- either landing on a different but self-consistent set, or failing
    its own re-validation and marking the copy inconsistent -- so either symptom is
   caught here without needing to predict which one occurs."
@@ -174,7 +174,7 @@
 
 (define-query beam-crossing-cascade-scenario-valid ()
   (and
-    (= (length (get-current-crossings)) 4)
+    (= (length (get-current-beam-crossings)) 4)
     (= (length (current-crossing-set)) 2)
     (beam-cut transmitter-sw receiver-sw)
     (beam-cut transmitter-se repeater-se)
@@ -194,14 +194,14 @@
 ;;;; MUTATION CHARACTERIZATION ;;;;
 
 
-(define-query-mutation beam-crossing-alphabetical-arbitration arbitrate-crossings
+(define-query-mutation beam-crossing-alphabetical-arbitration arbitrate-beam-crossings
   (?candidate)
   (do (assign $kept nil)
       (assign $remaining ?candidate)
       (ww-loop for $round from 1 to (length ?candidate)
                do (assign $lighting (compute-relay-lighting $kept))
                   (assign $best nil)
-                  (doall (?x (get-current-crossings))
+                  (doall (?x (get-current-beam-crossings))
                     (if (and (member ?x $remaining)
                              (crossing-reaches ?x $kept $lighting))
                       (if (or (not $best)

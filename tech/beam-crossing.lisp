@@ -16,7 +16,7 @@
 ;;; REQUIRES:
 ;;;   types     : crossing is declared optional by the nested -beam-crossing-coordinates
 ;;;               substrate and stays empty; the pool is minted at init time and reached
-;;;               through CURRENT-CROSSINGS>/GET-CURRENT-CROSSINGS rather than through the
+;;;               through CURRENT-BEAM-CROSSINGS/GET-CURRENT-BEAM-CROSSINGS rather than through the
 ;;;               type extension, so no problem declares it; los-endpoint is declared by the nested
 ;;;               -beam-los-coordinates substrate (via -beam-crossing-coordinates);
 ;;;               transmitter is declared optional here (define-optional-types); gate comes
@@ -25,7 +25,7 @@
 ;;;               update-relay-status! and/or update-receiver-status!
 ;;; PROVIDES:
 ;;;   nested    : -beam-crossing-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM>/
-;;;               CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
+;;;               BEAM-CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
 ;;;               LOS-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENTS, GATE-SEGMENTS,
 ;;;               BOUNDARY-WALL, and LOS derivation);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
@@ -36,9 +36,9 @@
 ;;;               beam-relay, etc.) independently declare their own transmitter-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,
-;;;               crossings-before-gate>, current-crossings>
-;;;   queries   : get-current-crossings, current-crossing-set, beam-reaches-crossing,
-;;;               compute-active-crossings, arbitrate-crossings, crossing-reaches,
+;;;               beam-crossings-before-gate>, current-beam-crossings
+;;;   queries   : get-current-beam-crossings, current-crossing-set, beam-reaches-crossing,
+;;;               compute-active-beam-crossings, arbitrate-beam-crossings, crossing-reaches,
 ;;;               crossing-priority, beam-source-distance, same-crossing-set,
 ;;;               beam-cut, beam-cut-in, beam-crossing-endpoints
 ;;;   update    : update-crossing-status!
@@ -66,8 +66,8 @@
 (define-static-relations
   (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
   (crossings-along-beam> los-endpoint $list los-endpoint)
-  (crossings-before-gate> los-endpoint $list gate los-endpoint)
-  (current-crossings> $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
+  (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
+  (current-beam-crossings $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -81,7 +81,7 @@
       (assign $have-previous nil)
       (assign $resolved nil)
       (ww-loop for $iteration from 1 to 10
-               do (assign $next (compute-active-crossings $active))
+               do (assign $next (compute-active-beam-crossings $active))
                   (if (same-crossing-set $next $active)
                     (do (assign $active $next)
                         (assign $resolved t)
@@ -89,12 +89,12 @@
                     (if (and $have-previous
                              (same-crossing-set $next $previous))
                       (do (assign $candidate (union $active $next))
-                          (assign $validated (compute-active-crossings $candidate))
+                          (assign $validated (compute-active-beam-crossings $candidate))
                           (if (same-crossing-set $validated $candidate)
                             (do (assign $active $candidate)
                                 (assign $resolved t))
-                            (do (assign $arbitrated (arbitrate-crossings $candidate))
-                                (assign $arb-validated (compute-active-crossings $arbitrated))
+                            (do (assign $arbitrated (arbitrate-beam-crossings $candidate))
+                                (assign $arb-validated (compute-active-beam-crossings $arbitrated))
                                 (if (same-crossing-set $arb-validated $arbitrated)
                                   (do (assign $active $arbitrated)
                                       (assign $resolved t))
@@ -105,7 +105,7 @@
                           (assign $active $next))))
                finally (inconsistent-state))
       (if $resolved
-        (doall (?x (get-current-crossings))
+        (doall (?x (get-current-beam-crossings))
           (if (member ?x $active)
             (crossing-active ?x)
             (not (crossing-active ?x)))))))
@@ -114,9 +114,9 @@
 ;;;; QUERY FUNCTIONS ;;;;
 
 
-(define-query get-current-crossings ()
+(define-query get-current-beam-crossings ()
   ;; The crossing pool, as a runtime lookup rather than a compile-time type extension.
-  ;; Every DOALL over crossings in this file iterates (get-current-crossings) instead of
+  ;; Every DOALL over crossings in this file iterates (get-current-beam-crossings) instead of
   ;; the bare CROSSING type, because TRANSLATE-DOALL resolves a bare type name into a
   ;; literal domain at load time -- when INSTALL-QUERY calls TRANSLATE -- and the pool
   ;; isn't known until -beam-crossing-coordinates' ESTABLISH-BEAM-COORDINATES has computed
@@ -124,16 +124,16 @@
   ;; other branch, which evaluates the domain against state on each call.  This must
   ;; therefore stay a DEFINE-QUERY: the branch is selected by membership in *QUERY-NAMES*,
   ;; so demoting it to a plain DEFUN would silently revert every caller to an empty
-  ;; compile-time domain.  Returns nil when nothing has asserted CURRENT-CROSSINGS>, which
+  ;; compile-time domain.  Returns nil when nothing has asserted CURRENT-BEAM-CROSSINGS, which
   ;; makes each such DOALL skip its body -- the same inert behavior a problem with no
   ;; crossings gets today.
-  (do (bind (current-crossings> $crossings))
-      $crossings))
+  (do (bind (current-beam-crossings $beam-crossings))
+      $beam-crossings))
 
 
 (define-query current-crossing-set ()
   (do (assign $active nil)
-      (doall (?x (get-current-crossings))
+      (doall (?x (get-current-beam-crossings))
         (if (crossing-active ?x)
           (assign $active (cons ?x $active))))
       $active))
@@ -160,7 +160,7 @@
         (do (assign $blocked nil)
             (assign $reached nil)
             (doall (?gate gate)
-              (if (and (bind (crossings-before-gate> $src $before ?gate $dst))
+              (if (and (bind (beam-crossings-before-gate> $src $before ?gate $dst))
                        (not (open ?gate))
                        (not (member ?xing $before)))
                 (assign $blocked t)))
@@ -176,16 +176,16 @@
       $reaches))
 
 
-(define-query compute-active-crossings (?active)
+(define-query compute-active-beam-crossings (?active)
   (do (assign $lighting (compute-relay-lighting ?active))
       (assign $next nil)
-      (doall (?x (get-current-crossings))
+      (doall (?x (get-current-beam-crossings))
         (if (crossing-reaches ?x ?active $lighting)
           (assign $next (cons ?x $next))))
       $next))
 
 
-(define-query arbitrate-crossings (?candidate)
+(define-query arbitrate-beam-crossings (?candidate)
   ;; Resolve cascade-coupled candidate sets by distance priority.
   (do (assign $kept nil)
       (assign $remaining ?candidate)
@@ -193,7 +193,7 @@
                do (assign $lighting (compute-relay-lighting $kept))
                   (assign $best nil)
                   (assign $best-priority most-positive-fixnum)
-                  (doall (?x (get-current-crossings))
+                  (doall (?x (get-current-beam-crossings))
                     (if (and (member ?x $remaining)
                              (crossing-reaches ?x $kept $lighting))
                       (do (assign $priority (crossing-priority ?x $lighting))
@@ -234,7 +234,7 @@
   (if (not *beam-crossing-cache*)
     (do (assign $beams (beam-crossing-canonical-beams))
         (assign $cache (make-hash-table :test 'eq))
-        (doall (?crossing (get-current-crossings))
+        (doall (?crossing (get-current-beam-crossings))
           (do (assign $containing (beam-crossing-beams-for-crossing ?crossing $beams))
               (if (/= (length $containing) 2)
                 (error "Crossing ~A appears on ~A canonical beam(s); expected exactly 2."

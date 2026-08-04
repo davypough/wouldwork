@@ -14,16 +14,16 @@
   (check-init-crossing-lists-match-declared-beams literals)
   (check-init-location-beam-reverses literals)
   (check-init-crossing-beams-have-sightlines literals)
-  (check-init-crossings-before-gate-prefixes literals)
-  (check-init-crossings-before-gate-gates-occlude-beams literals))
+  (check-init-beam-crossings-before-gate-prefixes literals)
+  (check-init-beam-crossings-before-gate-gates-occlude-beams literals))
 
 
-(define-init-check-helper init-crossings-along-beam-map (literals)
+(define-init-check-helper init-beam-crossings-along-beam-map (literals)
   (let ((beams (make-hash-table :test #'equal)))
     (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-      (destructuring-bind (source crossings destination)
+      (destructuring-bind (source beam-crossings destination)
           (rest (init-literal-proposition literal))
-        (setf (gethash (list source destination) beams) crossings)))
+        (setf (gethash (list source destination) beams) beam-crossings)))
     beams))
 
 
@@ -77,13 +77,13 @@
 
 
 (define-init-check-helper init-defined-beam-crossings (literals)
-  (let ((crossings nil))
+  (let ((beam-crossings nil))
     (dolist (literal (init-literals-with-relation 'beam-crossing> literals))
       (destructuring-bind (crossing from1 to1 from2 to2)
           (rest (init-literal-proposition literal))
         (declare (ignore from1 to1 from2 to2))
-        (push crossing crossings)))
-    crossings))
+        (push crossing beam-crossings)))
+    beam-crossings))
 
 
 (define-init-check-helper init-beams-for-crossing-map (literals)
@@ -148,11 +148,11 @@
 (define-init-check-helper check-init-crossing-lists-have-unique-items (literals)
   "Checks that crossing-order lists do not repeat a crossing."
   (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-    (destructuring-bind (source crossings destination)
+    (destructuring-bind (source beam-crossings destination)
         (rest (init-literal-proposition literal))
       (declare (ignore source destination))
-      (init-check-list-has-unique-items literal crossings)))
-  (dolist (literal (init-literals-with-relation 'crossings-before-gate> literals))
+      (init-check-list-has-unique-items literal beam-crossings)))
+  (dolist (literal (init-literals-with-relation 'beam-crossings-before-gate> literals))
     (destructuring-bind (source before gate destination)
         (rest (init-literal-proposition literal))
       (declare (ignore source gate destination))
@@ -172,11 +172,11 @@
   "Checks that crossing-order lists reference authored beam crossings."
   (let ((defined (init-defined-beam-crossings literals)))
     (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-      (destructuring-bind (source crossings destination)
+      (destructuring-bind (source beam-crossings destination)
           (rest (init-literal-proposition literal))
         (declare (ignore source destination))
-        (init-check-crossing-list-items-are-defined literal crossings defined)))
-    (dolist (literal (init-literals-with-relation 'crossings-before-gate> literals))
+        (init-check-crossing-list-items-are-defined literal beam-crossings defined)))
+    (dolist (literal (init-literals-with-relation 'beam-crossings-before-gate> literals))
       (destructuring-bind (source before gate destination)
           (rest (init-literal-proposition literal))
         (declare (ignore source gate destination))
@@ -185,25 +185,25 @@
 
 (define-init-check-helper init-check-beam-crossing-is-indexed
     (literal crossing source destination beams)
-  (let ((crossings (gethash (list source destination) beams)))
-    (unless crossings
+  (let ((beam-crossings (gethash (list source destination) beams)))
+    (unless beam-crossings
       (fail-init-check nil "~%BEAM-CROSSING> declares a beam with no CROSSINGS-ALONG-BEAM> entry.~%~
               Literal:  ~S~%~
               Crossing: ~S~%~
               Beam:     ~S -> ~S"
              literal crossing source destination))
-    (unless (member crossing crossings)
+    (unless (member crossing beam-crossings)
       (fail-init-check nil "~%BEAM-CROSSING> is missing from its declared beam's crossing list.~%~
               Literal:              ~S~%~
               Crossing:             ~S~%~
               Beam:                 ~S -> ~S~%~
               Crossings along beam: ~S"
-             literal crossing source destination crossings))))
+             literal crossing source destination beam-crossings))))
 
 
 (define-init-check-helper check-init-beam-crossings-are-indexed-by-declared-beams (literals)
   "Checks that each BEAM-CROSSING> appears on both of its declared beam lists."
-  (let ((beams (init-crossings-along-beam-map literals)))
+  (let ((beams (init-beam-crossings-along-beam-map literals)))
     (dolist (literal (init-literals-with-relation 'beam-crossing> literals))
       (destructuring-bind (crossing from1 to1 from2 to2)
           (rest (init-literal-proposition literal))
@@ -219,13 +219,13 @@ canonical direction while CROSSINGS-ALONG-BEAM> is authored for both directions)
 so the reverse pairing is also accepted when both endpoints are locations."
   (let ((crossing-beams (init-beams-for-crossing-map literals)))
     (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-      (destructuring-bind (source crossings destination)
+      (destructuring-bind (source beam-crossings destination)
           (rest (init-literal-proposition literal))
         (let ((beam (list source destination))
               (reverse-beam (list destination source))
               (bidirectional-p (and (init-type-member-p source 'location)
                                     (init-type-member-p destination 'location))))
-          (dolist (crossing crossings)
+          (dolist (crossing beam-crossings)
             (unless (or (member beam (gethash crossing crossing-beams)
                                  :test #'equal)
                         (and bidirectional-p
@@ -242,33 +242,34 @@ so the reverse pairing is also accepted when both endpoints are locations."
 
 (define-init-check-helper check-init-location-beam-reverses (literals)
   "Checks that location-location crossing lists exist in both directions and reverse exactly."
-  (let ((beams (init-crossings-along-beam-map literals)))
+  (let ((beams (init-beam-crossings-along-beam-map literals)))
     (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-      (destructuring-bind (source crossings destination)
+      (destructuring-bind (source beam-crossings destination)
           (rest (init-literal-proposition literal))
         (when (and (init-type-member-p source 'location)
                    (init-type-member-p destination 'location))
-          (let ((reverse-crossings (gethash (list destination source) beams)))
-            (unless reverse-crossings
+          (let ((reverse-beam-crossings (gethash (list destination source) beams)))
+            (unless reverse-beam-crossings
               (fail-init-check nil "~%Location-to-location CROSSINGS-ALONG-BEAM> has no reverse entry.~%~
                       Literal: ~S~%~
                       Expected reverse beam: (CROSSINGS-ALONG-BEAM> ~S ... ~S)"
                      literal destination source))
-            (unless (equal reverse-crossings (reverse crossings))
+            (unless (equal reverse-beam-crossings (reverse beam-crossings))
               (fail-init-check nil "~%Location-to-location CROSSINGS-ALONG-BEAM> reverse ordering is inconsistent.~%~
                       Literal:           ~S~%~
                       Crossings:         ~S~%~
                       Reverse crossings: ~S~%~
                       Expected reverse:  ~S"
-                     literal crossings reverse-crossings (reverse crossings)))))))))
+                     literal beam-crossings reverse-beam-crossings
+                     (reverse beam-crossings)))))))))
 
 
 (define-init-check-helper check-init-crossing-beams-have-sightlines (literals)
   "Checks that every CROSSINGS-ALONG-BEAM> beam has a matching sightline or corridor fact."
   (dolist (literal (init-literals-with-relation 'crossings-along-beam> literals))
-    (destructuring-bind (source crossings destination)
+    (destructuring-bind (source beam-crossings destination)
         (rest (init-literal-proposition literal))
-      (declare (ignore crossings))
+      (declare (ignore beam-crossings))
       (multiple-value-bind (occluders found-p)
           (init-occluders-for-directed-beam source destination literals)
         (declare (ignore occluders))
@@ -279,22 +280,22 @@ so the reverse pairing is also accepted when both endpoints are locations."
                  literal source destination))))))
 
 
-(define-init-check-helper check-init-crossings-before-gate-prefixes (literals)
-  "Checks that each CROSSINGS-BEFORE-GATE> list is an initial prefix of
+(define-init-check-helper check-init-beam-crossings-before-gate-prefixes (literals)
+  "Checks that each BEAM-CROSSINGS-BEFORE-GATE> list is an initial prefix of
 the matching CROSSINGS-ALONG-BEAM> list."
-  (let ((beams (init-crossings-along-beam-map literals)))
-    (dolist (literal (init-literals-with-relation 'crossings-before-gate> literals))
+  (let ((beams (init-beam-crossings-along-beam-map literals)))
+    (dolist (literal (init-literals-with-relation 'beam-crossings-before-gate> literals))
       (destructuring-bind (source before gate destination)
           (rest (init-literal-proposition literal))
         (let* ((beam-key (list source destination))
                (along (gethash beam-key beams)))
           (unless along
-            (fail-init-check nil "~%CROSSINGS-BEFORE-GATE> has no matching CROSSINGS-ALONG-BEAM>.~%~
+            (fail-init-check nil "~%BEAM-CROSSINGS-BEFORE-GATE> has no matching CROSSINGS-ALONG-BEAM>.~%~
                     Literal: ~S~%~
                     Expected matching beam: (CROSSINGS-ALONG-BEAM> ~S ... ~S)"
                    literal source destination))
           (unless (init-list-prefix-p before along)
-            (fail-init-check nil "~%CROSSINGS-BEFORE-GATE> list is not a prefix of CROSSINGS-ALONG-BEAM>.~%~
+            (fail-init-check nil "~%BEAM-CROSSINGS-BEFORE-GATE> list is not a prefix of CROSSINGS-ALONG-BEAM>.~%~
                     Literal:              ~S~%~
                     Crossings before gate: ~S~%~
                     Crossings along beam:  ~S~%~
@@ -302,25 +303,23 @@ the matching CROSSINGS-ALONG-BEAM> list."
                    literal before along gate)))))))
 
 
-(define-init-check-helper check-init-crossings-before-gate-gates-occlude-beams (literals)
-  "Checks that each CROSSINGS-BEFORE-GATE> gate is an occluder for its beam."
-  (dolist (literal (init-literals-with-relation 'crossings-before-gate> literals))
+(define-init-check-helper check-init-beam-crossings-before-gate-gates-occlude-beams (literals)
+  "Checks that each BEAM-CROSSINGS-BEFORE-GATE> gate is an occluder for its beam."
+  (dolist (literal (init-literals-with-relation 'beam-crossings-before-gate> literals))
     (destructuring-bind (source before gate destination)
         (rest (init-literal-proposition literal))
       (declare (ignore before))
       (multiple-value-bind (occluders found-p)
           (init-occluders-for-directed-beam source destination literals)
         (unless found-p
-          (fail-init-check nil "~%CROSSINGS-BEFORE-GATE> has no sightline/corridor facts for its beam.~%~
+          (fail-init-check nil "~%BEAM-CROSSINGS-BEFORE-GATE> has no sightline/corridor facts for its beam.~%~
                   Literal: ~S~%~
                   Beam:    ~S -> ~S"
                  literal source destination))
         (unless (member gate occluders)
-          (fail-init-check nil "~%CROSSINGS-BEFORE-GATE> gate does not occlude its beam.~%~
+          (fail-init-check nil "~%BEAM-CROSSINGS-BEFORE-GATE> gate does not occlude its beam.~%~
                   Literal:  ~S~%~
                   Gate:     ~S~%~
                   Beam:     ~S -> ~S~%~
                   Occluders: ~S"
                  literal gate source destination occluders))))))
-
-

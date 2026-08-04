@@ -13,7 +13,7 @@
 (define-init-check-helper check-init-stream-consistency (literals)
   "In a coordinate-driven problem (WALL-SEGMENTS or BOUNDARY-WALL asserted), every
    declared wall-gears' air stream must be derivable: a positioned HAS-POSITION swept
-   location and AIMED-AT> destination sharing an axis coordinate and not coincident.
+   location and AIMED-AT destination sharing an axis coordinate and not coincident.
    Any STREAM-WIDTH override must name a wall-gears and give a positive width."
   (when (or (positive-init-literals-with-relation 'wall-segments literals)
             (positive-init-literals-with-relation 'boundary-wall literals))
@@ -35,7 +35,7 @@
 
 (define-init-check-helper init-check-stream-derivable (gears positions literals)
   (let* ((swept (init-gears-related-location 'has-position gears literals))
-         (destination (init-gears-related-location 'aimed-at> gears literals))
+         (destination (init-gears-related-location 'aimed-at gears literals))
          (swept-point (and swept (gethash swept positions)))
          (destination-point (and destination (gethash destination positions))))
     (unless swept-point
@@ -44,7 +44,7 @@
              gears))
     (unless destination-point
       (fail-init-check nil "~%Wall-gears in a coordinate-driven problem has no positioned destination.~%~
-              ~S needs an AIMED-AT> destination with LOCATION-COORDS> coordinates."
+              ~S needs an AIMED-AT destination with LOCATION-COORDS> coordinates."
              gears))
     (when (equal swept-point destination-point)
       (fail-init-check nil "~%The air stream of ~S has coincident swept location and destination.~%~

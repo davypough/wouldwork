@@ -57,7 +57,7 @@
 ;;; and from -beam-crossing-coordinates (itself nested from beam-crossing).  Splicing is
 ;;; deduplicated per problem copy, so a problem including both visibility and beam-crossing
 ;;; still gets this file exactly once, and always before -beam-crossing-coordinates' own
-;;; ESTABLISH-BEAM-COORDINATES/DERIVE-CROSSINGS-BEFORE-GATE, regardless of which of the two
+;;; ESTABLISH-BEAM-COORDINATES/DERIVE-BEAM-CROSSINGS-BEFORE-GATE, regardless of which of the two
 ;;; parent techs the problem lists first.
 ;;;
 ;;; REQUIRES:

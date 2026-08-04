@@ -184,7 +184,7 @@
 
 
 (define-query repeater-crossing-scenario-valid ()
-  (and (= (length (get-current-crossings)) 1)
+  (and (= (length (get-current-beam-crossings)) 1)
        (= (length (current-crossing-set)) 1)
        (beam-cut crossing-source1 crossing-repeater1)
        (beam-cut crossing-source2 crossing-repeater2)

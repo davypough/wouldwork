@@ -72,7 +72,7 @@
   (on box2 box1)
   (has-elevation raised1 4)
   (has-height box3 3)
-  (aimed-at> gears1 raised1)
+  (aimed-at gears1 raised1)
 
   ;; Bare-ground landing at an explicitly elevated destination.
   (has-location fan2 source2)
@@ -81,7 +81,7 @@
   (mounted-on fan2 gears2)
   (on box4 fan2)
   (has-elevation bare2 6)
-  (aimed-at> gears2 bare2)
+  (aimed-at gears2 bare2)
 
   ;; Two-fan chain.  box5 first lands on fan4 at relay3, then fan4 launches it to
   ;; final3 during the same propagation fixpoint.
@@ -91,13 +91,13 @@
   (mounted-on fan3 gears3)
   (on box5 fan3)
   (has-elevation relay3 2)
-  (aimed-at> gears3 relay3)
+  (aimed-at gears3 relay3)
 
   (has-location fan4 relay3)
   (has-position gears4 relay3)
   (mounted-on fan4 gears4)
   (has-elevation final3 5)
-  (aimed-at> gears4 final3)
+  (aimed-at gears4 final3)
 
   ;; Fan immunity.  fan6 is loose cargo resting on fan5, so it is toppled onto source4
   ;; rather than launched to ignored4.
@@ -107,7 +107,7 @@
   (mounted-on fan5 gears5)
   (on fan6 fan5)
   (has-elevation ignored4 8)
-  (aimed-at> gears5 ignored4)
+  (aimed-at gears5 ignored4)
 
   ;; Persistence after power loss.  With plate1 initially clear, inverted control turns
   ;; gears6 on and initialization launches box6.  Stepping onto plate1 turns them off.
@@ -119,7 +119,7 @@
   (on box6 fan7)
   (controls ((plate1)) gears6 inverted)
   (has-elevation delivered5 9)
-  (aimed-at> gears6 delivered5)
+  (aimed-at gears6 delivered5)
 )
 
 

@@ -88,7 +88,7 @@
   (controls ((plate1)) gate1 normal)
   (controls ((plate1)) wgears1 normal)
   (controls ((receiver1)) gate2 normal)
-  (aimed-at> wgears1 location6)
+  (aimed-at wgears1 location6)
   (gate-segments
     ((gate1 12 21 12 17)
      (gate2 17 6 17 0)))

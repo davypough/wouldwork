@@ -89,15 +89,15 @@
 
   ;; Every gears set has a harmless fixed stream destination, satisfying the blower
   ;; topology without placing any occupant in an air stream.
-  (aimed-at> floor-pickup-gears unused-destination)
-  (aimed-at> welded-gears unused-destination)
-  (aimed-at> occupied-fan-gears unused-destination)
-  (aimed-at> occupied-gears unused-destination)
-  (aimed-at> remote-gears unused-destination)
-  (aimed-at> wall-pickup-gears unused-destination)
-  (aimed-at> wall-mounting-gears unused-destination)
-  (aimed-at> high-wall-gears unused-destination)
-  (aimed-at> angled-mounting-gears unused-destination)
+  (aimed-at floor-pickup-gears unused-destination)
+  (aimed-at welded-gears unused-destination)
+  (aimed-at occupied-fan-gears unused-destination)
+  (aimed-at occupied-gears unused-destination)
+  (aimed-at remote-gears unused-destination)
+  (aimed-at wall-pickup-gears unused-destination)
+  (aimed-at wall-mounting-gears unused-destination)
+  (aimed-at high-wall-gears unused-destination)
+  (aimed-at angled-mounting-gears unused-destination)
 
   ;; Located pickup lane: a floor-mounted fan is both located and attached.
   (has-position floor-pickup-gears floor-pickup-site)

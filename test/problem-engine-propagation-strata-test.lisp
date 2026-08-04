@@ -178,7 +178,7 @@
   (controls ((receiver1)) wgears1 normal)
 
   ;; Air-stream destination
-  (aimed-at> wgears1 east)
+  (aimed-at wgears1 east)
 )
 
 

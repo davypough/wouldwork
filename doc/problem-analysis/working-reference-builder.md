@@ -59,7 +59,7 @@ From `walk-via`, `walk-via>`, and the passability queries `obstacle-clear` / `al
 - **Each walking edge** with its clause list. Mark direction: `walk-via` is symmetric; `walk-via>` is directional, and the reverse direction may have a different clause list or none.
 - **Separate locomotion edges.** Record `jump-via` / `jump-via>` and `climb-via>` separately; they are not members of the walking closure.
 - **The per-kind passability rule** for each obstacle kind the spec actually uses, read from `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **gears** item is an air-stream crossing, passable unless a blowing fan is mounted.
-- **Air streams, if present.** They are derived, not authored: each wall-gears' band runs from the solid backstop behind its fan, through its `has-position` swept location, to its `aimed-at>` destination, 3 units wide unless `stream-width` overrides. The swept location is standable exactly while the stream is off.
+- **Air streams, if present.** They are derived, not authored: each wall-gears' band runs from the solid backstop behind its fan, through its `has-position` swept location, to its `aimed-at` destination, 3 units wide unless `stream-width` overrides. The swept location is standable exactly while the stream is off.
 - **Flag any location with no walk edge at all**, and any location reachable only by a directional edge.
 
 For a coordinate-derived spec, record the geometry inputs and the derived edge count, and note that the edge table comes from the load printout.
@@ -98,7 +98,7 @@ Read the truth condition of each derived fluent off the `define-query` helpers a
 - The per-output combine rule and its modes — `normal` = open when energized, `inverted` = open when not, `toggle` if present — including override precedence. Jamming overrides: a jammed gate is forced open, jammed gears forced stopped.
 - Note that `controls` takes a **DNF clause list** of controllers, same convention as the movement edges.
 - Which outputs are uncontrolled and therefore forceable only by a direct base action such as jamming. These usually pin the terminal action.
-- If beams are in play, the crossing bookkeeping: `beam-via`, `crossings-along-beam>`, `crossings-before-gate>`, and the dynamic `crossing-active`.
+- If beams are in play, the crossing bookkeeping: `beam-via`, `crossings-along-beam>`, `beam-crossings-before-gate>`, and the dynamic `crossing-active`.
 
 ### 6. World-mode enumeration
 

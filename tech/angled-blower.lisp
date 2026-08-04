@@ -1,14 +1,14 @@
 ;;; Filename: angled-blower.lisp
 
 ;;; Angled-blower technology: the angled mounting of the shared gears/fan machinery (see
-;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
+;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at, control
 ;;; wiring, the turning/blowing derivation, and the fan actions).  Angled gears are a
 ;;; flush floor fixture, exactly like floor-gears: their mounted fan is a floor object
 ;;; with a has-location, so it is steppable (step.lisp) and a placement target
 ;;; (-placement), its zero-thickness top sitting flush with the floor.
 ;;;
 ;;; While the fan blows, its air stream launches every occupant resting on it -- agent,
-;;; box, jammer, or connector -- along a 45-degree parabolic arc to the gears' aimed-at>
+;;; box, jammer, or connector -- along a 45-degree parabolic arc to the gears' aimed-at
 ;;; destination, a box's stack riding along still stacked.  Unlike floor-blower's vertical
 ;;; launch, this is a one-shot delivery, not a sustained hover: the arc clears any wall
 ;;; standing between pad and destination (no obstacle-clear/passability check is
@@ -29,14 +29,14 @@
 ;;; An agent mounts an angled-mounted fan via step technology's step-on, exactly like
 ;;; floor-blower, and is launched by the ensuing propagation when the gears are turning.
 ;;;
-;;; Authoring obligation: aimed-at> destinations must not chain into a cycle across
+;;; Authoring obligation: aimed-at destinations must not chain into a cycle across
 ;;; simultaneously-blowing angled (or wall) gears, directly or by landing on another
 ;;; blower's fan, or propagation's iteration cap trips inconsistent-state.  Acyclic chains
 ;;; are fine and settle within the cap (10 iterations).
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  angled-gears and fan come from nested -gears-fan
-;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
+;;;   nested    : -gears-fan (types, mounted-on, aimed-at, turning/blowing,
 ;;;               gears-elevation, landing-support, land-on-support!,
 ;;;               update-gears-status!, relocate-stack!, fan actions; nests
 ;;;               -support-occupancy, -location, -position, -elevation, -controls,
@@ -67,7 +67,7 @@
 
 (define-update arc-occupants-away! (?fan fan ?gears angled-gears)
   ;; Launch every occupant resting on ?fan -- agent, box, jammer, or connector -- to
-  ;; ?gears' aimed-at> destination via relocate-stack!, each box's riders traveling still
+  ;; ?gears' aimed-at destination via relocate-stack!, each box's riders traveling still
   ;; stacked.  land-on-support! then rests the base on its destination's landing-support
   ;; match, unconstrained by elevation, or leaves it on bare ground if none is clear.  A
   ;; jamming jammer or a paired connector stays jamming/paired through the ride: its
@@ -77,7 +77,7 @@
   ;; armed gun (or other threat) at the destination is not this file's concern: -threat's
   ;; enforce-threat-safety! backstop drops the whole resulting state if the arc lands the
   ;; agent somewhere unsafe, so the physics here stay unconditional.
-  (do (bind (aimed-at> ?gears $destination))
+  (do (bind (aimed-at ?gears $destination))
       (doall (?x support-occupant)
         (if (on ?x ?fan)
           (do (not (on ?x ?fan))

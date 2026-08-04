@@ -131,10 +131,10 @@
   (controls ((control-plate)) clear-fan-gears normal)
   (controls ((control-plate)) occupied-fan-gears normal)
   (controls ((control-plate)) wall-fan-gears normal)
-  (aimed-at> lifecycle-gears control-site)
-  (aimed-at> clear-fan-gears control-site)
-  (aimed-at> occupied-fan-gears control-site)
-  (aimed-at> wall-fan-gears control-site))
+  (aimed-at lifecycle-gears control-site)
+  (aimed-at clear-fan-gears control-site)
+  (aimed-at occupied-fan-gears control-site)
+  (aimed-at wall-fan-gears control-site))
 
 
 (define-init-action initialize-derived-state

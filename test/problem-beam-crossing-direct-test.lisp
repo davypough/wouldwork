@@ -128,7 +128,7 @@
 
 
 (define-query beam-crossing-direct-scenario-valid ()
-  (do (assign $crossings (get-current-crossings))
+  (do (assign $crossings (get-current-beam-crossings))
       (assign $active-crossings (current-crossing-set))
       (and (= (length $crossings) 1)
            (same-crossing-set $crossings $active-crossings)

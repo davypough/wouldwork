@@ -258,9 +258,9 @@ document, and the result is a compact illustration of Traps 1, 2 and 8.
 reaches back that far, so "declare a placeholder and grow it during init" cannot work.
 
 **What was done instead.** The five sites were converted to query-domain `doall` —
-`(doall (?x (get-current-crossings)))` — selecting `translate-doall`'s runtime branch (Trap 2).
+`(doall (?x (get-current-beam-crossings)))` — selecting `translate-doall`'s runtime branch (Trap 2).
 `establish-beam-coordinates` now mints one crossing per computed intersection via
-`register-dynamic-object` and publishes the pool as `current-crossings>`. Because
+`register-dynamic-object` and publishes the pool as `current-beam-crossings`. Because
 `register-dynamic-object` never touches `*types*` (Trap 8), the type extension stays permanently
 empty and the objects are reachable only through that relation.
 
@@ -272,19 +272,19 @@ empty and the objects are reachable only through that relation.
   analysis originally leaned on signatures being computed before init-actions; that ordering has
   since changed — see Trap 7 — but the conclusion does not depend on it.)
 - Stage 3's pre-scan behavior — query names registered before evaluation — is what makes the
-  forward reference from `update-crossing-status!` to `get-current-crossings` legal despite the
+  forward reference from `update-crossing-status!` to `get-current-beam-crossings` legal despite the
   query being defined further down the file.
 - Trap 5 explains why `establish-beam-coordinates` must keep its trailing
-  `convert-databases-to-integers` for the newly asserted `current-crossings>` to be visible to the
+  `convert-databases-to-integers` for the newly asserted `current-beam-crossings` to be visible to the
   next init-action.
 
-The genuinely dangerous step was the second consumer. `derive-crossings-before-gate` recomputes the
+The genuinely dangerous step was the second consumer. `derive-beam-crossings-before-gate` recomputes the
 same geometry; had it kept minting its own pool it would have produced same-named but distinct
 symbols that no other fact referred to — silent wrong answers rather than an error. It now reads the
-pool back from `current-crossings>`, and the length check in `beam-coordinates-crossing-records`
+pool back from `current-beam-crossings`, and the length check in `beam-coordinates-crossing-records`
 became a real cross-check that the two passes agree.
 
-Verified end state: 26 crossings, 4 `crossings-before-gate>` facts, unchanged solution.
+Verified end state: 26 crossings, 4 `beam-crossings-before-gate>` facts, unchanged solution.
 
 ---
 

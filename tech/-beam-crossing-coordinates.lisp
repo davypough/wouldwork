@@ -1,11 +1,11 @@
 ;;; Filename: -beam-crossing-coordinates.lisp
 
-;;; Beam crossing coordinates substrate: computes CROSSINGS-ALONG-BEAM>/CROSSINGS-BEFORE-GATE>
+;;; Beam crossing coordinates substrate: computes CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>
 ;;; from the beam geometry -beam-los-coordinates.lisp already derived (or the problem hand-
 ;;; authored) as LOS-TO-APPARATUS/LOS-TO-LOCATION, for a problem that would rather author 2D
 ;;; positions than hand-list which crossings lie on which beam and in what order.  Nested under
 ;;; beam-crossing-tech only -- unlike -beam-los-coordinates, this file's derivations are never
-;;; useful to a problem that includes beam-direct alone, since CROSSINGS-ALONG-BEAM>/CROSSINGS-
+;;; useful to a problem that includes beam-direct alone, since CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-
 ;;; BEFORE-GATE> are consumed only by beam-crossing's own BEAM-REACHES-CROSSING.  A problem
 ;;; wanting two crossing direct beams includes both beam-direct and beam-crossing together;
 ;;; splicing is deduplicated per problem copy and this file always nests -beam-los-coordinates
@@ -15,25 +15,25 @@
 ;;;
 ;;; The problem declares no CROSSING pool at all.  ESTABLISH-BEAM-COORDINATES mints exactly one
 ;;; crossing per computed intersection (BEAM-COORDINATES-DERIVE-CROSSING-RECORDS) and publishes
-;;; the result as CURRENT-CROSSINGS>, so both the pool's size and its per-beam ordering are
+;;; the result as CURRENT-BEAM-CROSSINGS, so both the pool's size and its per-beam ordering are
 ;;; outputs of the geometry.  The minted objects never enter (gethash 'crossing *types*) -- that
 ;;; extension is frozen into every compiled DOALL literal at load time, well before any
-;;; init-action runs -- so beam-crossing.lisp iterates them through its GET-CURRENT-CROSSINGS
+;;; init-action runs -- so beam-crossing.lisp iterates them through its GET-CURRENT-BEAM-CROSSINGS
 ;;; query instead of over the bare CROSSING type.  Does not assert BEAM-CROSSING> --
 ;;; beam-crossing-tech derives that itself, lazily, from whichever facts populate CROSSINGS-
 ;;; ALONG-BEAM>, regardless of how they got there.
 ;;;
-;;; Also derives CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
-;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENTS: DERIVE-CROSSINGS-BEFORE-GATE
+;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
+;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENTS: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
 ;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls have no
 ;;; counterpart here: a wall-blocked beam is excluded from LOS-TO-APPARATUS/LOS-TO-LOCATION
 ;;; entirely by -beam-los-coordinates, so it never becomes a beam to split in the first place.
-;;; Without a populated CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
+;;; Without a populated BEAM-CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
 ;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
 ;;; LOCATION occluder list may also carry location entries (-beam-los-coordinates' own
-;;; location-occlusion test); DERIVE-CROSSINGS-BEFORE-GATE's three loops below skip any
+;;; location-occlusion test); DERIVE-BEAM-CROSSINGS-BEFORE-GATE's three loops below skip any
 ;;; occluder that is not a gate, since a location entry has no GATE-SEGMENTS record to split
 ;;; a beam's crossing set at.
 ;;;
@@ -43,16 +43,16 @@
 ;;; REQUIRES:
 ;;;   nested    : -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
 ;;;               POSITION>; LOS-TO-APPARATUS/LOS-TO-LOCATION, hand-authored or derived)
-;;;   relations : crossings-along-beam>, crossings-before-gate>  --  declared by
+;;;   relations : crossings-along-beam>, beam-crossings-before-gate>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
 ;;; PROVIDES:
 ;;;   nested    : -beam-los-coordinates
 ;;;   types     : crossing  --  declared optional here and left permanently empty; the pool is
 ;;;               created at init time by ESTABLISH-BEAM-COORDINATES and published as
-;;;               CURRENT-CROSSINGS>, not declared by the problem.  The declaration survives
+;;;               CURRENT-BEAM-CROSSINGS, not declared by the problem.  The declaration survives
 ;;;               only to keep the type name registered so beam-crossing.lisp's relation
 ;;;               signatures over CROSSING resolve
-;;;   init      : establish-beam-coordinates, derive-crossings-before-gate  --  in this order,
+;;;   init      : establish-beam-coordinates, derive-beam-crossings-before-gate  --  in this order,
 ;;;               and both after -beam-los-coordinates' own derive-los-from-segments
 
 (include-tech -beam-los-coordinates)
@@ -122,7 +122,7 @@
   ;; shape: (crossing beam1 parameter1 beam2 parameter2).  Used by the second and later
   ;; consumers of the topology, which recompute the same geometry and must land on the
   ;; same crossing objects ESTABLISH-BEAM-COORDINATES already created -- they pass the
-  ;; pool read back from CURRENT-CROSSINGS>.  The length check is therefore a real
+  ;; pool read back from CURRENT-BEAM-CROSSINGS.  The length check is therefore a real
   ;; cross-check between init-actions: a mismatch means two passes over the same
   ;; coordinates disagreed, which should be impossible.  BEAM-COORDINATES-DERIVE-CROSSING-
   ;; RECORDS below is the creation path and does not go through here.
@@ -156,9 +156,9 @@
   ;; records BEAM-COORDINATES-CROSSING-RECORDS computes) at SPLIT-PARAMETER -- the point
   ;; along BEAM where one of its occluding gates' own segment properly intersects it.
   ;; Returns a cons of (BEFORE . AFTER): BEFORE is BEAM's crossings with a smaller
-  ;; parameter, in increasing order (nearest BEAM's first endpoint first) -- CROSSINGS-
+  ;; parameter, in increasing order (nearest BEAM's first endpoint first) -- BEAM-CROSSINGS-
   ;; BEFORE-GATE>'s value for that endpoint; AFTER is the crossings with a larger
-  ;; parameter, in decreasing order (nearest BEAM's second endpoint first) -- CROSSINGS-
+  ;; parameter, in decreasing order (nearest BEAM's second endpoint first) -- BEAM-CROSSINGS-
   ;; BEFORE-GATE>'s value for the opposite endpoint, when BEAM's endpoints are both
   ;; locations and the beam can be traversed in either direction.  A single return value,
   ;; not multiple values, for the same CHECK-VARIABLE-NAMES reason noted on BEAM-
@@ -237,7 +237,7 @@
   ;; crossings.  Gates are deliberately not checked: a direct beam's gates live in its
   ;; authored BEAM-VIA corridor, and BEAM-CLEAR (beam-direct.lisp) already takes the whole
   ;; beam down when one closes -- unlike a relay beam there is no partial cutting range for
-  ;; CROSSINGS-BEFORE-GATE> to split, which is why DERIVE-CROSSINGS-BEFORE-GATE below leaves
+  ;; BEAM-CROSSINGS-BEFORE-GATE> to split, which is why DERIVE-BEAM-CROSSINGS-BEFORE-GATE below leaves
   ;; direct beams alone.
   (loop for beam in beams
         when (some (lambda (wall)
@@ -263,16 +263,16 @@
   ;; The crossings are ordinary interned symbols registered as planning objects of type
   ;; CROSSING, never entries in (gethash 'crossing *types*) -- that extension was already
   ;; frozen into every compiled DOALL literal at load time, long before this runs.  They
-  ;; are reachable instead through CURRENT-CROSSINGS>, which beam-crossing.lisp's
-  ;; GET-CURRENT-CROSSINGS query wraps for the DOALL sites.  REGISTER-DYNAMIC-OBJECT must
+  ;; are reachable instead through CURRENT-BEAM-CROSSINGS, which beam-crossing.lisp's
+  ;; GET-CURRENT-BEAM-CROSSINGS query wraps for the DOALL sites.  REGISTER-DYNAMIC-OBJECT must
   ;; run before any proposition mentions the object, which is why minting happens here
   ;; rather than at the point of first assertion.
   (let* ((geometry (beam-coordinates-geometric-crossings beams positions))
-         (crossings (loop for index from 1 to (length geometry)
-                          collect (register-dynamic-object
-                                    (intern (format nil "CROSSING~D" index) :ww)
-                                    'crossing))))
-    (mapcar #'cons crossings geometry)))
+         (beam-crossings (loop for index from 1 to (length geometry)
+                               collect (register-dynamic-object
+                                         (intern (format nil "CROSSING~D" index) :ww)
+                                         'crossing))))
+    (mapcar #'cons beam-crossings geometry)))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -283,10 +283,10 @@
   ;; inert otherwise, so a purely topological problem (hand-authoring CROSSINGS-ALONG-
   ;; BEAM> directly) is entirely unaffected.  Computes every proper beam intersection from
   ;; the authored sightlines (LOS-TO-APPARATUS, LOS-TO-LOCATION) and coordinates, mints
-  ;; one crossing per intersection, publishes the pool as CURRENT-CROSSINGS>, and asserts
-  ;; CROSSINGS-ALONG-BEAM> accordingly.  CURRENT-CROSSINGS> is asserted before the
+  ;; one crossing per intersection, publishes the pool as CURRENT-BEAM-CROSSINGS, and asserts
+  ;; CROSSINGS-ALONG-BEAM> accordingly.  CURRENT-BEAM-CROSSINGS is asserted before the
   ;; per-beam loop below purely for readability; nothing in this effect reads it back, but
-  ;; DERIVE-CROSSINGS-BEFORE-GATE does, and beam-crossing.lisp's GET-CURRENT-CROSSINGS
+  ;; DERIVE-BEAM-CROSSINGS-BEFORE-GATE does, and beam-crossing.lisp's GET-CURRENT-BEAM-CROSSINGS
   ;; reads it for every DOALL over crossings from here on.  Does not assert BEAM-CROSSING> --
   ;; beam-crossing derives that itself, lazily, from whichever facts populate CROSSINGS-
   ;; ALONG-BEAM>.  Ends with an explicit CONVERT-DATABASES-TO-INTEGERS: this init-action's
@@ -316,42 +316,42 @@
           (beam-coordinates-coupled-beams) $positions $all-walls)
         (assign $records
                 (beam-coordinates-derive-crossing-records $beams $positions))
-        (assign $crossings (mapcar #'first $records))
-        (current-crossings> $crossings)
+        (assign $beam-crossings (mapcar #'first $records))
+        (current-beam-crossings $beam-crossings)
         (ww-loop for $beam in $beams
-                 do (assign $crossings
+                 do (assign $beam-crossings
                             (beam-coordinates-crossings-on-beam $beam $records))
-                    (if $crossings
+                    (if $beam-crossings
                       (do (crossings-along-beam>
-                            (first $beam) $crossings (second $beam))
+                            (first $beam) $beam-crossings (second $beam))
                           (if (and (member (first $beam)
                                            (gethash 'location *types*))
                                    (member (second $beam)
                                            (gethash 'location *types*)))
                             (crossings-along-beam>
-                              (second $beam) (reverse $crossings)
+                              (second $beam) (reverse $beam-crossings)
                               (first $beam))))))
         (convert-databases-to-integers))))
 
 
-(define-init-action derive-crossings-before-gate
-  ;; Splits each gate-conditioned beam's crossing set into a per-gate CROSSINGS-BEFORE-
+(define-init-action derive-beam-crossings-before-gate
+  ;; Splits each gate-conditioned beam's crossing set into a per-gate BEAM-CROSSINGS-BEFORE-
   ;; GATE> list, using each gate's own crossing parameter on that beam -- fixing a real
   ;; gap BEAM-REACHES-CROSSING (beam-crossing.lisp) already checks for: without this, a
   ;; beam paired through a gate stays live for cutting along its full geometric length
   ;; even after the gate closes, since RELAY-BEAM-LIVE-FOR-CUTTING never itself checks
   ;; gate state.  A beam conditioned on more than one gate gets one independent
-  ;; CROSSINGS-BEFORE-GATE> fact per gate, each with that gate's own cutoff -- correct
+  ;; BEAM-CROSSINGS-BEFORE-GATE> fact per gate, each with that gate's own cutoff -- correct
   ;; because BEAM-REACHES-CROSSING already ORs the blocking test across every gate.
   ;; Runs only when the problem has asserted GATE-SEGMENTS -- inert otherwise.  Needs
   ;; GATE-SEGMENTS for the actual gate segment coordinates (the LOS-TO-APPARATUS/LOS-TO-
   ;; LOCATION occluder list only has gate names), so, unlike ESTABLISH-BEAM-COORDINATES,
   ;; can't run for a problem that hand-authors its own gate-conditioned LOS facts without
-  ;; also supplying the geometry -- such a problem simply leaves CROSSINGS-BEFORE-GATE>
+  ;; also supplying the geometry -- such a problem simply leaves BEAM-CROSSINGS-BEFORE-GATE>
   ;; unpopulated.  Defined here, after
   ;; -beam-los-coordinates' own DERIVE-LOS-FROM-SEGMENTS (needs LOS-TO-APPARATUS/LOS-TO-
   ;; LOCATION populated) -- file/load order, same as that init-action's own commentary
-  ;; explains.  Reads the crossing pool back from CURRENT-CROSSINGS> rather than minting
+  ;; explains.  Reads the crossing pool back from CURRENT-BEAM-CROSSINGS rather than minting
   ;; its own: the crossings this splits must be the very objects CROSSINGS-ALONG-BEAM>
   ;; already names, and a second call to BEAM-COORDINATES-DERIVE-CROSSING-RECORDS would
   ;; produce a parallel set of same-named-but-distinct symbols that no other fact refers
@@ -366,10 +366,10 @@
   (assert
     (do (assign $positions (beam-coordinates-endpoint-positions))
         (assign $beams (beam-coordinates-potential-beams))
-        (bind (current-crossings> $crossings))
+        (bind (current-beam-crossings $beam-crossings))
         (assign $records
                 (beam-coordinates-crossing-records
-                  $beams $positions $crossings))
+                  $beams $positions $beam-crossings))
         (doall (?location location)
           (doall (?transmitter transmitter)
             (if (bind (los-to-apparatus ?location $beam-gates ?transmitter))
@@ -382,7 +382,7 @@
                                 (assign $split
                                         (beam-coordinates-split-crossings-at-parameter
                                           (list ?transmitter ?location) $records $gate-parameter))
-                                (crossings-before-gate>
+                                (beam-crossings-before-gate>
                                   ?transmitter (car $split) $gate-name ?location)))))))
         (doall (?location location)
           (doall (?receiver receiver)
@@ -396,7 +396,7 @@
                                 (assign $split
                                         (beam-coordinates-split-crossings-at-parameter
                                           (list ?location ?receiver) $records $gate-parameter))
-                                (crossings-before-gate>
+                                (beam-crossings-before-gate>
                                   ?location (car $split) $gate-name ?receiver)))))))
         (doall (?source location)
           (doall (?destination location)
@@ -412,8 +412,8 @@
                                 (assign $split
                                         (beam-coordinates-split-crossings-at-parameter
                                           (list ?source ?destination) $records $gate-parameter))
-                                (crossings-before-gate>
+                                (beam-crossings-before-gate>
                                   ?source (car $split) $gate-name ?destination)
-                                (crossings-before-gate>
+                                (beam-crossings-before-gate>
                                   ?destination (cdr $split) $gate-name ?source)))))))
         (convert-databases-to-integers))))

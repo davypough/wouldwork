@@ -25,7 +25,7 @@
 ;;; lexicographically) so derived facts are deterministic and diffable.
 ;;;
 ;;; A wall-mounted fan's air stream is DERIVED geometry, not authored: its center line
-;;; runs from the gears' HAS-POSITION location (the swept location) to the AIMED-AT>
+;;; runs from the gears' HAS-POSITION location (the swept location) to the AIMED-AT
 ;;; destination (error unless axis-aligned), extended backward behind the fan to the
 ;;; nearest solid (the backstop -- the wall the gears hang on), and widened to the
 ;;; stream's width -- 3 units by default, overridable per gears with a STREAM-WIDTH
@@ -39,7 +39,7 @@
 ;;; clipped silently wherever a solid already covers them.  Crossing the band anywhere
 ;;; costs its gears once: two curtains on one route dedupe in the door-set algebra.
 ;;;
-;;; A location on a stream curtain -- the AIMED-AT> destination's normal situation,
+;;; A location on a stream curtain -- the AIMED-AT destination's normal situation,
 ;;; mid-interval on the front curtain -- belongs to the zone OUTSIDE the band only, and
 ;;; the swept location in the band's interior belongs to the band's own zone only, so
 ;;; every walking edge to or from either spot's band side carries the gears in each
@@ -199,7 +199,7 @@
 
 (defun walkability-coordinates-stream-band (spec solids)
   ;; SPEC is (gears swept-location destination sx sy dx dy width): the gears' own
-  ;; position, the AIMED-AT> destination and its position, and the stream's width.  The
+  ;; position, the AIMED-AT destination and its position, and the stream's width.  The
   ;; center line must be axis-aligned; it extends backward from the swept location, away
   ;; from the destination, to the nearest solid (the backstop).  The band spans the
   ;; center line laterally by half the width each way; its curtains are the front edge
@@ -274,7 +274,7 @@
 
 (defun walkability-coordinates-memberships (positions xs ys classified zones boundary-points bands)
   ;; One (location zone-list ride-zones) entry per location: the zones the location
-  ;; belongs to, and -- when it is some stream's AIMED-AT> destination -- the zones from
+  ;; belongs to, and -- when it is some stream's AIMED-AT destination -- the zones from
   ;; which that stream can be ridden to it (the zones across its band's side curtains).
   ;; With a declared boundary, the unbounded corner cell's zone is the outside; a
   ;; location landing there is an authoring mistake caught here.
@@ -348,7 +348,7 @@
 (defun walkability-coordinates-resolve-on-line (location x y axis cover near-zone far-zone bands)
   ;; Membership for a location on a single grid-line interval of AXIS (:v or :h), given
   ;; that interval's classification and the two flanking cells' zones.  On a stream
-  ;; curtain the location belongs to the zone OUTSIDE the band only -- the AIMED-AT>
+  ;; curtain the location belongs to the zone OUTSIDE the band only -- the AIMED-AT
   ;; destination's normal situation, standing at the stream's mouth: the band side is
   ;; a place it could occupy only while the stream is off, reached by an ordinary
   ;; gears-gated crossing.  Every stream-curtain line coincides with one of its band's
@@ -615,7 +615,7 @@
 (define-query walkability-coordinates-stream-specs ()
   ;; Default: no air streams.  -stream-passability, nested by wall-blower, redefines
   ;; this to gather one (gears swept-location destination sx sy dx dy width) spec per
-  ;; wall-gears from HAS-POSITION, AIMED-AT>, LOCATION-COORDS>, and STREAM-WIDTH
+  ;; wall-gears from HAS-POSITION, AIMED-AT, LOCATION-COORDS>, and STREAM-WIDTH
   ;; facts -- so this file never references blower relations itself.
   (do (assign $specs nil)
       $specs))

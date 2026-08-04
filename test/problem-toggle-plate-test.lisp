@@ -44,7 +44,7 @@
   (has-position occupied-unlatched-plate site)
   (has-position clear-latched-plate site)
   (has-position gears1 site)
-  (aimed-at> gears1 unused)
+  (aimed-at gears1 unused)
   (has-location weight-a site)
   (has-location weight-b site)
   (has-location weight-c site)

@@ -69,7 +69,7 @@
   (on box1 fan1)
   (on box2 box1)
   (has-elevation loft1 7)
-  (aimed-at> gears1 loft1)
+  (aimed-at gears1 loft1)
 
   ;; Fan immunity.  fan2 blows, but fan3 is only toppled off its top at base2.
   (has-location fan2 base2)
@@ -78,7 +78,7 @@
   (mounted-on fan2 gears2)
   (on fan3 fan2)
   (has-elevation loft2 8)
-  (aimed-at> gears2 loft2)
+  (aimed-at gears2 loft2)
 
   ;; Power-off drop.  Nothing rests on plate1, so normal control leaves gears3 stopped
   ;; and the unsupported box at loft3 falls back to the gears' location.
@@ -89,14 +89,14 @@
   (mounted-on fan4 gears3)
   (has-elevation loft3 9)
   (controls ((plate1)) gears3 normal)
-  (aimed-at> gears3 loft3)
+  (aimed-at gears3 loft3)
 
   ;; Fan-removal drop.  gears4 is uncontrolled and therefore turns, but no fan is
   ;; mounted on it, so nothing sustains box4 at loft4.
   (has-location box4 loft4)
   (has-position gears4 base4)
   (has-elevation loft4 11)
-  (aimed-at> gears4 loft4)
+  (aimed-at gears4 loft4)
 )
 
 

@@ -117,10 +117,10 @@
   (controls ((plate1)) wgears2 normal)
 
   ;; Forward chain: floor -> wall.  Reverse chain: wall -> floor.
-  (aimed-at> fgears1 pad1)
-  (aimed-at> wgears1 far)
-  (aimed-at> wgears2 reverse-fan)
-  (aimed-at> fgears2 reverse-far)
+  (aimed-at fgears1 pad1)
+  (aimed-at wgears1 far)
+  (aimed-at wgears2 reverse-fan)
+  (aimed-at fgears2 reverse-far)
 )
 
 

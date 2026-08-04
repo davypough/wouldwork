@@ -122,11 +122,11 @@
   (welded fan4 wgears4)  ;only fan1 is liftable, so fan1 must be ferried to fgears1
 
   ;; Air stream blowing destination
-  (aimed-at> wgears1 location1)
-  (aimed-at> wgears2 location4)
-  (aimed-at> wgears3 location6)
-  (aimed-at> wgears4 location8)
-  (aimed-at> fgears1 location11)
+  (aimed-at wgears1 location1)
+  (aimed-at wgears2 location4)
+  (aimed-at wgears3 location6)
+  (aimed-at wgears4 location8)
+  (aimed-at fgears1 location11)
 
   ;; The east corridor (wall3 to the boundary, height 4) is fully sealed by wgears3's
   ;; stream: default width 3 would leave half-unit walkable slips along wall3 and the
@@ -162,7 +162,7 @@
 
   ;; Air-stream barriers are DERIVED, not authored: each wall-gears' band runs from the
   ;; solid backstop behind its fan through its has-position swept location to its
-  ;; aimed-at> destination, 3 units wide by default (override with a (stream-width
+  ;; aimed-at destination, 3 units wide by default (override with a (stream-width
   ;; gears w) fact) -- see -stream-passability and -walkability-coordinates.  The
   ;; swept location is standable only while its stream is off (every edge to it is
   ;; gears-gated); each zone flanking a band's side curtains instead gets a free

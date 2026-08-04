@@ -73,7 +73,7 @@ vaultable-object (either gate screen wall)
 
 4. Static Relations
 
-(aimed-at> gears $location)
+(aimed-at gears $location)
 (apparatus-coords> (either transmitter receiver floor-repeater wall-repeater gun) $rational $rational)
 (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
 (beam-via fixed-beam-source $list fixed-beam-sink)
@@ -82,8 +82,8 @@ vaultable-object (either gate screen wall)
 (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode)
 (coupled fixed-beam-source fixed-beam-sink)  ;directional; fixed couplings unlimited
 (crossings-along-beam> los-endpoint $list los-endpoint)
-(crossings-before-gate> los-endpoint $list gate los-endpoint)
-(current-crossings> $list)
+(beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
+(current-beam-crossings $list)
 (gate-segments $list)
 (has-chroma (either transmitter receiver) $hue)
 (has-elevation elevated-object $fixnum)

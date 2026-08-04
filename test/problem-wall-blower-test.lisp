@@ -71,7 +71,7 @@
   ;; has-elevation, so its stream works at the default elevation 1.
   ;; Gears control and air-stream destination:
   (controls ((plate1)) wgears1 normal)
-  (aimed-at> wgears1 far)
+  (aimed-at wgears1 far)
 )
 
 

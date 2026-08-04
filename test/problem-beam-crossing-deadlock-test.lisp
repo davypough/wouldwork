@@ -1,6 +1,6 @@
 ;;; Filename: problem-beam-crossing-deadlock-test.lisp
 
-;;; Dedicated zero-action regression for the one cascade shape ARBITRATE-CROSSINGS can
+;;; Dedicated zero-action regression for the one cascade shape ARBITRATE-BEAM-CROSSINGS can
 ;;; never resolve: three beams that block each other in a closed loop rather than a
 ;;; chain.  Compare problem-beam-crossing-cascade-test.lisp's four-beam loop, which
 ;;; resolves cleanly -- the difference is not priority or tie-breaking but the loop's
@@ -105,7 +105,7 @@
 
 
 (define-query beam-crossing-deadlock-scenario-valid ()
-  (= (length (get-current-crossings)) 3))
+  (= (length (get-current-beam-crossings)) 3))
 
 
 (define-goal

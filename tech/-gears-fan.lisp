@@ -59,7 +59,7 @@
 ;;; PROVIDES:
 ;;;   types     : floor-gears, wall-gears, angled-gears, fan  --  declared optional here
 ;;;               gears (either floor-gears wall-gears angled-gears)
-;;;   relations : (aimed-at> gears $location)  --  fixed destination of the air stream
+;;;   relations : (aimed-at gears $location)  --  fixed destination of the air stream
 ;;;               (mounted-on fan $gears)  --  the fan's attachment to its gears
 ;;;               (welded fan $gears)  --  static; the fan and gears form an inseparable
 ;;;               unit: pickup-fan refuses to separate them.  A welding problem declares
@@ -115,7 +115,7 @@
 
 
 (define-static-relations
-  (aimed-at> gears $location)  ;fixed destination the air stream carries an occupant to
+  (aimed-at gears $location)  ;fixed destination the air stream carries an occupant to
   (welded fan $gears))  ;the fan is permanently attached to these gears and cannot be separated; declare alongside the init's (mounted-on ...)
 
 

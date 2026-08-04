@@ -1,7 +1,7 @@
 ;;; Filename: wall-blower.lisp
 
 ;;; Wall-blower technology: the wall mounting of the shared gears/fan machinery (see
-;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at>, control
+;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at, control
 ;;; wiring, the turning/blowing derivation, and the fan actions).  Wall gears are fixed
 ;;; on a wall of their has-position location -- the location the fan faces and sweeps --
 ;;; at the stream elevation given by gears-elevation (declared has-elevation or 1).  A
@@ -16,7 +16,7 @@
 ;;; elevation 1 blow anything standing on the floor, while gears at elevation 2 pass
 ;;; over the floor and blow only objects standing at elevation 1 (e.g. on a box top).  A
 ;;; blown object is torn off whatever support it rests on, relocates to the gears'
-;;; aimed-at> destination (an ordinary ground location -- no hover), and carries its own
+;;; aimed-at destination (an ordinary ground location -- no hover), and carries its own
 ;;; stacked riders along; an agent's held cargo travels with it implicitly.  If a clear
 ;;; plate or floor-mounted fan sits at the destination -- its top exactly at the
 ;;; destination's own floor elevation, unlike a box's raised top -- the object lands on
@@ -31,7 +31,7 @@
 ;;; makes its faced location impossible to occupy at that level, though traffic below
 ;;; (or above) the stream passes freely.
 ;;;
-;;; Authoring obligation: aimed-at> destinations must not chain the swept locations of
+;;; Authoring obligation: aimed-at destinations must not chain the swept locations of
 ;;; simultaneously-blowing wall fans -- directly, or indirectly by landing on another
 ;;; blower's fan -- into a cycle, or propagation's iteration cap trips inconsistent-state.
 ;;; Acyclic chains (one fan blowing into another's swept location, or landing on another
@@ -39,7 +39,7 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  wall-gears and fan come from nested -gears-fan
-;;;   nested    : -gears-fan (types, mounted-on, aimed-at>, turning/blowing,
+;;;   nested    : -gears-fan (types, mounted-on, aimed-at, turning/blowing,
 ;;;               gears-elevation, landing-support, land-on-support!,
 ;;;               update-gears-status!, relocate-stack!, fan actions; nests
 ;;;               -support-occupancy, -location, -position, -elevation, -controls,
@@ -76,7 +76,7 @@
 (define-update sweep-occupants-away! (?gears wall-gears)
   ;; Blow every occupant of ?gears' faced location whose body the stream strikes -- an
   ;; object standing at elevation $standing with height $height is blown iff
-  ;; $standing < stream <= $standing + $height -- to the aimed-at> destination.  A blown
+  ;; $standing < stream <= $standing + $height -- to the aimed-at destination.  A blown
   ;; object is torn off whatever support it rests on (plate, box, fan) and relocates via
   ;; relocate-stack!, its own stacked riders traveling still stacked; jamming and
   ;; connector-pairing facts persist through the ride, their effects re-derived by
@@ -90,7 +90,7 @@
   ;; enforce-threat-safety! backstop drops the whole resulting state if the sweep lands
   ;; the agent somewhere unsafe, so the physics here stay unconditional.
   (do (bind (has-position ?gears $swept))
-      (bind (aimed-at> ?gears $destination))
+      (bind (aimed-at ?gears $destination))
       (assign $stream (gears-elevation ?gears))
       (doall (?x support-occupant)
         (if (and (not (fan ?x))  ;a fan is zero-thickness: no stream ever strikes it

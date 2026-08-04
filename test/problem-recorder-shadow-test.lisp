@@ -84,8 +84,8 @@
   (welded fan1 wgears1)
   (controls ((control-plate)) wgears1 normal)
   (controls ((pressure-control)) pressure-gears normal)
-  (aimed-at> wgears1 destination)
-  (aimed-at> pressure-gears destination)
+  (aimed-at wgears1 destination)
+  (aimed-at pressure-gears destination)
 
   (current-phase phase0))
 

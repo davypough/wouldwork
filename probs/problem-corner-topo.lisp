@@ -3,8 +3,8 @@
 ;;; Companion to problem-corner.lisp: same puzzle and geometry, but nothing here is
 ;;; hand-authored topology anymore.  tech/-beam-los-coordinates.lisp's DERIVE-LOS-FROM-
 ;;; SEGMENTS derives LOS-TO-APPARATUS/LOS-TO-LOCATION; tech/-beam-crossing-
-;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-CROSSINGS-BEFORE-GATE mint the
-;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/CROSSINGS-BEFORE-GATE>; and
+;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-BEAM-CROSSINGS-BEFORE-GATE mint the
+;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-walkability-coordinates.lisp's DERIVE-WALK-VIA-FROM-SEGMENTS derives WALK-VIA --
 ;;; all from the raw segment geometry below (same shape as problem-corner.lisp's).  The two
 ;;; beam derivations read WALL-SEGMENTS, GATE-SEGMENTS and BOUNDARY-WALL; WINDOW-SEGMENTS is
@@ -24,7 +24,7 @@
 ;;;
 ;;; Expected derived figures, useful as a regression baseline: 17 LOS-TO-APPARATUS + 5
 ;;; LOS-TO-LOCATION pairs; 26 crossings (location2/location4 crossed no other beam either
-;;; way); 4 CROSSINGS-BEFORE-GATE> facts -- two for the location1/location4 beam, which is
+;;; way); 4 BEAM-CROSSINGS-BEFORE-GATE> facts -- two for the location1/location4 beam, which is
 ;;; derived in both directions, and one each for the two transmitter beams.
 
 
@@ -61,8 +61,8 @@
 ;;;; declaration living in the problem.  terminus is owned by beam-relay.
 ;;;; crossing is deliberately absent: the pool is minted at init time by
 ;;;; -beam-crossing-coordinates.lisp's ESTABLISH-BEAM-COORDINATES, one crossing per computed
-;;;; intersection, and published as CURRENT-CROSSINGS> for beam-crossing.lisp's
-;;;; GET-CURRENT-CROSSINGS to iterate.
+;;;; intersection, and published as CURRENT-BEAM-CROSSINGS for beam-crossing.lisp's
+;;;; GET-CURRENT-BEAM-CROSSINGS to iterate.
 
 
 (define-types
@@ -127,7 +127,7 @@
 
 
   ;; Raw wall/gate/window segment geometry -- drives DERIVE-LOS-FROM-SEGMENTS (tech/-beam-los-
-  ;; coordinates.lisp) and DERIVE-CROSSINGS-BEFORE-GATE (tech/-beam-crossing-
+  ;; coordinates.lisp) and DERIVE-BEAM-CROSSINGS-BEFORE-GATE (tech/-beam-crossing-
   ;; coordinates.lisp) below.  wall1/gate1 split at
   ;; y=11/2 keeps all three gate1-conditioned beams below the split and the location1-
   ;; >receiver2 crossing (correctly wall-blocked) above it, so neither segment is

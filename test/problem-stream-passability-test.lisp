@@ -73,8 +73,8 @@
   (welded upper-fan upper-gears)
   (controls ((upper-control-plate)) upper-gears normal)
 
-  (aimed-at> lower-gears lower-destination)
-  (aimed-at> upper-gears upper-destination)
+  (aimed-at lower-gears lower-destination)
+  (aimed-at upper-gears upper-destination)
 
   ;; LOWER-GEARS defaults to width 3.  UPPER-GEARS exercises the override.
   (stream-width upper-gears 4)

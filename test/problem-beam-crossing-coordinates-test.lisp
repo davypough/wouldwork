@@ -7,7 +7,7 @@
 ;;; horizontal beam's opposite direction.
 ;;;
 ;;; Two closed gates cross the horizontal beam between crossings: GATE1 at x=4
-;;; and GATE2 at x=7.  Their independently derived CROSSINGS-BEFORE-GATE> facts
+;;; and GATE2 at x=7.  Their independently derived BEAM-CROSSINGS-BEFORE-GATE> facts
 ;;; must split the sequence at different positions.  SPLIT-MARKER is also in the
 ;;; authored LOS occluder list, but is a location rather than a gate and must not
 ;;; create any gate-split record.
@@ -121,14 +121,14 @@
 (define-query gate-split-present
     (?from los-endpoint ?to los-endpoint)
   (exists (?gate gate)
-    (bind (crossings-before-gate> ?from $crossings ?gate ?to))))
+    (bind (beam-crossings-before-gate> ?from $crossings ?gate ?to))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
 (define-query beam-crossing-coordinates-scenarios-valid ()
-  (do (assign $pool (get-current-crossings))
+  (do (assign $pool (get-current-beam-crossings))
       (and
         ;; The pool is a deterministic output of the three proper intersections.
         (equal $pool '(crossing1 crossing2 crossing3))
@@ -167,17 +167,17 @@
         (not (crossings-along-present endpoint-top endpoint-bottom))
 
         ;; Each gate independently splits the main crossing sequence.
-        (bind (crossings-before-gate>
+        (bind (beam-crossings-before-gate>
                 main-left $gate1-forward gate1 main-right))
         (equal $gate1-forward '(crossing1))
-        (bind (crossings-before-gate>
+        (bind (beam-crossings-before-gate>
                 main-right $gate1-reverse gate1 main-left))
         (equal $gate1-reverse '(crossing3 crossing2))
 
-        (bind (crossings-before-gate>
+        (bind (beam-crossings-before-gate>
                 main-left $gate2-forward gate2 main-right))
         (equal $gate2-forward '(crossing1 crossing2))
-        (bind (crossings-before-gate>
+        (bind (beam-crossings-before-gate>
                 main-right $gate2-reverse gate2 main-left))
         (equal $gate2-reverse '(crossing3))
 

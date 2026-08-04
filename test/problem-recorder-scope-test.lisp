@@ -43,7 +43,7 @@
   (controls ((plate1)) wall-gears1 normal)
   (mounted-on fixed-fan wall-gears1)
   (welded fixed-fan wall-gears1)
-  (aimed-at> wall-gears1 destination-site))
+  (aimed-at wall-gears1 destination-site))
 
 
 (define-init-action initialize-derived-state
