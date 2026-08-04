@@ -180,7 +180,7 @@
     (unwind-protect
         (progn
           (install-compiled-goal '(current-cycle-status cycle-complete))
-          (solve-recorder-subgoal-form '(open cycle-gate))
+          (solve-subgoal (open cycle-gate))
           (setf result
             (and
               (= (length *recorder-cycle-history*) 1)
@@ -193,8 +193,7 @@
               ;; freshly seeded next-cycle baseline available.  Undo removes only the
               ;; failed attempt.
               (progn
-                (solve-recorder-subgoal-form
-                  '(current-cycle-status cycle-unreachable))
+                (solve-subgoal (current-cycle-status cycle-unreachable))
                 t)
               (= (length *recorder-cycle-history*) 1)
               (recorder-two-cycle-first-record-p)
@@ -204,7 +203,7 @@
               (recorder-two-cycle-first-record-p)
               (recorder-two-cycle-prepared-baseline-p)
 
-              (progn (solve-recorder-final) t)
+              (progn (solve) t)
               (= (length *recorder-cycle-history*) 2)
               (recorder-two-cycle-first-record-p)
               (recorder-two-cycle-final-record-p)

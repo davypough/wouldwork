@@ -125,9 +125,27 @@
                  printed))))
 
 
+(define-test-claim recorder-initial-solve-remains-ordinary
+  (let ((ordinary-solve-p nil))
+    (unwind-protect
+        (progn
+          (solve)
+          (setf ordinary-solve-p
+                (and *solutions-valid*
+                     (= (solution.depth (select-continuation-solution)) 2)
+                     (null *final-goal*)
+                     (null *recorder-cycle-history*)
+                     (null *undo-stack*))))
+      ;; An initial SOLVE does not create an undo checkpoint, so discard only its
+      ;; ordinary search result before the remaining claims run.
+      (setf *solution-paths* nil
+            *solutions-valid* nil))
+    ordinary-solve-p))
+
+
 (define-test-claim recorder-cycle-failure-restores-original-session
   (let ((initial-database (list-database (problem-state.idb *start-state*))))
-    (solve-recorder-subgoal-form '(cycle-at cycle-unreachable))
+    (solve-subgoal (cycle-at cycle-unreachable))
     (and (null *recorder-cycle-history*)
          (not *solutions-valid*)
          (null *solution-paths*)
@@ -146,7 +164,7 @@
 
 (define-test-claim recorder-cycle-commit-final-and-undo
   (let ((initial-database (list-database (problem-state.idb *start-state*))))
-    (solve-recorder-subgoal-form '(cycle-at cycle-middle))
+    (solve-subgoal (cycle-at cycle-middle))
     (and
       (= (length *recorder-cycle-history*) 1)
       (recorder-history-boundary-at-p 0 'cycle-middle)
@@ -170,7 +188,7 @@
       ;; A failed later cycle leaves the committed first cycle available.  Its checkpoint
       ;; restores the history as well as the generic planning session.
       (progn
-        (solve-recorder-subgoal-form '(cycle-at cycle-unreachable))
+        (solve-subgoal (cycle-at cycle-unreachable))
         t)
       (= (length *recorder-cycle-history*) 1)
       (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
@@ -181,7 +199,7 @@
         (first *recorder-cycle-history*) 1 2 7 1 2 7)
       (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
 
-      (progn (solve-recorder-final) t)
+      (progn (solve) t)
       (= (length *recorder-cycle-history*) 2)
       (recorder-history-boundary-at-p 1 'cycle-end)
       (recorder-cycle-metrics-p
@@ -225,6 +243,44 @@
       (equal initial-database
              (list-database (problem-state.idb *start-state*)))
       (null *undo-stack*))))
+
+
+(define-test-claim recorder-public-goal-chaining-dispatch
+  (let ((initial-database (list-database (problem-state.idb *start-state*)))
+        (subgoal-dispatched-p nil)
+        (final-dispatched-p nil))
+    (unwind-protect
+        (progn
+          ;; These are the public goal-chaining commands.  Recorder-enabled problems
+          ;; should give them recorder-cycle semantics without changing the interface.
+          (solve-subgoal (cycle-at cycle-middle))
+          (setf subgoal-dispatched-p
+                (and (= (length *recorder-cycle-history*) 1)
+                     (recorder-history-boundary-at-p 0 'cycle-middle)
+                     (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
+                     (null *solution-paths*)
+                     (not *solutions-valid*)
+                     (equal *final-goal* '(cycle-at cycle-end))))
+
+          (solve)
+          (setf final-dispatched-p
+                (and (= (length *recorder-cycle-history*) 2)
+                     (recorder-history-boundary-at-p 1 'cycle-end)
+                     *solutions-valid*
+                     (= (solution.depth (select-continuation-solution)) 1)
+                     (null *final-goal*)
+                     (equal *goal* '(cycle-at cycle-end)))))
+      ;; Each public chaining call creates one checkpoint.  Restore the staged problem
+      ;; after characterizing automatic recorder dispatch.
+      (loop while *undo-stack* do (ww-undo)))
+    (and subgoal-dispatched-p
+         final-dispatched-p
+         (null *recorder-cycle-history*)
+         (null *final-goal*)
+         (equal *goal* '(cycle-at cycle-end))
+         (equal initial-database
+                (list-database (problem-state.idb *start-state*)))
+         (null *undo-stack*))))
 
 
 (define-goal

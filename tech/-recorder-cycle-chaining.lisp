@@ -1,17 +1,17 @@
 ;;; Filename: -recorder-cycle-chaining.lisp
 
-;;; Explicit recorder orchestration over the generic goal-chaining substrate.  Each call
-;;; searches exactly one closed, validator-approved recorder cycle.  An intermediate cycle
-;;; commits its integrated playback boundary immediately, retains an independent history
-;;; record, prepares a fresh recording shadow, and discards the just-searched program.
+;;; Explicit recorder orchestration behind the generic goal-chaining interface.  Each
+;;; dispatched call searches exactly one closed, validator-approved recorder cycle.  An
+;;; intermediate cycle commits its integrated playback boundary immediately, retains an
+;;; independent history record, prepares a fresh recording shadow, and discards the
+;;; just-searched program.
 ;;; The final operation records the last cycle but retains its ordinary solution result.
 ;;;
 ;;; REQUIRES:
 ;;;   nested  : -recorder-cycle-boundary
 ;;;   planner : goal-chaining checkpoints, WW-SOLVE, solution selection
 ;;; PROVIDES:
-;;;   macros    : solve-recorder-subgoal
-;;;   functions : solve-recorder-subgoal-form, solve-recorder-final,
+;;;   functions : solve-recorder-subgoal-form and solve-recorder-final (policy handlers),
 ;;;               print-recorder-chain-report
 ;;;   structure : recorder-cycle-record
 
@@ -79,10 +79,6 @@
   'restore-recorder-cycle-history)
 
 
-(defmacro solve-recorder-subgoal (goal-form)
-  `(solve-recorder-subgoal-form ',goal-form))
-
-
 (defun validate-recorder-cycle-orchestration ()
   "Require a fresh serial baseline and active recorder candidate validation."
   (validate-continuation-preconditions)
@@ -143,19 +139,13 @@
 (defun print-recorder-cycle-record (record cycle-number stream)
   "Print one committed recorder cycle RECORD."
   (format stream "~&~%Cycle ~D~%" cycle-number)
-  (format stream "Subgoal: ~S~%" (recorder-cycle-record.subgoal record))
   (format stream "Closed goal: ~S~%" (recorder-cycle-record.closed-goal record))
   (format stream "Search policy: ~A~%" (recorder-cycle-record.solution-type record))
   (format stream "Cycle metrics: depth ~D; elapsed time ~A; value change ~A~%"
           (recorder-cycle-record.depth record)
           (recorder-cycle-record.elapsed-time record)
           (recorder-cycle-record.value-change record))
-  (format stream "Cumulative metrics: depth ~D; elapsed time ~A; value change ~A~%"
-          (recorder-cycle-record.cumulative-depth record)
-          (recorder-cycle-record.cumulative-time record)
-          (recorder-cycle-record.cumulative-value record))
   (let ((report (recorder-cycle-record.report record)))
-    (print-recorder-chain-sequence "Integrated sequence" (getf report :integrated) stream)
     (print-recorder-chain-sequence "Recording sequence" (getf report :recording) stream)
     (print-recorder-chain-sequence "Playback sequence" (getf report :playback) stream))
   record)
@@ -170,12 +160,6 @@
   (loop for record in history
         for cycle-number from 1
         do (print-recorder-cycle-record record cycle-number stream))
-  (let ((last-record (car (last history))))
-    (format stream "~&~%Chain totals: depth ~D; elapsed time ~A; value change ~A~%"
-            (recorder-cycle-record.cumulative-depth last-record)
-            (recorder-cycle-record.cumulative-time last-record)
-            (recorder-cycle-record.cumulative-value last-record)))
-  (format stream "Any optimization is local to its cycle; this chain is not globally optimized.~%")
   history)
 
 
@@ -244,7 +228,7 @@
                          (ww-undo) to restore the preceding session.~%"))
             (when record
               (print-recorder-chain-report))
-            record))
+            t))
       (unless completed
         (setf *solution-paths* nil
               *solutions-valid* nil)

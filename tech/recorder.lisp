@@ -5,13 +5,15 @@
 ;;; owns a private recording-shadow component; solution-time validation/reporting and the
 ;;; whole-problem support envelope remain separate services.
 ;;;
-;;; Recorder cycle chaining is explicit rather than planner-native.  One call to
-;;; SOLVE-RECORDER-SUBGOAL or SOLVE-RECORDER-FINAL searches at most one complete recording
-;;; cycle.  Every searched cycle physically returns its ghosts to a recorder before its
-;;; integrated playback state can become a boundary.  An intermediate commit preserves that
-;;; playback state, discards the completed program, and prepares a fresh capability-owned
-;;; recording shadow for the next call.  Cycles are optimized only within their own searches;
-;;; the retained history and cumulative metrics do not imply global optimality or completeness.
+;;; Recorder cycle chaining is explicit rather than planner-native.  After
+;;; ENABLE-RECORDER-SOLUTION, each SOLVE-SUBGOAL searches and commits at most one intermediate
+;;; recording cycle, and the following SOLVE searches and commits the final cycle.  An initial
+;;; SOLVE remains an ordinary whole-problem search.  Every searched cycle physically returns
+;;; its ghosts to a recorder before its integrated playback state can become a boundary.  An
+;;; intermediate commit preserves that playback state, discards the completed program, and
+;;; prepares a fresh capability-owned recording shadow for the next call.  Cycles are optimized
+;;; only within their own searches; the retained history and cumulative metrics do not imply
+;;; global optimality or completeness.
 ;;;
 ;;; The component order preserves the established propagation seed:
 ;;; ordinary receiver state, recording plate state, recording receiver state, recording

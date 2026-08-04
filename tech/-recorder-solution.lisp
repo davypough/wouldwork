@@ -2,7 +2,8 @@
 
 ;;; Solution-time recorder services: candidate validation and the two-phase report.  Nested
 ;;; by recorder.lisp, which makes the services available; an integrated recorder problem
-;;; activates both with ENABLE-RECORDER-SOLUTION.  Nothing here is a substrate hook, and
+;;; activates validation, reporting, and goal chaining with ENABLE-RECORDER-SOLUTION.
+;;; Nothing here is a substrate hook, and
 ;;; nothing here reads recording-side state.  The recorder shadow components derive
 ;;; RECORDING-DEPRESSED, RECORDING-LATCHED, RECORDING-TURNING, RECORDING-ACTIVE and
 ;;; RECORDING-OPEN during propagation, while this file runs once per completed candidate
@@ -30,7 +31,7 @@
 ;;; PROVIDES:
 ;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
 ;;;              recording-agent-return-route, recording-agent-at-recorder
-;;;   functions: enable-recorder-solution (activates validation and reporting together),
+;;;   functions: enable-recorder-solution (activates all recorder solution services),
 ;;;              validate-recorder-solution, build-recorder-report, print-recorder-report
 
 (include-tech -location)
@@ -92,10 +93,12 @@
 
 
 (defun enable-recorder-solution ()
-  "Activate recorder candidate validation and two-phase solution reporting for the staged
-   problem."
+  "Activate recorder validation, reporting, and goal chaining for the staged problem."
   (register-solution-validator 'validate-recorder-solution)
-  (register-solution-report-printer 'print-recorder-report))
+  (register-solution-report-printer 'print-recorder-report)
+  (register-goal-chaining-policy
+    'solve-recorder-subgoal-form
+    'solve-recorder-final))
 
 
 (defun recorder-move-agents (move)

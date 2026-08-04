@@ -546,6 +546,8 @@
   (when (and (boundp '*goal-chaining-checkpoint-extensions*)
              (listp *goal-chaining-checkpoint-extensions*))
     (setf *goal-chaining-checkpoint-extensions* nil))
+  (when (boundp '*goal-chaining-policy*)
+    (setf *goal-chaining-policy* nil))
   (when (boundp '*solutions-valid*)
     (setf *solutions-valid* nil))
   ;; Reset object index counter

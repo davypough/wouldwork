@@ -420,15 +420,21 @@ is staged again.
 
 
 (defun solve ()
-  (if *final-goal*
-    (progn
+  "Solve the current problem, or finish an active goal chain through its policy."
+  (cond
+    ((null *final-goal*)
+     (ww-solve))
+    (*goal-chaining-policy*
+     (funcall
+       (symbol-function
+         (goal-chaining-policy-final-solver *goal-chaining-policy*))))
+    (t
       ;; Mid-chain: consume the last subgoal result and reinstate the original goal.
       (continue-from-solution *final-goal*)
       (ww-solve)
       (when *solutions-valid*
         (setf *final-goal* nil))
-      *solution-paths*)
-    (ww-solve)))
+      *solution-paths*)))
 
 
 (defun list-all-problems (&optional (prettyp nil))

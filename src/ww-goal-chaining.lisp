@@ -50,6 +50,16 @@
 
 
 (defun solve-subgoal-form (goal-form)
+  "Solve GOAL-FORM through the staged problem's goal-chaining policy."
+  (if *goal-chaining-policy*
+    (funcall
+      (symbol-function
+        (goal-chaining-policy-subgoal-solver *goal-chaining-policy*))
+      goal-form)
+    (solve-generic-subgoal-form goal-form)))
+
+
+(defun solve-generic-subgoal-form (goal-form)
   "Solve GOAL-FORM as one subgoal and retain an undo checkpoint.
 
 The preceding valid solution, when present, supplies the new start state.  A normal

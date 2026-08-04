@@ -189,6 +189,33 @@
   "Registered (NAME SNAPSHOTTER RESTORER) extensions for goal-chaining undo state.")
 
 
+(defstruct goal-chaining-policy
+  "Problem-local implementations behind the public goal-chaining commands."
+  subgoal-solver
+  final-solver)
+
+
+(sb-ext:defglobal *goal-chaining-policy* nil
+  "Active problem-local goal-chaining policy, or NIL for generic goal chaining.")
+
+
+(defun register-goal-chaining-policy (subgoal-solver final-solver)
+  "Register specialized implementations for SOLVE-SUBGOAL and mid-chain SOLVE.
+
+SUBGOAL-SOLVER names a function of one goal-form argument.  FINAL-SOLVER names a
+function of no arguments.  Staging another problem clears the policy."
+  (dolist (solver (list subgoal-solver final-solver))
+    (unless (and (symbolp solver) (fboundp solver))
+      (error "Goal-chaining solver must name a defined function: ~S" solver)))
+  (when *goal-chaining-policy*
+    (error "A goal-chaining policy is already registered: ~S"
+           *goal-chaining-policy*))
+  (setf *goal-chaining-policy*
+        (make-goal-chaining-policy
+          :subgoal-solver subgoal-solver
+          :final-solver final-solver)))
+
+
 (defun register-goal-chaining-checkpoint-extension (name snapshotter restorer)
   "Register problem-local checkpoint state without specializing UNDO-CHECKPOINT."
   (when (assoc name *goal-chaining-checkpoint-extensions*)
