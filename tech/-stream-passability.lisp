@@ -49,7 +49,9 @@
   (stream-width wall-gears $rational))  ;optional; a wall fan's air stream is 3 units wide unless overridden
 
 
-(define-query stream-obstacle-clear (?agent agent ?obstacle gears)
+(define-query stream-obstacle-clear
+    (?agent agent
+     ?obstacle (either floor-gears wall-gears angled-gears))
   ;; A mounted fan bars this actor exactly when the gears turn in that actor's view.
   (not (exists (?f fan)
          (and (bind (mounted-on ?f $mount-gears))

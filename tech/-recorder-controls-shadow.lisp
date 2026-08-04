@@ -18,7 +18,8 @@
 (in-package :ww)
 
 
-(define-query recording-controller-energized (?controller (either receiver plate))
+(define-query recording-controller-energized
+    (?controller (either receiver pressure-plate toggle-plate))
   (or (and (receiver ?controller)
            (recording-active ?controller))
       (and (pressure-plate ?controller)

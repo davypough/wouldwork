@@ -44,9 +44,9 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater)
-  fixed-beam-source (either transmitter repeater)
-  fixed-beam-sink (either repeater receiver)
-  beam-node (either transmitter receiver repeater location))
+  fixed-beam-source (either transmitter floor-repeater wall-repeater)
+  fixed-beam-sink (either floor-repeater wall-repeater receiver)
+  beam-node (either transmitter receiver floor-repeater wall-repeater location))
 
 
 (define-dynamic-relations

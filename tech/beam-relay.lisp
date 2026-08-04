@@ -20,8 +20,9 @@
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
 ;;; PROVIDES:
-;;;   types      : relay (either connector repeater);
-;;;                terminus (either transmitter receiver connector repeater)
+;;;   types      : relay (either connector floor-repeater wall-repeater);
+;;;                terminus (either transmitter receiver connector floor-repeater
+;;;                wall-repeater)
 ;;;   relations  : paired, color
 ;;;   queries    : relay-beam-reaches-receiver,
 ;;;                recording-shadow-relay-beam-reaches-receiver,
@@ -49,8 +50,9 @@
 
 
 (define-types
-  relay (either connector repeater)
-  terminus (either transmitter receiver connector repeater))
+  relay (either connector floor-repeater wall-repeater)
+  terminus
+    (either transmitter receiver connector floor-repeater wall-repeater))
 
 
 (define-optional-types box hue connector transmitter receiver)
@@ -284,7 +286,7 @@
 
 
 (define-query beam-anchor-elevation
-    (?anchor (either transmitter receiver relay))
+    (?anchor (either transmitter receiver connector floor-repeater wall-repeater))
   (cond ((or (transmitter ?anchor)
              (receiver ?anchor))
          (fixture-elevation ?anchor))
@@ -296,7 +298,7 @@
 
 
 (define-query relay-linked
-    (?source (either transmitter relay) ?target relay)
+    (?source (either transmitter connector floor-repeater wall-repeater) ?target relay)
   ;; PAIRED is structurally undirected but is always stored with a connector first.
   ;; COUPLED is directional and can target only a repeater or receiver.
   (if (connector ?target)
@@ -309,7 +311,7 @@
 
 
 (define-query relay-link-clear
-    (?source (either transmitter relay)
+    (?source (either transmitter connector floor-repeater wall-repeater)
      ?source-anchor beam-node
      ?target relay
      ?target-anchor beam-node
@@ -320,7 +322,7 @@
 
 (define-query relay-link-clear-for-object
     (?view
-     ?source (either transmitter relay)
+     ?source (either transmitter connector floor-repeater wall-repeater)
      ?source-anchor beam-node
      ?target relay
      ?target-anchor beam-node
@@ -334,7 +336,7 @@
 
 
 (define-query paired-relay-visible
-    (?source (either transmitter relay)
+    (?source (either transmitter connector floor-repeater wall-repeater)
      ?source-anchor beam-node
      ?target relay
      ?target-anchor beam-node)
@@ -344,7 +346,7 @@
 
 (define-query paired-relay-visible-for-object
     (?view
-     ?source (either transmitter relay)
+     ?source (either transmitter connector floor-repeater wall-repeater)
      ?source-anchor beam-node
      ?target relay
      ?target-anchor beam-node)

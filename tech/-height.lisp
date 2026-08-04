@@ -15,8 +15,8 @@
 ;;; PROVIDES:
 ;;;   types    : repeater (either floor-repeater wall-repeater);
 ;;;              heighted-object (either box gate agent screen wall jammer connector
-;;;              repeater) -- what can have a declared height; optional subtypes absent
-;;;              from the problem resolve to nil, a no-op
+;;;              floor-repeater wall-repeater) -- what can have a declared height;
+;;;              optional subtypes absent from the problem resolve to nil, a no-op
 ;;;   relation : (has-height heighted-object $fixnum)
 ;;;   query    : declared-height  --  declared value or a fixed default of 1; not for
 ;;;              gate/screen/wall barrier-clearance height
@@ -29,7 +29,8 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater)
-  heighted-object (either box gate agent screen wall jammer connector repeater))
+  heighted-object
+    (either box gate agent screen wall jammer connector floor-repeater wall-repeater))
 
 
 (define-static-relations

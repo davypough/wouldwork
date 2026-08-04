@@ -47,11 +47,11 @@
 ;;; do not gain this test -- nothing but jam-target ever reads either, and a jammer's line to
 ;;; its target is not blocked by intervening objects, by design.
 ;;;
-;;; Declares LOS-ENDPOINT itself, as (either transmitter receiver repeater gun location) -- the
-;;; composite every consuming query/init-action here iterates over.  A problem may also declare it
-;;; identically in its own DEFINE-TYPES (as problem-corner-topo does); CHECK-TYPE-SIGNATURE-
-;;; CONSISTENCY requires every declaration to resolve to the same instance list, so the
-;;; duplicate is harmless.
+;;; Declares LOS-ENDPOINT itself, as (either transmitter receiver floor-repeater
+;;; wall-repeater gun location) -- the composite every consuming query/init-action here
+;;; iterates over.  A problem may also declare it identically in its own DEFINE-TYPES (as
+;;; problem-corner-topo does); CHECK-TYPE-SIGNATURE-CONSISTENCY requires every declaration
+;;; to resolve to the same instance list, so the duplicate is harmless.
 ;;;
 ;;; Self-contained; spliced by (include-tech -beam-los-coordinates), nested from visibility
 ;;; and from -beam-crossing-coordinates (itself nested from beam-crossing).  Splicing is
@@ -75,7 +75,8 @@
 ;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
 ;;;               core wouldwork setting, so it lives here rather than in ww-settings.lisp;
 ;;;               a problem overrides it with its own DEFPARAMETER
-;;;   types     : los-endpoint (either transmitter receiver repeater gun location);
+;;;   types     : los-endpoint (either transmitter receiver floor-repeater wall-repeater
+;;;               gun location);
 ;;;               jammer and gun
 ;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
 ;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
@@ -109,11 +110,14 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater)
-  los-endpoint (either transmitter receiver repeater gun location))
+  los-endpoint
+    (either transmitter receiver floor-repeater wall-repeater gun location))
 
 
 (define-static-relations
-  (apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
+  (apparatus-coords>
+    (either transmitter receiver floor-repeater wall-repeater gun)
+    $rational $rational)
   (wall-segments $list)
   (gate-segments $list)
   (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first

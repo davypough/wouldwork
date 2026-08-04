@@ -5,7 +5,7 @@
 ;;; and ordinary ALL-CLEAR conjunctions; this file isolates the otherwise unused
 ;;; STREAM-OBSTACLE-CLEAR default before -stream-passability overrides it.
 ;;;
-;;; One bare gears instance must pass for both an empty-handed agent and an agent
+;;; One wall-gears instance must pass for both an empty-handed agent and an agent
 ;;; holding cargo.  Singleton and repeated-gears lists must therefore be all clear,
 ;;; while adding a closed gate must still block the conjunction.  The characterization
 ;;; also verifies that including -passability alone does not install fan mounting,
@@ -37,7 +37,7 @@
   agent (empty-agent carrying-agent)
   connector (carried-connector)
   gate (closed-gate)
-  gears (neutral-gears))
+  wall-gears (neutral-gears))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
@@ -57,7 +57,7 @@
 
 
 (define-test-claim passability-neutral-layering
-  (expect-type-instances 'gears '(neutral-gears))
+  (expect-type-instances 'wall-gears '(neutral-gears))
   (expect-relation-absent 'mounted-on)
   (expect-relation-absent 'turning)
   (expect-relation-absent 'blowing))

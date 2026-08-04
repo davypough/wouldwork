@@ -17,9 +17,11 @@ jammer
 ladder
 location
 mode
-plate
+pressure-plate
 receiver
+recorder
 screen
+toggle-plate
 transmitter
 wall
 wall-gears
@@ -28,26 +30,27 @@ window
 
 2. Composite Types
 
-apparatus (either transmitter receiver repeater gun)
+apparatus (either transmitter receiver floor-repeater wall-repeater gun)
 beam-blocker (either agent box jammer connector)
-los-endpoint (either transmitter receiver repeater gun location)
-beam-node (either transmitter receiver repeater location)
+los-endpoint (either transmitter receiver floor-repeater wall-repeater gun location)
+beam-node (either transmitter receiver floor-repeater wall-repeater location)
 cargo (either box jammer connector fan)
-elevated-object (either location gate screen wall transmitter receiver wall-gears repeater)
-fixed-beam-source (either transmitter repeater)
-fixed-beam-sink (either repeater receiver)
-fixed-position-object (either plate ladder floor-gears wall-gears angled-gears)
-fixture (either gate transmitter receiver repeater gun)  ;ie, an apparatus or gate
+elevated-object (either location gate screen wall transmitter receiver wall-gears floor-repeater wall-repeater)
+fixed-beam-source (either transmitter floor-repeater wall-repeater)
+fixed-beam-sink (either floor-repeater wall-repeater receiver)
+fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder)
+fixture (either gate transmitter receiver floor-repeater wall-repeater gun)
 gears (either floor-gears wall-gears angled-gears)
-heighted-object (either box gate agent screen wall jammer connector repeater)
+heighted-object (either box gate agent screen wall jammer connector floor-repeater wall-repeater)
 mobile-object (either agent box jammer connector fan)
-relay (either connector repeater)
+plate (either pressure-plate toggle-plate)
+relay (either connector floor-repeater wall-repeater)
 repeater (either floor-repeater wall-repeater)
-steppable-object (either plate fan)
-support (either plate box fan)
+steppable-object (either pressure-plate toggle-plate fan)
+support (either pressure-plate toggle-plate box fan)
 support-occupant (either agent box jammer connector fan)
 target (either gate floor-gears wall-gears gun)
-terminus (either transmitter receiver connector repeater)
+terminus (either transmitter receiver connector floor-repeater wall-repeater)
 threat (either gun)
 vaultable-object (either gate screen wall)
 
@@ -71,7 +74,7 @@ vaultable-object (either gate screen wall)
 4. Static Relations
 
 (aimed-at> gears $location)
-(apparatus-coords> (either transmitter receiver repeater gun) $rational $rational)
+(apparatus-coords> (either transmitter receiver floor-repeater wall-repeater gun) $rational $rational)
 (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
 (beam-via fixed-beam-source $list fixed-beam-sink)
 (boundary-wall $list)  ;axis-aligned point list, explicitly closed by repeating the first point; used by LOS and walk-via derivation

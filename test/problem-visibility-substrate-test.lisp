@@ -45,9 +45,11 @@
 (define-test-claim visibility-substrate-schema
   (expect-type-components 'repeater '(floor-repeater wall-repeater))
   (expect-type-components
-    'fixture '(gate transmitter receiver repeater gun))
+    'fixture
+    '(gate transmitter receiver floor-repeater wall-repeater gun))
   (expect-type-components
-    'apparatus '(transmitter receiver repeater gun))
+    'apparatus
+    '(transmitter receiver floor-repeater wall-repeater gun))
   (expect-type-instances
     'repeater '(sample-floor-repeater sample-wall-repeater))
   (expect-type-instances

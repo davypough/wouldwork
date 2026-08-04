@@ -21,7 +21,7 @@
 ;;;               translation removes the guarded reference when the fan type is empty
 ;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
-;;;   types     : steppable-object (either plate fan)
+;;;   types     : steppable-object (either pressure-plate toggle-plate fan)
 ;;;   actions   : step-on, step-off
 
 (include-tech -support-occupancy)
@@ -35,7 +35,7 @@
 
 
 (define-types
-  steppable-object (either plate fan))
+  steppable-object (either pressure-plate toggle-plate fan))
 
 
 (define-action step-on

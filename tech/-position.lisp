@@ -7,8 +7,9 @@
 ;;; relation.
 ;;;
 ;;; PROVIDES:
-;;;   type     : fixed-position-object (either plate ladder floor-gears wall-gears
-;;;              angled-gears recorder)  --  what can be positioned at a fixed location; subtypes
+;;;   type     : fixed-position-object (either pressure-plate toggle-plate ladder
+;;;              floor-gears wall-gears angled-gears recorder)  --  what can be positioned
+;;;              at a fixed location; subtypes
 ;;;              absent from the problem's own define-types resolve to nil, a no-op.  The
 ;;;              gears leaf types appear directly because this file splices before
 ;;;              -gears-fan installs the gears union.
@@ -21,7 +22,8 @@
 
 
 (define-types
-  fixed-position-object (either plate ladder floor-gears wall-gears angled-gears recorder))  ;what can be positioned at a fixed location
+  fixed-position-object
+    (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder))  ;what can be positioned at a fixed location
 
 
 (define-static-relations

@@ -146,8 +146,20 @@
           (recorder-cycle-record.elapsed-time record)
           (recorder-cycle-record.value-change record))
   (let ((report (recorder-cycle-record.report record)))
+    (print-recorder-chain-sequence "Integrated sequence" (getf report :integrated) stream)
     (print-recorder-chain-sequence "Recording sequence" (getf report :recording) stream)
     (print-recorder-chain-sequence "Playback sequence" (getf report :playback) stream))
+  record)
+
+
+(defun print-recorder-chain-totals (record stream)
+  "Print the cumulative metrics and optimization scope through RECORD."
+  (format stream "~&~%Chain totals: depth ~D; elapsed time ~A; value change ~A~%"
+          (recorder-cycle-record.cumulative-depth record)
+          (recorder-cycle-record.cumulative-time record)
+          (recorder-cycle-record.cumulative-value record))
+  (format stream
+          "Any optimization is local to its cycle; this chain is not globally optimized.~%")
   record)
 
 
@@ -160,6 +172,7 @@
   (loop for record in history
         for cycle-number from 1
         do (print-recorder-cycle-record record cycle-number stream))
+  (print-recorder-chain-totals (car (last history)) stream)
   history)
 
 

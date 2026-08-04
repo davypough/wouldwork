@@ -81,12 +81,16 @@
     literals 'los-to-location '(gate location)))
 
 
-(define-query visible (?location location ?object (either fixture location))
+(define-query visible
+    (?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   (visible-for-object nil ?location ?object))
 
 
 (define-query visible-for-object
-    (?view ?location location ?object (either fixture location))
+    (?view
+     ?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   ;; A sightline must exist (an empty occluder list is a direct, always-clear line); it is
   ;; clear iff every occluder gate is open in ?view's environmental layer.  The NIL view
   ;; used by VISIBLE reads ordinary playback state.  Endpoint-elevation-blind: a location
@@ -107,7 +111,7 @@
 (define-query beam-visible
     (?location location
      ?near-elevation
-     ?object (either apparatus location)
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
   ;; therefore deliberately have no Wouldwork object type.
@@ -126,7 +130,7 @@
     (?view
      ?location location
      ?near-elevation
-     ?object (either apparatus location)
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   ;; A beam's recording view uses recording-side gate transparency and excludes mapped
   ;; live blockers.  The ordinary NIL view retains the shared playback environment.
@@ -160,7 +164,9 @@
       ?location ?from ?near-elevation ?to ?far-elevation)))
 
 
-(define-query potentially-visible (?location location ?object (either fixture location))
+(define-query potentially-visible
+    (?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   ;; Structural LOS ignores whether its authored gate occluders are currently open.  Relay
   ;; pairing selection uses this query; live beams and all other operational sight checks use
   ;; visible instead.

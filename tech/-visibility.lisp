@@ -7,11 +7,12 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : fixture (either gate transmitter receiver repeater gun), apparatus (either
-;;;              transmitter receiver repeater gun); gate, transmitter, receiver, repeater,
-;;;              and gun are optional.  APPARATUS-COORDS> names each apparatus's functional
-;;;              point: beam emission/reception/relay for beam apparatus, and the
-;;;              firing/targeting point for a gun.
+;;;   types    : fixture (either gate transmitter receiver floor-repeater wall-repeater gun),
+;;;              apparatus (either transmitter receiver floor-repeater wall-repeater gun);
+;;;              gate, transmitter, receiver, both repeater leaf types, and gun are optional.
+;;;              APPARATUS-COORDS> names each apparatus's functional point: beam
+;;;              emission/reception/relay for beam apparatus, and the firing/targeting point
+;;;              for a gun.
 ;;;   queries  : visible, visible-for-object, potentially-visible, beam-visible,
 ;;;              beam-visible-for-object -- null defaults, overridden by visibility.
 ;;;              The FOR-OBJECT forms select actor/view-specific gate state.  Their typed
@@ -31,27 +32,35 @@
 
 
 (define-types
-  fixture (either gate transmitter receiver repeater gun)
-  apparatus (either transmitter receiver repeater gun))
+  fixture
+    (either gate transmitter receiver floor-repeater wall-repeater gun)
+  apparatus
+    (either transmitter receiver floor-repeater wall-repeater gun))
 
 
-(define-query visible (?location location ?object (either fixture location))
+(define-query visible
+    (?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   (do ?location ?object nil))
 
 
 (define-query visible-for-object
-    (?view ?location location ?object (either fixture location))
+    (?view
+     ?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   (do ?view ?location ?object nil))
 
 
-(define-query potentially-visible (?location location ?object (either fixture location))
+(define-query potentially-visible
+    (?location location
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
   (do ?location ?object nil))
 
 
 (define-query beam-visible
     (?location location
      ?near-elevation
-     ?object (either apparatus location)
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
   ;; therefore deliberately have no Wouldwork object type.
@@ -62,6 +71,6 @@
     (?view
      ?location location
      ?near-elevation
-     ?object (either apparatus location)
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   (do ?view ?location ?near-elevation ?object ?far-elevation nil))

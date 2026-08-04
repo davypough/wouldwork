@@ -207,21 +207,29 @@
 
 
 (define-query-mutation ladder-obstacle-allows-carrying obstacle-clear
-  (?agent agent ?obstacle (either gate screen ladder gears))
-  (or (and (gate ?obstacle) (open ?obstacle))
+  (?agent agent
+   ?obstacle (either gate screen ladder floor-gears wall-gears angled-gears))
+  (or (and (gate ?obstacle) (gate-open-for-object ?agent ?obstacle))
       (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
       (ladder ?obstacle)
-      (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle)))
+      (and (or (floor-gears ?obstacle)
+               (wall-gears ?obstacle)
+               (angled-gears ?obstacle))
+           (stream-obstacle-clear ?agent ?obstacle)))
   "Drops the not-holding guard from ladder passability.  The carrying-agent
    probe must then make this characterization fail.")
 
 
 (define-query-mutation ladder-obstacle-ignores-closed-gate obstacle-clear
-  (?agent agent ?obstacle (either gate screen ladder gears))
+  (?agent agent
+   ?obstacle (either gate screen ladder floor-gears wall-gears angled-gears))
   (or (gate ?obstacle)
       (and (screen ?obstacle) (not (bind (holding ?agent $any-held-object))))
       (and (ladder ?obstacle) (not (bind (holding ?agent $any-held-object))))
-      (and (gears ?obstacle) (stream-obstacle-clear ?agent ?obstacle)))
+      (and (or (floor-gears ?obstacle)
+               (wall-gears ?obstacle)
+               (angled-gears ?obstacle))
+           (stream-obstacle-clear ?agent ?obstacle)))
   "Drops the open-state guard from gate passability.  The closed-gate probe
    must then make this characterization fail.")
 

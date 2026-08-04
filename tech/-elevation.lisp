@@ -10,8 +10,9 @@
 ;;; PROVIDES:
 ;;;   nested   : -height (repeater, declared-height)
 ;;;   types    : elevated-object (either location gate screen wall transmitter
-;;;              receiver wall-gears repeater)  --  wall-gears may declare the stream
-;;;              elevation of their mounted fan (default 1, via -gears-fan's gears-elevation)
+;;;              receiver wall-gears floor-repeater wall-repeater)  --  wall-gears may
+;;;              declare the stream elevation of their mounted fan (default 1, via
+;;;              -gears-fan's gears-elevation)
 ;;;   relation : (has-elevation elevated-object $fixnum)
 ;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
 ;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
@@ -26,7 +27,8 @@
 
 (define-types
   elevated-object
-    (either location gate screen wall transmitter receiver wall-gears repeater))
+    (either location gate screen wall transmitter receiver wall-gears
+            floor-repeater wall-repeater))
 
 
 (define-static-relations
@@ -68,7 +70,8 @@
     (repeater-mount-elevation ?repeater)))
 
 
-(define-query fixture-elevation (?fixture (either gate transmitter receiver repeater))
+(define-query fixture-elevation
+    (?fixture (either gate transmitter receiver floor-repeater wall-repeater))
   ;; Declared fixed-fixture level.  Gates use base elevation 0, transmitter/receiver anchors
   ;; default to 1, and repeaters use their mounting-dependent anchor rule.
   (if (repeater ?fixture)
@@ -82,7 +85,7 @@
 
 
 (define-query apparatus-anchor-elevation
-    (?apparatus (either transmitter receiver repeater))
+    (?apparatus (either transmitter receiver floor-repeater wall-repeater))
   ;; The vertical coordinate paired with APPARATUS-COORDS>'s horizontal functional point.
   ;; Transmitters and receivers are point apparatus; repeaters apply their mounting rule.
   (if (repeater ?apparatus)

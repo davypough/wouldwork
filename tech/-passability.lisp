@@ -3,19 +3,20 @@
 ;;; Passability substrate: whether an agent may pass each obstacle or enabling
 ;;; implement on a traversal edge.  Shared by walking, jumping, and ladder use.
 ;;;
-;;; Gate, screen, and ladder are owned outright here.  GEARS is reserved as a fourth
-;;; obstacle kind through a null-object default hook, STREAM-OBSTACLE-CLEAR, so a
+;;; Gate, screen, and ladder are owned outright here.  The three gears leaf types are
+;;; reserved as a fourth obstacle kind through a null-object default hook,
+;;; STREAM-OBSTACLE-CLEAR, so a
 ;;; technology like -stream-passability can override just that one slot instead of
 ;;; redefining OBSTACLE-CLEAR whole -- the same pattern -beam-substrate uses for its
-;;; peers.  GEARS itself is declared optional here without nesting -gears-fan, so a
+;;; peers.  The leaf types are declared optional here without nesting -gears-fan, so a
 ;;; walking-only problem never pulls in mounting machinery it doesn't use.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent
 ;;;   nested    : -holding (cargo, holding); -gate (gate optional type, (open gate) relation)
 ;;; PROVIDES:
-;;;   types     : screen, ladder, gears  --  declared optional; gears is a bare
-;;;               reservation, populated for real only when -gears-fan is also loaded
+;;;   types     : screen, ladder, floor-gears, wall-gears, angled-gears  --  declared
+;;;               optional, populated for real only when a problem declares those leaves
 ;;;   queries   : obstacle-clear, all-clear, and an actor-aware null-object default for
 ;;;               stream-obstacle-clear (overridden by -stream-passability)
 
@@ -25,7 +26,7 @@
 (in-package :ww)
 
 
-(define-optional-types screen ladder gears)
+(define-optional-types screen ladder floor-gears wall-gears angled-gears)
 
 
 (define-query all-clear (?agent agent ?obstacles)
@@ -35,7 +36,9 @@
            always (obstacle-clear ?agent $obstacle)))
 
 
-(define-query obstacle-clear (?agent agent ?obstacle (either gate screen ladder gears))
+(define-query obstacle-clear
+    (?agent agent
+     ?obstacle (either gate screen ladder floor-gears wall-gears angled-gears))
   ;; An open gate passes.  A screen or ladder passes only when the agent is
   ;; empty-handed.  A gears obstacle defers to stream-obstacle-clear, whose default
   ;; passes everything until a technology like -stream-passability overrides it with
@@ -46,15 +49,19 @@
            (not (bind (holding ?agent $any-held-object))))
       (and (ladder ?obstacle)
            (not (bind (holding ?agent $any-held-object))))
-      (and (gears ?obstacle)
+      (and (or (floor-gears ?obstacle)
+               (wall-gears ?obstacle)
+               (angled-gears ?obstacle))
            (stream-obstacle-clear ?agent ?obstacle))))
 
 
 ;;;; NULL-OBJECT DEFAULT HOOK ;;;;
-;;;; Overridden by whichever technology owns a gears-typed obstacle's real clearance
-;;;; rule.  Absent that technology, gears has no instances, so obstacle-clear's gears
-;;;; branch never actually binds and this default is never called.
+;;;; Overridden by whichever technology owns a gears obstacle's real clearance rule.
+;;;; When every gears leaf type is empty, obstacle-clear's gears branch never binds and
+;;;; this default is never called.
 
 
-(define-query stream-obstacle-clear (?agent agent ?obstacle gears)
+(define-query stream-obstacle-clear
+    (?agent agent
+     ?obstacle (either floor-gears wall-gears angled-gears))
   (do ?agent ?obstacle t))

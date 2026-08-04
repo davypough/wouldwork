@@ -67,7 +67,8 @@
 (define-test-claim position-contract
   (expect-type-components
     'fixed-position-object
-    '(plate ladder floor-gears wall-gears angled-gears recorder))
+    '(pressure-plate toggle-plate ladder
+      floor-gears wall-gears angled-gears recorder))
   (expect-type-instances
     'fixed-position-object
     '(positioned-plate unpositioned-plate

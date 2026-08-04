@@ -68,7 +68,8 @@
   (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode))
 
 
-(define-query energized (?controller (either receiver plate))
+(define-query energized
+    (?controller (either receiver pressure-plate toggle-plate))
   ;; A receiver follows its beam state.  A pressure plate follows current physical pressure;
   ;; a toggle plate follows its remembered latch instead.
   (or (and (receiver ?controller)

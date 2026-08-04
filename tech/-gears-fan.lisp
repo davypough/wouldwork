@@ -39,18 +39,20 @@
 ;;;   gears union is installed, so they reference the leaf types directly):
 ;;;               -controls          : (controls $list (either gate floor-gears wall-gears
 ;;;                                    angled-gears) $mode)
-;;;               -position          : fixed-position-object (either plate ladder
-;;;                                    floor-gears wall-gears angled-gears)
+;;;               -position          : fixed-position-object (either pressure-plate
+;;;                                    toggle-plate ladder floor-gears wall-gears
+;;;                                    angled-gears)
 ;;;               -elevation         : elevated-object includes wall-gears only --
 ;;;                                    floor-gears and angled-gears are both flush, so
 ;;;                                    neither needs an elevation override
-;;;               -support-occupancy : support (either plate box fan); gears are NOT a
-;;;                                    support -- only a fan can occupy them, by attachment
+;;;               -support-occupancy : support (either pressure-plate toggle-plate box fan);
+;;;                                    gears are NOT a support -- only a fan can occupy them,
+;;;                                    by attachment
 ;;;               -location          : mobile-object includes fan
 ;;;               -holding           : cargo includes fan
 ;;;               -support-elevation : a fan is a movable, zero-thickness support
-;;;               step.lisp          : steppable-object (either plate fan); reads mounted-on,
-;;;                                    guarded by fan
+;;;               step.lisp          : steppable-object (either pressure-plate toggle-plate
+;;;                                    fan); reads mounted-on, guarded by fan
 ;;;   driver    : the master propagate-consequences! must call update-gears-status!
 ;;;               after update-receiver-status! and update-plate-status!, and each
 ;;;               included mounting tech's consequences update after that
