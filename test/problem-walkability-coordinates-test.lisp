@@ -69,29 +69,25 @@
 
   ;; Each vertical partition touches both boundary edges exactly.  Door segments
   ;; fill every deliberate gap between its solid pieces.
-  (wall-segments
-    ((first-lower 4 0 4 1)
-     (first-middle 4 2 4 5)
-     (first-upper 4 6 4 8)
-     (second-lower 8 0 8 1)
-     (second-middle 8 2 8 5)
-     (second-upper 8 6 8 8)
-     (island-left 9 5 9 7)
-     (island-right 11 5 11 7)
-     (island-top 9 7 11 7)))
+  (wall-segment> first-lower 4 0 4 1)
+  (wall-segment> first-middle 4 2 4 5)
+  (wall-segment> first-upper 4 6 4 8)
+  (wall-segment> second-lower 8 0 8 1)
+  (wall-segment> second-middle 8 2 8 5)
+  (wall-segment> second-upper 8 6 8 8)
+  (wall-segment> island-left 9 5 9 7)
+  (wall-segment> island-right 11 5 11 7)
+  (wall-segment> island-top 9 7 11 7)
 
-  (gate-segments
-    ((gate-a 4 1 4 2)
-     (gate-b 4 5 4 6)
-     (gate-c 8 1 8 2)))
+  (gate-segment> gate-a 4 1 4 2)
+  (gate-segment> gate-b 4 5 4 6)
+  (gate-segment> gate-c 8 1 8 2)
 
-  (screen-segments
-    ((screen-a 8 5 8 6)))
+  (screen-segment> screen-a 8 5 8 6)
 
   ;; A window is a walking solid.  Together with the island walls, this closes
   ;; SEALED-SITE into a zone with no door edge.
-  (window-segments
-    ((sealed-window 9 5 11 5)))
+  (window-segment> sealed-window 9 5 11 5)
 
   ;; RIGHT-LINE lies exactly on the uncovered y=2 grid line.  RIGHT-VERTEX lies
   ;; exactly at the uncovered (9,2) grid vertex induced by unrelated segments.
@@ -113,6 +109,25 @@
 
 
 ;;;; CONSUMER-SPECIFIC BOUNDARY VALIDATION ;;;;
+
+
+(define-test-claim individual-segment-schema
+  (expect-relation-schema
+    'wall-segment> :static '(wall rational rational rational rational)
+    :fluent-indices '(2 3 4 5))
+  (expect-relation-schema
+    'gate-segment> :static '(gate rational rational rational rational)
+    :fluent-indices '(2 3 4 5))
+  (expect-relation-schema
+    'window-segment> :static '(window rational rational rational rational)
+    :fluent-indices '(2 3 4 5))
+  (expect-relation-schema
+    'screen-segment> :static '(screen rational rational rational rational)
+    :fluent-indices '(2 3 4 5))
+  (expect-relation-absent 'wall-segments)
+  (expect-relation-absent 'gate-segments)
+  (expect-relation-absent 'window-segments)
+  (expect-relation-absent 'screen-segments))
 
 
 (define-test-claim walkability-diagonal-boundary-rejected

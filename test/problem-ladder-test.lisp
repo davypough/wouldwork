@@ -106,7 +106,7 @@
   (has-location unsafe-agent unsafe-start)
   (has-position ladder8 unsafe-start)
   (climb-via> unsafe-start (ladder8) unsafe-goal)
-  (threatens unsafe-gun (unsafe-goal)))
+  (threatens unsafe-gun unsafe-goal))
 
 
 (define-init-action initialize-derived-state

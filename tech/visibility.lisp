@@ -21,7 +21,7 @@
 ;;; beam-elevation-at-location).  Never consulted for a jammer target, matching how a
 ;;; location occluder never appears in LOS-TO-TARGET's own entries.
 ;;;
-;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENTS --
+;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENT> --
 ;;; derived from raw 2D segment geometry by nested -beam-los-coordinates (entirely inert
 ;;; otherwise), mirroring walkability's own nested -walkability-coordinates deriving
 ;;; WALK-VIA.  This file owns the los relations, so it owns their coordinate derivation too;
@@ -32,7 +32,7 @@
 ;;; hand-authored problem may list a location as an occluder exactly as it would a gate; that
 ;;; location, and both of the beam's own endpoints, still need LOCATION-COORDS>/APPARATUS-
 ;;; COORDS> asserted -- beam-visible's elevation interpolation reads them live regardless of
-;;; whether the LOS fact itself was hand-authored or WALL-SEGMENTS-derived.
+;;; whether the LOS fact itself was hand-authored or WALL-SEGMENT>-derived.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, receiver, and apparatus are declared
@@ -43,7 +43,7 @@
 ;;;               walkability (via -passability), reachability, beam-direct, and
 ;;;               beam-crossing, which all nest -gate instead of hand-declaring it;
 ;;;               -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>,
-;;;               WALL-SEGMENTS, GATE-SEGMENTS, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS;
+;;;               WALL-SEGMENT>, GATE-SEGMENT>, BOUNDARY-WALL; DERIVE-LOS-FROM-SEGMENTS;
 ;;;               live BEAM-COORDINATES-ELEVATION-AT);
 ;;;               -beam-interpolation (the sloped-beam elevation hook);
 ;;;               -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)

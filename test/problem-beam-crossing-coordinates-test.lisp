@@ -80,9 +80,8 @@
 
   ;; Gate1 lies between CROSSING1/CROSSING2; gate2 lies between
   ;; CROSSING2/CROSSING3.
-  (gate-segments
-    ((gate1 4 -1 4 1)
-     (gate2 7 -1 7 1)))
+  (gate-segment> gate1 4 -1 4 1)
+  (gate-segment> gate2 7 -1 7 1)
 
   ;; Main beam and its three proper crossings.
   (location-coords> main-left 0 0)

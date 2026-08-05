@@ -93,13 +93,13 @@
 )
 
 
+(include-tech -segment-geometry)
+
+
 (define-static-relations
   (coords> (either area fixture) $rational $rational $rational)  ;the (x,y,z) position
   (controls (either receiver plate) (either gate blower))
   (chroma (either transmitter receiver) $hue)  ;fixed color
-  (wall-segments $list)    ; ((wall1 x1 y1 x2 y2) ...)
-  (gate-segments $list)    ; ((gate1 x1 y1 x2 y2) ...)
-  (window-segments $list)
   ;potential clear los from an area to a focus
   (los0 area focus)  
   (los1 area (either $gate $area) focus)  ;los can be blocked either by a closed $gate or object in $area
@@ -633,9 +633,9 @@
     (assign $result-x ?target-x)   
     (assign $result-y ?target-y)
     
-    ;; Bind cached geometry lists once
-    (bind (wall-segments $walls))
-    (bind (gate-segments $gates))
+    ;; Gather static geometry once
+    (assign $walls (wall-segment-records))
+    (assign $gates (gate-segment-records))
     
     ;; Loop 1: Check walls (always block)
     (ww-loop for $entry in $walls do
@@ -1453,9 +1453,11 @@
   (coords> receiver2 7 109/10 1)
   (coords> receiver3 1 109/10 1)
   (controls receiver1 gate1)
-  (wall-segments ((wall1 8 7 8 8) (wall2 8 0 8 3)))  ;internal walls only needed
-  (gate-segments ((gate1 8 3 8 7) (gate2 2 11 6 11)))
-  (window-segments ((window1 8 8 8 11)))
+  (wall-segment> wall1 8 7 8 8)  ;internal walls only needed
+  (wall-segment> wall2 8 0 8 3)
+  (gate-segment> gate1 8 3 8 7)
+  (gate-segment> gate2 2 11 6 11)
+  (window-segment> window1 8 8 8 11)
   (chroma transmitter1 red)
   (chroma transmitter2 blue)
   (chroma receiver1 red)

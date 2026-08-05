@@ -85,11 +85,10 @@
   (boundary-wall
     ((0 0) (14 0) (14 12) (0 12) (0 0)))
 
-  (wall-segments
-    ((backstop 2 0 2 12)
-     (lower-ride-cap 9 9/2 14 9/2)
-     (lane-separator 2 6 14 6)
-     (upper-ride-cap 9 11 14 11)))
+  (wall-segment> backstop 2 0 2 12)
+  (wall-segment> lower-ride-cap 9 9/2 14 9/2)
+  (wall-segment> lane-separator 2 6 14 6)
+  (wall-segment> upper-ride-cap 9 11 14 11)
 
   ;; Stream center lines run from (3,3) to (9,3), and from (3,9) to
   ;; (9,9).  LOWER-SIDE and UPPER-SIDE lie beyond the capped upper

@@ -20,9 +20,9 @@ Task is to build a Wouldwork Working Reference given a problem spec (and, option
 
 Settle this before transcribing anything; it changes what Sections 1–3 can contain.
 
-**Does the spec assert `wall-segments`?**
+**Does the spec assert any `wall-segment>` facts?**
 
-- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `wall-segments`, `gate-segments`, `window-segments`, `screen-segments`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
+- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `wall-segment>`, `gate-segment>`, `window-segment>`, `screen-segment>`, `boundary-wall` — as the authoritative source, and take the derived edges from the load printout, marked as derived output.
 - **No — hand-authored.** The spec states its edges directly. Transcribe them.
 
 Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* hand-authored sightline relations in its own older vocabulary (`los0`/`los1`, `visible0`/`visible1`, `accessible0`/`accessible1`). Transcribe whatever that file actually declares; do not translate it into `tech/` names.

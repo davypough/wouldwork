@@ -11,11 +11,11 @@
 
 
 (define-init-check-helper check-init-stream-consistency (literals)
-  "In a coordinate-driven problem (WALL-SEGMENTS or BOUNDARY-WALL asserted), every
+  "In a coordinate-driven problem (WALL-SEGMENT> or BOUNDARY-WALL asserted), every
    declared wall-gears' air stream must be derivable: a positioned HAS-POSITION swept
    location and AIMED-AT destination sharing an axis coordinate and not coincident.
    Any STREAM-WIDTH override must name a wall-gears and give a positive width."
-  (when (or (positive-init-literals-with-relation 'wall-segments literals)
+  (when (or (positive-init-literals-with-relation 'wall-segment> literals)
             (positive-init-literals-with-relation 'boundary-wall literals))
     (let ((positions (init-location-coords-map literals)))
       (dolist (gears (init-type-instances 'wall-gears))
@@ -73,5 +73,3 @@
   (loop for literal in (init-literals-with-relation relation literals)
         when (eql (second (init-literal-proposition literal)) gears)
           return (third (init-literal-proposition literal))))
-
-

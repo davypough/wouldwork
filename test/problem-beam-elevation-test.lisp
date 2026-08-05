@@ -6,10 +6,10 @@
 ;;; connector1 on the ground beaming to connector2 resting on a stack of boxes, with a low
 ;;; obstacle sitting between them.
 ;;;
-;;; Sightlines here are hand-authored, not WALL-SEGMENTS-derived: connect-connector's initial
+;;; Sightlines here are hand-authored, not WALL-SEGMENT>-derived: connect-connector's initial
 ;;; PAIRED facts are checked at load time against literal LOS-TO-APPARATUS/LOS-TO-LOCATION
 ;;; entries in DEFINE-INIT (CHECK-INIT-PAIRED-SIGHTLINES), which run before any coordinate
-;;; derivation would; a WALL-SEGMENTS-driven problem instead builds its PAIRED facts at solve
+;;; derivation would; a WALL-SEGMENT>-driven problem instead builds its PAIRED facts at solve
 ;;; time via connect-connector, never hand-authoring them in DEFINE-INIT.  low and high both
 ;;; get a direct, unoccluded LOS-TO-APPARATUS to their own transmitter/receiver; the
 ;;; interesting hop is connector1 -> connector2's own LOS-TO-LOCATION, which names mid as its

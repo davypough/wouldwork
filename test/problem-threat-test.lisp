@@ -43,7 +43,7 @@
   (expect-empty-type 'threat)
   (expect-empty-type 'gun)
   (expect-relation-schema
-    'threatens :static '(threat list) :fluent-indices '(2))
+    'threatens :static '(threat location) :fluent-indices nil)
   (expect-relation-schema 'lethal :dynamic '(threat))
   (expect-relation-absent 'controls :static)
   (expect-relation-absent 'jamming :dynamic)
@@ -62,8 +62,8 @@
     (not (exists (?candidate threat)
            (lethal ?candidate)))
     (not (exists (?candidate threat)
-           (bind (threatens ?candidate
-                            $unexpected-threatened-locations))))))
+           (exists (?location location)
+             (threatens ?candidate ?location))))))
 
 (define-goal
   (threat-scenarios-valid))

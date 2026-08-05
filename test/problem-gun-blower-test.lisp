@@ -68,7 +68,7 @@
   (has-position gears1 lower1)
   (los-to-apparatus lower1 () gun1)
   (mounted-on fan1 gears1)
-  (threatens gun1 (loft))
+  (threatens gun1 loft)
   (aimed-at gears1 loft)
 
   ;; Isolated negative lane.  gun2 has no jamming sightline and remains armed.
@@ -76,7 +76,7 @@
   (has-location fan2 lower2)
   (has-position gears2 lower2)
   (mounted-on fan2 gears2)
-  (threatens gun2 (loft2))
+  (threatens gun2 loft2)
   (aimed-at gears2 loft2)
 )
 

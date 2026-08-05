@@ -146,19 +146,15 @@
     ))
 
   ;; Segments
-  (wall-segments
-    ((wall1 6 11 6 17)
-     (wall2 22 13 22 17)
-     (wall3 24 13 30 13)
-     (wall4 24 10 24 13)
-     (wall5 26 11 33 11)
-     (wall6 22 10 24 10)  ;seals the lower room's west slot: its only exit is L9's slot under wgears4
-    ))
+  (wall-segment> wall1 6 11 6 17)
+  (wall-segment> wall2 22 13 22 17)
+  (wall-segment> wall3 24 13 30 13)
+  (wall-segment> wall4 24 10 24 13)
+  (wall-segment> wall5 26 11 33 11)
+  (wall-segment> wall6 22 10 24 10)  ;seals the lower room's west slot: its only exit is L9's slot under wgears4
 
-  (gate-segments
-    ((gate1 1 12 6 12)
-     (gate2 1 14 6 14)
-    ))
+  (gate-segment> gate1 1 12 6 12)
+  (gate-segment> gate2 1 14 6 14)
 
   ;; Air-stream barriers are DERIVED, not authored: each wall-gears' band runs from the
   ;; solid backstop behind its fan through its has-position swept location to its

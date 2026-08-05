@@ -93,18 +93,16 @@
 
   ;; The first segment crosses its lane in the interior.  The second begins
   ;; exactly on its lane, exercising the inclusive wall-endpoint convention.
-  (wall-segments
-    ((interior-wall 5 9 5 11)
-     (corner-wall 5 20 5 22)))
+  (wall-segment> interior-wall 5 9 5 11)
+  (wall-segment> corner-wall 5 20 5 22)
 
   ;; CLOSED-GATE and OPEN-GATE properly cross their lanes.  CORNER-GATE begins
   ;; exactly on its lane and therefore remains strict/non-occluding.  TARGET-GATE
   ;; supplies its own midpoint as the gate-target endpoint.
-  (gate-segments
-    ((closed-gate 5 29 5 31)
-     (open-gate 5 39 5 41)
-     (corner-gate 5 50 5 52)
-     (target-gate 10 64 10 66)))
+  (gate-segment> closed-gate 5 29 5 31)
+  (gate-segment> open-gate 5 39 5 41)
+  (gate-segment> corner-gate 5 50 5 52)
+  (gate-segment> target-gate 10 64 10 66)
 
   ;; Location endpoints and location-occlusion candidates.
   (location-coords> idle -1 -1)

@@ -1362,9 +1362,11 @@ Example: (bw-test-corner-single 15)"
     ;; Controls
     (controls receiver1 gate1)
     ;; Geometry segments
-    (wall-segments ((wall1 8 7 8 8) (wall2 8 0 8 3)))
-    (gate-segments ((gate1 8 3 8 7) (gate2 2 11 6 11)))
-    (window-segments ((window1 8 8 8 11)))
+    (wall-segment> wall1 8 7 8 8)
+    (wall-segment> wall2 8 0 8 3)
+    (gate-segment> gate1 8 3 8 7)
+    (gate-segment> gate2 2 11 6 11)
+    (window-segment> window1 8 8 8 11)
     ;; Chroma (transmitter/receiver colors)
     (chroma transmitter1 red)
     (chroma transmitter2 blue)

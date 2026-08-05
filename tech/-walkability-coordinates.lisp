@@ -4,7 +4,7 @@
 ;;; air stream's destination, WALK-VIA>) from raw segment geometry, for a problem that
 ;;; would rather author 2D positions than hand-list which locations can walk to which.
 ;;; Nested under public walkability and under -stream-passability; entirely inert unless
-;;; the problem actually asserts WALL-SEGMENTS or BOUNDARY-WALL -- a problem that
+;;; the problem actually asserts WALL-SEGMENT> or BOUNDARY-WALL -- a problem that
 ;;; hand-authors WALK-VIA directly is unaffected.
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
@@ -67,10 +67,10 @@
 ;;; problem-claustro-topo's slab (wall4/wall5) for the pattern.
 ;;;
 ;;; Reuses LOCATION-COORDS> (nested from -location-coordinates, shared with
-;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Declares its
-;;; own segment relations (identical signatures to -beam-los-coordinates.lisp's, for a
-;;; problem that also includes a beam tech), so this derivation never requires any beam
-;;; tech to be included.  SCREEN-SEGMENTS has no counterpart there, and streams none at
+;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Reuses the
+;;; individually authored segment relations from nested -segment-geometry, shared with
+;;; -beam-los-coordinates without requiring any beam tech.  SCREEN-SEGMENT> has no beam
+;;; consumer, and streams none at
 ;;; all -- they affect walking only, never a sightline.
 ;;;
 ;;; Self-contained; spliced by (include-tech -walkability-coordinates), nested from
@@ -83,9 +83,9 @@
 ;;;   nested    : -walkability (WALK-VIA/WALK-VIA> topology relations);
 ;;;               -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
-;;;   relations : wall-segments, gate-segments, window-segments, screen-segments,
+;;;   relations : wall-segment>, gate-segment>, window-segment>, screen-segment>,
 ;;;               boundary-wall  --  default to no facts; a problem that asserts
-;;;               wall-segments or boundary-wall gets WALK-VIA/WALK-VIA> derived
+;;;               wall-segment> or boundary-wall gets WALK-VIA/WALK-VIA> derived
 ;;;               automatically instead of hand-authoring them
 ;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
 ;;;               redefined by -stream-passability where wall blowers exist
@@ -93,17 +93,9 @@
 
 (include-tech -walkability)
 (include-tech -location-coordinates)
-(include-tech -segment-init-checks)
+(include-tech -segment-geometry)
 
 (in-package :ww)
-
-
-(define-static-relations
-  (wall-segments $list)
-  (gate-segments $list)
-  (window-segments $list)
-  (screen-segments $list)
-  (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
 
 
 ;;;; DERIVATION CORE ;;;;
@@ -627,7 +619,7 @@
 (define-init-action derive-walk-via-from-segments
   ;; Derives WALK-VIA (and WALK-VIA> for rides into stream destinations) from the
   ;; problem's raw segment geometry -- see the file header for the region-connectivity
-  ;; derivation.  Runs only when the problem has asserted WALL-SEGMENTS or
+  ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT> or
   ;; BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own WALK-VIA
   ;; facts is unaffected.  Only one direction per symmetric pair is asserted: WALK-VIA
   ;; has no ">" suffix, so WW mirrors it both ways itself; a pair whose ride edges
@@ -635,14 +627,15 @@
   ;; directions instead, never both kinds.
   0
   ()
-  (or (bind (wall-segments $trigger-walls))
+  (or (exists (?wall wall)
+        (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
       (bind (boundary-wall $trigger-boundary)))
   ()
   (assert
-    (do (assign $walls (if (bind (wall-segments $wall-facts)) $wall-facts))
-        (assign $gates (if (bind (gate-segments $gate-facts)) $gate-facts))
-        (assign $windows (if (bind (window-segments $window-facts)) $window-facts))
-        (assign $screens (if (bind (screen-segments $screen-facts)) $screen-facts))
+    (do (assign $walls (wall-segment-records))
+        (assign $gates (gate-segment-records))
+        (assign $windows (window-segment-records))
+        (assign $screens (screen-segment-records))
         (assign $boundary (if (bind (boundary-wall $boundary-points)) $boundary-points))
         (assign $stream-specs (walkability-coordinates-stream-specs))
         (assign $positions (walkability-coordinates-location-coords))

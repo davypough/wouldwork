@@ -1,14 +1,14 @@
 ;;; Filename: -beam-los-coordinates.lisp
 
 ;;; Beam LOS coordinates substrate: derives LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
-;;; from raw WALL-SEGMENTS/GATE-SEGMENTS/BOUNDARY-WALL segment geometry, for a problem that
+;;; from raw WALL-SEGMENT>/GATE-SEGMENT>/BOUNDARY-WALL segment geometry, for a problem that
 ;;; would rather author 2D positions than hand-list sightlines.  Nested under visibility-tech
 ;;; (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
-;;; asserts WALL-SEGMENTS, so a problem that hand-authors its own LOS-TO-APPARATUS/LOS-TO-
+;;; asserts WALL-SEGMENT>, so a problem that hand-authors its own LOS-TO-APPARATUS/LOS-TO-
 ;;; TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently takes that
-;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENTS and derive.
+;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENT> facts and derive.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
 ;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
@@ -32,7 +32,7 @@
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
 ;;; repeats its first -- each consecutive polygon edge is folded into the wall list too, so a sightline that would
 ;;; have to leave the map's own silhouette is blocked the same as any other wall; unlike
-;;; WALL-SEGMENTS/GATE-SEGMENTS, BOUNDARY-WALL is consulted only here, not by
+;;; WALL-SEGMENT>/GATE-SEGMENT>, BOUNDARY-WALL is consulted only here, not by
 ;;; -walkability-coordinates.lisp's own WALK-VIA derivation.
 ;;;
 ;;; The location<->apparatus and location<->location branches additionally test every other
@@ -83,16 +83,15 @@
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
 ;;;   relations : apparatus-coords> (transmitter/receiver/repeater/gun functional point),
-;;;               wall-segments,
-;;;               gate-segments, boundary-wall -- all default to no facts; a problem that
-;;;               asserts wall-segments gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
+;;;               wall-segment>, gate-segment>, boundary-wall -- all default to no facts;
+;;;               a problem that asserts wall-segment> gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
 ;;;               derived automatically instead of hand-authoring them; boundary-wall
 ;;;               additionally folds its polygon edges into that derivation's wall list
 ;;;   queries   : beam-coordinates-endpoint-xy, beam-coordinates-elevation-at -- live
 ;;;               (query-time, not just init-time) coordinate lookup and interpolation,
 ;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
 ;;;               location occluder exactly as for a derived one, so a problem that hand-
-;;;               authors LOS-TO-APPARATUS/LOS-TO-LOCATION directly (bypassing WALL-SEGMENTS
+;;;               authors LOS-TO-APPARATUS/LOS-TO-LOCATION directly (bypassing WALL-SEGMENT>
 ;;;               derivation) can still list a location as an occluder -- it still needs
 ;;;               LOCATION-COORDS>/APPARATUS-COORDS> asserted for that location and for both
 ;;;               of the beam's own endpoints, even though DERIVE-LOS-FROM-SEGMENTS itself
@@ -100,7 +99,7 @@
 ;;;   init      : derive-los-from-segments
 
 (include-tech -location-coordinates)
-(include-tech -segment-init-checks)
+(include-tech -segment-geometry)
 
 (in-package :ww)
 
@@ -117,10 +116,7 @@
 (define-static-relations
   (apparatus-coords>
     (either transmitter receiver floor-repeater wall-repeater gun)
-    $rational $rational)
-  (wall-segments $list)
-  (gate-segments $list)
-  (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
+    $rational $rational))
 
 
 (defvar *beam-occlusion-tolerance* 1/2
@@ -161,7 +157,7 @@
   ;; Converts an explicitly closed BOUNDARY-WALL point list into wall-shaped
   ;; (name x1 y1 x2 y2) records, one per consecutive polygon edge.  Fed into
   ;; DERIVE-LOS-FROM-SEGMENTS below as unconditional LOS blockers
-  ;; alongside WALL-SEGMENTS: a sightline that would have to leave the map's own
+  ;; alongside WALL-SEGMENT>: a sightline that would have to leave the map's own
   ;; silhouette is never a real beam.  A wall's name is never read by BEAM-COORDINATES-
   ;; LOS-OCCLUDERS (only a gate's is), so a plain edge index suffices.
   (loop for (point1 point2) on boundary-points
@@ -174,7 +170,7 @@
 
 (defun beam-coordinates-obstacle-intersection-parameter (beam positions obstacle &optional endpoints-block)
   ;; Returns BEAM's own parameter (0 < t < 1) where OBSTACLE -- an (name x1 y1 x2 y2)
-  ;; segment record, as found in a WALL-SEGMENTS/GATE-SEGMENTS list -- blocks BEAM's
+  ;; segment record gathered from WALL-SEGMENT>/GATE-SEGMENT> facts -- blocks BEAM's
   ;; interior, or nil if it doesn't.  Strict on BEAM's own side always: BEAM's own
   ;; endpoint touching OBSTACLE is never itself a crossing (see the error clause below
   ;; instead).  On OBSTACLE's side, ENDPOINTS-BLOCK controls whether OBSTACLE's own
@@ -224,7 +220,7 @@
 
 (defun beam-coordinates-los-occluders (beam positions walls gates)
   ;; Tests BEAM -- a (source destination) los-endpoint pair -- against the problem's
-  ;; WALL-SEGMENTS and GATE-SEGMENTS.  Returns the keyword :BLOCKED if any wall blocks
+  ;; WALL-SEGMENT> and GATE-SEGMENT> facts.  Returns the keyword :BLOCKED if any wall blocks
   ;; BEAM's interior -- including at the wall's own corner, since walls are tested with
   ;; ENDPOINTS-BLOCK true -- meaning no LOS fact should be asserted for it at all;
   ;; otherwise returns the (possibly empty) list of gate names whose segment properly
@@ -360,7 +356,7 @@
 
 (define-init-action derive-los-from-segments
   ;; Derives LOS-TO-APPARATUS/LOS-TO-LOCATION, and LOS-TO-TARGET/gun's LOS-TO-APPARATUS
-  ;; entries when a jammer is present, from WALL-SEGMENTS/GATE-SEGMENTS raw segment
+  ;; entries when a jammer is present, from WALL-SEGMENT>/GATE-SEGMENT> raw segment
   ;; geometry, when the problem supplies it, instead of requiring them hand-authored.
   ;; LOS-TO-TARGET and gun's LOS-TO-APPARATUS entries are both gated on (exists (?j
   ;; jammer) t): nothing but jam-target ever consumes a location<->gate or location<->gun
@@ -374,7 +370,7 @@
   ;; any consequence for a beam this blocks (eg, a connector losing its light) is resolved
   ;; the normal way, since this init-action runs before the problem's own INITIALIZE-
   ;; DERIVED-STATE calls PROPAGATE-CHANGES!.  Runs only when the problem has asserted
-  ;; WALL-SEGMENTS -- inert otherwise, so a problem that hand-authors its own LOS facts
+  ;; WALL-SEGMENT> -- inert otherwise, so a problem that hand-authors its own LOS facts
   ;; instead is unaffected.  Defined here, textually before
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
@@ -390,10 +386,12 @@
   ;; not blocked by intervening objects.
   0
   ()
-  (bind (wall-segments $walls))
+  (exists (?wall wall)
+    (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
   ()
   (assert
-    (do (bind (gate-segments $gates))
+    (do (assign $walls (wall-segment-records))
+        (assign $gates (gate-segment-records))
         (assign $boundary-walls
                 (if (bind (boundary-wall $boundary-points))
                   (beam-coordinates-boundary-segments $boundary-points)))

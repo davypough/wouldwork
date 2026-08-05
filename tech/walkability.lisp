@@ -18,7 +18,7 @@
 ;;;               -walkability (WALK-VIA/WALK-VIA> topology relations and the
 ;;;               identity-default walkable-locations/walkable interface);
 ;;;               -walkability-coordinates (optional coordinate-based WALK-VIA/WALK-VIA>
-;;;               derivation from WALL/GATE/WINDOW/SCREEN-SEGMENTS, BOUNDARY-WALL, and
+;;;               derivation from WALL/GATE/WINDOW/SCREEN-SEGMENT> facts, BOUNDARY-WALL, and
 ;;;               derived air-stream bands);
 ;;;               -threat (safe -- true unless an armed gun or other threat endangers the
 ;;;               location; gated inside one-step-walkable, not walk, so an unsafe
@@ -104,4 +104,3 @@
            (ww-loop for $clause in $clauses
                     thereis (all-clear ?agent $clause)))
        (safe ?to)))
-

@@ -89,12 +89,10 @@
   (controls ((plate1)) wgears1 normal)
   (controls ((receiver1)) gate2 normal)
   (aimed-at wgears1 location6)
-  (gate-segments
-    ((gate1 12 21 12 17)
-     (gate2 17 6 17 0)))
-  (wall-segments
-    ((wall1 12 6 19 6)
-     (wall2 12 0 12 6)))
+  (gate-segment> gate1 12 21 12 17)
+  (gate-segment> gate2 17 6 17 0)
+  (wall-segment> wall1 12 6 19 6)
+  (wall-segment> wall2 12 0 12 6)
   (has-chroma transmitter1 blue)
   (has-chroma receiver1 blue)
   (mounted-on fan1 wgears1)

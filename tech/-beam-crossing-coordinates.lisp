@@ -24,7 +24,7 @@
 ;;; ALONG-BEAM>, regardless of how they got there.
 ;;;
 ;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
-;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENTS: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
+;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENT>: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
 ;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls have no
 ;;; counterpart here: a wall-blocked beam is excluded from LOS-TO-APPARATUS/LOS-TO-LOCATION
@@ -34,7 +34,7 @@
 ;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
 ;;; LOCATION occluder list may also carry location entries (-beam-los-coordinates' own
 ;;; location-occlusion test); DERIVE-BEAM-CROSSINGS-BEFORE-GATE's three loops below skip any
-;;; occluder that is not a gate, since a location entry has no GATE-SEGMENTS record to split
+;;; occluder that is not a gate, since a location entry has no GATE-SEGMENT> fact to split
 ;;; a beam's crossing set at.
 ;;;
 ;;; Self-contained; spliced by (include-tech -beam-crossing-coordinates), nested from
@@ -307,7 +307,7 @@
   (assert
     (do (assign $beams (beam-coordinates-potential-beams))
         (assign $positions (beam-coordinates-endpoint-positions))
-        (bind (wall-segments $walls))
+        (assign $walls (wall-segment-records))
         (assign $boundary-walls
                 (if (bind (boundary-wall $boundary-points))
                   (beam-coordinates-boundary-segments $boundary-points)))
@@ -343,8 +343,8 @@
   ;; gate state.  A beam conditioned on more than one gate gets one independent
   ;; BEAM-CROSSINGS-BEFORE-GATE> fact per gate, each with that gate's own cutoff -- correct
   ;; because BEAM-REACHES-CROSSING already ORs the blocking test across every gate.
-  ;; Runs only when the problem has asserted GATE-SEGMENTS -- inert otherwise.  Needs
-  ;; GATE-SEGMENTS for the actual gate segment coordinates (the LOS-TO-APPARATUS/LOS-TO-
+  ;; Runs only when the problem has asserted GATE-SEGMENT> -- inert otherwise.  Needs
+  ;; GATE-SEGMENT> for the actual gate segment coordinates (the LOS-TO-APPARATUS/LOS-TO-
   ;; LOCATION occluder list only has gate names), so, unlike ESTABLISH-BEAM-COORDINATES,
   ;; can't run for a problem that hand-authors its own gate-conditioned LOS facts without
   ;; also supplying the geometry -- such a problem simply leaves BEAM-CROSSINGS-BEFORE-GATE>
@@ -361,10 +361,12 @@
   ;; file do.
   0
   ()
-  (bind (gate-segments $gates))
+  (exists (?gate gate)
+    (bind (gate-segment> ?gate $x1 $y1 $x2 $y2)))
   ()
   (assert
-    (do (assign $positions (beam-coordinates-endpoint-positions))
+    (do (assign $gates (gate-segment-records))
+        (assign $positions (beam-coordinates-endpoint-positions))
         (assign $beams (beam-coordinates-potential-beams))
         (bind (current-beam-crossings $beam-crossings))
         (assign $records

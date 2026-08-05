@@ -26,7 +26,7 @@
 ;;; PROVIDES:
 ;;;   nested    : -beam-crossing-coordinates (optional coordinate-based CROSSINGS-ALONG-BEAM>/
 ;;;               BEAM-CROSSINGS-BEFORE-GATE> input; itself nests -beam-los-coordinates for
-;;;               LOS-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENTS, GATE-SEGMENTS,
+;;;               LOS-ENDPOINT, APPARATUS-COORDS>, WALL-SEGMENT>, GATE-SEGMENT>,
 ;;;               BOUNDARY-WALL, and LOS derivation);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
 ;;;               walkability (via -passability), reachability, visibility, and

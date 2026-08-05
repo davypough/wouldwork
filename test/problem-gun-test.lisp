@@ -81,14 +81,16 @@
   (los-to-apparatus blocked-site (gate1) gun3)
   (jam-disallowed> goal disallowed-site gun2)
 
-  ;; Uncontrolled and controlled kill zones.  gun2 and gun3 deliberately overlap.
-  (threatens gun1 (watched))
-  (threatens gun2 (shared-zone))
-  (threatens gun3 (shared-zone))
-  (threatens gun4 (normal-clear-zone))
-  (threatens gun5 (normal-down-zone))
-  (threatens gun6 (inverted-clear-zone))
-  (threatens gun7 (inverted-down-zone))
+  ;; Uncontrolled and controlled kill zones.  gun1 deliberately threatens two
+  ;; locations, and gun2 and gun3 deliberately overlap at one location.
+  (threatens gun1 watched)
+  (threatens gun1 controls-site)
+  (threatens gun2 shared-zone)
+  (threatens gun3 shared-zone)
+  (threatens gun4 normal-clear-zone)
+  (threatens gun5 normal-down-zone)
+  (threatens gun6 inverted-clear-zone)
+  (threatens gun7 inverted-down-zone)
 
   ;; The lifecycle's walking route and the final-state reach edges used to retrieve
   ;; jammer1 and evaluate the three jam-target placements.
@@ -140,6 +142,8 @@
     (has-location agent1 goal)
     (holding agent1 jammer1)
     (lethal gun1)
+    (threatens gun1 watched)
+    (threatens gun1 controls-site)
     (not (jamming jammer1 gun1))
     (not (safe watched))
     (not (member 'watched (walkable-locations agent1 goal)))

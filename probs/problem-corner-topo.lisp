@@ -7,7 +7,7 @@
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-walkability-coordinates.lisp's DERIVE-WALK-VIA-FROM-SEGMENTS derives WALK-VIA --
 ;;; all from the raw segment geometry below (same shape as problem-corner.lisp's).  The two
-;;; beam derivations read WALL-SEGMENTS, GATE-SEGMENTS and BOUNDARY-WALL; WINDOW-SEGMENTS is
+;;; beam derivations read WALL-SEGMENT>, GATE-SEGMENT> and BOUNDARY-WALL; WINDOW-SEGMENT> is
 ;;; consulted only by WALK-VIA's, which uses side-of-partition-line classification rather
 ;;; than beam intersection -- walking connectivity is a zone-adjacency question, not a
 ;;; sightline one (see that file's header for why).
@@ -132,9 +132,11 @@
   ;; y=11/2 keeps all three gate1-conditioned beams below the split and the location1-
   ;; >receiver2 crossing (correctly wall-blocked) above it, so neither segment is
   ;; fragmented.
-  (wall-segments ((wall1 8 11/2 8 8) (wall2 8 0 8 3) (wall3 11 10 16 10)))
-  (gate-segments ((gate1 8 3 8 11/2)))
-  (window-segments ((window1 8 8 8 11)))
+  (wall-segment> wall1 8 11/2 8 8)
+  (wall-segment> wall2 8 0 8 3)
+  (wall-segment> wall3 11 10 16 10)
+  (gate-segment> gate1 8 3 8 11/2)
+  (window-segment> window1 8 8 8 11)
 
   ;; Exact 2D endpoint coordinates, split between LOCATION-COORDS> (locations; shared
   ;; with walkability-tech's own coordinate needs -- see tech/-location-coordinates.lisp)

@@ -1,17 +1,66 @@
-;;; Filename: -segment-init-checks.lisp
+;;; Filename: -segment-geometry.lisp
 
-;;; Initialization validation for shared coordinate segment geometry.
+;;; Shared coordinate segment geometry: typed, individually authored wall/gate/window/
+;;; screen segments, the ordered boundary polygon, list-gathering queries for the geometry
+;;; algorithms, and initialization validation.
 
 
 (in-package :ww)
 
 
+(define-optional-types wall gate window screen)
+
+
+(define-static-relations
+  (wall-segment> wall $rational $rational $rational $rational)
+  (gate-segment> gate $rational $rational $rational $rational)
+  (window-segment> window $rational $rational $rational $rational)
+  (screen-segment> screen $rational $rational $rational $rational)
+  (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
+
+
+;;;; SEGMENT GATHERING ;;;;
+
+
+(define-query wall-segment-records ()
+  (do (assign $records nil)
+      (doall (?wall wall)
+        (if (bind (wall-segment> ?wall $x1 $y1 $x2 $y2))
+          (push (list ?wall $x1 $y1 $x2 $y2) $records)))
+      $records))
+
+
+(define-query gate-segment-records ()
+  (do (assign $records nil)
+      (doall (?gate gate)
+        (if (bind (gate-segment> ?gate $x1 $y1 $x2 $y2))
+          (push (list ?gate $x1 $y1 $x2 $y2) $records)))
+      $records))
+
+
+(define-query window-segment-records ()
+  (do (assign $records nil)
+      (doall (?window window)
+        (if (bind (window-segment> ?window $x1 $y1 $x2 $y2))
+          (push (list ?window $x1 $y1 $x2 $y2) $records)))
+      $records))
+
+
+(define-query screen-segment-records ()
+  (do (assign $records nil)
+      (doall (?screen screen)
+        (if (bind (screen-segment> ?screen $x1 $y1 $x2 $y2))
+          (push (list ?screen $x1 $y1 $x2 $y2) $records)))
+      $records))
+
+
+;;;; INITIALIZATION VALIDATION ;;;;
+
+
 (define-init-check segment-geometry-init-check (literals)
-  (:consumes wall gate window screen)
   (check-init-boundary-walls literals)
-  (check-init-segment-records-well-formed literals)
+  (check-init-segment-geometry literals)
   (check-init-segment-names-unique literals)
-  (check-init-segment-names-typed literals)
   (check-init-segment-types-covered literals))
 
 
@@ -65,34 +114,25 @@
 
 
 (define-init-check-helper init-segment-relation-types ()
-  "The named-segment relations and the object type each record name must instantiate."
-  '((wall-segments . wall)
-    (gate-segments . gate)
-    (window-segments . window)
-    (screen-segments . screen)))
+  "The individually authored segment relations and their keyed object types."
+  '((wall-segment> . wall)
+    (gate-segment> . gate)
+    (window-segment> . window)
+    (screen-segment> . screen)))
 
 
 (define-init-check-helper init-segment-records (relation literals)
   (loop for literal in (positive-init-literals-with-relation relation literals)
-        append (second (init-literal-proposition literal))))
+        collect (rest (init-literal-proposition literal))))
 
 
-(define-init-check-helper check-init-segment-records-well-formed (literals)
+(define-init-check-helper check-init-segment-geometry (literals)
   (dolist (entry (init-segment-relation-types))
     (dolist (record (init-segment-records (car entry) literals))
       (init-check-segment-record (car entry) record))))
 
 
 (define-init-check-helper init-check-segment-record (kind record)
-  (unless (and (listp record)
-               (= (length record) 5)
-               (symbolp (first record))
-               (first record)
-               (every #'rationalp (rest record)))
-    (fail-init-check nil "~%Malformed ~S record in DEFINE-INIT.~%~
-            Record: ~S~%~
-            Expected shape: (name x1 y1 x2 y2), a symbol name and rational coordinates."
-           kind record))
   (let ((x1 (second record))
         (y1 (third record))
         (x2 (fourth record))
@@ -121,20 +161,8 @@
           (setf (gethash (first record) seen) (car entry)))))))
 
 
-(define-init-check-helper check-init-segment-names-typed (literals)
-  (dolist (entry (init-segment-relation-types))
-    (dolist (record (init-segment-records (car entry) literals))
-      (unless (init-type-member-p (first record) (cdr entry))
-        (fail-init-check nil "~%Segment name in DEFINE-INIT is not a declared instance of its type.~%~
-                Record kind:   ~S~%~
-                Record:        ~S~%~
-                Expected type: ~S~%~
-                Declare ~S as an instance of type ~S in DEFINE-TYPES."
-               (car entry) record (cdr entry) (first record) (cdr entry))))))
-
-
 (define-init-check-helper check-init-segment-types-covered (literals)
-  (when (positive-init-literals-with-relation 'wall-segments literals)
+  (when (positive-init-literals-with-relation 'wall-segment> literals)
     (dolist (entry (init-segment-relation-types))
       (init-check-segment-type-coverage (car entry) (cdr entry) literals))))
 
@@ -148,5 +176,4 @@
                 Record names:   ~S~%~
                 Every ~S instance in a coordinate-driven problem must contribute a segment."
                type kind instance names type)))))
-
 

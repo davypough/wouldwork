@@ -166,7 +166,7 @@
   (paired connector1 transmitter1)
   (paired connector1 receiver1)
 
-  ;; Sightlines.  Hand-authored: with no wall-segments asserted, visibility's nested
+  ;; Sightlines.  Hand-authored: with no wall-segment> asserted, visibility's nested
   ;; -beam-los-coordinates derivation is inert and these facts stand as written.  west
   ;; sees transmitter1 directly; the sightline from west to receiver1 runs through gate1,
   ;; which is what makes the plate load-bearing.

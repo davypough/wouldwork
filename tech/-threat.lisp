@@ -27,8 +27,8 @@
 ;;; PROVIDES:
 ;;;   types     : threat (either gun)  --  extensible; a future hazard technology adds its
 ;;;               own leaf type to this either form.  gun is declared optional here.
-;;;   relations : (threatens threat $list)  --  static; the locations a threat instance
-;;;               endangers while lethal
+;;;   relations : (threatens threat location)  --  static; one fact per location a threat
+;;;               instance endangers while lethal
 ;;;               (lethal threat)  --  dynamic; asserted only by each threat technology's
 ;;;               own status update
 ;;;   query     : safe
@@ -47,7 +47,7 @@
 
 
 (define-static-relations
-  (threatens threat $list))  ;the locations a threat instance endangers while lethal
+  (threatens threat location))
 
 
 (define-dynamic-relations
@@ -55,11 +55,10 @@
 
 
 (define-query safe (?location location)
-  ;; True unless some currently-lethal threat's authored THREATENS list includes ?location.
+  ;; True unless some currently-lethal threat has a THREATENS fact for ?location.
   (not (exists (?t threat)
          (and (lethal ?t)
-              (bind (threatens ?t $locations))
-              (member ?location $locations)))))
+              (threatens ?t ?location)))))
 
 
 (define-update enforce-threat-safety! ()

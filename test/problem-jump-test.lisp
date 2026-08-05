@@ -125,7 +125,7 @@
   ;; at its threatened destination.
   (has-location unsafe-probe-agent unsafe-start)
   (jump-via> unsafe-start () unsafe-goal)
-  (threatens unsafe-gun (unsafe-goal))
+  (threatens unsafe-gun unsafe-goal)
 
   ;; The destination box is occupied by a non-box support occupant.  The edge must still
   ;; produce a ground landing, but never a landing on occupied-target-box itself.

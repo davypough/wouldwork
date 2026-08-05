@@ -119,33 +119,29 @@
   ;; blocked; the elevation-2 crossing location12 <-> location13 lies entirely inside
   ;; the footprint (gated by gate8/gate9), and the level changes onto and off the slab
   ;; are the authored jump-via edges below.
-  (wall-segments
-    ((wall1 24 0 24 2)
-     (wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
-     (wall3 11 10 16 10)
-     (wall4 7 10 7 17)
-     (wall5 3 10 3 17)))
+  (wall-segment> wall1 24 0 24 2)
+  (wall-segment> wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
+  (wall-segment> wall3 11 10 16 10)
+  (wall-segment> wall4 7 10 7 17)
+  (wall-segment> wall5 3 10 3 17)
 
-  (window-segments
-    ((window1 24 2 24 4)))
+  (window-segment> window1 24 2 24 4)
 
   ;; Gate geometry.  Paired barriers are separated by 1/5 unit:
   ;; each lies 1/10 unit from its integral center line.
-  (gate-segments
-    ((gate1 16 5 16 10)
-     (gate2 16 99/10 24 99/10)
-     (gate3 16 101/10 24 101/10)
-     (gate4 24 101/10 33 101/10)
-     (gate5 16 10 16 17)
-     (gate6 101/10 10 101/10 17)
-     (gate7 99/10 10 99/10 17)
-     (gate8 51/10 10 51/10 17)
-     (gate9 49/10 10 49/10 17)))
+  (gate-segment> gate1 16 5 16 10)
+  (gate-segment> gate2 16 99/10 24 99/10)
+  (gate-segment> gate3 16 101/10 24 101/10)
+  (gate-segment> gate4 24 101/10 33 101/10)
+  (gate-segment> gate5 16 10 16 17)
+  (gate-segment> gate6 101/10 10 101/10 17)
+  (gate-segment> gate7 99/10 10 99/10 17)
+  (gate-segment> gate8 51/10 10 51/10 17)
+  (gate-segment> gate9 49/10 10 49/10 17)
 
   ;; Screen1 lies south of gate4, preserving the area2 -> area3
   ;; traversal order gate4, then screen1.
-  (screen-segments
-    ((screen1 24 99/10 33 99/10)))
+  (screen-segment> screen1 24 99/10 33 99/10)
 
   ;; Representative location coordinates
   (location-coords> location1 23 2)

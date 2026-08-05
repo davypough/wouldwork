@@ -16,7 +16,7 @@
 ;;; must remain uncut and activate receiver3.  The goal checks the crossing pool, active
 ;;; set, cuts, and all three receiver outcomes directly.
 ;;;
-;;; No WALL-SEGMENTS are authored, so DERIVE-LOS-FROM-SEGMENTS stays inert and contributes
+;;; No WALL-SEGMENT> facts are authored, so DERIVE-LOS-FROM-SEGMENTS stays inert and contributes
 ;;; no location beams; every beam here comes from COUPLED.
 ;;;
 ;;; Expected minimum solution: 0 actions (the derived start state satisfies the goal).
@@ -66,7 +66,7 @@
 ;;;; capability; the tech file fails to translate, with an error naming LOS-TO-APPARATUS
 ;;;; and no hint that the missing piece is an include.  Every beam-crossing problem in the
 ;;;; repository includes visibility for this reason.  It stays inert here regardless, since
-;;;; DERIVE-LOS-FROM-SEGMENTS is guarded on WALL-SEGMENTS, which this problem never asserts.
+;;;; DERIVE-LOS-FROM-SEGMENTS is guarded on WALL-SEGMENT>, which this problem never asserts.
 
 
 (include-tech beam-direct)
