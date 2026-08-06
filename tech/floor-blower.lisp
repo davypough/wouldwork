@@ -21,8 +21,8 @@
 ;;; in-the-air hover level, via this file's location-elevation override); a problem
 ;;; overrides that by declaring the destination's has-elevation fact.
 ;;;
-;;; An agent mounts a floor-mounted fan via step technology's step-on and is launched by
-;;; the ensuing propagation when the gears are turning.  The return from the lofted
+;;; An agent mounts a floor-mounted fan through step's configuration-transition provider
+;;; and is launched by the ensuing propagation when the gears are turning.  The return from the lofted
 ;;; destination is an authored downward jump edge (jump technology, whose downward
 ;;; landings are unrestricted), or simply cutting the gears' power, which drops the
 ;;; hovering occupants at the gears' location.

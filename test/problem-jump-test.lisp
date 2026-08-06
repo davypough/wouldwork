@@ -9,20 +9,26 @@
 ;;;   3. An agent crosses a symmetric edge in the reverse authored direction and lands
 ;;;      directly from one height-4 box onto another.  A ground landing cannot later reach
 ;;;      the destination box, so the direct box-landing branch is required.
-;;;   4. A height-2 agent carries a box across a height-2 screen.  Carrying makes the screen
-;;;      non-passable, so this is an exact-boundary vault, and the cargo must remain held.
+;;;   4. A height-2 agent carries a box through a stairs-then-jump mobility route in one
+;;;      MOVE.  The stairs raise the hypothetical jump source from elevation 0 to 2.  The
+;;;      jump then reaches elevation 4 and clears two barriers whose tops are also 4.
+;;;   5. A grounded agent jumps directly onto a remote clear box, exercising the remaining
+;;;      ground-to-support configuration boundary.
 ;;;
 ;;; Independent stationary probes characterize the public clearance queries and inspect
-;;; JUMP-TO's real generated children.  They verify inclusive and just-over elevation
+;;; MOVE's and CHANGE-CONFIGURATION's real generated children.  They verify inclusive and
+;;; just-over elevation
 ;;; boundaries, downward freedom, barrier defaults and explicit overrides, highest-feature
 ;;; selection, empty-handed screen passability, directed-edge asymmetry, rejection of an
 ;;; unsafe landing, rejection of an occupied box top while preserving its ground landing,
-;;; and rejection of an over-height local box mount.
+;;; rejection of an over-height local box mount, and exclusive ownership of grounded jumps
+;;; by mobility rather than the configuration-transition substrate.
 ;;;
-;;; Expected minimum solution (5 steps, in any interleaving): mount vault-box; cross
+;;; Expected minimum solution (6 steps, in any interleaving): mount vault-box; cross
 ;;; vault-start -> vault-goal; drop from drop-box; cross transfer-start -> transfer-goal
-;;; directly onto transfer-target-box; cross carry-start -> carry-goal while holding
-;;; carried-box.
+;;; directly onto transfer-target-box; move carry-approach -> carry-goal through stairs and
+;;; jump segments while holding carried-box; jump from remote-mount-start directly onto
+;;; remote-target-box.
 
 
 (in-package :ww)
@@ -36,9 +42,9 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 5)
+(ww-set *depth-cutoff* 6)
 
-(setf *expected-min-length* 5)
+(setf *expected-min-length* 6)
 
 
 ;;;; TYPES ;;;;
@@ -47,14 +53,15 @@
 (define-types
   agent (vault-agent drop-agent transfer-agent carrying-agent
          boundary-agent screen-probe-agent unsafe-probe-agent
-         occupied-probe-agent tall-box-probe-agent)
+         occupied-probe-agent tall-box-probe-agent remote-mount-agent)
   location (vault-start vault-goal drop-site
-            transfer-start transfer-goal carry-start carry-goal
+            transfer-start transfer-goal carry-approach carry-start carry-goal
             boundary-site screen-probe-start screen-probe-goal
             unsafe-start unsafe-goal occupied-start occupied-goal
-            tall-box-site)
+            tall-box-site remote-mount-start remote-mount-goal)
   box (vault-box drop-box transfer-source-box transfer-target-box carried-box
-       boundary-box occupied-target-box tall-local-box)
+       transfer-base-box boundary-box occupied-target-box tall-local-box
+       remote-target-box)
   connector (blocking-connector)
   gate (default-gate)
   screen (cargo-screen passable-screen)
@@ -66,6 +73,7 @@
 
 
 (include-tech jump)
+(include-tech stairs)
 (include-tech gun)
 
 
@@ -96,16 +104,24 @@
   (has-height transfer-source-box 4)
   (on transfer-agent transfer-source-box)
   (has-location transfer-target-box transfer-goal)
-  (has-height transfer-target-box 4)
+  (has-height transfer-target-box 3)
+  (has-location transfer-base-box transfer-goal)
+  (on transfer-target-box transfer-base-box)
   (jump-via transfer-goal () transfer-start)
 
-  ;; Planned lane 4: holding carried-box makes cargo-screen non-passable.  Its explicit
-  ;; height 2 is nevertheless exactly within carrying-agent's vaulting clearance.
-  (has-location carrying-agent carry-start)
+  ;; Planned lane 4: one mobility route first climbs stairs from elevation 0 to 2, then
+  ;; jumps to elevation 4.  Both non-passable barriers have top elevation 4, exactly within
+  ;; carrying-agent's height from the hypothetical intermediate source.  Computing the jump
+  ;; from carrying-agent's actual pre-move elevation 0 would incorrectly reject this route.
+  (has-location carrying-agent carry-approach)
   (has-height carrying-agent 2)
   (holding carrying-agent carried-box)
+  (has-elevation carry-start 2)
+  (has-elevation carry-goal 4)
+  (stairs-via> carry-approach () carry-start)
+  (has-elevation cargo-screen 2)
   (has-height cargo-screen 2)
-  (jump-via> carry-start (cargo-screen) carry-goal)
+  (jump-via> carry-start (vault-wall cargo-screen) carry-goal)
 
   ;; Exact-boundary query probe: standing elevation 2 plus agent height 2 reaches 4, but
   ;; not 5.
@@ -121,7 +137,8 @@
   (has-height screen-probe-agent 1)
   (jump-via> screen-probe-start (passable-screen) screen-probe-goal)
 
-  ;; An uncontrolled gun is lethal after initialization, so JUMP-TO must produce no child
+  ;; An uncontrolled gun is lethal after initialization, so the transition action must
+  ;; produce no child
   ;; at its threatened destination.
   (has-location unsafe-probe-agent unsafe-start)
   (jump-via> unsafe-start () unsafe-goal)
@@ -139,7 +156,15 @@
   (has-location tall-box-probe-agent tall-box-site)
   (has-height tall-box-probe-agent 2)
   (has-location tall-local-box tall-box-site)
-  (has-height tall-local-box 3))
+  (has-height tall-local-box 3)
+
+  ;; A grounded remote support landing remains explicit and occupies the target box.  Two
+  ;; authored edges offer the same destination through different witnesses; central
+  ;; canonicalization must retain only the lexical first.
+  (has-location remote-mount-agent remote-mount-start)
+  (has-location remote-target-box remote-mount-goal)
+  (jump-via remote-mount-start () remote-mount-goal)
+  (jump-via> remote-mount-start (passable-screen) remote-mount-goal))
 
 
 (define-init-action initialize-derived-state
@@ -164,14 +189,20 @@
 
 
 (define-test-helper jump-transition-scenarios-valid-p (state)
-  "Characterize positive and negative JUMP-TO successors from STATE."
-  (let ((action (find 'jump-to *actions* :key #'action.name))
+  "Characterize positive and negative MOVE and configuration successors from STATE."
+  (let ((move-action (find 'move *actions* :key #'action.name))
+        (configuration-action
+          (find 'change-configuration *actions* :key #'action.name))
         (saved-dropped-count *inconsistent-states-dropped*))
     (unwind-protect
-      (let* ((*actions* (list action))
-             (children
-               (generate-children
-                 (make-node :state state :depth 0))))
+      (let ((move-children
+              (let ((*actions* (list move-action)))
+                (generate-children
+                  (make-node :state state :depth 0))))
+            (configuration-children
+              (let ((*actions* (list configuration-action)))
+                (generate-children
+                  (make-node :state state :depth 0)))))
         (and
           ;; Empty-handed passability ignores passable-screen's default height 3.
           (some (lambda (child)
@@ -179,30 +210,45 @@
                     child
                     '((has-location screen-probe-agent screen-probe-goal))
                     nil))
-                children)
+                move-children)
 
-          ;; A lethal destination cannot be produced by the real jump action.
+          ;; Ground-to-ground jump edges belong only to MOVE.
+          (notany (lambda (child)
+                    (jump-child-matches-p
+                      child
+                      '((has-location screen-probe-agent screen-probe-goal))
+                      nil))
+                  configuration-children)
+
+          ;; A lethal destination cannot be produced by the real mobility action.
           (notany (lambda (child)
                     (jump-child-matches-p
                       child
                       '((has-location unsafe-probe-agent unsafe-goal))
                       nil))
-                  children)
+                  move-children)
 
-          ;; The occupied-box lane retains its legal ground child but has no box-top child.
+          ;; The occupied-box lane retains its legal MOVE ground child, while the explicit
+          ;; configuration action has neither a ground child nor an occupied box-top child.
           (some (lambda (child)
                   (jump-child-matches-p
                     child
                     '((has-location occupied-probe-agent occupied-goal))
                     '((on occupied-probe-agent occupied-target-box))))
-                children)
+                move-children)
+          (notany (lambda (child)
+                    (jump-child-matches-p
+                      child
+                      '((has-location occupied-probe-agent occupied-goal))
+                      nil))
+                  configuration-children)
           (notany (lambda (child)
                     (jump-child-matches-p
                       child
                       '((has-location occupied-probe-agent occupied-goal)
                         (on occupied-probe-agent occupied-target-box))
                       nil))
-                  children)
+                  configuration-children)
 
           ;; The clear but over-height local box cannot be mounted.
           (notany (lambda (child)
@@ -210,16 +256,24 @@
                       child
                       '((on tall-box-probe-agent tall-local-box))
                       nil))
-                  children)
+                  configuration-children)
 
-          ;; vault-start -> vault-goal is directed and cannot be traversed backward.
+          ;; vault-start -> vault-goal is directed and cannot be traversed backward by MOVE.
           (notany (lambda (child)
                     (jump-child-matches-p
                       child
                       '((has-location vault-agent vault-start))
                       nil))
-                  children)))
+                  move-children)))
       (setf *inconsistent-states-dropped* saved-dropped-count))))
+
+
+(define-test-claim jump-configuration-canonicalization-contract
+  (equal
+    (configuration-transition-results
+      *start-state* 'remote-mount-agent)
+    '((jump (remote-mount-start ground) (passable-screen)
+            (remote-mount-goal remote-target-box)))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -247,25 +301,49 @@
     (not (on transfer-agent transfer-source-box))
     (cleartop transfer-source-box)
     (not (cleartop transfer-target-box))
+    (on transfer-target-box transfer-base-box)
+    (= (support-top-elevation transfer-target-box) 4)
     (jump-via transfer-start () transfer-goal)
     (jump-via transfer-goal () transfer-start)
 
-    ;; Planned lane 4 retained cargo, which continues to make its screen non-passable.
+    ;; Planned lane 4 retained cargo after one composed stairs/jump MOVE.  The canonical
+    ;; route proves that the jump provider used the intermediate floor elevation 2 rather
+    ;; than carrying-agent's actual elevation before the action.
     (has-location carrying-agent carry-goal)
     (holding carrying-agent carried-box)
     (not (exists (?location location)
            (has-location carried-box ?location)))
     (not (vaultable-object-passable carrying-agent cargo-screen))
-    (= (jump-required-clearance-height carrying-agent '(cargo-screen)) 2)
-    (jump-path-clear carrying-agent '(cargo-screen))
+    (= (jump-required-clearance-height carrying-agent '(cargo-screen)) 4)
+    (jump-path-clear carrying-agent 2 '(cargo-screen))
+    (equal
+      (assoc 'carry-goal
+             (mobility-results carrying-agent carry-approach))
+      '(carry-goal
+         ((stairs carry-approach nil carry-start)
+          (jump carry-start (cargo-screen vault-wall) carry-goal))))
 
-    ;; Inclusive upward boundary, just-over rejection, and unrestricted downward movement.
+    ;; Inclusive upward boundary, just-over rejection, unrestricted downward movement, and
+    ;; explicit hypothetical-source behavior independent of the agent's actual support.
     (= (occupant-elevation boundary-agent) 2)
-    (jump-elevation-reachable boundary-agent 4)
-    (not (jump-elevation-reachable boundary-agent 5))
-    (jump-elevation-reachable boundary-agent -100)
-    (jump-path-clear boundary-agent '(vault-wall))
-    (not (jump-path-clear tall-box-probe-agent '(vault-wall)))
+    (jump-elevation-reachable boundary-agent 2 4)
+    (not (jump-elevation-reachable boundary-agent 2 5))
+    (jump-elevation-reachable boundary-agent 2 -100)
+    (jump-path-clear boundary-agent 2 '(vault-wall))
+    (not (jump-path-clear boundary-agent 0 '(vault-wall)))
+    (jump-path-clear tall-box-probe-agent 2 '(vault-wall))
+    (not (jump-path-clear tall-box-probe-agent 0 '(vault-wall)))
+
+    ;; Provider directionality and symmetric reverse traversal are preserved independently
+    ;; of whether the agent is currently grounded and eligible to execute MOVE.
+    (traversable transfer-agent transfer-start transfer-goal)
+    (not (traversable vault-agent vault-goal vault-start))
+
+    ;; Ground-to-remote-support is one explicit jump configuration transition.  Its
+    ;; duplicate authored destination was checked against the initial state above.
+    (has-location remote-mount-agent remote-mount-goal)
+    (on remote-mount-agent remote-target-box)
+    (not (cleartop remote-target-box))
 
     ;; Barrier default, explicit override, top elevation, feature typing, and maximum
     ;; non-passable height.  The passable screen contributes nothing to the mixed list.
@@ -294,6 +372,10 @@
     (has-location tall-box-probe-agent tall-box-site)
     (cleartop tall-local-box)
 
+    ;; The old monolithic jump action is gone.
+    (find 'change-configuration *actions* :key #'action.name)
+    (not (find 'jump-to *actions* :key #'action.name))
+
     ;; Inspect the installed action rather than merely restating its branch conditions.
     (jump-transition-scenarios-valid-p state)))
 
@@ -313,7 +395,27 @@
 
 
 (define-query-mutation jump-unbounded-elevation jump-elevation-reachable
-  (?agent agent ?target-elevation)
+  (?agent agent ?source-elevation ?target-elevation)
   (not nil)
   "Drops the upward-height restriction.  The just-over-boundary probe must then
    make this characterization fail.")
+
+
+(define-query-mutation jump-elevation-uses-actual-source jump-elevation-reachable
+  (?agent agent ?source-elevation ?target-elevation)
+  (<= (- ?target-elevation (occupant-elevation ?agent))
+      (declared-height ?agent))
+  "Ignores the explicit hypothetical source elevation.  The stairs-then-jump
+   route must then fail from the agent's actual pre-move elevation.")
+
+
+(define-query-mutation jump-path-uses-actual-source jump-path-clear
+  (?agent agent ?source-elevation ?features)
+  (and (vaultable-object-list ?features)
+       (assign $required
+               (jump-required-clearance-height ?agent ?features))
+       (or (not $required)
+           (<= (- $required (occupant-elevation ?agent))
+               (declared-height ?agent))))
+  "Ignores the explicit hypothetical source elevation for path clearance.  The
+   elevated intermediate jump and the explicit-source probes must detect it.")

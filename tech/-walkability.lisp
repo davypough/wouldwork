@@ -1,18 +1,14 @@
 ;;; Filename: -walkability.lisp
 
-;;; Walkability substrate: the shared topology and query interface for technologies that
-;;; produce or consume walking edges.  WALK-VIA/WALK-VIA> hold authored or coordinate-derived
-;;; topology.  The default query exposes only the starting location; the public walkability
-;;; technology overrides it with the walking closure over passable edges.  WALKABLE provides
-;;; the Boolean predicate parallel to VISIBLE and REACHABLE.
+;;; Walkability substrate: shared topology and canonical obstacle-family algebra for the
+;;; walking mobility provider.  WALK-VIA/WALK-VIA> hold authored or coordinate-derived
+;;; topology; public WALKABILITY converts enabled edges into normalized traversal segments.
 ;;;
 ;;; REQUIRES:
 ;;;   types    : agent, location
 ;;; PROVIDES:
 ;;;   relations: (walk-via location $list location), (walk-via> location $list location)
 ;;;              -- $list is a DNF clause list: () direct, else OR over clauses, AND within
-;;;   queries  : walkable-locations  --  identity default, overridden by walkability
-;;;              walkable            --  Boolean membership in that closure
 ;;;   functions: canonical minimal-family algebra used by the coordinate zone-graph
 ;;;              derivation in -walkability-coordinates
 
@@ -34,17 +30,14 @@
         '(gate screen ladder gears)))))
 
 
-(define-query walkable-locations (?agent agent ?from location)
-  (do ?agent (list ?from)))
-
-
-(define-query walkable (?agent agent ?from location ?to location)
-  (member ?to (walkable-locations ?agent ?from)))
-
-
 ;;;; MINIMAL WALK-OBSTACLE FAMILIES ;;;;
 ;;;; Shared by coordinate topology derivation and optional runtime routes.  A
 ;;;; family is an antichain of obstacle sets: OR over clauses, AND within each clause.
+
+
+(defparameter *walkability-canonical-families*
+  (make-hash-table :test #'equal)
+  "Canonical forms of static walking families encountered in the staged problem.")
 
 
 (defun walkability-family-union (family1 family2)
@@ -70,6 +63,16 @@
                                      clauses))
                              clauses)))
     (sort (copy-list minimal) #'walkability-clause-precedes-p)))
+
+
+(define-problem-helper walkability-canonical-family (family)
+  "Return FAMILY's canonical form, computing it once per staged static value."
+  (multiple-value-bind (canonical present)
+      (gethash family *walkability-canonical-families*)
+    (if present
+      canonical
+      (setf (gethash family *walkability-canonical-families*)
+            (walkability-minimize-family family)))))
 
 
 (defun walkability-canonical-clause (clause)

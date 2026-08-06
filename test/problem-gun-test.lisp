@@ -5,8 +5,8 @@
 ;;; threatens watched on the only walking route from start to goal.  The agent must pick up
 ;;; jammer1, jam gun1 from start, cross watched while it is safe, then remotely pick the
 ;;; jammer back up from goal.  That last pickup clears the jam and rearms gun1; the final
-;;; characterization checks that watched is again unsafe and absent from walkable-locations,
-;;; so a broken threat-safety filter cannot pass merely by producing a shorter walk.
+;;; characterization checks that watched is again unsafe and absent from mobility-locations,
+;;; so a broken threat-safety filter cannot pass merely by producing a shorter move.
 ;;; Uncontrolled guns default on, matching the default turning behavior of -gears-fan.
 ;;;
 ;;; Independent zero-action scenarios verify normal and inverted plate control in both
@@ -17,7 +17,7 @@
 ;;; sightline blocked by a closed gate.
 ;;;
 ;;; Expected minimum solution (4 steps): pickup-jammer jammer1; jam-target gun1 at start;
-;;; walk start->goal through watched; pickup-jammer jammer1 remotely from start.
+;;; move start->goal through watched; pickup-jammer jammer1 remotely from start.
 
 
 (in-package :ww)
@@ -146,7 +146,7 @@
     (threatens gun1 controls-site)
     (not (jamming jammer1 gun1))
     (not (safe watched))
-    (not (member 'watched (walkable-locations agent1 goal)))
+    (not (member 'watched (mobility-locations agent1 goal)))
 
     ;; The real action precondition accepts the allowed placement and rejects the two
     ;; distinct negative cases: policy-disallowed and closed-gate-blocked.

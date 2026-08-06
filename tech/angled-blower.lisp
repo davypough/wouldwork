@@ -26,8 +26,9 @@
 ;;; Only another fan is too flat to catch the stream: it is merely toppled off the fan's
 ;;; top and rests on ground at the fan's own location, which is already its has-location.
 ;;;
-;;; An agent mounts an angled-mounted fan via step technology's step-on, exactly like
-;;; floor-blower, and is launched by the ensuing propagation when the gears are turning.
+;;; An agent mounts an angled-mounted fan through step's configuration-transition provider,
+;;; exactly like floor-blower, and is launched by the ensuing propagation when the gears
+;;; are turning.
 ;;;
 ;;; Authoring obligation: aimed-at destinations must not chain into a cycle across
 ;;; simultaneously-blowing angled (or wall) gears, directly or by landing on another

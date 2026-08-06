@@ -1,7 +1,7 @@
 ;;; Filename: -passability.lisp
 
 ;;; Passability substrate: whether an agent may pass each obstacle or enabling
-;;; implement on a traversal edge.  Shared by walking, jumping, and ladder use.
+;;; implement on a traversal edge.  Shared by walking, stairs, jumping, and ladder traversal.
 ;;;
 ;;; Gate, screen, and ladder are owned outright here.  The three gears leaf types are
 ;;; reserved as a fourth obstacle kind through a null-object default hook,
@@ -19,6 +19,7 @@
 ;;;               optional, populated for real only when a problem declares those leaves
 ;;;   queries   : obstacle-clear, all-clear, and an actor-aware null-object default for
 ;;;               stream-obstacle-clear (overridden by -stream-passability)
+;;;   functions : canonical-enabling-means
 
 (include-tech -holding)
 (include-tech -gate)
@@ -27,6 +28,12 @@
 
 
 (define-optional-types screen ladder floor-gears wall-gears angled-gears)
+
+
+(define-problem-helper canonical-enabling-means (means)
+  "Return a stable set representation for a flat conjunction of enabling means."
+  (sort (copy-list (remove-duplicates means :test #'eq))
+        #'string< :key #'symbol-name))
 
 
 (define-query all-clear (?agent agent ?obstacles)

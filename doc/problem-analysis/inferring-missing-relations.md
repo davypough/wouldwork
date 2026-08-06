@@ -63,8 +63,9 @@ A scaffold that has held up in practice. Each milestone is a checkpoint to confi
 |---|---|---|---|
 | `walk-via location $list location` | Symmetric walking edge | Can the agent *walk between these two spots* now? | `$list` is a DNF clause list — see below. Agent-dependent. |
 | `walk-via> location $list location` | Directional walking edge | Can the agent walk *this way only*? | Same convention. Emitted for rides into an air stream's destination. |
-| `jump-via` / `jump-via>` | Jumping edge (symmetric / directional) | Can the agent *jump* this gap? | Same clause convention. |
-| `climb-via> location $list location` | One-way climb (ladders) | Can the agent climb here? | Same clause convention; not part of walkability. |
+| `stairs-via` / `stairs-via>` | Stairs edge (symmetric / directional) | Can grounded mobility use these stairs? | `$list` is a flat conjunction of enabling means; elevation difference is unrestricted. |
+| `jump-via` / `jump-via>` | Jumping edge (symmetric / directional) | Can grounded mobility *jump* this gap? | `$list` is a flat conjunction of path features; feasibility uses the source and destination floor elevations. |
+| `climb-via> location $list location` | One-way climb (ladders) | Can the agent climb here? | `$list` is a flat conjunction that must contain a ladder positioned at the source; contributes to mobility. |
 | `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open. Symmetric, agent-independent. |
 | `los-to-location location $list location` | Sightline between two locations | Can I *see that spot* from here? | `$list` = occluders; `()` is a direct, always-clear line; clear iff every occluder gate is open. |
 | `los-to-target location $list gate` | Sightline to a jam target | Can I *jam that gate* from here? | As above. Gate targets only — a gears target resolves through its `has-position` location's `los-to-location` entry instead. |
@@ -75,7 +76,7 @@ A scaffold that has held up in practice. Each milestone is a checkpoint to confi
 
 ### The DNF clause convention
 
-`walk-via`, `walk-via>`, `jump-via`, `climb-via>`, and `controls` all take a **disjunctive-normal-form clause list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. So `((gate1) (gate2 gate3))` means *gate1 open, or else both gate2 and gate3 open*. A clause is a set of simultaneous conditions; multiple clauses are alternative routes.
+`walk-via`, `walk-via>`, and `controls` take a **disjunctive-normal-form clause list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. So `((gate1) (gate2 gate3))` means *gate1 open, or else both gate2 and gate3 open*. A clause is a set of simultaneous conditions; multiple clauses are alternative routes. By contrast, stairs, jump, and climb relations use one flat conjunction.
 
 Clause items on a traversal edge may be **gates, screens, ladders, or gears**:
 
@@ -117,7 +118,8 @@ Appendix B works all three at once.
 First confirm the facts are hand-authored, not derived (Section 4). Then map each **unmet need** to exactly one relation, and choose its barriers deliberately.
 
 - *"The agent must be able to walk here"* → `walk-via` entries joining the location to its neighbors — or `walk-via>` if the passage is one-way. Choose the DNF clause list.
-- *"The agent must be able to jump or climb here"* → `jump-via` / `jump-via>` / `climb-via>`, same clause convention.
+- *"The agent must be able to use stairs here"* → `stairs-via` / `stairs-via>`, with a flat enabling-means list.
+- *"The agent must be able to jump or climb here"* → `jump-via` / `jump-via>` / `climb-via>`, with a flat feature/means list; a climb list must contain its positioned ladder.
 - *"The target must be visible from here"* → the appropriate `los-to-*` relation for the consuming role: `los-to-target` for a jammer's gate target, `los-to-apparatus` for beam pairing, `los-to-location` for everything else. Choose the occluder list.
 - *"Cargo must cross a gap from here without the agent walking"* → `reach-via`, with a flat list of barrier gates.
 
@@ -147,7 +149,7 @@ The barrier choice is frequently the keystone of the whole inference, not a styl
 - **Sightline that contradicts the wall.** Granting a location a clear view of a target that, by its position, should be occluded by the intervening wall's gates.
 - **Unbarred reach edge through a wall.** A `reach-via` with an empty barrier list punches a hole straight through a gated wall and can collapse the puzzle to two actions.
 - **Treating a reach list as DNF.** `reach-via`'s list is a flat conjunction — every gate must be open. Writing it as alternative clauses does not mean what it looks like.
-- **Forgetting that screens and ladders block reach absolutely.** They have an empty-handed exemption on walk edges only.
+- **Forgetting that screens and ladders block reach absolutely.** Their empty-handed exemption applies to mobility passability, not to reach edges.
 - **Conflating reach with movement (or sight).** They cross barriers under different rules; a fix valid for one is often invalid for another.
 - **Fixing the symptom site.** The deadlock surfaces downstream of the omission; place the new relations at the deadlock's *cause*.
 - **Wrong `los-to-*` for the role.** Sightlines are split by consuming role, not object kind. A jammer aiming at a gate needs `los-to-target`; beam pairing needs `los-to-apparatus`; a gears jam target needs `los-to-location` on its `has-position` location.

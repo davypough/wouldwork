@@ -9,12 +9,12 @@
 ;;; RECORDING-OPEN during propagation, while this file runs once per completed candidate
 ;;; path and touches none of them.  What it does read is identity from -recorder-core --
 ;;; LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location, position, and the
-;;; walking closure.
+;;; mobility closure.
 ;;;
-;;; A recording is closed by walking back to a recorder and stopping it, which gives a
+;;; A recording is closed by moving back to a recorder and stopping it, which gives a
 ;;; problem two sensible places to stop searching.  The default is to stop when the problem's
 ;;; own goal is met, leaving the ghost wherever its last useful action left it; the recording
-;;; is still performable because the ghost can walk back afterward, and the report supplies
+;;; is still performable because the ghost can move back afterward, and the report supplies
 ;;; that return trip.  A problem that would rather see the return spelled out in the solution
 ;;; path adds GHOST-STOPS-RECORDER as a goal conjunct and pays the extra actions.
 ;;; VALIDATE-RECORDER-SOLUTION enforces only the weaker of the two -- a validator vetoes
@@ -24,7 +24,7 @@
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -location ((has-location ...)); -position (recorder has-position role);
-;;;            -walkability (walkable-locations -- the identity default reduces
+;;;            -mobility (mobility-results -- the identity default reduces
 ;;;            RECORDING-AGENT-CAN-CLOSE to standing on the recorder, which is the right
 ;;;            reading for a problem with no walking technology)
 ;;;   soft   : -recorder-core's identity queries, assembled by recorder.lisp
@@ -36,13 +36,13 @@
 
 (include-tech -location)
 (include-tech -position)
-(include-tech -walkability)
+(include-tech -mobility)
 
 (in-package :ww)
 
 
 (define-query ghost-stops-recorder ()
-  ;; Optional goal conjunct.  Every mapped ghost agent has walked back to a recorder, so the
+  ;; Optional goal conjunct.  Every mapped ghost agent has moved back to a recorder, so the
   ;; return trip appears in the solution path and its length counts toward min-length.  A
   ;; problem that omits this conjunct stops at its own goal and lets the report supply the
   ;; return instead.  Place it after the problem's own goal literals: the conjunction is
@@ -54,11 +54,12 @@
 
 (define-query recording-agent-can-close (?agent agent)
   ;; The recording remains closable: some recorder's location lies in ?agent's current
-  ;; walking closure, which for a ghost is computed against recording-side gate and gears
-  ;; state.  An agent resting on a support steps off before walking, and a step-off is not
-  ;; itself a walking obstacle, so support occupancy is not consulted here.
+  ;; mobility closure, which for a ghost is computed against recording-side gate and gears
+  ;; state.  An agent resting on a support changes to ground before moving, and that
+  ;; configuration transition is not itself a traversal obstacle, so support occupancy is
+  ;; not consulted here.
   (do (bind (has-location ?agent $agent-location))
-      (assign $reachable (walkable-locations ?agent $agent-location))
+      (assign $reachable (mobility-locations ?agent $agent-location))
       (exists (?recorder recorder)
         (exists (?location location)
           (and (has-position ?recorder ?location)
@@ -66,21 +67,23 @@
 
 
 (define-query recording-agent-return-route (?agent agent)
-  ;; (?agent from to) for the walk that closes ?agent's recording, or nil when ?agent
+  ;; (?agent from to route) for the move that closes ?agent's recording, or nil when ?agent
   ;; already stands on a recorder and no return trip is outstanding.  Consumed by the
-  ;; report, which appends the walk a goal-terminated search stopped short of.
+  ;; report, which appends the move a goal-terminated search stopped short of.
   (do (bind (has-location ?agent $agent-location))
       (assign $outstanding (not (recording-agent-at-recorder ?agent)))
-      (assign $reachable (walkable-locations ?agent $agent-location))
-      (assign $route nil)
-      (doall (?recorder recorder)
-        (doall (?location location)
-          (if (and $outstanding
-                   (not $route)
-                   (has-position ?recorder ?location)
-                   (member ?location $reachable))
-            (assign $route (list ?agent $agent-location ?location)))))
-      $route))
+      (assign $results (mobility-results ?agent $agent-location))
+      (assign $return-move nil)
+      (ww-loop for $result in $results
+               do (assign $location (first $result))
+                  (if (and $outstanding
+                           (not $return-move)
+                           (exists (?recorder recorder)
+                             (has-position ?recorder $location)))
+                    (assign $return-move
+                            (list ?agent $agent-location $location
+                                  (second $result)))))
+      $return-move))
 
 
 (define-query recording-agent-at-recorder (?agent agent)
@@ -215,7 +218,7 @@ rules."
 
 (defun recorder-recording-sequence (state integrated-path)
   "Extract ghost moves, replace each live-action block with one PAUSE marker, and close with
-whatever return walk the searched path stopped short of."
+whatever return move the searched path stopped short of."
   (let ((sequence (list '(start-recorder)))
         (previous-side nil))
     (dolist (move integrated-path)
@@ -226,21 +229,21 @@ whatever return walk the searched path stopped short of."
         (when (eql side :ghost)
           (setf sequence (nconc sequence (list move))))
         (setf previous-side side)))
-    (nconc sequence (recorder-return-walks state) (list '(stop-recorder)))))
+    (nconc sequence (recorder-return-moves state) (list '(stop-recorder)))))
 
 
-(defun recorder-return-walks (state)
-  "Return one (WALK agent from to) marker per ghost agent still away from a recorder.
+(defun recorder-return-moves (state)
+  "Return one (MOVE agent from to route) marker per ghost still away from a recorder.
 
 STATE is the completed integrated state.  A ghost's location there, and the recording-side
-gate and gears state its walking closure is computed against, are the same as at the end of
+gate and gears state its mobility closure is computed against, are the same as at the end of
 the ghost-only recording, so no second replay is needed.  A path that already carries the
 return -- the GHOST-STOPS-RECORDER goal style -- yields no markers.  These are report
 markers, not planner actions, and carry no step number for that reason."
   (loop for agent in (recorder-recording-agents state)
-        for route = (funcall (symbol-function 'recording-agent-return-route) state agent)
-        when route
-          collect (cons 'walk route)))
+        for move = (funcall (symbol-function 'recording-agent-return-route) state agent)
+        when move
+          collect (cons 'move move)))
 
 
 (defun recorder-playback-sequence (state integrated-path)

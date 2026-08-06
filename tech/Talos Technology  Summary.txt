@@ -98,6 +98,8 @@ vaultable-object (either gate screen wall)
 (los-to-target location $list gate)
 (reach-via location $list location)
 (screen-segment> screen $rational $rational $rational $rational)
+(stairs-via location $list location)
+(stairs-via> location $list location)
 (stream-width wall-gears $rational)  ;default 3 units
 (threatens threat location)
 (walk-via location $list location)
@@ -109,9 +111,10 @@ vaultable-object (either gate screen wall)
 5. Actions
 
 (connect-connector ">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
+(change-configuration ">" ?agent "changes from" $source-configuration "to" $destination-configuration "via" $transition)
 (jam-target ">" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
-(jump-to ">" ?agent "at" $a-location "jumps onto" $place)
 (mount-fan ">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
+(move ">" ?agent "moves from" $source "to" $destination "via" $route)
 (pickup-box ">" ?agent "picks up" ?box "at" $box-location "from" $a-location)
 (pickup-connector ">" ?agent "picks up" ?connector "at" $a-location)
 (pickup-fan ">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
@@ -119,10 +122,6 @@ vaultable-object (either gate screen wall)
 (put-box ">" ?agent "puts" ?box "on" $place "at" ?location)
 (put-connector ">" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
 (put-fan ">" ?agent "puts" ?fan "on" $place "at" ?location)
-(step-off ">" ?agent "at" $a-location "steps off" $fixture)
-(step-on ">" ?agent "at" $a-location "steps onto" ?fixture)
-(use-ladder ">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location "to go to" ?destination)
-(walk ">" ?agent "walks from" $a-location "to" $dest)
 
 6. Default Type Heights
 

@@ -47,7 +47,7 @@
 
 
 (include-tech floor-blower)
-(include-tech step)  ;boarding the floor fan (step-on) is how the agent rides fgears1's stream to the loft
+(include-tech step)  ;boarding the floor fan is how the agent rides fgears1's stream to the loft
 (include-tech wall-blower)
 (include-tech jammer)
 (include-tech gate)

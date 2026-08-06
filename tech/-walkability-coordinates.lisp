@@ -62,7 +62,8 @@
 ;;; pair that crosses them regardless of level.  Multi-level maps therefore author an
 ;;; elevated platform's ground-level footprint as wall segments, keep the platform's own
 ;;; locations inside that footprint, and connect the levels only with authored
-;;; jump-via/climb-via> edges (which this derivation never touches); ONE-STEP-WALKABLE's
+;;; stairs-via, jump-via, or climb-via> edges (which this derivation never touches);
+;;; ONE-STEP-WALKABLE's
 ;;; elevation-equality check rejects any derived edge between different levels.  See
 ;;; problem-claustro-topo's slab (wall4/wall5) for the pattern.
 ;;;

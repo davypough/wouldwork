@@ -9,13 +9,13 @@
 ;;; hand-authored clear sightline, then steps on fan1 and is launched.  Its characterization
 ;;; checks the complete resulting state, not just arrival at loft.
 ;;;
-;;; The isolated negative lane leaves gun2 armed over loft2.  Its STEP-ON precondition is
-;;; valid, but the forced landing must be marked inconsistent by enforce-threat-safety! and
-;;; discarded by generate-children.  The goal probes that installed transition directly,
+;;; The isolated negative lane leaves gun2 armed over loft2.  Its STEP transition is
+;;; available, but the forced landing must be marked inconsistent by enforce-threat-safety!
+;;; and discarded by generate-children.  The goal probes that installed transition directly,
 ;;; so a broken backstop cannot pass by returning the previously possible one-step solution.
 ;;;
 ;;; Expected minimum solution (3 steps): pickup-jammer jammer1; jam-target gun1 at lower1;
-;;; step-on fan1.
+;;; mount fan1.
 
 
 (in-package :ww)
@@ -94,18 +94,29 @@
 
 
 (define-test-helper gun-blower-unsafe-step-rejected-p (state agent fixture)
-  "Whether an applicable STEP-ON has no legitimate child from STATE."
-  (let* ((action (find 'step-on *actions* :key #'action.name))
-         (args (list agent fixture))
-         (precondition-result
-           (and (member args (get-precondition-args action state) :test #'equal)
-                (apply (action.pre-defun-name action) state args))))
-    (and precondition-result
+  "Whether an available STEP transition has no safe generated child from STATE."
+  (let* ((action
+           (find 'change-configuration *actions* :key #'action.name))
+         (location
+           (first
+             (funcall (symbol-function 'agent-configuration)
+                      state agent)))
+         (transition
+           (list 'step (list location 'ground) nil
+                 (list location fixture))))
+    (and (member transition
+                 (configuration-transition-results state agent)
+                 :test #'equal)
          (let ((saved-dropped-count *inconsistent-states-dropped*))
            (unwind-protect
              (let ((*actions* (list action)))
-               (null (generate-children
-                       (make-node :state state :depth 0))))
+               (notany
+                 (lambda (child)
+                   (member (list 'has-location agent 'loft2)
+                           (database child)
+                           :test #'equal))
+                 (generate-children
+                   (make-node :state state :depth 0))))
              (setf *inconsistent-states-dropped* saved-dropped-count))))))
 
 
@@ -124,7 +135,7 @@
     (mounted-on fan1 gears1)
     (= (location-elevation loft) 10)
 
-    ;; The isolated unjammed lane remains ready to launch, but its real STEP-ON transition
+    ;; The isolated unjammed lane remains ready to launch, but its real STEP transition
     ;; must have no legitimate successor because gun2 makes loft2 unsafe.
     (has-location agent2 lower2)
     (not (on agent2 fan2))

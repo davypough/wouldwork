@@ -15,7 +15,7 @@
 ;;;                leaf types are optional through the nested roles
 ;;;   nested     : -beam-substrate (beam relations and hooks); -placement;
 ;;;                -visibility (null defaults); -support-elevation; -elevation;
-;;;                -walkability; -reachability; -pickup
+;;;                -mobility; -reachability; -pickup
 ;;;   parameter  : *max-pairings* -- connector pairings only; fixed couplings are unlimited
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
@@ -41,7 +41,7 @@
 (include-tech -visibility)
 (include-tech -support-elevation)
 (include-tech -elevation)
-(include-tech -walkability)
+(include-tech -mobility)
 (include-tech -reachability)
 (include-tech -pickup)
 (include-tech -beam-relay-init-checks)
@@ -114,7 +114,7 @@
        (reachable ?location $a-location)
        (connectable-location $connector ?location)
        (assign $places (placement-options ?agent ?location $connector))
-       (assign $pairing-vantages (walkable-locations ?agent $a-location))
+       (assign $pairing-vantages (mobility-locations ?agent $a-location))
         (exists (?t terminus)
           (connectable-terminus
             ?agent $pairing-vantages ?location $connector ?t)))
@@ -424,7 +424,7 @@
      ?placement-location location
      ?connector connector
      ?terminus terminus)
-  ;; Pairing selection uses structural LOS from any currently walkable vantage.  Exact
+  ;; Pairing selection uses structural LOS from any currently traversable vantage.  Exact
   ;; placement and live visibility subsequently determine whether the beam carries color.
   (and (connector-pairing-allowed ?agent ?connector ?terminus)
        (ww-loop for $vantage in ?pairing-vantages

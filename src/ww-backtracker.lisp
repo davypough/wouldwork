@@ -226,7 +226,8 @@
                 (list
                  (destructuring-bind (forward-ops inverse-ops) change-lists
                    (let* ((combined-act (cons (action.name action)
-                                              (update.instantiations updated-db)))
+                                              (copy-tree
+                                               (update.instantiations updated-db))))
                           (new-choice (make-choice :act combined-act
                                                    :forward-update forward-ops
                                                    :inverse-update inverse-ops
@@ -244,7 +245,8 @@
                 (hash-table
                  ;; Snapshot-style update: register by replacing idb; inverse restores pre-idb.
                  (let* ((combined-act (cons (action.name action)
-                                            (update.instantiations updated-db)))
+                                            (copy-tree
+                                             (update.instantiations updated-db))))
                         (new-choice (make-choice :act combined-act
                                                  :forward-update change-lists
                                                  :inverse-update pre-idb

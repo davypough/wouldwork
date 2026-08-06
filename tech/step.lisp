@@ -1,8 +1,9 @@
 ;;; Filename: step.lisp
 
-;;; Step technology: ground-level mounting and dismounting of flush supports (plates and
+;;; Step technology: provide ground-level mounting and dismounting transitions for flush
+;;; supports (plates and
 ;;; gears-mounted fans).  A steppable's top sits exactly at its location's floor elevation,
-;;; so stepping involves no elevation change -- that is what distinguishes step-on/step-off
+;;; so stepping involves no elevation change -- that is what distinguishes step transitions
 ;;; from the jump technology, which handles exclusively elevation-related support changes
 ;;; (box tops) and authored jump edges.  A fan is steppable only while mounted on gears: a
 ;;; fan lying on the ground or resting on a box top cannot be stepped on (nor jumped to).
@@ -14,18 +15,21 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location; plate comes from nested -plate-types and fan is
 ;;;               declared optional here
-;;;   nested    : -support-occupancy ((on ...), cleartop); -location ((has-location ...));
+;;;   nested    : -configuration-transition (configuration representation, provider
+;;;               registry, central action, support mutation, and propagation);
 ;;;               -position ((has-position ...))
 ;;;   conditional relations:
 ;;;               mounted-on (fan), guarded by fan  --  owned by -gears-fan.lisp;
 ;;;               translation removes the guarded reference when the fan type is empty
-;;;   driver    : propagate-changes! (master)
 ;;; PROVIDES:
 ;;;   types     : steppable-object (either pressure-plate toggle-plate fan)
-;;;   actions   : step-on, step-off
+;;;   queries   : step-source-can-mount, step-source-can-dismount,
+;;;               steppable-fixture-at, step-configuration-transitions
+;;;   provider  : step-configuration-transitions registered with
+;;;               -configuration-transition
+;;;   action    : change-configuration (from -configuration-transition)
 
-(include-tech -support-occupancy)
-(include-tech -location)
+(include-tech -configuration-transition)
 (include-tech -position)
 
 (in-package :ww)
@@ -38,37 +42,48 @@
   steppable-object (either pressure-plate toggle-plate fan))
 
 
-(define-action step-on
-  ;; Step from ground onto a clear steppable fixture at the agent's own location.  A plate
-  ;; is fixed (has-position); a fan is movable (has-location) and qualifies only while it
-  ;; is mounted on gears, which keeps its top flush with the floor.
-  1
-  (?agent agent ?fixture steppable-object)
-  (and (bind (has-location ?agent $a-location))
-       (not (bind (on ?agent $anyplace)))
-       (or (and (plate ?fixture)
-                (bind (has-position ?fixture $f-location)))
-           (and (fan ?fixture)
-                (bind (mounted-on ?fixture $gears))
-                (bind (has-location ?fixture $f-location))))
-       (eql $a-location $f-location)
-       (cleartop ?fixture)
-       (support-use-allowed ?agent ?fixture))
-  (">" ?agent "at" $a-location "steps onto" ?fixture)
-  (assert (on ?agent ?fixture)
-          (finally (propagate-changes!))))
+(define-query step-source-can-mount (?source-place)
+  (eql ?source-place 'ground))
 
 
-(define-action step-off
-  ;; Step from a steppable fixture back onto ground at the same location.  Box dismounts
-  ;; belong to jump (a drop); an agent on a fan implies the fan is gears-mounted (step-on is
-  ;; the only mount, and a fan cannot be picked up while occupied), and a launched agent is
-  ;; already off its fan, so step-off from a blowing fan never arises.
-  1
-  (?agent agent)
-  (and (bind (on ?agent $fixture))
-       (steppable-object $fixture)
-       (bind (has-location ?agent $a-location)))
-  (">" ?agent "at" $a-location "steps off" $fixture)
-  (assert (not (on ?agent $fixture))
-          (finally (propagate-changes!))))
+(define-query step-source-can-dismount (?source-place)
+  (and (not (eql ?source-place 'ground))
+       (steppable-object ?source-place)))
+
+
+(define-query steppable-fixture-at
+    (?fixture steppable-object ?location location)
+  ;; A plate is fixed.  A fan is steppable only while attached to gears and carrying a
+  ;; floor location; a wall-mounted fan has no location and therefore cannot match.
+  (or (and (plate ?fixture)
+           (has-position ?fixture ?location))
+      (and (fan ?fixture)
+           (bind (mounted-on ?fixture $gears))
+           (has-location ?fixture ?location))))
+
+
+(define-query step-configuration-transitions (?agent agent ?source-configuration)
+  (do (assign $location (first ?source-configuration))
+      (assign $source-place (second ?source-configuration))
+      (assign $transitions nil)
+      (if (step-source-can-mount $source-place)
+        (doall (?fixture steppable-object)
+          (if (and (steppable-fixture-at ?fixture $location)
+                   (cleartop ?fixture)
+                   (support-use-allowed ?agent ?fixture))
+            (assign $transitions
+                    (cons
+                      (list 'step ?source-configuration nil
+                            (list $location ?fixture))
+                      $transitions)))))
+      (if (step-source-can-dismount $source-place)
+        (assign $transitions
+                (cons
+                  (list 'step ?source-configuration nil
+                        (list $location 'ground))
+                  $transitions)))
+      $transitions))
+
+
+(register-configuration-transition-provider
+  'step-configuration-transitions)

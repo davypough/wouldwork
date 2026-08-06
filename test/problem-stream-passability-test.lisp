@@ -11,7 +11,7 @@
 ;;;
 ;;; The lower fan is uncontrolled and remains blowing, characterizing the blocked
 ;;; ordinary crossings and the still-available inbound rides.  The upper fan is
-;;; controlled by the plate under TEST-AGENT.  The required STEP-OFF action clears
+;;; controlled by the plate under TEST-AGENT.  The required dismount transition clears
 ;;; that plate, stops the still-mounted fan, and makes every upper gears-gated route
 ;;; passable without changing any object's location.
 ;;;
@@ -57,7 +57,7 @@
 
 
 (define-init
-  ;; TEST-AGENT initially holds the upper control on.  STEP-OFF is the only
+  ;; TEST-AGENT initially holds the upper control on.  Dismounting is the only
   ;; required state transition and leaves the agent at this same location.
   (has-location test-agent upper-side)
   (has-position upper-control-plate upper-side)
@@ -135,7 +135,7 @@
 
 (define-query stream-passability-scenarios-valid ()
   (and
-    ;; STEP-OFF changes support/control state, not location.
+    ;; Dismounting changes support/control state, not location.
     (has-location test-agent upper-side)
     (not (exists (?support support)
            (on test-agent ?support)))
@@ -213,16 +213,16 @@
     (not (one-step-walkable
            test-agent lower-side lower-swept))
     (= (length
-         (walkable-locations test-agent lower-side))
+         (mobility-locations test-agent lower-side))
        2)
     (member 'lower-side
-            (walkable-locations test-agent lower-side))
+            (mobility-locations test-agent lower-side))
     (member 'lower-destination
-            (walkable-locations test-agent lower-side))
+            (mobility-locations test-agent lower-side))
     (not (member 'lower-swept
-                 (walkable-locations test-agent lower-side)))
+                 (mobility-locations test-agent lower-side)))
     (= (length
-         (walkable-locations test-agent lower-destination))
+         (mobility-locations test-agent lower-destination))
        1)
 
     ;; Once UPPER-FAN stops, the same raw gears clauses pass in both
@@ -238,17 +238,17 @@
     (one-step-walkable
       test-agent upper-side upper-swept)
     (= (length
-         (walkable-locations test-agent upper-side))
+         (mobility-locations test-agent upper-side))
        3)
     (member 'upper-side
-            (walkable-locations test-agent upper-side))
+            (mobility-locations test-agent upper-side))
     (member 'upper-swept
-            (walkable-locations test-agent upper-side))
+            (mobility-locations test-agent upper-side))
     (member 'upper-destination
-            (walkable-locations test-agent upper-side))
+            (mobility-locations test-agent upper-side))
 
     ;; The solid separator keeps both stream scenarios independent.
-    (not (walkable test-agent lower-side upper-side))
+    (not (traversable test-agent lower-side upper-side))
     (not (bind (walk-via lower-side
                          $cross-lane-symmetric-family
                          upper-side)))

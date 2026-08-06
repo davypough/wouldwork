@@ -92,7 +92,7 @@
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect connector actions
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
-(include-tech walkability)          ;walk-via; walkable-locations; walkable; one-step-walkable; walk
+(include-tech walkability)          ;walk-via; mobility-results; traversable; one-step-walkable; move
 (include-tech visibility)            ;los-to-apparatus; los-to-location; visible; visible-clear
 
 

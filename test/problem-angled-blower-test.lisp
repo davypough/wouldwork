@@ -9,12 +9,13 @@
 ;;;      chain.
 ;;;   4. A loose fan resting on a blowing fan is toppled in place rather than launched.
 ;;;   5. Clear plate1 drives gears6 through inverted control, so box6 is delivered during
-;;;      initialization.  The one required action, step-on plate1, depresses the plate
+;;;      initialization.  The one required configuration transition mounts plate1,
+;;;      depressing the plate
 ;;;      and switches gears6 and fan7 off; box6 must remain at delivered5.
 ;;;
 ;;; The goal's characterization query verifies all positive outcomes and the absence of
 ;;; stale source/intermediate supports and locations.  Expected minimum solution: one
-;;; step, (step-on agent1 plate1).
+;;; step, mounting agent1 on plate1.
 
 (in-package :ww)
 

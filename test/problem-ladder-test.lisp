@@ -1,84 +1,73 @@
 ;;; Filename: problem-ladder-test.lisp
-
-;;; Combined stageable regression for ladder.lisp.  The planning lane requires two explicit
-;;; one-way climbs: lower -> middle uses ladder1 through the flat conjunction
-;;; (ladder1 screen1), then middle -> upper uses ladder2.  The agent is empty-handed and on
-;;; ground throughout.  This verifies screen/ladder passability, exact fixed positioning,
-;;; directional edges, and the fact that climb edges remain individual actions rather than
-;;; entering a movement closure.
 ;;;
-;;; Independent stationary probes invoke USE-LADDER's installed precondition directly.
-;;; They reject carrying cargo, starting on a support, using a ladder positioned elsewhere,
-;;; using a clear means list that omits the selected ladder, crossing a closed gate, and
-;;; landing at a lethal destination.  The goal also characterizes ONE-WAY-CLEAR's flat
-;;; all-means conjunction, including its vacuously clear empty-list boundary.
+;;; Focused regression for ladders as a transparent mobility provider.  The planning lane
+;;; composes WALK, LADDER, LADDER, and WALK segments into one MOVE action.  The first climb
+;;; requires both ladder1 and screen1; the second requires ladder2.  Because both fixtures
+;;; are reached only after earlier segments, the route proves exact positioning is evaluated
+;;; at each hypothetical intermediate source rather than only at the agent's initial location.
 ;;;
-;;; Expected minimum solution (2 steps): use ladder1 from lower to middle; use ladder2 from
-;;; middle to upper.  Every negative probe remains in its initial state.
-
+;;; Independent probes reject carrying cargo, using a ladder positioned elsewhere, omitting
+;;; the positioned ladder from the edge means, crossing a closed gate, and landing at a lethal
+;;; destination.  A supported agent retains a hypothetical grounded closure but cannot invoke
+;;; MOVE until an explicit configuration transition leaves the support.
+;;;
+;;; Expected minimum solution: one MOVE from ENTRY to GOAL with the complete four-segment
+;;; route witness.
 
 (in-package :ww)
 
 
 (ww-set *problem-name* ladder-test)
-
 (ww-set *problem-type* planning)
-
 (ww-set *solution-type* min-length)
-
 (ww-set *tree-or-graph* graph)
+(ww-set *depth-cutoff* 1)
 
-(ww-set *depth-cutoff* 2)
-
-(setf *expected-min-length* 2)
-
-
-;;;; TYPES ;;;;
+(setf *expected-min-length* 1)
 
 
 (define-types
   agent (climber carrying-agent supported-agent misplaced-agent
-         unlisted-agent gate-agent unsafe-agent)
-  location (lower middle upper
+         unlisted-agent gate-agent unsafe-agent canonical-agent)
+  location (entry lower middle upper goal
             carry-start carry-goal
             supported-start supported-goal
             misplaced-start misplaced-ladder-site misplaced-goal
             unlisted-start unlisted-goal
             gate-start gate-goal
-            unsafe-start unsafe-goal)
-  ladder (ladder1 ladder2 ladder3 ladder4 ladder5 ladder6 ladder7 ladder8)
+            unsafe-start unsafe-goal
+            canonical-start canonical-goal)
+  ladder (ladder1 ladder2 ladder3 ladder4 ladder5 ladder6 ladder7 ladder8
+          canonical-ladder-a canonical-ladder-b)
   screen (screen1 unlisted-screen)
   gate (closed-gate)
   box (carried-box support-box)
   gun (unsafe-gun))
 
 
-;;;; TECHNOLOGY INCLUDES ;;;;
-
-
+(include-tech walkability)
 (include-tech ladder)
 (include-tech gun)
 
 
-;;;; INITIALIZATION ;;;;
-
-
 (define-init
-  ;; Planned two-action chain.  The first edge's flat means list requires both its ladder
-  ;; and screen to pass; the second edge requires its own ladder at middle.
-  (has-location climber lower)
+  ;; Planned heterogeneous route.  Both ladder positions are consulted from hypothetical
+  ;; intermediate sources while mobility closure is being computed.
+  (has-location climber entry)
   (has-position ladder1 lower)
   (has-position ladder2 middle)
+  (walk-via> entry () lower)
   (climb-via> lower (ladder1 screen1) middle)
   (climb-via> middle (ladder2) upper)
+  (walk-via> upper () goal)
 
-  ;; Carrying blocks the ladder itself, so an otherwise direct climb is inapplicable.
+  ;; Carrying blocks the ladder itself.
   (has-location carrying-agent carry-start)
   (holding carrying-agent carried-box)
   (has-position ladder3 carry-start)
   (climb-via> carry-start (ladder3) carry-goal)
 
-  ;; A supported agent cannot use a ladder even when the ladder and edge are otherwise clear.
+  ;; The closure describes hypothetical ground travel, while MOVE enforces actual grounding.
   (has-location supported-agent supported-start)
   (has-location support-box supported-start)
   (on supported-agent support-box)
@@ -90,23 +79,30 @@
   (has-position ladder5 misplaced-ladder-site)
   (climb-via> misplaced-start (ladder5) misplaced-goal)
 
-  ;; The ladder is correctly positioned and the screen is passable, but the selected
-  ;; ladder is absent from the edge's means list.
+  ;; The ladder is correctly positioned but absent from the edge's clear means list.
   (has-location unlisted-agent unlisted-start)
   (has-position ladder6 unlisted-start)
   (climb-via> unlisted-start (unlisted-screen) unlisted-goal)
 
-  ;; The ladder passes for this empty-handed agent, but every means must pass and the
-  ;; unincluded public gate technology leaves closed-gate closed.
+  ;; Every item in the flat means conjunction must pass.
   (has-location gate-agent gate-start)
   (has-position ladder7 gate-start)
   (climb-via> gate-start (ladder7 closed-gate) gate-goal)
 
-  ;; The edge and ladder are clear, but an uncontrolled gun makes the destination lethal.
+  ;; A clear edge may not land at a lethal destination.
   (has-location unsafe-agent unsafe-start)
   (has-position ladder8 unsafe-start)
   (climb-via> unsafe-start (ladder8) unsafe-goal)
-  (threatens unsafe-gun unsafe-goal))
+  (threatens unsafe-gun unsafe-goal)
+
+  ;; Two listed and positioned ladders are effect-equivalent.  The provider must select
+  ;; exactly one by name, independently of their authored order.
+  (has-location canonical-agent canonical-start)
+  (has-position canonical-ladder-a canonical-start)
+  (has-position canonical-ladder-b canonical-start)
+  (climb-via> canonical-start
+              (canonical-ladder-b canonical-ladder-a)
+              canonical-goal))
 
 
 (define-init-action initialize-derived-state
@@ -117,86 +113,134 @@
   (assert (propagate-changes!)))
 
 
-;;;; ACTION-PRECONDITION CHARACTERIZATION ;;;;
+(define-test-helper ladder-test-move-updates (state agent)
+  "Return every MOVE update generated for AGENT in STATE."
+  (let* ((action (find 'move *actions* :key #'action.name))
+         (args (list agent)))
+    (when (member args (get-precondition-args action state) :test #'equal)
+      (let ((pre-result (apply (action.pre-defun-name action) state args)))
+        (when pre-result
+          (if (eql pre-result t)
+              (funcall (action.eff-defun-name action) state)
+              (apply (action.eff-defun-name action) state pre-result)))))))
 
 
-(define-test-helper use-ladder-applicable-p (state agent ladder destination)
-  "Whether the installed USE-LADDER action accepts this exact parameter tuple in STATE."
-  (let* ((action (find 'use-ladder *actions* :key #'action.name))
-         (args (list agent ladder destination)))
-    (and (member args (get-precondition-args action state) :test #'equal)
-         (apply (action.pre-defun-name action) state args))))
+(define-test-helper ladder-test-updates-to (state agent destination)
+  "Return AGENT's MOVE updates whose endpoint is DESTINATION."
+  (remove-if-not
+    (lambda (update)
+      (eql (third (update.instantiations update)) destination))
+    (ladder-test-move-updates state agent)))
 
 
-;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+(define-test-claim ladder-move-retains-complete-route
+  (let ((updates
+          (ladder-test-updates-to *start-state* 'climber 'goal)))
+    (and (= (length updates) 1)
+         (equal
+           (fourth (update.instantiations (first updates)))
+           '((walk entry nil lower)
+             (ladder lower (ladder1 screen1) middle)
+             (ladder middle (ladder2) upper)
+             (walk upper nil goal))))))
+
+
+(define-test-claim ladder-provider-selects-one-fixture
+  (let ((updates
+          (ladder-test-updates-to
+            *start-state* 'canonical-agent 'canonical-goal)))
+    (and (= (length updates) 1)
+         (equal
+           (fourth (update.instantiations (first updates)))
+           '((ladder canonical-start
+               (canonical-ladder-a canonical-ladder-b)
+               canonical-goal))))))
+
+
+(define-query ladder-climber-at-goal ()
+  (has-location climber goal))
+
+
+(define-test-claim ladder-route-replays-exactly
+  (multiple-value-bind (state success-p failure)
+      (apply-action-to-state
+        '(move climber entry goal
+          ((walk entry nil lower)
+           (ladder lower (ladder1 screen1) middle)
+           (ladder middle (ladder2) upper)
+           (walk upper nil goal)))
+        *start-state*
+        nil)
+    (declare (ignore failure))
+    (and success-p
+         (funcall (symbol-function 'ladder-climber-at-goal) state)))
+  (multiple-value-bind (state success-p failure)
+      (apply-action-to-state
+        '(move climber entry goal
+          ((walk entry nil lower)
+           (ladder lower (ladder2 screen1) middle)
+           (ladder middle (ladder1) upper)
+           (walk upper nil goal)))
+        *start-state*
+        nil)
+    (declare (ignore state))
+    (and (not success-p)
+         (consp failure)
+         (eql (first failure) :state-mismatch))))
+
+
+(define-test-claim ladder-action-boundaries-are-preserved
+  (and (not (find 'use-ladder *actions* :key #'action.name))
+       (not (ladder-test-move-updates *start-state* 'carrying-agent))
+       (not (ladder-test-move-updates *start-state* 'supported-agent))
+       (not (ladder-test-move-updates *start-state* 'misplaced-agent))
+       (not (ladder-test-move-updates *start-state* 'unlisted-agent))
+       (not (ladder-test-move-updates *start-state* 'gate-agent))
+       (not (ladder-test-move-updates *start-state* 'unsafe-agent))))
 
 
 (define-query ladder-scenarios-valid ()
   (and
-    ;; The planned climber completed exactly two explicit directed actions and remains on
-    ;; ground.  Neither authored edge exists in reverse.
-    (has-location climber upper)
-    (not (has-location climber lower))
-    (not (has-location climber middle))
+    ;; The heterogeneous route is one directed mobility closure and leaves the agent grounded.
+    (has-location climber goal)
+    (not (has-location climber entry))
     (not (exists (?support support)
            (on climber ?support)))
-    (climb-via> lower (ladder1 screen1) middle)
-    (climb-via> middle (ladder2) upper)
-    (not (climb-via> middle (ladder1 screen1) lower))
-    (not (climb-via> upper (ladder2) middle))
+    (traversable climber entry goal)
+    (not (traversable climber goal entry))
 
-    ;; ONE-WAY-CLEAR is a flat conjunction.  Empty means are vacuously clear, while both
-    ;; the positive multi-item list and its individual empty-handed obstacles pass.
-    (one-way-clear climber '())
-    (one-way-clear climber '(ladder1 screen1))
-    (one-way-clear climber '(ladder1))
-    (one-way-clear climber '(screen1))
+    ;; The means list is a flat conjunction.  Its empty boundary is vacuously clear.
+    (all-clear climber '())
+    (all-clear climber '(ladder1 screen1))
+    (all-clear climber '(ladder1))
+    (all-clear climber '(screen1))
 
-    ;; Carrying blocks ladder and screen passability, and the real action stays unavailable.
+    ;; Carrying blocks ladder and screen passability.
     (has-location carrying-agent carry-start)
     (holding carrying-agent carried-box)
-    (not (exists (?location location)
-           (has-location carried-box ?location)))
-    (not (one-way-clear carrying-agent '(ladder3)))
-    (not (one-way-clear carrying-agent '(unlisted-screen)))
-    (not (use-ladder-applicable-p
-           state 'carrying-agent 'ladder3 'carry-goal))
+    (not (all-clear carrying-agent '(ladder3)))
+    (not (all-clear carrying-agent '(unlisted-screen)))
+    (not (traversable carrying-agent carry-start carry-goal))
 
-    ;; Ground-only: the edge itself is clear, but existing support rejects the action.
+    ;; The provider is grounded in configuration space; MOVE owns the check that the
+    ;; actual agent is currently grounded.
     (has-location supported-agent supported-start)
     (on supported-agent support-box)
-    (one-way-clear supported-agent '(ladder4))
-    (not (use-ladder-applicable-p
-           state 'supported-agent 'ladder4 'supported-goal))
+    (traversable supported-agent supported-start supported-goal)
 
-    ;; Exact fixed positioning: a clear, listed ladder at another location is unusable.
-    (has-location misplaced-agent misplaced-start)
+    ;; Exact fixture position and membership are both required.
     (has-position ladder5 misplaced-ladder-site)
-    (one-way-clear misplaced-agent '(ladder5))
-    (not (use-ladder-applicable-p
-           state 'misplaced-agent 'ladder5 'misplaced-goal))
+    (not (traversable misplaced-agent misplaced-start misplaced-goal))
+    (all-clear unlisted-agent '(unlisted-screen))
+    (not (traversable unlisted-agent unlisted-start unlisted-goal))
 
-    ;; Membership is separate from clearance: this screen-only list is clear, but ladder6
-    ;; is not one of its means and therefore cannot instantiate the action.
-    (has-location unlisted-agent unlisted-start)
-    (one-way-clear unlisted-agent '(unlisted-screen))
-    (not (use-ladder-applicable-p
-           state 'unlisted-agent 'ladder6 'unlisted-goal))
-
-    ;; One closed item blocks the whole flat conjunction.
-    (has-location gate-agent gate-start)
+    ;; A closed item blocks the conjunction, and an unsafe destination blocks the segment.
     (not (open closed-gate))
-    (not (one-way-clear gate-agent '(ladder7 closed-gate)))
-    (not (use-ladder-applicable-p
-           state 'gate-agent 'ladder7 'gate-goal))
-
-    ;; Destination safety is an independent final precondition after means clearance.
-    (has-location unsafe-agent unsafe-start)
-    (one-way-clear unsafe-agent '(ladder8))
+    (not (all-clear gate-agent '(ladder7 closed-gate)))
+    (not (traversable gate-agent gate-start gate-goal))
     (lethal unsafe-gun)
     (not (safe unsafe-goal))
-    (not (use-ladder-applicable-p
-           state 'unsafe-agent 'ladder8 'unsafe-goal))))
+    (not (traversable unsafe-agent unsafe-start unsafe-goal))))
 
 
 (define-goal
@@ -234,37 +278,15 @@
    must then make this characterization fail.")
 
 
-(define-action-precondition-mutation use-ladder-allows-supported-agent use-ladder
-  (and (bind (has-location ?agent $a-location))
-       (bind (has-position ?ladder $ladder-location))
-       (eql $a-location $ladder-location)
-       (bind (climb-via> $a-location $means ?destination))
-       (member ?ladder $means)
-       (one-way-clear ?agent $means)
-       (safe ?destination))
-  "Drops USE-LADDER's ground-only guard.  The supported-agent probe must then
-   make this characterization fail.")
+(define-query-mutation ladder-provider-ignores-position usable-ladder-at-source
+  (?ladder ladder ?source location ?means)
+  (do ?source (member ?ladder ?means))
+  "Drops exact fixture positioning.  The misplaced-agent probe must then make
+   this characterization fail.")
 
 
-(define-action-precondition-mutation use-ladder-ignores-position use-ladder
-  (and (bind (has-location ?agent $a-location))
-       (not (bind (on ?agent $anyplace)))
-       (bind (has-position ?ladder $ladder-location))
-       (bind (climb-via> $a-location $means ?destination))
-       (member ?ladder $means)
-       (one-way-clear ?agent $means)
-       (safe ?destination))
-  "Drops USE-LADDER's exact-positioning check.  The misplaced-agent probe must
-   then make this characterization fail.")
-
-
-(define-action-precondition-mutation use-ladder-ignores-means-membership use-ladder
-  (and (bind (has-location ?agent $a-location))
-       (not (bind (on ?agent $anyplace)))
-       (bind (has-position ?ladder $ladder-location))
-       (eql $a-location $ladder-location)
-       (bind (climb-via> $a-location $means ?destination))
-       (one-way-clear ?agent $means)
-       (safe ?destination))
-  "Drops USE-LADDER's means-membership check.  The unlisted-agent probe must
-   then make this characterization fail.")
+(define-query-mutation ladder-provider-ignores-means-membership usable-ladder-at-source
+  (?ladder ladder ?source location ?means)
+  (do ?means (has-position ?ladder ?source))
+  "Drops edge-means membership.  The unlisted-agent probe must then make this
+   characterization fail.")

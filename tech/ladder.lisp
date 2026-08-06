@@ -1,30 +1,26 @@
 ;;; Filename: ladder.lisp
 
-;;; Ladder technology: one-way climbing over a ladder-like object.  A directed climb edge
-;;; (climb-via>) carries the agent from its current location to the edge's destination when
-;;; every enabling implement is usable.  Unlike walking (walkability), climb edges are not
-;;; folded into the reachable-set closure; they are explicit ladder actions.
+;;; Ladder mobility provider.  A directed CLIMB-VIA> edge contributes a LADDER traversal
+;;; segment when one of its listed ladder fixtures is positioned exactly at the segment
+;;; source and every enabling implement is usable.  The segment witness places the selected
+;;; ladder first, followed by the other canonicalized enabling means.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  ladder is declared optional here (define-optional-types)
-;;;   nested    : -support-occupancy (support-occupant, support, (on ...), cleartop);
-;;;               -location (mobile-object, (has-location ...)); -position (fixed-position-object,
-;;;               (has-position ...)); -passability (obstacle-clear, all-clear); -threat
-;;;               (safe -- true unless an armed gun or other threat endangers the
-;;;               destination)  --  all shared via nested include-tech rather than local
-;;;               declaration
+;;;   nested    : -position; -passability; -threat; -mobility-action
 ;;; PROVIDES:
 ;;;   types     : ladder  --  declared optional here and by nested -passability; the
 ;;;               declarations resolve compatibly
 ;;;   relations : (climb-via> location $list location)
-;;;   query     : one-way-clear
-;;;   action    : use-ladder
+;;;   queries   : usable-ladder-at-source, positioned-ladders-for-means,
+;;;               ladder-traversal-segments
+;;;   provider  : ladder-traversal-segments registered with -mobility
+;;;   action    : move (from -mobility-action)
 
-(include-tech -support-occupancy)
-(include-tech -location)
 (include-tech -position)
 (include-tech -passability)
 (include-tech -threat)
+(include-tech -mobility-action)
 
 (in-package :ww)
 
@@ -42,29 +38,45 @@
     literals 'climb-via> '(gate screen ladder)))
 
 
-(define-query one-way-clear (?agent agent ?means)
-  ;; Every implement enabling a one-way edge must be usable by ?agent.  Delegates to
-  ;; passability's shared all-clear over the edge's means list, so use-ladder can
-  ;; guard the hop without re-deriving passability inline. ?means is computed Lisp list
-  ;; data rather than one planning object.
-  (all-clear ?agent ?means))
+(define-query usable-ladder-at-source
+    (?ladder ladder ?source location ?means)
+  (and (member ?ladder ?means)
+       (has-position ?ladder ?source)))
 
 
-(define-action use-ladder
-  ;; Use a one-way ladder-like object from ground.  The agent lands on ground at the
-  ;; traversal destination.  The one-way edge starts at the agent's current location; the
-  ;; agent must be standing at the ladder's fixed location to climb it, not merely within reach.
-  1
-  (?agent agent ?ladder ladder ?destination location)
-  (and (bind (has-location ?agent $a-location))
-       (not (bind (on ?agent $anyplace)))
-       (bind (has-position ?ladder $ladder-location))
-       (eql $a-location $ladder-location)
-       (bind (climb-via> $a-location $means ?destination))
-       (member ?ladder $means)
-       (one-way-clear ?agent $means)
-       (safe ?destination))
-  (">" ?agent "at" $a-location "uses" ?ladder "at" $ladder-location
-       "to go to" ?destination)
-  (assert (has-location ?agent ?destination)
-          (finally (propagate-changes!))))
+(define-query positioned-ladders-for-means (?source location ?means)
+  (do (assign $ladders nil)
+      (doall (?ladder ladder)
+        (if (usable-ladder-at-source ?ladder ?source ?means)
+          (assign $ladders (cons ?ladder $ladders))))
+      (sort $ladders #'string< :key #'symbol-name)))
+
+
+(define-problem-helper ladder-segment-witness (ladder means)
+  "Place the selected LADDER first, followed by every other required enabling means."
+  (cons ladder
+        (remove ladder (canonical-enabling-means means)
+                :test #'eq :count 1)))
+
+
+(define-query ladder-traversal-segments (?agent agent ?from location)
+  (do (assign $segments nil)
+      (doall (?to location)
+        (if (bind (climb-via> ?from $raw-means ?to))
+          (do (assign $means (canonical-enabling-means $raw-means))
+              (assign $ladders
+                      (positioned-ladders-for-means ?from $means))
+              (if (and $ladders
+                       (all-clear ?agent $means)
+                       (safe ?to))
+                (assign $segments
+                        (cons
+                          (list 'ladder ?from
+                                (ladder-segment-witness
+                                  (first $ladders) $means)
+                                ?to)
+                          $segments))))))
+      $segments))
+
+
+(register-mobility-provider 'ladder-traversal-segments)

@@ -30,13 +30,17 @@
 
 (defun profile ()
   "Deterministically profiles Wouldwork. Press Ctrl-C during the solve
-   to abort early and still see a report of data gathered so far."
+   to abort early and still see a report of data gathered so far. Profiling
+   instrumentation is always removed before this function returns."
   (sb-profile:reset)
   (sb-profile:profile "WOULDWORK")
-  (handler-case (ww-solve)
-    (sb-sys:interactive-interrupt ()
-      (format t "~2%Profiling interrupted by user -- reporting data gathered so far.~%")))
-  (sb-profile:report))
+  (unwind-protect
+      (progn
+        (handler-case (ww-solve)
+          (sb-sys:interactive-interrupt ()
+            (format t "~2%Profiling interrupted by user -- reporting data gathered so far.~%")))
+        (sb-profile:report))
+    (sb-profile:unprofile)))
 
 
 ;;;;;;;;;;;;; User Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -159,9 +163,10 @@
    and any active incremental idb-hash fold."
   (declare (type hash-table db)
            (type integer key))
-  (when *detect-propagated-changes*
-    (note-add-change db key value))
-  (fold-store key value db t)
+  (if *detect-propagated-changes*
+    (when (note-add-change db key value)
+      (fold-store key value db t))
+    (fold-store key value db t))
   t)
 
 
@@ -170,9 +175,10 @@
    and any active incremental idb-hash fold."
   (declare (type hash-table db)
            (type integer key))
-  (when *detect-propagated-changes*
-    (note-del-change db key))
-  (fold-remove key db t)
+  (if *detect-propagated-changes*
+    (when (note-del-change db key)
+      (fold-remove key db t))
+    (fold-remove key db t))
   t)
 
 
@@ -244,20 +250,22 @@
 
 
 (defun note-add-change (db key new-value)
-  "Sets *propagated-state-changed* when storing NEW-VALUE at KEY would change DB --
-   KEY is absent, or its current value differs.  Called from add-prop only while
-   *detect-propagated-changes* is in effect, just before the store."
+  "Return true and set *PROPAGATED-STATE-CHANGED* when storing NEW-VALUE at KEY
+   would change DB -- KEY is absent, or its current value differs."
   (multiple-value-bind (old-value present) (gethash key db)
-    (when (or (not present)
-              (not (equal old-value new-value)))
-      (setf *propagated-state-changed* t))))
+    (let ((changed (or (not present)
+                       (not (equal old-value new-value)))))
+      (when changed
+        (setf *propagated-state-changed* t))
+      changed)))
 
 
 (defun note-del-change (db key)
-  "Sets *propagated-state-changed* when KEY is present in DB and is about to be
-   removed.  Called from del-prop only while *detect-propagated-changes* is in effect."
-  (when (nth-value 1 (gethash key db))
-    (setf *propagated-state-changed* t)))
+  "Return true and set *PROPAGATED-STATE-CHANGED* when KEY is present in DB."
+  (let ((changed (nth-value 1 (gethash key db))))
+    (when changed
+      (setf *propagated-state-changed* t))
+    changed))
 
 
 (defun fold-store (key value db int-db)

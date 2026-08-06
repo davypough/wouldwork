@@ -1,8 +1,8 @@
 (in-package :ww)
 
 ;;; Characterizes the intended toggle-plate lifecycle.  Three actions are
-;;; STEP-ON, STEP-OFF, STEP-ON: the first press energizes both
-;;; controlled devices, stepping off preserves the latched state, and the
+;;; mount, dismount, mount: the first press energizes both
+;;; controlled devices, dismounting preserves the latched state, and the
 ;;; second press de-energizes both devices while depressing the plate again.
 ;;; Independently, a second plate initializes beneath one weight with its latch
 ;;; explicitly on.  Initial propagation establishes depression without changing

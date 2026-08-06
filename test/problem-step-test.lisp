@@ -8,9 +8,9 @@
 ;;;;   3. FAN-AGENT steps onto a clear gears-mounted floor fan.
 ;;;;
 ;;;; A characterization query verifies both lifecycles and directly checks that step
-;;;; actions reject an occupied plate, an already-supported agent, a remote plate, a
-;;;; loose fan, a wall-mounted fan without a location, a box as a step-on target, and
-;;;; an agent attempting to step off a box.  The mounted fan's normal control remains
+;;;; transition generation rejects an occupied plate, an already-supported agent, a remote
+;;;; plate, a loose fan, a wall-mounted fan without a location, a box as a mount target,
+;;;; and an agent attempting to dismount a box.  The mounted fan's normal control remains
 ;;;; clear, keeping its gears stopped so the fan occupancy can be observed directly.
 ;;;;
 ;;;; Expected minimum path length: 3.
@@ -86,7 +86,7 @@
   (on supported-agent current-plate)
 
   ;; A loose fan and a box are both colocated and clear, but neither is a legal
-  ;; step-on target.  REMOTE-PLATE separately checks exact location equality.
+  ;; step target.  REMOTE-PLATE separately checks exact location equality.
   (has-location loose-agent loose-site)
   (has-location loose-fan loose-site)
   (has-location nonsteppable-box loose-site)
@@ -113,14 +113,14 @@
   (assert (propagate-changes!)))
 
 
-;;;; ACTION-PRECONDITION CHARACTERIZATION ;;;;
+;;;; TRANSITION CHARACTERIZATION ;;;;
 
 
-(define-test-helper step-action-applicable-p (state action-name args)
-  "Whether the installed step action accepts ARGS in STATE."
-  (let ((action (find action-name *actions* :key #'action.name)))
-    (and (member args (get-precondition-args action state) :test #'equal)
-         (apply (action.pre-defun-name action) state args))))
+(define-test-helper step-transition-available-p (state agent transition)
+  "Whether the central configuration action offers TRANSITION for AGENT in STATE."
+  (member transition
+          (configuration-transition-results state agent)
+          :test #'equal))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -128,22 +128,24 @@
 
 (define-query step-scenarios-valid ()
   (and
-    ;; STEP-ON establishes occupancy without moving the agent and propagates plate
+    ;; A step transition establishes occupancy without moving the agent and propagates plate
     ;; depression.
     (has-location boarding-agent boarding-site)
     (on boarding-agent boarding-plate)
     (not (cleartop boarding-plate))
     (depressed boarding-plate)
 
-    ;; STEP-OFF removes the only support fact, leaves location unchanged, and
+    ;; Dismounting removes the only support fact, leaves location unchanged, and
     ;; propagates the plate back to clear and undepressed.
     (has-location leaving-agent leaving-site)
     (not (exists (?support support)
            (on leaving-agent ?support)))
     (cleartop leaving-plate)
     (not (depressed leaving-plate))
-    (step-action-applicable-p
-      state 'step-on '(leaving-agent leaving-plate))
+    (step-transition-available-p
+      state 'leaving-agent
+      '(step (leaving-site ground) nil
+             (leaving-site leaving-plate)))
 
     ;; A mounted floor fan is steppable while a clear control keeps it stopped.
     (has-location fan-agent fan-site)
@@ -155,15 +157,19 @@
     (not (depressed fan-control-plate))
     (not (turning floor-gears1))
     (not (blowing floor-fan))
-    (step-action-applicable-p state 'step-off '(fan-agent))
+    (step-transition-available-p
+      state 'fan-agent
+      '(step (fan-site floor-fan) nil (fan-site ground)))
 
     ;; An occupied plate is geometrically eligible but fails CLEARTOP.
     (has-location occupied-agent occupied-site)
     (on plate-blocker occupied-plate)
     (not (cleartop occupied-plate))
     (depressed occupied-plate)
-    (not (step-action-applicable-p
-           state 'step-on '(occupied-agent occupied-plate)))
+    (not (step-transition-available-p
+           state 'occupied-agent
+           '(step (occupied-site ground) nil
+                  (occupied-site occupied-plate))))
 
     ;; An agent already on a plate cannot transfer directly to another clear plate.
     (has-location supported-agent supported-site)
@@ -172,28 +178,36 @@
     (depressed current-plate)
     (cleartop alternate-plate)
     (not (depressed alternate-plate))
-    (not (step-action-applicable-p
-           state 'step-on '(supported-agent alternate-plate)))
+    (not (step-transition-available-p
+           state 'supported-agent
+           '(step (supported-site current-plate) nil
+                  (supported-site alternate-plate))))
 
-    ;; STEP-ON requires exact colocation.
+    ;; Mounting requires exact colocation.
     (has-location loose-agent loose-site)
     (cleartop remote-plate)
-    (not (step-action-applicable-p
-           state 'step-on '(loose-agent remote-plate)))
+    (not (step-transition-available-p
+           state 'loose-agent
+           '(step (loose-site ground) nil
+                  (loose-site remote-plate))))
 
     ;; A loose fan has a location and a clear top but lacks a gears attachment.
     (has-location loose-fan loose-site)
     (not (exists (?gears gears)
            (mounted-on loose-fan ?gears)))
     (cleartop loose-fan)
-    (not (step-action-applicable-p
-           state 'step-on '(loose-agent loose-fan)))
+    (not (step-transition-available-p
+           state 'loose-agent
+           '(step (loose-site ground) nil
+                  (loose-site loose-fan))))
 
     ;; A box is a support but not a steppable fixture.
     (has-location nonsteppable-box loose-site)
     (cleartop nonsteppable-box)
-    (not (step-action-applicable-p
-           state 'step-on '(loose-agent nonsteppable-box)))
+    (not (step-transition-available-p
+           state 'loose-agent
+           '(step (loose-site ground) nil
+                  (loose-site nonsteppable-box))))
 
     ;; A wall-mounted fan has an attachment but no floor location to match.
     (has-location wall-agent wall-site)
@@ -204,13 +218,22 @@
     (cleartop wall-fan)
     (not (turning wall-gears1))
     (not (blowing wall-fan))
-    (not (step-action-applicable-p
-           state 'step-on '(wall-agent wall-fan)))
+    (not (step-transition-available-p
+           state 'wall-agent
+           '(step (wall-site ground) nil
+                  (wall-site wall-fan))))
 
-    ;; STEP-OFF deliberately excludes box tops; jump owns that transition.
+    ;; Step dismount deliberately excludes box tops; jump owns that transition.
     (has-location box-agent box-site)
     (on box-agent box-support)
-    (not (step-action-applicable-p state 'step-off '(box-agent)))))
+    (not (step-transition-available-p
+           state 'box-agent
+           '(step (box-site box-support) nil (box-site ground))))
+
+    ;; The old action pair is gone; one central action owns support mutation.
+    (find 'change-configuration *actions* :key #'action.name)
+    (not (find 'step-on *actions* :key #'action.name))
+    (not (find 'step-off *actions* :key #'action.name))))
 
 
 (define-goal
@@ -220,34 +243,26 @@
 ;;;; MUTATION CHARACTERIZATION ;;;;
 
 
-(define-action-precondition-mutation step-on-allows-supported-agent step-on
-  (and (bind (has-location ?agent $a-location))
-       (or (and (plate ?fixture)
-                (bind (has-position ?fixture $f-location)))
-           (and (fan ?fixture)
-                (bind (mounted-on ?fixture $gears))
-                (bind (has-location ?fixture $f-location))))
-       (eql $a-location $f-location)
-       (cleartop ?fixture))
-  "Drops STEP-ON's ground-only guard.  The supported-agent probe must then make
+(define-query-mutation step-mount-allows-supported-agent step-source-can-mount
+  (?source-place)
+  (not nil)
+  "Drops the step provider's ground-only mount guard.  The supported-agent probe must then make
    this characterization fail.")
 
 
-(define-action-precondition-mutation step-on-ignores-location step-on
-  (and (bind (has-location ?agent $a-location))
-       (not (bind (on ?agent $anyplace)))
-       (or (and (plate ?fixture)
-                (bind (has-position ?fixture $f-location)))
-           (and (fan ?fixture)
-                (bind (mounted-on ?fixture $gears))
-                (bind (has-location ?fixture $f-location))))
-       (cleartop ?fixture))
-  "Drops STEP-ON's exact-colocation check.  The remote-plate probe must then
+(define-query-mutation step-mount-ignores-location steppable-fixture-at
+  (?fixture steppable-object ?location location)
+  (do ?location
+      (or (plate ?fixture)
+          (and (fan ?fixture)
+               (bind (mounted-on ?fixture $gears))
+               (bind (has-location ?fixture $fixture-location)))))
+  "Drops the step provider's exact-colocation check.  The remote-plate probe must then
    make this characterization fail.")
 
 
-(define-action-precondition-mutation step-off-allows-any-support step-off
-  (and (bind (on ?agent $fixture))
-       (bind (has-location ?agent $a-location)))
-  "Drops STEP-OFF's steppable-object-type guard.  The box-support probe must then make
+(define-query-mutation step-dismount-allows-any-support step-source-can-dismount
+  (?source-place)
+  (not (eql ?source-place 'ground))
+  "Drops the step provider's steppable-support guard.  The box-support probe must then make
    this characterization fail.")

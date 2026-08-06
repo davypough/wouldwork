@@ -5,7 +5,7 @@
 ;;; box1; far is the air stream's destination and holds plate2, whose top is flush with
 ;;; far's elevation-0 floor.  fan1 starts mounted on wgears1, hanging with no location.
 ;;;
-;;; Expected minimum solution (1 step): step-on agent1 plate1.  The agent's weight
+;;; Expected minimum solution (1 step): mount agent1 on plate1.  The agent's weight
 ;;; depresses plate1, setting the gears turning and the mounted fan blowing.  The stream
 ;;; meets the unit-height box at its inclusive upper boundary, sweeps it from mid to far,
 ;;; and lands it on plate2 rather than bare ground.  The goal checks that whole lifecycle:

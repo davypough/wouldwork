@@ -90,7 +90,7 @@
 (defun copy-problem-state (state)
     (make-problem-state
       :name (problem-state.name state)
-      :instantiations (copy-list (problem-state.instantiations state))
+      :instantiations (copy-tree (problem-state.instantiations state))
       :happenings (copy-tree (problem-state.happenings state))
       :time (problem-state.time state)
       :value (problem-state.value state)
@@ -105,7 +105,7 @@
    Used when the idb will be immediately replaced with a different one."
   (make-problem-state
     :name (problem-state.name state)
-    :instantiations (copy-list (problem-state.instantiations state))
+    :instantiations (copy-tree (problem-state.instantiations state))
     :happenings (copy-tree (problem-state.happenings state))
     :time (problem-state.time state)
     :value (problem-state.value state)

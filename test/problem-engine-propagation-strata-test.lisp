@@ -73,14 +73,14 @@
 ;;; CONNECT-CONNECTOR), but gate1 occludes the sightline from WEST to receiver1, so the
 ;;; connector is lit and the receiver is dark until the plate opens the gate.
 ;;; Any support occupant depresses the plate, so there are two 3-step routes and both end
-;;; with walk WEST to MID, where the sweep carries the agent on to EAST.  The one the
+;;; with MOVE WEST to MID, where the sweep carries the agent on to EAST.  The one the
 ;;; search reports is pickup-connector, then connect-connector -- CONNECT-CONNECTOR places
 ;;; the held connector through PLACEMENT-OPTIONS, and plate1 is a legal placement, so the
 ;;; connector re-pairs and settles onto the plate in the same step, depressing it.  The
 ;;; box route (pickup-box, put-box box1 on plate1) is the same length and leaves the
 ;;; authored pairings untouched; box1 exists to keep it available, since it is the route
 ;;; that isolates the plate from the beam.  Stepping on the plate is one step shorter and
-;;; a dead end either way: WALK refuses to leave a support, and stepping off clears the
+;;; a dead end either way: MOVE refuses to leave a support, and stepping off clears the
 ;;; plate and shuts the gate again.
 
 
@@ -129,9 +129,9 @@
 (include-tech beam-relay)    ;paired; color; update-relay-status!; update-receiver-status!
 (include-tech wall-blower)   ;turning; blowing; update-gears-status!; update-wall-blower-status!
 (include-tech box)           ;pickup-box; put-box
-(include-tech step)          ;step-on; step-off
+(include-tech step)          ;step configuration transitions
 (include-tech visibility)    ;los-to-apparatus; visible; visible-clear
-(include-tech walkability)  ;walk-via; walkable-locations; walkable; walk
+(include-tech walkability)  ;walk-via; mobility-results; traversable; move
 
 
 ;;;; INITIALIZATION ;;;;

@@ -41,7 +41,7 @@
 ;;; upper boundary must block the beam: connector3 lights, but connector4 and receiver2 do
 ;;; not, gate2 stays closed, and blocked-goal stays unreachable.
 ;;;
-;;; Expected minimum solution (1 step): WALKABLE-LOCATIONS closes over low->mid->goal, so walk
+;;; Expected minimum solution (1 step): MOBILITY-RESULTS closes over low->mid->goal, so MOVE
 ;;; takes agent1 directly from low to goal once gate1 is open.  gate1 is open from t=0, since
 ;;; compute-relay-lighting/relay-beam-reaches-receiver light connector2 and activate
 ;;; receiver1 during INITIALIZE-DERIVED-STATE's own PROPAGATE-CHANGES!, before any action runs
@@ -89,7 +89,7 @@
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; compute-relay-lighting; relay-beam-reaches-receiver
 (include-tech visibility)    ;los-to-apparatus; los-to-location; visible; beam-visible
-(include-tech walkability)   ;walk-via; walkable-locations; walkable; walk
+(include-tech walkability)   ;walk-via; mobility-results; traversable; move
 
 
 ;;;; INITIALIZATION ;;;;
@@ -199,7 +199,7 @@
     (color connector2 blue)
     (active receiver1)
     (open gate1)
-    (walkable agent1 low goal)
+    (traversable agent1 low goal)
 
     ;; Blocked lane: the beam meets box4 exactly at its inclusive height-2 boundary.
     (has-location agent2 low2)
@@ -218,7 +218,7 @@
            (color connector4 ?h)))
     (not (active receiver2))
     (not (open gate2))
-    (not (walkable agent2 low2 blocked-goal))))
+    (not (traversable agent2 low2 blocked-goal))))
 
 
 (define-goal

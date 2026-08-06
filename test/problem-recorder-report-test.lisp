@@ -4,7 +4,7 @@
 ;;; deliberately have no star convention.  A synthetic integrated solution follows the
 ;;; documented Windtunnel block pattern: live, ghost, live, ghost, live.  Two ghost agents
 ;;; cover both terminal cases of the recording sequence: one ends away from the recorder and
-;;; has its return walk appended, one is already there and adds nothing.
+;;; has its return move appended, one is already there and adds nothing.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -41,9 +41,9 @@
 
   ;; Two ghost agents in the two terminal situations the recording sequence must handle.
   ;; PLAYBACK-ECHO ends its recording away from the recorder with a route back, so the
-  ;; report appends its return walk; PLAYBACK-BETA already stands on the recorder, so it
-  ;; contributes no marker.  Real walkability is required for the distinction to exist at
-  ;; all -- under -walkability's identity default the closure never leaves the agent's own
+  ;; report appends its return move; PLAYBACK-BETA already stands on the recorder, so it
+  ;; contributes no marker.  Real mobility is required for the distinction to exist at
+  ;; all -- without a provider the closure never leaves the agent's own
   ;; location, and a ghost away from the recorder could never close its recording.
   (has-location operator-alpha site-a)
   (has-location playback-echo site-b)
@@ -59,12 +59,18 @@
              '((1.0 (pickup-connector operator-alpha tool-alpha site-a))
                (2.0 (pickup-connector playback-echo tool-echo site-a))
                (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
-               (4.0 (walk operator-alpha site-a site-b))
+               (4.0 (move operator-alpha site-a site-b
+                    ((walk site-a nil site-b))))
                (5.0 (connect-connector operator-alpha tool-alpha tool-echo site-b))
-               (6.0 (walk operator-alpha site-b site-c))
-               (7.0 (walk playback-echo site-a site-b))
-               (8.0 (step-on playback-echo plate1))
-               (9.0 (walk operator-alpha site-c site-d))))
+               (6.0 (move operator-alpha site-b site-c
+                    ((walk site-b nil site-c))))
+               (7.0 (move playback-echo site-a site-b
+                    ((walk site-a nil site-b))))
+               (8.0 (change-configuration playback-echo
+                      (site-b ground) (site-b plate1)
+                      (step (site-b ground) nil (site-b plate1))))
+               (9.0 (move operator-alpha site-c site-d
+                    ((walk site-c nil site-d))))))
            (saved-path (copy-tree path))
            (solution
              (make-solution
@@ -95,14 +101,18 @@
             (2.0 (pickup-connector playback-echo tool-echo site-a))
             (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
             (pause)
-            (7.0 (walk playback-echo site-a site-b))
-            (8.0 (step-on playback-echo plate1))
+            (7.0 (move playback-echo site-a site-b
+                  ((walk site-a nil site-b))))
+            (8.0 (change-configuration playback-echo
+                   (site-b ground) (site-b plate1)
+                   (step (site-b ground) nil (site-b plate1))))
             (pause)
-            ;; Appended by RECORDER-RETURN-WALKS: the searched path stopped at the goal
+            ;; Appended by RECORDER-RETURN-MOVES: the searched path stopped at the goal
             ;; with PLAYBACK-ECHO away from the recorder, and a recording cannot be stopped
             ;; from there.  PLAYBACK-BETA is already on the recorder and adds nothing, so
             ;; exactly one marker appears and it carries no step number.
-            (walk playback-echo site-b site-a)
+            (move playback-echo site-b site-a
+              ((walk site-b nil site-a)))
             (stop-recorder)))
         (equal
           (getf report :playback)
@@ -112,16 +122,23 @@
             (2.0 (pickup-connector playback-echo tool-echo site-a))
             (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
             (pause)
-            (4.0 (walk operator-alpha site-a site-b))
+            (4.0 (move operator-alpha site-a site-b
+                  ((walk site-a nil site-b))))
             (5.0 (connect-connector operator-alpha tool-alpha tool-echo site-b))
-            (6.0 (walk operator-alpha site-b site-c))
+            (6.0 (move operator-alpha site-b site-c
+                  ((walk site-b nil site-c))))
             (resume)
-            (7.0 (walk playback-echo site-a site-b))
-            (8.0 (step-on playback-echo plate1))
+            (7.0 (move playback-echo site-a site-b
+                  ((walk site-a nil site-b))))
+            (8.0 (change-configuration playback-echo
+                   (site-b ground) (site-b plate1)
+                   (step (site-b ground) nil (site-b plate1))))
             (pause)
-            (9.0 (walk operator-alpha site-c site-d))))
+            (9.0 (move operator-alpha site-c site-d
+                  ((walk site-c nil site-d))))))
         (search "Recording phase:" printed)
         (search "Playback phase:" printed)
+        (search "(WALK SITE-A NIL SITE-B)" printed)
         solution-position
         recording-position
       playback-position

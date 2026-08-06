@@ -207,40 +207,45 @@
 
     ;; MAIN-AGENT passes GATE-A and then the screen, reaching every non-sealed
     ;; location.  No extra location may leak into its exact six-location closure.
-    (= (length (walkable-locations main-agent left-start)) 6)
+    (= (length (mobility-locations main-agent left-start)) 6)
     (member 'left-start
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (member 'left-peer
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (member 'middle
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (member 'right-goal
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (member 'right-line
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (member 'right-vertex
-            (walkable-locations main-agent left-start))
+            (mobility-locations main-agent left-start))
     (not (member 'sealed-site
-                 (walkable-locations main-agent left-start)))
+                 (mobility-locations main-agent left-start)))
     (one-step-walkable main-agent left-start right-goal)
-    (walkable main-agent left-start right-goal)
-    (not (walkable main-agent left-start sealed-site))
+    (traversable main-agent left-start right-goal)
+    (not (traversable main-agent left-start sealed-site))
+    (equal
+      (second
+        (assoc 'right-goal
+               (mobility-results main-agent left-start)))
+      '((walk left-start (gate-a screen-a) right-goal)))
 
     ;; HOLDING-AGENT passes open GATE-A but neither closed GATE-C nor SCREEN-A.
     ;; Its closure therefore stops after exactly the middle zone.
-    (= (length (walkable-locations holding-agent left-start)) 3)
+    (= (length (mobility-locations holding-agent left-start)) 3)
     (member 'left-start
-            (walkable-locations holding-agent left-start))
+            (mobility-locations holding-agent left-start))
     (member 'left-peer
-            (walkable-locations holding-agent left-start))
+            (mobility-locations holding-agent left-start))
     (member 'middle
-            (walkable-locations holding-agent left-start))
+            (mobility-locations holding-agent left-start))
     (not (member 'right-goal
-                 (walkable-locations holding-agent left-start)))
+                 (mobility-locations holding-agent left-start)))
     (one-step-walkable holding-agent left-start middle)
     (not (one-step-walkable holding-agent middle right-goal))
-    (not (walkable holding-agent left-start right-goal))
-    (not (walkable holding-agent left-start sealed-site))))
+    (not (traversable holding-agent left-start right-goal))
+    (not (traversable holding-agent left-start sealed-site))))
 
 
 (define-goal

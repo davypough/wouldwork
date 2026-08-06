@@ -51,13 +51,13 @@ Open with a **header block**: source filename; authoring path (coordinate-derive
 
 Then the sections below. Treat them as a **template**: drop any the problem doesn't exercise, and add problem-specific ones where a derived layer doesn't fit the headings.
 
-### 1. Walkability network
+### 1. Mobility network
 
-From `walk-via`, `walk-via>`, and the passability queries `obstacle-clear` / `all-clear` (in `tech/-passability.lisp`), consumed by `walkable-locations`, `walkable`, and `one-step-walkable`. Keep the separate `jump-via`, `jump-via>`, and `climb-via>` locomotion edges outside this walking network.
+From the currently installed mobility providers: `walk-via` / `walk-via>`, `stairs-via` / `stairs-via>`, `jump-via` / `jump-via>`, and `climb-via>`, composed by `mobility-results`, `mobility-locations`, and `traversable`. Passability comes from `obstacle-clear` / `all-clear` in `tech/-passability.lisp`.
 
-- **The clause convention, stated once.** These `$list` values are **DNF door-clause lists**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
+- **The walking clause convention, stated once.** `walk-via` and `walk-via>` values are **DNF door-clause lists**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
 - **Each walking edge** with its clause list. Mark direction: `walk-via` is symmetric; `walk-via>` is directional, and the reverse direction may have a different clause list or none.
-- **Separate locomotion edges.** Record `jump-via` / `jump-via>` and `climb-via>` separately; they are not members of the walking closure.
+- **Other mobility modes.** Record stairs, jump, and climb edges separately from walking even though the mobility closure composes their grounded traversals. Their values are flat conjunctions, not DNF. Jump feasibility uses the hypothetical source location's floor elevation, the destination floor elevation, and the highest non-passable feature top. A `climb-via>` list must contain a ladder positioned exactly at the segment source; the selected ladder appears first in the route witness. Support-changing jumps and steps are explicit `change-configuration` boundaries rather than mobility segments.
 - **The per-kind passability rule** for each obstacle kind the spec actually uses, read from `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **gears** item is an air-stream crossing, passable unless a blowing fan is mounted.
 - **Air streams, if present.** They are derived, not authored: each wall-gears' band runs from the solid backstop behind its fan, through its `has-position` swept location, to its `aimed-at` destination, 3 units wide unless `stream-width` overrides. The swept location is standable exactly while the stream is off.
 - **Flag any location with no walk edge at all**, and any location reachable only by a directional edge.

@@ -167,7 +167,7 @@
   (jam-disallowed> location1 location7 gate1)
   (jam-disallowed> location7 location1 gate4)
 
-  ;; One-way ladder traversal
+  ;; One-way ladder traversal contributed to the mobility closure.
   (climb-via> location7 (ladder1) location1)
 
   ;; Authored elevation changes

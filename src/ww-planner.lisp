@@ -12,7 +12,7 @@
   (declare (type problem-state state))  ; (ignore parent))
   (list (problem-state.time state)
         (cons (problem-state.name state)
-              (problem-state.instantiations state))))
+              (copy-tree (problem-state.instantiations state)))))
 
 
 (defun apply-depth-first-init-delta (state baseline-idb changes)
@@ -335,7 +335,7 @@
       (remhash (gethash 'waiting *constant-integers*) new-state-idb))  ;if prior was wait
     (make-problem-state
        :name (action.name action)
-       :instantiations new-state-instantiations
+       :instantiations (copy-tree new-state-instantiations)
        :happenings new-happenings  ;nil for normal actions, sim-state happenings for strategic-wait
        :time (+ (problem-state.time state) new-action-duration)
        :value (update.value updated-db)

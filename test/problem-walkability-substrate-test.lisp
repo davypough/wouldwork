@@ -1,11 +1,10 @@
-;;; Dedicated zero-action regression for the shared -walkability substrate.
+;;; Dedicated zero-action regression for -walkability topology and neutral -mobility.
 ;;;
 ;;; An authored WALK-VIA edge verifies symmetric relation installation and
 ;;; preservation of its DNF obstacle clauses.  An authored WALK-VIA> edge
 ;;; verifies the corresponding directional boundary.  Despite both topology
-;;; facts, the substrate's neutral WALKABLE-LOCATIONS implementation must return
-;;; exactly the requested starting location; only public walkability may replace
-;;; that identity default with a walking closure and install the WALK action.
+;;; facts, neutral MOBILITY-RESULTS returns exactly the requested starting location;
+;;; only public walkability registers a provider and brings in the MOVE action.
 ;;;
 ;;; The initial and final dynamic states are empty.  The characterization query
 ;;; is already true after staging, so the expected minimum path length is 0.
@@ -33,6 +32,7 @@
 
 
 (include-tech -walkability)
+(include-tech -mobility)
 
 
 ;;;; STATIC TOPOLOGY ;;;;
@@ -96,23 +96,23 @@
           $unexpected-directional-family
           origin)))
 
-    ;; Authored topology cannot expand the substrate's identity default.
+    ;; Authored topology cannot expand mobility without a registered provider.
     (equal
-      (walkable-locations first-agent origin)
+      (mobility-locations first-agent origin)
       '(origin))
-    (walkable first-agent origin origin)
-    (not (walkable first-agent origin symmetric-neighbor))
-    (not (walkable first-agent origin directional-neighbor))
+    (traversable first-agent origin origin)
+    (not (traversable first-agent origin symmetric-neighbor))
+    (not (traversable first-agent origin directional-neighbor))
 
     ;; The default is independent of the agent and works at an isolated start.
     (equal
-      (walkable-locations second-agent origin)
+      (mobility-locations second-agent origin)
       '(origin))
     (equal
-      (walkable-locations second-agent isolated-site)
+      (mobility-locations second-agent isolated-site)
       '(isolated-site))
-    (walkable second-agent isolated-site isolated-site)
-    (not (walkable second-agent isolated-site origin))))
+    (traversable second-agent isolated-site isolated-site)
+    (not (traversable second-agent isolated-site origin))))
 
 
 (define-goal

@@ -494,7 +494,7 @@ to the search's candidate-validation diagnostics."
   ;; Update state metadata
   (setf (problem-state.name state) (action.name action))
   (setf (problem-state.instantiations state)
-        (copy-list (update.instantiations update)))
+        (copy-tree (update.instantiations update)))
   (incf (problem-state.time state) (action.duration action))
   (setf (problem-state.value state) (update.value update)))
 
