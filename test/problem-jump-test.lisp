@@ -189,18 +189,12 @@
 
 
 (define-test-helper jump-transition-scenarios-valid-p (state)
-  "Characterize positive and negative MOVE and configuration successors from STATE."
+  "Characterize positive and negative grounded and support-changing MOVE successors."
   (let ((move-action (find 'move *actions* :key #'action.name))
-        (configuration-action
-          (find 'change-configuration *actions* :key #'action.name))
         (saved-dropped-count *inconsistent-states-dropped*))
     (unwind-protect
       (let ((move-children
               (let ((*actions* (list move-action)))
-                (generate-children
-                  (make-node :state state :depth 0))))
-            (configuration-children
-              (let ((*actions* (list configuration-action)))
                 (generate-children
                   (make-node :state state :depth 0)))))
         (and
@@ -212,14 +206,6 @@
                     nil))
                 move-children)
 
-          ;; Ground-to-ground jump edges belong only to MOVE.
-          (notany (lambda (child)
-                    (jump-child-matches-p
-                      child
-                      '((has-location screen-probe-agent screen-probe-goal))
-                      nil))
-                  configuration-children)
-
           ;; A lethal destination cannot be produced by the real mobility action.
           (notany (lambda (child)
                     (jump-child-matches-p
@@ -228,8 +214,8 @@
                       nil))
                   move-children)
 
-          ;; The occupied-box lane retains its legal MOVE ground child, while the explicit
-          ;; configuration action has neither a ground child nor an occupied box-top child.
+          ;; The occupied-box lane retains its legal grounded child, but cannot land on the
+          ;; occupied box top.
           (some (lambda (child)
                   (jump-child-matches-p
                     child
@@ -239,16 +225,10 @@
           (notany (lambda (child)
                     (jump-child-matches-p
                       child
-                      '((has-location occupied-probe-agent occupied-goal))
-                      nil))
-                  configuration-children)
-          (notany (lambda (child)
-                    (jump-child-matches-p
-                      child
                       '((has-location occupied-probe-agent occupied-goal)
                         (on occupied-probe-agent occupied-target-box))
                       nil))
-                  configuration-children)
+                  move-children)
 
           ;; The clear but over-height local box cannot be mounted.
           (notany (lambda (child)
@@ -256,7 +236,7 @@
                       child
                       '((on tall-box-probe-agent tall-local-box))
                       nil))
-                  configuration-children)
+                  move-children)
 
           ;; vault-start -> vault-goal is directed and cannot be traversed backward by MOVE.
           (notany (lambda (child)
@@ -372,8 +352,9 @@
     (has-location tall-box-probe-agent tall-box-site)
     (cleartop tall-local-box)
 
-    ;; The old monolithic jump action is gone.
-    (find 'change-configuration *actions* :key #'action.name)
+    ;; One MOVE action owns both grounded routes and explicit support changes.
+    (find 'move *actions* :key #'action.name)
+    (not (find 'change-configuration *actions* :key #'action.name))
     (not (find 'jump-to *actions* :key #'action.name))
 
     ;; Inspect the installed action rather than merely restating its branch conditions.

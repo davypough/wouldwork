@@ -114,21 +114,18 @@
 
 (define-test-claim move-produces-one-successor-per-endpoint
   (let* ((updates (move-action-updates *start-state* 'main-agent))
-         (destinations
+         (routes
            (mapcar (lambda (update)
-                     (third (update.instantiations update)))
+                     (second (update.instantiations update)))
                    updates)))
     (and (= (length updates) 2)
-         (= (count 'main-mid destinations) 1)
-         (= (count 'main-goal destinations) 1)
-         (equal
-           (fourth
-             (update.instantiations
-               (find 'main-goal updates
-                     :key (lambda (update)
-                            (third (update.instantiations update))))))
-           '((walk main-start nil main-mid)
-             (walk main-mid (open-gate-b) main-goal)))
+         (= (count '((walk main-start nil main-mid))
+                   routes :test #'equal)
+            1)
+         (= (count '((walk main-start nil main-mid)
+                     (walk main-mid (open-gate-b) main-goal))
+                   routes :test #'equal)
+            1)
          (not (move-action-updates *start-state* 'supported-agent))
          (not (move-action-updates *start-state* 'isolated-agent)))))
 
@@ -224,8 +221,9 @@
 
 
 (define-action-precondition-mutation move-allows-supported-agent move
-  (and (bind (has-location ?agent $source))
-       (assign $mobility-results
-               (mobility-results ?agent $source)))
+  (do (assign $source-configuration (agent-configuration ?agent))
+      (assign $movement-results
+              (grounded-movement-results-in-state
+                state ?agent (first $source-configuration))))
   "Drops MOVE's ground-only guard.  The supported-agent probe must then make
    this characterization fail.")

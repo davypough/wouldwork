@@ -109,13 +109,21 @@
          (goal-update
            (find 'main-goal updates
                  :key (lambda (update)
-                        (third (update.instantiations update))))))
+                        (fourth
+                          (car
+                            (last
+                              (second
+                                (update.instantiations update)))))))))
     (and (= (count 'main-goal updates
                    :key (lambda (update)
-                          (third (update.instantiations update))))
+                          (fourth
+                            (car
+                              (last
+                                (second
+                                  (update.instantiations update)))))))
             1)
          (equal
-           (fourth (update.instantiations goal-update))
+           (second (update.instantiations goal-update))
            '((walk main-start nil stairs-foot)
              (stairs stairs-foot (open-gate) stairs-top)
              (walk stairs-top nil main-goal))))))
@@ -161,11 +169,15 @@
          (goal-updates
            (remove-if-not
              (lambda (update)
-               (eql (third (update.instantiations update)) 'canonical-goal))
+               (eql (fourth
+                      (car
+                        (last
+                          (second (update.instantiations update)))))
+                    'canonical-goal))
              updates)))
     (and (= (length goal-updates) 1)
          (equal
-           (fourth (update.instantiations (first goal-updates)))
+           (second (update.instantiations (first goal-updates)))
            '((stairs canonical-start nil canonical-a)
              (walk canonical-a nil canonical-goal))))))
 

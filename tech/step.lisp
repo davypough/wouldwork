@@ -15,8 +15,8 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location; plate comes from nested -plate-types and fan is
 ;;;               declared optional here
-;;;   nested    : -configuration-transition (configuration representation, provider
-;;;               registry, central action, support mutation, and propagation);
+;;;   nested    : -mobility-action (central MOVE action, configuration representation,
+;;;               transition registry, support mutation, and propagation);
 ;;;               -position ((has-position ...))
 ;;;   conditional relations:
 ;;;               mounted-on (fan), guarded by fan  --  owned by -gears-fan.lisp;
@@ -27,9 +27,9 @@
 ;;;               steppable-fixture-at, step-configuration-transitions
 ;;;   provider  : step-configuration-transitions registered with
 ;;;               -configuration-transition
-;;;   action    : change-configuration (from -configuration-transition)
+;;;   action    : move (from -mobility-action)
 
-(include-tech -configuration-transition)
+(include-tech -mobility-action)
 (include-tech -position)
 
 (in-package :ww)

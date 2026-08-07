@@ -67,9 +67,9 @@
 
 
 (define-query recording-agent-return-route (?agent agent)
-  ;; (?agent from to route) for the move that closes ?agent's recording, or nil when ?agent
-  ;; already stands on a recorder and no return trip is outstanding.  Consumed by the
-  ;; report, which appends the move a goal-terminated search stopped short of.
+  ;; (?agent route) for the move that closes ?agent's recording, or nil when ?agent already
+  ;; stands on a recorder and no return trip is outstanding.  Consumed by the report, which
+  ;; appends the move a goal-terminated search stopped short of.
   (do (bind (has-location ?agent $agent-location))
       (assign $outstanding (not (recording-agent-at-recorder ?agent)))
       (assign $results (mobility-results ?agent $agent-location))
@@ -81,7 +81,7 @@
                            (exists (?recorder recorder)
                              (has-position ?recorder $location)))
                     (assign $return-move
-                            (list ?agent $agent-location $location
+                            (list ?agent
                                   (second $result)))))
       $return-move))
 
@@ -233,7 +233,7 @@ whatever return move the searched path stopped short of."
 
 
 (defun recorder-return-moves (state)
-  "Return one (MOVE agent from to route) marker per ghost still away from a recorder.
+  "Return one (MOVE agent route) marker per ghost away.
 
 STATE is the completed integrated state.  A ghost's location there, and the recording-side
 gate and gears state its mobility closure is computed against, are the same as at the end of

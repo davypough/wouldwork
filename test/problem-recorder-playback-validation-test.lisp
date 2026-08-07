@@ -76,8 +76,8 @@
   "Return the exact recorded action form for a local plate transition."
   (let ((source (list 'recorder-site source-place))
         (destination (list 'recorder-site destination-place)))
-    (list 'change-configuration agent source destination
-          (list 'step source nil destination))))
+    (list 'move agent
+          (list (list 'step source nil destination)))))
 
 
 (define-test-claim recorder-playback-validation-contract
@@ -144,14 +144,14 @@
   (validate-recorder-solution
     *start-state*
     '((1.0 (finish-while-plate-clear live-agent))
-      (2.0 (move ghost-agent recorder-site away-site
+      (2.0 (move ghost-agent
              ((walk recorder-site nil away-site)))))
     *start-state*)
   (multiple-value-bind (valid-p diagnostic)
       (validate-recorder-solution
         *start-state*
         '((1.0 (finish-while-plate-clear live-agent))
-          (2.0 (move ghost-agent recorder-site stranded-site
+          (2.0 (move ghost-agent
                  ((walk recorder-site nil away-site)
                   (walk away-site nil stranded-site)))))
         *start-state*)

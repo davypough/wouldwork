@@ -59,17 +59,16 @@
              '((1.0 (pickup-connector operator-alpha tool-alpha site-a))
                (2.0 (pickup-connector playback-echo tool-echo site-a))
                (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
-               (4.0 (move operator-alpha site-a site-b
+               (4.0 (move operator-alpha
                     ((walk site-a nil site-b))))
                (5.0 (connect-connector operator-alpha tool-alpha tool-echo site-b))
-               (6.0 (move operator-alpha site-b site-c
+               (6.0 (move operator-alpha
                     ((walk site-b nil site-c))))
-               (7.0 (move playback-echo site-a site-b
+               (7.0 (move playback-echo
                     ((walk site-a nil site-b))))
-               (8.0 (change-configuration playback-echo
-                      (site-b ground) (site-b plate1)
-                      (step (site-b ground) nil (site-b plate1))))
-               (9.0 (move operator-alpha site-c site-d
+               (8.0 (move playback-echo
+                      ((step (site-b ground) nil (site-b plate1)))))
+               (9.0 (move operator-alpha
                     ((walk site-c nil site-d))))))
            (saved-path (copy-tree path))
            (solution
@@ -101,17 +100,16 @@
             (2.0 (pickup-connector playback-echo tool-echo site-a))
             (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
             (pause)
-            (7.0 (move playback-echo site-a site-b
+            (7.0 (move playback-echo
                   ((walk site-a nil site-b))))
-            (8.0 (change-configuration playback-echo
-                   (site-b ground) (site-b plate1)
-                   (step (site-b ground) nil (site-b plate1))))
+            (8.0 (move playback-echo
+                   ((step (site-b ground) nil (site-b plate1)))))
             (pause)
             ;; Appended by RECORDER-RETURN-MOVES: the searched path stopped at the goal
             ;; with PLAYBACK-ECHO away from the recorder, and a recording cannot be stopped
             ;; from there.  PLAYBACK-BETA is already on the recorder and adds nothing, so
             ;; exactly one marker appears and it carries no step number.
-            (move playback-echo site-b site-a
+            (move playback-echo
               ((walk site-b nil site-a)))
             (stop-recorder)))
         (equal
@@ -122,19 +120,18 @@
             (2.0 (pickup-connector playback-echo tool-echo site-a))
             (3.0 (connect-connector playback-echo tool-echo transmitter1 site-a))
             (pause)
-            (4.0 (move operator-alpha site-a site-b
+            (4.0 (move operator-alpha
                   ((walk site-a nil site-b))))
             (5.0 (connect-connector operator-alpha tool-alpha tool-echo site-b))
-            (6.0 (move operator-alpha site-b site-c
+            (6.0 (move operator-alpha
                   ((walk site-b nil site-c))))
             (resume)
-            (7.0 (move playback-echo site-a site-b
+            (7.0 (move playback-echo
                   ((walk site-a nil site-b))))
-            (8.0 (change-configuration playback-echo
-                   (site-b ground) (site-b plate1)
-                   (step (site-b ground) nil (site-b plate1))))
+            (8.0 (move playback-echo
+                   ((step (site-b ground) nil (site-b plate1)))))
             (pause)
-            (9.0 (move operator-alpha site-c site-d
+            (9.0 (move operator-alpha
                   ((walk site-c nil site-d))))))
         (search "Recording phase:" printed)
         (search "Playback phase:" printed)

@@ -8,7 +8,7 @@
 ;;; gears' jam-forces-stopped.  A gun may be wired to receivers/plates via -controls
 ;;; exactly like a gate or gears.  It has zero physical height and is positioned as a
 ;;; functional point fixture exactly like a
-;;; transmitter or receiver (-visibility's apparatus/fixture unions, -beam-los-
+;;; transmitter or receiver (-visibility's apparatus union, -beam-los-
 ;;; coordinates' apparatus-coords>) rather than with HAS-POSITION: nothing can ever
 ;;; occupy a gun's mounting point, since it isn't a location at all.  Jammed via
 ;;; jammer.lisp's target union; jam-target's LOS check reads it through visible/
@@ -24,7 +24,7 @@
 ;;;   nested    : -threat (gun optional type, threat union, (threatens ...), (lethal ...),
 ;;;               safe); -controls ((controls ...), energized; nests -beam-substrate for
 ;;;               (active receiver)) -- shared with gate and the blower techs' gears
-;;;   soft      : apparatus-coords>/fixture/apparatus (-visibility, -beam-los-
+;;;   soft      : apparatus-coords>/apparatus (-visibility, -beam-los-
 ;;;               coordinates) -- required only if a problem wants to jam this gun;
 ;;;               reached through jammer.lisp's own -visibility nest, and through public
 ;;;               visibility.lisp if LOS is to be derived from geometry rather than

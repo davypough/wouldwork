@@ -115,13 +115,11 @@
   (let* ((route (claustro-boundary-route))
          (actions
            (list
-             '(change-configuration boundary-agent
-                (location10 ground) (location10 box2)
-                (jump (location10 ground) nil (location10 box2)))
-             '(change-configuration boundary-agent
-                (location10 box2) (location12 ground)
-                (jump (location10 box2) nil (location12 ground)))
-             (list 'move 'boundary-agent 'location12 'location11 route)))
+             '(move boundary-agent
+                ((jump (location10 ground) nil (location10 box2))))
+             '(move boundary-agent
+                ((jump (location10 box2) nil (location12 ground))))
+             (list 'move 'boundary-agent route)))
          (validation (validate-action-sequence *start-state* actions)))
     (and
       (action-sequence-validation-success-p validation)
@@ -138,7 +136,19 @@
                   (database final-state)
                   :test #'equal)
           (equal (problem-state.instantiations final-state)
-                 (list 'boundary-agent 'location12 'location11 route)))))))
+                 (list 'boundary-agent route)))))))
+
+
+(define-test-claim move-display-omits-route-endpoints
+  (let ((route (claustro-boundary-route)))
+    (and
+      (equal
+        (action.effect-variables
+          (find 'move *actions* :key #'action.name))
+        '(?agent $route))
+      (equal
+        (merge-effect-format 'move (list 'boundary-agent route))
+        (list ">" 'boundary-agent "moves via" route)))))
 
 
 (define-goal

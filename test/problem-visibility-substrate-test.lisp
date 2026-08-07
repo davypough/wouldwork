@@ -1,11 +1,11 @@
 ;;; Dedicated zero-action regression for the shared -visibility substrate.
 ;;;
-;;; One instance of every optional fixture leaf characterizes the exact
-;;; REPEATER, FIXTURE, and APPARATUS unions.  The goal calls each neutral
-;;; visibility hook across every valid target shape and several endpoint
-;;; elevations; every call must remain false until public visibility overrides
-;;; the hooks.  It also verifies that the public LOS/coordinate relations,
-;;; helper queries, initialization, actions, and dynamic state remain absent.
+;;; One instance of every optional apparatus/gate leaf characterizes the exact
+;;; REPEATER and APPARATUS unions.  The goal calls each neutral visibility hook
+;;; across every valid target shape and several endpoint elevations; every call
+;;; must remain false until public visibility overrides the hooks.  It also
+;;; verifies that the public LOS/coordinate relations, helper queries,
+;;; initialization, actions, and dynamic state remain absent.
 ;;;
 ;;; The initial and final dynamic states are empty.  The characterization query
 ;;; is true immediately after staging, so the expected minimum path length is 0.
@@ -43,19 +43,13 @@
 
 
 (define-test-claim visibility-substrate-schema
+  (expect-type-absent 'fixture)
   (expect-type-components 'repeater '(floor-repeater wall-repeater))
-  (expect-type-components
-    'fixture
-    '(gate transmitter receiver floor-repeater wall-repeater gun))
   (expect-type-components
     'apparatus
     '(transmitter receiver floor-repeater wall-repeater gun))
   (expect-type-instances
     'repeater '(sample-floor-repeater sample-wall-repeater))
-  (expect-type-instances
-    'fixture
-    '(sample-gate sample-transmitter sample-receiver
-      sample-floor-repeater sample-wall-repeater sample-gun))
   (expect-type-instances
     'apparatus
     '(sample-transmitter sample-receiver
@@ -75,8 +69,8 @@
   (not (state-is-inconsistent *start-state*)))
 
 
-(define-query visibility-substrate-fixture-type-valid
-    (?object fixture)
+(define-query visibility-substrate-gate-type-valid
+    (?object gate)
   (do
     ?object
     t))
@@ -89,8 +83,8 @@
     t))
 
 
-(define-query visibility-substrate-fixture-neutral
-    (?object fixture)
+(define-query visibility-substrate-gate-neutral
+    (?object gate)
   (and
     (not (visible near-site ?object))
     (not (visible-for-object nil near-site ?object))
@@ -100,7 +94,9 @@
 (define-query visibility-substrate-apparatus-neutral
     (?object apparatus)
   (and
-    (visibility-substrate-fixture-neutral ?object)
+    (not (visible near-site ?object))
+    (not (visible-for-object nil near-site ?object))
+    (not (potentially-visible near-site ?object))
     (not (beam-visible near-site 0 ?object 0))
     (not (beam-visible near-site -1 ?object 3/2))
     (not (beam-visible-for-object nil near-site 0 ?object 0))
@@ -124,11 +120,11 @@
 
 (define-query visibility-substrate-scenarios-valid ()
   (and
-    ;; A gate is a fixture but deliberately not an apparatus.
-    (visibility-substrate-fixture-type-valid sample-gate)
-    (visibility-substrate-fixture-neutral sample-gate)
+    ;; A gate is a valid sightline target but deliberately not an apparatus.
+    (visibility-substrate-gate-type-valid sample-gate)
+    (visibility-substrate-gate-neutral sample-gate)
 
-    ;; Every point fixture is both an apparatus and a fixture.
+    ;; Every point apparatus is a valid sightline target.
     (visibility-substrate-apparatus-type-valid sample-transmitter)
     (visibility-substrate-apparatus-type-valid sample-receiver)
     (visibility-substrate-apparatus-type-valid sample-floor-repeater)

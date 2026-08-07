@@ -117,7 +117,7 @@
 
 
 (define-test-helper step-transition-available-p (state agent transition)
-  "Whether the central configuration action offers TRANSITION for AGENT in STATE."
+  "Whether the configuration provider offers TRANSITION for AGENT in STATE."
   (member transition
           (configuration-transition-results state agent)
           :test #'equal))
@@ -230,8 +230,9 @@
            state 'box-agent
            '(step (box-site box-support) nil (box-site ground))))
 
-    ;; The old action pair is gone; one central action owns support mutation.
-    (find 'change-configuration *actions* :key #'action.name)
+    ;; One MOVE action owns both ordinary travel and support mutation.
+    (find 'move *actions* :key #'action.name)
+    (not (find 'change-configuration *actions* :key #'action.name))
     (not (find 'step-on *actions* :key #'action.name))
     (not (find 'step-off *actions* :key #'action.name))))
 

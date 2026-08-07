@@ -16,7 +16,6 @@
 ;;;   query     : agent-configuration, configuration-transition-results
 ;;;   functions : register-configuration-transition-provider and canonical selection helpers
 ;;;   update    : apply-agent-configuration!
-;;;   action    : change-configuration
 
 (include-tech -support-occupancy)
 (include-tech -location)
@@ -122,19 +121,3 @@
       (has-location ?agent (first ?destination-configuration))
       (if (not (eql (second ?destination-configuration) 'ground))
         (on ?agent (second ?destination-configuration)))))
-
-
-(define-action change-configuration
-  1
-  (?agent agent)
-  (do (assign $source-configuration (agent-configuration ?agent))
-      (assign $transitions (configuration-transition-results ?agent)))
-  (">" ?agent "changes from" $source-configuration "to"
-       $destination-configuration "via" $transition)
-  (ww-loop for $candidate in $transitions
-           do (assert
-                (assign $destination-configuration (fourth $candidate))
-                (assign $transition $candidate)
-                (apply-agent-configuration!
-                  ?agent $destination-configuration)
-                (finally (propagate-changes!)))))

@@ -129,7 +129,9 @@
   "Return AGENT's MOVE updates whose endpoint is DESTINATION."
   (remove-if-not
     (lambda (update)
-      (eql (third (update.instantiations update)) destination))
+      (eql (fourth
+             (car (last (second (update.instantiations update)))))
+           destination))
     (ladder-test-move-updates state agent)))
 
 
@@ -138,7 +140,7 @@
           (ladder-test-updates-to *start-state* 'climber 'goal)))
     (and (= (length updates) 1)
          (equal
-           (fourth (update.instantiations (first updates)))
+           (second (update.instantiations (first updates)))
            '((walk entry nil lower)
              (ladder lower (ladder1 screen1) middle)
              (ladder middle (ladder2) upper)
@@ -151,7 +153,7 @@
             *start-state* 'canonical-agent 'canonical-goal)))
     (and (= (length updates) 1)
          (equal
-           (fourth (update.instantiations (first updates)))
+           (second (update.instantiations (first updates)))
            '((ladder canonical-start
                (canonical-ladder-a canonical-ladder-b)
                canonical-goal))))))
@@ -164,7 +166,7 @@
 (define-test-claim ladder-route-replays-exactly
   (multiple-value-bind (state success-p failure)
       (apply-action-to-state
-        '(move climber entry goal
+        '(move climber
           ((walk entry nil lower)
            (ladder lower (ladder1 screen1) middle)
            (ladder middle (ladder2) upper)
@@ -176,7 +178,7 @@
          (funcall (symbol-function 'ladder-climber-at-goal) state)))
   (multiple-value-bind (state success-p failure)
       (apply-action-to-state
-        '(move climber entry goal
+        '(move climber
           ((walk entry nil lower)
            (ladder lower (ladder2 screen1) middle)
            (ladder middle (ladder1) upper)

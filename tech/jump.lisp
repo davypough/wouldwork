@@ -16,8 +16,7 @@
 ;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
 ;;;               support-top-elevation, and occupant-elevation); -passability
 ;;;               (holding and obstacle-clear); -threat (safe -- true unless an armed gun
-;;;               or other threat endangers the landing location); -mobility-action;
-;;;               -configuration-transition
+;;;               or other threat endangers the landing location); -mobility-action
 ;;; PROVIDES:
 ;;;   types     : box, wall  --  declared optional; jumping remains usable without them
 ;;;               vaultable-object (either gate screen wall)
@@ -30,14 +29,12 @@
 ;;;   provider  : jump-traversal-segments registered with -mobility
 ;;;               jump-configuration-transitions registered with
 ;;;               -configuration-transition
-;;;   actions   : move (ground-to-ground mobility); change-configuration
-;;;               (support changes)
+;;;   action    : move (grounded mobility and explicit support changes)
 
 (include-tech -support-elevation)
 (include-tech -passability)
 (include-tech -threat)
 (include-tech -mobility-action)
-(include-tech -configuration-transition)
 
 (in-package :ww)
 

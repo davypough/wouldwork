@@ -96,7 +96,7 @@
 (define-test-helper gun-blower-unsafe-step-rejected-p (state agent fixture)
   "Whether an available STEP transition has no safe generated child from STATE."
   (let* ((action
-           (find 'change-configuration *actions* :key #'action.name))
+           (find 'move *actions* :key #'action.name))
          (location
            (first
              (funcall (symbol-function 'agent-configuration)

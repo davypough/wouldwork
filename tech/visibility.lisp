@@ -37,7 +37,7 @@
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, receiver, and apparatus are declared
 ;;;               optional/composite here through nested -visibility
-;;;   nested    : -visibility (fixture, apparatus, and the null-default visible/beam-visible
+;;;   nested    : -visibility (apparatus and the null-default visible/beam-visible
 ;;;               interface);
 ;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
 ;;;               walkability (via -passability), reachability, beam-direct, and
