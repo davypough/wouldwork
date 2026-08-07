@@ -7,8 +7,7 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : fixture (either gate transmitter receiver floor-repeater wall-repeater gun),
-;;;              apparatus (either transmitter receiver floor-repeater wall-repeater gun);
+;;;   types    : apparatus (either transmitter receiver floor-repeater wall-repeater gun);
 ;;;              gate, transmitter, receiver, both repeater leaf types, and gun are optional.
 ;;;              APPARATUS-COORDS> names each apparatus's functional point: beam
 ;;;              emission/reception/relay for beam apparatus, and the firing/targeting point
@@ -32,8 +31,6 @@
 
 
 (define-types
-  fixture
-    (either gate transmitter receiver floor-repeater wall-repeater gun)
   apparatus
     (either transmitter receiver floor-repeater wall-repeater gun))
 

@@ -39,7 +39,6 @@ elevated-object (either location gate screen wall transmitter receiver wall-gear
 fixed-beam-source (either transmitter floor-repeater wall-repeater)
 fixed-beam-sink (either floor-repeater wall-repeater receiver)
 fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder)
-fixture (either gate transmitter receiver floor-repeater wall-repeater gun)
 gears (either floor-gears wall-gears angled-gears)
 heighted-object (either box gate agent screen wall jammer connector floor-repeater wall-repeater)
 mobile-object (either agent box jammer connector fan)

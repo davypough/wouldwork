@@ -177,8 +177,8 @@
   ;; Nearby manipulation across boundaries
   (reach-via location1 () location7)
   (reach-via location2 (gate2 gate3) location3)
-  (reach-via location4 () location5)
-  (reach-via location5 () location6)
+  ;(reach-via location4 () location5)  ;removing these 2 reaches increases solution by one step,
+  ;(reach-via location5 () location6)  ;but reduces search time by 12%
 
   ;; Beam corridor.  Hand-authored, not coordinate-derived: -beam-los-coordinates.lisp only
   ;; derives LOS-TO-APPARATUS/LOS-TO-LOCATION (per-location sightline occluders), not
