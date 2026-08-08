@@ -33,7 +33,7 @@
   gate  (gate1 gate2 gate3 gate4 gate5 gate6 gate7 gate8 gate9)
   screen (screen1)
   wall (wall1 wall2 wall3)
-  edge (edge1 edge2)
+  edge (edge1)
   window (window1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
             location9 location10 location11 location12 location13)
@@ -57,6 +57,7 @@
 (include-tech jammer)
 (include-tech box)
 (include-tech jump)
+(include-tech stairs)
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
@@ -114,21 +115,29 @@
   ;; Opaque internal wall, interrupted by a visibility-transparent,
   ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo.lisp
   ;; (same segment declared there) so LOS/walkability derivations here see it too.
-  ;; edge1 and edge2 are the ground-level footprint of the raised slab that location12,
-  ;; location13, gate8, and gate9 sit on (elevation 2): east edge between location12 and
-  ;; location10, west edge between location13 and location11, sealing against the
-  ;; boundary at y 10 and 17.  Walking across the slab at ground level is thereby
-  ;; blocked; the elevation-2 crossing location12 <-> location13 lies entirely inside
-  ;; the footprint (gated by gate8/gate9), and the level changes onto and off the slab
-  ;; are the authored jump-via edges below.  These are EDGE, not WALL: each marks the
-  ;; vertical boundary between two different-elevation regions rather than a freestanding
-  ;; linear partition, so neither carries a height or participates in vaulting -- the
-  ;; jump-via edges below cross them with an empty feature list, not as a vaultable-object.
+  ;; edge1 is the ground-level footprint of the raised slab that location12, location13,
+  ;; gate8, and gate9 sit on (elevation 2): its east edge, between location12 and
+  ;; location10, sealing against the boundary at y 10 and 17.  Walking across the slab
+  ;; at ground level is thereby blocked on that side; the elevation-2 crossing
+  ;; location12 <-> location13 lies entirely inside the footprint (gated by
+  ;; gate8/gate9), and the level change onto the slab is the authored jump-via edge
+  ;; below.  This is EDGE, not WALL: it marks the vertical boundary between two
+  ;; different-elevation regions rather than a freestanding linear partition, so it
+  ;; carries no height and takes no part in vaulting -- the jump-via edge below crosses
+  ;; it with an empty feature list, not as a vaultable-object.
+  ;;
+  ;; The slab's west side, location13 <-> location11, carries no edge at all: it is
+  ;; instead the authored stairs-via crossing below, unconditional in both directions
+  ;; and blind to the elevation difference by design (tech/stairs.lisp).  With no edge
+  ;; there, -walkability-coordinates.lisp's zone flood-fill merges location11 into the
+  ;; slab's own 2D zone and derives a WALK-VIA fact between them; that fact is inert --
+  ;; walking-segment-for-family's elevation-equality check always rejects it as a usable
+  ;; WALK, since the two locations sit at different elevations -- so stairs-via remains
+  ;; the only way to actually cross.
   (wall-segment> wall1 24 0 24 2)
   (wall-segment> wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
   (wall-segment> wall3 11 10 16 10)
   (edge-segment> edge1 7 10 7 17)
-  (edge-segment> edge2 3 10 3 17)
 
   (window-segment> window1 24 2 24 4)
 
@@ -172,26 +181,13 @@
   (jam-disallowed> location1 location7 gate1)
   (jam-disallowed> location7 location1 gate4)
 
-  ;; One-way ladder traversal contributed to the mobility closure.
+  ;; Specifically authorized acts and activities between locations
   (climb-via> location7 (ladder1) location1)
-
-  ;; Authored elevation changes
-  (jump-via location10 () location12)
-  (jump-via location13 () location11)
-
-  ;; Nearby manipulation across boundaries
-  (reach-via location1 () location7)
+  (jump-via location10 () location12)  ;authorized elevation change
+  (stairs-via location13 () location11)  ;authorized elevation change, unrestricted both ways
+  (reach-via location1 () location7)  ;authorizes manipulation
   (reach-via location2 (gate2 gate3) location3)
-  ;(reach-via location4 () location5)  ;removing these 2 reaches increases solution by one step,
-  ;(reach-via location5 () location6)  ;but reduces search time by 12%
-
-  ;; Beam corridor.  Hand-authored, not coordinate-derived: -beam-los-coordinates.lisp only
-  ;; derives LOS-TO-APPARATUS/LOS-TO-LOCATION (per-location sightline occluders), not
-  ;; BEAM-VIA's own gate+location corridor list, so beam-direct still needs this listed
-  ;; explicitly.  transmitter1 (111/10 9) -> receiver1 (239/10 9) runs along y=9; gate1
-  ;; (x=16, y 5-10) crosses it, and location2 (20 9) sits exactly on it, so a beam-blocker
-  ;; placed at location2 can occlude the beam.
-  (beam-via transmitter1 (gate1 location2) receiver1)
+  (beam-via transmitter1 (gate1 location2) receiver1)  ;authorizes direct beam
 )
 
 
