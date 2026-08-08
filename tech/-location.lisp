@@ -7,8 +7,8 @@
 ;;; re-declaring the same union and relation.
 ;;;
 ;;; PROVIDES:
-;;;   type     : mobile-object (either agent box jammer connector fan)  --  what can occupy a
-;;;              location; subtypes absent from the problem's own define-types resolve to
+;;;   type     : mobile-object (either agent box jammer connector fan tray)  --  what can occupy
+;;;              a location; subtypes absent from the problem's own define-types resolve to
 ;;;              nil, a no-op
 ;;;   relation : (has-location mobile-object $location)
 
@@ -18,7 +18,7 @@
 
 
 (define-types
-  mobile-object (either agent box jammer connector fan))  ;what can be at a location
+  mobile-object (either agent box jammer connector fan tray))  ;what can be at a location
 
 
 (define-dynamic-relations

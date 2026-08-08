@@ -6,9 +6,11 @@
 ;;;   1. PUT-BOX placing a held box on a clear floor-mounted fan exactly two elevation
 ;;;      units below its height-two agent.  The simultaneous ground successor cannot
 ;;;      satisfy the goal.
-;;;   2. PLACEMENT-OPTIONS returning exactly ground, a clear plate, a clear box, and a
-;;;      clear floor-mounted fan while excluding occupied supports, a loose fan, a
-;;;      wall-mounted fan, and the candidate object itself.
+;;;   2. PLACEMENT-OPTIONS returning exactly ground, a clear plate, a clear box, a clear
+;;;      floor-mounted fan, and a co-located agent's held tray, while excluding occupied
+;;;      supports, a loose fan, a wall-mounted fan, a grounded (inert) tray, and the
+;;;      candidate object itself -- including a currently-held tray offered as a target
+;;;      for itself.
 ;;;   3. Symmetric vertical reach: ground and a plate are offered exactly two units
 ;;;      above and below a height-two agent, but no option is offered three units away.
 ;;;
@@ -38,7 +40,7 @@
 
 
 (define-types
-  agent (lifecycle-agent matrix-agent boundary-agent
+  agent (lifecycle-agent matrix-agent boundary-agent tray-bearer-agent
          occupied-plate-rider occupied-box-rider occupied-fan-rider)
   location (lifecycle-origin lifecycle-target matrix-site control-site
             boundary-origin upper-boundary lower-boundary
@@ -50,7 +52,8 @@
        clear-support-box occupied-support-box)
   floor-gears (lifecycle-gears clear-fan-gears occupied-fan-gears)
   wall-gears (wall-fan-gears)
-  fan (lifecycle-fan clear-floor-fan occupied-floor-fan loose-fan wall-fan))
+  fan (lifecycle-fan clear-floor-fan occupied-floor-fan loose-fan wall-fan)
+  tray (matrix-clear-tray matrix-loose-tray))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -107,6 +110,13 @@
   (has-location loose-fan matrix-site)
   (has-position wall-fan-gears matrix-site)
   (mounted-on wall-fan wall-fan-gears)
+
+  ;; A tray held by a co-located agent is a legal placement target; a grounded
+  ;; tray, inert like a resting fan, is not.
+  (has-location tray-bearer-agent matrix-site)
+  (holding tray-bearer-agent matrix-clear-tray)
+  (has-location matrix-clear-tray matrix-site)
+  (has-location matrix-loose-tray matrix-site)
 
   ;; Symmetric inclusive boundaries around elevation 5.  Each destination has a
   ;; plate so both the ground and plate branches cross the same inequality.
@@ -172,33 +182,50 @@
            (has-location matrix-probe-box ?location)))
     (do (assign $places
                 (placement-options matrix-agent matrix-site matrix-probe-box))
-        (and (= (length $places) 4)
+        (and (= (length $places) 5)
              (member 'ground $places)
              (member 'clear-matrix-plate $places)
              (member 'clear-support-box $places)
              (member 'clear-floor-fan $places)
+             (member 'matrix-clear-tray $places)
              (not (member 'occupied-matrix-plate $places))
              (not (member 'occupied-support-box $places))
              (not (member 'occupied-floor-fan $places))
              (not (member 'loose-fan $places))
-             (not (member 'wall-fan $places))))
+             (not (member 'wall-fan $places))
+             (not (member 'matrix-loose-tray $places))))
 
     ;; Each movable support is excluded when passed as the hypothetical object
-    ;; being placed, while the other three legal choices remain available.
+    ;; being placed, while the other four legal choices remain available.
     (do (assign $without-box
                 (placement-options matrix-agent matrix-site clear-support-box))
-        (and (= (length $without-box) 3)
+        (and (= (length $without-box) 4)
              (member 'ground $without-box)
              (member 'clear-matrix-plate $without-box)
              (member 'clear-floor-fan $without-box)
+             (member 'matrix-clear-tray $without-box)
              (not (member 'clear-support-box $without-box))))
     (do (assign $without-fan
                 (placement-options matrix-agent matrix-site clear-floor-fan))
-        (and (= (length $without-fan) 3)
+        (and (= (length $without-fan) 4)
              (member 'ground $without-fan)
              (member 'clear-matrix-plate $without-fan)
              (member 'clear-support-box $without-fan)
+             (member 'matrix-clear-tray $without-fan)
              (not (member 'clear-floor-fan $without-fan))))
+
+    ;; A currently-held tray is likewise excluded as a target for itself: the
+    ;; same self-exclusion guard, not a structural impossibility, since a held
+    ;; tray's synced has-location would otherwise make it look like a candidate
+    ;; co-located with itself.
+    (do (assign $without-tray
+                (placement-options matrix-agent matrix-site matrix-clear-tray))
+        (and (= (length $without-tray) 4)
+             (member 'ground $without-tray)
+             (member 'clear-matrix-plate $without-tray)
+             (member 'clear-support-box $without-tray)
+             (member 'clear-floor-fan $without-tray)
+             (not (member 'matrix-clear-tray $without-tray))))
 
     ;; The negative support facts are explicit, so a missing option cannot pass
     ;; merely because its fixture was initialized incorrectly.
@@ -216,6 +243,10 @@
     (mounted-on wall-fan wall-fan-gears)
     (not (exists (?location location)
            (has-location wall-fan ?location)))
+    (holding tray-bearer-agent matrix-clear-tray)
+    (has-location matrix-clear-tray matrix-site)
+    (not (exists (?a agent) (holding ?a matrix-loose-tray)))
+    (has-location matrix-loose-tray matrix-site)
 
     ;; Absolute reach is inclusive in both directions and rejects one unit beyond.
     (holding boundary-agent boundary-probe-box)

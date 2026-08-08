@@ -4,8 +4,10 @@
 ;;; air stream's destination, WALK-VIA>) from raw segment geometry, for a problem that
 ;;; would rather author 2D positions than hand-list which locations can walk to which.
 ;;; Nested under public walkability and under -stream-passability; entirely inert unless
-;;; the problem actually asserts WALL-SEGMENT> or BOUNDARY-WALL -- a problem that
-;;; hand-authors WALK-VIA directly is unaffected.
+;;; the problem actually asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL -- a
+;;; problem that hand-authors WALK-VIA directly is unaffected.  Edge segments block
+;;; walking exactly like wall segments -- both feed the same solids list below -- an
+;;; edge is simply a wall-shaped barrier with no independent height/vaulting model.
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
 ;;; segment and boundary edge is axis-aligned (a diagonal one is an authoring mistake,
@@ -60,12 +62,13 @@
 ;;;
 ;;; The derivation is single-layer: segments are elevation-blind, blocking every walking
 ;;; pair that crosses them regardless of level.  Multi-level maps therefore author an
-;;; elevated platform's ground-level footprint as wall segments, keep the platform's own
-;;; locations inside that footprint, and connect the levels only with authored
-;;; stairs-via, jump-via, or climb-via> edges (which this derivation never touches);
-;;; ONE-STEP-WALKABLE's
+;;; elevated platform's ground-level footprint as wall or edge segments (edge is the
+;;; better fit -- it is precisely the vertical surface between two different-elevation
+;;; regions), keep the platform's own locations inside that footprint, and connect the
+;;; levels only with authored stairs-via, jump-via, or climb-via> edges (which this
+;;; derivation never touches); ONE-STEP-WALKABLE's
 ;;; elevation-equality check rejects any derived edge between different levels.  See
-;;; problem-claustro-topo's slab (wall4/wall5) for the pattern.
+;;; problem-claustro-topo's slab (edge1/edge2) for the pattern.
 ;;;
 ;;; Reuses LOCATION-COORDS> (nested from -location-coordinates, shared with
 ;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Reuses the
@@ -84,10 +87,10 @@
 ;;;   nested    : -walkability (WALK-VIA/WALK-VIA> topology relations);
 ;;;               -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
-;;;   relations : wall-segment>, gate-segment>, window-segment>, screen-segment>,
-;;;               boundary-wall  --  default to no facts; a problem that asserts
-;;;               wall-segment> or boundary-wall gets WALK-VIA/WALK-VIA> derived
-;;;               automatically instead of hand-authoring them
+;;;   relations : wall-segment>, edge-segment>, gate-segment>, window-segment>,
+;;;               screen-segment>, boundary-wall  --  default to no facts; a problem
+;;;               that asserts wall-segment>, edge-segment>, or boundary-wall gets
+;;;               WALK-VIA/WALK-VIA> derived automatically instead of hand-authoring them
 ;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
 ;;;               redefined by -stream-passability where wall blowers exist
 ;;;   init      : derive-walk-via-from-segments
@@ -620,8 +623,8 @@
 (define-init-action derive-walk-via-from-segments
   ;; Derives WALK-VIA (and WALK-VIA> for rides into stream destinations) from the
   ;; problem's raw segment geometry -- see the file header for the region-connectivity
-  ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT> or
-  ;; BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own WALK-VIA
+  ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT>, EDGE-SEGMENT>,
+  ;; or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own WALK-VIA
   ;; facts is unaffected.  Only one direction per symmetric pair is asserted: WALK-VIA
   ;; has no ">" suffix, so WW mirrors it both ways itself; a pair whose ride edges
   ;; widen a destination's inbound direction gets its two explicit WALK-VIA>
@@ -630,10 +633,12 @@
   ()
   (or (exists (?wall wall)
         (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
+      (exists (?edge edge)
+        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2)))
       (bind (boundary-wall $trigger-boundary)))
   ()
   (assert
-    (do (assign $walls (wall-segment-records))
+    (do (assign $walls (append (wall-segment-records) (edge-segment-records)))
         (assign $gates (gate-segment-records))
         (assign $windows (window-segment-records))
         (assign $screens (screen-segment-records))

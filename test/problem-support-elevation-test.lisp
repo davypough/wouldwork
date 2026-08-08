@@ -1,7 +1,7 @@
 ;;; Filename: problem-support-elevation-test.lisp
 
 ;;; Dedicated zero-action regression for the shared -support-elevation role.
-;;; Two independent scenarios characterize its complete elevation model:
+;;; Four independent scenarios characterize its complete elevation model:
 ;;;
 ;;;   1. A nonzero-elevation stack chains through plate, explicit-height box,
 ;;;      zero-thickness fan, default-height box, and default-height agent.
@@ -11,11 +11,16 @@
 ;;;   2. Ground occupants exercise both location-elevation fallbacks: an ordinary
 ;;;      default-elevation agent stands at zero, while a loose fan and a
 ;;;      default-height box at elevation four have tops of four and five.
+;;;   3. A grounded tray is inert and zero-thickness, like a resting fan,
+;;;      contributing nothing beyond its own resting level.
+;;;   4. A held tray's top rides its holder's own top level -- occupant-elevation
+;;;      plus declared-height, zero added for the tray itself -- and an occupant
+;;;      resting on the held tray chains through the ordinary recursion.
 ;;;
 ;;; The characterization goal verifies the authored support chain, the absence of
-;;; competing support and height facts, all exact intermediate elevations, fan
-;;; zero-thickness behavior, default heights, and the positive and negative reach
-;;; boundaries.  Initial and final states are identical.
+;;; competing support and height facts, all exact intermediate elevations, fan and
+;;; tray zero-thickness behavior, held-tray elevation, default heights, and the
+;;; positive and negative reach boundaries.  Initial and final states are identical.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -38,11 +43,12 @@
 
 
 (define-types
-  agent (stack-agent ground-agent)
-  location (stack-site default-site raised-ground-site)
+  agent (stack-agent ground-agent tray-holding-agent)
+  location (stack-site default-site raised-ground-site tray-holding-site)
   pressure-plate (base-plate)
-  box (base-box upper-box ground-box)
-  fan (middle-fan ground-fan))
+  box (base-box upper-box ground-box tray-occupant-box)
+  fan (middle-fan ground-fan)
+  tray (held-tray ground-tray))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -79,7 +85,17 @@
   (has-location ground-agent default-site)
   (has-elevation raised-ground-site 4)
   (has-location ground-fan raised-ground-site)
-  (has-location ground-box raised-ground-site))
+  (has-location ground-box raised-ground-site)
+  (has-location ground-tray raised-ground-site)
+
+  ;; A held tray's top rides its holder's own top level; an occupant resting on it
+  ;; chains through the same recursion as any other support.
+  (has-location tray-holding-agent tray-holding-site)
+  (has-elevation tray-holding-site 2)
+  (holding tray-holding-agent held-tray)
+  (has-location held-tray tray-holding-site)
+  (has-location tray-occupant-box tray-holding-site)
+  (on tray-occupant-box held-tray))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -147,7 +163,29 @@
     (not (bind (has-height ground-box $ground-box-height)))
     (= (declared-height ground-box) 1)
     (= (occupant-elevation ground-box) 4)
-    (= (support-top-elevation ground-box) 5)))
+    (= (support-top-elevation ground-box) 5)
+
+    ;; A grounded tray is inert, like a resting fan: zero-thickness, contributing
+    ;; nothing beyond its own resting level.
+    (not (exists (?a agent) (holding ?a ground-tray)))
+    (not (exists (?support support)
+           (on ground-tray ?support)))
+    (= (occupant-elevation ground-tray) 4)
+    (= (support-top-elevation ground-tray) 4)
+
+    ;; A held tray's top is its holder's own top level, zero added for the tray
+    ;; itself; an occupant resting on it chains through the ordinary recursion.
+    (holding tray-holding-agent held-tray)
+    (not (exists (?support support)
+           (on held-tray ?support)))
+    (= (location-elevation tray-holding-site) 2)
+    (= (occupant-elevation tray-holding-agent) 2)
+    (= (declared-height tray-holding-agent) 1)
+    (= (support-top-elevation held-tray) 3)
+    (support-elevation-only-on tray-occupant-box held-tray)
+    (= (occupant-elevation tray-occupant-box) 3)
+    (= (declared-height tray-occupant-box) 1)
+    (= (support-top-elevation tray-occupant-box) 4)))
 
 
 (define-goal

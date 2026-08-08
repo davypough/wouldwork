@@ -21,8 +21,10 @@
 ;;; boundaries, downward freedom, barrier defaults and explicit overrides, highest-feature
 ;;; selection, empty-handed screen passability, directed-edge asymmetry, rejection of an
 ;;; unsafe landing, rejection of an occupied box top while preserving its ground landing,
-;;; rejection of an over-height local box mount, and exclusive ownership of grounded jumps
-;;; by mobility rather than the configuration-transition substrate.
+;;; rejection of an over-height local box mount, exclusive ownership of grounded jumps
+;;; by mobility rather than the configuration-transition substrate, and rejection of an
+;;; edge instance from a JUMP-VIA feature list -- VAULTABLE-OBJECT deliberately excludes
+;;; edge, since an edge has no independent "top" to vault onto.
 ;;;
 ;;; Expected minimum solution (6 steps, in any interleaving): mount vault-box; cross
 ;;; vault-start -> vault-goal; drop from drop-box; cross transfer-start -> transfer-goal
@@ -66,6 +68,7 @@
   gate (default-gate)
   screen (cargo-screen passable-screen)
   wall (vault-wall default-wall)
+  edge (probe-edge)
   gun (unsafe-gun))
 
 
@@ -254,6 +257,25 @@
       *start-state* 'remote-mount-agent)
     '((jump (remote-mount-start ground) (passable-screen)
             (remote-mount-goal remote-target-box)))))
+
+
+(define-test-claim jump-vaultable-object-excludes-edge
+  ;; A genuine wall passes JUMP-INIT-CHECK's feature-list type check unchanged.
+  (null
+    (validate-init-literals
+      '((jump-via vault-start (default-wall) vault-goal))
+      :checks '(jump-init-check)))
+  ;; An edge instance in that same list position is rejected: VAULTABLE-OBJECT is
+  ;; (either gate screen wall), and edge is deliberately not a member -- it has no
+  ;; independent "top" a jump could vault onto.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((jump-via vault-start (probe-edge) vault-goal))
+        :checks '(jump-init-check)))
+    'init-check-failure
+    :containing "expected an instance of one of"
+    :check 'jump-init-check))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;

@@ -1,14 +1,17 @@
 ;;; Filename: -beam-los-coordinates.lisp
 
 ;;; Beam LOS coordinates substrate: derives LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
-;;; from raw WALL-SEGMENT>/GATE-SEGMENT>/BOUNDARY-WALL segment geometry, for a problem that
-;;; would rather author 2D positions than hand-list sightlines.  Nested under visibility-tech
-;;; (the owner of the los relations derived here) and beam-crossing-tech (via
+;;; from raw WALL-SEGMENT>/EDGE-SEGMENT>/GATE-SEGMENT>/BOUNDARY-WALL segment geometry, for a
+;;; problem that would rather author 2D positions than hand-list sightlines.  Nested under
+;;; visibility-tech (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
-;;; asserts WALL-SEGMENT>, so a problem that hand-authors its own LOS-TO-APPARATUS/LOS-TO-
-;;; TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently takes that
-;;; hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENT> facts and derive.
+;;; asserts WALL-SEGMENT> or EDGE-SEGMENT>, so a problem that hand-authors its own LOS-TO-
+;;; APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently
+;;; takes that hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENT>
+;;; facts and derive.  Edge segments block sightlines exactly like wall segments -- both feed
+;;; the same occluder test, unconditionally-blocking at their own corner -- an edge is simply
+;;; a wall-shaped LOS barrier with no independent height/vaulting model.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
 ;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
@@ -84,10 +87,11 @@
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
 ;;;   relations : apparatus-coords> (transmitter/receiver/repeater/gun functional point),
-;;;               wall-segment>, gate-segment>, boundary-wall -- all default to no facts;
-;;;               a problem that asserts wall-segment> gets LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
-;;;               derived automatically instead of hand-authoring them; boundary-wall
-;;;               additionally folds its polygon edges into that derivation's wall list
+;;;               wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
+;;;               to no facts; a problem that asserts wall-segment> or edge-segment> gets
+;;;               LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION derived automatically
+;;;               instead of hand-authoring them; boundary-wall additionally folds its
+;;;               polygon edges into that derivation's wall list
 ;;;   queries   : beam-coordinates-endpoint-xy, beam-coordinates-elevation-at -- live
 ;;;               (query-time, not just init-time) coordinate lookup and interpolation,
 ;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
@@ -371,8 +375,8 @@
   ;; any consequence for a beam this blocks (eg, a connector losing its light) is resolved
   ;; the normal way, since this init-action runs before the problem's own INITIALIZE-
   ;; DERIVED-STATE calls PROPAGATE-CHANGES!.  Runs only when the problem has asserted
-  ;; WALL-SEGMENT> -- inert otherwise, so a problem that hand-authors its own LOS facts
-  ;; instead is unaffected.  Defined here, textually before
+  ;; WALL-SEGMENT> or EDGE-SEGMENT> -- inert otherwise, so a problem that hand-authors its
+  ;; own LOS facts instead is unaffected.  Defined here, textually before
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
   ;; there on DO-INIT-ACTION-UPDATES), not by the numeric-looking argument below, and
@@ -387,11 +391,13 @@
   ;; not blocked by intervening objects.
   0
   ()
-  (exists (?wall wall)
-    (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
+  (or (exists (?wall wall)
+        (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
+      (exists (?edge edge)
+        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2))))
   ()
   (assert
-    (do (assign $walls (wall-segment-records))
+    (do (assign $walls (append (wall-segment-records) (edge-segment-records)))
         (assign $gates (gate-segment-records))
         (assign $boundary-walls
                 (if (bind (boundary-wall $boundary-points))

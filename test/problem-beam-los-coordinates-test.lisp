@@ -13,6 +13,8 @@
 ;;;      the polygon even though both endpoints are inside it.
 ;;;   6. Jammer-only gate-target and gun derivation, including the deliberate
 ;;;      absence of intervening locations from those two occluder lists.
+;;;   7. Complete LOS removal by an edge, identical to a wall -- confirming
+;;;      EDGE-SEGMENT> feeds the same occluder test as WALL-SEGMENT>.
 ;;;
 ;;; The goal is the characterization query itself.  No action or propagation is
 ;;; needed: DERIVE-LOS-FROM-SEGMENTS establishes the static LOS tables during
@@ -56,6 +58,7 @@
             target-intervening
             gun-site
             gun-intervening
+            edge-interior-site
             boundary-left
             boundary-right)
   transmitter (clear-transmitter)
@@ -64,12 +67,14 @@
             wall-corner-receiver
             closed-gate-receiver
             open-gate-receiver
-            gate-corner-receiver)
+            gate-corner-receiver
+            edge-interior-receiver)
   wall-repeater (clear-repeater)
   gun (test-gun)
   jammer (derivation-enabler)
   gate (closed-gate open-gate corner-gate target-gate)
-  wall (interior-wall corner-wall))
+  wall (interior-wall corner-wall)
+  edge (interior-edge))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
@@ -96,6 +101,10 @@
   (wall-segment> interior-wall 5 9 5 11)
   (wall-segment> corner-wall 5 20 5 22)
 
+  ;; An edge blocks LOS in its interior exactly like a wall does -- EDGE-SEGMENT>
+  ;; feeds the same $ALL-WALLS occluder list DERIVE-LOS-FROM-SEGMENTS builds.
+  (edge-segment> interior-edge 5 69 5 71)
+
   ;; CLOSED-GATE and OPEN-GATE properly cross their lanes.  CORNER-GATE begins
   ;; exactly on its lane and therefore remains strict/non-occluding.  TARGET-GATE
   ;; supplies its own midpoint as the gate-target endpoint.
@@ -121,6 +130,7 @@
   (location-coords> target-intervening 5 65)
   (location-coords> gun-site 0 68)
   (location-coords> gun-intervening 5 68)
+  (location-coords> edge-interior-site 0 70)
   (location-coords> boundary-left 0 80)
   (location-coords> boundary-right 10 80)
 
@@ -134,7 +144,8 @@
   (apparatus-coords> closed-gate-receiver 10 30)
   (apparatus-coords> open-gate-receiver 10 40)
   (apparatus-coords> gate-corner-receiver 10 50)
-  (apparatus-coords> test-gun 10 68))
+  (apparatus-coords> test-gun 10 68)
+  (apparatus-coords> edge-interior-receiver 10 70))
 
 
 ;;;; BOUNDARY VALIDATION CHARACTERIZATION ;;;;
@@ -184,6 +195,10 @@
     (not (visible wall-interior-site wall-interior-receiver))
     (not (potentially-visible wall-corner-site wall-corner-receiver))
     (not (visible wall-corner-site wall-corner-receiver))
+
+    ;; An edge removes the LOS fact entirely too, exactly like a wall.
+    (not (potentially-visible edge-interior-site edge-interior-receiver))
+    (not (visible edge-interior-site edge-interior-receiver))
 
     ;; Proper gate crossings retain structural LOS with exact conditional occluders.
     (bind (los-to-apparatus

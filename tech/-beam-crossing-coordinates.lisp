@@ -26,9 +26,10 @@
 ;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
 ;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENT>: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
-;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls have no
-;;; counterpart here: a wall-blocked beam is excluded from LOS-TO-APPARATUS/LOS-TO-LOCATION
-;;; entirely by -beam-los-coordinates, so it never becomes a beam to split in the first place.
+;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls and
+;;; edges have no counterpart here: a wall- or edge-blocked beam is excluded from LOS-TO-
+;;; APPARATUS/LOS-TO-LOCATION entirely by -beam-los-coordinates, so it never becomes a beam
+;;; to split in the first place.
 ;;; Without a populated BEAM-CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
 ;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
@@ -231,8 +232,9 @@
 
 
 (defun beam-coordinates-check-coupled-sightlines (beams positions walls)
-  ;; A COUPLED fact asserts a direct beam exists; a wall lying across that sightline says it
-  ;; cannot.  That is a contradiction between two authored inputs, not a case to resolve
+  ;; A COUPLED fact asserts a direct beam exists; a wall or edge lying across that sightline
+  ;; says it cannot -- WALLS here already carries both, appended by ESTABLISH-BEAM-
+  ;; COORDINATES.  That is a contradiction between two authored inputs, not a case to resolve
   ;; either way, so it is surfaced here rather than silently yielding a beam with no derived
   ;; crossings.  Gates are deliberately not checked: a direct beam's gates live in its
   ;; authored BEAM-VIA corridor, and BEAM-CLEAR (beam-direct.lisp) already takes the whole
@@ -243,8 +245,8 @@
         when (some (lambda (wall)
                      (beam-coordinates-obstacle-intersection-parameter beam positions wall t))
                    walls)
-          do (error "COUPLED asserts a direct beam ~A -> ~A, but a wall blocks that ~
-                     sightline.  Remove the COUPLED fact or move the wall."
+          do (error "COUPLED asserts a direct beam ~A -> ~A, but a wall or edge blocks that ~
+                     sightline.  Remove the COUPLED fact or move the obstacle."
                     (first beam) (second beam))))
 
 
@@ -307,7 +309,7 @@
   (assert
     (do (assign $beams (beam-coordinates-potential-beams))
         (assign $positions (beam-coordinates-endpoint-positions))
-        (assign $walls (wall-segment-records))
+        (assign $walls (append (wall-segment-records) (edge-segment-records)))
         (assign $boundary-walls
                 (if (bind (boundary-wall $boundary-points))
                   (beam-coordinates-boundary-segments $boundary-points)))

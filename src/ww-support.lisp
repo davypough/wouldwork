@@ -313,18 +313,50 @@
             collect (cons index-name args)))))
 
 
-(defun add-proposition (proposition db &optional indices precomputed-key precomputed-values)  
+(defun bijective-index-value (index-name args db int-db)
+  "Return the value currently stored under INDEX-NAME for ARGS' key position, or NIL
+   if no fact currently occupies that key.  Reusing the full current ARGS to compute
+   the key is safe regardless of which position INDEX-NAME treats as fluent: the
+   fluent position is skipped by GET-PROP-FLUENT-INDICES/CONVERT-FLUENTLESS-PROP-TO-INTEGER
+   either way, so its value here is never consulted."
+  (let* ((proposition (cons index-name args))
+         (fluent-indices (get-prop-fluent-indices proposition))
+         (key (if int-db
+                (convert-fluentless-prop-to-integer proposition fluent-indices)
+                (get-fluentless-prop proposition fluent-indices))))
+    (multiple-value-bind (vals present-p) (gethash key db)
+      (when present-p (first vals)))))
+
+
+(defun add-bijective-proposition (index-names args db int-db)
+  "Write ARGS under both of a bijective relation's indices, first retracting any
+   stale reverse mapping left by a different previous pairing on either side.
+   Without this, reassigning one side would leave the old partner's own index entry
+   still pointing back at it, and the two indices could permanently disagree about
+   who is paired with whom."
+  (destructuring-bind (index1-name index2-name) index-names
+    (destructuring-bind (arg1 arg2) args
+      (let ((old-arg2 (bijective-index-value index1-name args db int-db))
+            (old-arg1 (bijective-index-value index2-name args db int-db)))
+        (when (and old-arg2 (not (equal old-arg2 arg2)))
+          (del-prop (list index2-name arg1 old-arg2) db int-db))
+        (when (and old-arg1 (not (equal old-arg1 arg1)))
+          (del-prop (list index1-name old-arg1 arg2) db int-db))))
+    (dolist (index-name index-names)
+      (add-prop (cons index-name args) db int-db))))
+
+
+(defun add-proposition (proposition db &optional indices precomputed-key precomputed-values)
   "Adds an atomic proposition and all its symmetries to the database.
-   For bijective relations, adds both internal index propositions."
+   For bijective relations, adds both internal index propositions, first retracting
+   any stale reverse mapping -- see ADD-BIJECTIVE-PROPOSITION."
   (declare (type hash-table db))
   (let* ((int-db (eql (hash-table-test db) 'eql))
          (relation-name (car proposition))
          (args (cdr proposition))
          (index-names (gethash relation-name *bijective-relations*)))
     (if index-names
-        ;; Handle bijective relation directly (avoids building an intermediate list)
-        (dolist (index-name index-names)
-          (add-prop (cons index-name args) db int-db))
+        (add-bijective-proposition index-names args db int-db)
         ;; Handle normal relation (existing logic)
         (let ((symmetric-indexes (gethash relation-name *symmetrics*)))
           (if (null symmetric-indexes)

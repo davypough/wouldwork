@@ -101,21 +101,34 @@
 
 
 (defun check-init-duplicate-fluent-keys (literals)
-  "Reject repeated fluent storage keys before installation can overwrite one."
+  "Reject repeated fluent storage keys before installation can overwrite one.  A
+   bijective relation stores two independent indices, one per argument position --
+   the canonical relation alone has no non-fluent position left to discriminate on,
+   so each index is checked separately against its own key space."
   (let ((seen (make-hash-table :test #'equal)))
     (dolist (literal literals)
       (let* ((proposition (init-literal-proposition literal))
-             (fluent-indices (get-prop-fluent-indices proposition)))
-        (when fluent-indices
-          (let ((key (get-fluentless-prop proposition fluent-indices)))
-            (ut::if-it (gethash key seen)
-              (error "~%Duplicate DEFINE-INIT fluent key.~%~
-                      First literal:  ~S~%~
-                      Second literal: ~S~%~
-                      Storage key:    ~S~%~
-                      Only one fluent value can be stored for this key."
-                     ut::it literal key)
-              (setf (gethash key seen) literal))))))))
+             (index-names (gethash (car proposition) *bijective-relations*)))
+        (if index-names
+          (dolist (index-name index-names)
+            (check-init-fluent-key literal (cons index-name (cdr proposition)) seen))
+          (check-init-fluent-key literal proposition seen))))))
+
+
+(defun check-init-fluent-key (literal proposition seen)
+  "Record PROPOSITION's fluent storage key for LITERAL in SEEN, or signal a collision
+   with a prior literal already occupying that key."
+  (let ((fluent-indices (get-prop-fluent-indices proposition)))
+    (when fluent-indices
+      (let ((key (get-fluentless-prop proposition fluent-indices)))
+        (ut::if-it (gethash key seen)
+          (error "~%Duplicate DEFINE-INIT fluent key.~%~
+                  First literal:  ~S~%~
+                  Second literal: ~S~%~
+                  Storage key:    ~S~%~
+                  Only one fluent value can be stored for this key."
+                 ut::it literal key)
+          (setf (gethash key seen) literal))))))
 
 
 (defun check-init-no-derived-facts (literals)

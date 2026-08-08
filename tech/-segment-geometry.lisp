@@ -1,18 +1,25 @@
 ;;; Filename: -segment-geometry.lisp
 
-;;; Shared coordinate segment geometry: typed, individually authored wall/gate/window/
+;;; Shared coordinate segment geometry: typed, individually authored wall/edge/gate/window/
 ;;; screen segments, the ordered boundary polygon, list-gathering queries for the geometry
-;;; algorithms, and initialization validation.
+;;; algorithms, and initialization validation.  A wall is a vertical linear partition; an
+;;; edge is a vertical surface separating two regions of different elevation (eg, the
+;;; ground-level footprint of a raised slab).  Both block LOS and walking identically --
+;;; every downstream consumer treats WALL-SEGMENT> and EDGE-SEGMENT> facts the same way --
+;;; but only wall participates in vaulting/height (see jump.lisp's VAULTABLE-OBJECT and
+;;; -height.lisp/-elevation.lisp's HEIGHTED-OBJECT/ELEVATED-OBJECT): an edge has no "top"
+;;; a location could stand on, so it is deliberately excluded from all three.
 
 
 (in-package :ww)
 
 
-(define-optional-types wall gate window screen)
+(define-optional-types wall edge gate window screen)
 
 
 (define-static-relations
   (wall-segment> wall $rational $rational $rational $rational)
+  (edge-segment> edge $rational $rational $rational $rational)
   (gate-segment> gate $rational $rational $rational $rational)
   (window-segment> window $rational $rational $rational $rational)
   (screen-segment> screen $rational $rational $rational $rational)
@@ -27,6 +34,14 @@
       (doall (?wall wall)
         (if (bind (wall-segment> ?wall $x1 $y1 $x2 $y2))
           (push (list ?wall $x1 $y1 $x2 $y2) $records)))
+      $records))
+
+
+(define-query edge-segment-records ()
+  (do (assign $records nil)
+      (doall (?edge edge)
+        (if (bind (edge-segment> ?edge $x1 $y1 $x2 $y2))
+          (push (list ?edge $x1 $y1 $x2 $y2) $records)))
       $records))
 
 
@@ -116,6 +131,7 @@
 (define-init-check-helper init-segment-relation-types ()
   "The individually authored segment relations and their keyed object types."
   '((wall-segment> . wall)
+    (edge-segment> . edge)
     (gate-segment> . gate)
     (window-segment> . window)
     (screen-segment> . screen)))
@@ -162,7 +178,8 @@
 
 
 (define-init-check-helper check-init-segment-types-covered (literals)
-  (when (positive-init-literals-with-relation 'wall-segment> literals)
+  (when (or (positive-init-literals-with-relation 'wall-segment> literals)
+            (positive-init-literals-with-relation 'edge-segment> literals))
     (dolist (entry (init-segment-relation-types))
       (init-check-segment-type-coverage (car entry) (cdr entry) literals))))
 

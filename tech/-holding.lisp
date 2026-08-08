@@ -6,9 +6,10 @@
 ;;; of each re-declaring the same union and relation.
 ;;;
 ;;; PROVIDES:
-;;;   type     : cargo (either box jammer connector fan)  --  what an agent can carry; subtypes
+;;;   type     : cargo (either box jammer connector fan tray)  --  what an agent can carry; subtypes
 ;;;              absent from the problem's own define-types resolve to nil, a no-op
-;;;   relation : (holding agent $cargo)
+;;;   relation : (holding $agent $cargo :bijective)  --  bijective so a held tray's holder can
+;;;              be found in reverse, eg (bind (holding $agent ?tray)), without a scan
 
 (include-tech -physical-init-checks)
 
@@ -16,8 +17,8 @@
 
 
 (define-types
-  cargo (either box jammer connector fan))  ;what an agent can carry
+  cargo (either box jammer connector fan tray))  ;what an agent can carry
 
 
 (define-dynamic-relations
-  (holding agent $cargo))
+  (holding $agent $cargo :bijective))

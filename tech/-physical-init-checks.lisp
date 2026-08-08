@@ -41,11 +41,16 @@
 
 
 (define-init-check-helper init-check-object-not-held-and-has-location (literals locations)
+  ;; A tray is the one deviation: it keeps its has-location fact even while held (synced
+  ;; to its holder's location), so a support-occupant resting on it keeps resolving a
+  ;; location through the ordinary consumers.  Every other held cargo type must still
+  ;; have no has-location.
   (dolist (literal (init-literals-with-relation 'holding literals))
     (destructuring-bind (agent object)
         (rest (init-literal-proposition literal))
       (declare (ignore agent))
-      (when (gethash object locations)
+      (when (and (gethash object locations)
+                 (not (init-type-member-p object 'tray)))
         (fail-init-check nil "~%DEFINE-INIT object is both held and assigned HAS-LOCATION.~%~
                 Literal: ~S~%~
                 Object:  ~S"

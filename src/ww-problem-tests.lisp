@@ -273,12 +273,22 @@
 
 
 (defun mutation-solve-detected-p (problem-name mutation-name)
-  "Run the mutated claims and search, returning true when either detects it."
+  "Run the mutated claims and search, returning true when either detects it.  A
+   broken guard can let the search wander into states a corrupted invariant makes
+   look perpetually new, exhausting the control stack rather than cleanly finding
+   no solution; STORAGE-CONDITION is a sibling of ERROR under SERIOUS-CONDITION, not
+   a subtype, so it needs its own clause to count as detection instead of dropping
+   into the debugger."
   (handler-case
       (progn
         (run-test-claims)
         (ww-solve)
         (mutation-outcome-detected-p problem-name mutation-name))
+    (storage-condition (condition)
+      (format t
+              "~%Mutation detected: exhausted resources instead of solving: ~A~%"
+              condition)
+      t)
     (error (condition)
       (format t
               "~%Mutation detected: signaled an error instead of solving: ~A~%"
@@ -331,14 +341,15 @@
       t)))
 
 
-(defun test-talos (&key validate)
+(defun test-talos ()
   "Stage and solve every problem file in the test directory.
    Registered characterization claims run after staging and before search.  An
    attributed claim failure, no solution, or wrong solved length is recorded and
    the run continues; a genuine Lisp error still halts the run immediately, as it
-   does for TEST and TEST-BT.  A final summary lists every failed problem.
-   With :VALIDATE T, discover each problem's registered mutations during the
-   ordinary sweep, then restage and run them individually."
+   does for TEST and TEST-BT.  After the ordinary sweep, every problem's
+   registered mutations are restaged and run individually, each one required to
+   make its problem fail.  A final summary lists every failed problem and every
+   surviving mutant."
   (let ((problem-files
           (sort (directory (merge-pathnames "problem-*.lisp"
                                             (get-test-folder-path)))
@@ -356,28 +367,25 @@
             (print-test-header problem-name "TALOS")
             (setf *expected-min-length* nil)
             (%stage problem-path)
-            (when validate
-              (dolist (mutation *test-mutations*)
-                (push (list problem-path (test-mutation-name mutation))
-                      mutation-schedule)))
+            (dolist (mutation *test-mutations*)
+              (push (list problem-path (test-mutation-name mutation))
+                    mutation-schedule))
             (when (talos-problem-failed-p problem-name)
               (push problem-name failed-problems))))
-        (when validate
-          (setf mutation-schedule (nreverse mutation-schedule))
-          (format t "~%~%Validating check teeth (~D mutation case~:P)...~%"
-                  (length mutation-schedule))
-          (dolist (scheduled-mutation mutation-schedule)
-            (destructuring-bind (problem-path mutation-name) scheduled-mutation
-              (unless (run-mutation-case problem-path mutation-name)
-                (push mutation-name surviving-mutants)))))
+        (setf mutation-schedule (nreverse mutation-schedule))
+        (format t "~%~%Validating check teeth (~D mutation case~:P)...~%"
+                (length mutation-schedule))
+        (dolist (scheduled-mutation mutation-schedule)
+          (destructuring-bind (problem-path mutation-name) scheduled-mutation
+            (unless (run-mutation-case problem-path mutation-name)
+              (push mutation-name surviving-mutants))))
         (format t "~%~%Final Summary:~%")
         (format t "Total Talos test problems run: ~D~%" (length problem-files))
         (format t "Test failures: ~D~%" (length failed-problems))
         (format t "Failed problems: ~A~%" (reverse failed-problems))
-        (when validate
-          (format t "Mutation cases run: ~D~%" (length mutation-schedule))
-          (format t "Surviving mutants: ~D~%" (length surviving-mutants))
-          (format t "Surviving mutant names: ~A~%" (reverse surviving-mutants)))
+        (format t "Mutation cases run: ~D~%" (length mutation-schedule))
+        (format t "Surviving mutants: ~D~%" (length surviving-mutants))
+        (format t "Surviving mutant names: ~A~%" (reverse surviving-mutants))
         (format t "Overall: ~:[FAILED~;PASSED~]~%"
                 (and (null failed-problems) (null surviving-mutants)))
         (and (null failed-problems) (null surviving-mutants)))

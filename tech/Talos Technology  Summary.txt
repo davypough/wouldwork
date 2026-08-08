@@ -7,6 +7,7 @@ angled-gears
 box
 connector
 crossing  ;a crossing is where two beams intersect
+edge  ;a vertical surface separating two regions of different elevation; blocks LOS/walking like a wall, but has no height/vaulting
 fan
 floor-gears
 floor-repeater
@@ -83,6 +84,7 @@ vaultable-object (either gate screen wall)
 (crossings-along-beam> los-endpoint $list los-endpoint)
 (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
 (current-beam-crossings $list)
+(edge-segment> edge $rational $rational $rational $rational)
 (gate-segment> gate $rational $rational $rational $rational)
 (has-chroma (either transmitter receiver) $hue)
 (has-elevation elevated-object $fixnum)

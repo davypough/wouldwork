@@ -8,7 +8,8 @@
 ;;; the four canonical two-obstacle routes across both partitions.  The partitions
 ;;; terminate exactly on the boundary, so any endpoint leak changes those families.
 ;;;
-;;; A room sealed by three walls and one window must remain disconnected.  Two further
+;;; A room sealed by two walls, one edge, and one window must remain disconnected --
+;;; proving EDGE-SEGMENT> seals a zone exactly like WALL-SEGMENT> does.  Two further
 ;;; locations exercise valid placement exactly on an uncovered induced grid line and
 ;;; at an unambiguous induced grid vertex.  With only GATE-A open, an empty-handed
 ;;; agent crosses the second partition through SCREEN-A, while a holding agent cannot.
@@ -41,7 +42,8 @@
   connector (carried-connector)
   wall (first-lower first-middle first-upper
         second-lower second-middle second-upper
-        island-left island-right island-top)
+        island-left island-right)
+  edge (island-top)
   window (sealed-window))
 
 
@@ -77,7 +79,7 @@
   (wall-segment> second-upper 8 6 8 8)
   (wall-segment> island-left 9 5 9 7)
   (wall-segment> island-right 11 5 11 7)
-  (wall-segment> island-top 9 7 11 7)
+  (edge-segment> island-top 9 7 11 7)  ;an edge seals a zone exactly like a wall
 
   (gate-segment> gate-a 4 1 4 2)
   (gate-segment> gate-b 4 5 4 6)
@@ -85,7 +87,7 @@
 
   (screen-segment> screen-a 8 5 8 6)
 
-  ;; A window is a walking solid.  Together with the island walls, this closes
+  ;; A window is a walking solid.  Together with the island walls and edge, this closes
   ;; SEALED-SITE into a zone with no door edge.
   (window-segment> sealed-window 9 5 11 5)
 
@@ -116,6 +118,9 @@
     'wall-segment> :static '(wall rational rational rational rational)
     :fluent-indices '(2 3 4 5))
   (expect-relation-schema
+    'edge-segment> :static '(edge rational rational rational rational)
+    :fluent-indices '(2 3 4 5))
+  (expect-relation-schema
     'gate-segment> :static '(gate rational rational rational rational)
     :fluent-indices '(2 3 4 5))
   (expect-relation-schema
@@ -125,6 +130,7 @@
     'screen-segment> :static '(screen rational rational rational rational)
     :fluent-indices '(2 3 4 5))
   (expect-relation-absent 'wall-segments)
+  (expect-relation-absent 'edge-segments)
   (expect-relation-absent 'gate-segments)
   (expect-relation-absent 'window-segments)
   (expect-relation-absent 'screen-segments))
@@ -199,7 +205,7 @@
     (not (exists (?from location ?to location)
            (bind (walk-via> ?from $directional-family ?to))))
 
-    ;; The wall/window island has no derived edge to any other location.
+    ;; The wall/edge/window island has no derived edge to any other location.
     (not (exists (?other location)
            (bind (walk-via sealed-site $sealed-family ?other))))
     (not (exists (?other location)
