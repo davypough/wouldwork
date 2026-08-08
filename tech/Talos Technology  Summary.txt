@@ -6,7 +6,7 @@ agent
 angled-gears
 box
 connector
-crossing
+crossing  ;a crossing is where two beams intersect
 fan
 floor-gears
 floor-repeater

@@ -31,9 +31,10 @@
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
 ;;; repeats its first -- each consecutive polygon edge is folded into the wall list too, so a sightline that would
-;;; have to leave the map's own silhouette is blocked the same as any other wall; unlike
-;;; WALL-SEGMENT>/GATE-SEGMENT>, BOUNDARY-WALL is consulted only here, not by
-;;; -walkability-coordinates.lisp's own WALK-VIA derivation.
+;;; have to leave the map's own silhouette is blocked the same as any other wall.
+;;; -walkability-coordinates.lisp's own WALK-VIA derivation folds BOUNDARY-WALL in the same way
+;;; (as a solid boundary segment, alongside WALL-SEGMENT>), so a problem that asserts it gets
+;;; both LOS and walkability blocked at the map's edge automatically.
 ;;;
 ;;; The location<->apparatus and location<->location branches additionally test every other
 ;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the

@@ -1,16 +1,12 @@
-;;; Filename: problem-claustro-topo.lisp
+;;; Filename: problem-rumin-topo.lisp
 
-;;; Coordinate-driven version of Talos 'Claustrophobia'.
-;;; Raw planar geometry computes the hand-authored beam corridor, visibility tables,
-;;; and walking topology.  Jumping, climbing,
-;;; reachability, and directional jamming exclusions remain explicitly authored
-;;; because they are not determined by planar geometry alone.
+;;; Coordinate/topology-driven version of Purgatory 'Rumination'.
 
 
 (in-package :ww)
 
 
-(ww-set *problem-name* claustro-topo)
+(ww-set *problem-name* rumin-topo)
 
 (ww-set *problem-type* planning)
 
