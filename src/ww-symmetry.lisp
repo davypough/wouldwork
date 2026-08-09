@@ -1,8 +1,10 @@
 ;;; Filename: ww-symmetry.lisp
 
 ;;; Symmetry detection and pruning for Wouldwork planner.
-;;; Identifies groups of interchangeable objects based on type membership,
-;;; static relations, initial dynamic state, and goal references.
+;;; Identifies families of interchangeable rows based on type membership,
+;;; complete static-database automorphisms, transition/goal references, and
+;;; problem-local coupling relations.  An ordinary object is a one-column row;
+;;; recorder live/ghost pairs are two-column rows whose columns never exchange.
 ;;; Provides two pruning strategies:
 ;;;   - Local (tree/backtracking): generation-time filtering of symmetric instantiations
 ;;;   - Global (graph): canonical closed-list hashing treats symmetric states as duplicates
@@ -15,20 +17,36 @@
 
 
 (defparameter *symmetry-groups* nil
-  "List of symmetry groups. Each group is a list of interchangeable objects.")
+  "Flattened object lists for detected symmetry families.
+   Retained for reporting and enumerator compatibility; search uses *SYMMETRY-FAMILIES*.")
+
+
+(defstruct (symmetry-family (:conc-name symmetry-family.))
+  "Rows that may be permuted while each column retains its semantic role."
+  rows)
+
+
+(defstruct (symmetry-membership (:conc-name symmetry-membership.))
+  "An object's family, row, and role column."
+  family
+  row-index
+  column-index)
+
+
+(defparameter *symmetry-families* nil
+  "Detected row-permutation families used by local and canonical pruning.")
 
 
 (defparameter *object-to-symmetry-group* (make-hash-table :test #'eq)
-  "Maps each object to its symmetry group, or NIL if singleton.")
+  "Maps each object to its flattened symmetry family, or NIL if singleton.")
+
+
+(defparameter *object-to-symmetry-membership* (make-hash-table :test #'eq)
+  "Maps each object to its SYMMETRY-MEMBERSHIP record.")
 
 
 (defparameter *symmetric-type-parameters* (make-hash-table :test #'eq)
   "Maps action-name to list of parameter indices that have symmetric types.")
-
-
-(defparameter *initial-object-signatures* (make-hash-table :test #'eq)
-  "Maps symmetric objects to their initial dynamic state signatures.
-   Used to detect when an object has been distinguished by state changes.")
 
 
 (sb-ext:defglobal *symmetry-pruning-count* 0
@@ -51,29 +69,12 @@
    during signature sorting and canonical signature comparisons.")
 
 
-(defvar *intkey-components-cache* nil
-  "Global cache: packed int-key -> decoded component list.")
+(defvar *local-symmetry-state-form* nil
+  "Dynamically bound symbolic state form used by local transposition checks.")
 
 
-(defvar *symmetry-group-code-set-cache* nil
-  "Global cache: group(list identity) -> hash-set of member int-codes.")
-
-
-(defvar *symmetry-group-symbol-set-cache* nil
-  "Global cache: group(list identity) -> hash-set of member object symbols.")
-
-
-(defparameter +canon-marker-offset+ 1000
-  "marker digits start here, to avoid colliding with normal component codes (<1000).")
-
-
-(defparameter +canon-marker-scale+ 1000
-  "marker = offset + group-index*scale + position (scale assumes position < 1000).")
-
-
-(defparameter +canon-pack-base+ 1000000
-  "smaller base to keep packed keys/bignums cheaper while still exceeding any digit.")
-
+(defvar *local-symmetry-swap-cache* nil
+  "Dynamically bound cache of local row-transposition results.")
 
 
 (defmacro with-signature-element-string-cache (&body body)
@@ -86,36 +87,221 @@
 
 
 (defun detect-symmetry-groups ()
-  "Main entry point for pre-search symmetry detection.
-   Populates *symmetry-groups*, *object-to-symmetry-group*, 
-   and *symmetric-type-parameters*."
-  ;; Reset data structures
-  (setf *symmetry-groups* nil)
+  "Detect exact static row symmetries and populate search lookup structures."
+  (setf *symmetry-groups* nil
+        *symmetry-families* nil)
   (clrhash *object-to-symmetry-group*)
+  (clrhash *object-to-symmetry-membership*)
   (clrhash *symmetric-type-parameters*)
-  (clrhash *initial-object-signatures*)
-  (reset-symmetry-caches)
   (reset-symmetry-statistics)
-  ;; Step 1: Identify candidate types (types with multiple instances)
-  (let ((candidate-types (identify-candidate-types)))
-    (when (null candidate-types)
-      (return-from detect-symmetry-groups nil))
-    ;; Step 2: Compute signatures for all objects in candidate types
-    (let ((signatures (compute-all-signatures candidate-types)))
-      ;; Step 3: Group objects by (type, signature)
-      (let ((groups (partition-by-signature candidate-types signatures)))
-        ;; Step 4: Split groups by goal references
-        (setf groups (split-groups-by-goal-references groups))
-        ;; Step 5: Build lookup structures
-        (setf *symmetry-groups* groups)
-        (dolist (group groups)
-          (dolist (object group)
-            (setf (gethash object *object-to-symmetry-group*) group)))
-        ;; Step 6: Identify which action parameters have symmetric types
-        (identify-symmetric-action-parameters)
-        ;; Step 7: Drop groups that no kept parameter references
-        (prune-inoperative-symmetry-groups)
-        *symmetry-groups*))))
+  (let* ((fixed-objects
+           (union
+             (extract-goal-object-references)
+             (union (extract-transition-object-references)
+                    (extract-happening-object-references)
+                    :test #'eq)
+             :test #'eq))
+         (coupled-rows (collect-coupled-symmetry-rows))
+         (coupled-objects
+           (remove-duplicates
+             (loop for rows in coupled-rows append (apply #'append rows))
+             :test #'eq))
+         (families
+           (append
+             (detect-coupled-symmetry-families coupled-rows fixed-objects)
+             (detect-ordinary-symmetry-families coupled-objects fixed-objects))))
+    (setf *symmetry-families*
+          (remove-duplicate-symmetry-families families))
+    (rebuild-symmetry-lookups)
+    (identify-symmetric-action-parameters)
+    (prune-inoperative-symmetry-groups)
+    *symmetry-groups*))
+
+
+(defun rename-symmetry-tree (tree mapping)
+  "Recursively replace object atoms in TREE according to MAPPING."
+  (cond ((consp tree)
+         (cons (rename-symmetry-tree (car tree) mapping)
+               (rename-symmetry-tree (cdr tree) mapping)))
+        (t
+         (multiple-value-bind (replacement presentp) (gethash tree mapping)
+           (if presentp replacement tree)))))
+
+
+(defun make-row-transposition (row1 row2)
+  "Return the complete column-preserving transposition of ROW1 and ROW2."
+  (unless (= (length row1) (length row2))
+    (error "Cannot transpose symmetry rows of different lengths: ~S and ~S" row1 row2))
+  (let ((mapping (make-hash-table :test #'eq)))
+    (loop for object1 in row1
+          for object2 in row2
+          do (setf (gethash object1 mapping) object2
+                   (gethash object2 mapping) object1))
+    mapping))
+
+
+(defun static-transposition-preserves-p (row1 row2)
+  "Whether exchanging ROW1 and ROW2 leaves the complete static database unchanged."
+  (let ((mapping (make-row-transposition row1 row2)))
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
+          always
+            (let ((renamed-key (rename-symmetry-tree key mapping))
+                  (renamed-value (rename-symmetry-tree value mapping)))
+              (multiple-value-bind (stored-value presentp)
+                  (gethash renamed-key *static-db*)
+                (and presentp (equal stored-value renamed-value)))))))
+
+
+(defun form-object-references (form all-objects)
+  "Return object constants occurring literally in FORM."
+  (let ((references nil)
+        (stack (list form)))
+    (loop while stack
+          for item = (pop stack)
+          do (cond ((consp item)
+                    (push (car item) stack)
+                    (push (cdr item) stack))
+                   ((and (symbolp item) (member item all-objects :test #'eq))
+                    (pushnew item references :test #'eq))))
+    references))
+
+
+(defun extract-transition-object-references ()
+  "Return constants embedded directly in searched actions, queries, or updates."
+  (let ((all-objects (collect-all-objects))
+        (references nil))
+    (dolist (action *actions*)
+      (dolist (form (list (action.precondition-form action)
+                          (action.effect-form action)))
+        (setf references
+              (union references (form-object-references form all-objects) :test #'eq))))
+    (dolist (name (append *query-names* *update-names*))
+      (setf references
+            (union references
+                   (form-object-references (get name :raw-body) all-objects)
+                   :test #'eq)))
+    references))
+
+
+(defun extract-happening-object-references ()
+  "Return happening owners and object constants embedded in their event programs."
+  (let ((all-objects (collect-all-objects))
+        (references nil))
+    (dolist (object *happening-names*)
+      (pushnew object references :test #'eq)
+      (let ((events (get object :events)))
+        (when events
+          (setf references
+                (union references
+                       (form-object-references
+                         (coerce events 'list) all-objects)
+                       :test #'eq)))))
+    references))
+
+
+(defun collect-coupled-symmetry-rows ()
+  "Return one disjoint object-row list per registered static coupling relation."
+  (let ((static-propositions (list-database *static-idb*))
+        (all-objects (collect-all-objects))
+        (seen-objects (make-hash-table :test #'eq)))
+    (loop for relation in *symmetry-coupling-relations*
+          for rows = (loop for proposition in static-propositions
+                           when (eq (first proposition) relation)
+                             collect (rest proposition))
+          when rows
+            do (let ((arity (length (first rows))))
+                 (dolist (row rows)
+                   (unless (= (length row) arity)
+                     (error "Symmetry coupling ~S has inconsistent row arity: ~S"
+                            relation row))
+                   (dolist (object row)
+                     (unless (member object all-objects :test #'eq)
+                       (error "Symmetry coupling ~S contains a non-object: ~S"
+                              relation object))
+                     (when (gethash object seen-objects)
+                       (error "Object ~S occurs in more than one symmetry coupling row."
+                              object))
+                     (setf (gethash object seen-objects) t))))
+            and collect rows)))
+
+
+(defun partition-interchangeable-rows (rows)
+  "Partition ROWS into full static-transposition families."
+  (let ((remaining (copy-list rows))
+        (families nil))
+    (loop while remaining
+          for seed = (pop remaining)
+          for matches = (remove-if-not
+                          (lambda (row)
+                            (static-transposition-preserves-p seed row))
+                          remaining)
+          do (setf remaining (set-difference remaining matches :test #'equal))
+             (when matches
+               (push (make-symmetry-family :rows (cons seed matches)) families)))
+    (nreverse families)))
+
+
+(defun detect-coupled-symmetry-families (coupled-row-sets fixed-objects)
+  "Detect row symmetries supplied by registered coupling relations."
+  (loop for rows in coupled-row-sets
+        for eligible = (remove-if
+                         (lambda (row)
+                           (intersection row fixed-objects :test #'eq))
+                         rows)
+        append (partition-interchangeable-rows eligible)))
+
+
+(defun detect-ordinary-symmetry-families (coupled-objects fixed-objects)
+  "Detect exact one-column symmetries among objects outside coupled rows."
+  (let ((families nil))
+    (dolist (type-name (identify-candidate-types))
+      (let* ((objects (gethash type-name *types*))
+             (eligible
+               (set-difference objects
+                               (union coupled-objects fixed-objects :test #'eq)
+                               :test #'eq)))
+        (when (> (length eligible) 1)
+          (setf families
+                (nconc families
+                       (partition-interchangeable-rows
+                         (mapcar #'list eligible)))))))
+    families))
+
+
+(defun symmetry-family-objects (family)
+  "Return every object in FAMILY in row-major order."
+  (apply #'append (symmetry-family.rows family)))
+
+
+(defun remove-duplicate-symmetry-families (families)
+  "Remove families rediscovered through overlapping union types."
+  (remove-duplicates
+    families
+    :test (lambda (family1 family2)
+            (alexandria:set-equal
+              (symmetry-family-objects family1)
+              (symmetry-family-objects family2)))))
+
+
+(defun rebuild-symmetry-lookups ()
+  "Rebuild flattened compatibility groups and per-object row memberships."
+  (setf *symmetry-groups*
+        (mapcar #'symmetry-family-objects *symmetry-families*))
+  (clrhash *object-to-symmetry-group*)
+  (clrhash *object-to-symmetry-membership*)
+  (dolist (family *symmetry-families*)
+    (let ((group (symmetry-family-objects family)))
+      (loop for row in (symmetry-family.rows family)
+            for row-index from 0
+            do (loop for object in row
+                     for column-index from 0
+                     do (setf (gethash object *object-to-symmetry-group*) group
+                              (gethash object *object-to-symmetry-membership*)
+                                (make-symmetry-membership
+                                  :family family
+                                  :row-index row-index
+                                  :column-index column-index))))))
+  *symmetry-groups*)
 
 
 (defun identify-candidate-types ()
@@ -396,23 +582,21 @@
 
 
 (defun prune-inoperative-symmetry-groups ()
-  "Remove groups that no kept action parameter references.
-   A group is inoperative when, for every action, none of the kept parameter
-   indices in *symmetric-type-parameters* corresponds to a type whose instances
-   intersect the group. Such groups do no pruning work and would unsoundly
-   participate in canonical hashing for graph search; dropping them is both a
-   cleanup and a soundness fix.
-   Rebuilds *object-to-symmetry-group* to match the pruned group list."
-  (setf *symmetry-groups*
-        (remove-if-not (lambda (group)
-                         (some (lambda (action)
-                                 (action-uses-group-soundly-p action group))
-                               *actions*))
-                       *symmetry-groups*))
-  (clrhash *object-to-symmetry-group*)
-  (dolist (group *symmetry-groups*)
-    (dolist (object group)
-      (setf (gethash object *object-to-symmetry-group*) group))))
+  "Keep only operative families whose every transition use is permutation-safe.
+   A single identity-sensitive action use invalidates a family for global
+   canonicalization, even when another action could use that family safely."
+  (setf *symmetry-families*
+        (remove-if-not
+          (lambda (family)
+            (let ((group (symmetry-family-objects family)))
+              (and (some (lambda (action)
+                           (action-uses-group-soundly-p action group))
+                         *actions*)
+                   (every (lambda (action)
+                            (action-uses-group-entirely-safely-p action group))
+                          *actions*))))
+          *symmetry-families*))
+  (rebuild-symmetry-lookups))
 
 
 (defun action-uses-group-soundly-p (action group)
@@ -425,6 +609,27 @@
     (some (lambda (idx)
             (type-includes-group-member-p (nth idx non-header-types) group))
           kept-indices)))
+
+
+(defun action-group-parameter-indices (action group)
+  "Return every ACTION parameter index whose declared type intersects GROUP."
+  (let ((non-header-types
+          (remove-if (lambda (ptype)
+                       (member ptype *parameter-headers*))
+                     (action.precondition-types action))))
+    (loop for type in non-header-types
+          for index from 0
+          when (type-includes-group-member-p type group)
+            collect index)))
+
+
+(defun action-uses-group-entirely-safely-p (action group)
+  "Whether every ACTION parameter that can bind GROUP passed the safety walk."
+  (let ((used-indices (action-group-parameter-indices action group))
+        (kept-indices
+          (gethash (action.name action) *symmetric-type-parameters*)))
+    (or (null used-indices)
+        (subsetp used-indices kept-indices :test #'=))))
 
 
 (defun type-includes-group-member-p (type-spec group)
@@ -456,26 +661,6 @@
 ;;;; GENERATION-TIME FILTERING (LOCAL STRATEGY) ;;;;
 
 
-(defun ensure-symmetry-caches ()
-  "Ensure global symmetry caches are initialized to hash-tables."
-  (unless (hash-table-p *intkey-components-cache*)
-    (setf *intkey-components-cache* (make-hash-table :test #'eql)))
-  (unless (hash-table-p *symmetry-group-code-set-cache*)
-    (setf *symmetry-group-code-set-cache* (make-hash-table :test #'eq)))
-  (unless (hash-table-p *symmetry-group-symbol-set-cache*)
-    (setf *symmetry-group-symbol-set-cache* (make-hash-table :test #'eq)))
-  t)
-
-
-(defun reset-symmetry-caches ()
-  "Clear global symmetry caches for a fresh problem/run."
-  (ensure-symmetry-caches)
-  (clrhash *intkey-components-cache*)
-  (clrhash *symmetry-group-code-set-cache*)
-  (clrhash *symmetry-group-symbol-set-cache*)
-  t)
-
-
 (defun filter-symmetric-instantiations (action instantiations state)
   "Filter INSTANTIATIONS to remove symmetric equivalents.
    For graph search with canonical hashing: returns all instantiations
@@ -491,7 +676,10 @@
     ;; Fast path: action has no symmetric parameters
     (unless param-indices
       (return-from filter-symmetric-instantiations instantiations))
-    (let ((filtered nil))
+    (let ((filtered nil)
+          (*local-symmetry-state-form*
+            (symbolic-idb-form (problem-state.idb state)))
+          (*local-symmetry-swap-cache* (make-hash-table :test #'equal)))
       (dolist (inst instantiations)
         (increment-global *symmetry-check-count* 1)
         (if (instantiation-allowed-p inst param-indices state)
@@ -500,107 +688,62 @@
       (nreverse filtered))))
 
 
-;;;; CURRENT-STATE SIGNATURES ;;;;
+;;;; EXACT CURRENT-STATE TRANSPOSITIONS ;;;;
 
 
-(defun compute-current-state-signature (object state)
-  "Compute signature of OBJECT in current STATE (dynamic relations only).
-   OBJECT is a symbol; STATE's idb contains integer-coded propositions.
-   The signature is a sorted list of (normalized-proposition value) pairs
-   where the object is replaced with a placeholder '_'.
-   Two objects with identical signatures occupy equivalent positions in
-   the current state."
-  (let* ((idb (problem-state.idb state))
-         (int-object (gethash object *constant-integers*))
-         (normalized-props nil))
-    ;; If object has no integer mapping, return empty signature
-    (unless int-object
-      (return-from compute-current-state-signature nil))
-    ;; Collect all propositions involving this object
-    (maphash (lambda (int-key value)
-               (when (integerp int-key)  ; Keys are packed integers
-                 (let ((components (extract-integer-components int-key)))
-                   (when (member int-object components :test #'eql)
-                     ;; Replace object's integer code with placeholder
-                     (let ((norm (substitute '_ int-object components :test #'eql)))
-                       (push (list norm value) normalized-props))))))
-             idb)
-    ;; Sort for consistent comparison
-    (sort normalized-props #'signature-element-less-p)))
+(defun symbolic-idb-form (idb)
+  "Return IDB as a recursively comparable sorted proposition list."
+  (sort (copy-tree (list-database idb)) #'ww-object<))
 
 
-;; helper for uncached decoding
-(defun extract-integer-components/uncached (int-key)
-  "Extract component integer codes from a packed integer key.
-   Keys are packed as: code0 + code1*1000 + code2*1000000 + ...
-   Returns list of component codes in original order (predicate first)."
-  (let ((components nil)
-        (x int-key))
-    (loop while (> x 0)
-          do (multiple-value-bind (quotient remainder) (truncate x 1000)
-               (push remainder components)
-               (setf x quotient)))
-    (nreverse components)))
+(defun renamed-symbolic-form (form mapping)
+  "Rename every object occurrence in symbolic state FORM and sort the result."
+  (sort (mapcar (lambda (proposition)
+                  (rename-symmetry-tree proposition mapping))
+                form)
+        #'ww-object<))
 
 
-(defun extract-integer-components (int-key)
-  "Extract the component integer codes from a packed integer key.
-   Keys are packed as: code0 + code1*1000 + code2*1000000 + ...
-   Returns list of component codes in original order (predicate first)."
-  (let ((components nil)
-        (x int-key))
-    (loop while (> x 0)
-          do (multiple-value-bind (quotient remainder) (truncate x 1000)
-               (push remainder components)
-               (setf x quotient)))
-    (nreverse components)))
-
-
-(defun canonicalize-proposition-components (components canonical-map original-int-key)
-  "Like CANONICALIZE-PROPOSITION-KEY, but takes decoded COMPONENTS.
-   Returns ORIGINAL-INT-KEY if nothing maps (avoids consing)."
-  (let ((result nil)
-        (any-mapped nil))
-    (dolist (code components)
-      (let ((marker (gethash code canonical-map)))
-        (if marker
-            (progn (push marker result) (setf any-mapped t))
-            (push code result))))
-    (if any-mapped
-        (nreverse result)
-        original-int-key)))
-
-
-(defun ensure-symmetry-group-sets (group)
-  "Return two values: (code-set symbol-set) for GROUP.
-   Memoized so we don't rebuild these sets per state."
-  (let ((code-set (gethash group *symmetry-group-code-set-cache*))
-        (symbol-set (gethash group *symmetry-group-symbol-set-cache*)))
-    (unless (and code-set symbol-set)
-      (setf code-set (make-hash-table :test #'eql))
-      (setf symbol-set (make-hash-table :test #'eq))
-      (dolist (obj group)
-        (let ((code (gethash obj *constant-integers*)))
-          (when code
-            (setf (gethash code code-set) t)
-            (let ((sym (gethash code *integer-constants*)))
-              (when sym
-                (setf (gethash sym symbol-set) t))))))
-      (setf (gethash group *symmetry-group-code-set-cache*) code-set)
-      (setf (gethash group *symmetry-group-symbol-set-cache*) symbol-set))
-    (values code-set symbol-set)))
+(defun symmetry-row-swap-preserves-state-p (family row-index1 row-index2 state)
+  "Whether directly exchanging two FAMILY rows leaves STATE unchanged."
+  (when (= row-index1 row-index2)
+    (return-from symmetry-row-swap-preserves-state-p t))
+  (let* ((low (min row-index1 row-index2))
+         (high (max row-index1 row-index2))
+         (cache-key (list family low high))
+         (cache *local-symmetry-swap-cache*))
+    (when cache
+      (multiple-value-bind (answer presentp) (gethash cache-key cache)
+        (when presentp
+          (return-from symmetry-row-swap-preserves-state-p answer))))
+    (let* ((rows (symmetry-family.rows family))
+           (mapping
+             (make-row-transposition (nth low rows) (nth high rows)))
+           (state-form
+             (or *local-symmetry-state-form*
+                 (symbolic-idb-form (problem-state.idb state))))
+           (answer
+             (equal state-form (renamed-symbolic-form state-form mapping))))
+      (when cache
+        (setf (gethash cache-key cache) answer))
+      answer)))
 
 
 (defun objects-equivalent-in-state-p (obj1 obj2 state)
-  "Check if OBJ1 and OBJ2 have equivalent roles in STATE.
-   Both must be in the same symmetry group, and all their 
-   current relations must be structurally identical."
-  (let ((group (gethash obj1 *object-to-symmetry-group*)))
-    (unless (and group (member obj2 group))
-      (return-from objects-equivalent-in-state-p nil))
-    ;; Compare current state signatures
-    (equal (compute-current-state-signature obj1 state)
-           (compute-current-state-signature obj2 state))))
+  "Check exact current-state interchangeability of two same-role row members."
+  (let ((membership1 (gethash obj1 *object-to-symmetry-membership*))
+        (membership2 (gethash obj2 *object-to-symmetry-membership*)))
+    (and membership1
+         membership2
+         (eq (symmetry-membership.family membership1)
+             (symmetry-membership.family membership2))
+         (= (symmetry-membership.column-index membership1)
+            (symmetry-membership.column-index membership2))
+         (symmetry-row-swap-preserves-state-p
+           (symmetry-membership.family membership1)
+           (symmetry-membership.row-index membership1)
+           (symmetry-membership.row-index membership2)
+           state))))
 
 
 ;;;; GLOBAL SYMMETRY STRATEGY (GRAPH SEARCH) ;;;;
@@ -612,208 +755,207 @@
   "Returns T if canonical symmetry hashing should be used.
    Canonical hashing is used for graph search with symmetry pruning enabled."
   (and *symmetry-pruning*
-       *symmetry-groups*              ; groups were detected
+       *symmetry-families*            ; families were detected
        (eql *tree-or-graph* 'graph))) ; graph search only
 
 
+(defun symmetry-permutations (items)
+  "Return every permutation of ITEMS."
+  (if (null items)
+      (list nil)
+      (loop for item in items
+            append
+              (loop for tail in (symmetry-permutations
+                                  (remove item items :count 1 :test #'eq))
+                    collect (cons item tail)))))
+
+
+(defun symmetry-tree-contains-row-p (tree row)
+  "Whether TREE contains any object in ROW."
+  (cond ((consp tree)
+         (or (symmetry-tree-contains-row-p (car tree) row)
+             (symmetry-tree-contains-row-p (cdr tree) row)))
+        (t (member tree row :test #'eq))))
+
+
+(defun normalize-row-signature-tree
+    (tree family self-row-index family-indices)
+  "Replace symmetry objects in TREE with row-invariant family/role markers."
+  (cond
+    ((consp tree)
+     (cons (normalize-row-signature-tree
+             (car tree) family self-row-index family-indices)
+           (normalize-row-signature-tree
+             (cdr tree) family self-row-index family-indices)))
+    (t
+     (let ((membership (gethash tree *object-to-symmetry-membership*)))
+       (cond
+         ((null membership) tree)
+         ((eq family (symmetry-membership.family membership))
+          (list (if (= self-row-index
+                       (symmetry-membership.row-index membership))
+                    :self-row
+                    :peer-row)
+                (symmetry-membership.column-index membership)))
+         (t
+          (list :other-family
+                (gethash (symmetry-membership.family membership) family-indices)
+                (symmetry-membership.column-index membership))))))))
+
+
+(defun compute-row-state-signature
+    (family row row-index state-form family-indices)
+  "Return an invariant complete-incidence signature for one FAMILY row."
+  (sort
+    (loop for proposition in state-form
+          when (symmetry-tree-contains-row-p proposition row)
+            collect (normalize-row-signature-tree
+                      proposition family row-index family-indices))
+    #'ww-object<))
+
+
+(defun family-state-signature-cells (family state-form family-indices)
+  "Partition FAMILY rows by invariant state signatures and sort the cells."
+  (let ((partitions (make-hash-table :test #'equal)))
+    (loop for row in (symmetry-family.rows family)
+          for row-index from 0
+          for signature = (compute-row-state-signature
+                            family row row-index state-form family-indices)
+          do (push row (gethash signature partitions)))
+    (sort
+      (loop for signature being the hash-keys of partitions
+              using (hash-value rows)
+            collect (cons signature (nreverse rows)))
+      #'ww-object<
+      :key #'car)))
+
+
+(defun same-symmetry-row-p (membership1 membership2)
+  "Whether two memberships identify the same family row."
+  (and (eq (symmetry-membership.family membership1)
+           (symmetry-membership.family membership2))
+       (= (symmetry-membership.row-index membership1)
+          (symmetry-membership.row-index membership2))))
+
+
+(defun symmetry-tree-row-memberships (tree)
+  "Return the distinct symmetry rows referenced anywhere in TREE."
+  (remove-duplicates
+    (cond ((consp tree)
+           (append (symmetry-tree-row-memberships (car tree))
+                   (symmetry-tree-row-memberships (cdr tree))))
+          (t
+           (let ((membership
+                   (gethash tree *object-to-symmetry-membership*)))
+             (when membership (list membership)))))
+    :test #'same-symmetry-row-p))
+
+
+(defun symmetry-cell-rows-interact-p (rows state-form)
+  "Whether a CELL row participates in a fact that couples distinct symmetry rows."
+  (some
+    (lambda (proposition)
+      (and (some (lambda (row)
+                   (symmetry-tree-contains-row-p proposition row))
+                 rows)
+           (> (length (symmetry-tree-row-memberships proposition)) 1)))
+    state-form))
+
+
+(defun symmetry-cell-row-orderings (cell state-form)
+  "Return the row orderings needed for one equal-signature CELL.
+   Independent equal-signature rows yield the same canonical form in every order."
+  (let ((rows (cdr cell)))
+    (if (symmetry-cell-rows-interact-p rows state-form)
+        (symmetry-permutations rows)
+        (list rows))))
+
+
+(defun combine-symmetry-cell-orderings (cells state-form)
+  "Return canonical row orderings formed from already signature-sorted CELLS."
+  (if (null cells)
+      (list nil)
+      (loop for head-ordering in
+              (symmetry-cell-row-orderings (first cells) state-form)
+            append
+              (loop for tail-ordering in
+                      (combine-symmetry-cell-orderings (rest cells) state-form)
+                    collect (append head-ordering tail-ordering)))))
+
+
+(defun family-canonical-row-orderings (family state-form family-indices)
+  "Return only the exact row orderings unresolved by invariant state signatures."
+  (combine-symmetry-cell-orderings
+    (family-state-signature-cells family state-form family-indices)
+    state-form))
+
+
+(defun install-family-canonical-mapping
+    (mapping family family-index ordered-rows)
+  "Map ORDERED-ROWS onto canonical row positions while preserving columns."
+  (loop for row in ordered-rows
+        for row-position from 0
+        do (loop for object in row
+                 for column-position from 0
+                 do (setf (gethash object mapping)
+                          (list :ww-symmetry-marker
+                                family-index row-position column-position))))
+  family)
+
+
+(defun clear-family-canonical-mapping (mapping family)
+  "Remove FAMILY's objects from MAPPING."
+  (dolist (object (symmetry-family-objects family))
+    (remhash object mapping)))
+
+
+(defun visit-symmetry-canonical-mappings
+    (function families family-index state-form family-indices mapping)
+  "Recursive worker for MAP-SYMMETRY-CANONICAL-MAPPINGS."
+  (if (null families)
+      (funcall function mapping)
+      (let ((family (first families)))
+        (dolist (ordering
+                  (family-canonical-row-orderings
+                    family state-form family-indices))
+          (install-family-canonical-mapping
+            mapping family family-index ordering)
+          (visit-symmetry-canonical-mappings
+            function (rest families) (1+ family-index)
+            state-form family-indices mapping)
+          (clear-family-canonical-mapping mapping family)))))
+
+
+(defun map-symmetry-canonical-mappings (function state-form)
+  "Call FUNCTION for every unresolved exact family-row ordering in STATE-FORM."
+  (let ((mapping (make-hash-table :test #'eq))
+        (family-indices (make-hash-table :test #'eq)))
+    (loop for family in *symmetry-families*
+          for family-index from 0
+          do (setf (gethash family family-indices) family-index))
+    (visit-symmetry-canonical-mappings
+      function *symmetry-families* 0 state-form family-indices mapping)))
+
+
+(defun build-exact-canonical-idb-form (idb)
+  "Return the lexicographically least exact IDB form under all family permutations."
+  (let ((state-form (symbolic-idb-form idb))
+        (best nil))
+    (map-symmetry-canonical-mappings
+      (lambda (mapping)
+        (let ((candidate (renamed-symbolic-form state-form mapping)))
+          (when (or (null best) (ww-object< candidate best))
+            (setf best candidate))))
+      state-form)
+    best))
+
+
 (defun compute-canonical-idb-hash (idb)
-  "Compute a hash of IDB invariant under permutation of symmetric objects."
+  "Compute an exact permutation-invariant hash of IDB."
   (declare (type hash-table idb))
   (ww-with-timing :symm/canon-hash
-    ;; Predecode integer keys once per state (if you already have this, keep yours)
-    (let ((decoded-int-keys (make-hash-table :test #'eql)))
-      (maphash (lambda (k v)
-                 (declare (ignore v))
-                 (when (integerp k)
-                   (setf (gethash k decoded-int-keys)
-                         (extract-integer-components k))))
-               idb)
-      (let ((canonical-map (build-canonical-mapping idb decoded-int-keys))
-            (hash 0))
-        (declare (type fixnum hash))
-        (maphash (lambda (key val)
-                   (let* ((components (and (integerp key) (gethash key decoded-int-keys)))
-                          ;; PH4C: pass COMPONENTS so canonicalize-proposition-key doesn't decode again
-                          (canon-key (if (integerp key)
-                                         (canonicalize-proposition-key key canonical-map components)  ;; PH4C
-                                         key))
-                          (canon-val (canonicalize-value val canonical-map)))
-                     ;; keep your existing combiner here (whatever you currently use)
-                     (setf hash (ldb (byte 62 0)
-                                     (+ hash (deep-sxhash (cons canon-key canon-val)))))))
-                 idb)
-        hash))))
-
-
-(defun build-canonical-mapping (idb &optional decoded-int-keys)
-  "Build a mapping from symmetric object int-codes to canonical markers.
-   markers are fixnums in a reserved range:
-   marker = +canon-marker-offset+ + group-index*+canon-marker-scale+ + position
-   DECODED-INT-KEYS, when supplied, is used downstream (signature-building) to avoid repeated decoding."
-  (ww-with-timing :symm/canon-map
-    (let ((mapping (make-hash-table :test #'eql))
-          (group-index 0))
-      (dolist (group *symmetry-groups*)
-        (let ((obj-sigs (compute-group-object-signatures group idb decoded-int-keys)))
-          (setf obj-sigs (sort obj-sigs #'canonical-signature-less-p :key #'cdr))
-          (let ((position 0)
-                (prev-sig nil))
-            (dolist (obj-sig obj-sigs)
-              (let ((obj (car obj-sig))
-                    (sig (cdr obj-sig)))
-                (when (and prev-sig (not (equal sig prev-sig)))
-                  (incf position))
-                (setf prev-sig sig)
-                (let ((int-code (gethash obj *constant-integers*)))
-                  ;; PH4C: integer marker instead of (group-index . position)
-                  (setf (gethash int-code mapping)
-                        (+ +canon-marker-offset+
-                           (* group-index +canon-marker-scale+)
-                           position)))))))
-        (incf group-index))
-      mapping)))
-
-
-(defun compute-group-object-signatures (group idb &optional decoded-int-keys)
-  "PH4A: Compute signatures for all objects in GROUP with a single pass over IDB,
-but avoid consing normalized KEY lists by packing them into integers (with terminator).
-
-Returns an alist (obj . signature), where signature is a sorted list of
-(packed-normalized-key . normalized-value) pairs."
-  (ww-with-timing :symm/group-sigs
-    (let* ((group-int-codes (remove nil
-                                   (mapcar (lambda (obj)
-                                             (gethash obj *constant-integers*))
-                                           group)))
-           (code-set (make-hash-table :test #'eql))
-           (symbol-set (make-hash-table :test #'eq))
-           (buckets (make-hash-table :test #'eql)))
-      ;; membership + buckets
-      (dolist (code group-int-codes)
-        (setf (gethash code code-set) t)
-        (setf (gethash code buckets) nil)
-        (let ((sym (gethash code *integer-constants*)))
-          (when sym
-            (setf (gethash sym symbol-set) t))))
-
-      ;; single pass over IDB
-      (maphash
-       (lambda (int-key value)
-         (when (integerp int-key)
-           (let* ((components (or (and decoded-int-keys (gethash int-key decoded-int-keys))
-                                  (extract-integer-components int-key)))
-                  (members nil))
-             ;; find which group objects appear in this key
-             (dolist (code components)
-               (when (gethash code code-set)
-                 (pushnew code members :test #'eql)))
-             (when members
-               (dolist (self members)
-                 (let* ((self-symbol (gethash self *integer-constants*))
-                        ;; PH4A: packed normalized key (no list allocation)
-                        (packed-key (pack-normalized-components components self code-set))
-                        (norm-val (cond ((eql value self-symbol) 0)
-                                        ((and (symbolp value) (gethash value symbol-set)) 1)
-                                        (t value))))
-                   (push (cons packed-key norm-val)
-                         (gethash self buckets))))))))
-       idb)
-
-      ;; build (obj . sorted-signature) alist
-      (let ((obj-sigs nil))
-        (dolist (obj group)
-          (let ((code (gethash obj *constant-integers*)))
-            (when code
-              (push (cons obj
-                          (sort (gethash code buckets) #'signature-element-less-p))
-                    obj-sigs))))
-        (nreverse obj-sigs)))))
-
-
-(defun compute-idb-object-signature (int-object idb &optional symmetric-codes decoded-int-keys)
-  "Compute signature of an object (by int-code) from current IDB state.
-   if DECODED-INT-KEYS is supplied, use it to avoid repeated calls to
-   EXTRACT-INTEGER-COMPONENTS for each INT-KEY."
-  (let ((normalized-props nil)
-        (self-symbol (gethash int-object *integer-constants*))
-        (symmetric-symbols (when symmetric-codes
-                             (remove nil
-                                     (mapcar (lambda (code) (gethash code *integer-constants*))
-                                             symmetric-codes)))))
-    (maphash (lambda (int-key value)
-               (when (integerp int-key)
-                 (let ((components (or (and decoded-int-keys (gethash int-key decoded-int-keys))
-                                       (extract-integer-components int-key))))
-                   (when (member int-object components :test #'eql)
-                     (let* ((norm-key (mapcar (lambda (code)
-                                                (cond ((eql code int-object) 0)
-                                                      ((and symmetric-codes
-                                                            (member code symmetric-codes :test #'eql))
-                                                       1)
-                                                      (t code)))
-                                              components))
-                            (norm-val (cond ((eql value self-symbol) 0)
-                                            ((and symmetric-symbols
-                                                  (member value symmetric-symbols :test #'eql))
-                                             1)
-                                            (t value))))
-                       (push (cons norm-key norm-val) normalized-props))))))
-             idb)
-    (sort normalized-props #'signature-element-less-p)))
-
-
-(defun canonical-signature-less-p (sig1 sig2)
-  "Lexicographic comparison of signatures (lists of (key . value) pairs).
-   Used to sort objects within a symmetry group by their current state."
-  (cond ((null sig1) (not (null sig2)))           ; empty < non-empty
-        ((null sig2) nil)                          ; non-empty > empty
-        (t (let ((elem1 (car sig1))
-                 (elem2 (car sig2)))
-             (cond ((signature-element-less-p elem1 elem2) t)
-                   ((signature-element-less-p elem2 elem1) nil)
-                   (t (canonical-signature-less-p (cdr sig1) (cdr sig2))))))))
-
-
-(defun canonicalize-proposition-key (int-key canonical-map &optional components)
-  "Replace symmetric object codes in INT-KEY with their canonical markers.
-  - Returns INT-KEY unchanged when nothing maps.
-  - Otherwise returns a packed integer with an arity-preserving terminator.
-  - Optional COMPONENTS allows callers to supply decoded digits to avoid extraction."
-  (let* ((components (or components (extract-integer-components int-key)))
-         (digits nil)
-         (any-mapped nil))
-    (dolist (code components)
-      (let ((marker (gethash code canonical-map)))
-        (if marker
-            (progn
-              (push marker digits)
-              (setf any-mapped t))
-            (push code digits))))
-    (if any-mapped
-        (pack-canonical-digits (nreverse digits))
-        int-key)))
-
-
-(defun canonicalize-value (val canonical-map)
-  "Canonicalize a value by replacing symmetric object symbols with canonical markers.
-   - Symmetric object symbols: symbol → int-code → canonical-marker
-   - Non-symmetric object symbols: symbol → int-code
-   - Non-object symbols (T, NIL, keywords): pass through unchanged
-   - Lists: recurse through elements"
-  (cond
-    ;; List: recurse through elements
-    ((consp val)
-     (mapcar (lambda (elem) (canonicalize-value elem canonical-map)) val))
-    ;; Symbol: check if it's an object constant
-    ((symbolp val)
-     (let ((int-code (gethash val *constant-integers*)))
-       (if int-code
-           ;; Object constant - return marker if symmetric, else int-code
-           (gethash int-code canonical-map int-code)
-           ;; Not an object constant
-           val)))
-    ;; Other atoms (numbers, etc.): pass through
-    (t val)))
+    (ldb (byte 62 0)
+         (deep-sxhash (build-exact-canonical-idb-form idb)))))
 
 
 ;;;; STATISTICS AND REPORTING ;;;;
@@ -881,63 +1023,62 @@ Returns an alist (obj . signature), where signature is a sorted list of
 ;;;; INITIALIZATION ;;;;
 
 
-(defun initialize-initial-signatures ()
-  "Record initial dynamic state signatures for all objects in symmetry groups.
-   Must be called AFTER integer conversion so signatures match runtime format.
-   Uses *start-state* which contains the initial idb."
-  (clrhash *initial-object-signatures*)
-  (dolist (group *symmetry-groups*)
-    (dolist (object group)
-      (let ((sig (compute-current-state-signature object *start-state*)))
-        (setf (gethash object *initial-object-signatures*) sig)))))
+(defun first-equivalent-uncommitted-row
+    (membership committed-rows state)
+  "Return the first row equivalent to MEMBERSHIP's row after prior commitments."
+  (let* ((family (symmetry-membership.family membership))
+         (chosen-row (symmetry-membership.row-index membership)))
+    (loop for row in (symmetry-family.rows family)
+          for row-index from 0
+          when (and (not (member row-index committed-rows :test #'=))
+                    (symmetry-row-swap-preserves-state-p
+                      family chosen-row row-index state))
+            return row-index)))
 
 
 (defun instantiation-allowed-p (instantiation param-indices state)
   "Returns T if INSTANTIATION should be kept (not pruned).
-   Implements current-state equivalence: objects are interchangeable only if
-   they have identical current state signatures. Among equivalent objects,
-   canonical (group) order is enforced across parameters."
-  (let ((committed (make-hash-table :test #'eq)))  ; group -> list of committed objects
+   Rows are interchangeable only when their complete column-preserving transposition
+   leaves the current state unchanged.  Canonical row order is enforced per family."
+  (let ((committed (make-hash-table :test #'eq)))
     (loop for idx in param-indices
           for obj = (nth idx instantiation)
-          for group = (gethash obj *object-to-symmetry-group*)
+          for membership = (gethash obj *object-to-symmetry-membership*)
           always 
           (cond
-            ;; Not in a symmetry group → allow
-            ((null group) t)
-            ;; Already committed this exact object → allow (same object in multiple params)
-            ((member obj (gethash group committed) :test #'eq) t)
-            ;; Check if obj is canonical among currently-equivalent uncommitted objects
-            (t 
-             (let* ((obj-sig (compute-current-state-signature obj state))
-                    (already-committed (gethash group committed))
-                    ;; Find first group member with same current signature, not yet committed
-                    (first-equivalent
-                      (find-if (lambda (member)
-                                 (and (not (member member already-committed :test #'eq))
-                                      (equal (compute-current-state-signature member state)
-                                             obj-sig)))
-                               group)))
-               ;; Commit this object for future parameters
-               (push obj (gethash group committed))
-               ;; Object must be first equivalent (or no equivalent exists)
-               (eq obj first-equivalent)))))))
+            ((null membership) t)
+            (t
+             (let* ((family (symmetry-membership.family membership))
+                    (row-index (symmetry-membership.row-index membership))
+                    (committed-rows (gethash family committed)))
+               (cond
+                 ((member row-index committed-rows :test #'=) t)
+                 (t
+                  (let ((first-equivalent
+                          (first-equivalent-uncommitted-row
+                            membership committed-rows state)))
+                    (push row-index (gethash family committed))
+                    (= row-index first-equivalent))))))))))
 
 
 (defun initialize-symmetry-detection ()
   "Initialize symmetry detection if enabled. Must be called AFTER
-   do-init-action-updates, so that object signatures see the static facts
+   do-init-action-updates, so that exact transpositions see the static facts
    derived by init actions and not merely those authored in define-init."
   (when *symmetry-pruning*
     (detect-symmetry-groups)
+    (when (and (boundp '*start-state*) *start-state*)
+      (setf (problem-state.idb-hash *start-state*) nil))
     (cond
-      (*symmetry-groups*
-       (format t "~2%Symmetry groups detected: ~D~%" (length *symmetry-groups*))
-       (dolist (group *symmetry-groups*)
-         (format t "  ~A [~D potentially interchangeable objects of type ~A]~%"
-                 group
-                 (length group)
-                 (find-group-type group)))
+      (*symmetry-families*
+       (format t "~2%Symmetry families detected: ~D~%" (length *symmetry-families*))
+       (dolist (family *symmetry-families*)
+         (let ((rows (symmetry-family.rows family))
+               (objects (symmetry-family-objects family)))
+           (format t "  ~A [~D interchangeable row~:P of type ~A]~%"
+                   rows
+                   (length rows)
+                   (find-group-type objects))))
        ;; Explain goal reference impact and strategy
        (let ((goal-objects (extract-goal-object-references)))
          (when goal-objects
@@ -951,36 +1092,17 @@ Returns an alist (obj . signature), where signature is a sorted list of
              (format t "  Strategy: Local — symmetric actions are detected at generation time and pruned.~%")))
        (terpri))
       (t
-       (format t "~2%No symmetry groups detected. Set *symmetry-pruning* = nil for greater efficiency.~2%")))))
+       (format t "~2%No symmetry families detected. Set *symmetry-pruning* = nil for greater efficiency.~2%")))))
 
 
-(defun pack-normalized-components (components self-code code-set)
-  "Pack normalized COMPONENTS into an integer with an arity-preserving terminator.
-Normalization:
-  self-code -> 0
-  other group member -> 1
-  else unchanged
-We append a terminator digit (a 1 in the next base-1000 place) so that
-trailing zeros in normalized components do NOT collapse."
-  (let ((packed 0)
-        (mult 1))
-    (dolist (code components)
-      (let ((mapped (cond ((eql code self-code) 0)
-                          ((and code-set (gethash code code-set)) 1)
-                          (t code))))
-        (incf packed (* mapped mult))
-        (setf mult (* mult 1000))))
-    ;; Arity terminator (prevents collisions when trailing normalized zeros occur)
-    (+ packed mult)))
-
-
-(defun pack-canonical-digits (digits)
-  "Pack DIGITS into an integer with an arity-preserving terminator.
-  We append a terminator digit (a 1 in the next base place) so trailing zeros
-  do not collapse (e.g., (... 0) differs from (...))."
-  (let ((packed 0)
-        (mult 1))
-    (dolist (d digits)
-      (incf packed (* d mult))
-      (setf mult (* mult +canon-pack-base+)))
-    (+ packed mult)))  ; terminator
+(defun refresh-symmetry-detection ()
+  "Rebuild symmetry after a runtime goal change."
+  (if *symmetry-pruning*
+      (initialize-symmetry-detection)
+      (progn
+        (setf *symmetry-groups* nil
+              *symmetry-families* nil)
+        (clrhash *object-to-symmetry-group*)
+        (clrhash *object-to-symmetry-membership*)
+        (clrhash *symmetric-type-parameters*)))
+  *symmetry-families*)

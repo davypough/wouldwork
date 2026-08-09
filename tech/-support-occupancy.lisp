@@ -9,7 +9,8 @@
 ;;; PROVIDES:
 ;;;   types    : support-occupant (either agent box jammer connector fan tray)  --  also
 ;;;              declared identically by box, jammer, walkability, and ladder
-;;;              support (either pressure-plate toggle-plate box fan tray)  --  also declared
+;;;              support (either pressure-plate toggle-plate box fan tray floor-blower
+;;;              angled-blower)  --  also declared
 ;;;              identically by box, jammer, walkability, and ladder.  Gears are not a
 ;;;              support: only a fan can occupy them, via -gears-fan's (mounted-on ...)
 ;;;              attachment rather than (on ...).  A tray is a support only while held; on
@@ -29,7 +30,8 @@
 
 (define-types
   support-occupant (either agent box jammer connector fan tray)  ;also declared identically by box/jammer/walkability/ladder
-  support (either pressure-plate toggle-plate box fan tray))  ;also declared identically by box/jammer/walkability/ladder; what a movable object can rest on (fan-on-gears is an attachment, not support)
+  support
+    (either pressure-plate toggle-plate box fan tray floor-blower angled-blower))  ;fixed floor/angled blowers expose the same flush support surface as a mounted fan
 
 
 (define-dynamic-relations

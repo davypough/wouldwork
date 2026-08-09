@@ -3,7 +3,8 @@
 ;;; Recorder identity and cross-layer interaction policy.  RECORDING-COPY> explicitly maps
 ;;; each live mobile object to the ghost that replays it.  The relation is directional and
 ;;; functional from live to ghost; recorder initialization adds the one-to-one, disjoint,
-;;; and leaf-category-compatible invariants.
+;;; leaf-category-compatible, and exhaustive loose-cargo invariants.  The relation also
+;;; registers its ordered tuples as coupled symmetry rows.
 ;;;
 ;;; This file deliberately owns no apparatus shadow state and no propagation update.  It
 ;;; identifies the recording view, selects which mapped objects existed in that view, and
@@ -39,6 +40,9 @@
 
 (define-static-relations
   (recording-copy> mobile-object $mobile-object))
+
+
+(register-symmetry-coupling 'recording-copy>)
 
 
 (defvar *recorder-shadow-lifecycles* nil

@@ -10,9 +10,9 @@
 ;;; PROVIDES:
 ;;;   nested   : -height (repeater, declared-height)
 ;;;   types    : elevated-object (either location gate screen wall edge transmitter
-;;;              receiver gun wall-gears floor-repeater wall-repeater)  --  wall-gears may
-;;;              declare the stream elevation of their mounted fan (default 1, via
-;;;              -gears-fan's gears-elevation)
+;;;              receiver gun wall-gears wall-blower floor-repeater wall-repeater)  --
+;;;              wall gears and fixed wall blowers may declare their stream elevation
+;;;              (default 1, via -gears-fan's blower-elevation)
 ;;;   relation : (has-elevation elevated-object $rational)
 ;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
 ;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
@@ -22,12 +22,14 @@
 (in-package :ww)
 
 
-(define-optional-types gate screen wall edge transmitter receiver gun wall-gears)
+(define-optional-types
+  gate screen wall edge transmitter receiver gun wall-gears wall-blower)
 
 
 (define-types
   elevated-object
-    (either location gate screen wall edge transmitter receiver gun wall-gears
+    (either location gate screen wall edge transmitter receiver gun
+            wall-gears wall-blower
             floor-repeater wall-repeater))
 
 

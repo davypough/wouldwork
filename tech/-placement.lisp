@@ -1,13 +1,14 @@
 ;;; Filename: -placement.lisp
 
 ;;; Placement substrate: where a carried object may be set down -- a plate, a floor-mounted
-;;; fan, a clear box top, another agent's currently-held tray, or bare ground -- gated by
-;;; cleartop and the agent's vertical reach.  A fan qualifies as a support only while
-;;; mounted on gears: a loose fan is mere cargo, like a connector, and a wall-mounted fan
-;;; has no has-location.  A tray qualifies as a support only while held: grounded, it is
-;;; inert, so only currently-held trays are ever offered.  Shared by every carried-object
+;;; fan, a fixed floor/angled blower, a clear box top, another agent's currently-held tray,
+;;; or bare ground -- gated by cleartop and the agent's vertical reach.  A fan qualifies as
+;;; a support only while mounted on gears: a loose fan is mere cargo, like a connector, and
+;;; a wall-mounted fan has no has-location.  A fixed floor/angled blower exposes the same
+;;; flush support surface through its fixed position.  A tray qualifies as a support only
+;;; while held: grounded, it is inert, so only currently-held trays are ever offered.  Shared by every carried-object
 ;;; technology that must choose where a held object comes to rest: box, jammer, beam-relay,
-;;; and floor-blower's fan.  Declared identically by each until now; this file owns it
+;;; and a fan mounted on floor-gears.  Declared identically by each until now; this file owns it
 ;;; once.  Mounting a fan on gears is an attachment, not a support placement, so it is
 ;;; -gears-fan's own mount-fan action rather than a case here.
 ;;;
@@ -19,9 +20,10 @@
 ;;; PROVIDES:
 ;;;   queries   : placement-choice-allowed -- shared policy gate used by both option
 ;;;               generation and the placement update
-;;;               placement-options  --  legal plate/fan/box/tray/ground placements at a
-;;;               location, excluding a given object (?self) as a candidate support;
-;;;               only a floor-mounted fan and only a currently-held tray are ever offered
+;;;               placement-options  --  legal plate/fan/fixed-blower/box/tray/ground
+;;;               placements at a location, excluding a given object (?self) as a
+;;;               candidate support; only a floor-mounted fan and only a currently-held
+;;;               tray are ever offered
 ;;;               placement-elevation -- the resting base elevation produced by an option
 ;;;   update    : place-held-object!  --  releases ?agent's hold, sets ?object's location,
 ;;;               and rests it on ?place unless ?place is 'ground
@@ -32,7 +34,7 @@
 (in-package :ww)
 
 
-(define-optional-types fan)
+(define-optional-types fan floor-blower angled-blower)
 
 
 (define-query placement-choice-allowed (?agent agent ?object cargo ?place)
@@ -63,6 +65,14 @@
                  (placement-choice-allowed ?agent ?self ?fan)
                  (within-agent-vertical-reach ?agent (support-top-elevation ?fan)))
           (assign $places (cons ?fan $places))))
+      (doall (?fixed (either floor-blower angled-blower))
+        (if (and (different ?fixed ?self)
+                 (has-position ?fixed ?location)
+                 (cleartop ?fixed)
+                 (placement-choice-allowed ?agent ?self ?fixed)
+                 (within-agent-vertical-reach ?agent
+                                                (support-top-elevation ?fixed)))
+          (assign $places (cons ?fixed $places))))
       (doall (?support-box box)
         (if (and (different ?support-box ?self)
                  (has-location ?support-box ?location)

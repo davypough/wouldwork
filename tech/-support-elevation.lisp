@@ -28,8 +28,8 @@
   ;; A box top is its resting level plus its declared-or-default height.  A fan is a
   ;; movable, zero-thickness support: its top is its own resting level, so a fan mounted
   ;; on gears stays flush with the floor.  A tray's top depends on whether it is currently
-  ;; held (see tray-top-elevation).  A plate top is the floor elevation of the location
-  ;; where the plate is positioned.
+  ;; held (see tray-top-elevation).  A plate or fixed floor/angled blower top is the floor
+  ;; elevation of the location where the fixture is positioned.
   (if (box ?support)
     (+ (occupant-elevation ?support) (declared-height ?support))
     (if (fan ?support)

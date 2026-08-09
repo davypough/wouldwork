@@ -12,21 +12,24 @@
 
 (define-init-check-helper check-init-stream-consistency (literals)
   "In a coordinate-driven problem (WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL
-   asserted), every declared wall-gears' air stream must be derivable: a positioned
+   asserted), every declared wall-gears or wall-blower stream must be derivable: a positioned
    HAS-POSITION swept location and AIMED-AT destination sharing an axis coordinate and
-   not coincident.  Any STREAM-WIDTH override must name a wall-gears and give a positive
+   not coincident.  Any STREAM-WIDTH override must name a wall-gears or wall-blower and give a positive
    width."
   (when (or (positive-init-literals-with-relation 'wall-segment> literals)
             (positive-init-literals-with-relation 'edge-segment> literals)
             (positive-init-literals-with-relation 'boundary-wall literals))
     (let ((positions (init-location-coords-map literals)))
-      (dolist (gears (init-type-instances 'wall-gears))
+      (dolist (gears
+                (append (init-type-instances 'wall-gears)
+                        (init-type-instances 'wall-blower)))
         (init-check-stream-derivable gears positions literals))))
   (dolist (literal (init-literals-with-relation 'stream-width literals))
     (destructuring-bind (gears width)
         (rest (init-literal-proposition literal))
-      (unless (init-type-member-p gears 'wall-gears)
-        (fail-init-check nil "~%STREAM-WIDTH names ~S, which is not a declared wall-gears instance.~%~
+      (unless (or (init-type-member-p gears 'wall-gears)
+                  (init-type-member-p gears 'wall-blower))
+        (fail-init-check nil "~%STREAM-WIDTH names ~S, which is not a declared wall-gears or wall-blower instance.~%~
                 Literal: ~S"
                gears (init-literal-proposition literal)))
       (unless (and (rationalp width) (plusp width))

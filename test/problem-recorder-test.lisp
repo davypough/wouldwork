@@ -1,9 +1,9 @@
 ;;; Filename: problem-recorder-test.lisp
 
 ;;; Dedicated zero-action regression for recorder identity and placement.  The authored
-;;; mapping pairs agents with agents and connectors with connectors, while an unmapped fan
-;;; proves that MOBILE-OBJECT membership alone does not assign a recording side.  Direct
-;;; validation probes characterize the one-to-one, disjoint, category-compatible contract.
+;;; mapping pairs agents with agents, connectors with connectors, and every cargo object
+;;; with its playback copy.  Direct validation probes characterize the exhaustive cargo,
+;;; one-to-one, disjoint, category-compatible contract.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -28,7 +28,7 @@
 (define-types
   agent (live-agent ghost-agent other-live-agent other-ghost-agent third-agent)
   connector (live-connector ghost-connector)
-  fan (unmapped-fan)
+  fan (live-fan ghost-fan)
   recorder (recorder1 unpositioned-recorder)
   location (recorder-site alternate-site))
 
@@ -36,6 +36,7 @@
 ;;;; TECHNOLOGY INCLUDE ;;;;
 
 
+(include-tech -holding)
 (include-tech recorder)
 
 
@@ -47,7 +48,8 @@
   (has-location live-agent recorder-site)
   (has-location ghost-agent recorder-site)
   (recording-copy> live-agent ghost-agent)
-  (recording-copy> live-connector ghost-connector))
+  (recording-copy> live-connector ghost-connector)
+  (recording-copy> live-fan ghost-fan))
 
 
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
@@ -117,6 +119,15 @@
         :checks '(recorder-init-check)))
     'init-check-failure
     :containing "incompatible object categories"
+    :check 'recorder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-agent ghost-agent)
+          (recording-copy> live-connector ghost-connector))
+        :checks '(recorder-init-check)))
+    'init-check-failure
+    :containing "Recorder cargo is missing from RECORDING-COPY>"
     :check 'recorder-init-check))
 
 
@@ -130,6 +141,7 @@
   ;; RECORDING-COPY> holds as authored and is directional: the reverse pair is not a fact.
   (and (recording-copy> live-agent ghost-agent)
        (recording-copy> live-connector ghost-connector)
+       (recording-copy> live-fan ghost-fan)
        (not (recording-copy> ghost-agent live-agent))))
 
 
@@ -137,17 +149,12 @@
   ;; Each mapped object classifies onto exactly one recording side.
   (and (live-recording-object live-agent)
        (live-recording-object live-connector)
+       (live-recording-object live-fan)
        (not (ghost-recording-object live-agent))
        (ghost-recording-object ghost-agent)
        (ghost-recording-object ghost-connector)
+       (ghost-recording-object ghost-fan)
        (not (live-recording-object ghost-agent))))
-
-
-(define-query recorder-unmapped-object-valid ()
-  ;; MOBILE-OBJECT membership alone assigns no side: the unmapped fan is neither live nor
-  ;; ghost, which is what makes the mapping authoritative rather than exhaustive.
-  (and (not (live-recording-object unmapped-fan))
-       (not (ghost-recording-object unmapped-fan))))
 
 
 (define-query recorder-position-valid ()
@@ -162,5 +169,4 @@
 (define-goal
   (and (recorder-mapping-valid)
        (recorder-side-classification-valid)
-       (recorder-unmapped-object-valid)
        (recorder-position-valid)))

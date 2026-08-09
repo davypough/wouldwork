@@ -37,7 +37,8 @@
   agent (empty-agent carrying-agent)
   connector (carried-connector)
   gate (closed-gate)
-  wall-gears (neutral-gears))
+  wall-gears (neutral-gears)
+  wall-blower (neutral-blower))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
@@ -58,6 +59,7 @@
 
 (define-test-claim passability-neutral-layering
   (expect-type-instances 'wall-gears '(neutral-gears))
+  (expect-type-instances 'wall-blower '(neutral-blower))
   (expect-relation-absent 'mounted-on)
   (expect-relation-absent 'turning)
   (expect-relation-absent 'blowing))
@@ -72,6 +74,8 @@
     (stream-obstacle-clear empty-agent neutral-gears)
     (obstacle-clear empty-agent neutral-gears)
     (obstacle-clear carrying-agent neutral-gears)
+    (stream-obstacle-clear empty-agent neutral-blower)
+    (obstacle-clear empty-agent neutral-blower)
 
     ;; ALL-CLEAR routes every bare gears item through the same actor-aware neutral hook.
     (all-clear empty-agent '(neutral-gears))

@@ -37,9 +37,9 @@
   pressure-plate (boarding-plate leaving-plate fan-control-plate occupied-plate
                   current-plate alternate-plate remote-plate)
   box (plate-blocker nonsteppable-box box-support)
-  floor-gears (floor-gears1)
-  wall-gears (wall-gears1)
-  fan (floor-fan loose-fan wall-fan))
+  floor-blower (floor-gears1)
+  wall-blower (wall-gears1)
+  fan (loose-fan))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -63,14 +63,11 @@
   (has-position leaving-plate leaving-site)
   (on leaving-agent leaving-plate)
 
-  ;; Required fan-on lifecycle.  The clear control plate keeps both mounted fans
-  ;; stopped, and welding prevents unrelated pickup-fan branches.
+  ;; Required floor-blower-on lifecycle.  The clear control plate keeps both fixed
+  ;; blowers stopped.
   (has-location fan-agent fan-site)
   (has-position fan-control-plate control-site)
-  (has-location floor-fan fan-site)
   (has-position floor-gears1 fan-site)
-  (mounted-on floor-fan floor-gears1)
-  (welded floor-fan floor-gears1)
   (controls ((fan-control-plate)) floor-gears1 normal)
 
   ;; Occupancy alone blocks an otherwise colocated plate step.
@@ -92,11 +89,9 @@
   (has-location nonsteppable-box loose-site)
   (has-position remote-plate remote-site)
 
-  ;; A wall-mounted fan is attached but deliberately has no location.
+  ;; A fixed wall blower deliberately has no mobile location.
   (has-location wall-agent wall-site)
   (has-position wall-gears1 wall-site)
-  (mounted-on wall-fan wall-gears1)
-  (welded wall-fan wall-gears1)
   (controls ((fan-control-plate)) wall-gears1 normal)
 
   ;; Stepping off applies only to steppables, not to a box top.
@@ -147,19 +142,16 @@
       '(step (leaving-site ground) nil
              (leaving-site leaving-plate)))
 
-    ;; A mounted floor fan is steppable while a clear control keeps it stopped.
+    ;; A fixed floor blower is steppable while a clear control keeps it stopped.
     (has-location fan-agent fan-site)
-    (has-location floor-fan fan-site)
-    (mounted-on floor-fan floor-gears1)
-    (welded floor-fan floor-gears1)
-    (on fan-agent floor-fan)
-    (not (cleartop floor-fan))
+    (on fan-agent floor-gears1)
+    (not (cleartop floor-gears1))
     (not (depressed fan-control-plate))
     (not (turning floor-gears1))
-    (not (blowing floor-fan))
+    (not (blowing floor-gears1))
     (step-transition-available-p
       state 'fan-agent
-      '(step (fan-site floor-fan) nil (fan-site ground)))
+      '(step (fan-site floor-gears1) nil (fan-site ground)))
 
     ;; An occupied plate is geometrically eligible but fails CLEARTOP.
     (has-location occupied-agent occupied-site)
@@ -209,19 +201,14 @@
            '(step (loose-site ground) nil
                   (loose-site nonsteppable-box))))
 
-    ;; A wall-mounted fan has an attachment but no floor location to match.
+    ;; A fixed wall blower has no floor support role or mobile location to match.
     (has-location wall-agent wall-site)
-    (mounted-on wall-fan wall-gears1)
-    (welded wall-fan wall-gears1)
-    (not (exists (?location location)
-           (has-location wall-fan ?location)))
-    (cleartop wall-fan)
     (not (turning wall-gears1))
-    (not (blowing wall-fan))
+    (not (blowing wall-gears1))
     (not (step-transition-available-p
            state 'wall-agent
            '(step (wall-site ground) nil
-                  (wall-site wall-fan))))
+                  (wall-site wall-gears1))))
 
     ;; Step dismount deliberately excludes box tops; jump owns that transition.
     (has-location box-agent box-site)
@@ -255,6 +242,8 @@
   (?fixture steppable-object ?location location)
   (do ?location
       (or (plate ?fixture)
+          (floor-blower ?fixture)
+          (angled-blower ?fixture)
           (and (fan ?fixture)
                (bind (mounted-on ?fixture $gears))
                (bind (has-location ?fixture $fixture-location)))))

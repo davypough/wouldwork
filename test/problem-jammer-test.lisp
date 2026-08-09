@@ -11,7 +11,7 @@
 ;;;      succeeding without any authored LOS fact and stopping the gears.
 ;;;   4. PICKUP-JAMMER remotely retrieving a jammer that rests on a plate and
 ;;;      suppresses wall gears.  Pickup must clear location, support, and jamming;
-;;;      propagation must clear the plate and restart the welded mounted fan.
+;;;      propagation must clear the plate and restart the fixed wall blower.
 ;;;
 ;;; The first three agents begin holding their dedicated jammers so each positive
 ;;; targeting branch requires exactly one action.  The lifecycle agent begins
@@ -50,9 +50,10 @@
   jammer (gate-jammer wall-jammer floor-jammer lifecycle-jammer disallowed-jammer)
   gate (gate-target)
   pressure-plate (gate-plate lifecycle-plate)
-  wall-gears (wall-target lifecycle-target)
+  wall-gears (wall-target)
+  wall-blower (lifecycle-target)
   floor-gears (floor-target disallowed-gears)
-  fan (lifecycle-fan))
+  )
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -90,7 +91,7 @@
   (has-position floor-target floor-site)
 
   ;; Pickup lifecycle: the jammer starts on a plate, actively suppressing the
-  ;; uncontrolled gears and their welded fan.  The agent can reach across one
+  ;; uncontrolled fixed wall blower.  The agent can reach across one
   ;; authored empty-barrier edge but never moves.
   (has-location lifecycle-agent lifecycle-agent-site)
   (has-location lifecycle-jammer lifecycle-gears-site)
@@ -98,8 +99,6 @@
   (on lifecycle-jammer lifecycle-plate)
   (jamming lifecycle-jammer lifecycle-target)
   (has-position lifecycle-target lifecycle-gears-site)
-  (mounted-on lifecycle-fan lifecycle-target)
-  (welded lifecycle-fan lifecycle-target)
   (reach-via lifecycle-agent-site () lifecycle-gears-site)
 
   ;; Disallowed-pairing negative probe: geometrically and visually legal (placement
@@ -187,11 +186,7 @@
     (cleartop lifecycle-plate)
     (not (depressed lifecycle-plate))
     (turning lifecycle-target)
-    (mounted-on lifecycle-fan lifecycle-target)
-    (welded lifecycle-fan lifecycle-target)
-    (blowing lifecycle-fan)
-    (not (exists (?location location)
-           (has-location lifecycle-fan ?location)))
+    (blowing lifecycle-target)
 
     ;; Important cross-lane absences.
     (not (jamming gate-jammer wall-target))

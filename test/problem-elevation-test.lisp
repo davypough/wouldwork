@@ -50,6 +50,7 @@
   receiver (explicit-receiver default-receiver)
   gun (explicit-gun default-gun)
   wall-gears (explicit-wall-gears default-wall-gears)
+  wall-blower (explicit-wall-blower default-wall-blower)
   floor-repeater (explicit-floor-repeater default-floor-repeater)
   wall-repeater (explicit-wall-repeater default-wall-repeater))
 
@@ -74,6 +75,7 @@
   (has-elevation explicit-receiver 8)
   (has-elevation explicit-gun 13)
   (has-elevation explicit-wall-gears 9)
+  (has-elevation explicit-wall-blower 14)
   (has-elevation explicit-floor-repeater 10)
   (has-elevation explicit-wall-repeater 11)
 
@@ -117,6 +119,7 @@
     (explicit-elevation-valid explicit-receiver 8)
     (explicit-elevation-valid explicit-gun 13)
     (explicit-elevation-valid explicit-wall-gears 9)
+    (explicit-elevation-valid explicit-wall-blower 14)
     (explicit-elevation-valid explicit-floor-repeater 10)
     (explicit-elevation-valid explicit-wall-repeater 11)
 
@@ -129,6 +132,7 @@
     (default-elevation-valid default-receiver)
     (default-elevation-valid default-gun)
     (default-elevation-valid default-wall-gears)
+    (default-elevation-valid default-wall-blower)
     (default-elevation-valid default-floor-repeater)
     (default-elevation-valid default-wall-repeater)
 

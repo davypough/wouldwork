@@ -1,7 +1,7 @@
 ;;; Filename: -recorder-init-checks.lisp
 
-;;; Initialization validation for -recorder-core identity, recording-layer isolation, and
-;;; the explicitly supported set of shadow components assembled by recorder.lisp.
+;;; Initialization validation for -recorder-core identity, exhaustive cargo copying,
+;;; recording-layer isolation, and the explicitly supported shadow components.
 
 
 (in-package :ww)
@@ -9,7 +9,8 @@
 
 (define-init-check recorder-init-check (literals)
   (check-init-recorder-consistency literals)
-  (init-check-recorder-supported-scope))
+  (init-check-recorder-supported-scope)
+  (init-check-recording-cargo-mapping-complete literals))
 
 
 (define-init-check-helper check-init-recorder-consistency (literals)
@@ -76,6 +77,30 @@
   (let ((side1 (init-recording-side object1 live-objects ghost-objects))
         (side2 (init-recording-side object2 live-objects ghost-objects)))
     (and side1 (eql side1 side2))))
+
+
+(define-init-check-helper init-check-recording-cargo-completeness
+    (live-objects ghost-objects)
+  "Require every cargo instance to occur on exactly one side of a copy pair."
+  (dolist (object (init-type-instances 'cargo))
+    (unless (init-recording-side object live-objects ghost-objects)
+      (fail-init-check nil "~%Recorder cargo is missing from RECORDING-COPY>.~%~
+              Object: ~S~%~
+              Every cargo object must be a live or ghost endpoint.  Fixed combined ~
+              blowers are shared BLOWER objects, not cargo fans."
+             object))))
+
+
+(define-init-check-helper init-check-recording-cargo-mapping-complete (literals)
+  "Collect the already-validated mapping and enforce cargo completeness last."
+  (let ((live-objects (make-hash-table :test #'equal))
+        (ghost-objects (make-hash-table :test #'equal)))
+    (dolist (literal
+              (positive-init-literals-with-relation 'recording-copy> literals))
+      (let ((proposition (init-literal-proposition literal)))
+        (setf (gethash (second proposition) live-objects) t
+              (gethash (third proposition) ghost-objects) t)))
+    (init-check-recording-cargo-completeness live-objects ghost-objects)))
 
 
 (define-init-check-helper init-check-recording-locations
@@ -162,13 +187,14 @@
       (destructuring-bind (clauses controlled-object mode)
           (rest (init-literal-proposition literal))
         (declare (ignore mode))
-        (when (init-type-member-p controlled-object 'wall-gears)
+        (when (or (init-type-member-p controlled-object 'wall-gears)
+                  (init-type-member-p controlled-object 'wall-blower))
           (dolist (clause clauses)
             (dolist (controller clause)
               (unless (init-type-member-p controller 'plate)
-                (fail-init-check nil "~%Recording-side wall-gears controls support only plates.~%~
+                (fail-init-check nil "~%Recording-side wall blower controls support only plates.~%~
                         Literal:          ~S~%~
-                        Wall gears:       ~S~%~
+                        Wall drive:        ~S~%~
                         Unsupported item: ~S"
                        literal controlled-object controller)))))))))
 
@@ -215,6 +241,8 @@
 (define-init-check-helper init-check-recorder-supported-scope ()
   "Rejects installed objects and capabilities outside the recorder shadow."
   (init-check-recorder-unsupported-type 'floor-gears "recording-side floor blowers")
+  (init-check-recorder-unsupported-type 'floor-blower "recording-side floor blowers")
   (init-check-recorder-unsupported-type 'angled-gears "recording-side angled blowers")
+  (init-check-recorder-unsupported-type 'angled-blower "recording-side angled blowers")
   (init-check-recording-threats)
   (init-check-recording-beam-crossings))

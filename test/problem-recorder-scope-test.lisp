@@ -1,7 +1,7 @@
 ;;; Filename: problem-recorder-scope-test.lisp
 
 ;;; Zero-action characterization of the recorder's supported recording-shadow boundary.
-;;; The staged problem is a supported fixed-wall-fan configuration.  Direct validation
+;;; The staged problem is a supported fixed wall-blower configuration.  Direct validation
 ;;; probes then install one unsupported optional capability at a time and verify that each
 ;;; fails at recorder initialization rather than acquiring approximate playback physics.
 ;;; Expected minimum path length: zero.
@@ -20,10 +20,10 @@
 
 (define-types
   agent (live-agent ghost-agent)
-  fan (fixed-fan live-fan ghost-fan)
+  fan (live-fan ghost-fan)
   recorder (recorder1)
   pressure-plate (plate1)
-  wall-gears (wall-gears1)
+  wall-blower (wall-gears1)
   receiver (receiver1)
   location (source-site destination-site))
 
@@ -38,14 +38,13 @@
 
 (define-init
   (recording-copy> live-agent ghost-agent)
+  (recording-copy> live-fan ghost-fan)
   (has-location live-agent source-site)
   (has-location ghost-agent source-site)
   (has-position recorder1 source-site)
   (has-position plate1 source-site)
   (has-position wall-gears1 source-site)
   (controls ((plate1)) wall-gears1 normal)
-  (mounted-on fixed-fan wall-gears1)
-  (welded fixed-fan wall-gears1)
   (aimed-at wall-gears1 destination-site))
 
 
@@ -84,15 +83,14 @@
 
 
 (define-test-claim recorder-supported-scope-validation
-  ;; The staged fixed-fan configuration and explicit plate control are supported.
+  ;; The staged fixed-blower configuration and explicit plate control are supported.
   (null
     (validate-init-literals
       '((recording-copy> live-agent ghost-agent)
+        (recording-copy> live-fan ghost-fan)
         (has-location live-agent source-site)
         (has-location ghost-agent source-site)
-        (controls ((plate1)) wall-gears1 normal)
-        (mounted-on fixed-fan wall-gears1)
-        (welded fixed-fan wall-gears1))
+        (controls ((plate1)) wall-gears1 normal))
       :checks '(recorder-init-check)))
 
   (expect-condition
@@ -151,25 +149,16 @@
         '((controls ((receiver1)) wall-gears1 normal))
         :checks '(recorder-init-check)))
     'init-check-failure
-    :containing "wall-gears controls support only plates"
+    :containing "wall blower controls support only plates"
     :check 'recorder-init-check)
 
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((recording-copy> live-fan ghost-fan))
+        '((recording-copy> live-agent ghost-agent))
         :checks '(recorder-init-check)))
     'init-check-failure
-    :containing "mapped wall-fan mounting"
-    :check 'recorder-init-check)
-
-  (expect-condition
-    (lambda ()
-      (validate-init-literals
-        '((has-location fixed-fan source-site))
-        :checks '(recorder-init-check)))
-    'init-check-failure
-    :containing "unmapped mobile object"
+    :containing "cargo is missing"
     :check 'recorder-init-check))
 
 

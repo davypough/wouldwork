@@ -4,12 +4,14 @@ TALOS TECHNOLOGY SUMMARY
 
 agent
 angled-gears
+angled-blower
 box
 connector
 crossing  ;a crossing is where two beams intersect
 edge  ;a finite-height vertical surface separating elevations; blocks walking like a wall but is not vaultable
 fan
 floor-gears
+floor-blower
 floor-repeater
 gate
 gun
@@ -27,6 +29,7 @@ transmitter
 tray
 wall
 wall-gears
+wall-blower
 wall-repeater
 window
 
@@ -37,20 +40,21 @@ beam-blocker (either agent box jammer connector)
 los-endpoint (either transmitter receiver floor-repeater wall-repeater gun location)
 beam-node (either transmitter receiver floor-repeater wall-repeater location)
 cargo (either box jammer connector fan tray)
-elevated-object (either location gate screen wall edge transmitter receiver gun wall-gears floor-repeater wall-repeater)
+elevated-object (either location gate screen wall edge transmitter receiver gun wall-gears wall-blower floor-repeater wall-repeater)
 fixed-beam-source (either transmitter floor-repeater wall-repeater)
 fixed-beam-sink (either floor-repeater wall-repeater receiver)
-fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder)
+fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower recorder)
 gears (either floor-gears wall-gears angled-gears)
+blower (either floor-blower wall-blower angled-blower)
 heighted-object (either box gate agent screen wall edge jammer connector floor-repeater wall-repeater)
 mobile-object (either agent box jammer connector fan tray)
 plate (either pressure-plate toggle-plate)
 relay (either connector floor-repeater wall-repeater)
 repeater (either floor-repeater wall-repeater)
-steppable-object (either pressure-plate toggle-plate fan)
-support (either pressure-plate toggle-plate box fan)
+steppable-object (either pressure-plate toggle-plate fan floor-blower angled-blower)
+support (either pressure-plate toggle-plate box fan floor-blower angled-blower)
 support-occupant (either agent box jammer connector fan tray)
-target (either gate floor-gears wall-gears gun)
+target (either gate floor-gears wall-gears floor-blower wall-blower gun)
 terminus (either transmitter receiver connector floor-repeater wall-repeater)
 threat (either gun)
 vaultable-object (either gate screen wall)
@@ -59,7 +63,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 3. Dynamic Relations
 
 (active receiver)
-(blowing fan)
+(blowing (either fan floor-blower wall-blower angled-blower))
 (color relay $hue)
 (crossing-active crossing)
 (depressed plate)
@@ -71,17 +75,17 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (on support-occupant $support)
 (open gate)
 (paired connector terminus)  ;undirected; stored connector-first
-(turning gears)
+(turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
 
 4. Static Relations
 
-(aimed-at gears $location)
+(aimed-at (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower) $location)
 (apparatus-coords> (either transmitter receiver floor-repeater wall-repeater gun) $rational $rational)
 (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
 (beam-via fixed-beam-source $list fixed-beam-sink)
 (boundary-wall $list)  ;axis-aligned point list, explicitly closed by repeating the first point; used by LOS and walk-via derivation
 (climb-via> location $list location)
-(controls $list (either gate floor-gears wall-gears angled-gears gun) $mode)
+(controls $list (either gate floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower gun) $mode)
 (coupled fixed-beam-source fixed-beam-sink)  ;directional; fixed couplings unlimited
 (crossings-along-beam> los-endpoint $list los-endpoint)
 (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
@@ -104,12 +108,11 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (screen-segment> screen $rational $rational $rational $rational)
 (stairs-via location $list location)
 (stairs-via> location $list location)
-(stream-width wall-gears $rational)  ;default 3 units
+(stream-width (either wall-gears wall-blower) $rational)  ;default 3 units
 (threatens threat location)
 (walk-via location $list location)
 (walk-via> location $list location)
 (wall-segment> wall $rational $rational $rational $rational)
-(welded fan $gears)
 (window-segment> window $rational $rational $rational $rational)
 
 5. Actions

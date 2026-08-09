@@ -39,8 +39,7 @@
   location (lower-swept lower-destination lower-side
             upper-swept upper-destination upper-side)
   pressure-plate (upper-control-plate)
-  wall-gears (lower-gears upper-gears)
-  fan (lower-fan upper-fan)
+  wall-blower (lower-gears upper-gears)
   wall (backstop lane-separator lower-ride-cap upper-ride-cap))
 
 
@@ -67,10 +66,6 @@
   ;; UPPER-GEARS turns only while the occupied plate is energized.
   (has-position lower-gears lower-swept)
   (has-position upper-gears upper-swept)
-  (mounted-on lower-fan lower-gears)
-  (mounted-on upper-fan upper-gears)
-  (welded lower-fan lower-gears)
-  (welded upper-fan upper-gears)
   (controls ((upper-control-plate)) upper-gears normal)
 
   (aimed-at lower-gears lower-destination)
@@ -143,27 +138,17 @@
     (not (depressed upper-control-plate))
 
     ;; The permanently-live lower stream remains the negative reference.
-    (mounted-on lower-fan lower-gears)
-    (welded lower-fan lower-gears)
     (turning lower-gears)
-    (blowing lower-fan)
+    (blowing lower-gears)
     (not (stream-obstacle-clear test-agent lower-gears))
     (not (obstacle-clear test-agent lower-gears))
 
     ;; The upper attachment persists, but loss of plate control stops the stream
     ;; and immediately makes its gears obstacle clear.
-    (mounted-on upper-fan upper-gears)
-    (welded upper-fan upper-gears)
     (not (turning upper-gears))
-    (not (blowing upper-fan))
+    (not (blowing upper-gears))
     (stream-obstacle-clear test-agent upper-gears)
     (obstacle-clear test-agent upper-gears)
-
-    ;; Wall-mounted fans never acquire ordinary locations.
-    (not (exists (?location location)
-           (has-location lower-fan ?location)))
-    (not (exists (?location location)
-           (has-location upper-fan ?location)))
 
     ;; Stream-spec gathering uses the lower default and upper exact override.
     (not (bind (stream-width lower-gears $lower-width)))

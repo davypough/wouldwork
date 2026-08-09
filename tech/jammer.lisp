@@ -2,7 +2,7 @@
 
 ;;; Jammer technology: a carried jammer that, when placed at a location with line of sight
 ;;; to a target, jams it.  Jamming forces a gate open (gate's update-gate-status!), forces
-;;; gears stopped (-gears-fan's update-gears-status!), and forces a gun safe (gun's
+;;; blower drives stopped (-gears-fan's update-blower-status!), and forces a gun safe (gun's
 ;;; update-gun-status!) -- the same override with opposite polarity in each case: a jam
 ;;; always disables the barrier or threat.  A placed jammer is movable cargo: it may rest
 ;;; on a plate (depressing it) or a clear box top, and picking it up clears both its
@@ -24,7 +24,8 @@
 ;;;               update-gate-status!
 ;;; PROVIDES:
 ;;;   types     : jammer, box -- declared optional here
-;;;               target (either gate floor-gears wall-gears gun)  --  what a jammer can
+;;;               target (either gate floor-gears wall-gears floor-blower wall-blower gun)
+;;;               -- what a jammer can
 ;;;               jam; connector pairings use beam-relay's terminus instead
 ;;;   relations : (jamming jammer $target)
 ;;;               (jam-disallowed> location location target)
@@ -41,10 +42,11 @@
 
 
 (define-types
-  target (either gate floor-gears wall-gears gun))  ;what a jammer can jam: a gate (forced open), gears (forced stopped), or a gun (forced safe); connector pairings use terminus
+  target (either gate floor-gears wall-gears floor-blower wall-blower gun))  ;what a jammer can jam: a gate, blower drive, or gun; connector pairings use terminus
 
 
-(define-optional-types jammer box floor-gears wall-gears gun)
+(define-optional-types
+  jammer box floor-gears wall-gears floor-blower wall-blower gun)
 
 
 (define-dynamic-relations
@@ -62,7 +64,8 @@
     (+ (object-elevation ?target) (/ (declared-height ?target) 2))
     (if (gun ?target)
       (fixture-elevation ?target)
-      (if (wall-gears ?target)
+      (if (or (wall-gears ?target)
+              (wall-blower ?target))
         (if (bind (has-elevation ?target $level)) $level 1)
         (do (bind (has-position ?target $location))
             (location-elevation $location))))))

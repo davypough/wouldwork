@@ -9,8 +9,8 @@
 ;;;   4. MOUNT-FAN's flush branch to attach a held fan to angled gears.
 ;;;   5. MOUNT-FAN's wall branch at the inclusive vertical-reach boundary.
 ;;;
-;;; The goal also probes the installed action preconditions directly.  A welded fan, an
-;;; occupied fan, occupied gears, wall gears one unit beyond reach, and gears at a
+;;; The goal also probes the installed action preconditions directly.  A fixed combined
+;;; blower, an occupied fan, occupied gears, wall gears one unit beyond reach, and gears at a
 ;;; disconnected location must remain unusable.  Every lane has its own agent and isolated
 ;;; topology, so each positive result requires one distinct unit-cost action and no agent
 ;;; can satisfy another lane's goal.  Expected minimum path length: five actions, in any
@@ -50,19 +50,21 @@
             remote-site unused-destination)
   pressure-plate (placement-plate off-plate)
   box (occupant-box)
-  floor-gears (floor-pickup-gears welded-gears occupied-fan-gears
+  floor-gears (floor-pickup-gears occupied-fan-gears
                 occupied-gears remote-gears)
+  floor-blower (fixed-floor-blower)
   wall-gears (wall-pickup-gears wall-mounting-gears high-wall-gears)
   angled-gears (angled-mounting-gears)
   fan (fan-to-place floor-pickup-fan wall-pickup-fan
        angled-mounting-fan wall-mounting-fan
-       welded-fan occupied-fan gear-occupant-fan))
+       occupied-fan gear-occupant-fan))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
 
 
 (include-tech plate)
+(include-tech floor-gears)
 (include-tech floor-blower)
 (include-tech wall-blower)
 (include-tech angled-blower)
@@ -90,7 +92,7 @@
   ;; Every gears set has a harmless fixed stream destination, satisfying the blower
   ;; topology without placing any occupant in an air stream.
   (aimed-at floor-pickup-gears unused-destination)
-  (aimed-at welded-gears unused-destination)
+  (aimed-at fixed-floor-blower unused-destination)
   (aimed-at occupied-fan-gears unused-destination)
   (aimed-at occupied-gears unused-destination)
   (aimed-at remote-gears unused-destination)
@@ -119,12 +121,9 @@
   (has-position wall-mounting-gears wall-mounting-fixture-site)
   (has-elevation wall-mounting-gears 2)
 
-  ;; Negative pickup fixtures at PLACING-SITE.  WELDED-FAN is otherwise clear and
-  ;; reachable; OCCUPIED-FAN is otherwise removable but carries OCCUPANT-BOX.
-  (has-position welded-gears placing-site)
-  (has-location welded-fan placing-site)
-  (mounted-on welded-fan welded-gears)
-  (welded welded-fan welded-gears)
+  ;; The fixed combined blower is a clear support at PLACING-SITE but not a fan action
+  ;; parameter.  OCCUPIED-FAN is removable except that it carries OCCUPANT-BOX.
+  (has-position fixed-floor-blower placing-site)
 
   (has-position occupied-fan-gears placing-site)
   (has-location occupied-fan placing-site)
@@ -168,6 +167,12 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
+(define-test-claim blower-type-contract
+  (expect-type-components
+    'blower '(floor-blower wall-blower angled-blower))
+  (expect-type-instances 'blower '(fixed-floor-blower)))
+
+
 (define-query gears-fan-scenarios-valid ()
   (and
     ;; PUT-FAN releases the hold, establishes an ordinary location/support placement,
@@ -194,7 +199,7 @@
 
     ;; The wall pickup branch succeeds exactly two elevation units above the agent and
     ;; likewise clears mounting/blowing without inventing a location.
-    (= (gears-elevation wall-pickup-gears) 2)
+    (= (blower-elevation wall-pickup-gears) 2)
     (within-agent-vertical-reach wall-pickup-agent 2)
     (has-location wall-pickup-agent wall-pickup-site)
     (holding wall-pickup-agent wall-pickup-fan)
@@ -218,7 +223,7 @@
 
     ;; Wall mounting has the same inclusive elevation-2 boundary but deliberately adds
     ;; no location, keeping the fan unavailable to support placement.
-    (= (gears-elevation wall-mounting-gears) 2)
+    (= (blower-elevation wall-mounting-gears) 2)
     (within-agent-vertical-reach wall-mounting-agent 2)
     (has-location wall-mounting-agent wall-mounting-site)
     (not (holding wall-mounting-agent wall-mounting-fan))
@@ -230,13 +235,11 @@
     (turning wall-mounting-gears)
     (blowing wall-mounting-fan)
 
-    ;; Welding is the only failed condition for this otherwise clear, reachable,
-    ;; floor-mounted fan.
-    (mounted-on welded-fan welded-gears)
-    (welded welded-fan welded-gears)
-    (cleartop welded-fan)
+    ;; A fixed combined blower has no independently actionable fan identity.
+    (blowing fixed-floor-blower)
+    (cleartop fixed-floor-blower)
     (not (fan-action-applicable-p
-           state 'pickup-fan '(placing-agent welded-fan)))
+           state 'pickup-fan '(placing-agent fixed-floor-blower)))
 
     ;; Occupancy independently blocks pickup.
     (mounted-on occupied-fan occupied-fan-gears)
@@ -255,14 +258,14 @@
            '(floor-pickup-agent floor-pickup-fan occupied-gears)))
 
     ;; Elevation 3 is exactly one unit beyond a default-height agent's reach.
-    (= (gears-elevation high-wall-gears) 3)
+    (= (blower-elevation high-wall-gears) 3)
     (not (within-agent-vertical-reach floor-pickup-agent 3))
     (not (fan-action-applicable-p
            state 'mount-fan
            '(floor-pickup-agent floor-pickup-fan high-wall-gears)))
 
     ;; The remote gears are vertically usable but disconnected.
-    (= (gears-elevation remote-gears) 0)
+    (= (blower-elevation remote-gears) 0)
     (not (reachable remote-site floor-pickup-site))
     (not (fan-action-applicable-p
            state 'mount-fan
@@ -276,28 +279,11 @@
 ;;;; MUTATION CHARACTERIZATION ;;;;
 
 
-(define-action-precondition-mutation pickup-fan-allows-welded pickup-fan
-  (and (bind (has-location ?agent $a-location))
-       (or (and (bind (has-location ?fan $fan-location))
-                (cleartop ?fan)
-                (pickup-clear ?agent $a-location ?fan $fan-location))
-           (and (bind (mounted-on ?fan $w-gears))
-                (wall-gears $w-gears)
-                (not (bind (holding ?agent $any-held)))
-                (bind (has-position $w-gears $fan-location))
-                (reachable $fan-location $a-location)
-                (within-agent-vertical-reach
-                  ?agent
-                  (gears-elevation $w-gears)))))
-  "Drops PICKUP-FAN's not-welded guard.  The welded-fan probe must then make
-   this characterization fail.")
-
-
 (define-action-precondition-mutation mount-fan-allows-occupied-gears mount-fan
   (and (holding ?agent ?fan)
        (bind (has-location ?agent $a-location))
        (bind (has-position ?gears $g-location))
        (reachable $g-location $a-location)
-       (within-agent-vertical-reach ?agent (gears-elevation ?gears)))
+       (within-agent-vertical-reach ?agent (blower-elevation ?gears)))
   "Drops MOUNT-FAN's vacancy guard.  The occupied-gears probe must then make
    this characterization fail.")

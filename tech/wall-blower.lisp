@@ -4,10 +4,11 @@
 ;;; -gears-fan, which owns the types, the mounted-on attachment, aimed-at, control
 ;;; wiring, the turning/blowing derivation, and the fan actions).  Wall gears are fixed
 ;;; on a wall of their has-position location -- the location the fan faces and sweeps --
-;;; at the stream elevation given by gears-elevation (declared has-elevation or 1).  A
+;;; at the stream elevation given by blower-elevation (declared has-elevation or 1).  A
 ;;; wall-mounted fan hangs with NO has-location, so nothing can stand or rest on it and
 ;;; it is invisible to step and placement; the agent mounts and dismounts it with
-;;; -gears-fan's mount-fan and pickup-fan, reaching to the stream elevation.
+;;; -gears-fan's mount-fan and pickup-fan, reaching to the stream elevation.  A fixed
+;;; wall-blower is the complete wall fixture with no separate fan identity.
 ;;;
 ;;; While the fan's gears turn in an object's environmental view, its air stream sweeps
 ;;; the faced location horizontally at the stream elevation: an object standing at
@@ -40,14 +41,14 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  wall-gears and fan come from nested -gears-fan
 ;;;   nested    : -gears-fan (types, mounted-on, aimed-at, turning/blowing,
-;;;               gears-elevation, landing-support, land-on-support!,
-;;;               update-gears-status!, relocate-stack!, fan actions; nests
+;;;               blower-elevation, landing-support, land-on-support!,
+;;;               update-blower-status!, relocate-stack!, fan actions; nests
 ;;;               -support-occupancy, -location, -position, -elevation, -controls,
 ;;;               -placement, -reachability, and -pickup); -stream-passability
 ;;;               (obstacle-clear's gears branch and the derived air-stream walking
 ;;;               bands, with stream-width's 3-unit default)
 ;;;   driver    : the master propagate-consequences! must call
-;;;               update-wall-blower-status! after update-gears-status! and any
+;;;               update-wall-blower-status! after update-blower-status! and any
 ;;;               recording-side gears derivation
 ;;; PROVIDES:
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
@@ -67,13 +68,12 @@
   ;; Sweeping removes every struck occupant from that location, so the fixpoint
   ;; terminates for acyclic destination chains.  Change detection is automatic, so an
   ;; unchanged re-assert is silent.
-  (doall (?f fan)
-    (if (and (bind (mounted-on ?f $gears))
-             (wall-gears $gears))
-      (sweep-occupants-away! $gears))))
+  (doall (?drive (either wall-gears wall-blower))
+    (if (blower-present ?drive)
+      (sweep-occupants-away! ?drive))))
 
 
-(define-update sweep-occupants-away! (?gears wall-gears)
+(define-update sweep-occupants-away! (?drive (either wall-gears wall-blower))
   ;; Blow every occupant of ?gears' faced location whose body the stream strikes -- an
   ;; object standing at elevation $standing with height $height is blown iff
   ;; $standing < stream <= $standing + $height -- to the aimed-at destination.  A blown
@@ -89,14 +89,14 @@
   ;; threat) at the destination is not this file's concern: -threat's
   ;; enforce-threat-safety! backstop drops the whole resulting state if the sweep lands
   ;; the agent somewhere unsafe, so the physics here stay unconditional.
-  (do (bind (has-position ?gears $swept))
-      (bind (aimed-at ?gears $destination))
-      (assign $stream (gears-elevation ?gears))
+  (do (bind (has-position ?drive $swept))
+      (bind (aimed-at ?drive $destination))
+      (assign $stream (blower-elevation ?drive))
       (doall (?x support-occupant)
         (if (and (not (fan ?x))  ;a fan is zero-thickness: no stream ever strikes it
                  (bind (has-location ?x $x-location))
                  (eql $x-location $swept)
-                 (gears-turning-for-object ?x ?gears))
+                 (blower-active-for-object ?x ?drive))
           (do (assign $standing (occupant-elevation ?x))
               (assign $height (declared-height ?x))
               (if (and (< $standing $stream)

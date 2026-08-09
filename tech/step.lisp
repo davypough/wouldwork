@@ -13,8 +13,8 @@
 ;;; destination during the ensuing propagation.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location; plate comes from nested -plate-types and fan is
-;;;               declared optional here
+;;;   types     : agent, location; plate comes from nested -plate-types; fan,
+;;;               floor-blower, and angled-blower are declared optional here
 ;;;   nested    : -mobility-action (central MOVE action, configuration representation,
 ;;;               transition registry, support mutation, and propagation);
 ;;;               -position ((has-position ...))
@@ -22,7 +22,8 @@
 ;;;               mounted-on (fan), guarded by fan  --  owned by -gears-fan.lisp;
 ;;;               translation removes the guarded reference when the fan type is empty
 ;;; PROVIDES:
-;;;   types     : steppable-object (either pressure-plate toggle-plate fan)
+;;;   types     : steppable-object (either pressure-plate toggle-plate fan floor-blower
+;;;               angled-blower)
 ;;;   queries   : step-source-can-mount, step-source-can-dismount,
 ;;;               steppable-fixture-at, step-configuration-transitions
 ;;;   provider  : step-configuration-transitions registered with
@@ -35,11 +36,12 @@
 (in-package :ww)
 
 
-(define-optional-types fan)
+(define-optional-types fan floor-blower angled-blower)
 
 
 (define-types
-  steppable-object (either pressure-plate toggle-plate fan))
+  steppable-object
+    (either pressure-plate toggle-plate fan floor-blower angled-blower))
 
 
 (define-query step-source-can-mount (?source-place)
@@ -53,9 +55,13 @@
 
 (define-query steppable-fixture-at
     (?fixture steppable-object ?location location)
-  ;; A plate is fixed.  A fan is steppable only while attached to gears and carrying a
-  ;; floor location; a wall-mounted fan has no location and therefore cannot match.
+  ;; A plate or combined floor/angled blower is fixed.  A removable fan is steppable only
+  ;; while attached to gears and carrying a floor location; a wall-mounted fan has no
+  ;; location and therefore cannot match.
   (or (and (plate ?fixture)
+           (has-position ?fixture ?location))
+      (and (or (floor-blower ?fixture)
+               (angled-blower ?fixture))
            (has-position ?fixture ?location))
       (and (fan ?fixture)
            (bind (mounted-on ?fixture $gears))

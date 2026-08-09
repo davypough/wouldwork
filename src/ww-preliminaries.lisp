@@ -120,7 +120,7 @@
    are present, which is the whole difference between this list and *included-tech-names*.
 
    Read by driver-candidate-updates, which needs the opposite of what report-inert-techs
-   needs.  update-gears-status! and update-receiver-status! reach a blower problem only
+   needs.  update-blower-status! and update-receiver-status! reach a blower problem only
    through -gears-fan and -beam-substrate, several levels below anything the problem wrote,
    yet both belong in its propagation driver.  A candidate set built from
    *included-tech-names* would silently omit them.
@@ -546,6 +546,9 @@
   (when (and (boundp '*goal-chaining-checkpoint-extensions*)
              (listp *goal-chaining-checkpoint-extensions*))
     (setf *goal-chaining-checkpoint-extensions* nil))
+  (when (and (boundp '*symmetry-coupling-relations*)
+             (listp *symmetry-coupling-relations*))
+    (setf *symmetry-coupling-relations* nil))
   (when (boundp '*goal-chaining-policy*)
     (setf *goal-chaining-policy* nil))
   (when (boundp '*solutions-valid*)

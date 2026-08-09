@@ -15,7 +15,7 @@
 ;;;
 ;;;   {update-plate-status!}
 ;;;     then {update-gate-status! update-relay-status! update-receiver-status!}
-;;;       then {update-gears-status!}
+;;;       then {update-blower-status!}
 ;;;
 ;;; The characterization query checks that structure automatically, including the exact
 ;;; candidate set, derived order, strata, and installed driver body.  REPORT-DERIVED-DRIVER
@@ -44,12 +44,12 @@
 ;;;       (update-gate-status!)
 ;;;       (update-relay-status!)
 ;;;       (update-receiver-status!)
-;;;       (update-gears-status!)
+;;;       (update-blower-status!)
 ;;;       (update-wall-blower-status!)
 ;;;       (enforce-threat-safety!)
 ;;;       *propagated-state-changed*))
 ;;;
-;;;   - move UPDATE-GEARS-STATUS! below UPDATE-WALL-BLOWER-STATUS!.  The blower is a
+;;;   - move UPDATE-BLOWER-STATUS! below UPDATE-WALL-BLOWER-STATUS!.  The blower is a
 ;;;     reaction reading BLOWING from a derivation the driver now calls later, so INIT
 ;;;     halts with a propagation order error and prints a repaired body that restores
 ;;;     the authored order.
@@ -115,8 +115,7 @@
   transmitter (transmitter1)
   receiver (receiver1)
   gate (gate1)
-  wall-gears (wgears1)
-  fan (fan1)
+  wall-blower (wgears1)
   hue (blue)
 )
 
@@ -127,7 +126,7 @@
 (include-tech plate)         ;depressed; update-plate-status!
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; update-relay-status!; update-receiver-status!
-(include-tech wall-blower)   ;turning; blowing; update-gears-status!; update-wall-blower-status!
+(include-tech wall-blower)   ;turning; blowing; update-blower-status!; update-wall-blower-status!
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step configuration transitions
 (include-tech visibility)    ;los-to-apparatus; visible; visible-clear
@@ -138,7 +137,7 @@
 
 
 (define-init
-  ;; Movable objects; fan1 is wall-mounted, so it has no has-location.
+  ;; Movable objects.
   (has-location agent1 west)
   (has-location box1 west)
   (has-location connector1 west)
@@ -146,11 +145,6 @@
   ;; Fixed-position objects; wgears1 hangs on mid's wall, facing (sweeping) mid.
   (has-position plate1 west)
   (has-position wgears1 mid)
-
-  ;; The fan starts mounted on the wall gears and is welded to them, so pickup-fan can
-  ;; never separate the pair and the blower stays in the propagation graph throughout.
-  (mounted-on fan1 wgears1)
-  (welded fan1 wgears1)
 
   ;; Walking topology.  All three locations are ordinary ground (elevation 0), and wgears1
   ;; declares no has-elevation, so its stream works at the default elevation 1 and strikes
@@ -200,7 +194,7 @@
              update-gate-status!
              update-relay-status!
              update-receiver-status!
-             update-gears-status!
+             update-blower-status!
              update-wall-blower-status!
              enforce-threat-safety!))
          (expected-strata
@@ -208,7 +202,7 @@
              (update-gate-status!
               update-relay-status!
               update-receiver-status!)
-             (update-gears-status!)))
+             (update-blower-status!)))
          (candidates
            (remove-if #'update-quantifies-only-over-empty-types-p
                       (driver-candidate-updates)))
@@ -217,7 +211,7 @@
              (propagation-relation-sets 'update-gate-status!)))
          (gears-sets
            (multiple-value-list
-             (propagation-relation-sets 'update-gears-status!)))
+             (propagation-relation-sets 'update-blower-status!)))
          (gate-reads (first gate-sets))
          (gears-reads (first gears-sets)))
     (multiple-value-bind (derived component-alist strata)
@@ -249,9 +243,7 @@
        (active receiver1)
        (open gate1)
        (turning wgears1)
-       (blowing fan1)
-       (mounted-on fan1 wgears1)
-       (welded fan1 wgears1)))
+       (blowing wgears1)))
 
 
 (define-goal

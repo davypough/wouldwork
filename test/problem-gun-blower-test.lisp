@@ -52,7 +52,7 @@
 
 (include-tech gun)
 (include-tech jammer)
-(include-tech floor-blower)
+(include-tech floor-gears)
 (include-tech step)
 (include-tech visibility)
 

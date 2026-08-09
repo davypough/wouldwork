@@ -1,17 +1,16 @@
 ;;; Filename: -gears-fan.lisp
 
 ;;; Gears/fan substrate: the shared machinery every blower technology programs against,
-;;; modeled on -beam-substrate's peer-substrate pattern.  A blower is a fan mounted on a
-;;; set of fixed gears; the mountings differ (floor-blower's flush floor fixture,
-;;; wall-blower's wall fixture, angled-blower's flush pad fixture), but the constituents
-;;; are the same: floor-gears, wall-gears, and angled-gears are leaf types unified as
-;;; gears, the fan is a carryable disc, mounting is an attachment via (mounted-on ...)
-;;; rather than a support placement, control follows gate.lisp's DNF convention via
-;;; -controls, and the derived state is uniform -- gears turn when uncontrolled or
-;;; control-on, and a fan blows iff it is mounted on turning gears.  What blowing *does*
-;;; is mounting-specific, so this file's update-gears-status! derives turning/blowing
-;;; only; each mounting tech owns its own consequences update (floor-blower's
-;;; update-floor-blower-status! launches and drops, wall-blower's
+;;; modeled on -beam-substrate's peer-substrate pattern.  A removable blower consists of
+;;; a carryable fan mounted on fixed gears.  A fixed combined unit is instead one
+;;; floor-blower, wall-blower, or angled-blower object, unified by the blower type.  The
+;;; three gears leaves remain mountable and are unified separately as gears.  Control
+;;; follows gate.lisp's DNF convention via -controls, and the derived state is uniform:
+;;; each gears/blower drive turns when uncontrolled or control-on; a removable fan blows
+;;; iff mounted on a turning drive, and a fixed blower blows iff it turns.  What blowing
+;;; *does* is mounting-specific, so this file's update-blower-status! derives turning/blowing
+;;; only; each mounting behavior owns its own consequences update (-floor-blowing's
+;;; update-floor-blowing-status! launches and drops, wall-blower's
 ;;; update-wall-blower-status! sweeps, angled-blower's update-angled-blower-status!
 ;;; launches along the arc), called after it.
 ;;;
@@ -20,7 +19,7 @@
 ;;; location.  A wall-mounted fan hangs on the wall with NO has-location: every
 ;;; has-location bind in step, placement, and the resting-fan pickup branch fails for it
 ;;; automatically, so nothing can stand or rest on it, and pickup-fan reaches it through
-;;; its own wall-mounted branch instead (vertical reach to gears-elevation).
+;;; its own wall-mounted branch instead (vertical reach to blower-elevation).
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
@@ -33,51 +32,52 @@
 ;;;               hooks, overridden by recorder's capability-specific shadows)
 ;;;   conditional relations:
 ;;;               jamming (jammer), guarded by an exists over jammer (gate.lisp's pattern):
-;;;               a jamming jammer forces gears stopped in update-gears-status!; jammer is
+;;;               a jamming jammer forces a drive stopped in update-blower-status!; jammer is
 ;;;               declared optional here, so a problem with no jammers need not declare it
 ;;;   substrate edits (companions to this file; these files splice before this file's
 ;;;   gears union is installed, so they reference the leaf types directly):
 ;;;               -controls          : (controls $list (either gate floor-gears wall-gears
-;;;                                    angled-gears) $mode)
+;;;                                    angled-gears floor-blower wall-blower
+;;;                                    angled-blower) $mode)
 ;;;               -position          : fixed-position-object (either pressure-plate
 ;;;                                    toggle-plate ladder floor-gears wall-gears
-;;;                                    angled-gears)
-;;;               -elevation         : elevated-object includes wall-gears only --
-;;;                                    floor-gears and angled-gears are both flush, so
-;;;                                    neither needs an elevation override
-;;;               -support-occupancy : support (either pressure-plate toggle-plate box fan);
-;;;                                    gears are NOT a support -- only a fan can occupy them,
-;;;                                    by attachment
+;;;                                    angled-gears floor-blower wall-blower angled-blower)
+;;;               -elevation         : elevated-object includes wall-gears and wall-blower;
+;;;                                    floor and angled drives are flush
+;;;               -support-occupancy : support includes floor-blower and angled-blower;
+;;;                                    mountable gears are NOT supports -- only their
+;;;                                    attached fan can be occupied
 ;;;               -location          : mobile-object includes fan
 ;;;               -holding           : cargo includes fan
 ;;;               -support-elevation : a fan is a movable, zero-thickness support
-;;;               step.lisp          : steppable-object (either pressure-plate toggle-plate
-;;;                                    fan); reads mounted-on, guarded by fan
-;;;   driver    : the master propagate-consequences! must call update-gears-status!
+;;;               step.lisp          : steppable-object includes fan, floor-blower, and
+;;;                                    angled-blower; removable fans read mounted-on
+;;;   driver    : the master propagate-consequences! must call update-blower-status!
 ;;;               after update-receiver-status! and update-plate-status!, and each
 ;;;               included mounting tech's consequences update after that
 ;;; PROVIDES:
-;;;   types     : floor-gears, wall-gears, angled-gears, fan  --  declared optional here
+;;;   types     : floor-gears, wall-gears, angled-gears, floor-blower, wall-blower,
+;;;               angled-blower, fan -- declared optional here
 ;;;               gears (either floor-gears wall-gears angled-gears)
-;;;   relations : (aimed-at gears $location)  --  fixed destination of the air stream
+;;;               blower (either floor-blower wall-blower angled-blower)
+;;;   relations : (aimed-at (either gears blower) $location) -- fixed stream destination
 ;;;               (mounted-on fan $gears)  --  the fan's attachment to its gears
-;;;               (welded fan $gears)  --  static; the fan and gears form an inseparable
-;;;               unit: pickup-fan refuses to separate them.  A welding problem declares
-;;;               both (welded ...) and the init's (mounted-on ...)
-;;;               (turning gears)  --  derived; asserted only by update-gears-status!
-;;;               (blowing fan)  --  derived; a fan blows iff it is mounted on turning
-;;;               gears; asserted only by update-gears-status!
-;;;   query     : gears-elevation  --  the working height of a mounted fan: wall gears'
+;;;               (turning (either gears blower)) -- derived by update-blower-status!
+;;;               (blowing (either fan floor-blower wall-blower angled-blower)) -- derived
+;;;   query     : blower-drive -- mounted fan's gears, or a fixed blower itself
+;;;               blower-present -- whether a drive has a removable or built-in fan
+;;;               blower-elevation -- the working height of a mounted or fixed blower
 ;;;               declared has-elevation or 1 (matching transmitter/receiver anchors);
-;;;               floor gears' floor elevation
-;;;               gears-turning-for-object -- ordinary turning state except that recorder
+;;;               floor/angled drives use their floor elevation
+;;;               blower-turning-for-object -- ordinary turning state except that recorder
 ;;;               ghosts use recording-side wall-gears state
+;;;               blower-active-for-object -- presence plus the correct turning view
 ;;;               stack-rider  --  true when a candidate is directly or transitively
 ;;;               stacked above a given base
 ;;;               landing-support  --  the first clear plate/floor-mounted-fan/box at a
 ;;;               location whose top matches a required elevation (nil accepts any),
 ;;;               excluding the relocated base and its riders; no agent or reach gate
-;;;   updates   : update-gears-status! (state only), relocate-stack!, land-on-support!
+;;;   updates   : update-blower-status! (state only), relocate-stack!, land-on-support!
 ;;;               (rests a relocated object on its destination's landing-support match;
 ;;;               read by wall-blower's sweep and angled-blower's arc)
 ;;;   actions   : pickup-fan, put-fan, mount-fan
@@ -96,17 +96,21 @@
 (in-package :ww)
 
 
-(define-optional-types floor-gears wall-gears angled-gears fan jammer)
+(define-optional-types
+  floor-gears wall-gears angled-gears
+  floor-blower wall-blower angled-blower fan jammer)
 
 
 (define-types
-  gears (either floor-gears wall-gears angled-gears))
+  gears (either floor-gears wall-gears angled-gears)
+  blower (either floor-blower wall-blower angled-blower))
 
 
 (define-dynamic-relations
   (mounted-on fan $gears)  ;the fan's attachment to its gears; not an (on ...) support fact
-  (turning gears)  ;derived each pass; asserted only by update-gears-status!
-  (blowing fan))  ;derived each pass; a fan blows iff it is mounted on turning gears
+  (turning (either floor-gears wall-gears angled-gears
+                   floor-blower wall-blower angled-blower))
+  (blowing (either fan floor-blower wall-blower angled-blower)))
 
 
 (define-derived-relations
@@ -115,51 +119,88 @@
 
 
 (define-static-relations
-  (aimed-at gears $location)  ;fixed destination the air stream carries an occupant to
-  (welded fan $gears))  ;the fan is permanently attached to these gears and cannot be separated; declare alongside the init's (mounted-on ...)
+  (aimed-at (either floor-gears wall-gears angled-gears
+                    floor-blower wall-blower angled-blower)
+            $location))
 
 
-(define-query gears-elevation (?gears gears)
-  ;; The working height of a fan mounted on ?gears, used for mounting/dismounting reach
-  ;; and for wall-blower's stream-strike test (who the horizontal air stream hits).
-  ;; Wall gears hang at their declared has-elevation, defaulting to 1 (the same anchor
-  ;; default as transmitters and receivers); floor and angled gears are both flush, so
-  ;; their fan works at the floor elevation of their position.
-  (if (wall-gears ?gears)
-    (if (bind (has-elevation ?gears $level))
+(define-query blower-drive
+    (?source (either fan floor-blower wall-blower angled-blower))
+  ;; A removable fan delegates to its current mount; a fixed blower is its own drive.
+  (if (fan ?source)
+    (do (bind (mounted-on ?source $gears))
+        $gears)
+    ?source))
+
+
+(define-query blower-present
+    (?drive (either floor-gears wall-gears angled-gears
+                    floor-blower wall-blower angled-blower))
+  (or (floor-blower ?drive)
+      (wall-blower ?drive)
+      (angled-blower ?drive)
+      (exists (?fan fan)
+        (and (bind (mounted-on ?fan $gears))
+             (eql $gears ?drive)))))
+
+
+(define-query blower-elevation
+    (?drive (either floor-gears wall-gears angled-gears
+                    floor-blower wall-blower angled-blower))
+  ;; Wall drives use their declared stream elevation, defaulting to 1.  Floor and angled
+  ;; drives are flush and use the floor elevation of their fixed position.
+  (if (or (wall-gears ?drive)
+          (wall-blower ?drive))
+    (if (bind (has-elevation ?drive $level))
       $level
       1)
-    (do (bind (has-position ?gears $location))
+    (do (bind (has-position ?drive $location))
         (location-elevation $location))))
 
 
-(define-query gears-turning-for-object (?object ?gears gears)
+(define-query blower-turning-for-object
+    (?object
+     ?drive (either floor-gears wall-gears angled-gears
+                    floor-blower wall-blower angled-blower))
   (if (recording-shadow-object ?object)
-    (recording-shadow-turning ?gears)
-    (turning ?gears)))
+    (recording-shadow-turning ?drive)
+    (turning ?drive)))
 
 
-(define-update update-gears-status! ()
+(define-query blower-active-for-object
+    (?object
+     ?drive (either floor-gears wall-gears angled-gears
+                    floor-blower wall-blower angled-blower))
+  (and (blower-present ?drive)
+       (blower-turning-for-object ?object ?drive)))
+
+
+(define-update update-blower-status! ()
   ;; Pass 1: turning <=> control-on AND not jammed, with -controls' shared CONTROL-ON
-  ;; supplying the DNF aggregate and a T uncontrolled default, so gears nothing controls
-  ;; turn all the time.  A jamming jammer forces gears stopped -- the polarity mirror of
-  ;; gate's jam-forces-open: a jam always disables the barrier.  Pass 2: a fan blows iff it
-  ;; is mounted on turning gears.  Pure state derivation only: what blowing does
+  ;; supplying the DNF aggregate and a T uncontrolled default, so drives nothing controls
+  ;; turn all the time.  A jamming jammer forces the drive stopped -- the polarity mirror of
+  ;; gate's jam-forces-open: a jam always disables the barrier.  Pass 2 derives removable
+  ;; and fixed blowing sources from their drives.  Pure state derivation only: what blowing does
   ;; (launching, sweeping, dropping) is
   ;; mounting-specific and owned by each mounting tech's own consequences update, which
   ;; the driver calls after this one.  Change detection is automatic, so an unchanged
   ;; re-assert is silent.
-  (do (doall (?g gears)
-        (if (and (control-on ?g t)
+  (do (doall (?drive (either floor-gears wall-gears angled-gears
+                              floor-blower wall-blower angled-blower))
+        (if (and (control-on ?drive t)
                  (not (exists (?j jammer)
-                        (jamming ?j ?g))))
-          (turning ?g)
-          (not (turning ?g))))
+                        (jamming ?j ?drive))))
+          (turning ?drive)
+          (not (turning ?drive))))
       (doall (?f fan)
         (if (and (bind (mounted-on ?f $gears))
                  (turning $gears))
           (blowing ?f)
-          (not (blowing ?f))))))
+          (not (blowing ?f))))
+      (doall (?fixed blower)
+        (if (turning ?fixed)
+          (blowing ?fixed)
+          (not (blowing ?fixed))))))
 
 
 (define-update relocate-stack! (?base support-occupant ?destination location)
@@ -230,6 +271,15 @@
                  (or (not ?required-elevation)
                      (eql (support-top-elevation ?fan) ?required-elevation)))
           (assign $landing ?fan)))
+      (doall (?fixed (either floor-blower angled-blower))
+        (if (and (not $landing)
+                 (different ?fixed ?self)
+                 (has-position ?fixed ?location)
+                 (cleartop ?fixed)
+                 (support-use-allowed ?self ?fixed)
+                 (or (not ?required-elevation)
+                     (eql (support-top-elevation ?fixed) ?required-elevation)))
+          (assign $landing ?fixed)))
       (doall (?box box)
         (if (and (not $landing)
                  (different ?box ?self)
@@ -259,14 +309,12 @@
   ;; pickup-clear path; a wall-mounted fan has no has-location, so it is reached through
   ;; its gears' position and stream elevation instead, and nothing can rest on it.
   ;; Occupied fans (like occupied boxes) cannot be lifted, so an agent standing on a fan
-  ;; can never carry it away.  A fan welded to its gears is an inseparable unit and can
-  ;; never be picked up.  Lifting a fan off turning gears is allowed -- the fan itself is
-  ;; never blown -- and the ensuing propagation clears its blowing status and applies the
-  ;; mounting tech's consequences (e.g. dropping hovering occupants).
+  ;; can never carry it away.  Fixed combined blowers are a different type and cannot bind
+  ;; this action.  Lifting a fan off turning gears is allowed -- the fan itself is never
+  ;; blown -- and propagation clears its blowing status and applies mounting consequences.
   1
   (?agent agent ?fan fan)
-  (and (not (bind (welded ?fan $weld-gears)))
-       (bind (has-location ?agent $a-location))
+  (and (bind (has-location ?agent $a-location))
        (or (and (bind (has-location ?fan $fan-location))
                 (cleartop ?fan)
                 (pickup-clear ?agent $a-location ?fan $fan-location))
@@ -276,7 +324,7 @@
                  (not (bind (holding ?agent $any-held)))
                 (bind (has-position $w-gears $fan-location))
                 (reachable $fan-location $a-location)
-                (within-agent-vertical-reach ?agent (gears-elevation $w-gears)))))
+                (within-agent-vertical-reach ?agent (blower-elevation $w-gears)))))
   (">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
   (assert (holding ?agent ?fan)
           (if (bind (has-location ?fan $f-location))
@@ -320,7 +368,7 @@
        (not (exists (?f fan)
               (and (bind (mounted-on ?f $g))
                    (eql $g ?gears))))
-       (within-agent-vertical-reach ?agent (gears-elevation ?gears)))
+       (within-agent-vertical-reach ?agent (blower-elevation ?gears)))
   (">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
   (assert (not (holding ?agent ?fan))
           (if (or (floor-gears ?gears)

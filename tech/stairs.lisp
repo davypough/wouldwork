@@ -31,7 +31,9 @@
   (dolist (relation '(stairs-via stairs-via>))
     (check-init-list-relation-items-have-types
       literals relation
-      '(gate screen ladder floor-gears wall-gears angled-gears))))
+      '(gate screen ladder
+        floor-gears wall-gears angled-gears
+        floor-blower wall-blower angled-blower))))
 
 
 (define-problem-helper stairs-segment-for-means

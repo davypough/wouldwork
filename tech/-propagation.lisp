@@ -6,7 +6,7 @@
 ;;; receives both driver functions without writing either one.
 ;;;
 ;;; PROPAGATE-CHANGES! is the fixpoint loop, and it is fixed.  It was byte-identical in
-;;; CLAUSTRO-TOPO, CORNER-TOPO, PHOBIA, PROBLEM-FLOOR-BLOWER-TEST,
+;;; CLAUSTRO-TOPO, CORNER-TOPO, PHOBIA, PROBLEM-FLOOR-GEARS-TEST,
 ;;; PROBLEM-WALL-BLOWER-TEST, PROBLEM-PROPAGATION-STRATA-TEST and
 ;;; PROBLEM-REACTION-ORDER-TEST -- seven independent transcriptions of one loop, which is
 ;;; exactly the thing a technology should own.

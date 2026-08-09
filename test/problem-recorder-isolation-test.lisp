@@ -52,7 +52,7 @@
 (include-tech -recorder-init-checks)
 (include-tech plate)
 (include-tech box)
-(include-tech floor-blower)
+(include-tech -gears-fan)
 (include-tech beam-relay)
 (include-tech visibility)
 

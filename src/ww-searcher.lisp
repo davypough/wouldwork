@@ -837,29 +837,10 @@
 
 
 (defun build-canonical-idb-form (idb)
-  "Build a canonical (sorted) representation of IDB for equality comparison.
-  - Canonical proposition keys become packed integers (when any symmetric mapping occurs),
-  which reduces consing and makes sorting cheaper."
+  "Build the exact row-permutation canonical representation of IDB."
   (declare (type hash-table idb))
   (ww-with-timing :symm/canon-form
-    (let ((decoded-int-keys (make-hash-table :test #'eql)))
-      (maphash (lambda (k v)
-                 (declare (ignore v))
-                 (when (integerp k)
-                   (setf (gethash k decoded-int-keys)
-                         (extract-integer-components k))))
-               idb)
-      (let ((canonical-map (build-canonical-mapping idb decoded-int-keys))
-            (canon-props nil))
-        (maphash (lambda (key val)
-                   (let* ((components (and (integerp key) (gethash key decoded-int-keys)))
-                          (canon-key (if (integerp key)
-                                         (canonicalize-proposition-key key canonical-map components) ;; PH4C
-                                         key))
-                          (canon-val (canonicalize-value val canonical-map)))
-                     (push (cons canon-key canon-val) canon-props)))
-                 idb)
-        (sort canon-props #'canonical-prop-less-p)))))
+    (build-exact-canonical-idb-form idb)))
 
 
 (defun canonical-prop-less-p (prop1 prop2)
@@ -1606,7 +1587,7 @@
                   (hash-table-size *closed*)))
       (format t "~%repeated states = ~:D (~,1F% of total states)"
                 *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))
-    (when (and *symmetry-pruning* *symmetry-groups*)
+    (when (and *symmetry-pruning* *symmetry-families*)
       (if (use-canonical-symmetry-p)
         (when (> *symmetric-duplicates-pruned* 0)
           (format t "~%symmetry pruned = ~:D (~,1F% of total states)"

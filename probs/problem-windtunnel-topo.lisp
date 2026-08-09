@@ -32,8 +32,7 @@
   transmitter     (transmitter1)
   receiver        (receiver1)
   toggle-plate    (plate1)
-  wall-gears      (wgears1)
-  fan             (fan1)
+  wall-blower     (wgears1)
   hue             (blue)  ;the hue of a transmitter, receiver, repeater, or active connector
   location        (location1 location2 location3 location4 location5 location6))
 
@@ -92,8 +91,6 @@
   (wall-segment> wall2 12 0 12 6)
   (has-chroma transmitter1 blue)
   (has-chroma receiver1 blue)
-  (mounted-on fan1 wgears1)
-  (welded fan1 wgears1)
   (stream-width wgears1 4)
 
   (boundary-wall

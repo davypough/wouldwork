@@ -1,6 +1,6 @@
-;;; Filename: problem-floor-blower-test.lisp
+;;; Filename: problem-floor-gears-test.lisp
 
-;;; Combined floor-blower regression.  Four independent networks exercise:
+;;; Removable-fan floor-gears regression.  Four independent networks exercise:
 ;;;
 ;;;   1. Uncontrolled gears1 launches box1 from fan1 to explicitly elevated loft1 while
 ;;;      box2 rides along still stacked; the unsupported stack remains hovering because
@@ -20,7 +20,7 @@
 (in-package :ww)
 
 
-(ww-set *problem-name* floor-blower-test)
+(ww-set *problem-name* floor-gears-test)
 
 (ww-set *problem-type* planning)
 
@@ -50,7 +50,7 @@
 
 
 (include-tech plate)
-(include-tech floor-blower)
+(include-tech floor-gears)
 
 
 ;;;; INITIALIZATION ;;;;
@@ -60,7 +60,7 @@
   (has-location agent1 idle)
 
   ;; Active launch with a stacked rider.  loft1's explicit elevation overrides the
-  ;; floor-blower default of 10.
+  ;; floor-blowing default of 10.
   (has-location box1 base1)
   (has-location box2 base1)
   (has-location fan1 base1)
@@ -112,7 +112,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(define-query floor-blower-scenarios-valid ()
+(define-query floor-gears-scenarios-valid ()
   (and
     ;; Sustained, explicitly elevated stack hover.
     (= (location-elevation loft1) 7)
@@ -152,4 +152,4 @@
 
 
 (define-goal
-  (floor-blower-scenarios-valid))
+  (floor-gears-scenarios-valid))

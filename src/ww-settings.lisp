@@ -189,6 +189,18 @@
   "Registered (NAME SNAPSHOTTER RESTORER) extensions for goal-chaining undo state.")
 
 
+(sb-ext:defglobal *symmetry-coupling-relations* nil
+  "Static relations whose tuples must be permuted as complete symmetry rows.")
+
+
+(defun register-symmetry-coupling (relation)
+  "Require symmetry to preserve every tuple of static RELATION column by column."
+  (unless (symbolp relation)
+    (error "Symmetry coupling must name a relation: ~S" relation))
+  (pushnew relation *symmetry-coupling-relations* :test #'eq)
+  relation)
+
+
 (defstruct goal-chaining-policy
   "Problem-local implementations behind the public goal-chaining commands."
   subgoal-solver
@@ -328,7 +340,7 @@ treat their arguments as read-only and be safe to call concurrently."
    Prevents infinite waiting in problems with no enabling happenings.")
 
 (defvar *symmetry-pruning* nil
-  "When T, detect symmetry groups and prune symmetric action instantiations.")
+  "When T, detect symmetry families and prune symmetric actions or states.")
 
 (defvar *max-pairings* 0
   "Default maximum initial pairings per connector. Problem files can override this.")

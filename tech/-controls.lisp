@@ -31,12 +31,14 @@
 ;;;               Translation removes either guarded reference when its leaf type is empty.
 ;;; PROVIDES:
 ;;;   types     : mode (normal inverted), owned here; plate comes from -plate-types;
-;;;               gate, floor-gears, wall-gears, angled-gears, receiver, and gun are
+;;;               gate, the three gears leaves, the three fixed blower leaves, receiver,
+;;;               and gun are
 ;;;               declared optional here.  The gears leaf types appear directly (not via
 ;;;               the gears union) because this file splices before -gears-fan installs
 ;;;               the union; gun likewise appears directly since gun.lisp nests this file
 ;;;               rather than the other way around.
-;;;   relations : (controls $list (either gate floor-gears wall-gears angled-gears gun)
+;;;   relations : (controls $list (either gate floor-gears wall-gears angled-gears
+;;;               floor-blower wall-blower angled-blower gun)
 ;;;               $mode)  --  $list = DNF OR-list of AND-lists of controllers
 ;;;               (receiver/plate); mode: normal | inverted
 ;;;   queries   : energized, control-on
@@ -55,7 +57,9 @@
 (in-package :ww)
 
 
-(define-optional-types gate floor-gears wall-gears angled-gears receiver gun)
+(define-optional-types
+  gate floor-gears wall-gears angled-gears
+  floor-blower wall-blower angled-blower receiver gun)
 
 
 (define-types
@@ -65,7 +69,10 @@
 (define-static-relations
   ;; $list is a DNF OR-list of AND-lists.  The init validator checks its nested
   ;; controller types because a fluent list value cannot express them in this signature.
-  (controls $list (either gate floor-gears wall-gears angled-gears gun) $mode))
+  (controls $list
+    (either gate floor-gears wall-gears angled-gears
+            floor-blower wall-blower angled-blower gun)
+    $mode))
 
 
 (define-query energized

@@ -87,10 +87,11 @@ the complete pre-call session, including the preceding solutions."
 
 
 (defun install-compiled-goal (goal-form)
-  "Install GOAL-FORM and compile the translated GOAL-FN immediately."
+  "Install GOAL-FORM, compile GOAL-FN, and refresh goal-constrained symmetry."
   (install-goal goal-form)
   (when (boundp 'goal-fn)
     (compile 'goal-fn (subst-int-code (symbol-value 'goal-fn))))
+  (refresh-symmetry-detection)
   goal-form)
 
 

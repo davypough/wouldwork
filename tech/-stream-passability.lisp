@@ -1,14 +1,13 @@
 ;;; Filename: -stream-passability.lisp
 
 ;;; Stream passability substrate: the walking-side model of a wall fan's air stream.
-;;; Overrides -passability.lisp's actor-aware STREAM-OBSTACLE-CLEAR hook: gears pass
-;;; unless a fan is mounted and those gears turn in the walking agent's environmental
-;;; view.  Ordinary actors read playback TURNING; recorder ghosts read the recording
-;;; shadow.  Vacant or stopped gears are clear, and a fan carried away or remounted
-;;; elsewhere takes its stream with it automatically.
+;;; Overrides -passability.lisp's actor-aware STREAM-OBSTACLE-CLEAR hook: a drive passes
+;;; unless it has a removable or built-in fan and turns in the walking agent's
+;;; environmental view.  Ordinary actors read playback TURNING; recorder ghosts read the
+;;; recording shadow.  Vacant or stopped gears are clear.
 ;;;
 ;;; Also supplies the stream geometry to -walkability-coordinates' derivation by
-;;; redefining WALKABILITY-COORDINATES-STREAM-SPECS: one spec per wall-gears, from
+;;; redefining WALKABILITY-COORDINATES-STREAM-SPECS: one spec per wall drive, from
 ;;; the gears' HAS-POSITION location (the swept location), the AIMED-AT destination,
 ;;; both locations' LOCATION-COORDS> coordinates, and the stream's width -- 3 units
 ;;; by default, overridable per gears with a (STREAM-WIDTH gears w) fact, the same
@@ -31,11 +30,11 @@
 ;;;               -gears-fan (gears types, mounted-on, blowing, has-position, aimed-at);
 ;;;               -walkability-coordinates (the derivation and the stream-specs default)
 ;;; PROVIDES:
-;;;   relations : (stream-width wall-gears $rational)  --  optional per-gears override
+;;;   relations : (stream-width (either wall-gears wall-blower) $rational) -- optional override
 ;;;               of the 3-unit default stream width
 ;;;   queries   : stream-obstacle-clear  --  overrides -passability's null default;
 ;;;               walkability-coordinates-stream-specs  --  redefinition gathering
-;;;               one spec per wall-gears
+;;;               one spec per wall drive
 
 (include-tech -passability)
 (include-tech -gears-fan)
@@ -46,17 +45,15 @@
 
 
 (define-static-relations
-  (stream-width wall-gears $rational))  ;optional; a wall fan's air stream is 3 units wide unless overridden
+  (stream-width (either wall-gears wall-blower) $rational))  ;optional; a wall stream is 3 units wide unless overridden
 
 
 (define-query stream-obstacle-clear
     (?agent agent
-     ?obstacle (either floor-gears wall-gears angled-gears))
-  ;; A mounted fan bars this actor exactly when the gears turn in that actor's view.
-  (not (exists (?f fan)
-         (and (bind (mounted-on ?f $mount-gears))
-              (eql $mount-gears ?obstacle)
-              (gears-turning-for-object ?agent ?obstacle)))))
+     ?obstacle (either floor-gears wall-gears angled-gears
+                       floor-blower wall-blower angled-blower))
+  ;; A removable or fixed blower bars this actor exactly when active in that view.
+  (not (blower-active-for-object ?agent ?obstacle)))
 
 
 (define-query walkability-coordinates-stream-specs ()
@@ -67,7 +64,7 @@
   ;; DERIVE-WALK-VIA-FROM-SEGMENTS, so a problem without segment geometry (hand-
   ;; authored walk-via) never evaluates it.
   (do (assign $specs nil)
-      (doall (?g wall-gears)
+      (doall (?g (either wall-gears wall-blower))
         (do (if (not (bind (has-position ?g $swept-location)))
               (error "Wall-gears ~A has no HAS-POSITION swept location." ?g))
             (if (not (bind (aimed-at ?g $destination)))

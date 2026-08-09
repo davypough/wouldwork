@@ -35,9 +35,10 @@
   receiver (receiver1 receiver2)
   location (compute (loop for i from 1 to 13
                           collect (intern (format nil "LOCATION~D" i))))
-  wall-gears (wgears1 wgears2 wgears3 wgears4)
+  wall-gears (wgears1)
   floor-gears (fgears1)
-  fan (fan1 fan2 fan3 fan4)
+  wall-blower (wblower2 wblower3 wblower4)
+  fan (fan1)
   wall (wall1 wall2 wall3 wall4 wall5 wall6)
   hue (red)
 )
@@ -46,7 +47,7 @@
 ;;;; TECHNOLOGY INCLUDES ;;;;
 
 
-(include-tech floor-blower)
+(include-tech floor-gears)
 (include-tech step)  ;boarding the floor fan is how the agent rides fgears1's stream to the loft
 (include-tech wall-blower)
 (include-tech jammer)
@@ -79,16 +80,13 @@
   (has-location connector1 location6)
   (has-location connector2 location3)
   (has-location fan1 location2)
-  (has-location fan2 location5)
-  (has-location fan3 location7)
-  (has-location fan4 location9)
 
   ;; Fixed-position objects
   (has-position fgears1 location10)
   (has-position wgears1 location2)
-  (has-position wgears2 location5)
-  (has-position wgears3 location7)
-  (has-position wgears4 location9)
+  (has-position wblower2 location5)
+  (has-position wblower3 location7)
+  (has-position wblower4 location9)
 
   ;; Object coordinates
   (location-coords> location1 12 125/10)
@@ -103,7 +101,7 @@
   (location-coords> location10 241/10 6)
   (location-coords> location11 241/10 6)
   (location-coords> location12 7 8)  ;station: sees transmitter1 (up x=7 through the curtain gaps), receiver1, gate1, and gate2 through open gate1
-  (location-coords> location13 239/10 19)  ;station in the north alcove: sees wgears2 (down x=23.9 past wall3's west end) and receiver2, so wgears2 can be jammed from the east side of its band
+  (location-coords> location13 239/10 19)  ;station in the north alcove: sees wblower2 (down x=23.9 past wall3's west end) and receiver2, so wblower2 can be jammed from the east side of its band
   (has-elevation location11 10)  ;do I need to specify this since it is the default
   (apparatus-coords> transmitter1 7 169/10)
   (apparatus-coords> receiver1 11/10 9)
@@ -114,29 +112,25 @@
   (has-chroma receiver1 red)
   (has-chroma receiver2 red)
   (mounted-on fan1 wgears1)
-  (mounted-on fan2 wgears2)
-  (mounted-on fan3 wgears3)
-  (mounted-on fan4 wgears4)
-  (welded fan2 wgears2)
-  (welded fan3 wgears3)
-  (welded fan4 wgears4)  ;only fan1 is liftable, so fan1 must be ferried to fgears1
+  ;; The other three wall blowers are fixed combined units; only fan1 is removable and
+  ;; can be ferried to fgears1.
 
   ;; Air stream blowing destination
   (aimed-at wgears1 location1)
-  (aimed-at wgears2 location4)
-  (aimed-at wgears3 location6)
-  (aimed-at wgears4 location8)
+  (aimed-at wblower2 location4)
+  (aimed-at wblower3 location6)
+  (aimed-at wblower4 location8)
   (aimed-at fgears1 location11)
 
-  ;; The east corridor (wall3 to the boundary, height 4) is fully sealed by wgears3's
+  ;; The east corridor (wall3 to the boundary, height 4) is fully sealed by wblower3's
   ;; stream: default width 3 would leave half-unit walkable slips along wall3 and the
   ;; boundary, deriving a direct location8<->location6 route the room does not have.
-  (stream-width wgears3 4)
+  (stream-width wblower3 4)
 
   ;; Controllers
   (controls ((receiver1)) gate1 normal)
-  (controls ((receiver2)) wgears2 inverted)
-  (controls ((receiver2)) wgears3 normal)
+  (controls ((receiver2)) wblower2 inverted)
+  (controls ((receiver2)) wblower3 normal)
 
   ;; Boundary wall
   (boundary-wall
@@ -151,13 +145,13 @@
   (wall-segment> wall3 24 13 30 13)
   (wall-segment> wall4 24 10 24 13)
   (wall-segment> wall5 26 11 33 11)
-  (wall-segment> wall6 22 10 24 10)  ;seals the lower room's west slot: its only exit is L9's slot under wgears4
+  (wall-segment> wall6 22 10 24 10)  ;seals the lower room's west slot: its only exit is L9's slot under wblower4
 
   (gate-segment> gate1 1 12 6 12)
   (gate-segment> gate2 1 14 6 14)
 
-  ;; Air-stream barriers are DERIVED, not authored: each wall-gears' band runs from the
-  ;; solid backstop behind its fan through its has-position swept location to its
+  ;; Air-stream barriers are DERIVED, not authored: each wall drive's band runs from the
+  ;; solid backstop behind its blower through its has-position swept location to its
   ;; aimed-at destination, 3 units wide by default (override with a (stream-width
   ;; gears w) fact) -- see -stream-passability and -walkability-coordinates.  The
   ;; swept location is standable only while its stream is off (every edge to it is
@@ -190,4 +184,4 @@
 )
 
 
-  ;(and (active receiver2) (has-location agent1 location13) (has-location jammer1 location13) (has-location fan1 location13) (jamming jammer1 wgears2))  ;second subgoal
+  ;(and (active receiver2) (has-location agent1 location13) (has-location jammer1 location13) (has-location fan1 location13) (jamming jammer1 wblower2))  ;second subgoal

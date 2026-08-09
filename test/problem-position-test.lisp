@@ -40,6 +40,9 @@
   floor-gears (positioned-floor-gears unpositioned-floor-gears)
   wall-gears (positioned-wall-gears unpositioned-wall-gears)
   angled-gears (positioned-angled-gears unpositioned-angled-gears)
+  floor-blower (positioned-floor-blower unpositioned-floor-blower)
+  wall-blower (positioned-wall-blower unpositioned-wall-blower)
+  angled-blower (positioned-angled-blower unpositioned-angled-blower)
   recorder (positioned-recorder unpositioned-recorder))
 
 
@@ -58,6 +61,9 @@
   (has-position positioned-floor-gears floor-site)
   (has-position positioned-wall-gears wall-site)
   (has-position positioned-angled-gears angled-site)
+  (has-position positioned-floor-blower floor-site)
+  (has-position positioned-wall-blower wall-site)
+  (has-position positioned-angled-blower angled-site)
   (has-position positioned-recorder recorder-site))
 
 
@@ -68,7 +74,8 @@
   (expect-type-components
     'fixed-position-object
     '(pressure-plate toggle-plate ladder
-      floor-gears wall-gears angled-gears recorder))
+      floor-gears wall-gears angled-gears
+      floor-blower wall-blower angled-blower recorder))
   (expect-type-instances
     'fixed-position-object
     '(positioned-plate unpositioned-plate
@@ -76,6 +83,9 @@
       positioned-floor-gears unpositioned-floor-gears
       positioned-wall-gears unpositioned-wall-gears
       positioned-angled-gears unpositioned-angled-gears
+      positioned-floor-blower unpositioned-floor-blower
+      positioned-wall-blower unpositioned-wall-blower
+      positioned-angled-blower unpositioned-angled-blower
       positioned-recorder unpositioned-recorder))
   (expect-relation-schema
     'has-position :static '(fixed-position-object location)

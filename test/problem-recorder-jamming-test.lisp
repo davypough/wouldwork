@@ -132,6 +132,8 @@
   (null
     (validate-init-literals
       '((recording-copy> live-gate-jammer ghost-gate-jammer)
+        (recording-copy> live-gears-jammer ghost-gears-jammer)
+        (recording-copy> live-visibility-jammer ghost-visibility-jammer)
         (jamming live-gate-jammer live-target-gate)
         (jamming ghost-gate-jammer ghost-target-gate))
       :checks '(recorder-init-check)))
@@ -199,7 +201,7 @@
 
 
 (define-query-mutation recording-jammed-uses-all-jammers recording-jammed
-  (?target (either gate wall-gears))
+  (?target (either gate wall-gears wall-blower))
   (exists (?jammer jammer)
     (jamming ?jammer ?target))
   "Drops RECORDING-JAMMED's ghost filter.  Live jams must not affect recording state.")
@@ -218,7 +220,7 @@
 (define-update-mutation recording-gears-update-ignores-jamming
     update-recording-gears-status!
   ()
-  (doall (?gears wall-gears)
+  (doall (?gears (either wall-gears wall-blower))
     (if (recording-control-on ?gears t)
       (recording-turning ?gears)
       (not (recording-turning ?gears))))
@@ -232,7 +234,10 @@
        (reachable ?location $a-location)
        (or (and (or (gate ?target) (gun ?target))
                 (visible ?location ?target))
-           (and (or (floor-gears ?target) (wall-gears ?target))
+           (and (or (floor-gears ?target)
+                    (wall-gears ?target)
+                    (floor-blower ?target)
+                    (wall-blower ?target))
                 (bind (has-position ?target $t-location))
                 (or (eql ?location $t-location)
                     (visible ?location $t-location))))

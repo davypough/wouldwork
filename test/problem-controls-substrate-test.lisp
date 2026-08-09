@@ -35,6 +35,9 @@
   floor-gears (sample-floor-gears)
   wall-gears (sample-wall-gears)
   angled-gears (sample-angled-gears)
+  floor-blower (sample-floor-blower)
+  wall-blower (sample-wall-blower)
+  angled-blower (sample-angled-blower)
   gun (sample-gun))
 
 
@@ -56,6 +59,9 @@
   (controls ((inactive-receiver)) sample-floor-gears inverted)
   (controls (()) sample-wall-gears normal)
   (controls () sample-angled-gears inverted)
+  (controls ((active-receiver)) sample-floor-blower normal)
+  (controls ((inactive-receiver)) sample-wall-blower inverted)
+  (controls (()) sample-angled-blower normal)
   (controls ((active-receiver)) sample-gun normal))
 
 
@@ -82,7 +88,7 @@
   (expect-registered :query 'energized)
   (expect-registered :update 'update-receiver-status!)
   (expect-not-registered :update 'update-gate-status!)
-  (expect-not-registered :update 'update-gears-status!)
+  (expect-not-registered :update 'update-blower-status!)
   (expect-not-registered :update 'update-gun-status!)
   (expect-type-instances 'mode '(normal inverted))
   (expect-empty-type 'plate)
@@ -142,7 +148,8 @@
 
 
 (define-query controls-substrate-family-is
-    (?target (either gate floor-gears wall-gears angled-gears gun)
+    (?target (either gate floor-gears wall-gears angled-gears
+                     floor-blower wall-blower angled-blower gun)
      ?expected
      ?mode mode)
   (do
@@ -163,6 +170,11 @@
       inverted)
     (controls-substrate-family-is sample-wall-gears '(()) normal)
     (controls-substrate-family-is sample-angled-gears nil inverted)
+    (controls-substrate-family-is
+      sample-floor-blower '((active-receiver)) normal)
+    (controls-substrate-family-is
+      sample-wall-blower '((inactive-receiver)) inverted)
+    (controls-substrate-family-is sample-angled-blower '(()) normal)
     (controls-substrate-family-is
       sample-gun
       '((active-receiver))

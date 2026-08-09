@@ -172,15 +172,14 @@ the last component in the Stage 1 list.
 | 8 | `finalize-patroller-happenings` | |
 | 9 | `do-init-action-updates *start-state*` | `ww-planner.lisp`; iterates `*init-actions*` **in order**, compiling each precondition and effect with a plain `compile` |
 | 10 | `convert-databases-to-integers` | New propositions only; no recompilation |
-| 11 | `initialize-symmetry-detection` | Deliberately placed *after* init-actions so signatures see derived static facts |
-| 12 | `initialize-initial-signatures` | Symmetry signatures; moved with step 11, still after `do-integer-conversion` |
-| 13 | `validate-start-state-consistency` | |
-| 14 | Set `*inconsistent-state-key*` | |
-| 15 | Compute `*min-action-duration*` | |
-| 16 | Apply `heuristic?`, `min-steps-remaining?`, `bounding-function?`; compatibility checks | |
+| 11 | `initialize-symmetry-detection` | Deliberately placed *after* init-actions so exact static automorphism checks see derived static facts |
+| 12 | `validate-start-state-consistency` | |
+| 13 | Set `*inconsistent-state-key*` | |
+| 14 | Compute `*min-action-duration*` | |
+| 15 | Apply `heuristic?`, `min-steps-remaining?`, `bounding-function?`; compatibility checks | |
 
 **Freezes:** integer object codes and all compiled functions at step 7; the start-state database at
-step 10; symmetry signatures at step 12.
+step 10; symmetry families at step 11.
 
 ---
 
@@ -225,13 +224,13 @@ both do, and both explain why in their own comments.
 `do-init-action-updates` iterates `*init-actions*` linearly. The leading `0` in a
 `define-init-action` form is a duration, not a priority.
 
-**7. Symmetry signatures are computed after init-actions fire — this was not always true.**
-`initialize-symmetry-detection` and `initialize-initial-signatures` (steps 11 and 12) now run
-*after* `do-init-action-updates` (step 9), deliberately, so that signatures see static facts derived
-by init-actions. The source carries `;changed:` comments marking the move. Older notes and any
-reasoning that assumed signatures are computed from the pre-init-action type extensions are
-obsolete. What remains true: signatures are computed from `*types*`, and `register-dynamic-object`
-never adds to `*types*` (Trap 8), so dynamically minted objects still do not appear in them.
+**7. Symmetry families are detected after init-actions fire — this was not always true.**
+`initialize-symmetry-detection` (step 11) runs *after* `do-init-action-updates` (step 9), so its
+complete static-database transposition checks see static facts derived by init-actions. Coupling
+relations such as recorder's directional `recording-copy>` are converted into ordered rows before
+ordinary one-object families are considered. What remains true: candidates come from `*types*`,
+and `register-dynamic-object` never adds to `*types*` (Trap 8), so dynamically minted objects still
+do not appear in them.
 
 **8. `register-dynamic-object` does not update `*types*`.**
 `register-dynamic-object` (`ww-converter.lisp`) assigns an integer code and asserts
