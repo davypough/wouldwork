@@ -13,7 +13,8 @@
 ;;;              emission/reception/relay for beam apparatus, and the firing/targeting point
 ;;;              for a gun.
 ;;;   queries  : visible, visible-for-object, potentially-visible, beam-visible,
-;;;              beam-visible-for-object -- null defaults, overridden by visibility.
+;;;              beam-visible-for-object, elevation-visible-for-object -- null defaults,
+;;;              overridden by visibility.
 ;;;              The FOR-OBJECT forms select actor/view-specific gate state.  Their typed
 ;;;              object parameters remain valid when an optional type has no objects: the
 ;;;              query is still installed and its null body returns NIL; only iteration
@@ -69,5 +70,14 @@
      ?location location
      ?near-elevation
      ?object (either transmitter receiver floor-repeater wall-repeater gun location)
+     ?far-elevation)
+  (do ?view ?location ?near-elevation ?object ?far-elevation nil))
+
+
+(define-query elevation-visible-for-object
+    (?view
+     ?location location
+     ?near-elevation
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   (do ?view ?location ?near-elevation ?object ?far-elevation nil))

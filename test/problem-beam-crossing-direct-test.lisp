@@ -16,8 +16,8 @@
 ;;; must remain uncut and activate receiver3.  The goal checks the crossing pool, active
 ;;; set, cuts, and all three receiver outcomes directly.
 ;;;
-;;; No WALL-SEGMENT> facts are authored, so DERIVE-LOS-FROM-SEGMENTS stays inert and contributes
-;;; no location beams; every beam here comes from COUPLED.
+;;; No wall, edge, gate, or boundary geometry is authored, so coordinate LOS derivation stays
+;;; inert and contributes no location beams; every beam here comes from COUPLED.
 ;;;
 ;;; Expected minimum solution: 0 actions (the derived start state satisfies the goal).
 
@@ -59,14 +59,10 @@
 ;;;; beam-crossing supplies the crossing machinery and, through its nested
 ;;;; -beam-crossing-coordinates, the derivation under test.
 ;;;;
-;;;; visibility is not optional here even though this problem has no sightlines to speak
-;;;; of.  beam-crossing nests -beam-crossing-coordinates, which nests -beam-los-coordinates,
-;;;; whose DERIVE-LOS-FROM-SEGMENTS references LOS-TO-APPARATUS/LOS-TO-LOCATION -- and
-;;;; visibility is what declares those relations.  Omitting it does not merely lose a
-;;;; capability; the tech file fails to translate, with an error naming LOS-TO-APPARATUS
-;;;; and no hint that the missing piece is an include.  Every beam-crossing problem in the
-;;;; repository includes visibility for this reason.  It stays inert here regardless, since
-;;;; DERIVE-LOS-FROM-SEGMENTS is guarded on WALL-SEGMENT>, which this problem never asserts.
+;;;; beam-direct now brings in public visibility because fixed couplings use its static
+;;;; barrier-crossing records.  The explicit include below documents that this test also
+;;;; exercises visibility's relation ownership; nested splicing deduplicates it.  Coordinate
+;;;; LOS derivation stays inert because this problem has no wall, edge, or boundary geometry.
 
 
 (include-tech beam-direct)

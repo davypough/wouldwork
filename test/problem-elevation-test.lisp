@@ -4,12 +4,12 @@
 ;;; complete matrix gives every ELEVATED-OBJECT leaf one explicit-elevation
 ;;; fixture and one fixture with no authored HAS-ELEVATION fact:
 ;;;
-;;;   location, gate, screen, wall, transmitter, receiver, wall-gears,
+;;;   location, gate, screen, wall, edge, transmitter, receiver, gun, wall-gears,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
 ;;; The characterization goal verifies exact authored bindings, the generic
 ;;; default of zero, and every role-specific lookup.  In particular,
-;;; transmitter/receiver functional anchors default to one despite their generic
+;;; transmitter/receiver/gun functional anchors default to one despite their generic
 ;;; elevation of zero; a floor repeater's anchor is its base plus height; and a
 ;;; wall repeater's height is horizontal and cannot raise its anchor.  Initial
 ;;; and final states are identical.  Expected minimum path length: zero.
@@ -45,8 +45,10 @@
   gate (explicit-gate default-gate)
   screen (explicit-screen default-screen)
   wall (explicit-wall default-wall)
+  edge (explicit-edge default-edge)
   transmitter (explicit-transmitter default-transmitter)
   receiver (explicit-receiver default-receiver)
+  gun (explicit-gun default-gun)
   wall-gears (explicit-wall-gears default-wall-gears)
   floor-repeater (explicit-floor-repeater default-floor-repeater)
   wall-repeater (explicit-wall-repeater default-wall-repeater))
@@ -67,8 +69,10 @@
   (has-elevation explicit-gate 3)
   (has-elevation explicit-screen 4)
   (has-elevation explicit-wall 6)
+  (has-elevation explicit-edge 12)
   (has-elevation explicit-transmitter 7)
   (has-elevation explicit-receiver 8)
+  (has-elevation explicit-gun 13)
   (has-elevation explicit-wall-gears 9)
   (has-elevation explicit-floor-repeater 10)
   (has-elevation explicit-wall-repeater 11)
@@ -108,8 +112,10 @@
     (explicit-elevation-valid explicit-gate 3)
     (explicit-elevation-valid explicit-screen 4)
     (explicit-elevation-valid explicit-wall 6)
+    (explicit-elevation-valid explicit-edge 12)
     (explicit-elevation-valid explicit-transmitter 7)
     (explicit-elevation-valid explicit-receiver 8)
+    (explicit-elevation-valid explicit-gun 13)
     (explicit-elevation-valid explicit-wall-gears 9)
     (explicit-elevation-valid explicit-floor-repeater 10)
     (explicit-elevation-valid explicit-wall-repeater 11)
@@ -118,8 +124,10 @@
     (default-elevation-valid default-gate)
     (default-elevation-valid default-screen)
     (default-elevation-valid default-wall)
+    (default-elevation-valid default-edge)
     (default-elevation-valid default-transmitter)
     (default-elevation-valid default-receiver)
+    (default-elevation-valid default-gun)
     (default-elevation-valid default-wall-gears)
     (default-elevation-valid default-floor-repeater)
     (default-elevation-valid default-wall-repeater)
@@ -140,6 +148,10 @@
     (= (apparatus-anchor-elevation explicit-receiver) 8)
     (= (fixture-elevation default-receiver) 1)
     (= (apparatus-anchor-elevation default-receiver) 1)
+    (= (fixture-elevation explicit-gun) 13)
+    (= (apparatus-anchor-elevation explicit-gun) 13)
+    (= (fixture-elevation default-gun) 1)
+    (= (apparatus-anchor-elevation default-gun) 1)
 
     ;; Floor-mounted: base 10 + height 2, and default base 0 + default height 1.
     (= (repeater-mount-elevation explicit-floor-repeater) 10)

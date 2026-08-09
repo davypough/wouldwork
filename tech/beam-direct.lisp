@@ -2,8 +2,10 @@
 
 ;;; Fixed coupled beam technology.  It activates direct transmitter -> receiver links and
 ;;; supplies shared corridor clearance for every directional fixed link whose endpoints are
-;;; transmitter/repeater -> repeater/receiver.  Location occluders are elevation-aware,
-;;; interpolating between unequal endpoint anchors when visibility supplies coordinates.
+;;; transmitter/repeater -> repeater/receiver.  Coordinate-derived wall, edge, gate, and
+;;; boundary crossings are recorded once during initialization and checked against the
+;;; beam's live endpoint elevations at runtime.  Authored location occluders remain
+;;; elevation-aware and interpolate between unequal endpoint anchors.
 ;;; A problem with crossing fixed beams includes beam-crossing alongside this technology.
 ;;;
 ;;; Self-contained; spliced by (include-tech beam-direct).
@@ -12,26 +14,60 @@
 ;;;   types  : location, hue, agent -- transmitter, receiver, repeaters, box, jammer,
 ;;;            connector, and plate are optional through the nested roles
 ;;;   nested : -beam-substrate (coupled, beam-via, receiver and beam hooks);
-;;;            -beam-occlusion (beam-blocker-occludes-location);
-;;;            -elevation (apparatus-anchor-elevation);
-;;;            -beam-interpolation (horizontal default, overridden by visibility for
-;;;            sloped beams); -gate (open)
+;;;            visibility (segment-crossing records, coordinate interpolation, gate state,
+;;;            apparatus elevation, and movable beam occlusion)
 ;;; PROVIDES:
+;;;   init    : derive-fixed-beam-barrier-crossings
 ;;;   queries : direct-beam-reaches-receiver, recording-shadow-direct-beam-reaches-receiver,
-;;;             fixed-beam-elevation-at, beam-clear, beam-clear-for-object,
+;;;             fixed-beam-elevation-at, fixed-beam-recorded-barriers-clear-for-object,
+;;;             beam-clear, beam-clear-for-object,
 ;;;             fixed-beam-corridor-clear, fixed-beam-corridor-clear-for-object,
 ;;;             direct-beam-live-for-cutting
 
 (include-tech -beam-substrate)
-(include-tech -beam-occlusion)
-(include-tech -elevation)
-(include-tech -beam-interpolation)
-(include-tech -gate)
+(include-tech visibility)
 
 (in-package :ww)
 
 
 (define-optional-types transmitter receiver box jammer connector)
+
+
+(define-init-action derive-fixed-beam-barrier-crossings
+  ;; A fixed coupling has no location endpoint, so DERIVE-LOS-FROM-SEGMENTS's ordinary LOS
+  ;; families do not encounter it.  Record its static segment crossings explicitly here.
+  ;; Gate crossings are retained too: a coordinate-known closed gate blocks only through its
+  ;; finite vertical span, while a hand-authored BEAM-VIA gate with no crossing geometry
+  ;; keeps the legacy open-only rule in FIXED-BEAM-CORRIDOR-CLEAR-FOR-OBJECT.
+  0
+  ()
+  (and (exists (?source fixed-beam-source)
+         (exists (?sink fixed-beam-sink)
+           (coupled ?source ?sink)))
+       (or (exists (?wall wall)
+             (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
+           (exists (?edge edge)
+             (bind (edge-segment> ?edge $x1 $y1 $x2 $y2)))
+           (exists (?gate gate)
+             (bind (gate-segment> ?gate $x1 $y1 $x2 $y2)))
+           (bind (boundary-wall $some-boundary-points))))
+  ()
+  (assert
+    (do (assign $positions (beam-coordinates-endpoint-positions))
+        (assign $walls (wall-segment-records))
+        (assign $edges (edge-segment-records))
+        (assign $gates (gate-segment-records))
+        (assign $boundary-segments
+                (if (bind (boundary-wall $boundary-points))
+                  (beam-coordinates-boundary-segments $boundary-points)))
+        (ww-loop for $beam in (beam-coordinates-coupled-beams)
+                 do (assign $source (first $beam))
+                    (assign $sink (second $beam))
+                    (assign $crossings
+                            (beam-coordinates-barrier-crossings
+                              $beam $positions $walls $edges $boundary-segments $gates))
+                    (los-barrier-crossings> $source $crossings $sink))
+        (convert-databases-to-integers))))
 
 
 (define-query direct-beam-reaches-receiver (?receiver receiver)
@@ -75,8 +111,10 @@
     (?from fixed-beam-source
      ?obstacle (either gate location)
      ?to fixed-beam-sink)
-  ;; Closed gates block outright.  A location blocks only when one of its beam-blocking
-  ;; occupants spans the fixed beam's interpolated elevation there.
+  ;; Legacy authored-obstacle behavior: a gate without matching crossing geometry clears
+  ;; only when open.  FIXED-BEAM-CORRIDOR-CLEAR-FOR-OBJECT handles coordinate-recorded gates
+  ;; separately as finite-height barriers.  A location blocks only when one of its beam-
+  ;; blocking occupants spans the fixed beam's interpolated elevation there.
   (beam-clear-for-object nil ?from ?obstacle ?to))
 
 
@@ -98,14 +136,37 @@
   (fixed-beam-corridor-clear-for-object nil ?from ?to))
 
 
+(define-query fixed-beam-recorded-barriers-clear-for-object
+    (?view
+     ?from fixed-beam-source
+     ?crossings
+     ?to fixed-beam-sink)
+  (do (assign $from-elevation (apparatus-anchor-elevation ?from))
+      (assign $to-elevation (apparatus-anchor-elevation ?to))
+      (recorded-barriers-clear-for-object
+        ?view ?crossings $from-elevation $to-elevation)))
+
+
 (define-query fixed-beam-corridor-clear-for-object
     (?view ?from beam-node ?to beam-node)
   (and (or (transmitter ?from) (repeater ?from))
        (or (repeater ?to) (receiver ?to))
        (coupled ?from ?to)
        (bind (beam-via ?from $obstacles ?to))
+       (assign $crossings (los-barrier-crossings ?from ?to))
+       (or (eql $crossings :unrecorded)
+           (fixed-beam-recorded-barriers-clear-for-object
+             ?view ?from $crossings ?to))
        (ww-loop for $o in $obstacles
-                always (beam-clear-for-object ?view ?from $o ?to))))
+                always
+                  (if (gate $o)
+                    ;; A coordinate-recorded gate was evaluated at its exact crossing above.
+                    ;; An authored gate without matching geometry keeps the legacy rule.
+                    (if (and (not (eql $crossings :unrecorded))
+                             (find $o $crossings :key #'second :test #'eql))
+                      t
+                      (gate-open-for-object ?view $o))
+                    (beam-clear-for-object ?view ?from $o ?to)))))
 
 
 (define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)

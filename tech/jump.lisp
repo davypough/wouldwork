@@ -3,13 +3,16 @@
 ;;; Jumping technology: contribute grounded jumps across authored edges to the mobility
 ;;; closure, or provide one explicit agent-configuration transition.  Support-changing
 ;;; landings may be local ground, remote ground, or a clear box top.  Level and downward
-;;; landings are unrestricted; upward landings are limited by the agent's declared height.
+;;; landings are unrestricted; upward landings -- whether reaching a higher support or
+;;; clearing a vaultable barrier's top -- are limited to *jump-elevation-limit* (default
+;;; 1), independent of the jumping agent's own declared height.
 ;;; Jumping handles exclusively elevation-related moves: local support changes involve box
 ;;; tops only (mounting and dismounting flush supports like plates and gears-mounted fans
 ;;; belongs to the step technology; a fan resting on a box top is not a jump landing).
 ;;; Open gates and passable screens impose no clearance requirement.  Closed gates,
-;;; non-passable screens, and walls must be within vaulting reach; a multi-feature
-;;; jump must clear the highest feature that is not currently passable.
+;;; non-passable screens, and walls contribute their top elevations; a multi-feature jump
+;;; must clear the highest feature that is not currently passable, within that same fixed
+;;; elevation limit.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and wall are declared optional here
@@ -22,7 +25,13 @@
 ;;;               vaultable-object (either gate screen wall)
 ;;;   relations : (jump-via location $list location)
 ;;;               (jump-via> location $list location)
-;;;   queries   : jump-elevation-reachable, vaultable-object-passable, jump-barrier-height,
+;;;   parameter : *jump-elevation-limit*, default 1 -- a Talos-problem default, not a core
+;;;               wouldwork setting, so it lives here rather than in ww-settings.lisp; the
+;;;               maximum elevation a JUMP may rise above its launch point, whether landing
+;;;               higher or clearing a vaultable barrier's top, independent of the jumping
+;;;               agent's own declared height; a problem overrides it with its own
+;;;               DEFPARAMETER
+;;;   queries   : jump-elevation-reachable, vaultable-object-passable,
 ;;;               jump-barrier-top-elevation, vaultable-object-list,
 ;;;               jump-required-clearance-height, jump-path-clear,
 ;;;               jump-traversal-segments, jump-configuration-transitions
@@ -59,13 +68,21 @@
     literals 'jump-via> '(gate screen wall)))
 
 
+(defvar *jump-elevation-limit* 1
+  "Maximum elevation a JUMP may rise above its launch point -- landing higher (onto a box,
+   across an edge) or clearing a vaultable barrier's top -- independent of the jumping
+   agent's own declared height.  Downward and level jumps remain unrestricted.  Problem
+   files can override this.")
+
+
 (define-query jump-elevation-reachable
     (?agent agent ?source-elevation ?target-elevation)
-  ;; Downward and level jumps are unrestricted.  An upward landing may be no more than the
-  ;; agent's declared height above the explicit source elevation.  Keeping the source
+  ;; Downward and level jumps are unrestricted.  An upward landing may rise no more than
+  ;; *jump-elevation-limit* above the explicit source elevation.  Keeping the source
   ;; explicit lets mobility test an intermediate location without moving the agent there.
-  (<= (- ?target-elevation ?source-elevation)
-      (declared-height ?agent)))
+  (do ?agent
+      (<= (- ?target-elevation ?source-elevation)
+          *jump-elevation-limit*)))
 
 
 (define-query vaultable-object-passable (?agent agent ?feature vaultable-object)
@@ -77,16 +94,9 @@
            (obstacle-clear ?agent ?feature))))
 
 
-(define-query jump-barrier-height (?feature vaultable-object)
-  ;; Explicit heights override the default of 4 for gates, screens, and walls.
-  (if (bind (has-height ?feature $height))
-    $height
-    4))
-
-
 (define-query jump-barrier-top-elevation (?feature vaultable-object)
   (+ (object-elevation ?feature)
-     (jump-barrier-height ?feature)))
+     (declared-height ?feature)))
 
 
 (define-query vaultable-object-list (?features)
@@ -110,12 +120,17 @@
 
 
 (define-query jump-path-clear (?agent agent ?source-elevation ?features)
+  ;; A vaultable barrier's top may rise no more than *jump-elevation-limit* above the
+  ;; explicit launch elevation -- the same fixed bound JUMP-ELEVATION-REACHABLE applies to
+  ;; a raised landing.  Clearing a barrier and rising in elevation are the same physical
+  ;; constraint, independent of the jumping agent's own declared height; ?agent still
+  ;; matters here only through VAULTABLE-OBJECT-PASSABLE's holding-state check.
   (and (vaultable-object-list ?features)
        (assign $required
                (jump-required-clearance-height ?agent ?features))
        (or (not $required)
            (<= (- $required ?source-elevation)
-               (declared-height ?agent)))))
+               *jump-elevation-limit*))))
 
 
 (define-problem-helper jump-segment-for-features

@@ -4,15 +4,14 @@
 ;;; matrix gives every HEIGHTED-OBJECT leaf one explicit-height fixture and one
 ;;; fixture with no authored HAS-HEIGHT fact:
 ;;;
-;;;   agent, box, jammer, connector, gate, screen, wall,
+;;;   agent, box, jammer, connector, gate, screen, wall, edge,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
 ;;; Distinct explicit values verify exact binding and DECLARED-HEIGHT lookup.  The
-;;; explicit agent has height one, distinguishing an authored value equal to the
-;;; fallback from the ten absent facts that must all default to one.  Barrier
-;;; clearance policy is intentionally outside this test: fixed obstacles belong to
-;;; HEIGHTED-OBJECT, but jump.lisp applies its own barrier-specific defaults.
-;;; Initial and final states are identical.  Expected minimum path length: zero.
+;;; explicit agent has height two, distinguishing an authored value equal to the
+;;; fallback from an absent agent fact.  Undeclared gate, screen, and wall share the
+;;; default 4; undeclared edge defaults to 3/2.  Initial and final states are
+;;; identical.  Expected minimum path length: zero.
 
 (in-package :ww)
 
@@ -41,6 +40,7 @@
   gate (explicit-gate default-gate)
   screen (explicit-screen default-screen)
   wall (explicit-wall default-wall)
+  edge (explicit-edge default-edge)
   floor-repeater (explicit-floor-repeater default-floor-repeater)
   wall-repeater (explicit-wall-repeater default-wall-repeater))
 
@@ -55,15 +55,16 @@
 
 
 (define-init
-  ;; The explicit value one is deliberately indistinguishable numerically from
-  ;; the fallback; the characterization query also requires its authored fact.
-  (has-height explicit-agent 1)
+  ;; The explicit value two is deliberately indistinguishable numerically from
+  ;; the agent fallback; the characterization query also requires its authored fact.
+  (has-height explicit-agent 2)
   (has-height explicit-box 2)
   (has-height explicit-jammer 3)
   (has-height explicit-connector 4)
   (has-height explicit-gate 6)
   (has-height explicit-screen 7)
   (has-height explicit-wall 8)
+  (has-height explicit-edge 11)
   (has-height explicit-floor-repeater 9)
   (has-height explicit-wall-repeater 10)
 
@@ -83,10 +84,10 @@
     (= (declared-height ?object) ?expected-height)))
 
 
-(define-query default-height-valid (?object heighted-object)
+(define-query default-height-valid (?object heighted-object ?expected-height)
   (and
     (not (bind (has-height ?object $authored-height)))
-    (= (declared-height ?object) 1)))
+    (= (declared-height ?object) ?expected-height)))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -95,26 +96,29 @@
 (define-query height-scenarios-valid ()
   (and
     ;; Complete explicit-height matrix, including both repeater orientations.
-    (explicit-height-valid explicit-agent 1)
+    (explicit-height-valid explicit-agent 2)
     (explicit-height-valid explicit-box 2)
     (explicit-height-valid explicit-jammer 3)
     (explicit-height-valid explicit-connector 4)
     (explicit-height-valid explicit-gate 6)
     (explicit-height-valid explicit-screen 7)
     (explicit-height-valid explicit-wall 8)
+    (explicit-height-valid explicit-edge 11)
     (explicit-height-valid explicit-floor-repeater 9)
     (explicit-height-valid explicit-wall-repeater 10)
 
-    ;; The exact absent-fact boundary always returns the shared default of one.
-    (default-height-valid default-agent)
-    (default-height-valid default-box)
-    (default-height-valid default-jammer)
-    (default-height-valid default-connector)
-    (default-height-valid default-gate)
-    (default-height-valid default-screen)
-    (default-height-valid default-wall)
-    (default-height-valid default-floor-repeater)
-    (default-height-valid default-wall-repeater)))
+    ;; Box, jammer, connector, and repeaters default to one; gate, screen, and wall
+    ;; default to four; edge defaults to 3/2; agent defaults to two.
+    (default-height-valid default-agent 2)
+    (default-height-valid default-box 1)
+    (default-height-valid default-jammer 1)
+    (default-height-valid default-connector 1)
+    (default-height-valid default-gate 4)
+    (default-height-valid default-screen 4)
+    (default-height-valid default-wall 4)
+    (default-height-valid default-edge 3/2)
+    (default-height-valid default-floor-repeater 1)
+    (default-height-valid default-wall-repeater 1)))
 
 
 (define-goal

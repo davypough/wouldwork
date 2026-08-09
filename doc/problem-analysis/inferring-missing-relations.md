@@ -19,7 +19,7 @@ Given a problem spec that is known to be solvable *except* for one missing relat
 
 **Assumptions.** The spec's queries, update logic, actions, types, and static environment are correct and current. Only one relation instance (and, if it is a location, its incident relations) is missing. Always analyze against the **current file on disk**, never a remembered version.
 
-**Before starting, determine whether the relevant facts are authored or derived.** See Section 4's closing note. If the problem asserts `wall-segment>` facts, its `walk-via` and `los-to-*` facts are computed from geometry at initialization, and hand-adding one is the wrong fix.
+**Before starting, determine whether the relevant facts are authored or derived.** See Section 4's closing note. If the problem asserts `wall-segment>`, `edge-segment>`, or `boundary-wall`, its `walk-via` and `los-to-*` facts are computed from geometry at initialization, and hand-adding one is the wrong fix.
 
 ---
 
@@ -67,10 +67,10 @@ A scaffold that has held up in practice. Each milestone is a checkpoint to confi
 | `jump-via` / `jump-via>` | Jumping edge (symmetric / directional) | Can grounded mobility *jump* this gap? | `$list` is a flat conjunction of path features; feasibility uses the source and destination floor elevations. |
 | `climb-via> location $list location` | One-way climb (ladders) | Can the agent climb here? | `$list` is a flat conjunction that must contain a ladder positioned at the source; contributes to mobility. |
 | `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open. Symmetric, agent-independent. |
-| `los-to-location location $list location` | Sightline between two locations | Can I *see that spot* from here? | `$list` = occluders; `()` is a direct, always-clear line; clear iff every occluder gate is open. |
-| `los-to-target location $list gate` | Sightline to a jam target | Can I *jam that gate* from here? | As above. Gate targets only — a gears target resolves through its `has-position` location's `los-to-location` entry instead. |
-| `los-to-apparatus location $list apparatus` | Sightline to a beam endpoint | Can a connector here *pair* with that transmitter/receiver? | As above. |
-| `beam-via transmitter $list receiver` | Beam corridor | Does the beam *reach its receiver*? | Corridor gates open **and** corridor locations unoccupied. |
+| `los-to-location location $list location` | Structural sightline between locations | Is there a possible straight sightline? | Coordinate derivation retains separate wall/edge/gate/boundary crossings. Ordinary sight treats solid crossings as opaque; beam and elevated-jammer consumers may clear finite barriers by height. |
+| `los-to-target location $list gate` | Sightline to a jam target | Can a jammer here *aim at that gate*? | A ground jammer may be blocked, while an elevated placement can clear a finite wall, edge, boundary, or closed gate. A gears target resolves through its `has-position` location instead. |
+| `los-to-apparatus location $list apparatus` | Sightline to a beam endpoint or gun | Can a connector pair here, or can a jammer target this gun? | Pairing is structural first; live beam/jammer use interpolated endpoint elevations for finite barriers. Ordinary visual sight remains opaque through solid barriers. |
+| `beam-via fixed-beam-source $list fixed-beam-sink` | Fixed beam corridor | Does the fixed beam *reach its sink*? | Authored locations block only when an occupant spans the beam height. Coordinate-known walls, edges, boundaries, and closed gates block only across their finite vertical span. |
 | `controls $list <barrier> $mode` | Derived barrier state from controllers | Is this gate *driven open/closed* right now? | `$list` is a DNF clause list of controllers. `normal` = open when energized; `inverted` = open when not; jamming overrides. |
 | `jam-disallowed> location location target` | Explicit jam prohibition | Is jamming ruled out from here? | — |
 
@@ -95,9 +95,9 @@ Clause items on a traversal edge may be **gates, screens, ladders, or gears**:
 Movement and sightline facts come from one of two places, and this decides how a gap may legitimately be fixed.
 
 - **Hand-authored.** The problem asserts `walk-via` and `los-to-*` facts directly. A missing edge is fixed by adding the fact.
-- **Derived from geometry.** If the problem asserts `wall-segment>` facts (with `gate-segment>`, `window-segment>`, `screen-segment>`, `boundary-wall`), then `-walkability-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization, from raw 2D segment geometry. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-coords>` is wrong.
+- **Derived from geometry.** If the problem asserts any `wall-segment>`, `edge-segment>`, or `boundary-wall` geometry (usually alongside `gate-segment>`, `window-segment>`, and `screen-segment>`), then `-walkability-coordinates` derives `walk-via`/`walk-via>` and `-beam-los-coordinates` derives the `los-to-*` tables at initialization. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Fix the geometry instead: a missing sightline means a segment is wrong, or a location's `location-coords>` is wrong.
 
-Check for `wall-segment>` in the spec before synthesizing anything in Section 6.
+Check for `wall-segment>`, `edge-segment>`, or `boundary-wall` before synthesizing anything in Section 6.
 
 ---
 
@@ -143,7 +143,7 @@ The barrier choice is frequently the keystone of the whole inference, not a styl
 
 ## 8. Pitfalls & anti-patterns (grows)
 
-- **Hand-adding a derived fact.** The spec asserts `wall-segment>`, so `walk-via` and the `los-to-*` tables are computed at init. Adding one by hand fixes nothing. Fix the geometry.
+- **Hand-adding a derived fact.** The spec asserts wall, edge, or boundary geometry, so `walk-via` and the `los-to-*` tables are computed at init. Adding one by hand fixes nothing. Fix the geometry.
 - **Assuming a bridge.** Treating the missing relation as case 2(a) when it only extends one frontier (2(b)/2(c)). Check which it is.
 - **Committing to a destination before pruning.** A destination can look viable on sight or reach grounds yet be movement-unreachable. Prune walkability first.
 - **Sightline that contradicts the wall.** Granting a location a clear view of a target that, by its position, should be occluded by the intervening wall's gates.
@@ -158,7 +158,7 @@ The barrier choice is frequently the keystone of the whole inference, not a styl
 
 ## Appendix A — quick procedure
 
-1. Determine whether movement/sightline facts are authored or derived from `wall-segment>`.
+1. Determine whether movement/sightline facts are authored or derived from wall, edge, or boundary geometry.
 2. Reduce the goal to its forced terminal action and consumed resource.
 3. Characterize every legal terminal vantage; note the sight/reach/stand constraints.
 4. List invariants and resource couplings.

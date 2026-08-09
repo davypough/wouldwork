@@ -2,18 +2,18 @@
 
 ;;; Elevation substrate: the fixed vertical level of a location's own floor, a fixed
 ;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Locations and barrier
-;;; fixtures default to base elevation 0; transmitter and receiver beam anchors default to
-;;; elevation 1.  A floor-repeater's declared elevation is its base level (default 0) and
+;;; fixtures default to base elevation 0; transmitter, receiver, and gun functional anchors
+;;; default to elevation 1.  A floor-repeater's declared elevation is its base level (default 0) and
 ;;; its anchor adds its declared height; a wall-repeater's declared elevation is directly
 ;;; its mounting/anchor level (default 1).  Nondefault objects assert an explicit fact.
 ;;;
 ;;; PROVIDES:
 ;;;   nested   : -height (repeater, declared-height)
-;;;   types    : elevated-object (either location gate screen wall transmitter
-;;;              receiver wall-gears floor-repeater wall-repeater)  --  wall-gears may
+;;;   types    : elevated-object (either location gate screen wall edge transmitter
+;;;              receiver gun wall-gears floor-repeater wall-repeater)  --  wall-gears may
 ;;;              declare the stream elevation of their mounted fan (default 1, via
 ;;;              -gears-fan's gears-elevation)
-;;;   relation : (has-elevation elevated-object $fixnum)
+;;;   relation : (has-elevation elevated-object $rational)
 ;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
 ;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
 
@@ -22,17 +22,17 @@
 (in-package :ww)
 
 
-(define-optional-types gate screen wall transmitter receiver wall-gears)
+(define-optional-types gate screen wall edge transmitter receiver gun wall-gears)
 
 
 (define-types
   elevated-object
-    (either location gate screen wall transmitter receiver wall-gears
+    (either location gate screen wall edge transmitter receiver gun wall-gears
             floor-repeater wall-repeater))
 
 
 (define-static-relations
-  (has-elevation elevated-object $fixnum))  ;fixed base/anchor level; absent default depends on role
+  (has-elevation elevated-object $rational))  ;fixed base/anchor level; absent default depends on role
 
 
 (define-query object-elevation (?object elevated-object)
@@ -71,23 +71,24 @@
 
 
 (define-query fixture-elevation
-    (?fixture (either gate transmitter receiver floor-repeater wall-repeater))
-  ;; Declared fixed-fixture level.  Gates use base elevation 0, transmitter/receiver anchors
+    (?fixture (either gate transmitter receiver gun floor-repeater wall-repeater))
+  ;; Declared fixed-fixture level.  Gates use base elevation 0, point-apparatus anchors
   ;; default to 1, and repeaters use their mounting-dependent anchor rule.
   (if (repeater ?fixture)
     (repeater-anchor-elevation ?fixture)
     (if (bind (has-elevation ?fixture $level))
       $level
       (if (or (transmitter ?fixture)
-              (receiver ?fixture))
+              (receiver ?fixture)
+              (gun ?fixture))
         1
         0))))
 
 
 (define-query apparatus-anchor-elevation
-    (?apparatus (either transmitter receiver floor-repeater wall-repeater))
+    (?apparatus (either transmitter receiver gun floor-repeater wall-repeater))
   ;; The vertical coordinate paired with APPARATUS-COORDS>'s horizontal functional point.
-  ;; Transmitters and receivers are point apparatus; repeaters apply their mounting rule.
+  ;; Transmitters, receivers, and guns are point apparatus; repeaters apply their mounting rule.
   (if (repeater ?apparatus)
     (repeater-anchor-elevation ?apparatus)
     (fixture-elevation ?apparatus)))

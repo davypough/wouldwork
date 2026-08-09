@@ -2,29 +2,33 @@
 
 ;;; Combined stageable regression for jump.lisp.  Four independent planning lanes exercise:
 ;;;
-;;;   1. A height-2 agent must first mount a height-2 box, then clear a wall whose top is
-;;;      exactly two units above the box top.  The directed jump lands on ground and removes
-;;;      the launch-box support.
+;;;   1. An agent mounts a box exactly at the fixed jump-elevation limit, then clears a wall
+;;;      from the box top, itself exactly at the same fixed limit above that raised launch
+;;;      point.  The directed jump lands on ground and removes the launch-box support.
 ;;;   2. An agent already on a box drops to local ground without changing location.
 ;;;   3. An agent crosses a symmetric edge in the reverse authored direction and lands
 ;;;      directly from one height-4 box onto another.  A ground landing cannot later reach
 ;;;      the destination box, so the direct box-landing branch is required.
-;;;   4. A height-2 agent carries a box through a stairs-then-jump mobility route in one
-;;;      MOVE.  The stairs raise the hypothetical jump source from elevation 0 to 2.  The
-;;;      jump then reaches elevation 4 and clears two barriers whose tops are also 4.
+;;;   4. An agent carries a box through a stairs-then-jump mobility route in one MOVE.  The
+;;;      stairs raise the hypothetical jump source from elevation 0 to 2.  The jump then
+;;;      rises exactly the fixed jump-elevation limit to elevation 3 and clears two barriers
+;;;      from that same hypothetical source -- one comfortably under the limit, one exactly
+;;;      at it.
 ;;;   5. A grounded agent jumps directly onto a remote clear box, exercising the remaining
 ;;;      ground-to-support configuration boundary.
 ;;;
 ;;; Independent stationary probes characterize the public clearance queries and inspect
 ;;; MOVE's and CHANGE-CONFIGURATION's real generated children.  They verify inclusive and
-;;; just-over elevation
-;;; boundaries, downward freedom, barrier defaults and explicit overrides, highest-feature
-;;; selection, empty-handed screen passability, directed-edge asymmetry, rejection of an
-;;; unsafe landing, rejection of an occupied box top while preserving its ground landing,
-;;; rejection of an over-height local box mount, exclusive ownership of grounded jumps
-;;; by mobility rather than the configuration-transition substrate, and rejection of an
-;;; edge instance from a JUMP-VIA feature list -- VAULTABLE-OBJECT deliberately excludes
-;;; edge, since an edge has no independent "top" to vault onto.
+;;; just-over elevation boundaries -- JUMP-ELEVATION-REACHABLE's raised-landing bound and
+;;; JUMP-PATH-CLEAR's vaulting bound share the same fixed *jump-elevation-limit*, and
+;;; neither consults any agent's declared height -- downward freedom, barrier defaults and
+;;; explicit overrides, highest-feature selection, empty-handed screen passability,
+;;; directed-edge asymmetry, rejection of an unsafe landing, rejection of an occupied box
+;;; top while preserving its ground landing, rejection of an over-limit local box mount,
+;;; exclusive ownership of grounded jumps by mobility rather than the configuration-
+;;; transition substrate, and rejection of an edge instance from a JUMP-VIA feature list --
+;;; VAULTABLE-OBJECT deliberately excludes edge, since an edge has no independent "top" to
+;;; vault onto.
 ;;;
 ;;; Expected minimum solution (6 steps, in any interleaving): mount vault-box; cross
 ;;; vault-start -> vault-goal; drop from drop-box; cross transfer-start -> transfer-goal
@@ -84,13 +88,14 @@
 
 
 (define-init
-  ;; Planned lane 1: ground cannot clear vault-wall's top elevation 4.  Vault-box raises
-  ;; vault-agent from elevation 0 to 2, making the remaining clearance exactly its height 2.
+  ;; Planned lane 1: ground cannot clear vault-wall's top from source elevation 0 (required
+  ;; clearance 2 exceeds the fixed jump-elevation limit 1).  Vault-box raises vault-agent
+  ;; from elevation 0 to 1 -- exactly the fixed limit -- making the remaining vault
+  ;; clearance exactly that same limit.  No agent height is asserted anywhere in this
+  ;; file: neither JUMP-ELEVATION-REACHABLE nor JUMP-PATH-CLEAR consults it.
   (has-location vault-agent vault-start)
-  (has-height vault-agent 2)
   (has-location vault-box vault-start)
-  (has-height vault-box 2)
-  (has-elevation vault-wall 2)
+  (has-height vault-box 1)
   (has-height vault-wall 2)
   (jump-via> vault-start (vault-wall) vault-goal)
 
@@ -99,10 +104,10 @@
   (has-location drop-box drop-site)
   (on drop-agent drop-box)
 
-  ;; Planned lane 3: both box tops are elevation 4.  The edge is authored target-first so
-  ;; the required source-to-target traversal depends on JUMP-VIA symmetry.
+  ;; Planned lane 3: both box tops are elevation 4, so the jump between them has zero
+  ;; elevation gain and is unaffected by any upward-reach limit.  The edge is authored
+  ;; target-first so the required source-to-target traversal depends on JUMP-VIA symmetry.
   (has-location transfer-agent transfer-start)
-  (has-height transfer-agent 1)
   (has-location transfer-source-box transfer-start)
   (has-height transfer-source-box 4)
   (on transfer-agent transfer-source-box)
@@ -113,31 +118,33 @@
   (jump-via transfer-goal () transfer-start)
 
   ;; Planned lane 4: one mobility route first climbs stairs from elevation 0 to 2, then
-  ;; jumps to elevation 4.  Both non-passable barriers have top elevation 4, exactly within
-  ;; carrying-agent's height from the hypothetical intermediate source.  Computing the jump
-  ;; from carrying-agent's actual pre-move elevation 0 would incorrectly reject this route.
+  ;; jumps to elevation 3 -- exactly the fixed limit above that hypothetical source.  Both
+  ;; non-passable barriers must clear within that same limit from source 2: VAULT-WALL's
+  ;; top 2 is already under it, and CARGO-SCREEN's top 3 is the binding constraint, exactly
+  ;; source plus the limit.  Computing either check from carrying-agent's actual pre-move
+  ;; elevation 0 would incorrectly reject this route: the elevation gain would be 3, and
+  ;; CARGO-SCREEN's required clearance would be 3, both exceeding the fixed limit 1.
   (has-location carrying-agent carry-approach)
-  (has-height carrying-agent 2)
   (holding carrying-agent carried-box)
   (has-elevation carry-start 2)
-  (has-elevation carry-goal 4)
+  (has-elevation carry-goal 3)
   (stairs-via> carry-approach () carry-start)
-  (has-elevation cargo-screen 2)
+  (has-elevation cargo-screen 1)
   (has-height cargo-screen 2)
   (jump-via> carry-start (vault-wall cargo-screen) carry-goal)
 
-  ;; Exact-boundary query probe: standing elevation 2 plus agent height 2 reaches 4, but
-  ;; not 5.
+  ;; Exact-boundary query probes.  The fixed *jump-elevation-limit* governs both
+  ;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR identically: source 2 reaches 3 but not
+  ;; 4, and clears a barrier at top 2 but not one it would need to clear from ground level.
   (has-location boundary-agent boundary-site)
-  (has-height boundary-agent 2)
   (has-location boundary-box boundary-site)
   (has-height boundary-box 2)
   (on boundary-agent boundary-box)
 
-  ;; An empty-handed agent ignores a default-height screen even though height 3 exceeds its
-  ;; own height 1.  This probe remains stationary; the goal inspects the generated child.
+  ;; An empty-handed agent ignores a default-height screen entirely: passability
+  ;; short-circuits vaulting clearance before the fixed elevation limit is ever consulted.
+  ;; This probe remains stationary; the goal inspects the generated child.
   (has-location screen-probe-agent screen-probe-start)
-  (has-height screen-probe-agent 1)
   (jump-via> screen-probe-start (passable-screen) screen-probe-goal)
 
   ;; An uncontrolled gun is lethal after initialization, so the transition action must
@@ -155,11 +162,11 @@
   (on blocking-connector occupied-target-box)
   (jump-via> occupied-start () occupied-goal)
 
-  ;; A clear height-3 local box is one unit beyond this height-2 agent's reach.
+  ;; A clear height-2 local box is one unit beyond the fixed *jump-elevation-limit*; the
+  ;; mount must fail regardless of any agent's height, since none is consulted.
   (has-location tall-box-probe-agent tall-box-site)
-  (has-height tall-box-probe-agent 2)
   (has-location tall-local-box tall-box-site)
-  (has-height tall-local-box 3)
+  (has-height tall-local-box 2)
 
   ;; A grounded remote support landing remains explicit and occupies the target box.  Two
   ;; authored edges offer the same destination through different witnesses; central
@@ -201,7 +208,7 @@
                 (generate-children
                   (make-node :state state :depth 0)))))
         (and
-          ;; Empty-handed passability ignores passable-screen's default height 3.
+          ;; Empty-handed passability ignores passable-screen's default height 4.
           (some (lambda (child)
                   (jump-child-matches-p
                     child
@@ -233,7 +240,7 @@
                       nil))
                   move-children)
 
-          ;; The clear but over-height local box cannot be mounted.
+          ;; The clear but over-limit local box cannot be mounted.
           (notany (lambda (child)
                     (jump-child-matches-p
                       child
@@ -316,7 +323,7 @@
     (not (exists (?location location)
            (has-location carried-box ?location)))
     (not (vaultable-object-passable carrying-agent cargo-screen))
-    (= (jump-required-clearance-height carrying-agent '(cargo-screen)) 4)
+    (= (jump-required-clearance-height carrying-agent '(cargo-screen)) 3)
     (jump-path-clear carrying-agent 2 '(cargo-screen))
     (equal
       (assoc 'carry-goal
@@ -325,12 +332,15 @@
          ((stairs carry-approach nil carry-start)
           (jump carry-start (cargo-screen vault-wall) carry-goal))))
 
-    ;; Inclusive upward boundary, just-over rejection, unrestricted downward movement, and
-    ;; explicit hypothetical-source behavior independent of the agent's actual support.
+    ;; Inclusive upward boundary and just-over rejection for the fixed, agent-independent
+    ;; elevation limit; unrestricted downward movement.
     (= (occupant-elevation boundary-agent) 2)
-    (jump-elevation-reachable boundary-agent 2 4)
-    (not (jump-elevation-reachable boundary-agent 2 5))
+    (jump-elevation-reachable boundary-agent 2 3)
+    (not (jump-elevation-reachable boundary-agent 2 4))
     (jump-elevation-reachable boundary-agent 2 -100)
+
+    ;; JUMP-PATH-CLEAR's vaulting bound is the identical fixed limit, from an explicit
+    ;; hypothetical source rather than any agent's own reach.
     (jump-path-clear boundary-agent 2 '(vault-wall))
     (not (jump-path-clear boundary-agent 0 '(vault-wall)))
     (jump-path-clear tall-box-probe-agent 2 '(vault-wall))
@@ -349,11 +359,11 @@
 
     ;; Barrier default, explicit override, top elevation, feature typing, and maximum
     ;; non-passable height.  The passable screen contributes nothing to the mixed list.
-    (= (jump-barrier-height default-gate) 3)
-    (= (jump-barrier-height passable-screen) 3)
-    (= (jump-barrier-height default-wall) 3)
-    (= (jump-barrier-height vault-wall) 2)
-    (= (jump-barrier-top-elevation vault-wall) 4)
+    (= (declared-height default-gate) 4)
+    (= (declared-height passable-screen) 4)
+    (= (declared-height default-wall) 4)
+    (= (declared-height vault-wall) 2)
+    (= (jump-barrier-top-elevation vault-wall) 2)
     (vaultable-object-list '(passable-screen default-wall))
     (vaultable-object-passable screen-probe-agent passable-screen)
     (not (vaultable-object-passable screen-probe-agent default-gate))
@@ -362,7 +372,7 @@
            screen-probe-agent '(passable-screen)))
     (= (jump-required-clearance-height
          screen-probe-agent '(passable-screen default-wall))
-       3)
+       4)
 
     ;; Threat state and occupied-top setup remain present for the generated-child probes.
     (lethal unsafe-gun)
@@ -407,7 +417,7 @@
 (define-query-mutation jump-elevation-uses-actual-source jump-elevation-reachable
   (?agent agent ?source-elevation ?target-elevation)
   (<= (- ?target-elevation (occupant-elevation ?agent))
-      (declared-height ?agent))
+      *jump-elevation-limit*)
   "Ignores the explicit hypothetical source elevation.  The stairs-then-jump
    route must then fail from the agent's actual pre-move elevation.")
 
@@ -419,6 +429,6 @@
                (jump-required-clearance-height ?agent ?features))
        (or (not $required)
            (<= (- $required (occupant-elevation ?agent))
-               (declared-height ?agent))))
+               *jump-elevation-limit*)))
   "Ignores the explicit hypothetical source elevation for path clearance.  The
    elevated intermediate jump and the explicit-source probes must detect it.")

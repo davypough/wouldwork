@@ -84,10 +84,10 @@
 
   ;; Nondefault elevations.  Other locations, gates, and screens default to 0.
   ;; Transmitters and receivers default to elevation 1.
-  (has-elevation location12 2)
-  (has-elevation location13 2)
-  (has-elevation gate8 2)
-  (has-elevation gate9 2)
+  (has-elevation location12 3/2)
+  (has-elevation location13 3/2)
+  (has-elevation gate8 3/2)
+  (has-elevation gate9 3/2)
 
   ;; Gate controllers
   (controls ((receiver1)) gate2 normal)
@@ -104,8 +104,8 @@
   (coupled transmitter1 receiver1)
 
   ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
-  ;; DERIVE-LOS-FROM-SEGMENTS folds each polygon edge into its wall list, so a sightline that
-  ;; would have to cut outside this silhouette is blocked exactly like a wall-segment.
+  ;; DERIVE-LOS-FROM-SEGMENTS retains each polygon crossing, so ordinary low sight outside
+  ;; this silhouette is blocked exactly like an internal wall segment.
   ;; tech/-walkability-coordinates.lisp's own WALK-VIA derivation folds it in the same way, so
   ;; walking across this silhouette is blocked too.
   (boundary-wall

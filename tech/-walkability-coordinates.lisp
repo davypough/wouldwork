@@ -6,8 +6,8 @@
 ;;; Nested under public walkability and under -stream-passability; entirely inert unless
 ;;; the problem actually asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL -- a
 ;;; problem that hand-authors WALK-VIA directly is unaffected.  Edge segments block
-;;; walking exactly like wall segments -- both feed the same solids list below -- an
-;;; edge is simply a wall-shaped barrier with no independent height/vaulting model.
+;;; walking exactly like wall segments -- both feed the same solids list below.  LOS gives
+;;; edges finite height, but walking remains elevation-blind and jumping excludes edges.
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
 ;;; segment and boundary edge is axis-aligned (a diagonal one is an authoring mistake,

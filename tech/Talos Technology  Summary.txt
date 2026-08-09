@@ -7,7 +7,7 @@ angled-gears
 box
 connector
 crossing  ;a crossing is where two beams intersect
-edge  ;a vertical surface separating two regions of different elevation; blocks LOS/walking like a wall, but has no height/vaulting
+edge  ;a finite-height vertical surface separating elevations; blocks walking like a wall but is not vaultable
 fan
 floor-gears
 floor-repeater
@@ -37,12 +37,12 @@ beam-blocker (either agent box jammer connector)
 los-endpoint (either transmitter receiver floor-repeater wall-repeater gun location)
 beam-node (either transmitter receiver floor-repeater wall-repeater location)
 cargo (either box jammer connector fan tray)
-elevated-object (either location gate screen wall transmitter receiver wall-gears floor-repeater wall-repeater)
+elevated-object (either location gate screen wall edge transmitter receiver gun wall-gears floor-repeater wall-repeater)
 fixed-beam-source (either transmitter floor-repeater wall-repeater)
 fixed-beam-sink (either floor-repeater wall-repeater receiver)
 fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder)
 gears (either floor-gears wall-gears angled-gears)
-heighted-object (either box gate agent screen wall jammer connector floor-repeater wall-repeater)
+heighted-object (either box gate agent screen wall edge jammer connector floor-repeater wall-repeater)
 mobile-object (either agent box jammer connector fan tray)
 plate (either pressure-plate toggle-plate)
 relay (either connector floor-repeater wall-repeater)
@@ -54,6 +54,7 @@ target (either gate floor-gears wall-gears gun)
 terminus (either transmitter receiver connector floor-repeater wall-repeater)
 threat (either gun)
 vaultable-object (either gate screen wall)
+visibility-object (either gate transmitter receiver floor-repeater wall-repeater gun location)
 
 3. Dynamic Relations
 
@@ -88,8 +89,8 @@ vaultable-object (either gate screen wall)
 (edge-segment> edge $rational $rational $rational $rational)
 (gate-segment> gate $rational $rational $rational $rational)
 (has-chroma (either transmitter receiver) $hue)
-(has-elevation elevated-object $fixnum)
-(has-height heighted-object $fixnum)
+(has-elevation elevated-object $rational)
+(has-height heighted-object $rational)
 (has-position fixed-position-object $location)
 (jam-disallowed> location location target)
 (jump-via location $list location)
@@ -98,6 +99,7 @@ vaultable-object (either gate screen wall)
 (los-to-apparatus location $list apparatus)
 (los-to-location location $list location)
 (los-to-target location $list gate)
+(los-barrier-crossings> los-endpoint $list visibility-object)  ;directed records (:kind identity parameter x1 y1 x2 y2), including fixed couplings and gate targets
 (reach-via location $list location)
 (screen-segment> screen $rational $rational $rational $rational)
 (stairs-via location $list location)
@@ -129,14 +131,16 @@ vaultable-object (either gate screen wall)
 
 6. Default Type Heights
 
-agent 1
+agent 2
 box 1
 connector 1
+edge 3/2
 gate 4
 jammer 1
 repeater 1
 screen 4
 wall 4
+boundary-wall 6  ;LOS-only default; a boundary-wall polygon has no named object for has-height
 
 7. Default Type Elevations
 
@@ -144,3 +148,8 @@ floor-repeater 0 (base; beam anchor = base + height)
 receiver 1
 transmitter 1
 wall-repeater 1
+
+8. Other Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
+
+*jump-elevation-limit* 1  ;tech/jump.lisp; max JUMP elevation gain moving upward, and max vaulting clearance over a barrier -- both measured from the launch elevation, independent of the jumping agent's declared height
+*beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder

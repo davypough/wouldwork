@@ -7,7 +7,8 @@
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-walkability-coordinates.lisp's DERIVE-WALK-VIA-FROM-SEGMENTS derives WALK-VIA --
 ;;; all from the raw segment geometry below (same shape as problem-corner.lisp's).  The two
-;;; beam derivations read WALL-SEGMENT>, GATE-SEGMENT> and BOUNDARY-WALL; WINDOW-SEGMENT> is
+;;; beam derivations read the authored WALL-SEGMENT>/GATE-SEGMENT> facts and BOUNDARY-WALL
+;;; (this problem has no EDGE-SEGMENT> facts); WINDOW-SEGMENT> is
 ;;; consulted only by WALK-VIA's, which uses side-of-partition-line classification rather
 ;;; than beam intersection -- walking connectivity is a zone-adjacency question, not a
 ;;; sightline one (see that file's header for why).
@@ -16,16 +17,9 @@
 ;;; this is an intentional test-fixture divergence, not a correction.  The wall1/gate1 split
 ;;; point is placed at y=11/2 so all three gate1-conditioned beams (location1->location4,
 ;;; transmitter2->location4, transmitter1->location4) cross x=8 comfortably below the split,
-;;; while the only other affected beam (location1->receiver2) crosses x=8 above it -- hence
-;;; derivation correctly excludes location1->receiver2 as wall-blocked.  location2/location4
-;;; is wall-blocked too: their sightline runs exactly along wall1's top corner (8,8) --
-;;; solid wall, not the window above it -- which -beam-los-coordinates.lisp's wall-corner
-;;; convention excludes (see that file's header).
-;;;
-;;; Expected derived figures, useful as a regression baseline: 17 LOS-TO-APPARATUS + 5
-;;; LOS-TO-LOCATION pairs; 26 crossings (location2/location4 crossed no other beam either
-;;; way); 4 BEAM-CROSSINGS-BEFORE-GATE> facts -- two for the location1/location4 beam, which is
-;;; derived in both directions, and one each for the two transmitter beams.
+;;; while the only other affected beam (location1->receiver2) crosses x=8 above it.  That
+;;; sightline, and location2/location4 through wall1's top corner (8,8), retain structural
+;;; crossing records but remain blocked at their ordinary low elevations.
 
 
 (in-package :ww)
@@ -117,8 +111,8 @@
   (has-chroma receiver3 blue)
 
   ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
-  ;; DERIVE-LOS-FROM-SEGMENTS folds each polygon edge into its wall list, so a sightline that
-  ;; would have to cut outside this silhouette is blocked exactly like a wall-segment.  Not
+  ;; DERIVE-LOS-FROM-SEGMENTS retains each polygon crossing, so ordinary low sight outside
+  ;; this silhouette is blocked exactly like an internal wall segment.  Not
   ;; currently consulted by walkability's own coordinate derivation (walk-via).  This
   ;; rectangle fully encloses the map and is convex, so it's functionally inert here (a
   ;; straight line between two interior points of a convex boundary wall can never cross it).
@@ -130,7 +124,7 @@
   ;; coordinates.lisp) and DERIVE-BEAM-CROSSINGS-BEFORE-GATE (tech/-beam-crossing-
   ;; coordinates.lisp) below.  wall1/gate1 split at
   ;; y=11/2 keeps all three gate1-conditioned beams below the split and the location1-
-  ;; >receiver2 crossing (correctly wall-blocked) above it, so neither segment is
+  ;; >receiver2 wall crossing above it, so neither segment is
   ;; fragmented.
   (wall-segment> wall1 8 11/2 8 8)
   (wall-segment> wall2 8 0 8 3)

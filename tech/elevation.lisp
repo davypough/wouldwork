@@ -8,7 +8,7 @@
 ;;;   via -elevation: elevated-object, has-elevation, object-elevation,
 ;;;                   location-elevation, fixture-elevation
 ;;;                   (locations and barriers, including walls, default to base 0;
-;;;                    transmitters/receivers default to beam-anchor elevation 1)
+;;;                    transmitters/receivers/guns default to functional elevation 1)
 
 (include-tech -elevation)
 

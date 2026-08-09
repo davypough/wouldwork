@@ -104,10 +104,10 @@
   (has-location floor-pickup-fan floor-pickup-site)
   (mounted-on floor-pickup-fan floor-pickup-gears)
 
-  ;; Wall pickup lane: the fan hangs without a location.  Elevation 1 is exactly the
+  ;; Wall pickup lane: the fan hangs without a location.  Elevation 2 is exactly the
   ;; default-height agent's inclusive reach from the elevation-0 floor.
   (has-position wall-pickup-gears wall-pickup-fixture-site)
-  (has-elevation wall-pickup-gears 1)
+  (has-elevation wall-pickup-gears 2)
   (mounted-on wall-pickup-fan wall-pickup-gears)
 
   ;; Flush angled mounting lane.
@@ -117,7 +117,7 @@
   ;; Wall mounting lane, also at the inclusive reach boundary.
   (holding wall-mounting-agent wall-mounting-fan)
   (has-position wall-mounting-gears wall-mounting-fixture-site)
-  (has-elevation wall-mounting-gears 1)
+  (has-elevation wall-mounting-gears 2)
 
   ;; Negative pickup fixtures at PLACING-SITE.  WELDED-FAN is otherwise clear and
   ;; reachable; OCCUPIED-FAN is otherwise removable but carries OCCUPANT-BOX.
@@ -142,7 +142,7 @@
   (mounted-on gear-occupant-fan occupied-gears)
 
   (has-position high-wall-gears floor-pickup-site)
-  (has-elevation high-wall-gears 2)
+  (has-elevation high-wall-gears 3)
 
   (has-position remote-gears remote-site))
 
@@ -192,10 +192,10 @@
     (not (blowing floor-pickup-fan))
     (turning floor-pickup-gears)
 
-    ;; The wall pickup branch succeeds exactly one elevation unit above the agent and
+    ;; The wall pickup branch succeeds exactly two elevation units above the agent and
     ;; likewise clears mounting/blowing without inventing a location.
-    (= (gears-elevation wall-pickup-gears) 1)
-    (within-agent-vertical-reach wall-pickup-agent 1)
+    (= (gears-elevation wall-pickup-gears) 2)
+    (within-agent-vertical-reach wall-pickup-agent 2)
     (has-location wall-pickup-agent wall-pickup-site)
     (holding wall-pickup-agent wall-pickup-fan)
     (not (exists (?location location)
@@ -216,10 +216,10 @@
     (turning angled-mounting-gears)
     (blowing angled-mounting-fan)
 
-    ;; Wall mounting has the same inclusive elevation-1 boundary but deliberately adds
+    ;; Wall mounting has the same inclusive elevation-2 boundary but deliberately adds
     ;; no location, keeping the fan unavailable to support placement.
-    (= (gears-elevation wall-mounting-gears) 1)
-    (within-agent-vertical-reach wall-mounting-agent 1)
+    (= (gears-elevation wall-mounting-gears) 2)
+    (within-agent-vertical-reach wall-mounting-agent 2)
     (has-location wall-mounting-agent wall-mounting-site)
     (not (holding wall-mounting-agent wall-mounting-fan))
     (mounted-on wall-mounting-fan wall-mounting-gears)
@@ -254,9 +254,9 @@
            state 'mount-fan
            '(floor-pickup-agent floor-pickup-fan occupied-gears)))
 
-    ;; Elevation 2 is exactly one unit beyond a default-height agent's reach.
-    (= (gears-elevation high-wall-gears) 2)
-    (not (within-agent-vertical-reach floor-pickup-agent 2))
+    ;; Elevation 3 is exactly one unit beyond a default-height agent's reach.
+    (= (gears-elevation high-wall-gears) 3)
+    (not (within-agent-vertical-reach floor-pickup-agent 3))
     (not (fan-action-applicable-p
            state 'mount-fan
            '(floor-pickup-agent floor-pickup-fan high-wall-gears)))

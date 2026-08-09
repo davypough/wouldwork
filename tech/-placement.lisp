@@ -22,6 +22,7 @@
 ;;;               placement-options  --  legal plate/fan/box/tray/ground placements at a
 ;;;               location, excluding a given object (?self) as a candidate support;
 ;;;               only a floor-mounted fan and only a currently-held tray are ever offered
+;;;               placement-elevation -- the resting base elevation produced by an option
 ;;;   update    : place-held-object!  --  releases ?agent's hold, sets ?object's location,
 ;;;               and rests it on ?place unless ?place is 'ground
 
@@ -81,6 +82,14 @@
                (within-agent-vertical-reach ?agent (location-elevation ?location)))
         (assign $places (cons 'ground $places)))
       $places))
+
+
+(define-query placement-elevation (?location location ?place)
+  ;; ?place is either a support object or the Lisp marker GROUND.  This is the base level
+  ;; an object will have after PLACE-HELD-OBJECT!, before its own height is added.
+  (if (eql ?place 'ground)
+    (location-elevation ?location)
+    (support-top-elevation ?place)))
 
 
 (define-update place-held-object!

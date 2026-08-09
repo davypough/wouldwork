@@ -4,11 +4,9 @@
 ;;; screen segments, the ordered boundary polygon, list-gathering queries for the geometry
 ;;; algorithms, and initialization validation.  A wall is a vertical linear partition; an
 ;;; edge is a vertical surface separating two regions of different elevation (eg, the
-;;; ground-level footprint of a raised slab).  Both block LOS and walking identically --
-;;; every downstream consumer treats WALL-SEGMENT> and EDGE-SEGMENT> facts the same way --
-;;; but only wall participates in vaulting/height (see jump.lisp's VAULTABLE-OBJECT and
-;;; -height.lisp/-elevation.lisp's HEIGHTED-OBJECT/ELEVATED-OBJECT): an edge has no "top"
-;;; a location could stand on, so it is deliberately excluded from all three.
+;;; ground-level footprint of a raised slab).  Both block walking identically and both have
+;;; finite height for LOS.  Only wall participates in vaulting: an edge is not a physical
+;;; feature whose top an agent can vault onto, so jump.lisp deliberately excludes it.
 
 
 (in-package :ww)
@@ -193,4 +191,3 @@
                 Record names:   ~S~%~
                 Every ~S instance in a coordinate-driven problem must contribute a segment."
                type kind instance names type)))))
-

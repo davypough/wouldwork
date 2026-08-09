@@ -26,10 +26,9 @@
 ;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
 ;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENT>: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
-;;; the beam -- independently per gate, for a beam conditioned on more than one.  Walls and
-;;; edges have no counterpart here: a wall- or edge-blocked beam is excluded from LOS-TO-
-;;; APPARATUS/LOS-TO-LOCATION entirely by -beam-los-coordinates, so it never becomes a beam
-;;; to split in the first place.
+;;; the beam -- independently per gate, for a beam conditioned on more than one.  Wall,
+;;; edge, and boundary crossings do not split the crossing sequence: visibility and
+;;; beam-direct retain them separately and decide vertical clearance at runtime.
 ;;; Without a populated BEAM-CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
 ;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
@@ -182,8 +181,8 @@
   ;; Canonical deterministic order: transmitter -> location, location -> receiver,
   ;; location -> repeater, then location -> location in declared type order
   ;; (los-to-location is symmetric at runtime, so the type-order test avoids counting each
-  ;; L-L pair twice), and finally the fixed COUPLED beams.  The location families come from the
-  ;; derived LOS relations, which already exclude anything a wall blocks; direct beams have
+  ;; L-L pair twice), and finally the fixed COUPLED beams.  The location families come from
+  ;; structural LOS relations that retain finite barrier crossings; direct beams have
   ;; no LOS fact to enumerate from -- their existence is authored as COUPLED -- so they are
   ;; appended from BEAM-COORDINATES-COUPLED-BEAMS instead.  Appended last so that adding
   ;; beam-direct to an existing problem cannot renumber the crossings its relay beams
@@ -208,46 +207,6 @@
                    (bind (los-to-location ?source $gates ?destination)))
             (push (list ?source ?destination) $beams))))
       (append (reverse $beams) (beam-coordinates-coupled-beams))))
-
-
-;;;; DIRECT BEAM PAIRINGS ;;;;
-
-
-(defun beam-coordinates-coupled-beams ()
-  ;; The fixed directional beams a problem authored with COUPLED,
-  ;; read straight out of *STATIC-DB* rather than through a WW query.  Deliberately not a
-  ;; DEFINE-QUERY: scanning keeps the crossing numbering deterministic and independent of
-  ;; query translation.
-  ;;
-  ;; Sorted by endpoint name because hash iteration order is unspecified, and this order
-  ;; feeds the crossing1, crossing2, ... assignment -- which has to be reproducible across
-  ;; runs for CROSSINGS-ALONG-BEAM> to mean anything stable.
-  (let ((pairs (loop for key being the hash-keys of *static-db*
-                     when (and (consp key) (eq (first key) 'coupled))
-                       collect (list (second key) (third key)))))
-    (sort pairs (lambda (left right)
-                  (if (string= (symbol-name (first left)) (symbol-name (first right)))
-                    (string< (symbol-name (second left)) (symbol-name (second right)))
-                    (string< (symbol-name (first left)) (symbol-name (first right))))))))
-
-
-(defun beam-coordinates-check-coupled-sightlines (beams positions walls)
-  ;; A COUPLED fact asserts a direct beam exists; a wall or edge lying across that sightline
-  ;; says it cannot -- WALLS here already carries both, appended by ESTABLISH-BEAM-
-  ;; COORDINATES.  That is a contradiction between two authored inputs, not a case to resolve
-  ;; either way, so it is surfaced here rather than silently yielding a beam with no derived
-  ;; crossings.  Gates are deliberately not checked: a direct beam's gates live in its
-  ;; authored BEAM-VIA corridor, and BEAM-CLEAR (beam-direct.lisp) already takes the whole
-  ;; beam down when one closes -- unlike a relay beam there is no partial cutting range for
-  ;; BEAM-CROSSINGS-BEFORE-GATE> to split, which is why DERIVE-BEAM-CROSSINGS-BEFORE-GATE below leaves
-  ;; direct beams alone.
-  (loop for beam in beams
-        when (some (lambda (wall)
-                     (beam-coordinates-obstacle-intersection-parameter beam positions wall t))
-                   walls)
-          do (error "COUPLED asserts a direct beam ~A -> ~A, but a wall or edge blocks that ~
-                     sightline.  Remove the COUPLED fact or move the obstacle."
-                    (first beam) (second beam))))
 
 
 ;;;; CROSSING POOL ;;;;
@@ -309,13 +268,6 @@
   (assert
     (do (assign $beams (beam-coordinates-potential-beams))
         (assign $positions (beam-coordinates-endpoint-positions))
-        (assign $walls (append (wall-segment-records) (edge-segment-records)))
-        (assign $boundary-walls
-                (if (bind (boundary-wall $boundary-points))
-                  (beam-coordinates-boundary-segments $boundary-points)))
-        (assign $all-walls (append $walls $boundary-walls))
-        (beam-coordinates-check-coupled-sightlines
-          (beam-coordinates-coupled-beams) $positions $all-walls)
         (assign $records
                 (beam-coordinates-derive-crossing-records $beams $positions))
         (assign $beam-crossings (mapcar #'first $records))

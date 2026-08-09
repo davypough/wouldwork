@@ -6,12 +6,12 @@
 ;;; visibility-tech (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
-;;; asserts WALL-SEGMENT> or EDGE-SEGMENT>, so a problem that hand-authors its own LOS-TO-
+;;; asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL, so a problem that hand-authors its own LOS-TO-
 ;;; APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently
 ;;; takes that hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENT>
-;;; facts and derive.  Edge segments block sightlines exactly like wall segments -- both feed
-;;; the same occluder test, unconditionally-blocking at their own corner -- an edge is simply
-;;; a wall-shaped LOS barrier with no independent height/vaulting model.
+;;; facts and derive.  Walls, edges, gates, and boundary segments retain their static 2D
+;;; crossings for runtime vertical-clearance checks.  Edges have the same finite-height
+;;; model as walls for LOS, while remaining excluded from jump feature lists.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
 ;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
@@ -23,8 +23,8 @@
 ;;; being present, like LOS-TO-TARGET, since nothing but jam-target ever reads them).
 ;;;
 ;;; DERIVE-LOS-FROM-SEGMENTS tests every location<->apparatus, location<->gate, and
-;;; location<->location pair against that geometry, excluding any pair a wall blocks and
-;;; recording any gate that properly does as an occluder.  A wall blocks at its own corner
+;;; location<->location pair against that geometry, recording every finite barrier crossing
+;;; and every gate that properly intersects as an occluder.  A wall crossing counts at its own corner
 ;;; exactly like its interior -- so a sightline can't leak through the junction where it
 ;;; meets another wall, a gate, or the boundary wall -- while a gate stays strict at its own
 ;;; corner, since the neighboring wall already covers that point; a beam endpoint that lies
@@ -33,11 +33,11 @@
 ;;; own -- it is authored as an extended segment, not a point endpoint -- so its LOS-TO-TARGET
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
-;;; repeats its first -- each consecutive polygon edge is folded into the wall list too, so a sightline that would
-;;; have to leave the map's own silhouette is blocked the same as any other wall.
+;;; repeats its first -- each consecutive polygon edge contributes its own retained crossing.
 ;;; -walkability-coordinates.lisp's own WALK-VIA derivation folds BOUNDARY-WALL in the same way
 ;;; (as a solid boundary segment, alongside WALL-SEGMENT>), so a problem that asserts it gets
-;;; both LOS and walkability blocked at the map's edge automatically.
+;;; ordinary LOS and walkability remain blocked at the map's edge automatically, while a
+;;; sufficiently elevated beam or jammer sightline can clear its default height 4.
 ;;;
 ;;; The location<->apparatus and location<->location branches additionally test every other
 ;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the
@@ -88,10 +88,13 @@
 ;;;               nothing can consume
 ;;;   relations : apparatus-coords> (transmitter/receiver/repeater/gun functional point),
 ;;;               wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
-;;;               to no facts; a problem that asserts wall-segment> or edge-segment> gets
+;;;               to no facts; a problem that asserts wall-segment>, edge-segment>, or
+;;;               boundary-wall gets
 ;;;               LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION derived automatically
 ;;;               instead of hand-authoring them; boundary-wall additionally folds its
-;;;               polygon edges into that derivation's wall list
+;;;               polygon edges into that derivation's finite-barrier crossings
+;;;   functions : beam-coordinates-coupled-beams -- stable raw enumeration shared with
+;;;               beam-direct and -beam-crossing-coordinates
 ;;;   queries   : beam-coordinates-endpoint-xy, beam-coordinates-elevation-at -- live
 ;;;               (query-time, not just init-time) coordinate lookup and interpolation,
 ;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
@@ -110,6 +113,20 @@
 
 
 (define-optional-types jammer gun floor-repeater wall-repeater)
+
+
+(defun beam-coordinates-coupled-beams ()
+  ;; Fixed directional beams authored through COUPLED.  Read *STATIC-DB* directly so this
+  ;; geometry helper remains usable whether or not the calling technology has a translated
+  ;; query over COUPLED.  Stable endpoint ordering keeps every downstream crossing identity
+  ;; reproducible across runs.
+  (let ((pairs (loop for key being the hash-keys of *static-db*
+                     when (and (consp key) (eq (first key) 'coupled))
+                       collect (list (second key) (third key)))))
+    (sort pairs (lambda (left right)
+                  (if (string= (symbol-name (first left)) (symbol-name (first right)))
+                    (string< (symbol-name (second left)) (symbol-name (second right)))
+                    (string< (symbol-name (first left)) (symbol-name (first right))))))))
 
 
 (define-types
@@ -161,10 +178,8 @@
 (defun beam-coordinates-boundary-segments (boundary-points)
   ;; Converts an explicitly closed BOUNDARY-WALL point list into wall-shaped
   ;; (name x1 y1 x2 y2) records, one per consecutive polygon edge.  Fed into
-  ;; DERIVE-LOS-FROM-SEGMENTS below as unconditional LOS blockers
-  ;; alongside WALL-SEGMENT>: a sightline that would have to leave the map's own
-  ;; silhouette is never a real beam.  A wall's name is never read by BEAM-COORDINATES-
-  ;; LOS-OCCLUDERS (only a gate's is), so a plain edge index suffices.
+  ;; DERIVE-LOS-FROM-SEGMENTS below as finite barriers alongside WALL-SEGMENT>.  A plain
+  ;; edge index provides stable identity within this one boundary polygon.
   (loop for (point1 point2) on boundary-points
         while point2
         for edge-index from 1
@@ -175,8 +190,8 @@
 
 (defun beam-coordinates-obstacle-intersection-parameter (beam positions obstacle &optional endpoints-block)
   ;; Returns BEAM's own parameter (0 < t < 1) where OBSTACLE -- an (name x1 y1 x2 y2)
-  ;; segment record gathered from WALL-SEGMENT>/GATE-SEGMENT> facts -- blocks BEAM's
-  ;; interior, or nil if it doesn't.  Strict on BEAM's own side always: BEAM's own
+  ;; wall, edge, gate, or boundary segment record -- crosses BEAM's interior, or nil if it
+  ;; doesn't.  Strict on BEAM's own side always: BEAM's own
   ;; endpoint touching OBSTACLE is never itself a crossing (see the error clause below
   ;; instead).  On OBSTACLE's side, ENDPOINTS-BLOCK controls whether OBSTACLE's own
   ;; endpoint also counts: nil (the default; gates use this) keeps the strict reading,
@@ -189,7 +204,7 @@
   ;;
   ;; Errors if BEAM's own endpoint -- a location or fixture's authored position -- lies
   ;; exactly on OBSTACLE's own segment, corner or interior: a fixture must always be
-  ;; offset off every wall/gate it sits beside, never placed on one, so this is an
+  ;; offset off every segment barrier it sits beside, never placed on one, so this is an
   ;; authoring mistake to catch, not a case to silently resolve either way.
   (let* ((position1 (beam-coordinates-position (first beam) positions))
          (position2 (beam-coordinates-position (second beam) positions))
@@ -215,7 +230,7 @@
                            denominator)))
         (when (and (<= 0 parameter2 1) (or (zerop parameter1) (= parameter1 1)))
           (error "Beam endpoint ~A lies exactly on obstacle ~A; offset the fixture or ~
-                  location off the wall/gate instead of leaving it on one."
+                  location off the barrier segment instead of leaving it on one."
                  (if (zerop parameter1) (first beam) (second beam))
                  (first obstacle)))
         (when (and (< 0 parameter1 1)
@@ -223,30 +238,50 @@
           parameter1)))))
 
 
-(defun beam-coordinates-los-occluders (beam positions walls gates)
-  ;; Tests BEAM -- a (source destination) los-endpoint pair -- against the problem's
-  ;; WALL-SEGMENT> and GATE-SEGMENT> facts.  Returns the keyword :BLOCKED if any wall blocks
-  ;; BEAM's interior -- including at the wall's own corner, since walls are tested with
-  ;; ENDPOINTS-BLOCK true -- meaning no LOS fact should be asserted for it at all;
-  ;; otherwise returns the (possibly empty) list of gate names whose segment properly
-  ;; intersects BEAM's interior, strict at the gate's own corner (left to its
-  ;; neighboring wall) -- BEAM's occluder list.  A LOS-TO-TARGET beam's own first
-  ;; endpoint is that gate's own name, standing in for BEAM-COORDINATES-GATE-MIDPOINT
-  ;; (a gate has no APPARATUS-COORDS> of its own) -- so a gate is always skipped against a
-  ;; beam it is itself an endpoint of, or its own midpoint would trip BEAM-COORDINATES-
-  ;; OBSTACLE-INTERSECTION-PARAMETER's lies-exactly-on-obstacle error every time, not
-  ;; because of any authoring mistake.  A single return value, not multiple values:
-  ;; CHECK-VARIABLE-NAMES, run on an init-action's effect (unlike a query/update body,
-  ;; which it never checks), only recognizes ASSIGN/BIND/MVSETQ as $-variable-
-  ;; establishing forms, not MV-ASSIGN.
-  (if (some (lambda (wall)
-              (beam-coordinates-obstacle-intersection-parameter beam positions wall t))
-            walls)
-    :blocked
-    (loop for gate in gates
-          when (and (not (member (first gate) beam :test #'eql))
-                    (beam-coordinates-obstacle-intersection-parameter beam positions gate))
-            collect (first gate))))
+(defun beam-coordinates-barrier-crossing-records
+    (beam positions obstacles kind endpoints-block)
+  ;; One stable record per 2D crossing: (kind identity beam-parameter x1 y1 x2 y2).
+  ;; BEAM is oriented exactly like LOS-BARRIER-CROSSINGS>, so the stored parameter can be
+  ;; applied directly to the caller's near and far elevations at runtime.
+  (loop for obstacle in obstacles
+        for endpoint-gate = (and (eql kind :gate)
+                                 (member (first obstacle) beam :test #'eql))
+        for parameter = (unless endpoint-gate
+                          (beam-coordinates-obstacle-intersection-parameter
+                            beam positions obstacle endpoints-block))
+          when parameter
+            collect (list kind (first obstacle) parameter
+                          (second obstacle) (third obstacle)
+                          (fourth obstacle) (fifth obstacle))))
+
+
+(defun beam-coordinates-barrier-crossings
+    (beam positions walls edges boundary-segments gates)
+  ;; Retains every crossing rather than deleting the whole 2D sightline.  Wall, edge, and
+  ;; boundary endpoints count as crossings; gate endpoints remain strict because their
+  ;; neighboring solid segment owns the shared corner.
+  (append
+    (beam-coordinates-barrier-crossing-records beam positions walls :wall t)
+    (beam-coordinates-barrier-crossing-records beam positions edges :edge t)
+    (beam-coordinates-barrier-crossing-records
+      beam positions boundary-segments :boundary t)
+    (beam-coordinates-barrier-crossing-records beam positions gates :gate nil)))
+
+
+(defun beam-coordinates-gate-occluders (crossings)
+  (loop for crossing in crossings
+        when (eql (first crossing) :gate)
+          collect (second crossing)))
+
+
+(defun beam-coordinates-reverse-crossings (crossings)
+  ;; Used for the reverse direction of a symmetric location sightline.  Geometry and
+  ;; identity remain unchanged; only the oriented beam parameter changes.
+  (mapcar (lambda (crossing)
+            (list (first crossing) (second crossing) (- 1 (third crossing))
+                  (fourth crossing) (fifth crossing)
+                  (sixth crossing) (seventh crossing)))
+          crossings))
 
 
 (defun beam-coordinates-location-occluders (beam positions locations tolerance)
@@ -276,7 +311,7 @@
   ;; True iff LOCATION-POSITION's own orthogonal projection onto BEAM's line falls strictly
   ;; between BEAM's two endpoints and its perpendicular distance from that line is within
   ;; TOLERANCE -- strict at BEAM's own endpoints exactly like BEAM-COORDINATES-OBSTACLE-
-  ;; INTERSECTION-PARAMETER's own wall/gate test: a location standing at (or beyond) either
+  ;; INTERSECTION-PARAMETER's own segment-barrier test: a location standing at (or beyond) either
   ;; endpoint is never its own occluder.  Coincident 2D endpoints have no interior horizontal
   ;; segment, so no location can occlude between them; this occurs legitimately when two
   ;; locations represent different elevations at the same map coordinates.  Compares squared
@@ -361,7 +396,7 @@
 
 (define-init-action derive-los-from-segments
   ;; Derives LOS-TO-APPARATUS/LOS-TO-LOCATION, and LOS-TO-TARGET/gun's LOS-TO-APPARATUS
-  ;; entries when a jammer is present, from WALL-SEGMENT>/GATE-SEGMENT> raw segment
+  ;; entries when a jammer is present, from wall/edge/gate/boundary raw segment
   ;; geometry, when the problem supplies it, instead of requiring them hand-authored.
   ;; LOS-TO-TARGET and gun's LOS-TO-APPARATUS entries are both gated on (exists (?j
   ;; jammer) t): nothing but jam-target ever consumes a location<->gate or location<->gun
@@ -370,12 +405,12 @@
   ;; entries use BEAM-COORDINATES-GATE-MIDPOINT as their reference point, since a gate is
   ;; authored as an extended segment rather than
   ;; a point endpoint.  When the problem also asserts BOUNDARY-WALL, each polygon edge
-  ;; (BEAM-COORDINATES-BOUNDARY-SEGMENTS) is folded into the wall list, so a sightline that
-  ;; would have to cut outside the map's own silhouette is blocked exactly like a wall --
-  ;; any consequence for a beam this blocks (eg, a connector losing its light) is resolved
-  ;; the normal way, since this init-action runs before the problem's own INITIALIZE-
+  ;; (BEAM-COORDINATES-BOUNDARY-SEGMENTS) is retained alongside internal wall, edge, and gate
+  ;; crossings.  Ordinary sight treats solid crossings as opaque; beam and elevated-jammer
+  ;; sight evaluates their vertical span at runtime.  This init-action runs before the
+  ;; problem's own INITIALIZE-
   ;; DERIVED-STATE calls PROPAGATE-CHANGES!.  Runs only when the problem has asserted
-  ;; WALL-SEGMENT> or EDGE-SEGMENT> -- inert otherwise, so a problem that hand-authors its
+  ;; WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its
   ;; own LOS facts instead is unaffected.  Defined here, textually before
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
@@ -394,86 +429,102 @@
   (or (exists (?wall wall)
         (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
       (exists (?edge edge)
-        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2))))
+        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2)))
+      (bind (boundary-wall $some-boundary-points)))
   ()
   (assert
-    (do (assign $walls (append (wall-segment-records) (edge-segment-records)))
+    (do (assign $walls (wall-segment-records))
+        (assign $edges (edge-segment-records))
         (assign $gates (gate-segment-records))
-        (assign $boundary-walls
+        (assign $boundary-segments
                 (if (bind (boundary-wall $boundary-points))
                   (beam-coordinates-boundary-segments $boundary-points)))
-        (assign $all-walls (append $walls $boundary-walls))
         (assign $positions (beam-coordinates-endpoint-positions))
         (assign $target-positions
                 (append (beam-coordinates-gate-positions $gates) $positions))
         (assign $locations (gethash 'location *types*))
         (doall (?location location)
           (doall (?transmitter transmitter)
-            (do (assign $occluders
-                        (beam-coordinates-los-occluders
-                          (list ?transmitter ?location) $positions $all-walls $gates))
-                (if (not (eql $occluders :blocked))
-                  (do (assign $location-occluders
-                              (beam-coordinates-location-occluders
-                                (list ?transmitter ?location) $positions $locations
-                                *beam-occlusion-tolerance*))
-                      (los-to-apparatus ?location
-                                        (append $occluders $location-occluders)
-                                        ?transmitter))))))
+            (do (assign $beam (list ?location ?transmitter))
+                (assign $crossings
+                        (beam-coordinates-barrier-crossings
+                          $beam $positions $walls $edges $boundary-segments $gates))
+                (assign $location-occluders
+                        (beam-coordinates-location-occluders
+                          $beam $positions $locations *beam-occlusion-tolerance*))
+                (los-to-apparatus ?location
+                                  (append (beam-coordinates-gate-occluders $crossings)
+                                          $location-occluders)
+                                  ?transmitter)
+                (los-barrier-crossings> ?location $crossings ?transmitter))))
         (doall (?location location)
           (doall (?receiver receiver)
-            (do (assign $occluders
-                        (beam-coordinates-los-occluders
-                          (list ?location ?receiver) $positions $all-walls $gates))
-                (if (not (eql $occluders :blocked))
-                  (do (assign $location-occluders
-                              (beam-coordinates-location-occluders
-                                (list ?location ?receiver) $positions $locations
-                                *beam-occlusion-tolerance*))
-                      (los-to-apparatus ?location
-                                        (append $occluders $location-occluders)
-                                        ?receiver))))))
+            (do (assign $beam (list ?location ?receiver))
+                (assign $crossings
+                        (beam-coordinates-barrier-crossings
+                          $beam $positions $walls $edges $boundary-segments $gates))
+                (assign $location-occluders
+                        (beam-coordinates-location-occluders
+                          $beam $positions $locations *beam-occlusion-tolerance*))
+                (los-to-apparatus ?location
+                                  (append (beam-coordinates-gate-occluders $crossings)
+                                          $location-occluders)
+                                  ?receiver)
+                (los-barrier-crossings> ?location $crossings ?receiver))))
         (doall (?location location)
           (doall (?repeater repeater)
-            (do (assign $occluders
-                        (beam-coordinates-los-occluders
-                          (list ?location ?repeater) $positions $all-walls $gates))
-                (if (not (eql $occluders :blocked))
-                  (do (assign $location-occluders
-                              (beam-coordinates-location-occluders
-                                (list ?location ?repeater) $positions $locations
-                                *beam-occlusion-tolerance*))
-                      (los-to-apparatus ?location
-                                        (append $occluders $location-occluders)
-                                        ?repeater))))))
+            (do (assign $beam (list ?location ?repeater))
+                (assign $crossings
+                        (beam-coordinates-barrier-crossings
+                          $beam $positions $walls $edges $boundary-segments $gates))
+                (assign $location-occluders
+                        (beam-coordinates-location-occluders
+                          $beam $positions $locations *beam-occlusion-tolerance*))
+                (los-to-apparatus ?location
+                                  (append (beam-coordinates-gate-occluders $crossings)
+                                          $location-occluders)
+                                  ?repeater)
+                (los-barrier-crossings> ?location $crossings ?repeater))))
         (if (exists (?j jammer) t)
           (do (doall (?location location)
                 (doall (?gate gate)
-                  (do (assign $occluders
-                              (beam-coordinates-los-occluders
-                                (list ?gate ?location) $target-positions $all-walls $gates))
-                      (if (not (eql $occluders :blocked))
-                        (los-to-target ?location $occluders ?gate)))))
+                  (do (assign $beam (list ?location ?gate))
+                      (assign $crossings
+                              (beam-coordinates-barrier-crossings
+                                $beam $target-positions $walls $edges
+                                $boundary-segments $gates))
+                      (los-to-target ?location
+                                     (beam-coordinates-gate-occluders $crossings)
+                                     ?gate)
+                      (los-barrier-crossings> ?location $crossings ?gate))))
               (doall (?location location)
                 (doall (?gun gun)
-                  (do (assign $occluders
-                              (beam-coordinates-los-occluders
-                                (list ?location ?gun) $positions $all-walls $gates))
-                      (if (not (eql $occluders :blocked))
-                        (los-to-apparatus ?location $occluders ?gun)))))))
+                  (do (assign $beam (list ?location ?gun))
+                      (assign $crossings
+                              (beam-coordinates-barrier-crossings
+                                $beam $positions $walls $edges $boundary-segments $gates))
+                      (los-to-apparatus ?location
+                                        (beam-coordinates-gate-occluders $crossings)
+                                        ?gun)
+                      (los-barrier-crossings> ?location $crossings ?gun))))))
         (doall (?source location)
           (doall (?destination location)
             (if (member ?destination
                         (rest (member ?source (gethash 'location *types*))))
-              (do (assign $occluders
-                          (beam-coordinates-los-occluders
-                            (list ?source ?destination) $positions $all-walls $gates))
-                  (if (not (eql $occluders :blocked))
-                    (do (assign $location-occluders
-                                (beam-coordinates-location-occluders
-                                  (list ?source ?destination) $positions $locations
-                                  *beam-occlusion-tolerance*))
-                        (los-to-location ?source
-                                          (append $occluders $location-occluders)
-                                          ?destination)))))))
+              (do (assign $beam (list ?source ?destination))
+                  (assign $crossings
+                          (beam-coordinates-barrier-crossings
+                            $beam $positions $walls $edges $boundary-segments $gates))
+                  (assign $location-occluders
+                          (beam-coordinates-location-occluders
+                            $beam $positions $locations *beam-occlusion-tolerance*))
+                  (los-to-location ?source
+                                   (append (beam-coordinates-gate-occluders $crossings)
+                                           $location-occluders)
+                                   ?destination)
+                  (los-barrier-crossings> ?source $crossings ?destination)
+                  (los-barrier-crossings>
+                    ?destination
+                    (beam-coordinates-reverse-crossings $crossings)
+                    ?source)))))
         (convert-databases-to-integers))))

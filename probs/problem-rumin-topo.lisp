@@ -118,17 +118,17 @@
 
   ;; Nondefault elevations.  Other locations, gates, and screens default to 0.
   ;; Transmitters and receivers default to elevation 1.
-  (has-elevation location4 1)
-  (has-elevation location9 2)
-  (has-elevation location10 2)
-  (has-elevation gate4 2)
+  (has-elevation location4 3/2)
+  (has-elevation location9 3/2)
+  (has-elevation location10 3/2)
+  (has-elevation gate4 3/2)
   (has-elevation receiver1 2)
 
   ;; Nondefault heights.
-  (has-height wall10 1)
-  (has-height wall11 1)
-  (has-height wall12 1)
-  (has-height wall13 1)
+  (has-height wall10 3/2)
+  (has-height wall11 3/2)
+  (has-height wall12 3/2)
+  (has-height wall13 3/2)
 
   ;; Gate controllers
   (controls ((receiver1)) gate1 normal)

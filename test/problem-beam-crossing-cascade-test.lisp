@@ -91,7 +91,7 @@
 ;;;; required even though this problem has no sightlines: beam-crossing nests
 ;;;; -beam-crossing-coordinates, which nests -beam-los-coordinates, whose
 ;;;; DERIVE-LOS-FROM-SEGMENTS references LOS-TO-APPARATUS/LOS-TO-LOCATION -- relations
-;;;; only visibility declares.  It stays inert here since no WALL-SEGMENT> facts are authored.
+;;;; only visibility declares.  It stays inert here since no segment-barrier geometry is authored.
 
 
 (include-tech repeater)

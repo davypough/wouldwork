@@ -220,14 +220,12 @@
        (jammer $any-jammer)
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
-       (or (and (or (gate ?target) (gun ?target))
-                (visible-for-object ?agent ?location ?target))
-           (and (or (floor-gears ?target) (wall-gears ?target))
-                (bind (has-position ?target $t-location))
-                (or (eql ?location $t-location)
-                    (visible-for-object ?agent ?location $t-location))))
        (assign $places
-               (placement-options ?agent ?location $any-jammer)))
+               (placement-options ?agent ?location $any-jammer))
+       (assign $visible-places
+               (jammer-visible-placement-options
+                 ?agent ?location $any-jammer ?target $places))
+       (not (null $visible-places)))
   "Drops JAM-TARGET's authored disallowance guard.  The disallowed pairing probe
    must then make this characterization fail.")
 

@@ -4,17 +4,17 @@
 ;;; -beam-los-coordinates role.  Independent horizontal bands characterize:
 ;;;
 ;;;   1. Empty-corridor LOS to a transmitter, receiver, and fixed repeater.
-;;;   2. Complete LOS removal at a wall interior and exactly at a wall endpoint.
+;;;   2. Structural LOS retained across finite walls, with ordinary sight opaque and beam
+;;;      clearance decided from crossing height (including exact-top blocking).
 ;;;   3. Exact gate occluder lists for open and closed gates, plus the strict
 ;;;      gate-endpoint case that must not add an occluder.
 ;;;   4. Location occlusion exactly at the inclusive 1/2-unit tolerance, while
 ;;;      excluding a farther location and locations projected at an endpoint.
-;;;   5. A concave BOUNDARY-WALL blocking a sightline that leaves and re-enters
-;;;      the polygon even though both endpoints are inside it.
+;;;   5. A concave BOUNDARY-WALL retaining both crossings of a sightline that leaves and
+;;;      re-enters the polygon, with its own default height 6.
 ;;;   6. Jammer-only gate-target and gun derivation, including the deliberate
 ;;;      absence of intervening locations from those two occluder lists.
-;;;   7. Complete LOS removal by an edge, identical to a wall -- confirming
-;;;      EDGE-SEGMENT> feeds the same occluder test as WALL-SEGMENT>.
+;;;   7. Finite-height edge clearance, while ordinary sight remains opaque.
 ;;;
 ;;; The goal is the characterization query itself.  No action or propagation is
 ;;; needed: DERIVE-LOS-FROM-SEGMENTS establishes the static LOS tables during
@@ -100,9 +100,10 @@
   ;; exactly on its lane, exercising the inclusive wall-endpoint convention.
   (wall-segment> interior-wall 5 9 5 11)
   (wall-segment> corner-wall 5 20 5 22)
+  (has-height interior-wall 2)
 
-  ;; An edge blocks LOS in its interior exactly like a wall does -- EDGE-SEGMENT>
-  ;; feeds the same $ALL-WALLS occluder list DERIVE-LOS-FROM-SEGMENTS builds.
+  ;; An edge has the same finite-height LOS model as a wall.  It remains excluded from
+  ;; jumping because it is not a vaultable feature.
   (edge-segment> interior-edge 5 69 5 71)
 
   ;; CLOSED-GATE and OPEN-GATE properly cross their lanes.  CORNER-GATE begins
@@ -190,15 +191,31 @@
     (visible clear-site clear-receiver)
     (visible clear-site clear-repeater)
 
-    ;; Walls remove the LOS fact entirely, including at the wall's own endpoint.
-    (not (potentially-visible wall-interior-site wall-interior-receiver))
+    ;; Walls retain structural pairing but remain opaque to ordinary sight.  INTERIOR-WALL
+    ;; explicitly overrides the default with height 2; equality blocks and 3 clears.
+    (potentially-visible wall-interior-site wall-interior-receiver)
     (not (visible wall-interior-site wall-interior-receiver))
-    (not (potentially-visible wall-corner-site wall-corner-receiver))
-    (not (visible wall-corner-site wall-corner-receiver))
+    (bind (los-barrier-crossings>
+            wall-interior-site $wall-crossings wall-interior-receiver))
+    (equal $wall-crossings '((:wall interior-wall 1/2 5 9 5 11)))
+    (beam-visible wall-interior-site -1 wall-interior-receiver -1)
+    (not (beam-visible wall-interior-site 2 wall-interior-receiver 2))
+    (beam-visible wall-interior-site 3 wall-interior-receiver 3)
 
-    ;; An edge removes the LOS fact entirely too, exactly like a wall.
-    (not (potentially-visible edge-interior-site edge-interior-receiver))
+    ;; CORNER-WALL has no declared height and therefore defaults to 4.  Its own endpoint
+    ;; remains inclusive in 2D, just as before.
+    (potentially-visible wall-corner-site wall-corner-receiver)
+    (not (visible wall-corner-site wall-corner-receiver))
+    (= (declared-height corner-wall) 4)
+    (not (beam-visible wall-corner-site 4 wall-corner-receiver 4))
+    (beam-visible wall-corner-site 5 wall-corner-receiver 5)
+
+    ;; An undeclared edge defaults to height 3/2.
+    (potentially-visible edge-interior-site edge-interior-receiver)
     (not (visible edge-interior-site edge-interior-receiver))
+    (= (declared-height interior-edge) 3/2)
+    (not (beam-visible edge-interior-site 3/2 edge-interior-receiver 3/2))
+    (beam-visible edge-interior-site 5/2 edge-interior-receiver 5/2)
 
     ;; Proper gate crossings retain structural LOS with exact conditional occluders.
     (bind (los-to-apparatus
@@ -207,12 +224,15 @@
     (potentially-visible closed-gate-site closed-gate-receiver)
     (not (visible closed-gate-site closed-gate-receiver))
     (not (open closed-gate))
+    (not (beam-visible closed-gate-site 4 closed-gate-receiver 4))
+    (beam-visible closed-gate-site 5 closed-gate-receiver 5)
 
     (bind (los-to-apparatus
             open-gate-site $open-occluders open-gate-receiver))
     (equal $open-occluders '(open-gate))
     (potentially-visible open-gate-site open-gate-receiver)
     (visible open-gate-site open-gate-receiver)
+    (beam-visible open-gate-site 1 open-gate-receiver 1)
     (open open-gate)
 
     ;; A gate intersection at the gate segment's endpoint is deliberately strict.
@@ -235,11 +255,20 @@
             tolerance-left $coincident-occluders tolerance-endpoint))
     (null $coincident-occluders)
 
-    ;; Both endpoints are inside the boundary, but their beam crosses the open notch.
-    (not (potentially-visible boundary-left boundary-right))
-    (not (potentially-visible boundary-right boundary-left))
+    ;; Both endpoints are inside the boundary, but their line leaves and re-enters through
+    ;; the notch.  Both oriented crossing records are retained.  Ordinary sight is opaque;
+    ;; a beam at the default top 6 blocks and one strictly above it clears.
+    (potentially-visible boundary-left boundary-right)
+    (potentially-visible boundary-right boundary-left)
     (not (visible boundary-left boundary-right))
     (not (visible boundary-right boundary-left))
+    (bind (los-barrier-crossings>
+            boundary-left $boundary-crossings boundary-right))
+    (= (length $boundary-crossings) 2)
+    (not (beam-visible boundary-left 6 boundary-right 6))
+    (beam-visible boundary-left 7 boundary-right 7)
+    (not (beam-visible boundary-right 6 boundary-left 6))
+    (beam-visible boundary-right 7 boundary-left 7)
 
     ;; Gate midpoint/self-segment handling and the jammer-specific exclusions:
     ;; intervening locations do not enter target-gate or gun occluder lists.
