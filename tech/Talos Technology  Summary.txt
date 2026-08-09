@@ -24,6 +24,7 @@ recorder
 screen
 toggle-plate
 transmitter
+tray
 wall
 wall-gears
 wall-repeater
@@ -35,20 +36,20 @@ apparatus (either transmitter receiver floor-repeater wall-repeater gun)
 beam-blocker (either agent box jammer connector)
 los-endpoint (either transmitter receiver floor-repeater wall-repeater gun location)
 beam-node (either transmitter receiver floor-repeater wall-repeater location)
-cargo (either box jammer connector fan)
+cargo (either box jammer connector fan tray)
 elevated-object (either location gate screen wall transmitter receiver wall-gears floor-repeater wall-repeater)
 fixed-beam-source (either transmitter floor-repeater wall-repeater)
 fixed-beam-sink (either floor-repeater wall-repeater receiver)
 fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wall-gears angled-gears recorder)
 gears (either floor-gears wall-gears angled-gears)
 heighted-object (either box gate agent screen wall jammer connector floor-repeater wall-repeater)
-mobile-object (either agent box jammer connector fan)
+mobile-object (either agent box jammer connector fan tray)
 plate (either pressure-plate toggle-plate)
 relay (either connector floor-repeater wall-repeater)
 repeater (either floor-repeater wall-repeater)
 steppable-object (either pressure-plate toggle-plate fan)
 support (either pressure-plate toggle-plate box fan)
-support-occupant (either agent box jammer connector fan)
+support-occupant (either agent box jammer connector fan tray)
 target (either gate floor-gears wall-gears gun)
 terminus (either transmitter receiver connector floor-repeater wall-repeater)
 threat (either gun)
@@ -119,20 +120,23 @@ vaultable-object (either gate screen wall)
 (pickup-connector ">" ?agent "picks up" ?connector "at" $a-location)
 (pickup-fan ">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
 (pickup-jammer ">" ?agent "picks up" ?jammer "at" $a-location)
+(pickup-tray ">" ?agent "picks up" ?tray "at" $tray-location "from" $a-location)
 (put-box ">" ?agent "puts" ?box "on" $place "at" ?location)
 (put-connector ">" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
 (put-fan ">" ?agent "puts" ?fan "on" $place "at" ?location)
+(put-jammer ">" ?agent "puts" ?jammer "on" $place "at" ?location "without jamming")
+(put-tray ">" ?agent "puts" ?tray "on" $place "at" ?location)
 
 6. Default Type Heights
 
 agent 1
 box 1
 connector 1
-gate 3
+gate 4
 jammer 1
 repeater 1
-screen 3
-wall 3
+screen 4
+wall 4
 
 7. Default Type Elevations
 

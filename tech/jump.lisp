@@ -78,10 +78,10 @@
 
 
 (define-query jump-barrier-height (?feature vaultable-object)
-  ;; Explicit heights override the default of 3 for gates, screens, and walls.
+  ;; Explicit heights override the default of 4 for gates, screens, and walls.
   (if (bind (has-height ?feature $height))
     $height
-    3))
+    4))
 
 
 (define-query jump-barrier-top-elevation (?feature vaultable-object)

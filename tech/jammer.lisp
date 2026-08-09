@@ -6,7 +6,9 @@
 ;;; update-gun-status!) -- the same override with opposite polarity in each case: a jam
 ;;; always disables the barrier or threat.  A placed jammer is movable cargo: it may rest
 ;;; on a plate (depressing it) or a clear box top, and picking it up clears both its
-;;; jamming and its support.
+;;; jamming and its support.  Put-jammer places it inertly -- no target required --
+;;; exactly mirroring put-connector's relationship to connect-connector; jam-target is
+;;; the active variant that also establishes jamming.
 ;;;
 ;;; REQUIRES (supplied by other techs):
 ;;;   types     : agent, location; plate comes from nested -plate-types, while jammer
@@ -26,7 +28,7 @@
 ;;;               jam; connector pairings use beam-relay's terminus instead
 ;;;   relations : (jamming jammer $target)
 ;;;               (jam-disallowed> location location target)
-;;;   actions   : pickup-jammer, jam-target
+;;;   actions   : pickup-jammer, put-jammer, jam-target
 
 (include-tech -placement)
 (include-tech -reachability)
@@ -65,6 +67,20 @@
           (if (bind (on ?jammer $support))
             (not (on ?jammer $support)))
           (finally (propagate-changes!))))
+
+
+(define-action put-jammer
+  1
+  (?agent agent ?jammer jammer ?location location)
+  (and (holding ?agent ?jammer)
+       (bind (has-location ?agent $a-location))
+       (reachable ?location $a-location)
+       (assign $places (placement-options ?agent ?location ?jammer)))
+  (">" ?agent "puts" ?jammer "on" $place "at" ?location "without jamming")
+  (ww-loop for $placement-option in $places
+           do (assert (assign $place $placement-option)
+                      (place-held-object! ?agent ?jammer ?location $placement-option)
+                      (finally (propagate-changes!)))))
 
 
 (define-action jam-target
