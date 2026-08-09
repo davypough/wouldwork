@@ -36,7 +36,10 @@
   test-phase (phase0 phase1 phase2 phase3 phase4))
 
 
-(include-tech recorder)
+;; This characterizes recorder mechanics without installing the public solution policy.
+(include-tech -recorder-gate-shadow)
+(include-tech -recorder-wall-gears-shadow)
+(include-tech -recorder-init-checks)
 (include-tech plate)
 (include-tech gate)
 (include-tech beam-direct)

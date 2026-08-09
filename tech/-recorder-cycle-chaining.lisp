@@ -83,7 +83,7 @@
   "Require a fresh serial baseline and active recorder candidate validation."
   (validate-continuation-preconditions)
   (unless (member 'validate-recorder-solution *solution-validators*)
-    (error "Recorder cycle solving requires (enable-recorder-solution) in the problem."))
+    (error "Recorder cycle solving requires the services installed by (include-tech recorder)."))
   (when *solutions-valid*
     (error "A completed solution is still active. Undo or stage a fresh recorder chain ~
             before starting another recorder cycle."))

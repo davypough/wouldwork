@@ -30,9 +30,6 @@
 (include-tech walkability)
 
 
-(enable-recorder-solution)
-
-
 (define-init
   (recording-copy> operator-alpha playback-echo)
   (recording-copy> operator-beta playback-beta)

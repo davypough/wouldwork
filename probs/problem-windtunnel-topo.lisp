@@ -51,9 +51,6 @@
 (include-tech recorder)
 
 
-(enable-recorder-solution)
-
-
 ;;;; INITIALIZATION ;;;;
 
 

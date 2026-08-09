@@ -37,9 +37,6 @@
 (include-tech walkability)
 
 
-(enable-recorder-solution)
-
-
 (define-init
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-box ghost-box)

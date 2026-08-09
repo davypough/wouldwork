@@ -32,7 +32,11 @@
   location (recorder-site away-site))
 
 
-(include-tech recorder)
+;; This characterizes shadow preparation without installing the public solution policy.
+(include-tech -recorder-gate-shadow)
+(include-tech -recorder-wall-gears-shadow)
+(include-tech -recorder-cycle-boundary)
+(include-tech -recorder-init-checks)
 (include-tech plate)
 (include-tech gate)
 (include-tech beam-direct)

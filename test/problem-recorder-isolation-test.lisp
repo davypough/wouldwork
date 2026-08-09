@@ -3,8 +3,9 @@
 ;;; Zero-action characterization of recorder cross-layer isolation.  It exercises the
 ;;; installed generic pickup and connector actions in the initial state, inspects exact
 ;;; placement and physical-landing choices, and probes malformed initial HOLDING, ON, and
-;;; PAIRED facts.  Recorder is included first to verify that nested-hook deduplication keeps
-;;; its overrides in force when the shared action technologies are spliced later.
+;;; PAIRED facts.  Recorder's private shadow components are included first to verify that
+;;; nested-hook deduplication keeps their overrides in force when the shared action
+;;; technologies are spliced later.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -46,7 +47,9 @@
 ;;;; TECHNOLOGY INCLUDES ;;;;
 
 
-(include-tech recorder)
+(include-tech -recorder-gate-shadow)
+(include-tech -recorder-wall-gears-shadow)
+(include-tech -recorder-init-checks)
 (include-tech plate)
 (include-tech box)
 (include-tech floor-blower)

@@ -2,18 +2,18 @@
 
 ;;; Public recorder assembly.  Problems continue to write only (include-tech recorder).
 ;;; Identity and interaction isolation live in -recorder-core; each supported apparatus
-;;; owns a private recording-shadow component; solution-time validation/reporting and the
-;;; whole-problem support envelope remain separate services.
+;;; owns a private recording-shadow component.  Including this public assembly also installs
+;;; recorder-specific candidate validation, solution reporting, and goal chaining after all
+;;; of their implementations have been defined.
 ;;;
-;;; Recorder cycle chaining is explicit rather than planner-native.  After
-;;; ENABLE-RECORDER-SOLUTION, each SOLVE-SUBGOAL searches and commits at most one intermediate
-;;; recording cycle, and the following SOLVE searches and commits the final cycle.  An initial
-;;; SOLVE remains an ordinary whole-problem search.  Every searched cycle physically returns
-;;; its ghosts to a recorder before its integrated playback state can become a boundary.  An
-;;; intermediate commit preserves that playback state, discards the completed program, and
-;;; prepares a fresh capability-owned recording shadow for the next call.  Cycles are optimized
-;;; only within their own searches; the retained history and cumulative metrics do not imply
-;;; global optimality or completeness.
+;;; Recorder cycle chaining is explicit rather than planner-native.  Each SOLVE-SUBGOAL
+;;; searches and commits at most one intermediate recording cycle, and the following SOLVE
+;;; searches and commits the final cycle.  An initial SOLVE remains an ordinary whole-problem
+;;; search.  Every searched cycle physically returns its ghosts to a recorder before its
+;;; integrated playback state can become a boundary.  An intermediate commit preserves that
+;;; playback state, discards the completed program, and prepares a fresh capability-owned
+;;; recording shadow for the next call.  Cycles are optimized only within their own searches;
+;;; the retained history and cumulative metrics do not imply global optimality or completeness.
 ;;;
 ;;; The component order preserves the established propagation seed:
 ;;; ordinary receiver state, recording plate state, recording receiver state, recording
@@ -51,3 +51,13 @@
 (include-tech -recorder-init-checks)
 
 (in-package :ww)
+
+
+;; These registries are reset before every stage.  Keeping installation at the end of the
+;; public assembly scopes the complete recorder policy to problems that include RECORDER and
+;; guarantees that every registered implementation has already been defined.
+(register-solution-validator 'validate-recorder-solution)
+(register-solution-report-printer 'print-recorder-report)
+(register-goal-chaining-policy
+  'solve-recorder-subgoal-form
+  'solve-recorder-final)

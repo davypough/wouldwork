@@ -38,9 +38,6 @@
 (include-tech gate)
 
 
-(enable-recorder-solution)
-
-
 (define-dynamic-relations
   (current-cycle-status cycle-status))
 

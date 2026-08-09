@@ -64,9 +64,6 @@
 (include-tech visibility)
 (include-tech reachability)
 
-(enable-recorder-solution)
-
-
 ;;;; INITIALIZATION ;;;;
 
 

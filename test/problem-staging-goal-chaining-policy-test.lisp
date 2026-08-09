@@ -31,7 +31,9 @@
 
 (define-test-claim staging-clears-goal-chaining-policy
   (and (boundp '*goal-chaining-policy*)
-       (null (symbol-value '*goal-chaining-policy*))))
+       (null (symbol-value '*goal-chaining-policy*))
+       (null *solution-validators*)
+       (null *solution-report-printers*)))
 
 
 (define-goal

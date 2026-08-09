@@ -31,9 +31,6 @@
 (include-tech plate)
 
 
-(enable-recorder-solution)
-
-
 (define-dynamic-relations
   (cycle-at cycle-stage))
 

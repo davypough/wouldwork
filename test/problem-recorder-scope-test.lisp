@@ -28,7 +28,10 @@
   location (source-site destination-site))
 
 
-(include-tech recorder)
+;; This characterizes recorder mechanics without installing the public solution policy.
+(include-tech -recorder-gate-shadow)
+(include-tech -recorder-wall-gears-shadow)
+(include-tech -recorder-init-checks)
 (include-tech plate)
 (include-tech wall-blower)
 

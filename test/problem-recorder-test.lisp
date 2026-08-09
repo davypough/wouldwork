@@ -44,6 +44,8 @@
 
 (define-init
   (has-position recorder1 recorder-site)
+  (has-location live-agent recorder-site)
+  (has-location ghost-agent recorder-site)
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-connector ghost-connector))
 
@@ -58,8 +60,15 @@
   ;; Membership, not the full union roster: another technology may add a fixed kind.
   (expect-type-component 'fixed-position-object 'recorder)
   (expect-type-instance 'fixed-position-object 'recorder1)
-  (expect-registrations :solution-validator nil)
-  (expect-registrations :solution-printer nil))
+  (expect-registrations
+    :solution-validator '(validate-recorder-solution))
+  (expect-registrations
+    :solution-printer '(print-recorder-report))
+  (goal-chaining-policy-p *goal-chaining-policy*)
+  (eq (goal-chaining-policy-subgoal-solver *goal-chaining-policy*)
+      'solve-recorder-subgoal-form)
+  (eq (goal-chaining-policy-final-solver *goal-chaining-policy*)
+      'solve-recorder-final))
 
 
 (define-test-claim recorder-validation
