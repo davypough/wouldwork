@@ -202,5 +202,5 @@
 
 
 (define-goal
-  (open gate5)
+  (open gate1)
 )
