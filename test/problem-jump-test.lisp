@@ -28,7 +28,9 @@
 ;;; exclusive ownership of grounded jumps by mobility rather than the configuration-
 ;;; transition substrate, and rejection of an edge instance from a JUMP-VIA feature list --
 ;;; VAULTABLE-OBJECT deliberately excludes edge, since an edge has no independent "top" to
-;;; vault onto.
+;;; vault onto.  The move-type tag itself is also characterized: a genuinely vaulting
+;;; transition (lane 4) is tagged VAULT, while a non-empty but fully passable feature list
+;;; (the remote-mount canonicalization contract below) still tags JUMP.
 ;;;
 ;;; Expected minimum solution (6 steps, in any interleaving): mount vault-box; cross
 ;;; vault-start -> vault-goal; drop from drop-box; cross transfer-start -> transfer-goal
@@ -259,6 +261,9 @@
 
 
 (define-test-claim jump-configuration-canonicalization-contract
+  ;; PASSABLE-SCREEN never required clearance for this empty-handed agent, so the winning
+  ;; candidate's move-type tag is JUMP despite its non-empty feature list -- the tag
+  ;; reflects genuine clearance need, not mere feature-list presence.
   (equal
     (configuration-transition-results
       *start-state* 'remote-mount-agent)
@@ -330,7 +335,7 @@
              (mobility-results carrying-agent carry-approach))
       '(carry-goal
          ((stairs carry-approach nil carry-start)
-          (jump carry-start (cargo-screen vault-wall) carry-goal))))
+          (vault carry-start (cargo-screen vault-wall) carry-goal))))
 
     ;; Inclusive upward boundary and just-over rejection for the fixed, agent-independent
     ;; elevation limit; unrestricted downward movement.

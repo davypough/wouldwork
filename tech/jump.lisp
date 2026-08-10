@@ -13,6 +13,10 @@
 ;;; non-passable screens, and walls contribute their top elevations; a multi-feature jump
 ;;; must clear the highest feature that is not currently passable, within that same fixed
 ;;; elevation limit.
+;;; Each produced segment or transition is tagged JUMP when nothing required clearance, or
+;;; VAULT when some feature genuinely did (accounting for passability) -- a move-type label
+;;; a printed route displays alongside WALK, STAIRS, and CLIMB; it does not affect
+;;; feasibility.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and wall are declared optional here
@@ -135,7 +139,9 @@
 
 (define-problem-helper jump-segment-for-features
     (state agent source destination features)
-  "Return a normalized JUMP segment for a feasible grounded traversal."
+  "Return a normalized JUMP or VAULT segment for a feasible grounded traversal.  The
+   move-type tag is VAULT when some feature genuinely required clearance for this agent,
+   else JUMP."
   (let ((canonical-features (canonical-enabling-means features))
         (source-elevation
           (funcall (symbol-function 'location-elevation) state source))
@@ -147,7 +153,11 @@
             (funcall (symbol-function 'jump-elevation-reachable)
                      state agent source-elevation target-elevation)
             (funcall (symbol-function 'safe) state destination))
-      (list 'jump source canonical-features destination))))
+      (list (if (funcall (symbol-function 'jump-required-clearance-height)
+                         state agent canonical-features)
+              'vault
+              'jump)
+            source canonical-features destination))))
 
 
 (define-query jump-traversal-segments (?agent agent ?from location)
@@ -176,7 +186,9 @@
 (define-problem-helper jump-configuration-transition-for-features
     (state agent source-configuration source-elevation
            destination-configuration target-elevation features)
-  "Return one feasible support-changing JUMP transition across an authored edge."
+  "Return one feasible support-changing JUMP or VAULT transition across an authored edge.
+   The move-type tag is VAULT when some feature genuinely required clearance for this
+   agent, else JUMP."
   (let ((canonical-features (canonical-enabling-means features))
         (destination (first destination-configuration)))
     (when (and
@@ -185,7 +197,11 @@
             (funcall (symbol-function 'jump-elevation-reachable)
                      state agent source-elevation target-elevation)
             (funcall (symbol-function 'safe) state destination))
-      (list 'jump source-configuration canonical-features
+      (list (if (funcall (symbol-function 'jump-required-clearance-height)
+                         state agent canonical-features)
+              'vault
+              'jump)
+            source-configuration canonical-features
             destination-configuration))))
 
 
