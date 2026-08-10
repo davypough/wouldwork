@@ -658,18 +658,18 @@
     (t nil)))
 
 
-;;;; GENERATION-TIME FILTERING (LOCAL STRATEGY) ;;;;
+;;;; GENERATION-TIME FILTERING ;;;;
 
 
 (defun filter-symmetric-instantiations (action instantiations state)
-  "Filter INSTANTIATIONS to remove symmetric equivalents.
+  "Filter symmetric action instantiations using exact committed row ordering.
    For graph search with canonical hashing: returns all instantiations
-   (closed list handles symmetry via canonical hash equality).
-   For tree/backtracking: uses committed-ordering approach.
-   Returns filtered list of instantiations."
+   (closed list handles symmetry via canonical hash equality) -- generation-time
+   filtering there checked far more instantiations than it pruned relative to
+   the closed-list's own yield, at a real per-node allocation cost.
+   For tree/backtracking: uses the committed-ordering approach below."
   (unless *symmetry-pruning*
     (return-from filter-symmetric-instantiations instantiations))
-  ;; For graph search with canonical hashing, closed list handles symmetry
   (when (use-canonical-symmetry-p)
     (return-from filter-symmetric-instantiations instantiations))
   (let ((param-indices (gethash (action.name action) *symmetric-type-parameters*)))
@@ -950,14 +950,6 @@
     best))
 
 
-(defun compute-canonical-idb-hash (idb)
-  "Compute an exact permutation-invariant hash of IDB."
-  (declare (type hash-table idb))
-  (ww-with-timing :symm/canon-hash
-    (ldb (byte 62 0)
-         (deep-sxhash (build-exact-canonical-idb-form idb)))))
-
-
 ;;;; STATISTICS AND REPORTING ;;;;
 
 
@@ -1068,7 +1060,7 @@
   (when *symmetry-pruning*
     (detect-symmetry-groups)
     (when (and (boundp '*start-state*) *start-state*)
-      (setf (problem-state.idb-hash *start-state*) nil))
+      (invalidate-problem-state-hash *start-state*))
     (cond
       (*symmetry-families*
        (format t "~2%Symmetry families detected: ~D~%" (length *symmetry-families*))

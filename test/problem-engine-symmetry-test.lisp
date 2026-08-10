@@ -2,7 +2,7 @@
 
 ;;; Ordinary one-column symmetry characterization.  This is the non-recorder counterpart
 ;;; to problem-recorder-symmetry-test: exchanging TOKEN-1 and TOKEN-2 is a safe static
-;;; automorphism and produces the same canonical state.  Expected minimum path length: zero.
+;;; automorphism and produces the same canonical state.  Expected minimum path length: one.
 
 (in-package :ww)
 
@@ -14,7 +14,7 @@
 (ww-set *depth-cutoff* 1)
 (ww-set *symmetry-pruning* t)
 
-(setf *expected-min-length* 0)
+(setf *expected-min-length* 1)
 
 
 (define-types
@@ -76,7 +76,7 @@
         (delete-proposition proposition idb)))
     (add-proposition `(token-at token-1 ,token-1-site) idb)
     (add-proposition `(token-at token-2 ,token-2-site) idb)
-    (setf (problem-state.idb-hash state) nil)
+    (invalidate-problem-state-hash state)
     state))
 
 
@@ -100,6 +100,72 @@
                   'token-1 'token-2 undistinguished))))))
 
 
+(define-test-claim split-symmetry-hash-contract
+  (let ((base (engine-symmetry-state 'site-1 'site-2))
+        (swapped (engine-symmetry-state 'site-2 'site-1)))
+    (let ((base-hash (ensure-idb-hash base))
+          (swapped-hash (ensure-idb-hash swapped)))
+      (and (= base-hash swapped-hash)
+           (= (hash-table-count (problem-state.idb base)) 4)
+           (= (hash-table-count (problem-state.symmetry-idb base)) 2)
+           (equal (problem-state.canonical-symmetry-form base)
+                  (problem-state.canonical-symmetry-form swapped))))))
+
+
+(define-test-claim split-closed-duplicate-contract
+  (let* ((base (engine-symmetry-state 'site-1 'site-2))
+         (swapped (engine-symmetry-state 'site-2 'site-1))
+         (fixed-difference (engine-symmetry-state 'site-1 'site-2))
+         (table (make-hash-table :test #'eql))
+         (prior-pruned *symmetric-duplicates-pruned*))
+    (unwind-protect
+        (progn
+          (add-proposition '(coded-token-at coded-token-1 site-2)
+                           (problem-state.idb fixed-difference))
+          (ensure-idb-hash base)
+          (ensure-idb-hash swapped)
+          (ensure-idb-hash fixed-difference)
+          (setf (problem-state.idb-hash fixed-difference)
+                (problem-state.idb-hash base))
+          (let ((entry (make-closed-entry base 0)))
+            (closed-bucket-insert entry base 0 table)
+            (and (eq (closed-bucket-find swapped 0 table) entry)
+                 (null (closed-bucket-find fixed-difference 0 table)))))
+      (setf *symmetric-duplicates-pruned* prior-pruned))))
+
+
+(define-test-claim split-effect-carry-contract
+  (let* ((state (engine-symmetry-state 'site-1 'site-2))
+         (action (find 'relocate-token *actions* :key #'action.name)))
+    (ensure-idb-hash state)
+    (let* ((pre-result
+             (funcall (action.pre-defun-name action)
+                      state 'token-1 'site-2))
+           (update
+             (first
+               (apply (action.eff-defun-name action)
+                      state pre-result)))
+           (child (create-action-state action state update))
+           (carried-slice (update.symmetry-idb update)))
+      (and (null (problem-state.idb-hash child))
+           (= (problem-state.fixed-idb-hash child)
+              (update.fixed-idb-hash update))
+           (eq (problem-state.symmetry-idb child) carried-slice)
+           (progn
+             (ensure-idb-hash child)
+             (eq (problem-state.symmetry-idb child) carried-slice))))))
+
+
+(define-test-claim split-hash-invalidation-contract
+  (let ((state (engine-symmetry-state 'site-1 'site-2)))
+    (ensure-idb-hash state)
+    (invalidate-problem-state-hash state)
+    (and (null (problem-state.idb-hash state))
+         (null (problem-state.fixed-idb-hash state))
+         (null (problem-state.symmetry-idb state))
+         (eq (problem-state.canonical-symmetry-form state) :uncached))))
+
+
 (define-goal
-  (exists (?token token)
+  (forall (?token token)
     (token-at ?token site-1)))

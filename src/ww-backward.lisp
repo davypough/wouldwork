@@ -73,7 +73,7 @@
     (dolist (prop (bw--all-props state))
       (when (eql (car prop) relation)
         (delete-proposition prop idb))))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 
@@ -83,7 +83,7 @@
     (dolist (prop (bw--all-props state))
       (when (funcall predicate prop)
         (delete-proposition prop idb))))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 
@@ -91,7 +91,7 @@
   "Ensure (CURRENT-BEAMS ()) exists, and no other CURRENT-BEAMS proposition exists."
   (bw--delete-props-by-relation! state 'current-beams)
   (add-proposition '(current-beams ()) (problem-state.idb state))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 
@@ -133,7 +133,7 @@ Intended for REPL experiments (e.g., pasting a validator printout)."
                      (eql relations :all)
                      (member (car p) relations)))
         (add-proposition p (problem-state.idb st))))
-    (setf (problem-state.idb-hash st) nil)
+    (invalidate-problem-state-hash st)
     st))
 
 
@@ -226,7 +226,7 @@ Returns STATE (mutated)."
     (let (forward-list inverse-list)
       (declare (special forward-list inverse-list))
       (funcall (symbol-function normalizer) state)))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 
@@ -265,7 +265,7 @@ Action instance: (MOVE agent from to)."
      pred (lambda (p) (and (eql (car p) 'loc)
                            (eql (second p) agent))))
     (add-proposition (list 'loc agent from) idb)
-    (setf (problem-state.idb-hash pred) nil)
+    (invalidate-problem-state-hash pred)
     (list pred)))
 
 
@@ -320,7 +320,7 @@ Forward validation filters inconsistent candidates."
             ;; Respect relation typing: (paired connector terminus).
             ;; Do not synthesize reverse (paired term connector) facts.
             (add-proposition (list 'paired connector term) idb))
-          (setf (problem-state.idb-hash pred) nil)
+          (invalidate-problem-state-hash pred)
           (push pred results))))
     (nreverse results)))
 
@@ -362,7 +362,7 @@ Other facts are preserved from TARGET-STATE."
               (and (eql (car p) 'paired)
                    (or (eql (second p) cargo)
                        (eql (third p) cargo)))))
-      (setf (problem-state.idb-hash pred) nil)
+      (invalidate-problem-state-hash pred)
       (list pred))))
 
 

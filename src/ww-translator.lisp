@@ -953,20 +953,36 @@ predicates stay unknown because their argument may or may not be an instance."
 
 
 (defun translate-assert (form flag)
-  "For depth-first, translates an assert statement with selective write-mode context."
+  "For depth-first, translate an assert while carrying the active state hash components."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let* ((parent-hash (unless (use-canonical-symmetry-p)  ;seed incremental idb-hash from parent (standard mode only)
-                                (ensure-idb-hash state)))
+    (pre `(let* ((canonical-p (use-canonical-symmetry-p))
+                 (parent-hash (ensure-idb-hash state))
+                 (parent-canonical-form (problem-state.canonical-symmetry-form state))
+                 (parent-canonical-form-hash (problem-state.canonical-form-hash state))
                  (state (copy-problem-state state))
-                 (*idb-hash-acc* parent-hash))  ;NIL here disables folding (canonical-symmetry mode)
+                 (*idb-hash-acc* (unless canonical-p parent-hash))
+                 (*fixed-idb-hash-acc* (when canonical-p
+                                         (problem-state.fixed-idb-hash state)))
+                 (*symmetry-idb-acc* (when canonical-p
+                                       (problem-state.symmetry-idb state)))
+                 (*symmetry-idb-touched-p* nil))
             ,@(mapcar (lambda (statement)
                         ;; Bind read-mode to nil only for direct assert statements
                         (let ((*proposition-read-mode* nil))
                           (translate statement 'eff)))
                       (cdr form))
             (push (make-update :changes (problem-state.idb state)
-                               :hash *idb-hash-acc*  ;carry incremental hash out of the effect
+                               :hash *idb-hash-acc*
+                               :fixed-idb-hash *fixed-idb-hash-acc*
+                               :symmetry-idb *symmetry-idb-acc*
+                               :canonical-symmetry-form
+                                 (if (and canonical-p (not *symmetry-idb-touched-p*))
+                                     parent-canonical-form
+                                     :uncached)
+                               :canonical-form-hash
+                                 (when (and canonical-p (not *symmetry-idb-touched-p*))
+                                   parent-canonical-form-hash)
                                :value ,(if *objective-value-p*
                                          '$objective-value
                                          0.0)

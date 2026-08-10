@@ -16,7 +16,11 @@
   (heuristic 0.0 :type real)
   (idb (make-hash-table) :type hash-table)  ;integer hash table of propositions
   (hidb (make-hash-table) :type hash-table)  ;integer table for happening events
-  (idb-hash nil :type (or null fixnum)))  ;hash fixnum representing an idb
+  (idb-hash nil :type (or null fixnum))  ;final hash used for graph identity
+  (fixed-idb-hash nil :type (or null fixnum))  ;incremental hash of propositions outside symmetry families
+  (symmetry-idb nil :type (or null hash-table))  ;propositions that reference symmetry-family objects
+  (canonical-symmetry-form :uncached :type (or list (eql :uncached)))  ;canonical form of symmetry-idb
+  (canonical-form-hash nil :type (or null fixnum)))  ;memoized hash of canonical-symmetry-form; cleared whenever the form is
 ;Note: hidb is separate from idb because otherwise each exogenous event will change
 ;the state, leading to endless revisiting of the same similar state
 ;Note: happenings contains an entry for each object's next event, updated as events occur
@@ -97,7 +101,12 @@
       :heuristic (problem-state.heuristic state)
       :idb (copy-idb (problem-state.idb state))
       :hidb (copy-idb (problem-state.hidb state))
-      :idb-hash nil))
+      :idb-hash nil
+      :fixed-idb-hash (problem-state.fixed-idb-hash state)
+      :symmetry-idb (when (problem-state.symmetry-idb state)
+                      (copy-idb (problem-state.symmetry-idb state)))
+      :canonical-symmetry-form :uncached
+      :canonical-form-hash nil))
 
 
 (defun copy-problem-state-without-idb (state)
@@ -112,7 +121,11 @@
     :heuristic (problem-state.heuristic state)
     :idb (make-hash-table :test 'eql :synchronized nil)
     :hidb (copy-idb (problem-state.hidb state))
-    :idb-hash nil))  ; will be recomputed when alist is created
+    :idb-hash nil
+    :fixed-idb-hash nil
+    :symmetry-idb nil
+    :canonical-symmetry-form :uncached
+    :canonical-form-hash nil))  ; will be recomputed when alist is created
 
 
 (defun copy-idb (idb)
@@ -127,6 +140,17 @@
                          v)))
              idb)
     new-idb))
+
+
+(defun invalidate-problem-state-hash (state)
+  "Clear every cached hash component after STATE's IDB changes outside folding."
+  (declare (type problem-state state))
+  (setf (problem-state.idb-hash state) nil
+        (problem-state.fixed-idb-hash state) nil
+        (problem-state.symmetry-idb state) nil
+        (problem-state.canonical-symmetry-form state) :uncached
+        (problem-state.canonical-form-hash state) nil)
+  state)
 
 
 (defparameter *start-state* (make-problem-state)
@@ -164,7 +188,11 @@
   (instantiations nil :type list)
   (followups nil :type list)    ;next & finally followup function calls
   (sim-state nil)               ;strategic-wait simulation state
-  (hash nil :type (or null fixnum)))  ;incremental idb-hash carried out of the effect (nil = recompute downstream)
+  (hash nil :type (or null fixnum))  ;incremental standard idb-hash carried out of the effect
+  (fixed-idb-hash nil :type (or null fixnum))  ;incremental fixed component in canonical mode
+  (symmetry-idb nil :type (or null hash-table))  ;symmetric slice carried out of the effect
+  (canonical-symmetry-form :uncached :type (or list (eql :uncached)))  ;parent's form, carried forward when the slice is untouched
+  (canonical-form-hash nil :type (or null fixnum)))  ;parent's memoized form-hash, carried forward alongside it
 
 
 (defstruct (solution (:conc-name solution.))

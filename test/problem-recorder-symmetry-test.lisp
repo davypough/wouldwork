@@ -69,7 +69,7 @@
     (loop for object in objects
           for location in (list live-1-site ghost-1-site live-2-site ghost-2-site)
           do (add-proposition `(has-location ,object ,location) idb))
-    (setf (problem-state.idb-hash state) nil)
+    (invalidate-problem-state-hash state)
     state))
 
 
@@ -108,6 +108,19 @@
          (not (equal
                 (build-canonical-idb-form (problem-state.idb base))
                 (build-canonical-idb-form (problem-state.idb live-only-swap)))))))
+
+
+(define-test-claim recorder-symmetry-split-hash-contract
+  (let ((base
+          (recorder-symmetry-state 'site-1 'site-1 'site-2 'site-2))
+        (live-only-swap
+          (recorder-symmetry-state 'site-2 'site-1 'site-1 'site-2))
+        (paired-swap
+          (recorder-symmetry-state 'site-2 'site-2 'site-1 'site-1)))
+    (and (= (ensure-idb-hash base)
+            (ensure-idb-hash paired-swap))
+         (canonical-state-equal-p base paired-swap)
+         (not (canonical-state-equal-p base live-only-swap)))))
 
 
 (define-test-claim recorder-symmetry-local-state-contract

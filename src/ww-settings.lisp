@@ -529,6 +529,22 @@ treat their arguments as read-only and be safe to call concurrently."
    without rescanning the whole idb. NIL disables folding, leaving non-effect database
    paths (init, propagation, replay) untouched. Per-effect/per-thread dynamic binding.")
 
+
+(defvar *fixed-idb-hash-acc* nil
+  "Running XOR hash of entries outside symmetry families during canonical effects.")
+
+
+(defvar *symmetry-idb-acc* nil
+  "Running symmetric IDB slice during canonical effects.")
+
+
+(defvar *symmetry-idb-touched-p* nil
+  "Set by fold-store/fold-remove when the active canonical effect writes a
+   symmetry-family-referencing entry. NIL afterward means the symmetric slice
+   is unchanged, so the parent's canonical form can be carried forward instead
+   of rebuilt.")
+
+
 (defvar *validate-idb-hash* nil
   "Debug gate. When T, every successor's incrementally-carried idb-hash is checked
    against a full compute-idb-hash rescan (validate-carried-hash); a mismatch signals

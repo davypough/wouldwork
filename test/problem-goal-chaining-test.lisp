@@ -59,8 +59,8 @@
         (delete-proposition proposition (problem-state.idb state))))
     (add-proposition `(chain-at ,stage) (problem-state.idb state))
     (setf (problem-state.time state) time
-          (problem-state.value state) value
-          (problem-state.idb-hash state) nil)
+          (problem-state.value state) value)
+    (invalidate-problem-state-hash state)
     state))
 
 

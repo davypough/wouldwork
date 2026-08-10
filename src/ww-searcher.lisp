@@ -70,14 +70,40 @@
 
 
 (defun ensure-idb-hash (state)
-  "Ensures the idb-hash is computed and cached for the given state.
-   When canonical symmetry is active (graph search with symmetry pruning),
-   computes a permutation-invariant hash so symmetric states hash identically.
-   Returns the state's idb-hash."
-  (unless (problem-state.idb-hash state)
-    (setf (problem-state.idb-hash state)
-          (if (use-canonical-symmetry-p)
-              (compute-canonical-idb-hash (problem-state.idb state))
+  "Ensure STATE carries its graph hash and canonical split components when active."
+  (if (use-canonical-symmetry-p)
+      (progn
+        (unless (problem-state.symmetry-idb state)
+          (let ((fixed-hash 0)
+                (symmetry-idb (make-hash-table :test #'eql :synchronized nil)))
+            (maphash
+              (lambda (key value)
+                (if (idb-entry-references-symmetry-p key value)
+                    (setf (gethash key symmetry-idb) value)
+                    (setf fixed-hash
+                          (logxor fixed-hash
+                                  (deep-sxhash (cons key value))))))
+              (problem-state.idb state))
+            (setf (problem-state.fixed-idb-hash state) fixed-hash
+                  (problem-state.symmetry-idb state) symmetry-idb)))
+        (when (eq (problem-state.canonical-symmetry-form state) :uncached)
+          (setf (problem-state.canonical-symmetry-form state)
+                (build-canonical-idb-form
+                  (problem-state.symmetry-idb state))
+                (problem-state.canonical-form-hash state) nil))
+        (unless (problem-state.canonical-form-hash state)
+          (setf (problem-state.canonical-form-hash state)
+                (ww-with-timing :symm/canon-hash
+                  (ldb (byte 62 0)
+                       (deep-sxhash
+                         (problem-state.canonical-symmetry-form state))))))
+        (unless (problem-state.idb-hash state)
+          (setf (problem-state.idb-hash state)
+                (logxor
+                  (problem-state.fixed-idb-hash state)
+                  (problem-state.canonical-form-hash state)))))
+      (unless (problem-state.idb-hash state)
+        (setf (problem-state.idb-hash state)
               (compute-idb-hash (problem-state.idb state)))))
   (problem-state.idb-hash state))
 
@@ -242,7 +268,7 @@
     (hs::push-hstack start-node *open* :new-only (eq *tree-or-graph* 'graph))
     ;; Reserve start state in *closed* for graph search (maintains consistency with process-successors)
     (when (eql *tree-or-graph* 'graph)
-      (setf (problem-state.idb-hash *start-state*) nil)  ;discard any hash cached during init-action processing (idb is mutated in place afterward)
+      (invalidate-problem-state-hash *start-state*)
       (ensure-idb-hash *start-state*)
       (let ((closed-table (if (> *threads* 0)
                               (closed-shard *start-state*)
@@ -821,21 +847,6 @@
                carried full state)))))
 
 
-(defun canonical-idb-equal-p (idb1 idb2)
-  "Check if two idb hash-tables are equal under canonical symmetry.
-   Returns T if the states are identical or symmetric permutations.
-   For non-symmetric mode, uses standard equalp comparison."
-  (declare (type hash-table idb1 idb2))
- (ww-with-timing :symm/canon-equal
-  (if (use-canonical-symmetry-p)
-      ;; Canonical comparison: build canonical forms and compare
-      (let ((canon1 (build-canonical-idb-form idb1))
-            (canon2 (build-canonical-idb-form idb2)))
-        (equal canon1 canon2))
-      ;; Standard comparison
-      (equalp idb1 idb2))))
-
-
 (defun build-canonical-idb-form (idb)
   "Build the exact row-permutation canonical representation of IDB."
   (declare (type hash-table idb))
@@ -856,27 +867,68 @@
                       (prin1-to-string k2))))))
 
 
+(defun fixed-idb-equal-p (idb1 slice1 idb2 slice2)
+  "Whether IDB1 and IDB2 contain exactly the same entries outside their cached
+   symmetry slices SLICE1 and SLICE2. Membership in the slice stands in for
+   re-deriving each entry's symmetry-family status, so this scans each idb once."
+  (declare (type hash-table idb1 slice1 idb2 slice2))
+  (unless (= (- (hash-table-count idb1) (hash-table-count slice1))
+             (- (hash-table-count idb2) (hash-table-count slice2)))
+    (return-from fixed-idb-equal-p nil))
+  (maphash
+    (lambda (key value)
+      (unless (nth-value 1 (gethash key slice1))
+        (multiple-value-bind (other-value present-p) (gethash key idb2)
+          (unless (and present-p
+                       (not (nth-value 1 (gethash key slice2)))
+                       (equalp value other-value))
+            (return-from fixed-idb-equal-p nil)))))
+    idb1)
+  t)
+
+
+(defun canonical-state-equal-p (state1 state2)
+  "Whether STATE1 and STATE2 are exactly equal under the active row permutations."
+  (declare (type problem-state state1 state2))
+  (ensure-idb-hash state1)
+  (ensure-idb-hash state2)
+  (or (equalp (problem-state.idb state1)
+              (problem-state.idb state2))
+      (ww-with-timing :symm/canon-equal
+        (and
+          (equal (problem-state.canonical-symmetry-form state1)
+                 (problem-state.canonical-symmetry-form state2))
+          (fixed-idb-equal-p (problem-state.idb state1)
+                              (problem-state.symmetry-idb state1)
+                              (problem-state.idb state2)
+                              (problem-state.symmetry-idb state2))))))
+
+
 (defun closed-bucket-find (state depth table)
   "Return the entry in TABLE for STATE at DEPTH, or NIL if absent.
-   Walks the bucket at (closed-key state depth) and verifies state identity
-   with equalp on idb. In canonical-symmetry mode, falls back to canonical-form
-   comparison on equalp miss, lazily caching the canonical form on the entry.
+   Verify concrete identity first, then cached canonical-slice equality, then
+   exact fixed-part equality in canonical mode. Neither the canonical form nor
+   the symmetry slice is rebuilt during bucket lookup.
    CALLER MUST HOLD THE APPROPRIATE SHARD LOCK in parallel mode."
   (let ((bucket (gethash (closed-key state depth) table)))
     (when bucket
       (let ((succ-idb (problem-state.idb state))
+            (succ-canonical-form
+              (problem-state.canonical-symmetry-form state))
+            (succ-symmetry-idb (problem-state.symmetry-idb state))
             (canonical-mode (use-canonical-symmetry-p)))
         (find-if (lambda (entry)
                    (let ((closed-idb (first entry)))
                      (cond ((equalp closed-idb succ-idb) t)
                            ((not canonical-mode) nil)
-                           (t (let ((closed-canon (fifth entry)))
-                                (unless closed-canon
-                                  (setf (fifth entry) (build-canonical-idb-form closed-idb))
-                                  (setf closed-canon (fifth entry)))
-                                (when (equal (build-canonical-idb-form succ-idb) closed-canon)
-                                  (increment-global *symmetric-duplicates-pruned*)
-                                  t))))))
+                           (t
+                            (ww-with-timing :symm/canon-equal
+                              (when (and
+                                      (equal (fifth entry) succ-canonical-form)
+                                      (fixed-idb-equal-p closed-idb (sixth entry)
+                                                          succ-idb succ-symmetry-idb))
+                                (increment-global *symmetric-duplicates-pruned*)
+                                t))))))
                  bucket)))))
 
 
@@ -905,20 +957,28 @@
 
 
 (defun make-closed-entry (state depth &optional node)
-  "Build the value stored in *closed* for STATE at DEPTH.
-   PH3A: adds a CANON-FORM slot (initially NIL) for lazy canonical-form caching."
-  (if *hybrid-mode*
-      (list (problem-state.idb state)
-            depth
-            (problem-state.time state)
-            (problem-state.value state)
-            nil          ; <-- PH3A: cached canonical form goes here
-            node)
-      (list (problem-state.idb state)
-            depth
-            (problem-state.time state)
-            (problem-state.value state)
-            nil)))
+  "Build a closed entry, including STATE's cached canonical form and symmetry
+   slice when active, so later comparisons never re-derive them."
+  (let ((canonical-form
+          (when (use-canonical-symmetry-p)
+            (problem-state.canonical-symmetry-form state)))
+        (symmetry-idb
+          (when (use-canonical-symmetry-p)
+            (problem-state.symmetry-idb state))))
+    (if *hybrid-mode*
+        (list (problem-state.idb state)
+              depth
+              (problem-state.time state)
+              (problem-state.value state)
+              canonical-form
+              symmetry-idb
+              node)
+        (list (problem-state.idb state)
+              depth
+              (problem-state.time state)
+              (problem-state.value state)
+              canonical-form
+              symmetry-idb))))
 
 
 (defun get-closed-values (state depth)
@@ -940,7 +1000,7 @@
                                        (closed-shard state)
                                        *closed*))))
     (when entry
-      (sixth entry))))
+      (seventh entry))))
 
 
 (defun goal (state)
@@ -1726,9 +1786,8 @@
                            (ensure-idb-hash existing-goal)
                            (and (= (problem-state.idb-hash existing-goal)
                                    goal-hash)
-                                (canonical-idb-equal-p
-                                 (problem-state.idb goal-state)
-                                 (problem-state.idb existing-goal)))))
+                                (canonical-state-equal-p
+                                  goal-state existing-goal))))
                        *hybrid-goals*)
           (narrate "Duplicate solution found (via symmetry) ***" goal-state goal-depth)
           (increment-global *repeated-states*)

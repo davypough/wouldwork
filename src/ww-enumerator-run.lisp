@@ -2095,7 +2095,7 @@ If the user answers NO, returns immediately."
     (dolist (p propositions)
       (when (consp p)
         (add-proposition p (problem-state.idb st))))
-    (setf (problem-state.idb-hash st) nil)
+    (invalidate-problem-state-hash st)
     st))
 
 

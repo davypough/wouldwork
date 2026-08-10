@@ -69,8 +69,8 @@
      (when update
        (revise (problem-state.idb *backtrack-state*) update)))
     (hash-table
-     (setf (problem-state.idb *backtrack-state*) (copy-idb update)
-           (problem-state.idb-hash *backtrack-state*) nil))))
+     (setf (problem-state.idb *backtrack-state*) (copy-idb update))))
+  (invalidate-problem-state-hash *backtrack-state*))
 
 
 (defun apply-update-inverse-bt (update)
@@ -81,8 +81,8 @@
      (when update
        (revise (problem-state.idb *backtrack-state*) update)))
     (hash-table
-     (setf (problem-state.idb *backtrack-state*) (copy-idb update)
-           (problem-state.idb-hash *backtrack-state*) nil))))
+     (setf (problem-state.idb *backtrack-state*) (copy-idb update))))
+  (invalidate-problem-state-hash *backtrack-state*))
 
 
 (defun search-backtracking ()

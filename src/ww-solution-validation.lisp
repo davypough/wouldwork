@@ -466,7 +466,7 @@ to the search's candidate-validation diagnostics."
       (apply (car followup) state+ (cdr followup))
       (let ((updated-idb (problem-state.idb state+)))
         (setf (problem-state.idb state) updated-idb))))
-  (setf (problem-state.idb-hash state) nil))                 ; clear stale hash
+  (invalidate-problem-state-hash state))
 
 
 (defun apply-update-to-state (state update action)
@@ -496,7 +496,8 @@ to the search's candidate-validation diagnostics."
   (setf (problem-state.instantiations state)
         (copy-tree (update.instantiations update)))
   (incf (problem-state.time state) (action.duration action))
-  (setf (problem-state.value state) (update.value update)))
+  (setf (problem-state.value state) (update.value update))
+  (invalidate-problem-state-hash state))
 
 
 (defun find-combination-var-groups (precondition-params)

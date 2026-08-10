@@ -81,13 +81,13 @@
 
 (define-test-helper delete-recorder-boundary-fact! (state proposition)
   (delete-proposition proposition (problem-state.idb state))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 
 (define-test-helper add-recorder-boundary-fact! (state proposition)
   (add-proposition proposition (problem-state.idb state))
-  (setf (problem-state.idb-hash state) nil)
+  (invalidate-problem-state-hash state)
   state)
 
 

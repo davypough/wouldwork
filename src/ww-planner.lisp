@@ -31,7 +31,7 @@
                    (setf (gethash key state-idb) val)
                    (setf (gethash (convert-to-proposition key) *db*) val))))
              changes)
-    (setf (problem-state.idb-hash state) nil)))
+    (invalidate-problem-state-hash state)))
 
 
 (defun do-init-action-updates (state)
@@ -278,7 +278,7 @@
               (*happening-names*  ;note that act-state = state+
                (ut::mvs (net-state new-state) (amend-happenings state act-state))  ;check for violation
                (when net-state  ;happenings mutate idb outside the folded path; force hash recompute
-                 (setf (problem-state.idb-hash net-state) nil)))
+                 (invalidate-problem-state-hash net-state)))
               ;; Normal actions without happenings
               (t
                (setf net-state act-state)
@@ -310,8 +310,7 @@
 
 
 (defun create-action-state (action state updated-db)  ;if action is non-wait
-  "Creates a new wait or non-wait state.
-   For strategic-wait: extracts time and happenings from sim-state in update."
+  "Create a new state and carry hash components produced by its action effect."
   (let* ((new-state-idb (update.changes updated-db))
          (new-state-instantiations (cond 
                                      ((eql (action.name action) 'wait)
@@ -330,7 +329,9 @@
                                     (problem-state.time state))) 
                                 (t (action.duration action))))
          (new-happenings (when (eql (action.name action) 'strategic-wait)
-                           (problem-state.happenings sim-state))))
+                           (problem-state.happenings sim-state)))
+         (carry-hash-components-p
+           (not (eql (problem-state.name state) 'wait))))
     (when (eql (problem-state.name state) 'wait)
       (remhash (gethash 'waiting *constant-integers*) new-state-idb))  ;if prior was wait
     (make-problem-state
@@ -340,8 +341,17 @@
        :time (+ (problem-state.time state) new-action-duration)
        :value (update.value updated-db)
        :idb new-state-idb
-       :idb-hash (unless (eql (problem-state.name state) 'wait)  ;carry incremental hash; NIL after a wait-remhash forces downstream recompute
-                   (update.hash updated-db)))))
+       :idb-hash (when carry-hash-components-p
+                   (update.hash updated-db))
+       :fixed-idb-hash (when carry-hash-components-p
+                         (update.fixed-idb-hash updated-db))
+       :symmetry-idb (when carry-hash-components-p
+                       (update.symmetry-idb updated-db))
+       :canonical-symmetry-form (if carry-hash-components-p
+                                   (update.canonical-symmetry-form updated-db)
+                                   :uncached)
+       :canonical-form-hash (when carry-hash-components-p
+                               (update.canonical-form-hash updated-db)))))
 
 
 (defun get-wait-happenings (state)
@@ -363,13 +373,19 @@
 (defun process-followups (net-state updated-db)
   "Triggering forms are saved previously during effect apply.
    Followups execute on post-happening state, seeing cumulative changes.
-   With no followups (the common case) net-state already carries its correct idb-hash,
-   so return immediately without copying state or rehashing."
+   With no followups, NET-STATE already carries its correct hash components."
   (declare (ignorable updated-db))
   (unless (update.followups updated-db)  ;nothing to do; carried hash already describes net-state
     (validate-carried-hash net-state)
     (return-from process-followups net-state))
-  (let ((*idb-hash-acc* (problem-state.idb-hash net-state)))  ;thread carried hash through followup mutations (NIL = recompute downstream)
+  (let* ((canonical-p (use-canonical-symmetry-p))
+         (*idb-hash-acc* (unless canonical-p
+                           (problem-state.idb-hash net-state)))
+         (*fixed-idb-hash-acc* (when canonical-p
+                                 (problem-state.fixed-idb-hash net-state)))
+         (*symmetry-idb-acc* (when canonical-p
+                               (problem-state.symmetry-idb net-state)))
+         (*symmetry-idb-touched-p* nil))
     (iter (with state+ = (copy-problem-state-without-idb net-state))
           (initially (setf (problem-state.idb state+) (problem-state.idb net-state)))
           (for followup in (update.followups updated-db))
@@ -380,7 +396,15 @@
           #+:ww-debug (when (>= *debug* 4)
                         (ut::prt (list-database updated-idb)))
           (setf (problem-state.idb net-state) updated-idb)
-      (finally (setf (problem-state.idb-hash net-state) *idb-hash-acc*)  ;carry threaded hash
+      (finally (setf (problem-state.idb-hash net-state) *idb-hash-acc*
+                     (problem-state.fixed-idb-hash net-state) *fixed-idb-hash-acc*
+                     (problem-state.symmetry-idb net-state) *symmetry-idb-acc*)
+               ;; NET-STATE already carries create-action-state's canonical form (the
+               ;; parent's, if the action's own assert left the slice untouched); only
+               ;; invalidate it here if a followup (e.g. propagate-changes!) touched it.
+               (when *symmetry-idb-touched-p*
+                 (setf (problem-state.canonical-symmetry-form net-state) :uncached
+                       (problem-state.canonical-form-hash net-state) nil))
                (validate-carried-hash net-state)  ;debug gate (no-op unless *validate-idb-hash*)
                (return-from process-followups net-state)))))
 

@@ -268,36 +268,89 @@
     changed))
 
 
+(defun symmetry-object-in-tree-p (tree)
+  "Whether a cons tree contains an object registered in a symmetry family."
+  (cond ((consp tree)
+         (or (symmetry-object-in-tree-p (car tree))
+             (symmetry-object-in-tree-p (cdr tree))))
+        (t
+         (nth-value 1 (gethash tree *object-to-symmetry-membership*)))))
+
+
+(defun encoded-idb-key-references-symmetry-p (key)
+  "Whether integer IDB KEY encodes an object registered in a symmetry family."
+  (loop with remaining = key
+        do (multiple-value-bind (next code) (truncate remaining 1000)
+             (when (nth-value 1
+                     (gethash (gethash code *integer-constants*)
+                              *object-to-symmetry-membership*))
+               (return t))
+             (when (zerop next)
+               (return nil))
+             (setf remaining next))))
+
+
+(defun idb-entry-references-symmetry-p (key value)
+  "Whether encoded IDB entry KEY/VALUE mentions any symmetry-family object."
+  (or (encoded-idb-key-references-symmetry-p key)
+      (symmetry-object-in-tree-p value)))
+
+
 (defun fold-store (key value db int-db)
-  "Stores VALUE at KEY in DB. When an incremental idb hash is being accumulated over
-   an integer database (INT-DB and *idb-hash-acc* both set), folds the change into
-   *idb-hash-acc* so the running hash stays equal to (compute-idb-hash db) without a
-   full rescan. An idempotent re-store (KEY already present with an EQUAL value) leaves
-   the hash unchanged and skips the deep-sxhash work entirely -- this matters because
-   propagation fixpoint loops re-assert many already-true propositions. Otherwise XOR
-   is its own inverse: the old contribution is removed and the new one added in one step."
+  "Store VALUE at KEY while maintaining the active standard or split hash accumulator.
+   Standard mode folds every changed entry into *IDB-HASH-ACC*. Split mode folds fixed
+   entries into *FIXED-IDB-HASH-ACC* and stores symmetry-bearing entries in
+   *SYMMETRY-IDB-ACC*, setting *SYMMETRY-IDB-TOUCHED-P* so callers know the slice
+   changed. An idempotent re-store leaves every accumulator unchanged."
   (declare (type hash-table db))
-  (when (and int-db *idb-hash-acc*)
+  (when int-db
     (multiple-value-bind (old present) (gethash key db)
-      (cond ((not present)
-             (setf *idb-hash-acc* (logxor *idb-hash-acc* (deep-sxhash (cons key value)))))
-            ((not (equal old value))
-             (setf *idb-hash-acc* (logxor *idb-hash-acc*
-                                          (deep-sxhash (cons key old))
-                                          (deep-sxhash (cons key value))))))))
-  (setf (gethash key db) value))
+      (unless (and present (equal old value))
+        (cond
+          ((and *fixed-idb-hash-acc* *symmetry-idb-acc*)
+           (when present
+             (if (idb-entry-references-symmetry-p key old)
+                 (progn (remhash key *symmetry-idb-acc*)
+                        (setf *symmetry-idb-touched-p* t))
+                 (setf *fixed-idb-hash-acc*
+                       (logxor *fixed-idb-hash-acc*
+                               (deep-sxhash (cons key old))))))
+           (if (idb-entry-references-symmetry-p key value)
+               (progn (setf (gethash key *symmetry-idb-acc*) value)
+                      (setf *symmetry-idb-touched-p* t))
+               (setf *fixed-idb-hash-acc*
+                     (logxor *fixed-idb-hash-acc*
+                             (deep-sxhash (cons key value))))))
+          (*idb-hash-acc*
+           (when present
+             (setf *idb-hash-acc*
+                   (logxor *idb-hash-acc* (deep-sxhash (cons key old)))))
+           (setf *idb-hash-acc*
+                 (logxor *idb-hash-acc* (deep-sxhash (cons key value))))))))
+  (setf (gethash key db) value)))
 
 
 (defun fold-remove (key db int-db)
-  "Removes KEY from DB. When an incremental idb hash is being accumulated over an
-   integer database (INT-DB and *idb-hash-acc* both set), folds the removal out of
-   *idb-hash-acc* so the running hash stays equal to (compute-idb-hash db). A removal
-   only subtracts the entry's current contribution; a missing key contributes nothing."
+  "Remove KEY while maintaining the active standard or split hash accumulator.
+   Standard mode folds the removed entry out of *IDB-HASH-ACC*. Split mode removes
+   symmetry-bearing entries from *SYMMETRY-IDB-ACC*, setting *SYMMETRY-IDB-TOUCHED-P*,
+   and folds fixed entries out of *FIXED-IDB-HASH-ACC*. A missing key leaves every
+   accumulator unchanged."
   (declare (type hash-table db))
-  (when (and int-db *idb-hash-acc*)
+  (when int-db
     (multiple-value-bind (old present) (gethash key db)
       (when present
-        (setf *idb-hash-acc* (logxor *idb-hash-acc* (deep-sxhash (cons key old)))))))
+        (cond
+          ((and *fixed-idb-hash-acc* *symmetry-idb-acc*)
+           (if (idb-entry-references-symmetry-p key old)
+               (progn (remhash key *symmetry-idb-acc*)
+                      (setf *symmetry-idb-touched-p* t))
+               (setf *fixed-idb-hash-acc*
+                     (logxor *fixed-idb-hash-acc*
+                             (deep-sxhash (cons key old))))))
+          (*idb-hash-acc*
+           (setf *idb-hash-acc*
+                 (logxor *idb-hash-acc* (deep-sxhash (cons key old)))))))))
   (remhash key db))
 
 
@@ -767,12 +820,12 @@
   nil)
 
 
-(defmacro ww-with-timing (label &body body)  ;disables timing instrumentation
+#+ignore (defmacro ww-with-timing (label &body body)  ;disables timing instrumentation
   (declare (ignore label))
   `(progn ,@body))
 
 
-#+ignore (defmacro ww-with-timing (label &body body)  ;enables timing instrumentation
+(defmacro ww-with-timing (label &body body)  ;enables timing instrumentation
   "Inclusive CPU-time timing for BODY under LABEL."
   (let ((start (gensym "START")))
     `(if *ww-timing-enabled*
