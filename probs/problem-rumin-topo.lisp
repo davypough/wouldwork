@@ -18,7 +18,7 @@
 
 ;(ww-set *symmetry-pruning* t)
 
-(ww-set *depth-cutoff* 34)
+(ww-set *depth-cutoff* 10)
 
 
 (defparameter *max-pairings* 2)
@@ -113,7 +113,7 @@
   ;; unambiguously on the intended side of its adjacent boundary.
   (apparatus-coords> transmitter1 69/10 17)
   (apparatus-coords> transmitter2 69/10 2)
-  (apparatus-coords> receiver1 239/10 9)
+  (apparatus-coords> receiver1 13 149/10)
   (apparatus-coords> receiver2 31 41/10)
 
   ;; Nondefault elevations.  Other locations, gates, and screens default to 0.
@@ -181,6 +181,7 @@
 
   ;; Authorized elevation changes
   (jump-via location8 () location9)
+  (jump-via location4 () location2)
   (stairs-via location1 () location4)
   (stairs-via location4 () location13)
 

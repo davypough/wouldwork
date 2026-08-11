@@ -27,43 +27,61 @@
 ;;;   nested : -location ((has-location ...)); -position (recorder has-position role);
 ;;;            -mobility (mobility-results -- the identity default reduces
 ;;;            RECORDING-AGENT-CAN-CLOSE to standing on the recorder, which is the right
-;;;            reading for a problem with no walking technology)
+;;;            reading for a problem with no walking technology); -holding (cargo, holding
+;;;            -- nested here rather than left to cargo-carrying techs, so a recording
+;;;            session's closure rule is well-defined even in a cargo-free recorder
+;;;            problem; empty CARGO there makes RECORDING-AGENT-EMPTY-HANDED a no-op)
 ;;;   soft   : -recorder-core's identity queries, assembled by recorder.lisp
 ;;; PROVIDES:
 ;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
-;;;              recording-agent-return-route, recording-agent-at-recorder
+;;;              recording-agent-return-route, recording-agent-at-recorder,
+;;;              recording-agent-empty-handed
 ;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report
 
 (include-tech -location)
 (include-tech -position)
 (include-tech -mobility)
+(include-tech -holding)
 
 (in-package :ww)
 
 
+(define-query recording-agent-empty-handed (?agent agent)
+  ;; A recorder only accepts an empty-handed return.  Closing a recording session -- either
+  ;; the strict GHOST-STOPS-RECORDER style below or the weaker RECORDING-AGENT-CAN-CLOSE
+  ;; style -- requires the ghost to have already set down whatever it was carrying, not
+  ;; merely to be standing at or within reach of a recorder.
+  (not (bind (holding ?agent $anything))))
+
+
 (define-query ghost-stops-recorder ()
-  ;; Optional goal conjunct.  Every mapped ghost agent has moved back to a recorder, so the
-  ;; return trip appears in the solution path and its length counts toward min-length.  A
-  ;; problem that omits this conjunct stops at its own goal and lets the report supply the
-  ;; return instead.  Place it after the problem's own goal literals: the conjunction is
-  ;; evaluated in order, so this walks the ghost roster only on states that already qualify.
+  ;; Optional goal conjunct.  Every mapped ghost agent has moved back to a recorder empty-
+  ;; handed, so the return trip -- and any cargo it had to set down first -- appears in the
+  ;; solution path and its length counts toward min-length.  A problem that omits this
+  ;; conjunct stops at its own goal and lets the report supply the return instead.  Place it
+  ;; after the problem's own goal literals: the conjunction is evaluated in order, so this
+  ;; walks the ghost roster only on states that already qualify.
   (forall (?agent agent)
     (or (not (ghost-recording-object ?agent))
-        (recording-agent-at-recorder ?agent))))
+        (and (recording-agent-at-recorder ?agent)
+             (recording-agent-empty-handed ?agent)))))
 
 
 (define-query recording-agent-can-close (?agent agent)
-  ;; The recording remains closable: some recorder's location lies in ?agent's current
-  ;; mobility closure, which for a ghost is computed against recording-side gate and gears
-  ;; state.  An agent resting on a support changes to ground before moving, and that
-  ;; configuration transition is not itself a traversal obstacle, so support occupancy is
-  ;; not consulted here.
-  (do (bind (has-location ?agent $agent-location))
-      (assign $reachable (mobility-locations ?agent $agent-location))
-      (exists (?recorder recorder)
-        (exists (?location location)
-          (and (has-position ?recorder ?location)
-               (member ?location $reachable))))))
+  ;; The recording remains closable: ?agent is already empty-handed, and some recorder's
+  ;; location lies in its current mobility closure, which for a ghost is computed against
+  ;; recording-side gate and gears state.  An agent resting on a support changes to ground
+  ;; before moving, and that configuration transition is not itself a traversal obstacle, so
+  ;; support occupancy is not consulted here.  Reachability alone would let the report
+  ;; silently append the walk back to a recorder, but it cannot also silently set down
+  ;; cargo, so empty-handedness is checked now instead of deferred to the report.
+  (and (recording-agent-empty-handed ?agent)
+       (do (bind (has-location ?agent $agent-location))
+           (assign $reachable (mobility-locations ?agent $agent-location))
+           (exists (?recorder recorder)
+             (exists (?location location)
+               (and (has-position ?recorder ?location)
+                    (member ?location $reachable)))))))
 
 
 (define-query recording-agent-return-route (?agent agent)

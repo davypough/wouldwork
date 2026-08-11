@@ -1,0 +1,154 @@
+RUMIN-TOPO TENTATIVE SOLUTION NOTES
+
+Status: Phases 1 and 2 validated against tech/ as currently implemented. Phase 3 is
+blocked pending a restructuring of the recorder technology's ghost-state semantics (see
+tech/Recorder-ghost operations in the Talos Principle.txt and the open issue below).
+This file records what's settled and what's still open, for picking this back up later.
+
+
+GOAL
+
+(open gate1), controlled solely by receiver1 in "normal" mode -- gate1 opens iff
+receiver1 is active (a chroma-matching beam reaches it).
+
+
+OVERALL STRATEGY
+
+Phase 1 (live, pre-recording): agent1 carries connector1 to location13 and pairs it to
+receiver1. This connector is never touched again -- picking a connector back up clears
+all of its existing pairings, so its receiver1 link must survive undisturbed from here
+on.
+
+Phase 2 (ghost recording): agent1* independently carries tray1* from location4 to
+location2 and leaves it there, then returns to the recorder (location3).
+
+Phase 3 (live + ghost playback, NOT YET DESIGNED): something must complete a
+transmitter1 -> ... -> receiver1 beam chain to actually energize receiver1 and open
+gate1. The exact mechanism is unresolved -- see PHASE 3 below.
+
+
+PHASE 1 -- VALIDATED
+
+1. agent1 picks up connector1 (both at location1; pickup-clear satisfied trivially).
+2. agent1 moves to location13 (a single compound `move`, chained through the two
+   unconditional stairs-via edges location1->location4->location13; no gates block
+   either hop).
+3. agent1 connects connector1 with receiver1, placed on the ground at location13.
+   - connect-connector's terminus-selection check (potentially-visible) is nearly
+     unconditional: los-to-apparatus is asserted for every location/receiver pair
+     regardless of walls (derive-los-from-segments in -beam-los-coordinates.lisp), so
+     legality of *pairing* doesn't depend on geometry. Actual color conduction later
+     depends on the stricter beam-visible check, which does respect walls, gates, and
+     elevation -- that's a separate question from whether the pairing action itself is
+     legal.
+   - receiver1's apparatus-coords> were corrected during this work from (239/10 9) to
+     (13 149/10), specifically so a real, unobstructed line of sight from location13
+     exists. The earlier coordinates had gate1's own segment sitting on the direct line
+     between location13 and receiver1, which would have made the eventual beam
+     circular -- gate1 can't open until receiver1 is active, and receiver1 can't become
+     active if its sightline is itself gated by the very thing being opened.
+
+connector1 now rests, unheld, at location13, paired to receiver1. Nothing in the
+remaining phases picks it back up (this is exactly where phase 3 gets complicated --
+see below).
+
+
+PHASE 2 -- VALIDATED (ghost recording)
+
+1. agent1* moves to location4 (stairs-via location1->location4, unconditional).
+2. agent1* picks up tray1* (both at location4; hands empty).
+3. agent1* moves to location2. This is a direct jump, using a jump-via fact added
+   during this work: (jump-via location4 () location2). Downward/level jumps are
+   unrestricted in jump.lisp regardless of *jump-elevation-limit*, so the 3/2-unit drop
+   is free. A symmetric jump-via was used deliberately -- the return trip (a 3/2-unit
+   rise) stays blocked by *jump-elevation-limit* = 1 on its own, UNLESS a box ever ends
+   up at either location2 or location4 (a box specifically, not a tray, can serve as a
+   local mount/dismount stepping stone to bypass the limit in two smaller hops -- not
+   currently a concern, since box1/box1* both start at location7 and aren't part of
+   this plan).
+4. agent1* puts tray1* on the ground at location2 (agent1* is physically there after
+   the jump; an ordinary own-location placement).
+5. agent1* moves to location3 (a direct walk; location2 and location3 share a zone,
+   x=6, nothing between y=5 and y=9 in the wall/edge list).
+
+agent1* ends this phase at location3 (recorder1's position), empty-handed. tray1* sits
+on the ground at location2. connector1* has NOT been touched -- it is still sitting at
+its own init position, location1.
+
+Note: tech/-recorder-solution.lisp was also modified during this work to require a
+ghost to be empty-handed to close a recording session (new query
+recording-agent-empty-handed, folded into both ghost-stops-recorder and
+recording-agent-can-close). This wasn't previously enforced by the tech at all. It's a
+general recorder-tech change, not specific to this problem, and phase 2 step 4 above
+already satisfies it.
+
+
+PHASE 3 -- NOT YET DESIGNED
+
+The goal needs receiver1 active, which needs a chroma-matching beam chain reaching it.
+connector1 sits at location13, paired to receiver1, but not yet linked to any
+transmitter -- something has to complete that link without ever picking connector1 back
+up (doing so would erase its receiver1 pairing).
+
+Constraints established along the way that any design for this phase has to respect:
+  - A live agent can never hold or place a ghost-side object, and vice versa
+    (object-manipulation-allowed requires the same recording side). agent1 cannot pick
+    up connector1*; agent1* cannot pick up connector1.
+  - The one sanctioned cross-side bridge: a LIVE connector's connect-connector action
+    may select a GHOST connector as one of its (up to *max-pairings* = 2) termini. A
+    ghost connector may only pair with another ghost connector. Fixed apparatus
+    (transmitters/receivers/repeaters) is shared and can be paired by either side
+    directly, since it isn't a connector.
+  - connect-connector requires currently holding the connector, and commits its entire
+    pairing set in that one action as it's placed down. Picking a connector back up
+    wipes every existing pairing. So connector1's receiver1 link cannot survive a
+    second pickup, and (since connect-connector requires holding) no new pairing can be
+    added to it without one. Any additional link in the chain has to come from a
+    different connector (connector2/connector2*, or connector1* itself).
+  - connectable-terminus explicitly requires a connector-type terminus to sit at a
+    DIFFERENT location than the connector being placed -- two connectors can't pair
+    with each other while sitting at the exact same location.
+  - A grounded tray supports nothing (tray.lisp: only a currently-held tray can support
+    an occupant). tray1*, left on the ground at location2 in phase 2, cannot have
+    anything placed on it as things stand.
+  - Holding is exclusive -- pickup-clear requires empty hands, so no agent can carry
+    two items at once. A plan that has one ghost carry both the tray and a connector
+    simultaneously doesn't work.
+  - probs/problem-windtunnel-topo.lisp, a working sibling problem, solves an analogous
+    transmitter -> receiver relay by having connector1 (live) pair to a shared
+    REPEATER instead of pairing directly to connector1*'s ghost connector. That trick
+    isn't directly available here -- rumin-topo declares no repeater type or objects.
+
+Genuinely unresolved, and the reason phase 3 hasn't been designed yet: per the
+ground-truth explainer (tech/Recorder-ghost operations in the Talos Principle.txt,
+rules 5, 9, 11, 18), a ghost object should inherit its live counterpart's CURRENT
+state -- position, pairings -- at the moment recording starts, not the state declared
+in define-init. Since phase 1 happens before the recorder starts, connector1* should,
+per that rule, begin its recorded trajectory already at location13, already paired to
+receiver1 -- and agent1* itself should begin at the recorder's location, not at
+location1. None of this is actually implemented in tech/ as it stands today:
+recording-copy> is a static, init-time-only identity, and no code path forks a live
+object's current state onto its ghost counterpart at any point. This is a real gap
+between the documented design and the current engine, not just a phrasing ambiguity,
+and it is being tracked as a separate restructuring effort (a continuation prompt for a
+new session has already been prepared). Phase 3 can't be pinned down until that's
+resolved, since the answer to "where does connector1* start, and what is it already
+paired to, once recording begins" is exactly what's in question.
+
+
+CHANGES MADE TO THE CODEBASE DURING THIS WORK
+
+  - probs/problem-rumin-topo.lisp: receiver1's apparatus-coords> corrected from
+    (239/10 9) to (13 149/10); added (jump-via location4 () location2).
+  - tech/-recorder-solution.lisp: added recording-agent-empty-handed query; folded it
+    into ghost-stops-recorder and recording-agent-can-close; nested -holding so this
+    still works in a cargo-free recorder problem.
+
+
+NEXT STEPS
+
+  1. Resolve the recorder ghost-state restructuring (separate effort; see the
+     continuation prompt already prepared for a new session).
+  2. Re-derive phase 3 once ghost starting-state semantics are settled -- the answer
+     may make the existing phase 1/2 design unnecessary, or may confirm it and just
+     need a concrete connect-connector chain worked out for the beam.
