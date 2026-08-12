@@ -14,7 +14,7 @@
        ((*depth-cutoff* *progress-reporting-interval* *randomize-search*
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
-         *donation-fraction* *enable-work-donation*)
+         *donation-fraction* *enable-work-donation* *recorder-prefix-pruning*)
           (setf ,param ',val)
           (unless *ww-loading*
             (save-globals)

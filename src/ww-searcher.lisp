@@ -310,6 +310,7 @@
     (setf *prior-parallel-progress-cycles* 0)
     (setf *inconsistent-states-dropped* 0)
     (setf *lower-bound-pruned* 0)
+    (setf *search-prefix-pruned* 0)
     (setf *shutdown-requested* nil)
     (clrhash *prop-key-cache*)
     (let* ((start-goal-p (goal (node.state start-node)))
@@ -662,6 +663,24 @@
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
+(defun successor-search-prefix-valid-p (current-node succ-state)
+  "Whether some path to SUCC-STATE survives every enabled prefix validator.
+
+Standard search has one parent path.  Hybrid ALL-PATHS search keeps the successor
+when at least one path through its parent DAG remains viable."
+  (unless (search-prefix-validation-enabled-p)
+    (return-from successor-search-prefix-valid-p t))
+  (let ((move (record-move succ-state))
+        (parent-paths
+          (if *hybrid-mode*
+            (enumerate-paths-to-node current-node)
+            (list (record-solution-path current-node)))))
+    (some (lambda (parent-path)
+            (candidate-search-prefix-valid-p
+              (append parent-path (list move)) succ-state))
+          parent-paths)))
+
+
 (defun process-successors (succ-states current-node open)
   "Processes successor states: checks goals, handles duplicates, generates nodes.
    In hybrid mode, accumulates parent pointers for multi-path enumeration."
@@ -672,6 +691,9 @@
           (next-iteration))
         (when *global-invariants*
           (validate-global-invariants current-node succ-state))
+        (unless (successor-search-prefix-valid-p current-node succ-state)
+          (increment-global *search-prefix-pruned* 1)
+          (next-iteration))
         (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (increment-global *bound-pruned* 1)
@@ -1345,6 +1367,10 @@
     (format t "~2%min-steps-remaining? pruned ~:D node~:P, ~,1F% of total states."
             *lower-bound-pruned*
             (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
+  (when (> *search-prefix-pruned* 0)
+    (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
+            *search-prefix-pruned*
+            (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (print-candidate-solution-validation-statistics)
@@ -1662,6 +1688,10 @@
       (format t "~%min-steps-remaining? pruned = ~:D (~,1F% of total states)"
               *lower-bound-pruned*
               (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
+    (when (> *search-prefix-pruned* 0)
+      (format t "~%search-prefix validation pruned = ~:D (~,1F% of total states)"
+              *search-prefix-pruned*
+              (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
     (when (> *num-backtracks* 0)
       (format t "~%average backtrack distance = ~,1F levels (~:D backtracks)"
               (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)

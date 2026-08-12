@@ -20,7 +20,8 @@
     nil              ; *symmetry-pruning*
     0                ; *debug*
     nil              ; *goal*
-    0)               ; *threads*
+    0                ; *threads*
+    nil)             ; *recorder-prefix-pruning*
   "Default parameter values in save/read order")
 
 
@@ -99,6 +100,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                5 (step through search)>)
        (ww-set *symmetry-pruning* <t (prune symmetric states) or
                                    nil (don't prune symmetric states>)
+       (ww-set *recorder-prefix-pruning* <t (prune unplayable recording prefixes) or
+                                           nil (validate only completed candidates)>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
               see ww-settings.lisp and User Manual for probe format examples
@@ -193,10 +196,11 @@ is staged again.
                *branch* ~A~%
                *probe* ~A~%
                *symmetry-pruning* ~A~%
+               *recorder-prefix-pruning* ~A~%
                *debug* ~A~2%"
             *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
-            *probe* *symmetry-pruning* *debug*))
+            *probe* *symmetry-pruning* *recorder-prefix-pruning* *debug*))
 
 
 (defun refresh ()
@@ -218,7 +222,7 @@ is staged again.
        (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
         default-problem-type default-solution-type default-progress-reporting-interval 
         default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal
-        default-threads)
+        default-threads default-recorder-prefix-pruning)
       *default-parameters*
     (setf *problem-name* default-problem-name
           *depth-cutoff* default-depth-cutoff  
@@ -231,6 +235,7 @@ is staged again.
           *branch* default-branch
           *probe* default-probe
           *symmetry-pruning* default-symmetry-pruning
+          *recorder-prefix-pruning* default-recorder-prefix-pruning
           *debug* default-debug
           *goal* default-goal
           *threads* default-threads))
@@ -242,7 +247,7 @@ is staged again.
   (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
                       *solution-type* *progress-reporting-interval* *randomize-search* 
                       *branch* *probe* *symmetry-pruning* *debug* *goal*
-                      *threads*)
+                      *threads* *recorder-prefix-pruning*)
                 *globals-file*))
 
 
@@ -255,7 +260,7 @@ is staged again.
     (destructuring-bind 
          (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
           progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal
-          threads)
+          threads recorder-prefix-pruning)
         padded
       (setf *problem-name* problem-name
             *depth-cutoff* depth-cutoff
@@ -268,6 +273,7 @@ is staged again.
             *branch* branch
             *probe* probe
             *symmetry-pruning* symmetry-pruning
+            *recorder-prefix-pruning* recorder-prefix-pruning
             *debug* debug
             *goal* goal
             *threads* threads))))
@@ -413,6 +419,7 @@ is staged again.
           *branch* -1
           *randomize-search* nil
           *symmetry-pruning* nil
+          *recorder-prefix-pruning* nil
           *threads* 0
           *features* (remove :ww-debug *features*))
     (with-silenced-compilation

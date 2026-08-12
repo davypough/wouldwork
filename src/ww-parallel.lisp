@@ -75,6 +75,9 @@
                   (when (state-is-inconsistent succ-state)
                     (incf *inconsistent-states-dropped*)
                     (return-from process-succ))
+                  (unless (successor-search-prefix-valid-p node succ-state)
+                    (incf *search-prefix-pruned*)
+                    (return-from process-succ))
                   ;; Goal check during task generation
                   (when (goal succ-state)
                     (let ((goal-node
@@ -288,6 +291,10 @@
         (when *global-invariants*
           (unless (validate-global-invariants current-node succ-state)
             (return-from process-one)))
+
+        (unless (successor-search-prefix-valid-p current-node succ-state)
+          (increment-global *search-prefix-pruned* 1)
+          (return-from process-one))
         
         ;; Optimization bound check
         (when (and *solution-paths*

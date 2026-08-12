@@ -1,14 +1,15 @@
 ;;; Filename: -recorder-solution.lisp
 
-;;; Solution-time recorder services: candidate validation and the two-phase report.  Nested
-;;; by recorder.lisp, whose public assembly installs validation, reporting, and goal chaining
-;;; after all recorder components have been defined.  Lower-level tests may include this file
-;;; for its mechanics without installing those public services.  Nothing here is a substrate
-;;; hook, and
-;;; nothing here reads recording-side state.  The recorder shadow components derive
+;;; Recorder path services: optional recording-prefix pruning, candidate validation, and the
+;;; two-phase report.  Nested
+;;; by recorder.lisp, whose public assembly installs prefix pruning, validation, reporting,
+;;; and goal chaining after all recorder components have been defined.  Lower-level tests may
+;;; include this file for its mechanics without installing those public services.  Nothing
+;;; here is a substrate hook, and nothing here reads recording-side state.  The recorder
+;;; shadow components derive
 ;;; RECORDING-DEPRESSED, RECORDING-LATCHED, RECORDING-TURNING, RECORDING-ACTIVE and
-;;; RECORDING-OPEN during propagation, while this file runs once per completed candidate
-;;; path and touches none of them.  What it does read is identity from -recorder-core --
+;;; RECORDING-OPEN during propagation, while these services run only during prefix or
+;;; candidate replay and touch none of them.  What they do read is identity from -recorder-core --
 ;;; LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location, position, the
 ;;; mobility closure, and (since GHOST-STOPS-RECORDER was strengthened to require a
 ;;; genuinely closed session) RECORDING-IN-PROGRESS, which is session lifecycle state, not
@@ -40,6 +41,7 @@
 ;;;              recording-agent-return-route, recording-agent-at-recorder,
 ;;;              recording-agent-empty-handed
 ;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report;
+;;;              validate-recorder-recording-prefix;
 ;;;              recorder-recording-path, recorder-recording-window,
 ;;;              recorder-recording-snapshot and their helpers locate the real
 ;;;              START-RECORDER/STOP-RECORDER moves when the searched path contains them,
@@ -291,6 +293,58 @@ directly, because its focused tests author the already-open recording state ther
     (lambda (agent)
       (funcall (symbol-function 'ghost-recording-object) state agent))
     (gethash 'agent *types*)))
+
+
+(defun recorder-prefix-pruning-enabled-p ()
+  "Whether recorder recording-prefix pruning is enabled for the current search."
+  *recorder-prefix-pruning*)
+
+
+(defun recorder-recording-prefix-changed-p (start-state integrated-path)
+  "Whether the newest move changes the isolated recording sequence.
+
+Ordinary live moves are absent from that sequence.  Their pre-recording effects are
+captured when START-RECORDER is eventually checked, while live moves after the start
+cannot alter a recording prefix already accepted at its preceding ghost move."
+  (let* ((move (car (last integrated-path)))
+         (action (recorder-move-action-name move)))
+    (or (member action '(start-recorder stop-recorder))
+        (some (lambda (agent)
+                (funcall (symbol-function 'ghost-recording-object)
+                         start-state agent))
+              (recorder-move-agents move)))))
+
+
+(defun validate-recorder-recording-prefix (start-state integrated-path current-state)
+  "Accept a search prefix while its isolated recording sub-path remains replayable.
+
+This is deliberately narrower than VALIDATE-RECORDER-SOLUTION.  It checks session
+boundaries, reconstructs the START-RECORDER snapshot, and replays the recording actions
+seen so far.  It does not require the ghost to be able to close the recording and does not
+validate playback or the goal, because later actions can still change those conditions.
+Once an action in the isolated recording sequence fails, however, extending the integrated
+  path cannot repair that earlier prefix, so the branch is safe to prune."
+  (declare (ignore current-state))
+  (unless (recorder-recording-prefix-changed-p start-state integrated-path)
+    (return-from validate-recorder-recording-prefix (values t nil)))
+  (let ((boundary-diagnostic (recorder-boundary-diagnostic integrated-path)))
+    (when boundary-diagnostic
+      (return-from validate-recorder-recording-prefix
+        (values nil boundary-diagnostic))))
+  (multiple-value-bind (snapshot-state snapshot-diagnostic)
+      (recorder-recording-snapshot start-state integrated-path)
+    (when snapshot-diagnostic
+      (return-from validate-recorder-recording-prefix
+        (values nil snapshot-diagnostic)))
+    (let ((recording-validation
+            (validate-action-sequence
+              snapshot-state
+              (recorder-recording-path snapshot-state integrated-path))))
+      (if (action-sequence-validation-success-p recording-validation)
+        (values t nil)
+        (values nil
+                (recorder-action-failure-diagnostic
+                  :recording recording-validation))))))
 
 
 (defun validate-recorder-solution (start-state integrated-path goal-state)

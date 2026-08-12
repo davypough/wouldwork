@@ -18,6 +18,8 @@
 
 (ww-set *progress-reporting-interval* 3000000)
 
+(ww-set *recorder-prefix-pruning* t)
+
 
 (defparameter *max-pairings* 2)
 

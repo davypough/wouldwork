@@ -3,8 +3,8 @@
 ;;; Public recorder assembly.  Problems continue to write only (include-tech recorder).
 ;;; Identity and interaction isolation live in -recorder-core; each supported apparatus
 ;;; owns a private recording-shadow component.  Including this public assembly also installs
-;;; recorder-specific candidate validation, solution reporting, and goal chaining after all
-;;; of their implementations have been defined.
+;;; recorder-specific prefix pruning, candidate validation, solution reporting, and goal
+;;; chaining after all of their implementations have been defined.
 ;;;
 ;;; Recorder cycle chaining is explicit rather than planner-native.  Each SOLVE-SUBGOAL
 ;;; searches and commits at most one intermediate recording cycle, and the following SOLVE
@@ -62,6 +62,9 @@
 ;; public assembly scopes the complete recorder policy to problems that include RECORDER and
 ;; guarantees that every registered implementation has already been defined.
 (register-solution-validator 'validate-recorder-solution)
+(register-search-prefix-validator
+  'validate-recorder-recording-prefix
+  'recorder-prefix-pruning-enabled-p)
 (register-solution-report-printer 'print-recorder-report)
 (register-goal-chaining-policy
   'solve-recorder-subgoal-form

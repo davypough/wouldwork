@@ -24,6 +24,7 @@
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
+  (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
@@ -185,6 +186,54 @@
   "Problem-local functions that must accept a candidate path before it is a solution.")
 
 
+(defstruct (search-prefix-validator (:conc-name search-prefix-validator.))
+  "A path-prefix validator and the zero-argument predicate that enables it."
+  validator
+  enabled-p)
+
+
+(sb-ext:defglobal *search-prefix-validators* nil
+  "Problem-local validators that may reject irreversible path-prefix failures.")
+
+
+(defun register-search-prefix-validator (validator enabled-p)
+  "Register VALIDATOR for search-time path-prefix pruning.
+
+VALIDATOR receives START-STATE, PATH, and CURRENT-STATE and returns true while the
+prefix can still lead to a valid solution.  ENABLED-P is a zero-argument function
+symbol, allowing a disabled technology option to avoid path reconstruction and
+validation.  Both functions must be read-only and safe to call concurrently."
+  (dolist (function-name (list validator enabled-p))
+    (unless (and (symbolp function-name) (fboundp function-name))
+      (error "Search-prefix validator requires a defined function: ~S" function-name)))
+  (unless (find validator *search-prefix-validators*
+                :key #'search-prefix-validator.validator)
+    (setf *search-prefix-validators*
+          (append *search-prefix-validators*
+                  (list (make-search-prefix-validator
+                          :validator validator
+                          :enabled-p enabled-p)))))
+  validator)
+
+
+(defun search-prefix-validation-enabled-p ()
+  "Whether any registered search-prefix validator is currently enabled."
+  (some (lambda (entry)
+          (funcall (symbol-function (search-prefix-validator.enabled-p entry))))
+        *search-prefix-validators*))
+
+
+(defun candidate-search-prefix-valid-p (path current-state)
+  "Whether every enabled validator accepts PATH ending at CURRENT-STATE."
+  (dolist (entry *search-prefix-validators* t)
+    (when (funcall
+            (symbol-function (search-prefix-validator.enabled-p entry)))
+      (unless (funcall
+                (symbol-function (search-prefix-validator.validator entry))
+                *start-state* path current-state)
+        (return nil)))))
+
+
 (sb-ext:defglobal *goal-chaining-checkpoint-extensions* nil
   "Registered (NAME SNAPSHOTTER RESTORER) extensions for goal-chaining undo state.")
 
@@ -341,6 +390,9 @@ treat their arguments as read-only and be safe to call concurrently."
 
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry families and prune symmetric actions or states.")
+
+(defvar *recorder-prefix-pruning* nil
+  "When T, recorder technology prunes paths whose recording prefix cannot replay.")
 
 (defvar *max-pairings* 0
   "Default maximum initial pairings per connector. Problem files can override this.")
@@ -562,6 +614,10 @@ treat their arguments as read-only and be safe to call concurrently."
   "Count of nodes pruned by user-defined min-steps-remaining? function.")
 (declaim (type fixnum *lower-bound-pruned*))
 
+(sb-ext:defglobal *search-prefix-pruned* 0
+  "Count of successor states rejected by enabled search-prefix validators.")
+(declaim (type fixnum *search-prefix-pruned*))
+
 (sb-ext:defglobal *prop-key-cache* 
   (make-hash-table :test #'equal :synchronized (> *threads* 0))
   "Cache for prop-key-to-integer conversions")
@@ -600,6 +656,7 @@ treat their arguments as read-only and be safe to call concurrently."
             *debug* 0
             *goal* nil
             *auto-wait* nil
-            *symmetry-pruning* nil)
+            *symmetry-pruning* nil
+            *recorder-prefix-pruning* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

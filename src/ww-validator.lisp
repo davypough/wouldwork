@@ -950,6 +950,9 @@
                      (format t "~%It's normally inefficient to enable *auto-wait* without exogenous happenings.~%~
                                 Define patrollers or other happening objects first.~2%"))))
     (*symmetry-pruning* nil)
+    (*recorder-prefix-pruning*
+      (unless (typep val 'boolean)
+        (error "Can't set *recorder-prefix-pruning* to ~S. Must be either T or NIL." val)))
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))

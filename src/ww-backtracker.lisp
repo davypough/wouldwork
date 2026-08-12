@@ -170,6 +170,11 @@
                             ;; Filter inconsistent states (parallels depth-first filtering in generate-children)
                             ((bt-choice-inconsistent-p choice)
                              (increment-global *inconsistent-states-dropped* 1))
+                            ((and (search-prefix-validation-enabled-p)
+                                  (not (candidate-search-prefix-valid-p
+                                         (reconstruct-solution-path)
+                                         *backtrack-state*)))
+                             (increment-global *search-prefix-pruned* 1))
                             ;; Solution found at current level - register and handle continuation
                              ((is-complete-solution)
                               (let ((candidate-path (reconstruct-solution-path)))
