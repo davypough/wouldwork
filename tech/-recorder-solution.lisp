@@ -40,9 +40,10 @@
 ;;;              recording-agent-return-route, recording-agent-at-recorder,
 ;;;              recording-agent-empty-handed
 ;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report;
-;;;              recorder-recording-path, recorder-recording-window and their helpers now
-;;;              locate the real START-RECORDER/STOP-RECORDER moves when the searched path
-;;;              contains them, falling back to the whole path when it does not
+;;;              recorder-recording-path, recorder-recording-window,
+;;;              recorder-recording-snapshot and their helpers locate the real
+;;;              START-RECORDER/STOP-RECORDER moves when the searched path contains them,
+;;;              falling back to the whole path when it does not
 
 (include-tech -location)
 (include-tech -position)
@@ -187,6 +188,29 @@
   (find 'stop-recorder integrated-path :key #'recorder-move-action-name))
 
 
+(defun recorder-boundary-diagnostic (integrated-path)
+  "Return a diagnostic when INTEGRATED-PATH does not contain one well-ordered session."
+  (let ((start-positions nil)
+        (stop-positions nil))
+    (loop for move in integrated-path
+          for position from 0
+          for action = (recorder-move-action-name move)
+          when (eql action 'start-recorder)
+            do (push position start-positions)
+          when (eql action 'stop-recorder)
+            do (push position stop-positions))
+    (cond
+      ((> (length start-positions) 1)
+       '(:phase :recording :reason :invalid-boundary :detail :multiple-starts))
+      ((> (length stop-positions) 1)
+       '(:phase :recording :reason :invalid-boundary :detail :multiple-stops))
+      ((and stop-positions (null start-positions))
+       '(:phase :recording :reason :invalid-boundary :detail :stop-without-start))
+      ((and start-positions stop-positions
+            (< (first stop-positions) (first start-positions)))
+       '(:phase :recording :reason :invalid-boundary :detail :stop-before-start)))))
+
+
 (defun recorder-path-after (integrated-path move)
   "The tail of INTEGRATED-PATH strictly after MOVE, or the whole path when MOVE is NIL."
   (if move
@@ -199,6 +223,15 @@
   (if move
     (subseq integrated-path 0 (position move integrated-path))
     integrated-path))
+
+
+(defun recorder-pre-recording-path (integrated-path)
+  "Return the actions before INTEGRATED-PATH's real START-RECORDER.
+
+There is no pre-recording prefix in the legacy no-explicit-start form."
+  (let ((explicit-start (recorder-explicit-start integrated-path)))
+    (and explicit-start
+         (recorder-path-before integrated-path explicit-start))))
 
 
 (defun recorder-recording-window (integrated-path)
@@ -227,14 +260,6 @@ real action was searched."
             (and explicit-stop (list explicit-stop)))))
 
 
-(defun recorder-recording-agents (state)
-  "Return the mapped ghost agents that can act during recording."
-  (remove-if-not
-    (lambda (agent)
-      (funcall (symbol-function 'ghost-recording-object) state agent))
-    (gethash 'agent *types*)))
-
-
 (defun recorder-action-failure-diagnostic (phase validation)
   (list :phase phase
         :reason :action-failed
@@ -243,57 +268,91 @@ real action was searched."
         :detail (action-sequence-validation-failure-reason validation)))
 
 
+(defun recorder-recording-snapshot (start-state integrated-path)
+  "Return the state captured immediately before START-RECORDER and any replay diagnostic.
+
+An explicit recording begins from the result of replaying every pre-recording action from
+START-STATE.  The legacy form with no explicit START-RECORDER continues to use START-STATE
+directly, because its focused tests author the already-open recording state there."
+  (unless (recorder-explicit-start integrated-path)
+    (return-from recorder-recording-snapshot
+      (values (copy-problem-state start-state) nil)))
+  (let ((validation
+          (validate-action-sequence
+            start-state (recorder-pre-recording-path integrated-path))))
+    (if (action-sequence-validation-success-p validation)
+      (values (action-sequence-validation-final-state validation) nil)
+      (values nil (recorder-action-failure-diagnostic :snapshot validation)))))
+
+
+(defun recorder-recording-agents (state)
+  "Return the mapped ghost agents that can act during recording."
+  (remove-if-not
+    (lambda (agent)
+      (funcall (symbol-function 'ghost-recording-object) state agent))
+    (gethash 'agent *types*)))
+
+
 (defun validate-recorder-solution (start-state integrated-path goal-state)
   "Validate recording and playback under the recorder's snapshot-reset semantics.
 
-The recording is RECORDER-RECORDING-PATH replayed from START-STATE: the real
-START-RECORDER move when the searched path contains one, its ghost moves, and the real
-STOP-RECORDER move when present.  Every mapped ghost agent must still be able to reach a
-recorder when it ends -- the weaker of the two termination rules, so that a search
-stopping at the problem's own goal and a search carrying GHOST-STOPS-RECORDER as a goal
-conjunct are both admissible.  Playback then restores START-STATE and replays the complete
-integrated path under the ordinary action rules."
+When the path contains a real START-RECORDER, its pre-recording prefix is first replayed
+from START-STATE to reconstruct the snapshot captured immediately before that action.  The
+recording path -- START-RECORDER, its ghost moves, and STOP-RECORDER when present -- is
+then replayed from that snapshot.  The legacy no-explicit-start form continues to replay
+its ghost moves directly from START-STATE.  Every mapped ghost agent must still be able to
+reach a recorder when the recording ends -- the weaker of the two termination rules, so
+that a search stopping at the problem's own goal and a search carrying
+GHOST-STOPS-RECORDER as a goal conjunct are both admissible.  Playback independently
+replays the complete integrated path from START-STATE under the ordinary action rules."
   (declare (ignore goal-state))
-  (let* ((ghost-path
-           (recorder-recording-path start-state integrated-path))
-         (recording-validation
-           (validate-action-sequence start-state ghost-path)))
-    (unless (action-sequence-validation-success-p recording-validation)
-      (return-from validate-recorder-solution
-        (values nil
-                (recorder-action-failure-diagnostic
-                  :recording recording-validation))))
-    (let* ((recording-state
-             (action-sequence-validation-final-state recording-validation))
-           (recording-agents (recorder-recording-agents recording-state))
-           (stranded-agents
-             (remove-if
-               (lambda (agent)
-                 (funcall (symbol-function 'recording-agent-can-close)
-                          recording-state agent))
-               recording-agents)))
-      (when (null recording-agents)
-        (return-from validate-recorder-solution
-          (values nil '(:phase :recording :reason :no-recording-agent))))
-      (when stranded-agents
-        (return-from validate-recorder-solution
-          (values nil
-                  (list :phase :recording
-                        :reason :agents-cannot-close
-                        :agents stranded-agents)))))
-    (let ((playback-validation
-            (validate-action-sequence
-              start-state integrated-path
-              :goal-test (symbol-function 'goal-fn))))
-      (unless (action-sequence-validation-success-p playback-validation)
+  (let ((boundary-diagnostic (recorder-boundary-diagnostic integrated-path)))
+    (when boundary-diagnostic
+      (return-from validate-recorder-solution (values nil boundary-diagnostic))))
+  (multiple-value-bind (snapshot-state snapshot-diagnostic)
+      (recorder-recording-snapshot start-state integrated-path)
+    (when snapshot-diagnostic
+      (return-from validate-recorder-solution (values nil snapshot-diagnostic)))
+    (let* ((ghost-path
+             (recorder-recording-path snapshot-state integrated-path))
+           (recording-validation
+             (validate-action-sequence snapshot-state ghost-path)))
+      (unless (action-sequence-validation-success-p recording-validation)
         (return-from validate-recorder-solution
           (values nil
                   (recorder-action-failure-diagnostic
-                    :playback playback-validation))))
-      (unless (action-sequence-validation-goal-satisfied-p playback-validation)
-        (return-from validate-recorder-solution
-          (values nil '(:phase :playback :reason :goal-not-satisfied))))
-      (values t nil))))
+                    :recording recording-validation))))
+      (let* ((recording-state
+               (action-sequence-validation-final-state recording-validation))
+             (recording-agents (recorder-recording-agents recording-state))
+             (stranded-agents
+               (remove-if
+                 (lambda (agent)
+                   (funcall (symbol-function 'recording-agent-can-close)
+                            recording-state agent))
+                 recording-agents)))
+        (when (null recording-agents)
+          (return-from validate-recorder-solution
+            (values nil '(:phase :recording :reason :no-recording-agent))))
+        (when stranded-agents
+          (return-from validate-recorder-solution
+            (values nil
+                    (list :phase :recording
+                          :reason :agents-cannot-close
+                          :agents stranded-agents)))))
+      (let ((playback-validation
+              (validate-action-sequence
+                start-state integrated-path
+                :goal-test (symbol-function 'goal-fn))))
+        (unless (action-sequence-validation-success-p playback-validation)
+          (return-from validate-recorder-solution
+            (values nil
+                    (recorder-action-failure-diagnostic
+                      :playback playback-validation))))
+        (unless (action-sequence-validation-goal-satisfied-p playback-validation)
+          (return-from validate-recorder-solution
+            (values nil '(:phase :playback :reason :goal-not-satisfied))))
+        (values t nil)))))
 
 
 (defun recorder-recording-sequence (state integrated-path)
