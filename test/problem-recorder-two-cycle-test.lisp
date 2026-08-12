@@ -116,7 +116,9 @@
 
 
 (define-test-helper recorder-two-cycle-prepared-baseline-p ()
-  (and (recorder-two-cycle-fact-p *start-state* '(on live-agent cycle-plate))
+  ;; ON is bijective, so the database stores its ON1/ON2 index pair rather than a plain
+  ;; (ON ...) tuple; check ON1 (keyed by the occupant) directly.
+  (and (recorder-two-cycle-fact-p *start-state* '(on1 live-agent cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(depressed cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(latched cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(open cycle-gate))

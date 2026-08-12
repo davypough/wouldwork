@@ -19,20 +19,34 @@
 ;;; unrelated (recording-side beam power reaching one receiver).
 ;;;
 ;;; CONNECTOR, JAMMER, and FAN are redeclared optional here (idempotent and order-
-;;; independent, per tech/README.html) so the PAIRED, JAMMING, and MOUNTED-ON forks compile
-;;; for a problem that never includes beam-relay/beam-direct, jammer, or a fan-mounting
-;;; technology at all: an empty-domain quantifier never translates a body that would
-;;; otherwise reference an undeclared relation.  HAS-LOCATION, HOLDING, and ON need no such
-;;; guard -- they are already unconditionally available in any recorder problem via
-;;; -recorder-core, -recorder-solution, and -recorder-controls-shadow's existing nesting.
+;;; independent, per tech/README.html).  PAIRED, JAMMING, and MOUNTED-ON cannot be
+;;; redeclared unconditionally the same way: each takes a composite TERMINUS / TARGET /
+;;; GEARS argument type that only exists when the relation's real owner (beam-relay.lisp,
+;;; jammer.lisp, -gears-fan.lisp) is also included, and a problem may type CONNECTOR or FAN
+;;; instances without including that behavioral tech at all -- test/problem-recorder-test.lisp
+;;; does exactly this, to exercise RECORDING-COPY>'s own mapping machinery in isolation.  The
+;;; empty-domain quantifier guard that protects a relation reference when a TYPE has no
+;;; instances does not help here, since CONNECTOR and FAN are not empty in that test.
+;;;
+;;; So START-RECORDER's relation declaration and its three optional fork clauses are built
+;;; below with ordinary Lisp, calling INSTALL-DYNAMIC-RELATIONS and INSTALL-ACTION directly
+;;; instead of going through the DEFINE-DYNAMIC-RELATIONS / DEFINE-ACTION macros -- both
+;;; macros only quote their argument text and call these same functions, so nothing is lost.
+;;; Each composite type's presence in *TYPES* is checked once and reused for both the
+;;; relation declaration and the fork clause that depends on it, since a relation and its
+;;; own composite argument type are always declared together in the same owning file.
+;;; HAS-LOCATION, HOLDING, and ON need no such guard -- they are already unconditionally
+;;; available in any recorder problem via -recorder-core, -recorder-solution, and
+;;; -recorder-controls-shadow's existing nesting.
 ;;;
 ;;; REQUIRES:
-;;;   nested : -recorder-core (RECORDING-COPY>, shadow lifecycle registry);
-;;;            -recorder-solution (RECORDING-AGENT-AT-RECORDER, RECORDING-AGENT-EMPTY-HANDED);
-;;;            -location (HAS-LOCATION); -holding (HOLDING); -support-occupancy (ON);
-;;;            -propagation
+;;;   nested : -recorder-core (RECORDING-COPY>, RECORDING-IN-PROGRESS, shadow lifecycle
+;;;            registry); -recorder-solution (RECORDING-AGENT-AT-RECORDER,
+;;;            RECORDING-AGENT-EMPTY-HANDED); -location (HAS-LOCATION); -holding (HOLDING);
+;;;            -support-occupancy (ON); -propagation
 ;;; PROVIDES:
-;;;   relation  : recording-in-progress
+;;;   relations : paired, jamming, mounted-on -- redeclared, not owned, here, and only when
+;;;               their own composite argument type is already present
 ;;;   actions   : start-recorder, stop-recorder
 ;;;   lifecycle : reset-recording-session!
 
@@ -49,55 +63,82 @@
 (define-optional-types recorder connector jammer fan)
 
 
-(define-dynamic-relations
-  (recording-in-progress))
-
-
-(define-action start-recorder
-  1
-  (?agent agent)
-  (and (live-recording-object ?agent)
-       (not (recording-in-progress))
-       (recording-agent-at-recorder ?agent))
-  (">" ?agent "starts the recorder")
-  (assert
-    (recording-in-progress)
-    ;; has-location: every mapped mobile object, wherever it currently stands
-    (doall (?live mobile-object)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (has-location ?live $loc))
-          (has-location $ghost $loc))))
-    ;; holding: mirror both the holder and whatever it currently holds
-    (doall (?live mobile-object)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (holding ?live $cargo))
-          (if (bind (recording-copy> $cargo $cargo-ghost))
-            (holding $ghost $cargo-ghost)))))
-    ;; on: the support itself may or may not be a mapped mobile object
-    (doall (?live mobile-object)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (on ?live $support))
-          (if (bind (recording-copy> $support $support-ghost))
-            (on $ghost $support-ghost)
-            (on $ghost $support)))))
-    ;; paired: the terminus may be another connector or shared fixed apparatus
-    (doall (?live connector)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (paired ?live $terminus))
-          (if (bind (recording-copy> $terminus $terminus-ghost))
-            (paired $ghost $terminus-ghost)
-            (paired $ghost $terminus)))))
+(let* ((paired-p (nth-value 1 (gethash 'terminus *types*)))
+       (jamming-p (nth-value 1 (gethash 'target *types*)))
+       (mounting-p (nth-value 1 (gethash 'gears *types*)))
+       relations
+       optional-forks)
+  ;; Each composite argument type's presence stands in for its relation's own owning tech
+  ;; being included, since a relation and its composite argument type are always declared
+  ;; together in the same file (TERMINUS with PAIRED in beam-relay.lisp; TARGET with
+  ;; JAMMING in jammer.lisp; GEARS with MOUNTED-ON in -gears-fan.lisp).
+  (when paired-p
+    (push '(paired connector terminus) relations)
+    ;; paired: PAIRED declares no fluent argument -- either side may be a plain connector
+    ;; or fixed apparatus -- so BIND cannot extract a terminus the way it does for JAMMING
+    ;; and MOUNTED-ON below.  The fork instead walks every stored (connector terminus)
+    ;; pair directly.  A connector-to-connector pairing may have been stored with either
+    ;; connector first, depending on which one was placed second during the recording, so
+    ;; both sides are substituted with their own ghost independently; a side with no ghost
+    ;; keeps its live value, which covers shared fixed apparatus and any unmapped connector.
+    (push '(doall (?connector connector)
+             (doall (?terminus terminus)
+               (if (paired ?connector ?terminus)
+                 (if (bind (recording-copy> ?connector $connector-ghost))
+                   (if (bind (recording-copy> ?terminus $terminus-ghost))
+                     (paired $connector-ghost $terminus-ghost)
+                     (paired $connector-ghost ?terminus))
+                   (if (bind (recording-copy> ?terminus $terminus-ghost))
+                     (paired ?connector $terminus-ghost))))))
+          optional-forks))
+  (when jamming-p
+    (push '(jamming jammer $target) relations)
     ;; jamming: the target (gate/wall-gears/wall-blower) is never itself mapped
-    (doall (?live jammer)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (jamming ?live $target))
-          (jamming $ghost $target))))
+    (push '(doall (?live jammer)
+             (if (bind (recording-copy> ?live $ghost))
+               (if (bind (jamming ?live $target))
+                 (jamming $ghost $target))))
+          optional-forks))
+  (when mounting-p
+    (push '(mounted-on fan $gears) relations)
     ;; mounted-on: the gears are never themselves mapped
-    (doall (?live fan)
-      (if (bind (recording-copy> ?live $ghost))
-        (if (bind (mounted-on ?live $gears))
-          (mounted-on $ghost $gears))))
-    (finally (propagate-changes!))))
+    (push '(doall (?live fan)
+             (if (bind (recording-copy> ?live $ghost))
+               (if (bind (mounted-on ?live $gears))
+                 (mounted-on $ghost $gears))))
+          optional-forks))
+  (when relations
+    (install-dynamic-relations relations))
+  (install-action
+    'start-recorder
+    1
+    '(?agent agent)
+    '(and (live-recording-object ?agent)
+          (not (recording-in-progress))
+          (recording-agent-at-recorder ?agent))
+    '(">" ?agent "starts the recorder")
+    `(assert
+       (recording-in-progress)
+       ;; has-location: every mapped mobile object, wherever it currently stands
+       (doall (?live mobile-object)
+         (if (bind (recording-copy> ?live $ghost))
+           (if (bind (has-location ?live $loc))
+             (has-location $ghost $loc))))
+       ;; holding: mirror both the holder and whatever it currently holds
+       (doall (?live mobile-object)
+         (if (bind (recording-copy> ?live $ghost))
+           (if (bind (holding ?live $cargo))
+             (if (bind (recording-copy> $cargo $cargo-ghost))
+               (holding $ghost $cargo-ghost)))))
+       ;; on: the support itself may or may not be a mapped mobile object
+       (doall (?live mobile-object)
+         (if (bind (recording-copy> ?live $ghost))
+           (if (bind (on ?live $support))
+             (if (bind (recording-copy> $support $support-ghost))
+               (on $ghost $support-ghost)
+               (on $ghost $support)))))
+       ,@optional-forks
+       (finally (propagate-changes!)))))
 
 
 (define-action stop-recorder

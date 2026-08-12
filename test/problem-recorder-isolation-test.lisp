@@ -72,6 +72,10 @@
   (recording-copy> live-pair-connector ghost-pair-connector)
   (recording-copy> live-target-connector ghost-target-connector)
 
+  ;; The ghost-side pickup/placement/pairing characterizations below require an open
+  ;; session: OBJECT-MANIPULATION-ALLOWED gates ghost action on this flag.
+  (recording-in-progress)
+
   ;; Recorder and shared support apparatus.
   (has-position recorder1 place-site)
   (has-position shared-plate place-site)

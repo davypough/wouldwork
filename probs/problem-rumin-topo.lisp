@@ -68,17 +68,14 @@
 
 
 (define-init
-  ;; Movable objects
+  ;; Movable objects.  Ghosts (agent1*, connector1*, connector2*, box1*, tray1*) have no
+  ;; initial location: START-RECORDER forks each one from its live counterpart's current
+  ;; state when the search finds it, per rule 5 -- a ghost does not exist beforehand.
   (has-location agent1 location1)
-  (has-location agent1* location1)
   (has-location connector1 location1)
-  (has-location connector1* location1)
   (has-location connector2 location10)
-  (has-location connector2* location10)
   (has-location box1 location7)
-  (has-location box1* location7)
   (has-location tray1 location4)
-  (has-location tray1* location4)
 
   ;; Ghost definitions
   (recording-copy> agent1 agent1*)

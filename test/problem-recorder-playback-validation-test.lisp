@@ -40,6 +40,9 @@
 (define-init
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-box ghost-box)
+  ;; This test drives ghost actions directly rather than searching through a real
+  ;; START-RECORDER, so it declares the session already open.
+  (recording-in-progress)
   (has-location live-agent recorder-site)
   (has-location ghost-agent recorder-site)
   (has-location live-box recorder-site)

@@ -69,6 +69,10 @@
   (recording-copy> live-gears-jammer ghost-gears-jammer)
   (recording-copy> live-visibility-jammer ghost-visibility-jammer)
 
+  ;; The ghost jammers below must actually JAM-TARGET, which reaches
+  ;; OBJECT-MANIPULATION-ALLOWED through PLACEMENT-OPTIONS and so requires an open session.
+  (recording-in-progress)
+
   (has-location live-gate-agent live-gate-site)
   (has-location ghost-gate-agent ghost-gate-site)
   (has-location live-gears-agent live-gears-site)

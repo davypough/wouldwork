@@ -21,8 +21,8 @@
 ;;; orders the final calls from their actual read/write graph.
 ;;;
 ;;; REQUIRES / PROVIDES VIA COMPONENTS:
-;;;   -recorder-core               : RECORDING-COPY>, side identity, object presence,
-;;;                                  and cross-layer interaction policy
+;;;   -recorder-core               : RECORDING-COPY>, RECORDING-IN-PROGRESS, side identity,
+;;;                                  object presence, and cross-layer interaction policy
 ;;;   -recorder-plate-shadow       : RECORDING-DEPRESSED / RECORDING-LATCHED
 ;;;   -recorder-receiver-shadow    : RECORDING-ACTIVE
 ;;;   -recorder-controls-shadow    : recording-side DNF controller evaluation
@@ -30,6 +30,10 @@
 ;;;   -recorder-gate-shadow        : RECORDING-OPEN and gate-view hook
 ;;;   -recorder-wall-gears-shadow  : RECORDING-TURNING and gears-view hook
 ;;;   -recorder-solution           : candidate validation and two-phase report
+;;;   -recorder-session            : START-RECORDER / STOP-RECORDER actions and the
+;;;                                  live-to-ghost state fork; nests -recorder-solution,
+;;;                                  so its own list position is a readability choice, not
+;;;                                  a load-order requirement
 ;;;   -recorder-cycle-boundary     : closed-cycle goal and fresh-shadow preparation
 ;;;   -recorder-cycle-chaining     : one-cycle solve, commit, final solve, and undo history
 ;;;   -recorder-init-checks        : mapping, isolation, and supported-scope validation
@@ -46,6 +50,7 @@
 (include-tech -recorder-gate-shadow)
 (include-tech -recorder-wall-gears-shadow)
 (include-tech -recorder-solution)
+(include-tech -recorder-session)
 (include-tech -recorder-cycle-boundary)
 (include-tech -recorder-cycle-chaining)
 (include-tech -recorder-init-checks)

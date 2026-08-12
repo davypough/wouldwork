@@ -6,8 +6,9 @@
 ;;; second press de-energizes both devices while depressing the plate again.
 ;;; Independently, a second plate initializes beneath one weight with its latch
 ;;; explicitly on.  Initial propagation establishes depression without changing
-;;; that stored state; STACK-SECOND-WEIGHT adds another occupant while the plate
-;;; remains depressed and must not count as a new press.  Two more fixtures prove
+;;; that stored state; STACK-SECOND-WEIGHT rests a second weight on the first
+;;; (ON is bijective, so a support holds at most one direct occupant) rather than
+;;; directly on the plate, and this must not count as a new press.  Two more fixtures prove
 ;;; that initial occupancy does not turn an unlatched plate on, and that a clear
 ;;; plate may begin explicitly latched.  The four required actions may occur in
 ;;; any order.
@@ -68,11 +69,11 @@
   ()
   (and (current-phase before-stack)
        (on weight-a stacked-plate)
-       (not (on weight-b stacked-plate))
+       (not (on weight-b weight-a))
        (depressed stacked-plate)
        (latched stacked-plate))
-  ("> second weight is stacked on the already-depressed toggle plate")
-  (assert (on weight-b stacked-plate)
+  ("> second weight is stacked on the first, on the already-depressed toggle plate")
+  (assert (on weight-b weight-a)
           (not (current-phase before-stack))
           (current-phase after-stack)
           (finally (propagate-changes!))))
@@ -85,7 +86,7 @@
        (not (turning gears1))
        (current-phase after-stack)
        (on weight-a stacked-plate)
-       (on weight-b stacked-plate)
+       (on weight-b weight-a)
        (depressed stacked-plate)
        (latched stacked-plate)
        (depressed occupied-unlatched-plate)

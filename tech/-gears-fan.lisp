@@ -220,23 +220,25 @@
 (define-query stack-rider (?candidate support-occupant ?base support-occupant)
   ;; True when ?candidate's downward support chain reaches ?base.  Landing selection
   ;; uses this after relocate-stack!, while every original (on ...) link within the moved
-  ;; stack is still intact.  An already-cyclic authored chain is an inconsistent state,
-  ;; not a search condition to tolerate.
-  (do (assign $current ?candidate)
-      (assign $seen nil)
-      (ww-loop
-        do (if (member $current $seen)
-             (error "~%Support cycle encountered while checking landing support.~%~
-                     Candidate: ~S~%Base: ~S"
-                    ?candidate ?base))
-           (assign $seen (cons $current $seen))
-           (if (not (bind (on $current $support)))
-             (return nil))
-           (if (eql $support ?base)
-             (return t))
-           (if (not (support-occupant $support))
-             (return nil))
-           (assign $current $support))))
+  ;; stack is still intact.  Delegates to stack-rider-hop, which recurses one link per
+  ;; call so the walked object is always a bound query parameter and $support a fresh
+  ;; unbound target: the bind direction is then fixed at compile time, with nothing
+  ;; stale left over between hops.
+  (stack-rider-hop ?candidate ?base nil))
+
+
+(define-query stack-rider-hop (?current support-occupant ?base support-occupant ?seen)
+  ;; One link of stack-rider's downward walk.  An already-cyclic authored chain is an
+  ;; inconsistent state, not a search condition to tolerate.
+  (cond
+    ((member ?current ?seen)
+     (error "~%Support cycle encountered while checking landing support.~%~
+             Repeated object: ~S~%Base: ~S"
+            ?current ?base))
+    ((not (bind (on ?current $support))) nil)
+    ((eql $support ?base) t)
+    ((support-occupant $support) (stack-rider-hop $support ?base (cons ?current ?seen)))
+    (t nil)))
 
 
 (define-query landing-support (?location location ?self support-occupant ?required-elevation)

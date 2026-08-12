@@ -9,8 +9,10 @@
 ;;; RECORDING-DEPRESSED, RECORDING-LATCHED, RECORDING-TURNING, RECORDING-ACTIVE and
 ;;; RECORDING-OPEN during propagation, while this file runs once per completed candidate
 ;;; path and touches none of them.  What it does read is identity from -recorder-core --
-;;; LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location, position, and the
-;;; mobility closure.
+;;; LIVE-RECORDING-OBJECT and GHOST-RECORDING-OBJECT -- plus location, position, the
+;;; mobility closure, and (since GHOST-STOPS-RECORDER was strengthened to require a
+;;; genuinely closed session) RECORDING-IN-PROGRESS, which is session lifecycle state, not
+;;; one of the per-apparatus shadow views above.
 ;;;
 ;;; A recording is closed by moving back to a recorder and stopping it, which gives a
 ;;; problem two sensible places to stop searching.  The default is to stop when the problem's
@@ -31,12 +33,16 @@
 ;;;            -- nested here rather than left to cargo-carrying techs, so a recording
 ;;;            session's closure rule is well-defined even in a cargo-free recorder
 ;;;            problem; empty CARGO there makes RECORDING-AGENT-EMPTY-HANDED a no-op)
-;;;   soft   : -recorder-core's identity queries, assembled by recorder.lisp
+;;;   soft   : -recorder-core's identity queries and RECORDING-IN-PROGRESS, assembled by
+;;;            recorder.lisp before this component
 ;;; PROVIDES:
 ;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
 ;;;              recording-agent-return-route, recording-agent-at-recorder,
 ;;;              recording-agent-empty-handed
-;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report
+;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report;
+;;;              recorder-recording-path, recorder-recording-window and their helpers now
+;;;              locate the real START-RECORDER/STOP-RECORDER moves when the searched path
+;;;              contains them, falling back to the whole path when it does not
 
 (include-tech -location)
 (include-tech -position)
@@ -55,16 +61,22 @@
 
 
 (define-query ghost-stops-recorder ()
-  ;; Optional goal conjunct.  Every mapped ghost agent has moved back to a recorder empty-
-  ;; handed, so the return trip -- and any cargo it had to set down first -- appears in the
-  ;; solution path and its length counts toward min-length.  A problem that omits this
-  ;; conjunct stops at its own goal and lets the report supply the return instead.  Place it
-  ;; after the problem's own goal literals: the conjunction is evaluated in order, so this
-  ;; walks the ghost roster only on states that already qualify.
-  (forall (?agent agent)
-    (or (not (ghost-recording-object ?agent))
-        (and (recording-agent-at-recorder ?agent)
-             (recording-agent-empty-handed ?agent)))))
+  ;; Optional goal conjunct, and the closure the recorder-cycle-chaining machinery requires
+  ;; before treating a search as a genuinely closed cycle.  Position and holding alone are
+  ;; not enough: recording must actually have been stopped by a real STOP-RECORDER action,
+  ;; not merely be positionally consistent with having stopped, or a chained cycle could
+  ;; commit a boundary where recording never genuinely closed.  Every mapped ghost agent
+  ;; has moved back to a recorder empty-handed, so the return trip -- and any cargo it had
+  ;; to set down first -- appears in the solution path and its length counts toward
+  ;; min-length.  A problem that omits this conjunct stops at its own goal and lets the
+  ;; report supply the return instead.  Place it after the problem's own goal literals: the
+  ;; conjunction is evaluated in order, so this walks the ghost roster only on states that
+  ;; already qualify.
+  (and (not (recording-in-progress))
+       (forall (?agent agent)
+         (or (not (ghost-recording-object ?agent))
+             (and (recording-agent-at-recorder ?agent)
+                  (recording-agent-empty-handed ?agent))))))
 
 
 (define-query recording-agent-can-close (?agent agent)
@@ -157,6 +169,64 @@
     integrated-path))
 
 
+(defun recorder-move-action-name (move)
+  "The action name MOVE invokes, or NIL when MOVE is not an (index (action ...)) pair."
+  (when (and (listp move)
+             (= (length move) 2)
+             (listp (second move)))
+    (first (second move))))
+
+
+(defun recorder-explicit-start (integrated-path)
+  "The real START-RECORDER move in INTEGRATED-PATH, or NIL when none was searched."
+  (find 'start-recorder integrated-path :key #'recorder-move-action-name))
+
+
+(defun recorder-explicit-stop (integrated-path)
+  "The real STOP-RECORDER move in INTEGRATED-PATH, or NIL when none was searched."
+  (find 'stop-recorder integrated-path :key #'recorder-move-action-name))
+
+
+(defun recorder-path-after (integrated-path move)
+  "The tail of INTEGRATED-PATH strictly after MOVE, or the whole path when MOVE is NIL."
+  (if move
+    (rest (member move integrated-path))
+    integrated-path))
+
+
+(defun recorder-path-before (integrated-path move)
+  "The prefix of INTEGRATED-PATH strictly before MOVE, or the whole path when MOVE is NIL."
+  (if move
+    (subseq integrated-path 0 (position move integrated-path))
+    integrated-path))
+
+
+(defun recorder-recording-window (integrated-path)
+  "INTEGRATED-PATH narrowed to strictly between its real START-RECORDER and STOP-RECORDER
+moves.  Either or both edges default to the path's own start/end when the searched path
+never invoked the real action -- exactly the pre-restructuring behavior, where recording
+had no path-local edges at all."
+  (recorder-path-before
+    (recorder-path-after integrated-path (recorder-explicit-start integrated-path))
+    (recorder-explicit-stop integrated-path)))
+
+
+(defun recorder-recording-path (state integrated-path)
+  "The path segment VALIDATE-RECORDER-SOLUTION treats as one recording: the real
+START-RECORDER move when the searched path contains one, every ghost move within the
+window it opens, and the real STOP-RECORDER move when present.  A ghost action's own
+precondition now requires recording to be in progress, so the isolated replay needs
+START-RECORDER's fork included to be viable at all -- it is no longer purely a ghost-only
+subsequence.  Falls back to the whole path's ghost-only moves, with no edges, when neither
+real action was searched."
+  (let ((explicit-start (recorder-explicit-start integrated-path))
+        (explicit-stop (recorder-explicit-stop integrated-path)))
+    (append (and explicit-start (list explicit-start))
+            (recorder-path-moves-on-side
+              state (recorder-recording-window integrated-path) :ghost)
+            (and explicit-stop (list explicit-stop)))))
+
+
 (defun recorder-recording-agents (state)
   "Return the mapped ghost agents that can act during recording."
   (remove-if-not
@@ -176,15 +246,16 @@
 (defun validate-recorder-solution (start-state integrated-path goal-state)
   "Validate recording and playback under the recorder's snapshot-reset semantics.
 
-The recording is the ghost-only subsequence replayed from START-STATE.  Every mapped ghost
-agent must still be able to reach a recorder when it ends -- the weaker of the two
-termination rules, so that a search stopping at the problem's own goal and a search
-carrying GHOST-STOPS-RECORDER as a goal conjunct are both admissible.  Playback then
-restores START-STATE and replays the complete integrated path under the ordinary action
-rules."
+The recording is RECORDER-RECORDING-PATH replayed from START-STATE: the real
+START-RECORDER move when the searched path contains one, its ghost moves, and the real
+STOP-RECORDER move when present.  Every mapped ghost agent must still be able to reach a
+recorder when it ends -- the weaker of the two termination rules, so that a search
+stopping at the problem's own goal and a search carrying GHOST-STOPS-RECORDER as a goal
+conjunct are both admissible.  Playback then restores START-STATE and replays the complete
+integrated path under the ordinary action rules."
   (declare (ignore goal-state))
   (let* ((ghost-path
-           (recorder-path-moves-on-side start-state integrated-path :ghost))
+           (recorder-recording-path start-state integrated-path))
          (recording-validation
            (validate-action-sequence start-state ghost-path)))
     (unless (action-sequence-validation-success-p recording-validation)
@@ -226,11 +297,18 @@ rules."
 
 
 (defun recorder-recording-sequence (state integrated-path)
-  "Extract ghost moves, replace each live-action block with one PAUSE marker, and close with
-whatever return move the searched path stopped short of."
-  (let ((sequence (list '(start-recorder)))
-        (previous-side nil))
-    (dolist (move integrated-path)
+  "Extract ghost moves within the recording window, replace each live-action block with one
+PAUSE marker, and open/close with the real START-RECORDER/STOP-RECORDER moves when the
+searched path contains them.  Any pre-recording moves before a real START-RECORDER fall
+outside the window entirely, rather than appearing as an inferred leading pause.  Falls
+back to a synthesized opening marker, and to a synthesized closing marker plus whatever
+return move the searched path stopped short of, exactly as before real actions existed,
+when the corresponding real move is absent."
+  (let* ((explicit-start (recorder-explicit-start integrated-path))
+         (explicit-stop (recorder-explicit-stop integrated-path))
+         (sequence (list (or explicit-start '(start-recorder))))
+         (previous-side nil))
+    (dolist (move (recorder-recording-window integrated-path))
       (let ((side (recorder-report-move-side state move)))
         (when (and (eql side :live)
                    (not (eql previous-side :live)))
@@ -238,7 +316,10 @@ whatever return move the searched path stopped short of."
         (when (eql side :ghost)
           (setf sequence (nconc sequence (list move))))
         (setf previous-side side)))
-    (nconc sequence (recorder-return-moves state) (list '(stop-recorder)))))
+    (nconc sequence
+           (if explicit-stop
+             (list explicit-stop)
+             (nconc (recorder-return-moves state) (list '(stop-recorder)))))))
 
 
 (defun recorder-return-moves (state)

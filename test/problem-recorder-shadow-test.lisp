@@ -1,16 +1,24 @@
 ;;; Filename: problem-recorder-shadow-test.lisp
 
 ;;; Recorder Stage 3 characterization.  Eight phase-gated physical occupancy transitions
-;;; exercise one toggle plate and its wall fan in both environmental views.  A parallel
-;;; pressure plate with mapped box weights verifies ghost-only pressure output:
+;;; exercise two toggle plates -- CONTROL-PLATE, wired to the wall fan, and an
+;;; independent CONTROL-PLATE-2 -- in both environmental views.  ON is bijective, so a
+;;; support holds at most one direct occupant; a "first" agent presses CONTROL-PLATE,
+;;; which alone drives the fan, while the corresponding "second" agent presses the
+;;; independent CONTROL-PLATE-2, exercising the identical depressed/latched (and
+;;; recording-side) mechanics on a second fixture without either plate displacing the
+;;; other's occupant or the second plate's press/release ever perturbing the fan.  A
+;;; parallel pressure plate with mapped box weights verifies ghost-only pressure output:
 ;;;
 ;;;   - live occupancy first turns on playback only, so a live box is swept while its
 ;;;     ghost copy remains and only the live actor sees the stream as impassable;
-;;;   - additional live weight and both live releases do not retrigger the toggle;
+;;;   - pressing and releasing live-second on control-plate-2, and releasing live-first,
+;;;     never perturb control-plate's own latch or the fan's turning;
 ;;;   - the first ghost occupancy then turns playback off but recording on, so a newly
 ;;;     introduced live box remains while the ghost box is swept and only the ghost sees
 ;;;     the stream as impassable;
-;;;   - additional ghost weight and both ghost releases do not retrigger either view.
+;;;   - pressing and releasing ghost-second on control-plate-2, and releasing ghost-first,
+;;;     likewise never perturb either view of the fan.
 ;;;
 ;;; Expected minimum path length: 8.
 
@@ -35,7 +43,7 @@
        live-pressure ghost-pressure)
   recorder (recorder1)
   pressure-plate (pressure-control)
-  toggle-plate (control-plate)
+  toggle-plate (control-plate control-plate-2)
   wall-gears (pressure-gears)
   wall-blower (wgears1)
   location (plate-site swept destination storage)
@@ -80,6 +88,7 @@
 
   (has-position recorder1 plate-site)
   (has-position control-plate plate-site)
+  (has-position control-plate-2 plate-site)
   (has-position pressure-control plate-site)
   (has-position wgears1 swept)
   (has-position pressure-gears swept)
@@ -132,8 +141,8 @@
        (has-location ghost-swept swept)
        (not (obstacle-clear live-first wgears1))
        (obstacle-clear ghost-first wgears1))
-  ("> live-second adds weight without a second playback toggle")
-  (assert (on live-second control-plate)
+  ("> live-second presses control-plate-2 without retriggering control-plate")
+  (assert (on live-second control-plate-2)
           (not (current-phase phase1))
           (current-phase phase2)
           (finally (propagate-changes!))))
@@ -145,8 +154,10 @@
   (and (current-phase phase2)
        (depressed control-plate)
        (latched control-plate)
-       (on live-second control-plate))
-  ("> live-first leaves while the playback plate remains depressed")
+       (depressed control-plate-2)
+       (latched control-plate-2)
+       (on live-second control-plate-2))
+  ("> live-first leaves control-plate; latched persists and control-plate-2 stays depressed")
   (assert (not (on live-first control-plate))
           (not (current-phase phase2))
           (current-phase phase3)
@@ -157,11 +168,13 @@
   1
   ()
   (and (current-phase phase3)
-       (depressed control-plate)
+       (not (depressed control-plate))
        (latched control-plate)
-       (on live-second control-plate))
-  ("> live-second clears the plate without changing its latch")
-  (assert (not (on live-second control-plate))
+       (depressed control-plate-2)
+       (latched control-plate-2)
+       (on live-second control-plate-2))
+  ("> live-second clears control-plate-2 without changing either plate's latch")
+  (assert (not (on live-second control-plate-2))
           (not (current-phase phase3))
           (current-phase phase4)
           (finally (propagate-changes!))))
@@ -201,8 +214,8 @@
        (has-location ghost-swept destination)
        (obstacle-clear live-first wgears1)
        (not (obstacle-clear ghost-first wgears1)))
-  ("> ghost-second adds weight without retriggering either view")
-  (assert (on ghost-second control-plate)
+  ("> ghost-second presses control-plate-2 without retriggering either view")
+  (assert (on ghost-second control-plate-2)
           (not (current-phase phase5))
           (current-phase phase6)
           (finally (propagate-changes!))))
@@ -215,8 +228,13 @@
        (depressed control-plate)
        (recording-depressed control-plate)
        (not (latched control-plate))
-       (recording-latched control-plate))
-  ("> ghost-first leaves while both plate views remain depressed")
+       (recording-latched control-plate)
+       (depressed control-plate-2)
+       (recording-depressed control-plate-2)
+       (not (latched control-plate-2))
+       (recording-latched control-plate-2)
+       (on ghost-second control-plate-2))
+  ("> ghost-first leaves control-plate entirely while control-plate-2 stays depressed")
   (assert (not (on ghost-first control-plate))
           (not (current-phase phase6))
           (current-phase phase7)
@@ -227,12 +245,17 @@
   1
   ()
   (and (current-phase phase7)
-       (depressed control-plate)
-       (recording-depressed control-plate)
+       (not (depressed control-plate))
+       (not (recording-depressed control-plate))
        (not (latched control-plate))
-       (recording-latched control-plate))
-  ("> ghost-second clears both views without changing either latch")
-  (assert (not (on ghost-second control-plate))
+       (recording-latched control-plate)
+       (depressed control-plate-2)
+       (recording-depressed control-plate-2)
+       (not (latched control-plate-2))
+       (recording-latched control-plate-2)
+       (on ghost-second control-plate-2))
+  ("> ghost-second clears control-plate-2's both views without changing either latch")
+  (assert (not (on ghost-second control-plate-2))
           (not (on ghost-pressure pressure-control))
           (not (current-phase phase7))
           (current-phase phase8)

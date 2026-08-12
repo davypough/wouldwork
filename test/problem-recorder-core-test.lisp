@@ -41,6 +41,9 @@
 (define-init
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-connector ghost-connector)
+  ;; OBJECT-MANIPULATION-ALLOWED and CONNECTOR-PAIRING-ALLOWED gate ghost action on this
+  ;; flag; the characterization below expects both to be true for the ghost side.
+  (recording-in-progress)
   (has-position recorder1 recorder-site))
 
 

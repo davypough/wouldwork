@@ -17,9 +17,16 @@
 ;;;   nested : -location (mobile-object); -position (recorder has-position role);
 ;;;            -interaction-policy (neutral action hooks); -recording-shadow-policy
 ;;;            (neutral environmental-view hooks)
+;;; RECORDING-IN-PROGRESS is declared here, rather than alongside the START-RECORDER /
+;;; STOP-RECORDER actions that set it (-recorder-session.lisp), because
+;;; OBJECT-MANIPULATION-ALLOWED and CONNECTOR-PAIRING-ALLOWED below need to read it, and
+;;; this file is the first component -recorder.lisp assembles.  -recorder-session.lisp
+;;; nests this file for the relation, not the other way around.
+;;;
 ;;; PROVIDES:
 ;;;   type     : recorder, connector (optional)
-;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object)
+;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object);
+;;;              recording-in-progress
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
 ;;;              overrides recording-shadow-object, recording-shadow-object-present,
 ;;;              object-manipulation-allowed, support-use-allowed, and
@@ -40,6 +47,10 @@
 
 (define-static-relations
   (recording-copy> mobile-object $mobile-object))
+
+
+(define-dynamic-relations
+  (recording-in-progress))
 
 
 (register-symmetry-coupling 'recording-copy>)
@@ -105,10 +116,14 @@
 
 
 (define-query object-manipulation-allowed (?actor ?object)
-  ;; Recorder participants may manipulate only mapped objects on their own side.
+  ;; Recorder participants may manipulate only mapped objects on their own side.  A ghost
+  ;; does not exist to act until recording is in progress (rule 5); a live actor is
+  ;; unrestricted by session timing.
   (and (mobile-object ?actor)
        (mobile-object ?object)
-       (same-recording-side ?actor ?object)))
+       (same-recording-side ?actor ?object)
+       (or (live-recording-object ?actor)
+           (recording-in-progress))))
 
 
 (define-query support-use-allowed (?occupant ?support)
@@ -122,11 +137,15 @@
 (define-query connector-pairing-allowed (?actor ?connector ?terminus)
   ;; Fixed beam apparatus is shared.  During playback a live connector may use either
   ;; layer's connector as a terminus, while a ghost connector may depend only on another
-  ;; ghost connector -- never on a live movable connector absent from its recording.
+  ;; ghost connector -- never on a live movable connector absent from its recording.  The
+  ;; live-to-ghost bridge additionally requires recording to be in progress: a ghost
+  ;; terminus does not exist to reference before then (rule 5).  A ghost actor pairing with
+  ;; a ghost terminus is already gated by OBJECT-MANIPULATION-ALLOWED above.
   (and (object-manipulation-allowed ?actor ?connector)
        (or (not (connector ?terminus))
            (and (live-recording-object ?actor)
                 (or (live-recording-object ?terminus)
-                    (ghost-recording-object ?terminus)))
+                    (and (ghost-recording-object ?terminus)
+                         (recording-in-progress))))
            (and (ghost-recording-object ?actor)
                 (ghost-recording-object ?terminus)))))
