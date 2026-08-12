@@ -14,7 +14,8 @@
 ;;; is reset and, when necessary, seeded at a chained-cycle boundary.
 ;;;
 ;;; REQUIRES:
-;;;   nested : -location (mobile-object); -position (recorder has-position role);
+;;;   nested : -location (mobile-object); -holding (cargo and holding, needed to
+;;;            recognize a ghost-held tray); -position (recorder has-position role);
 ;;;            -interaction-policy (neutral action hooks); -recording-shadow-policy
 ;;;            (neutral environmental-view hooks)
 ;;; RECORDING-IN-PROGRESS is declared here, rather than alongside the START-RECORDER /
@@ -24,7 +25,7 @@
 ;;; nests this file for the relation, not the other way around.
 ;;;
 ;;; PROVIDES:
-;;;   type     : recorder, connector (optional)
+;;;   type     : recorder, connector, tray (optional)
 ;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object);
 ;;;              recording-in-progress
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
@@ -35,6 +36,7 @@
 ;;;              clear-recorder-shadow-relation!
 
 (include-tech -location)
+(include-tech -holding)
 (include-tech -position)
 (include-tech -interaction-policy)
 (include-tech -recording-shadow-policy)
@@ -42,7 +44,7 @@
 (in-package :ww)
 
 
-(define-optional-types recorder connector)
+(define-optional-types recorder connector tray)
 
 
 (define-static-relations
@@ -127,11 +129,21 @@
 
 
 (define-query support-use-allowed (?occupant ?support)
-  ;; Fixed supports such as plates are shared environmental apparatus.  A mobile support
-  ;; (box or floor-mounted fan) is usable only by an occupant on the same recording side.
+  ;; Fixed supports such as plates are shared environmental apparatus.  Mobile supports
+  ;; normally stay on their own recording side.  Rule 19 adds one directional playback
+  ;; exception: a live occupant may use a ghost tray while a ghost is actively holding it.
+  ;; The reverse dependency remains forbidden because the recorded ghost performance
+  ;; cannot rely on a live support introduced during playback.
   (or (not (mobile-object ?support))
       (and (mobile-object ?occupant)
-           (same-recording-side ?occupant ?support))))
+           (same-recording-side ?occupant ?support))
+      (and (live-recording-object ?occupant)
+           (ghost-recording-object ?support)
+           (tray ?support)
+           (recording-in-progress)
+           (exists (?holder agent)
+             (and (ghost-recording-object ?holder)
+                  (holding ?holder ?support))))))
 
 
 (define-query connector-pairing-allowed (?actor ?connector ?terminus)

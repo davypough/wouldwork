@@ -30,13 +30,16 @@
 (define-types
   agent (live-pickup-agent ghost-pickup-agent
          live-place-agent ghost-place-agent
-         live-pair-agent ghost-pair-agent)
+         live-pair-agent ghost-pair-agent
+         live-tray-holder ghost-tray-holder)
   box (live-pickup-box ghost-pickup-box
        live-support-box ghost-support-box
        live-landing-box ghost-landing-box)
   connector (live-place-connector ghost-place-connector
              live-pair-connector ghost-pair-connector
              live-target-connector ghost-target-connector)
+  tray (live-held-tray ghost-held-tray
+        live-ground-tray ghost-ground-tray)
   recorder (recorder1)
   pressure-plate (shared-plate)
   transmitter (shared-transmitter)
@@ -65,12 +68,15 @@
   (recording-copy> live-pickup-agent ghost-pickup-agent)
   (recording-copy> live-place-agent ghost-place-agent)
   (recording-copy> live-pair-agent ghost-pair-agent)
+  (recording-copy> live-tray-holder ghost-tray-holder)
   (recording-copy> live-pickup-box ghost-pickup-box)
   (recording-copy> live-support-box ghost-support-box)
   (recording-copy> live-landing-box ghost-landing-box)
   (recording-copy> live-place-connector ghost-place-connector)
   (recording-copy> live-pair-connector ghost-pair-connector)
   (recording-copy> live-target-connector ghost-target-connector)
+  (recording-copy> live-held-tray ghost-held-tray)
+  (recording-copy> live-ground-tray ghost-ground-tray)
 
   ;; The ghost-side pickup/placement/pairing characterizations below require an open
   ;; session: OBJECT-MANIPULATION-ALLOWED gates ghost action on this flag.
@@ -95,6 +101,14 @@
   (holding ghost-place-agent ghost-place-connector)
   (has-location live-support-box place-site)
   (has-location ghost-support-box place-site)
+  (has-location live-tray-holder place-site)
+  (has-location ghost-tray-holder place-site)
+  (holding live-tray-holder live-held-tray)
+  (holding ghost-tray-holder ghost-held-tray)
+  (has-location live-held-tray place-site)
+  (has-location ghost-held-tray place-site)
+  (has-location live-ground-tray place-site)
+  (has-location ghost-ground-tray place-site)
 
   ;; Physical landing matrix used by -gears-fan's shared landing-support query.
   (has-location live-landing-box landing-site)
@@ -126,12 +140,15 @@
   '((recording-copy> live-pickup-agent ghost-pickup-agent)
     (recording-copy> live-place-agent ghost-place-agent)
     (recording-copy> live-pair-agent ghost-pair-agent)
+    (recording-copy> live-tray-holder ghost-tray-holder)
     (recording-copy> live-pickup-box ghost-pickup-box)
     (recording-copy> live-support-box ghost-support-box)
     (recording-copy> live-landing-box ghost-landing-box)
     (recording-copy> live-place-connector ghost-place-connector)
     (recording-copy> live-pair-connector ghost-pair-connector)
-    (recording-copy> live-target-connector ghost-target-connector)))
+    (recording-copy> live-target-connector ghost-target-connector)
+    (recording-copy> live-held-tray ghost-held-tray)
+    (recording-copy> live-ground-tray ghost-ground-tray)))
 
 
 (define-test-claim recorder-isolation-validation
@@ -190,7 +207,9 @@
 
 
 (define-query recorder-isolation-placement-valid ()
-  ;; Placement retains shared ground/plate but filters mobile supports by layer.
+  ;; Placement retains shared ground/plate and same-side mobile supports.  Rule 19 also
+  ;; exposes a ghost-held tray to the live connector, but not a grounded ghost tray or a
+  ;; live-held tray to the ghost connector.
   (do (assign $live-places
         (placement-options live-place-agent place-site live-place-connector))
       (assign $ghost-places
@@ -199,10 +218,15 @@
            (member 'shared-plate $live-places)
            (member 'live-support-box $live-places)
            (not (member 'ghost-support-box $live-places))
+           (member 'live-held-tray $live-places)
+           (member 'ghost-held-tray $live-places)
+           (not (member 'ghost-ground-tray $live-places))
            (member 'ground $ghost-places)
            (member 'shared-plate $ghost-places)
            (member 'ghost-support-box $ghost-places)
-           (not (member 'live-support-box $ghost-places)))))
+           (not (member 'live-support-box $ghost-places))
+           (member 'ghost-held-tray $ghost-places)
+           (not (member 'live-held-tray $ghost-places)))))
 
 
 (define-query recorder-isolation-landing-valid ()

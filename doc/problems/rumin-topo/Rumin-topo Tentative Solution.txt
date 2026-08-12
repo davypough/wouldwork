@@ -1,9 +1,10 @@
 RUMIN-TOPO TENTATIVE SOLUTION NOTES
 
-Status: Phases 1 and 2 validated against tech/ as currently implemented. Phase 3 is
-blocked pending a restructuring of the recorder technology's ghost-state semantics (see
-tech/Recorder-ghost operations in the Talos Principle.txt and the open issue below).
-This file records what's settled and what's still open, for picking this back up later.
+Status: Historical phases 1 and 2 were validated when first written, but phase 3 remains
+unresolved and the phase-2 grounded tray cannot serve as a support. The recorder now
+forks each ghost from its live counterpart's current state at START-RECORDER, and rule 19
+now permits a live object to use a tray while a ghost is holding it. A useful phase 2/3
+will therefore need to keep the ghost tray held rather than leave it on the ground.
 
 
 GOAL
@@ -24,7 +25,8 @@ location2 and leaves it there, then returns to the recorder (location3).
 
 Phase 3 (live + ghost playback, NOT YET DESIGNED): something must complete a
 transmitter1 -> ... -> receiver1 beam chain to actually energize receiver1 and open
-gate1. The exact mechanism is unresolved -- see PHASE 3 below.
+gate1. The exact mechanism is unresolved, but a live connector on a ghost-held tray is
+now an available cross-side support arrangement -- see PHASE 3 below.
 
 
 PHASE 1 -- VALIDATED
@@ -75,6 +77,10 @@ agent1* ends this phase at location3 (recorder1's position), empty-handed. tray1
 on the ground at location2. connector1* has NOT been touched -- it is still sitting at
 its own init position, location1.
 
+This historical phase closes successfully, but it cannot contribute a tray support to
+playback: a grounded tray is inert. A revised recording must leave tray1* held at the
+location and time where the live agent needs its elevated platform.
+
 Note: tech/-recorder-solution.lisp was also modified during this work to require a
 ghost to be empty-handed to close a recording session (new query
 recording-agent-empty-handed, folded into both ghost-stops-recorder and
@@ -111,6 +117,10 @@ Constraints established along the way that any design for this phase has to resp
   - A grounded tray supports nothing (tray.lisp: only a currently-held tray can support
     an occupant). tray1*, left on the ground at location2 in phase 2, cannot have
     anything placed on it as things stand.
+  - During playback, a LIVE object may be placed on a GHOST tray while a ghost is
+    holding it (Talos rule 19). This is a directional exception to ordinary side
+    isolation: a grounded ghost tray is still inert, ordinary ghost supports remain
+    unusable by live objects, and a ghost object cannot depend on a live-held tray.
   - Holding is exclusive -- pickup-clear requires empty hands, so no agent can carry
     two items at once. A plan that has one ghost carry both the tray and a connector
     simultaneously doesn't work.
@@ -119,25 +129,20 @@ Constraints established along the way that any design for this phase has to resp
     REPEATER instead of pairing directly to connector1*'s ghost connector. That trick
     isn't directly available here -- rumin-topo declares no repeater type or objects.
 
-Genuinely unresolved, and the reason phase 3 hasn't been designed yet: per the
-ground-truth explainer (tech/Recorder-ghost operations in the Talos Principle.txt,
-rules 5, 9, 11, 18), a ghost object should inherit its live counterpart's CURRENT
-state -- position, pairings -- at the moment recording starts, not the state declared
-in define-init. Since phase 1 happens before the recorder starts, connector1* should,
-per that rule, begin its recorded trajectory already at location13, already paired to
-receiver1 -- and agent1* itself should begin at the recorder's location, not at
-location1. None of this is actually implemented in tech/ as it stands today:
-recording-copy> is a static, init-time-only identity, and no code path forks a live
-object's current state onto its ghost counterpart at any point. This is a real gap
-between the documented design and the current engine, not just a phrasing ambiguity,
-and it is being tracked as a separate restructuring effort (a continuation prompt for a
-new session has already been prepared). Phase 3 can't be pinned down until that's
-resolved, since the answer to "where does connector1* start, and what is it already
-paired to, once recording begins" is exactly what's in question.
+The former ghost-starting-state blocker has been resolved. START-RECORDER now forks
+every mapped ghost from its live counterpart's current has-location, holding, on,
+paired, jamming, and mounted-on state when the owning capability is present. Thus, if
+phase 1 leaves connector1 at location13 paired with receiver1, connector1* begins the
+recording at location13 with the corresponding receiver1 pairing, and agent1* begins at
+the recorder. Phase 3 still needs to be re-derived around that snapshot and the newly
+implemented ghost-held-tray support exception.
 
 
 CHANGES MADE TO THE CODEBASE DURING THIS WORK
 
+  - tech/-recorder-core.lisp: support-use-allowed now implements the Talos rule 19
+    exception. During playback, a live object may use a ghost tray only while a ghost
+    agent is holding it. The reverse dependency remains forbidden.
   - probs/problem-rumin-topo.lisp: receiver1's apparatus-coords> corrected from
     (239/10 9) to (13 149/10); added (jump-via location4 () location2).
   - tech/-recorder-solution.lisp: added recording-agent-empty-handed query; folded it
@@ -147,8 +152,7 @@ CHANGES MADE TO THE CODEBASE DURING THIS WORK
 
 NEXT STEPS
 
-  1. Resolve the recorder ghost-state restructuring (separate effort; see the
-     continuation prompt already prepared for a new session).
-  2. Re-derive phase 3 once ghost starting-state semantics are settled -- the answer
-     may make the existing phase 1/2 design unnecessary, or may confirm it and just
-     need a concrete connect-connector chain worked out for the beam.
+  1. Replace the grounded-tray phase with a recording that holds tray1* at the live
+     connector's required placement location during playback.
+  2. Re-derive phase 3 using the current START-RECORDER snapshot semantics and the
+     live-on-ghost-held-tray exception, then validate the concrete beam chain.

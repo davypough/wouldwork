@@ -25,6 +25,7 @@
   agent (live-agent ghost-agent)
   connector (live-connector ghost-connector)
   fan (unmapped-fan)
+  tray (live-held-tray ghost-held-tray live-ground-tray ghost-ground-tray)
   recorder (recorder1)
   location (recorder-site))
 
@@ -41,6 +42,10 @@
 (define-init
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-connector ghost-connector)
+  (recording-copy> live-held-tray ghost-held-tray)
+  (recording-copy> live-ground-tray ghost-ground-tray)
+  (holding live-agent live-held-tray)
+  (holding ghost-agent ghost-held-tray)
   ;; OBJECT-MANIPULATION-ALLOWED and CONNECTOR-PAIRING-ALLOWED gate ghost action on this
   ;; flag; the characterization below expects both to be true for the ghost side.
   (recording-in-progress)
@@ -102,6 +107,10 @@
 
     (support-use-allowed live-agent recorder1)
     (support-use-allowed live-agent live-connector)
+    ;; Rule 19 is directional and applies only while the ghost is holding the tray.
+    (support-use-allowed live-connector ghost-held-tray)
+    (not (support-use-allowed live-connector ghost-ground-tray))
+    (not (support-use-allowed ghost-connector live-held-tray))
     (not (support-use-allowed ghost-agent live-connector))
     (not (support-use-allowed live-agent unmapped-fan))
 
