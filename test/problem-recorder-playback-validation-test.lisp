@@ -155,9 +155,10 @@
                  ((walk recorder-site nil away-site)
                   (walk away-site nil stranded-site)))))
         *start-state*)
-    (and (not valid-p)
-         (eql (getf diagnostic :phase) :recording)
-         (eql (getf diagnostic :reason) :agents-cannot-close))))
+    ;; Once the problem goal is met, a stranded ghost no longer vetoes the candidate;
+    ;; requiring a return trip is the job of a GHOST-STOPS-RECORDER goal conjunct.
+    (and valid-p
+         (null diagnostic))))
 
 
 (define-goal

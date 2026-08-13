@@ -22,7 +22,7 @@
   agent (height-agent)
   location (height-site low-probe-site)
   jammer (height-jammer)
-  box (height-box)
+  box (height-box height-agent-platform)
   gun (height-gun)
   gate (sight-gate)
   wall (height-wall))
@@ -38,6 +38,12 @@
   (has-height height-agent 4)
   (holding height-agent height-jammer)
   (has-height height-jammer 1)
+
+  ;; Stand one unit below HEIGHT-BOX's top so the fixed unit reach permits the
+  ;; elevated placement without changing the visibility geometry under test.
+  (has-location height-agent-platform height-site)
+  (has-height height-agent-platform 3)
+  (on height-agent height-agent-platform)
 
   (has-location height-box height-site)
   (has-height height-box 4)

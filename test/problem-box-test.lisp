@@ -39,16 +39,17 @@
 (include-tech reachability)
 
 (define-init
-  ;; Lifecycle scenario: MOVING-BOX begins on a height-two support, exactly at
-  ;; LIFECYCLE-AGENT's vertical reach boundary.  TARGET-BOX is equally tall.
+  ;; Lifecycle scenario: MOVING-BOX begins on a height-one support, exactly at
+  ;; the fixed vertical-reach boundary.  TARGET-BOX is equally tall.  The agent's
+  ;; explicit height two is deliberately independent of that unit reach.
   (has-location lifecycle-agent source-site)
   (has-height lifecycle-agent 2)
   (has-location source-box source-site)
-  (has-height source-box 2)
+  (has-height source-box 1)
   (has-location moving-box source-site)
   (on moving-box source-box)
   (has-location target-box target-site)
-  (has-height target-box 2)
+  (has-height target-box 1)
   (reach-via source-site () target-site)
 
   ;; Independent placement lifecycle: the held box must be put on the plate.
@@ -67,7 +68,7 @@
   (has-location high-agent high-site)
   (has-height high-agent 2)
   (has-location high-support high-site)
-  (has-height high-support 3)
+  (has-height high-support 2)
   (has-location high-box high-site)
   (on high-box high-support)
 
@@ -77,18 +78,18 @@
   (has-location loose-box holding-site)
 
   ;; Placement characterization: ground and one clear box are valid supports;
-  ;; an occupied box and an elevation-three location are not.
+  ;; an occupied box and an elevation-two location are not.
   (has-location probe-agent probe-origin)
   (has-height probe-agent 2)
   (holding probe-agent probe-box)
   (has-location clear-probe-support probe-site)
-  (has-height clear-probe-support 2)
+  (has-height clear-probe-support 1)
   (has-location occupied-probe-support probe-site)
   (has-location probe-rider probe-site)
   (on probe-rider occupied-probe-support)
   (reach-via probe-origin () probe-site)
   (reach-via probe-origin () too-high-site)
-  (has-elevation too-high-site 3))
+  (has-elevation too-high-site 2))
 
 (define-init-action initialize-derived-state
   0
@@ -118,9 +119,9 @@
       (not (on moving-box source-box))
       (cleartop source-box)
       (not (cleartop target-box))
-      (= (support-top-elevation source-box) 2)
-      (= (support-top-elevation target-box) 2)
-      (= (occupant-elevation moving-box) 2)
+      (= (support-top-elevation source-box) 1)
+      (= (support-top-elevation target-box) 1)
+      (= (occupant-elevation moving-box) 1)
 
       ;; Putting the independent held box on the plate depresses it.
       (not (holding plate-agent plate-box))
@@ -136,12 +137,12 @@
       (not (box-action-applicable-p
              state 'pickup-box '(occupied-agent blocked-box)))
 
-      ;; HIGH-BOX is clear, but elevation three is just beyond a height-two
-      ;; agent's inclusive vertical reach.
+      ;; HIGH-BOX is clear, but elevation two is just beyond the fixed unit
+      ;; vertical reach, regardless of the agent's explicit height two.
       (cleartop high-box)
-      (= (support-top-elevation high-support) 3)
-      (= (occupant-elevation high-box) 3)
-      (not (within-agent-vertical-reach high-agent 3))
+      (= (support-top-elevation high-support) 2)
+      (= (occupant-elevation high-box) 2)
+      (not (within-agent-vertical-reach high-agent 2))
       (not (pickup-clear high-agent high-site high-box high-site))
       (not (box-action-applicable-p state 'pickup-box '(high-agent high-box)))
 
@@ -164,8 +165,8 @@
       (box-action-applicable-p
         state 'put-box '(probe-agent probe-box probe-site))
       (reachable too-high-site probe-origin)
-      (= (location-elevation too-high-site) 3)
-      (not (within-agent-vertical-reach probe-agent 3))
+      (= (location-elevation too-high-site) 2)
+      (not (within-agent-vertical-reach probe-agent 2))
       (not (placement-options probe-agent too-high-site probe-box))
       (not (box-action-applicable-p
              state 'put-box '(probe-agent probe-box too-high-site)))))

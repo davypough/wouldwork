@@ -20,7 +20,7 @@
 ;;; Independent stationary probes characterize the public clearance queries and inspect
 ;;; MOVE's and CHANGE-CONFIGURATION's real generated children.  They verify inclusive and
 ;;; just-over elevation boundaries -- JUMP-ELEVATION-REACHABLE's raised-landing bound and
-;;; JUMP-PATH-CLEAR's vaulting bound share the same fixed *jump-elevation-limit*, and
+;;; JUMP-PATH-CLEAR's vaulting bound share the same fixed *vertical-reach-limit*, and
 ;;; neither consults any agent's declared height -- downward freedom, barrier defaults and
 ;;; explicit overrides, highest-feature selection, empty-handed screen passability,
 ;;; directed-edge asymmetry, rejection of an unsafe landing, rejection of an occupied box
@@ -135,7 +135,7 @@
   (has-height cargo-screen 2)
   (jump-via> carry-start (vault-wall cargo-screen) carry-goal)
 
-  ;; Exact-boundary query probes.  The fixed *jump-elevation-limit* governs both
+  ;; Exact-boundary query probes.  The fixed *vertical-reach-limit* governs both
   ;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR identically: source 2 reaches 3 but not
   ;; 4, and clears a barrier at top 2 but not one it would need to clear from ground level.
   (has-location boundary-agent boundary-site)
@@ -164,7 +164,7 @@
   (on blocking-connector occupied-target-box)
   (jump-via> occupied-start () occupied-goal)
 
-  ;; A clear height-2 local box is one unit beyond the fixed *jump-elevation-limit*; the
+  ;; A clear height-2 local box is one unit beyond the fixed *vertical-reach-limit*; the
   ;; mount must fail regardless of any agent's height, since none is consulted.
   (has-location tall-box-probe-agent tall-box-site)
   (has-location tall-local-box tall-box-site)
@@ -422,7 +422,7 @@
 (define-query-mutation jump-elevation-uses-actual-source jump-elevation-reachable
   (?agent agent ?source-elevation ?target-elevation)
   (<= (- ?target-elevation (occupant-elevation ?agent))
-      *jump-elevation-limit*)
+      *vertical-reach-limit*)
   "Ignores the explicit hypothetical source elevation.  The stairs-then-jump
    route must then fail from the agent's actual pre-move elevation.")
 
@@ -434,6 +434,6 @@
                (jump-required-clearance-height ?agent ?features))
        (or (not $required)
            (<= (- $required (occupant-elevation ?agent))
-               *jump-elevation-limit*)))
+               *vertical-reach-limit*)))
   "Ignores the explicit hypothetical source elevation for path clearance.  The
    elevated intermediate jump and the explicit-source probes must detect it.")

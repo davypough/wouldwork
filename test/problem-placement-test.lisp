@@ -3,16 +3,17 @@
 ;;; Dedicated regression for the shared -placement role.  Three isolated scenarios
 ;;; exercise:
 ;;;
-;;;   1. PUT-BOX placing a held box on a clear floor-mounted fan exactly two elevation
-;;;      units below its height-two agent.  The simultaneous ground successor cannot
+;;;   1. PUT-BOX placing a held box on a clear floor-mounted fan exactly one elevation
+;;;      unit below its explicitly height-two agent.  The simultaneous ground successor cannot
 ;;;      satisfy the goal.
 ;;;   2. PLACEMENT-OPTIONS returning exactly ground, a clear plate, a clear box, a clear
 ;;;      floor-mounted fan, and a co-located agent's held tray, while excluding occupied
 ;;;      supports, a loose fan, a wall-mounted fan, a grounded (inert) tray, and the
 ;;;      candidate object itself -- including a currently-held tray offered as a target
 ;;;      for itself.
-;;;   3. Symmetric vertical reach: ground and a plate are offered exactly two units
-;;;      above and below a height-two agent, but no option is offered three units away.
+;;;   3. Symmetric vertical reach: ground and a plate are offered exactly one unit
+;;;      above and below an explicitly height-two agent, but no option is offered two
+;;;      units away.
 ;;;
 ;;; Only the first scenario changes state.  Its goal verifies PLACE-HELD-OBJECT! releases
 ;;; the hold, establishes the location and fan support, and leaves no competing support
@@ -69,11 +70,11 @@
 
 
 (define-init
-  ;; Lifecycle: the fan top at elevation 0 is exactly at the lower reach boundary
-  ;; of the height-two agent standing at elevation 2.
+  ;; Lifecycle: the fan top at elevation 0 is exactly at the fixed lower reach boundary
+  ;; of the explicitly height-two agent standing at elevation 1.
   (has-location lifecycle-agent lifecycle-origin)
   (has-height lifecycle-agent 2)
-  (has-elevation lifecycle-origin 2)
+  (has-elevation lifecycle-origin 1)
   (holding lifecycle-agent lifecycle-box)
   (has-position lifecycle-gears lifecycle-target)
   (has-location lifecycle-fan lifecycle-target)
@@ -92,7 +93,7 @@
   (on occupied-plate-rider occupied-matrix-plate)
 
   (has-location clear-support-box matrix-site)
-  (has-height clear-support-box 2)
+  (has-height clear-support-box 1)
   (has-location occupied-support-box matrix-site)
   (has-location occupied-box-rider matrix-site)
   (on occupied-box-rider occupied-support-box)
@@ -114,6 +115,7 @@
   ;; A tray held by a co-located agent is a legal placement target; a grounded
   ;; tray, inert like a resting fan, is not.
   (has-location tray-bearer-agent matrix-site)
+  (has-height tray-bearer-agent 1)
   (holding tray-bearer-agent matrix-clear-tray)
   (has-location matrix-clear-tray matrix-site)
   (has-location matrix-loose-tray matrix-site)
@@ -125,13 +127,13 @@
   (has-elevation boundary-origin 5)
   (holding boundary-agent boundary-probe-box)
 
-  (has-elevation upper-boundary 7)
+  (has-elevation upper-boundary 6)
   (has-position upper-boundary-plate upper-boundary)
-  (has-elevation lower-boundary 3)
+  (has-elevation lower-boundary 4)
   (has-position lower-boundary-plate lower-boundary)
-  (has-elevation too-high-boundary 8)
+  (has-elevation too-high-boundary 7)
   (has-position too-high-plate too-high-boundary)
-  (has-elevation too-low-boundary 2)
+  (has-elevation too-low-boundary 3)
   (has-position too-low-plate too-low-boundary)
 
   ;; Keep every mounted fan stopped so the placement fixtures remain ordinary,
@@ -171,7 +173,7 @@
     (mounted-on lifecycle-fan lifecycle-gears)
     (has-location lifecycle-fan lifecycle-target)
     (not (cleartop lifecycle-fan))
-    (= (occupant-elevation lifecycle-agent) 2)
+    (= (occupant-elevation lifecycle-agent) 1)
     (= (support-top-elevation lifecycle-fan) 0)
     (within-agent-vertical-reach lifecycle-agent 0)
 
@@ -251,10 +253,10 @@
     ;; Absolute reach is inclusive in both directions and rejects one unit beyond.
     (holding boundary-agent boundary-probe-box)
     (= (occupant-elevation boundary-agent) 5)
-    (within-agent-vertical-reach boundary-agent 7)
-    (within-agent-vertical-reach boundary-agent 3)
-    (not (within-agent-vertical-reach boundary-agent 8))
-    (not (within-agent-vertical-reach boundary-agent 2))
+    (within-agent-vertical-reach boundary-agent 6)
+    (within-agent-vertical-reach boundary-agent 4)
+    (not (within-agent-vertical-reach boundary-agent 7))
+    (not (within-agent-vertical-reach boundary-agent 3))
     (do (assign $upper
                 (placement-options
                   boundary-agent upper-boundary boundary-probe-box))

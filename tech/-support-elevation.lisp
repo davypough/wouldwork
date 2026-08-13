@@ -8,8 +8,14 @@
 ;;;   nested  : -support-occupancy, -location, -position, -height, -elevation, -holding
 ;;;             (cargo, holding -- needed to find a tray's holder)
 ;;; PROVIDES:
-;;;   queries : support-top-elevation, tray-top-elevation, occupant-elevation,
-;;;             within-agent-vertical-reach
+;;;   parameter : *vertical-reach-limit*, default 1 -- the maximum elevation gap an agent
+;;;               can act across vertically: reaching to pick up or place cargo above or
+;;;               below its own elevation, or jumping up onto a higher support or clearing
+;;;               a barrier (jump.lisp reuses this parameter rather than defining its own).
+;;;               Independent of the agent's own declared height.  A problem overrides it
+;;;               with its own DEFPARAMETER.
+;;;   queries   : support-top-elevation, tray-top-elevation, occupant-elevation,
+;;;               within-agent-vertical-reach
 
 (include-tech -support-occupancy)
 (include-tech -location)
@@ -22,6 +28,14 @@
 
 
 (define-optional-types box fan tray)
+
+
+(defvar *vertical-reach-limit* 1
+  "Maximum elevation gap an agent can act across vertically -- reaching to pick up or place
+   cargo above or below its own elevation, or jumping up onto a higher support or clearing a
+   barrier -- independent of the agent's own declared height.  Reach is symmetric: an object
+   resting more than this far below the agent's elevation is out of reach exactly as one more
+   than this far above it is.  Problem files can override this.")
 
 
 (define-query support-top-elevation (?support support)
@@ -61,8 +75,8 @@
 
 
 (define-query within-agent-vertical-reach (?agent agent ?target-elevation)
-  ;; Cargo pickup and placement use one vertical-reach convention: measure from
-  ;; the agent's standing elevation, with the agent's declared height as the
-  ;; maximum absolute distance above or below that level.
+  ;; Cargo pickup and placement use one vertical-reach convention: measure from the agent's
+  ;; standing elevation, capped by *vertical-reach-limit* in either direction, independent
+  ;; of the agent's own declared height.
   (<= (abs (- ?target-elevation (occupant-elevation ?agent)))
-      (declared-height ?agent)))
+      *vertical-reach-limit*))

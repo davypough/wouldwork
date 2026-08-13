@@ -354,11 +354,12 @@ When the path contains a real START-RECORDER, its pre-recording prefix is first 
 from START-STATE to reconstruct the snapshot captured immediately before that action.  The
 recording path -- START-RECORDER, its ghost moves, and STOP-RECORDER when present -- is
 then replayed from that snapshot.  The legacy no-explicit-start form continues to replay
-its ghost moves directly from START-STATE.  Every mapped ghost agent must still be able to
-reach a recorder when the recording ends -- the weaker of the two termination rules, so
-that a search stopping at the problem's own goal and a search carrying
-GHOST-STOPS-RECORDER as a goal conjunct are both admissible.  Playback independently
-replays the complete integrated path from START-STATE under the ordinary action rules."
+its ghost moves directly from START-STATE.  The search terminates as soon as the problem's
+own goal is met; a ghost left holding cargo or away from a recorder no longer vetoes that
+candidate.  A problem that wants the return trip spelled out in the solution path adds
+GHOST-STOPS-RECORDER as a goal conjunct instead -- the playback goal check below enforces
+it directly.  Playback independently replays the complete integrated path from START-STATE
+under the ordinary action rules."
   (declare (ignore goal-state))
   (let ((boundary-diagnostic (recorder-boundary-diagnostic integrated-path)))
     (when boundary-diagnostic
@@ -378,35 +379,23 @@ replays the complete integrated path from START-STATE under the ordinary action 
                     :recording recording-validation))))
       (let* ((recording-state
                (action-sequence-validation-final-state recording-validation))
-             (recording-agents (recorder-recording-agents recording-state))
-             (stranded-agents
-               (remove-if
-                 (lambda (agent)
-                   (funcall (symbol-function 'recording-agent-can-close)
-                            recording-state agent))
-                 recording-agents)))
+             (recording-agents (recorder-recording-agents recording-state)))
         (when (null recording-agents)
           (return-from validate-recorder-solution
-            (values nil '(:phase :recording :reason :no-recording-agent))))
-        (when stranded-agents
-          (return-from validate-recorder-solution
-            (values nil
-                    (list :phase :recording
-                          :reason :agents-cannot-close
-                          :agents stranded-agents)))))
-      (let ((playback-validation
-              (validate-action-sequence
-                start-state integrated-path
-                :goal-test (symbol-function 'goal-fn))))
-        (unless (action-sequence-validation-success-p playback-validation)
-          (return-from validate-recorder-solution
-            (values nil
-                    (recorder-action-failure-diagnostic
-                      :playback playback-validation))))
-        (unless (action-sequence-validation-goal-satisfied-p playback-validation)
-          (return-from validate-recorder-solution
-            (values nil '(:phase :playback :reason :goal-not-satisfied))))
-        (values t nil)))))
+            (values nil '(:phase :recording :reason :no-recording-agent))))))
+    (let ((playback-validation
+            (validate-action-sequence
+              start-state integrated-path
+              :goal-test (symbol-function 'goal-fn))))
+      (unless (action-sequence-validation-success-p playback-validation)
+        (return-from validate-recorder-solution
+          (values nil
+                  (recorder-action-failure-diagnostic
+                    :playback playback-validation))))
+      (unless (action-sequence-validation-goal-satisfied-p playback-validation)
+        (return-from validate-recorder-solution
+          (values nil '(:phase :playback :reason :goal-not-satisfied))))
+      (values t nil))))
 
 
 (defun recorder-recording-sequence (state integrated-path)

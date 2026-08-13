@@ -6,7 +6,7 @@
 ;;;   1. A nonzero-elevation stack chains through plate, explicit-height box,
 ;;;      zero-thickness fan, default-height box, and default-height agent.
 ;;;      The agent's recursively derived standing elevation supplies inclusive
-;;;      reach boundaries two units above and below, with rejection one unit
+;;;      reach boundaries one unit above and below, with rejection one unit
 ;;;      beyond either boundary.
 ;;;   2. Ground occupants exercise both location-elevation fallbacks: an ordinary
 ;;;      default-elevation agent stands at zero, while a loose fan and a
@@ -136,16 +136,16 @@
     (= (occupant-elevation upper-box) 5)
     (= (support-top-elevation upper-box) 6)
 
-    ;; The omitted agent height uses the exact default of two.
+    ;; The omitted agent height uses the exact default of 3/2.
     (not (bind (has-height stack-agent $stack-agent-height)))
-    (= (declared-height stack-agent) 2)
+    (= (declared-height stack-agent) 3/2)
     (= (occupant-elevation stack-agent) 6)
 
     ;; Reach is absolute and inclusive around the recursively derived level.
-    (within-agent-vertical-reach stack-agent 4)
-    (within-agent-vertical-reach stack-agent 8)
-    (not (within-agent-vertical-reach stack-agent 3))
-    (not (within-agent-vertical-reach stack-agent 9))
+    (within-agent-vertical-reach stack-agent 5)
+    (within-agent-vertical-reach stack-agent 7)
+    (not (within-agent-vertical-reach stack-agent 4))
+    (not (within-agent-vertical-reach stack-agent 8))
 
     ;; Ground occupants have no support and inherit explicit or default floor
     ;; elevation.  The fan still adds zero; the default-height box adds one.
@@ -181,12 +181,12 @@
            (on held-tray ?support)))
     (= (location-elevation tray-holding-site) 2)
     (= (occupant-elevation tray-holding-agent) 2)
-    (= (declared-height tray-holding-agent) 2)
-    (= (support-top-elevation held-tray) 4)
+    (= (declared-height tray-holding-agent) 3/2)
+    (= (support-top-elevation held-tray) 7/2)
     (support-elevation-only-on tray-occupant-box held-tray)
-    (= (occupant-elevation tray-occupant-box) 4)
+    (= (occupant-elevation tray-occupant-box) 7/2)
     (= (declared-height tray-occupant-box) 1)
-    (= (support-top-elevation tray-occupant-box) 5)))
+    (= (support-top-elevation tray-occupant-box) 9/2)))
 
 
 (define-goal

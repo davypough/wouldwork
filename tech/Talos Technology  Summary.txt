@@ -134,7 +134,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 
 6. Default Type Heights
 
-agent 2
+agent 3/2
 box 1
 connector 1
 edge 3/2
@@ -152,7 +152,7 @@ receiver 1
 transmitter 1
 wall-repeater 1
 
-8. Other Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
+8. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
 
-*jump-elevation-limit* 1  ;tech/jump.lisp; max JUMP elevation gain moving upward, and max vaulting clearance over a barrier -- both measured from the launch elevation, independent of the jumping agent's declared height
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
+*vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap an agent can act across vertically -- reaching to pick up or place cargo above or below its own elevation, or jumping up onto a higher support or clearing a barrier -- independent of the agent's own declared height; jump.lisp reuses this parameter rather than defining its own

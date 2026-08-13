@@ -18,7 +18,9 @@
 
 ;(ww-set *symmetry-pruning* t)
 
-(ww-set *depth-cutoff* 10)
+(ww-set *recorder-prefix-pruning* t)
+
+(ww-set *depth-cutoff* 13)
 
 
 (defparameter *max-pairings* 2)
@@ -75,7 +77,7 @@
   (has-location connector1 location1)
   (has-location connector2 location10)
   (has-location box1 location7)
-  (has-location tray1 location4)
+  (has-location tray1 location13)
 
   ;; Ghost definitions
   (recording-copy> agent1 agent1*)
@@ -104,7 +106,7 @@
   (location-coords> location10 20 5)
   (location-coords> location11 31 10)
   (location-coords> location12 32 5)
-  (location-coords> location13 16 10)
+  (location-coords> location13 11 9)
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
   ;; unambiguously on the intended side of its adjacent boundary.
@@ -118,8 +120,11 @@
   (has-elevation location4 3/2)
   (has-elevation location9 3/2)
   (has-elevation location10 3/2)
+  (has-elevation location13 3/2)
   (has-elevation gate4 3/2)
-  (has-elevation receiver1 2)
+  (has-elevation receiver1 3/2)
+  (has-elevation transmitter1 3/2)
+  (has-elevation transmitter2 3/2)
 
   ;; Nondefault heights.
   (has-height wall10 3/2)
@@ -150,7 +155,7 @@
   ;; Opaque internal wall/edge
   (wall-segment> wall1 7 11 7 13)
   (wall-segment> wall2 7 4 7 8)
-  (wall-segment> wall3 9 12 9 15)
+  (wall-segment> wall3 10 11 10 15)
   (wall-segment> wall4 16 15 19 15)
   (wall-segment> wall5 19 12 19 15)
   (wall-segment> wall6 19 4 19 7)
@@ -162,8 +167,8 @@
   (wall-segment> wall12 6 3 7 3)
   (wall-segment> wall13 6 0 6 3)
   (edge-segment> edge1 7 8 7 11)
-  (edge-segment> edge2 9 11 11 11)
-  (edge-segment> edge3 7 8 11 8)
+  (edge-segment> edge2 10 11 12 11)
+  (edge-segment> edge3 7 8 12 8)
   (edge-segment> edge4 24 4 24 7)
 
   ;; Gate geometry

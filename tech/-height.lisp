@@ -8,7 +8,7 @@
 ;;; so consumers nest-include this file instead of each re-declaring the same union, relation,
 ;;; or default-fallback query.
 ;;;
-;;; declared-height defaults gate, screen, and wall to 4; edge to 3/2; agent to 2; and
+;;; declared-height defaults gate, screen, and wall to 4; edge to 3/2; agent to 3/2; and
 ;;; box, jammer, connector, and repeater to 1.
 ;;; A repeater's height follows its mounting axis: vertical for a floor-repeater and
 ;;; horizontal for a wall-repeater.
@@ -20,7 +20,7 @@
 ;;;              optional subtypes absent from the problem resolve to nil, a no-op
 ;;;   relation : (has-height heighted-object $rational)
 ;;;   query    : declared-height  --  declared value, or role default (gate/screen/wall 4,
-;;;              edge 3/2, agent 2, box/jammer/connector/repeater 1)
+;;;              edge 3/2, agent 3/2, box/jammer/connector/repeater 1)
 
 (in-package :ww)
 
@@ -40,7 +40,7 @@
 
 (define-query declared-height (?object heighted-object)
   ;; Declared physical height, or the shared role default when undeclared.  Gate, screen,
-  ;; and wall use 4; edge uses 3/2; agent uses 2; box, jammer, connector, and repeaters
+  ;; and wall use 4; edge uses 3/2; agent uses 3/2; box, jammer, connector, and repeaters
   ;; use 1.
   (if (bind (has-height ?object $h))
     $h
@@ -49,5 +49,5 @@
       (if (edge ?object)
         3/2
         (if (agent ?object)
-          2
+          3/2
           1)))))

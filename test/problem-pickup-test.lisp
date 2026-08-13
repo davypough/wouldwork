@@ -5,8 +5,8 @@
 ;;;
 ;;;   1. Empty-handed identity pickup and authored-edge pickup for box, jammer,
 ;;;      and connector cargo.
-;;;   2. Inclusive vertical reach exactly two elevation units above and below a
-;;;      height-two agent, with rejection one unit beyond either boundary.
+;;;   2. Inclusive fixed vertical reach exactly one elevation unit above and below an
+;;;      explicitly height-two agent, with rejection one unit beyond either boundary.
 ;;;   3. A vertically valid but disconnected connector, rejected only by reachability.
 ;;;   4. A colocated, vertically valid connector rejected only because its agent
 ;;;      already holds another object.
@@ -58,7 +58,8 @@
 
 
 (define-init
-  ;; Boundary matrix: the agent stands at elevation 5 with an inclusive reach of 2.
+  ;; Boundary matrix: the height-two agent stands at elevation 5, but the independent
+  ;; fixed vertical-reach limit is one.
   (has-location boundary-agent boundary-origin)
   (has-height boundary-agent 2)
   (has-elevation boundary-origin 5)
@@ -66,11 +67,11 @@
   (has-location identity-box boundary-origin)
 
   (has-location upper-box upper-site)
-  (has-elevation upper-site 7)
+  (has-elevation upper-site 6)
   (reach-via boundary-origin () upper-site)
 
   (has-location lower-jammer lower-site)
-  (has-elevation lower-site 3)
+  (has-elevation lower-site 4)
   (reach-via boundary-origin () lower-site)
 
   (has-location same-level-connector same-level-site)
@@ -79,11 +80,11 @@
 
   ;; Both locations are reachable, so only vertical distance rejects these objects.
   (has-location too-high-box too-high-site)
-  (has-elevation too-high-site 8)
+  (has-elevation too-high-site 7)
   (reach-via boundary-origin () too-high-site)
 
   (has-location too-low-jammer too-low-site)
-  (has-elevation too-low-site 2)
+  (has-elevation too-low-site 3)
   (reach-via boundary-origin () too-low-site)
 
   ;; Same elevation as the boundary agent but deliberately disconnected.
@@ -120,14 +121,14 @@
     (pickup-clear
       boundary-agent boundary-origin identity-box boundary-origin)
 
-    (= (occupant-elevation upper-box) 7)
+    (= (occupant-elevation upper-box) 6)
     (reachable upper-site boundary-origin)
-    (within-agent-vertical-reach boundary-agent 7)
+    (within-agent-vertical-reach boundary-agent 6)
     (pickup-clear boundary-agent boundary-origin upper-box upper-site)
 
-    (= (occupant-elevation lower-jammer) 3)
+    (= (occupant-elevation lower-jammer) 4)
     (reachable lower-site boundary-origin)
-    (within-agent-vertical-reach boundary-agent 3)
+    (within-agent-vertical-reach boundary-agent 4)
     (pickup-clear boundary-agent boundary-origin lower-jammer lower-site)
 
     (= (occupant-elevation same-level-connector) 5)
@@ -136,15 +137,15 @@
       boundary-agent boundary-origin same-level-connector same-level-site)
 
     ;; One unit beyond either inclusive boundary fails only vertical reach.
-    (= (occupant-elevation too-high-box) 8)
+    (= (occupant-elevation too-high-box) 7)
     (reachable too-high-site boundary-origin)
-    (not (within-agent-vertical-reach boundary-agent 8))
+    (not (within-agent-vertical-reach boundary-agent 7))
     (not (pickup-clear
            boundary-agent boundary-origin too-high-box too-high-site))
 
-    (= (occupant-elevation too-low-jammer) 2)
+    (= (occupant-elevation too-low-jammer) 3)
     (reachable too-low-site boundary-origin)
-    (not (within-agent-vertical-reach boundary-agent 2))
+    (not (within-agent-vertical-reach boundary-agent 3))
     (not (pickup-clear
            boundary-agent boundary-origin too-low-jammer too-low-site))
 

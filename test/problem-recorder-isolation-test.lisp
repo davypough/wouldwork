@@ -103,6 +103,9 @@
   (has-location ghost-support-box place-site)
   (has-location live-tray-holder place-site)
   (has-location ghost-tray-holder place-site)
+  ;; Unit-height holders keep their held trays exactly at the fixed reach boundary.
+  (has-height live-tray-holder 1)
+  (has-height ghost-tray-holder 1)
   (holding live-tray-holder live-held-tray)
   (holding ghost-tray-holder ghost-held-tray)
   (has-location live-held-tray place-site)

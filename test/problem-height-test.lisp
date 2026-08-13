@@ -8,9 +8,9 @@
 ;;;   floor-repeater, and wall-repeater.
 ;;;
 ;;; Distinct explicit values verify exact binding and DECLARED-HEIGHT lookup.  The
-;;; explicit agent has height two, distinguishing an authored value equal to the
-;;; fallback from an absent agent fact.  Undeclared gate, screen, and wall share the
-;;; default 4; undeclared edge defaults to 3/2.  Initial and final states are
+;;; explicit agent has height two, distinct from the default agent height.  Undeclared
+;;; agent and edge fixtures default to 3/2; gate, screen, and wall share the default 4.
+;;; Initial and final states are
 ;;; identical.  Expected minimum path length: zero.
 
 (in-package :ww)
@@ -55,8 +55,8 @@
 
 
 (define-init
-  ;; The explicit value two is deliberately indistinguishable numerically from
-  ;; the agent fallback; the characterization query also requires its authored fact.
+  ;; The explicit agent value two is deliberately distinct from the 3/2 fallback;
+  ;; the characterization query also requires its authored fact.
   (has-height explicit-agent 2)
   (has-height explicit-box 2)
   (has-height explicit-jammer 3)
@@ -108,8 +108,8 @@
     (explicit-height-valid explicit-wall-repeater 10)
 
     ;; Box, jammer, connector, and repeaters default to one; gate, screen, and wall
-    ;; default to four; edge defaults to 3/2; agent defaults to two.
-    (default-height-valid default-agent 2)
+    ;; default to four; edge and agent both default to 3/2.
+    (default-height-valid default-agent 3/2)
     (default-height-valid default-box 1)
     (default-height-valid default-jammer 1)
     (default-height-valid default-connector 1)

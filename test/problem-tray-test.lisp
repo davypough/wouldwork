@@ -103,6 +103,8 @@
   ;; 0); LOADER-AGENT, co-located, holds CASCADE-BOX and will place it on the held tray.
   ;; CASCADE-DESTINATION sits three elevation units up, exercising a nontrivial cascade.
   (has-location bearer-agent cascade-origin)
+  ;; Keep the held tray at the fixed unit reach boundary for LOADER-AGENT.
+  (has-height bearer-agent 1)
   (holding bearer-agent cascade-tray)
   (has-location cascade-tray cascade-origin)
   (has-location loader-agent cascade-origin)
