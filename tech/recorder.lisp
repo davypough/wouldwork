@@ -3,8 +3,8 @@
 ;;; Public recorder assembly.  Problems continue to write only (include-tech recorder).
 ;;; Identity and interaction isolation live in -recorder-core; each supported apparatus
 ;;; owns a private recording-shadow component.  Including this public assembly also installs
-;;; recorder-specific prefix pruning, candidate validation, solution reporting, and goal
-;;; chaining after all of their implementations have been defined.
+;;; recorder-specific prefix pruning, interleaving audit, candidate validation, solution
+;;; reporting, and goal chaining after all of their implementations have been defined.
 ;;;
 ;;; Recorder cycle chaining is explicit rather than planner-native.  Each SOLVE-SUBGOAL
 ;;; searches and commits at most one intermediate recording cycle, and the following SOLVE
@@ -29,7 +29,8 @@
 ;;;   -recorder-jamming-shadow     : ghost-filtered RECORDING-JAMMED
 ;;;   -recorder-gate-shadow        : RECORDING-OPEN and gate-view hook
 ;;;   -recorder-wall-gears-shadow  : RECORDING-TURNING and gears-view hook
-;;;   -recorder-solution           : candidate validation and two-phase report
+;;;   -recorder-solution           : prefix validation, interleaving audit, candidate
+;;;                                  validation, and two-phase report
 ;;;   -recorder-session            : START-RECORDER / STOP-RECORDER actions and the
 ;;;                                  live-to-ghost state fork; nests -recorder-solution,
 ;;;                                  so its own list position is a readability choice, not
@@ -65,6 +66,11 @@
 (register-search-prefix-validator
   'validate-recorder-recording-prefix
   'recorder-prefix-pruning-enabled-p)
+(register-search-successor-auditor
+  'audit-recorder-interleaving-successor
+  'recorder-interleaving-audit-enabled-p
+  'reset-recorder-interleaving-audit-statistics
+  'print-recorder-interleaving-audit-statistics)
 (register-solution-report-printer 'print-recorder-report)
 (register-goal-chaining-policy
   'solve-recorder-subgoal-form

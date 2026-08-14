@@ -25,6 +25,7 @@
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
   (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
+  (format t "~&  *RECORDER-INTERLEAVING-AUDIT* => ~A" *recorder-interleaving-audit*)
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
@@ -194,6 +195,71 @@
 
 (sb-ext:defglobal *search-prefix-validators* nil
   "Problem-local validators that may reject irreversible path-prefix failures.")
+
+
+(defstruct (search-successor-auditor (:conc-name search-successor-auditor.))
+  "A read-only successor observer with search-lifecycle services."
+  auditor
+  enabled-p
+  resetter
+  reporter)
+
+
+(sb-ext:defglobal *search-successor-auditors* nil
+  "Problem-local observers that collect diagnostics without changing search results.")
+
+
+(defun register-search-successor-auditor
+    (auditor enabled-p resetter reporter)
+  "Register a read-only search-successor audit service.
+
+AUDITOR receives CURRENT-NODE and SUCCESSOR-STATE.  ENABLED-P is a zero-argument
+predicate.  RESETTER clears the service's statistics before each search, and REPORTER
+prints them to its one stream argument.  Staging another problem clears the service."
+  (dolist (function-name (list auditor enabled-p resetter reporter))
+    (unless (and (symbolp function-name) (fboundp function-name))
+      (error "Search-successor auditor requires a defined function: ~S"
+             function-name)))
+  (unless (find auditor *search-successor-auditors*
+                :key #'search-successor-auditor.auditor)
+    (setf *search-successor-auditors*
+          (append *search-successor-auditors*
+                  (list (make-search-successor-auditor
+                          :auditor auditor
+                          :enabled-p enabled-p
+                          :resetter resetter
+                          :reporter reporter)))))
+  auditor)
+
+
+(defun reset-search-successor-audits ()
+  "Reset every enabled problem-local successor audit."
+  (dolist (entry *search-successor-auditors*)
+    (when (funcall
+            (symbol-function (search-successor-auditor.enabled-p entry)))
+      (funcall
+        (symbol-function (search-successor-auditor.resetter entry))))))
+
+
+(defun audit-search-successor (current-node successor-state)
+  "Submit one accepted generated successor to every enabled read-only auditor."
+  (dolist (entry *search-successor-auditors*)
+    (when (funcall
+            (symbol-function (search-successor-auditor.enabled-p entry)))
+      (funcall
+        (symbol-function (search-successor-auditor.auditor entry))
+        current-node successor-state))))
+
+
+(defun print-search-successor-audit-statistics
+    (&optional (stream *standard-output*))
+  "Print every enabled problem-local successor audit report."
+  (dolist (entry *search-successor-auditors*)
+    (when (funcall
+            (symbol-function (search-successor-auditor.enabled-p entry)))
+      (funcall
+        (symbol-function (search-successor-auditor.reporter entry))
+        stream))))
 
 
 (defun register-search-prefix-validator (validator enabled-p)
@@ -393,6 +459,9 @@ treat their arguments as read-only and be safe to call concurrently."
 
 (defvar *recorder-prefix-pruning* nil
   "When T, recorder technology prunes paths whose recording prefix cannot replay.")
+
+(defvar *recorder-interleaving-audit* nil
+  "When T, audit interchangeable live/ghost action orderings without pruning them.")
 
 (defvar *max-pairings* 0
   "Default maximum initial pairings per connector. Problem files can override this.")
@@ -657,6 +726,7 @@ treat their arguments as read-only and be safe to call concurrently."
             *goal* nil
             *auto-wait* nil
             *symmetry-pruning* nil
-            *recorder-prefix-pruning* nil)
+            *recorder-prefix-pruning* nil
+            *recorder-interleaving-audit* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

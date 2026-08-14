@@ -301,6 +301,7 @@
     (setf *best-states* (list *start-state*))
     (setf *solution-count* 0)
     (reset-candidate-solution-validation-statistics)
+    (reset-search-successor-audits)
     (setf *upper-bound* 1000000)
     (setf *search-tree* nil)
     (setf *start-time* (get-internal-real-time))
@@ -694,6 +695,7 @@ when at least one path through its parent DAG remains viable."
         (unless (successor-search-prefix-valid-p current-node succ-state)
           (increment-global *search-prefix-pruned* 1)
           (next-iteration))
+        (audit-search-successor current-node succ-state)
         (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
             (increment-global *bound-pruned* 1)
@@ -1371,6 +1373,7 @@ when at least one path through its parent DAG remains viable."
     (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
             *search-prefix-pruned*
             (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
+  (print-search-successor-audit-statistics)
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (print-candidate-solution-validation-statistics)
@@ -1692,6 +1695,7 @@ when at least one path through its parent DAG remains viable."
       (format t "~%search-prefix validation pruned = ~:D (~,1F% of total states)"
               *search-prefix-pruned*
               (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
+    (print-search-successor-audit-statistics)
     (when (> *num-backtracks* 0)
       (format t "~%average backtrack distance = ~,1F levels (~:D backtracks)"
               (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)
