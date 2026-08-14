@@ -52,7 +52,7 @@ plate (either pressure-plate toggle-plate)
 relay (either connector floor-repeater wall-repeater)
 repeater (either floor-repeater wall-repeater)
 steppable-object (either pressure-plate toggle-plate fan floor-blower angled-blower)
-support (either pressure-plate toggle-plate box fan floor-blower angled-blower)
+support (either pressure-plate toggle-plate box fan tray floor-blower angled-blower)
 support-occupant (either agent box jammer connector fan tray)
 target (either gate floor-gears wall-gears floor-blower wall-blower gun)
 terminus (either transmitter receiver connector floor-repeater wall-repeater)
@@ -68,13 +68,15 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (crossing-active crossing)
 (depressed plate)
 (has-location mobile-object $location)
-(holding agent $cargo)
+(holding $agent $cargo :bijective)  ;reverse lookup, e.g. (bind (holding $holder ?tray))
 (jamming jammer $target)
+(latched toggle-plate)
 (lethal threat)
 (mounted-on fan $gears)
-(on support-occupant $support)
+(on $support-occupant $support :bijective)  ;reverse lookup via cleartop
 (open gate)
 (paired connector terminus)  ;undirected; stored connector-first
+(recording-in-progress)  ;true between start-recorder and stop-recorder
 (turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
 
 4. Static Relations
@@ -105,6 +107,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (los-to-target location $list gate)
 (los-barrier-crossings> los-endpoint $list visibility-object)  ;directed records (:kind identity parameter x1 y1 x2 y2), including fixed couplings and gate targets
 (reach-via location $list location)
+(recording-copy> mobile-object $mobile-object)  ;maps each live mobile object to its recorder ghost; directional, live -> ghost
 (screen-segment> screen $rational $rational $rational $rational)
 (stairs-via location $list location)
 (stairs-via> location $list location)
@@ -131,6 +134,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (put-fan ">" ?agent "puts" ?fan "on" $place "at" ?location)
 (put-jammer ">" ?agent "puts" ?jammer "on" $place "at" ?location "without jamming")
 (put-tray ">" ?agent "puts" ?tray "on" $place "at" ?location)
+(start-recorder ">" ?agent "starts the recorder")
+(stop-recorder ">" ?agent "stops the recorder")
 
 6. Default Type Heights
 
@@ -148,11 +153,15 @@ boundary-wall 6  ;LOS-only default; a boundary-wall polygon has no named object 
 7. Default Type Elevations
 
 floor-repeater 0 (base; beam anchor = base + height)
+gun 1
 receiver 1
 transmitter 1
+wall-blower 1  ;stream elevation (blower-elevation); tech/-gears-fan.lisp
+wall-gears 1  ;stream elevation (blower-elevation); tech/-gears-fan.lisp
 wall-repeater 1
 
 8. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
 
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
+*max-pairings* 3  ;tech/beam-relay.lisp; max PAIRED termini a connector may hold at once; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
 *vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap an agent can act across vertically -- reaching to pick up or place cargo above or below its own elevation, or jumping up onto a higher support or clearing a barrier -- independent of the agent's own declared height; jump.lisp reuses this parameter rather than defining its own
