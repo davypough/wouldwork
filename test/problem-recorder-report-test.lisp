@@ -148,11 +148,13 @@
            '((1.0 (pickup-connector operator-alpha tool-alpha site-a))
              (2.0 (connect-connector operator-alpha tool-alpha tool-echo site-a))
              (3.0 (start-recorder operator-alpha))
-             (4.0 (pickup-connector playback-echo tool-echo site-a))))
+             (4.0 (move operator-alpha
+                    ((walk site-a nil site-b))))
+             (5.0 (pickup-connector playback-echo tool-echo site-a))))
          (solution
            (make-solution
-             :depth 4
-             :time 4.0
+             :depth 5
+             :time 5.0
              :path path
              :goal *start-state*))
          (report (build-recorder-report solution))
@@ -166,7 +168,10 @@
         (format nil "Setup phase:~%~S~%~S~%~%Recording phase:"
                 (first setup) (second setup))
         printed)
-      (equal (first (getf report :recording)) (third path)))))
+      (equal (first (getf report :recording)) (third path))
+      (equal
+        (getf report :playback)
+        (list '(pause) (fourth path) '(resume) (fifth path))))))
 
 
 (define-goal

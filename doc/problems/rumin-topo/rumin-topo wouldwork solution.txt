@@ -1,151 +1,49 @@
-total states processed so far = 18,000,082
-current recent processing speed = 1,179 states/sec
-net average branching factor = 9.2 (recent: 9.5)
-effective branching factor (b*) = 3.52
+* (solve)
+
+working...
+
+
+
+total states processed so far = 1,000,030
+current recent processing speed = 1,065 states/sec
+net average branching factor = 3.6 (recent: 3.6)
+effective branching factor (b*) = 2.80
 average dead-end depth = PENDING
-average duplicate depth = 11
-depth-cutoff hits = 105,419 (0.6% of total states)
-frontier nodes: 46
-ht count: 1,462,762    ht size: 3,936,656
-repeated states = 3,497,428 (19.4% of total states)
-search-prefix validation pruned = 83,945 (0.5% of total states)
-
-Recorder live/ghost interleaving pruning:
-  Opposite-side adjacent pairs = 8,446,859
-  Ghost-before-live inversion candidates = 7,888,638
-  Certified interchangeable inversions = 7,866,017 (99.7%)
-  Canonical interleavings pruned = 7,866,017
-  CONNECT-CONNECTOR -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 17,850
-  CONNECT-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 66,780
-  CONNECT-CONNECTOR -> MOVE / CERTIFIED = 1,057,232
-  CONNECT-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 47,159
-  CONNECT-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 46,844
-  CONNECT-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 3,180
-  CONNECT-CONNECTOR -> PUT-TRAY / CERTIFIED = 61,725
-  MOVE -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 2,849
-  MOVE -> CONNECT-CONNECTOR / CERTIFIED = 259,139
-  MOVE -> MOVE / CERTIFIED = 4,744,256
-  MOVE -> PICKUP-CONNECTOR / CERTIFIED = 250,291
-  MOVE -> PICKUP-TRAY / CERTIFIED = 220,372
-  MOVE -> PUT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 106
-  MOVE -> PUT-CONNECTOR / CERTIFIED = 11,077
-  MOVE -> PUT-TRAY / ALTERNATE-FIRST-UNAVAILABLE = 851
-  MOVE -> PUT-TRAY / CERTIFIED = 194,717
-  PICKUP-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 2,373
-  PICKUP-CONNECTOR -> MOVE / CERTIFIED = 57,752
-  PICKUP-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 3,040
-  PICKUP-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 2,779
-  PICKUP-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 113
-  PICKUP-CONNECTOR -> PUT-TRAY / CERTIFIED = 2,160
-  PICKUP-TRAY -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 28
-  PICKUP-TRAY -> CONNECT-CONNECTOR / CERTIFIED = 18,067
-  PICKUP-TRAY -> MOVE / CERTIFIED = 400,320
-  PICKUP-TRAY -> PICKUP-CONNECTOR / CERTIFIED = 20,156
-  PICKUP-TRAY -> PICKUP-TRAY / CERTIFIED = 19,491
-  PICKUP-TRAY -> PUT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 1
-  PICKUP-TRAY -> PUT-CONNECTOR / CERTIFIED = 691
-  PICKUP-TRAY -> PUT-TRAY / CERTIFIED = 15,531
-  PUT-CONNECTOR -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 728
-  PUT-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 2,520
-  PUT-CONNECTOR -> MOVE / CERTIFIED = 39,260
-  PUT-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 1,730
-  PUT-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 1,566
-  PUT-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 120
-  PUT-CONNECTOR -> PUT-TRAY / CERTIFIED = 2,484
-  PUT-TRAY -> CONNECT-CONNECTOR / CERTIFIED = 35,063
-  PUT-TRAY -> MOVE / CERTIFIED = 248,228
-  PUT-TRAY -> PICKUP-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 203
-  PUT-TRAY -> PICKUP-CONNECTOR / CERTIFIED = 14,255
-  PUT-TRAY -> PICKUP-TRAY / ALTERNATE-FIRST-UNAVAILABLE = 5
-  PUT-TRAY -> PICKUP-TRAY / CERTIFIED = 9,227
-  PUT-TRAY -> PUT-CONNECTOR / CERTIFIED = 1,306
-  PUT-TRAY -> PUT-TRAY / CERTIFIED = 5,013
-
-average backtrack distance = 1.5 levels (342,382 backtracks)
-current progress: in #5 of 5 initial branches
-best solution depth = 13 (17,312,917 states since last improvement)
-bound-based pruning = 5,089,929 (28.3% of total states)
-elapsed time = 3h 23m 22s
+average duplicate depth = 13
+depth-cutoff hits = 176,983 (17.7% of total states)
+frontier nodes: 101
+ht count: 263,190    ht size: 540,008
+repeated states = 365,087 (36.5% of total states)
+average backtrack distance = 1.2 levels (44,683 backtracks)
+current progress: in #3 of 5 initial branches
+elapsed time = 0h 3m 30s
 
 
+New path to goal found at depth = 13
 
-In problem RUMIN-TOPO, performed GRAPH search for MIN-LENGTH solution.
+In problem RUMIN-TOPO, performed GRAPH search for FIRST solution.
 
-DEPTH-FIRST search process completed normally.
+Search ended with first solution found.
 
 Depth cutoff = 13
 
 Maximum depth explored = 13
 
-Program cycles = 2,039,645
+Program cycles = 286,485
 
-Total states processed = 18,871,015
+Total states processed = 1,035,719
 
-Repeated states = 3,685,888, ie, 19.5 percent
+Repeated states = 377,803, ie, 36.5 percent
 
 Average dead-end depth = PENDING
 
-Average duplicate depth = 11
+Average duplicate depth = 13
 
-Depth-cutoff hits = 105,419, ie, 0.6 percent
+Depth-cutoff hits = 182,080, ie, 17.6 percent
 
-Average backtrack distance = 1.5 levels (358,488 backtracks)
+Average backtrack distance = 1.2 levels (45,956 backtracks)
 
-Search-prefix validation pruned 88,027 states, 0.5% of total states.
-
-Recorder live/ghost interleaving pruning:
-  Opposite-side adjacent pairs = 8,832,553
-  Ghost-before-live inversion candidates = 8,270,928
-  Certified interchangeable inversions = 8,248,300 (99.7%)
-  Canonical interleavings pruned = 8,248,300
-  CONNECT-CONNECTOR -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 17,850
-  CONNECT-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 66,780
-  CONNECT-CONNECTOR -> MOVE / CERTIFIED = 1,125,628
-  CONNECT-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 47,159
-  CONNECT-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 50,744
-  CONNECT-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 3,180
-  CONNECT-CONNECTOR -> PUT-TRAY / CERTIFIED = 65,535
-  MOVE -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 2,849
-  MOVE -> CONNECT-CONNECTOR / CERTIFIED = 259,139
-  MOVE -> MOVE / CERTIFIED = 4,979,408
-  MOVE -> PICKUP-CONNECTOR / CERTIFIED = 250,291
-  MOVE -> PICKUP-TRAY / CERTIFIED = 232,351
-  MOVE -> PUT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 106
-  MOVE -> PUT-CONNECTOR / CERTIFIED = 11,077
-  MOVE -> PUT-TRAY / ALTERNATE-FIRST-UNAVAILABLE = 858
-  MOVE -> PUT-TRAY / CERTIFIED = 209,159
-  PICKUP-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 2,373
-  PICKUP-CONNECTOR -> MOVE / CERTIFIED = 59,864
-  PICKUP-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 3,040
-  PICKUP-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 2,899
-  PICKUP-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 113
-  PICKUP-CONNECTOR -> PUT-TRAY / CERTIFIED = 2,300
-  PICKUP-TRAY -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 28
-  PICKUP-TRAY -> CONNECT-CONNECTOR / CERTIFIED = 18,067
-  PICKUP-TRAY -> MOVE / CERTIFIED = 416,680
-  PICKUP-TRAY -> PICKUP-CONNECTOR / CERTIFIED = 20,156
-  PICKUP-TRAY -> PICKUP-TRAY / CERTIFIED = 20,321
-  PICKUP-TRAY -> PUT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 1
-  PICKUP-TRAY -> PUT-CONNECTOR / CERTIFIED = 691
-  PICKUP-TRAY -> PUT-TRAY / CERTIFIED = 16,988
-  PUT-CONNECTOR -> CONNECT-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 728
-  PUT-CONNECTOR -> CONNECT-CONNECTOR / CERTIFIED = 2,520
-  PUT-CONNECTOR -> MOVE / CERTIFIED = 41,724
-  PUT-CONNECTOR -> PICKUP-CONNECTOR / CERTIFIED = 1,730
-  PUT-CONNECTOR -> PICKUP-TRAY / CERTIFIED = 1,710
-  PUT-CONNECTOR -> PUT-CONNECTOR / CERTIFIED = 120
-  PUT-CONNECTOR -> PUT-TRAY / CERTIFIED = 2,621
-  PUT-TRAY -> CONNECT-CONNECTOR / CERTIFIED = 35,063
-  PUT-TRAY -> MOVE / CERTIFIED = 268,120
-  PUT-TRAY -> PICKUP-CONNECTOR / ALTERNATE-FIRST-UNAVAILABLE = 203
-  PUT-TRAY -> PICKUP-CONNECTOR / CERTIFIED = 14,255
-  PUT-TRAY -> PICKUP-TRAY / ALTERNATE-FIRST-UNAVAILABLE = 5
-  PUT-TRAY -> PICKUP-TRAY / CERTIFIED = 10,070
-  PUT-TRAY -> PUT-CONNECTOR / CERTIFIED = 1,306
-  PUT-TRAY -> PUT-TRAY / CERTIFIED = 5,118
-
-
-Average branching factor = 9.3
+Average branching factor = 3.6
 
 
 Candidate solution validation:
@@ -165,9 +63,11 @@ Goal:
 Total solution paths recorded = 1, of which 1 is/are unique solution paths
 Check *solution-paths* and *unique-solution-states* for solution records.
 
-Number of steps in a minimum path length solution = 13
+Number of steps in first solution found: = 13
 
-A minimum length solution path from start state to goal state:
+Duration of first solution found = 13.0
+
+Solution path of first solution found from start state to goal state:
 (0.0 (START-STATE))
 ((HAS-LOCATION AGENT1 LOCATION1) (HAS-LOCATION CONNECTOR1 LOCATION1) (HAS-LOCATION CONNECTOR2 LOCATION10) (HAS-LOCATION BOX1 LOCATION7)
  (HAS-LOCATION TRAY1 LOCATION13) (OPEN GATE2) (RECORDING-OPEN GATE2))
@@ -251,6 +151,9 @@ A minimum length solution path from start state to goal state:
 
 
 
+Setup phase:
+(1.0 (MOVE AGENT1 ((WALK LOCATION1 NIL LOCATION3))))
+
 Recording phase:
 (2.0 (START-RECORDER AGENT1))
 (PAUSE)
@@ -263,10 +166,9 @@ Recording phase:
 (PAUSE)
 (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3)))
 (STOP-RECORDER)
+
 Playback phase:
 (PAUSE)
-(1.0 (MOVE AGENT1 ((WALK LOCATION1 NIL LOCATION3))))
-(2.0 (START-RECORDER AGENT1))
 (3.0 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION1))))
 (4.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION1))
 (5.0 (MOVE AGENT1 ((STAIRS LOCATION1 NIL LOCATION4))))
@@ -281,10 +183,10 @@ Playback phase:
 (12.0 (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 TRAY1* (CONNECTOR1* TRANSMITTER1)))
 (13.0 (MOVE AGENT1 ((JUMP LOCATION4 NIL LOCATION2) (WALK LOCATION2 NIL LOCATION3))))
 Evaluation took:
-  12877.958 seconds of real time
-  12842.015625 seconds of total run time (12710.281250 user, 131.734375 system)
-  [ Real times consist of 11.138 seconds GC time, and 12866.820 seconds non-GC time. ]
-  [ Run times consist of 11.546 seconds GC time, and 12830.470 seconds non-GC time. ]
-  99.72% CPU
-  41,044,655,224,042 processor cycles
-  3,492,308,816,544 bytes consed
+  219.628 seconds of real time
+  218.937500 seconds of total run time (216.687500 user, 2.250000 system)
+  [ Real times consist of 0.385 seconds GC time, and 219.243 seconds non-GC time. ]
+  [ Run times consist of 0.421 seconds GC time, and 218.517 seconds non-GC time. ]
+  99.69% CPU
+  699,999,012,256 processor cycles
+  44,638,207,712 bytes consed

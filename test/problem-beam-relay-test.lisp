@@ -206,5 +206,9 @@
            relay-agent '(origin) target lifecycle-connector target-unlit-connector))))
 
 
+(define-test-claim beam-relay-pairing-limit-override
+  (= *max-pairings* 2))
+
+
 (define-goal
   (beam-relay-scenarios-valid))

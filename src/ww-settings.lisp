@@ -443,8 +443,8 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *recorder-prefix-pruning* nil
   "When T, recorder technology prunes paths whose recording prefix cannot replay.")
 
-(defvar *max-pairings* 0
-  "Default maximum initial pairings per connector. Problem files can override this.")
+(defvar *max-pairings* nil
+  "Maximum pairings per connector, or NIL until beam-relay supplies its default.")
 
 (sb-ext:defglobal *types*
   (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
@@ -706,6 +706,7 @@ treat their arguments as read-only and be safe to call concurrently."
             *goal* nil
             *auto-wait* nil
             *symmetry-pruning* nil
-            *recorder-prefix-pruning* nil)
+            *recorder-prefix-pruning* nil
+            *max-pairings* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

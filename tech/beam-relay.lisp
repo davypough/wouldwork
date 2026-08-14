@@ -16,7 +16,8 @@
 ;;;   nested     : -beam-substrate (beam relations and hooks); -placement;
 ;;;                -visibility (null defaults); -support-elevation; -elevation;
 ;;;                -mobility; -reachability; -pickup
-;;;   parameter  : *max-pairings* -- connector pairings only; fixed couplings are unlimited
+;;;   parameter  : *max-pairings* -- defaults to 3; connector pairings only; fixed
+;;;                couplings are unlimited; a problem may set a smaller value first
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
 ;;; PROVIDES:
@@ -47,6 +48,9 @@
 (include-tech -beam-relay-init-checks)
 
 (in-package :ww)
+
+
+(setf *max-pairings* (or *max-pairings* 3))
 
 
 (define-types

@@ -238,7 +238,8 @@ is staged again.
           *recorder-prefix-pruning* default-recorder-prefix-pruning
           *debug* default-debug
           *goal* default-goal
-          *threads* default-threads))
+          *threads* default-threads
+          *max-pairings* nil))
   (setf *features* (remove :ww-debug *features*)))
 
 
@@ -423,6 +424,7 @@ is staged again.
           *randomize-search* nil
           *symmetry-pruning* nil
           *recorder-prefix-pruning* nil
+          *max-pairings* nil
           *threads* 0
           *features* (remove :ww-debug *features*))
     (with-silenced-compilation

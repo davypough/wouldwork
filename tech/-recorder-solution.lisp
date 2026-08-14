@@ -553,10 +553,13 @@ markers, not planner actions, and carry no step number for that reason."
 
 
 (defun recorder-playback-sequence (state integrated-path)
-  "Retain the integrated moves, pausing live blocks and resuming following ghost blocks."
+  "Retain moves inside the recorder window, pausing live blocks and resuming ghost blocks.
+
+Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback actions.  The
+legacy form with no explicit start retains the whole integrated path."
   (let ((sequence nil)
         (previous-side nil))
-    (dolist (move integrated-path sequence)
+    (dolist (move (recorder-recording-window integrated-path) sequence)
       (let ((side (recorder-report-move-side state move)))
         (when (not (eql side previous-side))
           (cond
