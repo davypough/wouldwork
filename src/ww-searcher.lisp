@@ -695,6 +695,8 @@ when at least one path through its parent DAG remains viable."
         (unless (successor-search-prefix-valid-p current-node succ-state)
           (increment-global *search-prefix-pruned* 1)
           (next-iteration))
+        (when (search-successor-pruned-p current-node succ-state)
+          (next-iteration))
         (audit-search-successor current-node succ-state)
         (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)

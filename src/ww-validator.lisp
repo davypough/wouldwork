@@ -957,6 +957,10 @@
       (unless (typep val 'boolean)
         (error "Can't set *recorder-interleaving-audit* to ~S. Must be either T or NIL."
                val)))
+    (*recorder-interleaving-pruning*
+      (unless (typep val 'boolean)
+        (error "Can't set *recorder-interleaving-pruning* to ~S. Must be either T or NIL."
+               val)))
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))
