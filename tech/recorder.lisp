@@ -61,16 +61,12 @@
 
 ;; These registries are reset before every stage.  Keeping installation at the end of the
 ;; public assembly scopes the complete recorder policy to problems that include RECORDER and
-;; guarantees that every registered implementation has already been defined.
+;; guarantees that every registered implementation has already been defined.  Exact
+;; live/ghost interleaving pruning is automatic on the supported serial search path.
 (register-solution-validator 'validate-recorder-solution)
 (register-search-prefix-validator
   'validate-recorder-recording-prefix
   'recorder-prefix-pruning-enabled-p)
-(register-search-successor-auditor
-  'audit-recorder-interleaving-successor
-  'recorder-interleaving-analysis-enabled-p
-  'reset-recorder-interleaving-audit-statistics
-  'print-recorder-interleaving-audit-statistics)
 (register-search-successor-pruner
   'prune-recorder-interleaving-successor-p
   'recorder-interleaving-pruning-enabled-p)

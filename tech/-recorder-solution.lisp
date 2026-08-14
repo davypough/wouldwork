@@ -1,8 +1,8 @@
 ;;; Filename: -recorder-solution.lisp
 
-;;; Recorder path services: optional recording-prefix pruning, exact live/ghost
-;;; interleaving audit or canonical pruning, candidate validation, and the two-phase report.  Nested
-;;; by recorder.lisp, whose public assembly installs prefix pruning, validation, reporting,
+;;; Recorder path services: optional recording-prefix pruning, automatic exact live/ghost
+;;; interleaving canonicalization, candidate validation, and the two-phase report.  Nested
+;;; by recorder.lisp, whose public assembly installs pruning, validation, reporting,
 ;;; and goal chaining after all recorder components have been defined.  Lower-level tests may
 ;;; include this file for its mechanics without installing those public services.  Nothing
 ;;; here is a substrate hook, and nothing here reads recording-side state.  The recorder
@@ -42,7 +42,7 @@
 ;;;              recording-agent-empty-handed
 ;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report;
 ;;;              validate-recorder-recording-prefix;
-;;;              recorder interleaving audit/pruning and their statistics lifecycle;
+;;;              automatic recorder interleaving pruning;
 ;;;              recorder-recording-path, recorder-recording-window,
 ;;;              recorder-recording-snapshot and their helpers locate the real
 ;;;              START-RECORDER/STOP-RECORDER moves when the searched path contains them,
@@ -54,27 +54,6 @@
 (include-tech -holding)
 
 (in-package :ww)
-
-
-(sb-ext:defglobal *recorder-interleaving-opposite-side-pairs* 0
-  "Adjacent generated live/ghost successor pairs seen by the current audit.")
-(declaim (type fixnum *recorder-interleaving-opposite-side-pairs*))
-
-(sb-ext:defglobal *recorder-interleaving-inversions* 0
-  "Adjacent ghost-then-live pairs eligible for canonical-order certification.")
-(declaim (type fixnum *recorder-interleaving-inversions*))
-
-(sb-ext:defglobal *recorder-interleaving-certified* 0
-  "Ghost-then-live pairs certified equivalent to the swapped live-then-ghost order.")
-(declaim (type fixnum *recorder-interleaving-certified*))
-
-(sb-ext:defglobal *recorder-interleaving-pruned* 0
-  "Exactly certified ghost-then-live successors discarded by canonical pruning.")
-(declaim (type fixnum *recorder-interleaving-pruned*))
-
-(sb-ext:defglobal *recorder-interleaving-audit-results*
-  (make-hash-table :test #'equal)
-  "Counts audit outcomes by first action, second action, and certification result.")
 
 
 (define-query recording-agent-empty-handed (?agent agent)
@@ -186,45 +165,31 @@
   (recorder-report-agent-side state (recorder-report-agent move)))
 
 
-(defun recorder-interleaving-analysis-enabled-p ()
-  "Whether serial depth-first search should analyze recorder interleavings."
-  (when (or *recorder-interleaving-audit* *recorder-interleaving-pruning*)
-    (when (and *recorder-interleaving-audit* *recorder-interleaving-pruning*)
-      (error "Recorder interleaving audit and pruning cannot both be enabled."))
-    (unless (and (eql *algorithm* 'depth-first)
-                 (zerop *threads*)
-                 (not *hybrid-mode*))
-      (error "Recorder interleaving analysis requires serial, non-hybrid depth-first search."))
-    t))
-
-
 (defun recorder-interleaving-pruning-enabled-p ()
-  "Whether exact recorder interleaving certification should prune successors."
-  (and *recorder-interleaving-pruning*
-       (recorder-interleaving-analysis-enabled-p)))
+  "Whether this search path supports automatic recorder interleaving pruning."
+  (and (eql *algorithm* 'depth-first)
+       (zerop *threads*)
+       (not *hybrid-mode*)))
 
 
-(defun reset-recorder-interleaving-audit-statistics ()
-  "Clear all recorder interleaving analysis counters before a search."
-  (setf *recorder-interleaving-opposite-side-pairs* 0
-        *recorder-interleaving-inversions* 0
-        *recorder-interleaving-certified* 0
-        *recorder-interleaving-pruned* 0)
-  (clrhash *recorder-interleaving-audit-results*))
-
-
-(defun recorder-audit-action-side (state move)
+(defun recorder-interleaving-action-side (state move)
   "Return MOVE's recorder side, or NIL unless it names exactly one mapped agent."
   (let ((agents (recorder-move-agents move)))
     (when (= (length agents) 1)
       (recorder-report-agent-side state (first agents)))))
 
 
-(defun recorder-audit-count-result (first-action second-action result)
-  "Record RESULT for one concrete adjacent action-name pair."
-  (incf (gethash (list (first first-action) (first second-action) result)
-                 *recorder-interleaving-audit-results*
-                 0)))
+(defun recorder-interleaving-inversion-p (state first-move second-move)
+  "Whether the adjacent moves form a ghost-before-live canonical-order inversion."
+  (let ((first-action (second first-move))
+        (second-action (second second-move)))
+    (when (or (member (first first-action) '(start-recorder stop-recorder))
+              (member (first second-action) '(start-recorder stop-recorder)))
+      (return-from recorder-interleaving-inversion-p nil))
+    (let ((first-side (recorder-interleaving-action-side state first-move))
+          (second-side (recorder-interleaving-action-side state second-move)))
+      (and (eql first-side :ghost)
+           (eql second-side :live)))))
 
 
 (defun recorder-interleaving-other-prefix-validation-enabled-p ()
@@ -233,7 +198,7 @@
     '(validate-recorder-recording-prefix)))
 
 
-(defun recorder-audit-state-valid-p (state path)
+(defun recorder-interleaving-state-valid-p (state path)
   "Whether an alternate replay state passes non-redundant search validity checks."
   (and (not (state-is-inconsistent state))
        (or (not (and (boundp 'constraint-fn)
@@ -246,7 +211,7 @@
          path state '(validate-recorder-recording-prefix))))
 
 
-(defun recorder-audit-equivalent-state-p (state1 state2)
+(defun recorder-interleaving-equivalent-state-p (state1 state2)
   "Whether two action orders produce the same complete search-relevant state."
   (and (equalp (problem-state.idb state1)
                (problem-state.idb state2))
@@ -258,127 +223,59 @@
                (problem-state.happenings state2))))
 
 
-(defun recorder-audit-replay-step
-    (action state next-action path validate-prefix-p unavailable-result invalid-result)
-  "Replay ACTION and return its state, extended path, and audit result."
+(defun replay-recorder-interleaving-step
+    (action state next-action path validate-prefix-p)
+  "Replay ACTION and return its state, extended path, and validity."
   (multiple-value-bind (next-state valid-p reason)
       (apply-action-to-state action state next-action)
     (declare (ignore reason))
     (unless valid-p
-      (return-from recorder-audit-replay-step
-        (values nil nil unavailable-result)))
+      (return-from replay-recorder-interleaving-step
+        (values nil nil nil)))
     (let ((next-path
             (when validate-prefix-p
               (append path (list (record-move next-state))))))
-      (if (recorder-audit-state-valid-p next-state next-path)
-        (values next-state next-path nil)
-        (values nil nil invalid-result)))))
+      (if (recorder-interleaving-state-valid-p next-state next-path)
+        (values next-state next-path t)
+        (values nil nil nil)))))
 
 
-(defun recorder-audit-swapped-pair
+(defun recorder-interleaving-swap-certified-p
     (source-node first-action second-action actual-final-state)
-  "Return the diagnostic result of replaying SECOND-ACTION before FIRST-ACTION."
+  "Whether replaying SECOND-ACTION before FIRST-ACTION yields the same valid state."
   (let* ((validate-prefix-p
            (recorder-interleaving-other-prefix-validation-enabled-p))
          (source-state (node.state source-node))
          (source-path
            (when validate-prefix-p
              (record-solution-path source-node))))
-    (multiple-value-bind (alternate-first first-path first-result)
-        (recorder-audit-replay-step
-          second-action source-state first-action source-path validate-prefix-p
-          :alternate-first-unavailable :alternate-first-invalid)
-      (when first-result
-        (return-from recorder-audit-swapped-pair first-result))
-      (multiple-value-bind (alternate-final final-path second-result)
-          (recorder-audit-replay-step
-            first-action alternate-first nil first-path validate-prefix-p
-            :alternate-second-unavailable :alternate-second-invalid)
+    (multiple-value-bind (alternate-first first-path first-valid-p)
+        (replay-recorder-interleaving-step
+          second-action source-state first-action source-path validate-prefix-p)
+      (unless first-valid-p
+        (return-from recorder-interleaving-swap-certified-p nil))
+      (multiple-value-bind (alternate-final final-path final-valid-p)
+          (replay-recorder-interleaving-step
+            first-action alternate-first nil first-path validate-prefix-p)
         (declare (ignore final-path))
-        (when second-result
-          (return-from recorder-audit-swapped-pair second-result))
-        (if (recorder-audit-equivalent-state-p
-              alternate-final actual-final-state)
-          :certified
-          :different-final-state)))))
-
-
-(defun recorder-interleaving-successor-result (current-node successor-state)
-  "Analyze one adjacent pair, update statistics, and return its certification result."
-  (let ((source-node (node.parent current-node)))
-    (unless (node-p source-node)
-      (return-from recorder-interleaving-successor-result nil))
-    (let* ((first-move (record-move (node.state current-node)))
-           (second-move (record-move successor-state))
-           (first-action (second first-move))
-           (second-action (second second-move)))
-      (when (or (member (first first-action) '(start-recorder stop-recorder))
-                (member (first second-action) '(start-recorder stop-recorder)))
-        (return-from recorder-interleaving-successor-result nil))
-      (let ((first-side (recorder-audit-action-side (node.state source-node) first-move))
-            (second-side (recorder-audit-action-side (node.state source-node) second-move)))
-        (unless (and first-side second-side (not (eql first-side second-side)))
-          (return-from recorder-interleaving-successor-result nil))
-        (incf *recorder-interleaving-opposite-side-pairs*)
-        (when (and (eql first-side :ghost) (eql second-side :live))
-          (incf *recorder-interleaving-inversions*)
-          (let ((result
-                  (recorder-audit-swapped-pair
-                    source-node first-action second-action successor-state)))
-            (when (eql result :certified)
-              (incf *recorder-interleaving-certified*))
-            (recorder-audit-count-result first-action second-action result)
-            result))))))
-
-
-(defun audit-recorder-interleaving-successor (current-node successor-state)
-  "Audit one adjacent generated pair without changing the successor's disposition."
-  (when *recorder-interleaving-audit*
-    (recorder-interleaving-successor-result current-node successor-state))
-  nil)
+        (and final-valid-p
+             (recorder-interleaving-equivalent-state-p
+               alternate-final actual-final-state))))))
 
 
 (defun prune-recorder-interleaving-successor-p (current-node successor-state)
   "Discard exactly certified ghost-before-live successors in favor of live-before-ghost."
-  (when (eql (recorder-interleaving-successor-result current-node successor-state)
-             :certified)
-    (incf *recorder-interleaving-pruned*)
-    t))
-
-
-(defun recorder-interleaving-audit-rows ()
-  "Return detailed audit counts in stable printed order."
-  (let (rows)
-    (maphash (lambda (key count)
-               (push (append key (list count)) rows))
-             *recorder-interleaving-audit-results*)
-    (sort rows #'string< :key #'prin1-to-string)))
-
-
-(defun print-recorder-interleaving-audit-statistics
-    (&optional (stream *standard-output*))
-  "Print recorder interleaving opportunity measurements for the current search."
-  (format stream "~2%Recorder live/ghost interleaving ~A:"
-          (if *recorder-interleaving-pruning* "pruning" "audit"))
-  (format stream "~%  Opposite-side adjacent pairs = ~:D"
-          *recorder-interleaving-opposite-side-pairs*)
-  (format stream "~%  Ghost-before-live inversion candidates = ~:D"
-          *recorder-interleaving-inversions*)
-  (format stream "~%  Certified interchangeable inversions = ~:D"
-          *recorder-interleaving-certified*)
-  (when (> *recorder-interleaving-inversions* 0)
-    (format stream " (~,1F%)"
-            (* 100.0
-               (/ *recorder-interleaving-certified*
-                  *recorder-interleaving-inversions*))))
-  (when *recorder-interleaving-pruning*
-    (format stream "~%  Canonical interleavings pruned = ~:D"
-            *recorder-interleaving-pruned*))
-  (dolist (row (recorder-interleaving-audit-rows))
-    (destructuring-bind (first-action second-action result count) row
-      (format stream "~%  ~A -> ~A / ~A = ~:D"
-              first-action second-action result count)))
-  (terpri stream))
+  (let ((source-node (node.parent current-node)))
+    (unless (node-p source-node)
+      (return-from prune-recorder-interleaving-successor-p nil))
+    (let* ((first-move (record-move (node.state current-node)))
+           (second-move (record-move successor-state))
+           (first-action (second first-move))
+           (second-action (second second-move)))
+      (and (recorder-interleaving-inversion-p
+             (node.state source-node) first-move second-move)
+           (recorder-interleaving-swap-certified-p
+             source-node first-action second-action successor-state)))))
 
 
 (defun recorder-path-moves-on-side (state integrated-path side)
