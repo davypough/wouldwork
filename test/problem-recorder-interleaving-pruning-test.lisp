@@ -77,6 +77,29 @@
   (assert (dependent-done)))
 
 
+(defparameter *recorder-interleaving-extra-prefix-enabled* nil)
+(defparameter *recorder-interleaving-extra-prefix-calls* 0)
+
+
+(define-test-helper recorder-interleaving-extra-prefix-enabled-p ()
+  *recorder-interleaving-extra-prefix-enabled*)
+
+
+(define-test-helper validate-recorder-interleaving-extra-prefix
+    (start-state path current-state)
+  "Reject the canonical independent pair when this focused test enables the policy."
+  (declare (ignore start-state current-state))
+  (incf *recorder-interleaving-extra-prefix-calls*)
+  (not (equal
+         (mapcar #'recorder-move-action-name (last path 2))
+         '(live-independent ghost-independent))))
+
+
+(register-search-prefix-validator
+  'validate-recorder-interleaving-extra-prefix
+  'recorder-interleaving-extra-prefix-enabled-p)
+
+
 (define-test-helper pruning-recorder-action-pair (first-action second-action)
   "Generate an adjacent action pair and return whether successor pruning rejects it."
   (multiple-value-bind (first-state first-valid-p first-reason)
@@ -94,6 +117,35 @@
              (first-node
                (make-node :state first-state :depth 1 :parent start-node)))
         (search-successor-pruned-p first-node second-state)))))
+
+
+(define-test-helper pruning-recorder-prefix-call-count ()
+  "Return whether the independent inversion is pruned and recorder-prefix call count."
+  (let ((original-validator
+          (symbol-function 'validate-recorder-recording-prefix))
+        (calls 0))
+    (unwind-protect
+      (progn
+        (setf (symbol-function 'validate-recorder-recording-prefix)
+              (lambda (&rest arguments)
+                (incf calls)
+                (apply original-validator arguments)))
+        (values
+          (pruning-recorder-action-pair
+            '(ghost-independent ghost-agent)
+            '(live-independent live-agent))
+          calls))
+      (setf (symbol-function 'validate-recorder-recording-prefix)
+            original-validator))))
+
+
+(define-test-claim recorder-interleaving-reuses-accepted-recorder-prefix
+  (progn
+    (reset-search-successor-audits)
+    (let ((*recorder-prefix-pruning* t))
+      (multiple-value-bind (pruned recorder-prefix-calls)
+          (pruning-recorder-prefix-call-count)
+        (and pruned (zerop recorder-prefix-calls))))))
 
 
 (define-test-claim recorder-interleaving-pruning-contract
@@ -126,6 +178,26 @@
             (print-search-successor-audit-statistics stream))))
     (and (search "Recorder live/ghost interleaving pruning" output)
          (search "Canonical interleavings pruned = 1" output))))
+
+
+(define-test-claim recorder-interleaving-honors-other-prefix-validators
+  (progn
+    (reset-search-successor-audits)
+    (let ((*recorder-interleaving-extra-prefix-enabled* t)
+          (*recorder-interleaving-extra-prefix-calls* 0))
+      (and
+        (not
+          (pruning-recorder-action-pair
+            '(ghost-independent ghost-agent)
+            '(live-independent live-agent)))
+        (= *recorder-interleaving-extra-prefix-calls* 2)
+        (zerop *recorder-interleaving-certified*)
+        (zerop *recorder-interleaving-pruned*)
+        (= (gethash
+             '(ghost-independent live-independent :alternate-second-invalid)
+             *recorder-interleaving-audit-results*
+             0)
+           1)))))
 
 
 (define-goal

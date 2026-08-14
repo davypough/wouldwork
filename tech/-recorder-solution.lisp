@@ -227,8 +227,14 @@
                  0)))
 
 
+(defun recorder-interleaving-other-prefix-validation-enabled-p ()
+  "Whether certification must construct alternate paths for a non-recorder policy."
+  (search-prefix-validation-enabled-p
+    '(validate-recorder-recording-prefix)))
+
+
 (defun recorder-audit-state-valid-p (state path)
-  "Whether an alternate replay state passes the search's state and prefix checks."
+  "Whether an alternate replay state passes non-redundant search validity checks."
   (and (not (state-is-inconsistent state))
        (or (not (and (boundp 'constraint-fn)
                      (symbol-value 'constraint-fn)))
@@ -236,7 +242,8 @@
        (every (lambda (invariant)
                 (funcall (symbol-function invariant) state))
               *global-invariants*)
-       (candidate-search-prefix-valid-p path state)))
+       (candidate-search-prefix-valid-p
+         path state '(validate-recorder-recording-prefix))))
 
 
 (defun recorder-audit-equivalent-state-p (state1 state2)
@@ -252,7 +259,7 @@
 
 
 (defun recorder-audit-replay-step
-    (action state next-action path unavailable-result invalid-result)
+    (action state next-action path validate-prefix-p unavailable-result invalid-result)
   "Replay ACTION and return its state, extended path, and audit result."
   (multiple-value-bind (next-state valid-p reason)
       (apply-action-to-state action state next-action)
@@ -260,7 +267,9 @@
     (unless valid-p
       (return-from recorder-audit-replay-step
         (values nil nil unavailable-result)))
-    (let ((next-path (append path (list (record-move next-state)))))
+    (let ((next-path
+            (when validate-prefix-p
+              (append path (list (record-move next-state))))))
       (if (recorder-audit-state-valid-p next-state next-path)
         (values next-state next-path nil)
         (values nil nil invalid-result)))))
@@ -269,17 +278,21 @@
 (defun recorder-audit-swapped-pair
     (source-node first-action second-action actual-final-state)
   "Return the diagnostic result of replaying SECOND-ACTION before FIRST-ACTION."
-  (let* ((source-state (node.state source-node))
-         (source-path (record-solution-path source-node)))
+  (let* ((validate-prefix-p
+           (recorder-interleaving-other-prefix-validation-enabled-p))
+         (source-state (node.state source-node))
+         (source-path
+           (when validate-prefix-p
+             (record-solution-path source-node))))
     (multiple-value-bind (alternate-first first-path first-result)
         (recorder-audit-replay-step
-          second-action source-state first-action source-path
+          second-action source-state first-action source-path validate-prefix-p
           :alternate-first-unavailable :alternate-first-invalid)
       (when first-result
         (return-from recorder-audit-swapped-pair first-result))
       (multiple-value-bind (alternate-final final-path second-result)
           (recorder-audit-replay-step
-            first-action alternate-first nil first-path
+            first-action alternate-first nil first-path validate-prefix-p
             :alternate-second-unavailable :alternate-second-invalid)
         (declare (ignore final-path))
         (when second-result

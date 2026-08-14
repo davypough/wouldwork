@@ -324,22 +324,30 @@ validation.  Both functions must be read-only and safe to call concurrently."
   validator)
 
 
-(defun search-prefix-validation-enabled-p ()
-  "Whether any registered search-prefix validator is currently enabled."
+(defun search-prefix-validation-enabled-p (&optional excluded-validators)
+  "Whether any non-excluded search-prefix validator is currently enabled."
   (some (lambda (entry)
-          (funcall (symbol-function (search-prefix-validator.enabled-p entry))))
+          (let ((validator (search-prefix-validator.validator entry)))
+            (and (not (member validator excluded-validators :test #'eq))
+                 (funcall
+                   (symbol-function
+                     (search-prefix-validator.enabled-p entry))))))
         *search-prefix-validators*))
 
 
-(defun candidate-search-prefix-valid-p (path current-state)
-  "Whether every enabled validator accepts PATH ending at CURRENT-STATE."
+(defun candidate-search-prefix-valid-p
+    (path current-state &optional excluded-validators)
+  "Whether every enabled non-excluded validator accepts PATH ending at CURRENT-STATE."
   (dolist (entry *search-prefix-validators* t)
-    (when (funcall
-            (symbol-function (search-prefix-validator.enabled-p entry)))
-      (unless (funcall
-                (symbol-function (search-prefix-validator.validator entry))
-                *start-state* path current-state)
-        (return nil)))))
+    (let ((validator (search-prefix-validator.validator entry)))
+      (when (and (not (member validator excluded-validators :test #'eq))
+                 (funcall
+                   (symbol-function
+                     (search-prefix-validator.enabled-p entry))))
+        (unless (funcall
+                  (symbol-function validator)
+                  *start-state* path current-state)
+          (return nil))))))
 
 
 (sb-ext:defglobal *goal-chaining-checkpoint-extensions* nil
