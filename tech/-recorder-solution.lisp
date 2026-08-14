@@ -78,10 +78,10 @@
 
 
 (define-query recording-agent-empty-handed (?agent agent)
-  ;; A recorder only accepts an empty-handed return.  Closing a recording session -- either
-  ;; the strict GHOST-STOPS-RECORDER style below or the weaker RECORDING-AGENT-CAN-CLOSE
-  ;; style -- requires the ghost to have already set down whatever it was carrying, not
-  ;; merely to be standing at or within reach of a recorder.
+  ;; Operating a recorder requires empty hands.  In particular, closing a recording session
+  ;; -- either the strict GHOST-STOPS-RECORDER style below or the weaker
+  ;; RECORDING-AGENT-CAN-CLOSE style -- requires the ghost to have already set down whatever
+  ;; it was carrying, not merely to be standing at or within reach of a recorder.
   (not (bind (holding ?agent $anything))))
 
 

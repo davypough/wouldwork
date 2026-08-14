@@ -4,9 +4,9 @@ RECORDER-GHOST OPERATIONS IN THE TALOS PRINCIPLE
 
 2. The agent can perform actions on the environment and on real objects during the pre-recording phase.
 
-3. An ensuing recording phase starts when the agent starts the recorder.  At that moment,
-the recorder captures a snapshot of the complete scenario state for restoration before
-playback.
+3. An ensuing recording phase starts when the empty-handed agent starts the recorder.  At
+that moment, the recorder captures a snapshot of the complete scenario state for restoration
+before playback.
 
 4. Recording duration is limited to 5 minutes maximum.
 
@@ -16,7 +16,7 @@ playback.
 
 7. During the recording phase when a pause is set, any unfolding ghost events are paused at that point during playback, in particular if ghost objects are in motion.  For example, if a pause is set while a ghost object is falling, the ghost object will be suspended at the position it was at when the pause occurred.
 
-8. The recording phase stops when the agent returns to the recorder and stops it.
+8. The recording phase stops when the agent returns to the recorder empty-handed and stops it.
 
 9. When the recording phase stops, the complete scenario is restored to the snapshot taken
 when recording started.  Physical changes made during recording do not persist; only the

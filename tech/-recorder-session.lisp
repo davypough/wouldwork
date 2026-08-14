@@ -7,7 +7,9 @@
 ;;; tech/Recorder-ghost operations in the Talos Principle.txt -- every mapped ghost object
 ;;; inherits its live counterpart's CURRENT has-location, holding, on, paired, jamming, and
 ;;; mounted-on state at the exact moment recording starts, not whatever -- if anything --
-;;; define-init separately declared for it.  RECORDING-IN-PROGRESS also gates ghost
+;;; define-init separately declared for it.  The agent operating the recorder must itself
+;;; be empty-handed; holdings elsewhere in the mapped state still belong to the complete
+;;; snapshot.  RECORDING-IN-PROGRESS also gates ghost
 ;;; existence itself (see -recorder-core.lisp's OBJECT-MANIPULATION-ALLOWED and
 ;;; CONNECTOR-PAIRING-ALLOWED): a ghost cannot act, and a live connector cannot reference a
 ;;; ghost terminus, before this action has run.  That gate is not just faithfulness to rule
@@ -115,7 +117,8 @@
     '(?agent agent)
     '(and (live-recording-object ?agent)
           (not (recording-in-progress))
-          (recording-agent-at-recorder ?agent))
+          (recording-agent-at-recorder ?agent)
+          (recording-agent-empty-handed ?agent))
     '(">" ?agent "starts the recorder")
     `(assert
        (recording-in-progress)

@@ -5,6 +5,8 @@
 ;;; forking that current location, rather than the location authored in DEFINE-INIT.  The
 ;;; alternate ghost action demonstrates the converse: replaying START-RECORDER from the
 ;;; original problem state would accept it, but replaying from the true snapshot rejects it.
+;;; HOLD-BEFORE-RECORDER additionally characterizes the session boundary itself: even at the
+;;; recorder, a live agent carrying a mapped object cannot start recording.
 ;;;
 ;;; Expected minimum path length: three.
 
@@ -62,6 +64,18 @@
   (assert (has-location live-box snapshot-site)))
 
 
+(define-action hold-before-recorder
+  1
+  (?agent agent)
+  (and (live-recording-object ?agent)
+       (not (recording-in-progress))
+       (has-location ?agent recorder-site)
+       (has-location live-box original-site))
+  (">" ?agent "holds the box before starting the recorder")
+  (assert (holding ?agent live-box)
+          (has-location live-box recorder-site)))
+
+
 (define-action use-current-snapshot
   1
   (?agent agent)
@@ -98,6 +112,11 @@
     (3.0 (use-original-snapshot ghost-agent))))
 
 
+(define-test-helper recorder-held-start-path ()
+  '((1.0 (hold-before-recorder live-agent))
+    (2.0 (start-recorder live-agent))))
+
+
 (define-test-claim recorder-snapshot-validation-contract
   (equal (recorder-pre-recording-path (recorder-snapshot-valid-path))
          '((1.0 (prepare-snapshot live-agent))))
@@ -121,6 +140,12 @@
          (eql (getf diagnostic :reason) :action-failed)
          (equal (getf diagnostic :action)
                 '(use-original-snapshot ghost-agent))))
+  (let ((validation
+          (validate-action-sequence *start-state* (recorder-held-start-path))))
+    (and (not (action-sequence-validation-success-p validation))
+         (= (action-sequence-validation-failure-index validation) 2)
+         (equal (action-sequence-validation-failure-action validation)
+                '(start-recorder live-agent))))
   (multiple-value-bind (valid-p diagnostic)
       (validate-recorder-solution
         *start-state*
