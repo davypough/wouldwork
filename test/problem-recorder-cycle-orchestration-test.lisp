@@ -107,16 +107,18 @@
          (cycle-1 (search "Cycle 1" printed))
          (cycle-2 (search "Cycle 2" printed))
          (integrated-1 (search "Integrated sequence:" printed :start2 cycle-1))
+         (setup-1 (search "Setup sequence:" printed :start2 cycle-1))
          (recording-1 (search "Recording sequence:" printed :start2 cycle-1))
          (playback-1 (search "Playback sequence:" printed :start2 cycle-1))
          (integrated-2 (search "Integrated sequence:" printed :start2 cycle-2))
+         (setup-2 (search "Setup sequence:" printed :start2 cycle-2))
          (recording-2 (search "Recording sequence:" printed :start2 cycle-2))
          (playback-2 (search "Playback sequence:" printed :start2 cycle-2)))
     (and cycle-1 cycle-2
-         integrated-1 recording-1 playback-1
-         integrated-2 recording-2 playback-2
-         (< cycle-1 integrated-1 recording-1 playback-1 cycle-2
-            integrated-2 recording-2 playback-2)
+         integrated-1 setup-1 recording-1 playback-1
+         integrated-2 setup-2 recording-2 playback-2
+         (< cycle-1 integrated-1 setup-1 recording-1 playback-1 cycle-2
+            integrated-2 setup-2 recording-2 playback-2)
          (search "Chain totals: depth 2; elapsed time 5.0; value change 11.0" printed)
          (search "Any optimization is local to its cycle; this chain is not globally optimized."
                  printed))))

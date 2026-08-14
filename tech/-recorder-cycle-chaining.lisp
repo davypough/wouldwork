@@ -130,7 +130,7 @@
 
 (defun print-recorder-chain-sequence (heading sequence stream)
   "Print HEADING followed by every entry in a recorder chain SEQUENCE."
-  (format stream "~&~A:~%" heading)
+  (format stream "~&~%~A:~%" heading)
   (dolist (entry sequence)
     (format stream "~S~%" entry))
   sequence)
@@ -147,6 +147,7 @@
           (recorder-cycle-record.value-change record))
   (let ((report (recorder-cycle-record.report record)))
     (print-recorder-chain-sequence "Integrated sequence" (getf report :integrated) stream)
+    (print-recorder-chain-sequence "Setup sequence" (getf report :setup) stream)
     (print-recorder-chain-sequence "Recording sequence" (getf report :recording) stream)
     (print-recorder-chain-sequence "Playback sequence" (getf report :playback) stream))
   record)

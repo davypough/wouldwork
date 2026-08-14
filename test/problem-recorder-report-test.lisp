@@ -1,6 +1,6 @@
 ;;; Filename: problem-recorder-report-test.lisp
 
-;;; Zero-action characterization of the two-phase recorder report.  The mapped agent names
+;;; Zero-action characterization of the three-phase recorder report.  The mapped agent names
 ;;; deliberately have no star convention.  A synthetic integrated solution follows the
 ;;; documented Windtunnel block pattern: live, ghost, live, ghost, live.  Two ghost agents
 ;;; cover both terminal cases of the recording sequence: one ends away from the recorder and
@@ -85,11 +85,13 @@
                (let ((*standard-output* stream))
                  (funcall 'printout-solution empty-solution))))
            (solution-position (search "(START-STATE)" combined-printed))
+           (setup-position (search "Setup phase:" combined-printed))
            (recording-position (search "Recording phase:" combined-printed))
            (playback-position (search "Playback phase:" combined-printed)))
     (and
       (eq (getf report :integrated) path)
         (equal path saved-path)
+        (null (getf report :setup))
         (equal
           (getf report :recording)
           '((start-recorder)
@@ -130,13 +132,41 @@
             (pause)
             (9.0 (move operator-alpha
                   ((walk site-c nil site-d))))))
-        (search "Recording phase:" printed)
+        (search (format nil "Setup phase:~%~%Recording phase:") printed)
         (search "Playback phase:" printed)
+        (search (format nil "~S~%~%Playback phase:" '(stop-recorder)) printed)
         (search "(WALK SITE-A NIL SITE-B)" printed)
         solution-position
+        setup-position
         recording-position
       playback-position
-      (< solution-position recording-position playback-position))))
+      (< solution-position setup-position recording-position playback-position))))
+
+
+(define-test-claim recorder-report-explicit-setup-contract
+  (let* ((path
+           '((1.0 (pickup-connector operator-alpha tool-alpha site-a))
+             (2.0 (connect-connector operator-alpha tool-alpha tool-echo site-a))
+             (3.0 (start-recorder operator-alpha))
+             (4.0 (pickup-connector playback-echo tool-echo site-a))))
+         (solution
+           (make-solution
+             :depth 4
+             :time 4.0
+             :path path
+             :goal *start-state*))
+         (report (build-recorder-report solution))
+         (printed
+           (with-output-to-string (stream)
+             (print-recorder-report solution stream)))
+         (setup (subseq path 0 2)))
+    (and
+      (equal (getf report :setup) setup)
+      (search
+        (format nil "Setup phase:~%~S~%~S~%~%Recording phase:"
+                (first setup) (second setup))
+        printed)
+      (equal (first (getf report :recording)) (third path)))))
 
 
 (define-goal

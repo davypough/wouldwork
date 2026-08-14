@@ -10,15 +10,11 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* min-length)
+(ww-set *solution-type* first)
 
 (ww-set *tree-or-graph* graph)
 
 (ww-set *progress-reporting-interval* 1000000)
-
-;(ww-set *symmetry-pruning* t)
-
-(ww-set *recorder-prefix-pruning* t)
 
 (ww-set *depth-cutoff* 13)
 

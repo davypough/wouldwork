@@ -10,15 +10,13 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *solution-type* min-length)
+(ww-set *solution-type* first)
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 17)
+(ww-set *depth-cutoff* 16)
 
 (ww-set *progress-reporting-interval* 3000000)
-
-(ww-set *recorder-prefix-pruning* t)
 
 
 (defparameter *max-pairings* 2)

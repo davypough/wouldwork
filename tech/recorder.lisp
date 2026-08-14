@@ -30,7 +30,7 @@
 ;;;   -recorder-gate-shadow        : RECORDING-OPEN and gate-view hook
 ;;;   -recorder-wall-gears-shadow  : RECORDING-TURNING and gears-view hook
 ;;;   -recorder-solution           : prefix validation, interleaving audit/pruning,
-;;;                                  candidate validation, and two-phase report
+;;;                                  candidate validation, and three-phase report
 ;;;   -recorder-session            : START-RECORDER / STOP-RECORDER actions and the
 ;;;                                  live-to-ghost state fork; nests -recorder-solution,
 ;;;                                  so its own list position is a readability choice, not

@@ -1,7 +1,7 @@
 ;;; Filename: -recorder-solution.lisp
 
 ;;; Recorder path services: optional recording-prefix pruning, automatic exact live/ghost
-;;; interleaving canonicalization, candidate validation, and the two-phase report.  Nested
+;;; interleaving canonicalization, candidate validation, and the three-phase report.  Nested
 ;;; by recorder.lisp, whose public assembly installs pruning, validation, reporting,
 ;;; and goal chaining after all recorder components have been defined.  Lower-level tests may
 ;;; include this file for its mechanics without installing those public services.  Nothing
@@ -569,10 +569,10 @@ markers, not planner actions, and carry no step number for that reason."
 
 
 (defun build-recorder-report (&optional (solution (first *solution-paths*)))
-  "Build recording/playback sequences for a completed integrated SOLUTION.
+  "Build setup, recording, and playback sequences for a completed integrated SOLUTION.
 
 The returned plist retains the original path under :INTEGRATED and provides the derived
-sequences under :RECORDING and :PLAYBACK.  Report markers are not planner actions."
+sequences under :SETUP, :RECORDING, and :PLAYBACK.  Report markers are not planner actions."
   (unless solution
     (error "No completed solution is available for a recorder report."))
   (unless (solution-p solution)
@@ -580,18 +580,22 @@ sequences under :RECORDING and :PLAYBACK.  Report markers are not planner action
   (let ((path (solution.path solution))
         (state (solution.goal solution)))
     (list :integrated path
+          :setup (recorder-pre-recording-path path)
           :recording (recorder-recording-sequence state path)
           :playback (recorder-playback-sequence state path))))
 
 
 (defun print-recorder-report
     (&optional (solution (first *solution-paths*)) (stream *standard-output*))
-  "Print and return the two-phase report derived from SOLUTION."
+  "Print and return the three-phase report derived from SOLUTION."
   (let ((report (build-recorder-report solution)))
+    (format stream "~&~%Setup phase:~%")
+    (dolist (entry (getf report :setup))
+      (format stream "~S~%" entry))
     (format stream "~&~%Recording phase:~%")
     (dolist (entry (getf report :recording))
       (format stream "~S~%" entry))
-    (format stream "~&Playback phase:~%")
+    (format stream "~&~%Playback phase:~%")
     (dolist (entry (getf report :playback))
       (format stream "~S~%" entry))
     report))
