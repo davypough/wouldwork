@@ -129,15 +129,18 @@
 
 
 (defun copy-idb (idb)
-  "Copies a Wouldwork database with thread-safe hash table in parallel mode."
+  "Copy a Wouldwork database's table structure.
+   Database values are immutable: fluent updates replace their value lists rather than
+   modifying them.  Child states can therefore share those lists while retaining an
+   independently mutable, pre-sized hash table."
   (declare (type hash-table idb))
   (let ((new-idb (make-hash-table :test (hash-table-test idb)
-                                  :synchronized nil)))  ;not shared (> *threads* 0))))
+                                  :size (hash-table-count idb)
+                                  :rehash-size (hash-table-rehash-size idb)
+                                  :rehash-threshold (hash-table-rehash-threshold idb)
+                                  :synchronized nil)))
     (maphash (lambda (k v)
-               (setf (gethash k new-idb)
-                     (if (consp v)
-                         (copy-list v)
-                         v)))
+               (setf (gethash k new-idb) v))
              idb)
     new-idb))
 

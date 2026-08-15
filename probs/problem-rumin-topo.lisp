@@ -202,5 +202,6 @@
 
 (define-goal
   (and (has-location agent1 location7)
-       ;(ghost-stops-recorder))
+       ;(ghost-stops-recorder)
+  )
 )

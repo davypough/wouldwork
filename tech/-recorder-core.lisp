@@ -125,20 +125,21 @@
 
 
 (define-query recording-shadow-object (?object)
-  (and (mobile-object ?object)
-       (ghost-recording-object ?object)))
+  ;; A reverse mapping exists only for a mobile ghost, so a separate type lookup and
+  ;; nested GHOST-RECORDING-OBJECT call would repeat work on this hot path.
+  (bind (recording-copy> $live ?object)))
 
 
 (define-query recording-shadow-object-present (?object)
   ;; Fixed apparatus and genuinely unmapped objects exist in both views.  An explicit
   ;; closed-cycle marker removes mapped ghosts from the recording view.  Its absence also
   ;; preserves the legacy shadow-only view used by focused capability characterizations
-  ;; that do not install the recorder session actions.
+  ;; that do not install the recorder session actions.  Classify each mobile object once
+  ;; through the two recording-copy indexes instead of repeating live/ghost query calls.
   (or (not (mobile-object ?object))
-      (and (not (recorder-cycle-closed))
-           (ghost-recording-object ?object))
-      (and (not (live-recording-object ?object))
-           (not (ghost-recording-object ?object)))))
+      (if (bind (recording-copy> $live ?object))
+        (not (recorder-cycle-closed))
+        (not (bind (recording-copy> ?object $ghost))))))
 
 
 (define-query object-manipulation-allowed (?actor ?object)
