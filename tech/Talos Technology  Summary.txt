@@ -109,7 +109,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (los-to-target location $list gate)
 (los-barrier-crossings> los-endpoint $list visibility-object)  ;directed records (:kind identity parameter x1 y1 x2 y2), including fixed couplings and gate targets
 (reach-via location $list location)
-(recording-copy> mobile-object $mobile-object)  ;maps each live mobile object to its recorder ghost; directional, live -> ghost
+(recording-copy> $mobile-object $mobile-object :bijective)  ;indexed one-to-one live -> ghost mapping
 (screen-segment> screen $rational $rational $rational $rational)
 (stairs-via location $list location)
 (stairs-via> location $list location)

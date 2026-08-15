@@ -58,7 +58,7 @@
 (define-test-claim recorder-schema
   (expect-relation-schema
     'recording-copy> :static '(mobile-object mobile-object)
-    :fluent-indices '(2))
+    :fluent-indices '(1 2))
   ;; Membership, not the full union roster: another technology may add a fixed kind.
   (expect-type-component 'fixed-position-object 'recorder)
   (expect-type-instance 'fixed-position-object 'recorder1)
@@ -90,11 +90,9 @@
     (lambda ()
       (validate-init-literals
         '((recording-copy> live-agent ghost-agent)
-          (recording-copy> other-live-agent ghost-agent))
-        :checks '(recorder-init-check)))
-    'init-check-failure
-    :containing "repeats a ghost object"
-    :check 'recorder-init-check)
+          (recording-copy> other-live-agent ghost-agent))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key")
   (expect-condition
     (lambda ()
       (validate-init-literals

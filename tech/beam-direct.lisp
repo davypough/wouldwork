@@ -83,19 +83,18 @@
       $reaches))
 
 
-(define-query recording-shadow-direct-beam-reaches-receiver (?receiver receiver)
+(define-query recording-shadow-direct-beam-reaches-receiver
+    (?view ?receiver receiver)
   (do (assign $reaches nil)
-      (doall (?view mobile-object)
-        (if (recording-shadow-object ?view)
-          (doall (?transmitter transmitter)
-            (if (and (coupled ?transmitter ?receiver)
-                     (bind (has-chroma ?transmitter $source-hue))
-                     (bind (has-chroma ?receiver $required-hue))
-                     (eql $source-hue $required-hue)
-                     (fixed-beam-corridor-clear-for-object
-                       ?view ?transmitter ?receiver)
-                     (not (beam-cut ?transmitter ?receiver)))
-              (assign $reaches t)))))
+      (doall (?transmitter transmitter)
+        (if (and (coupled ?transmitter ?receiver)
+                 (bind (has-chroma ?transmitter $source-hue))
+                 (bind (has-chroma ?receiver $required-hue))
+                 (eql $source-hue $required-hue)
+                 (fixed-beam-corridor-clear-for-object
+                   ?view ?transmitter ?receiver)
+                 (not (beam-cut ?transmitter ?receiver)))
+          (assign $reaches t)))
       $reaches))
 
 

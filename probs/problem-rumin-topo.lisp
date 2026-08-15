@@ -31,7 +31,8 @@
   gate  (gate1 gate2 gate3 gate4 gate5)
   wall (wall1 wall2 wall3 wall4 wall5 wall6 wall7 wall8 wall9 wall10 wall11 wall12 wall13)
   edge (edge1 edge2 edge3 edge4)
-  location (location1 location2 location3 location4 location5 location6 location7
+  location (location1 location2 location3 location4  ;location5
+            location6 location7
             location8 location9 location10 location11 location12 location13)
   pressure-plate (plate1 plate2 plate3)
   box (box1 box1*)
@@ -39,7 +40,7 @@
   tray (tray1 tray1*)
   transmitter (transmitter1 transmitter2)
   receiver (receiver1 receiver2)
-  ladder (ladder1)
+  ;ladder (ladder1)
   hue (blue red)
 )
 
@@ -53,7 +54,7 @@
 (include-tech tray)
 (include-tech box)
 (include-tech recorder)
-(include-tech ladder)
+;(include-tech ladder)
 (include-tech stairs)
 (include-tech step)
 (include-tech jump)
@@ -86,7 +87,7 @@
   (has-position plate1 location6)
   (has-position plate2 location9)
   (has-position plate3 location12)
-  (has-position ladder1 location5)
+  ;(has-position ladder1 location5)
   (has-position recorder1 location3)
 
   ;; Representative location coordinates
@@ -94,7 +95,7 @@
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
   (location-coords> location4 8 10)
-  (location-coords> location5 17 151/10)
+  ;(location-coords> location5 17 151/10)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
   (location-coords> location8 241/10 6)
@@ -175,7 +176,7 @@
   (gate-segment> gate5 33 8 33 11)
 
   ;; One-way ladder traversal
-  (climb-via> location5 (ladder1) location4)
+  ;(climb-via> location5 (ladder1) location4)
 
   ;; Authorized elevation changes
   (jump-via location8 () location9)
@@ -200,6 +201,6 @@
 
 
 (define-goal
-  (and (has-location agent1 location1)
-       (ghost-stops-recorder))
+  (and (has-location agent1 location7)
+       ;(ghost-stops-recorder))
 )

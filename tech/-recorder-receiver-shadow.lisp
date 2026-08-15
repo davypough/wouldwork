@@ -5,8 +5,9 @@
 ;;; their combined result.
 ;;;
 ;;; REQUIRES:
-;;;   nested : -recorder-core (recording object/presence policy); -beam-substrate
-;;;            (recording-shadow-beam-reaches-receiver); -propagation
+;;;   nested : -recorder-core (recording object/presence policy and the single shadow-view
+;;;            selector); -beam-substrate (recording-shadow-beam-reaches-receiver and the
+;;;            relay-lighting hook); -propagation
 ;;; PROVIDES:
 ;;;   relation : recording-active
 ;;;   update   : update-recording-receiver-status!
@@ -33,10 +34,15 @@
 
 
 (define-update update-recording-receiver-status! ()
-  (doall (?receiver receiver)
-    (if (recording-shadow-beam-reaches-receiver ?receiver)
-      (recording-active ?receiver)
-      (not (recording-active ?receiver)))))
+  ;; Every mapped ghost observes the same recording-side environment.  Select that view
+  ;; once and compute its relay lighting once, then reuse both for every receiver.
+  (do (assign $view (recording-shadow-view-object))
+      (assign $lighting (compute-relay-lighting-for-object $view nil))
+      (doall (?receiver receiver)
+        (if (recording-shadow-beam-reaches-receiver
+              $view $lighting ?receiver)
+          (recording-active ?receiver)
+          (not (recording-active ?receiver))))))
 
 
 (register-recorder-shadow-lifecycle

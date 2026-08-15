@@ -2,7 +2,7 @@
 
 ;;; Recorder identity and cross-layer interaction policy.  RECORDING-COPY> explicitly maps
 ;;; each live mobile object to the ghost that replays it.  The relation is directional and
-;;; functional from live to ghost; recorder initialization adds the one-to-one, disjoint,
+;;; one-to-one, with static indexes in both directions; recorder initialization adds the disjoint,
 ;;; leaf-category-compatible, and exhaustive loose-cargo invariants.  The relation also
 ;;; registers its ordered tuples as coupled symmetry rows.
 ;;;
@@ -26,10 +26,11 @@
 ;;;
 ;;; PROVIDES:
 ;;;   type     : recorder, connector, tray (optional)
-;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object);
+;;;   relation : recording-copy> (indexed live mobile-object -> ghost mobile-object);
 ;;;              recording-in-progress, recorder-cycles-used,
 ;;;              recorder-cycle-closed
-;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
+;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side,
+;;;              recording-shadow-view-object;
 ;;;              recorder-cycle-count;
 ;;;              overrides recording-shadow-object, recording-shadow-object-present,
 ;;;              object-manipulation-allowed, support-use-allowed, and
@@ -50,7 +51,7 @@
 
 
 (define-static-relations
-  (recording-copy> mobile-object $mobile-object))
+  (recording-copy> $mobile-object $mobile-object :bijective))
 
 
 (define-dynamic-relations
@@ -90,13 +91,21 @@
 
 
 (define-query live-recording-object (?object mobile-object)
-  (exists (?ghost mobile-object)
-    (recording-copy> ?object ?ghost)))
+  (bind (recording-copy> ?object $ghost)))
 
 
 (define-query ghost-recording-object (?object mobile-object)
-  (exists (?live mobile-object)
-    (recording-copy> ?live ?object)))
+  (bind (recording-copy> $live ?object)))
+
+
+(define-query recording-shadow-view-object ()
+  ;; Environmental shadow queries need a side selector, not every ghost's identity.  Any
+  ;; mapped ghost selects the same recording view, so bind one representative once per
+  ;; recording-side propagation pass.
+  (do (assign $view nil)
+      (exists (?live mobile-object)
+        (bind (recording-copy> ?live $view)))
+      $view))
 
 
 (define-query same-recording-side (?object1 mobile-object ?object2 mobile-object)

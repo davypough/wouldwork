@@ -58,9 +58,19 @@
 (define-test-claim recorder-core-schema
   (expect-relation-schema
     'recording-copy> :static '(mobile-object mobile-object)
+    :fluent-indices '(1 2))
+  (expect-relation-schema
+    'recording-copy>1 :static '(mobile-object mobile-object)
     :fluent-indices '(2))
+  (expect-relation-schema
+    'recording-copy>2 :static '(mobile-object mobile-object)
+    :fluent-indices '(1))
+  (or (equal (gethash 'recording-copy> *bijective-relations*)
+             '(recording-copy>1 recording-copy>2))
+      (fail-test-claim "RECORDING-COPY> does not own both static lookup indexes."))
   (expect-registered :query 'live-recording-object)
   (expect-registered :query 'ghost-recording-object)
+  (expect-registered :query 'recording-shadow-view-object)
   (expect-registered :query 'same-recording-side)
   (expect-registered :query 'recording-shadow-object)
   (expect-registered :query 'recording-shadow-object-present)
@@ -91,6 +101,7 @@
     (recording-copy> live-connector ghost-connector)
     (live-recording-object live-agent)
     (ghost-recording-object ghost-agent)
+    (ghost-recording-object (recording-shadow-view-object))
     (not (recording-shadow-object live-agent))
     (recording-shadow-object ghost-agent)
     (not (recording-shadow-object unmapped-fan))

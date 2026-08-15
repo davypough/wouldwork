@@ -178,28 +178,26 @@
       $reaches))
 
 
-(define-query recording-shadow-relay-beam-reaches-receiver (?receiver receiver)
+(define-query recording-shadow-relay-beam-reaches-receiver
+    (?view ?lighting ?receiver receiver)
   (do (assign $reaches nil)
-      (doall (?view mobile-object)
-        (if (recording-shadow-object ?view)
-          (do (assign $lighting (compute-relay-lighting-for-object ?view nil))
-              (doall (?relay relay)
-                (if (and (relay-available-for-object ?view ?relay)
-                         (assign $record (assoc ?relay $lighting))
-                         $record
-                         (bind (has-chroma ?receiver $required-hue))
-                         (eql (second $record) $required-hue)
-                         (or (and (connector ?relay)
-                                  (paired ?relay ?receiver)
-                                  (bind (has-location ?relay $location))
-                                  (beam-visible-for-object
-                                    ?view $location (beam-anchor-elevation ?relay)
-                                    ?receiver (fixture-elevation ?receiver)))
-                             (and (repeater ?relay)
-                                  (coupled ?relay ?receiver)
-                                  (fixed-beam-corridor-clear-for-object
-                                    ?view ?relay ?receiver))))
-                  (assign $reaches t))))))
+      (doall (?relay relay)
+        (if (and (relay-available-for-object ?view ?relay)
+                 (assign $record (assoc ?relay ?lighting))
+                 $record
+                 (bind (has-chroma ?receiver $required-hue))
+                 (eql (second $record) $required-hue)
+                 (or (and (connector ?relay)
+                          (paired ?relay ?receiver)
+                          (bind (has-location ?relay $location))
+                          (beam-visible-for-object
+                            ?view $location (beam-anchor-elevation ?relay)
+                            ?receiver (fixture-elevation ?receiver)))
+                     (and (repeater ?relay)
+                          (coupled ?relay ?receiver)
+                          (fixed-beam-corridor-clear-for-object
+                            ?view ?relay ?receiver))))
+          (assign $reaches t)))
       $reaches))
 
 

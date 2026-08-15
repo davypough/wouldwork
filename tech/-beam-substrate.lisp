@@ -29,7 +29,8 @@
 ;;;               recording-shadow-relay-beam-reaches-receiver,
 ;;;               fixed-beam-corridor-clear, fixed-beam-corridor-clear-for-object,
 ;;;               current-crossing-set,
-;;;               compute-relay-lighting, beam-relay-source-distance
+;;;               compute-relay-lighting, compute-relay-lighting-for-object,
+;;;               beam-relay-source-distance
 ;;;   update    : update-receiver-status!
 
 (include-tech -propagation)
@@ -76,9 +77,11 @@
       (relay-beam-reaches-receiver ?receiver)))
 
 
-(define-query recording-shadow-beam-reaches-receiver (?receiver receiver)
-  (or (recording-shadow-direct-beam-reaches-receiver ?receiver)
-      (recording-shadow-relay-beam-reaches-receiver ?receiver)))
+(define-query recording-shadow-beam-reaches-receiver
+    (?view ?lighting ?receiver receiver)
+  (or (recording-shadow-direct-beam-reaches-receiver ?view ?receiver)
+      (recording-shadow-relay-beam-reaches-receiver
+        ?view ?lighting ?receiver)))
 
 
 (define-query beam-live-for-cutting
@@ -104,12 +107,14 @@
   (do ?receiver nil))
 
 
-(define-query recording-shadow-direct-beam-reaches-receiver (?receiver receiver)
-  (do ?receiver nil))
+(define-query recording-shadow-direct-beam-reaches-receiver
+    (?view ?receiver receiver)
+  (do ?view ?receiver nil))
 
 
-(define-query recording-shadow-relay-beam-reaches-receiver (?receiver receiver)
-  (do ?receiver nil))
+(define-query recording-shadow-relay-beam-reaches-receiver
+    (?view ?lighting ?receiver receiver)
+  (do ?view ?lighting ?receiver nil))
 
 
 (define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)
@@ -151,6 +156,10 @@
 
 (define-query compute-relay-lighting (?active)
   (do ?active nil))
+
+
+(define-query compute-relay-lighting-for-object (?view ?active)
+  (do ?view ?active nil))
 
 
 (define-query beam-relay-source-distance (?from beam-node ?lighting)

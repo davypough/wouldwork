@@ -168,12 +168,13 @@
         (values relation nil))))
 
 
-(defun create-bijective-indices (relation)
+(defun create-bijective-indices (relation relation-table)
   "Creates dual internal indices for a validated bijective relation.
    For (on $block $support), creates:
    - ON1: keyed by position 1 (block), fluent at position 2
    - ON2: keyed by position 2 (support), fluent at position 1
-   Registers all necessary data structures."
+   RELATION-TABLE is either *RELATIONS* or *STATIC-RELATIONS*, so the same
+   indexed representation serves dynamic and static bijections."
   (let* ((relation-name (car relation))
          (args (cdr relation))
          (normalized-args (mapcar #'normalize-fluent-spec args))
@@ -181,17 +182,17 @@
          (index1-name (intern (format nil "~A1" relation-name)))
          (index2-name (intern (format nil "~A2" relation-name))))
     
-    ;; Register canonical relation in *relations* for validation
-    (setf (gethash relation-name *relations*) sorted-args)
+    ;; Register the canonical relation for validation.
+    (setf (gethash relation-name relation-table) sorted-args)
     ;; Canonical relation has all positions as fluent
     (setf (gethash relation-name *fluent-relation-indices*) '(1 2))
     
     ;; Register ON1: keyed by position 1, fluent at position 2
-    (setf (gethash index1-name *relations*) sorted-args)
+    (setf (gethash index1-name relation-table) sorted-args)
     (setf (gethash index1-name *fluent-relation-indices*) '(2))
     
     ;; Register ON2: keyed by position 2, fluent at position 1
-    (setf (gethash index2-name *relations*) sorted-args)
+    (setf (gethash index2-name relation-table) sorted-args)
     (setf (gethash index2-name *fluent-relation-indices*) '(1))
     
     ;; Register bijective mappings
@@ -246,20 +247,28 @@
       (if bijectivep
         (progn
           (check-bijective-relation relation)
-          (create-bijective-indices relation))
+          (create-bijective-indices relation *relations*))
         (progn
           (setf (gethash (car relation) *relations*) new-signature)
           (ut::if-it (relation-signature-fluent-indices relation)
             (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))))))
 
 
-(defun register-static-relation-signature (relation)
-  (check-relation relation)
-  (let ((new-signature (relation-signature-value relation nil)))
-    (check-relation-signature-consistency relation *static-relations* new-signature nil)
-    (setf (gethash (car relation) *static-relations*) new-signature)
-    (ut::if-it (relation-signature-fluent-indices relation)
-      (setf (gethash (car relation) *fluent-relation-indices*) ut::it))))
+(defun register-static-relation-signature (raw-relation)
+  (multiple-value-bind (relation bijectivep)
+      (bijective-relation-p raw-relation)
+    (check-relation relation)
+    (let ((new-signature (relation-signature-value relation nil)))
+      (check-relation-signature-consistency
+        relation *static-relations* new-signature bijectivep)
+      (if bijectivep
+        (progn
+          (check-bijective-relation relation)
+          (create-bijective-indices relation *static-relations*))
+        (progn
+          (setf (gethash (car relation) *static-relations*) new-signature)
+          (ut::if-it (relation-signature-fluent-indices relation)
+            (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))))))
 
 
 (defun register-complementary-relation-signatures (positives->negatives)
@@ -341,8 +350,8 @@
 
 (defun install-static-relations (relations)
   (format t "~&Installing static relations...")
-  (iter (for relation in relations)
-        (register-static-relation-signature relation)
+  (iter (for raw-relation in relations)
+        (register-static-relation-signature raw-relation)
         (finally (maphash #'(lambda (key val)  ;install implied unary relations
                               (declare (ignore val))
                               (setf (gethash key *static-relations*) '(everything)))
@@ -350,7 +359,9 @@
   (iter (for (key val) in-hashtable *static-relations*)  ;install symmetric relations
     (when (and (not (eql val t))
                (not (alexandria:setp val))  ;multiple types
-               (not (final-charp #\> key)))   ;not explicitly directed
+               (not (final-charp #\> key))  ;not explicitly directed
+               (not (gethash key *bijective-relations*))
+               (not (gethash key *bijective-canonical*)))
       (setf (gethash key *symmetrics*) (symmetric-type-indexes val))))
   (setf (gethash 'always-true *static-relations*) t)
   (setf (gethash 'waiting *static-relations*) t)

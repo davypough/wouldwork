@@ -199,14 +199,21 @@
     references))
 
 
+(defun symmetry-coupling-storage-relation (relation)
+  "Return the stored relation that contains RELATION's ordered coupling rows."
+  (or (first (gethash relation *bijective-relations*))
+      relation))
+
+
 (defun collect-coupled-symmetry-rows ()
   "Return one disjoint object-row list per registered static coupling relation."
   (let ((static-propositions (list-database *static-idb*))
         (all-objects (collect-all-objects))
         (seen-objects (make-hash-table :test #'eq)))
     (loop for relation in *symmetry-coupling-relations*
+          for storage-relation = (symmetry-coupling-storage-relation relation)
           for rows = (loop for proposition in static-propositions
-                           when (eq (first proposition) relation)
+                           when (eq (first proposition) storage-relation)
                              collect (rest proposition))
           when rows
             do (let ((arity (length (first rows))))

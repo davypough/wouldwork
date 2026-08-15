@@ -26,16 +26,6 @@
                   Literal: ~S~%~
                   Object:  ~S"
                  literal live))
-        (when (gethash live live-objects)
-          (fail-init-check nil "~%RECORDING-COPY> repeats a live object.~%~
-                  Literal:    ~S~%~
-                  Live object: ~S"
-                 literal live))
-        (when (gethash ghost ghost-objects)
-          (fail-init-check nil "~%RECORDING-COPY> repeats a ghost object.~%~
-                  Literal:     ~S~%~
-                  Ghost object: ~S"
-                 literal ghost))
         (when (or (gethash live ghost-objects)
                   (gethash ghost live-objects))
           (fail-init-check nil "~%RECORDING-COPY> uses an object on both live and ghost sides.~%~
