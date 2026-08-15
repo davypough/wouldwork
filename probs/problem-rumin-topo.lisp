@@ -16,7 +16,7 @@
 
 (ww-set *progress-reporting-interval* 1000000)
 
-(ww-set *depth-cutoff* 14)
+(ww-set *depth-cutoff* 25)
 
 
 (defparameter *max-pairings* 2)
@@ -40,7 +40,6 @@
   tray (tray1 tray1*)
   transmitter (transmitter1 transmitter2)
   receiver (receiver1 receiver2)
-  ;ladder (ladder1)
   hue (blue red)
 )
 
@@ -54,7 +53,6 @@
 (include-tech tray)
 (include-tech box)
 (include-tech recorder)
-;(include-tech ladder)
 (include-tech stairs)
 (include-tech step)
 (include-tech jump)
@@ -87,7 +85,6 @@
   (has-position plate1 location6)
   (has-position plate2 location9)
   (has-position plate3 location12)
-  ;(has-position ladder1 location5)
   (has-position recorder1 location3)
 
   ;; Representative location coordinates
@@ -95,7 +92,6 @@
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
   (location-coords> location4 8 10)
-  ;(location-coords> location5 17 151/10)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
   (location-coords> location8 241/10 6)
@@ -175,9 +171,6 @@
   (gate-segment> gate4 22 4 22 7)
   (gate-segment> gate5 33 8 33 11)
 
-  ;; One-way ladder traversal
-  ;(climb-via> location5 (ladder1) location4)
-
   ;; Authorized elevation changes
   (jump-via location8 () location9)
   (jump-via location4 () location2)
@@ -201,7 +194,7 @@
 
 
 (define-goal
-  (and (has-location agent1 location7)
+  (and (holding agent1 connector2)
        ;(ghost-stops-recorder)
   )
 )
