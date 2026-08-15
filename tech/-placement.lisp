@@ -26,7 +26,8 @@
 ;;;               tray are ever offered
 ;;;               placement-elevation -- the resting base elevation produced by an option
 ;;;   update    : place-held-object!  --  releases ?agent's hold, sets ?object's location,
-;;;               and rests it on ?place unless ?place is 'ground
+;;;               unloads it first when it is a tray, and rests it on ?place unless
+;;;               ?place is 'ground
 
 (include-tech -support-elevation)
 (include-tech -holding)
@@ -105,9 +106,15 @@
 (define-update place-held-object!
     (?agent agent ?object cargo ?location location ?place)
   ;; ?place is either a support object or the Lisp marker GROUND, so it remains untyped.
+  ;; A tray stops being a support as soon as its holder releases it.  Its direct rider's
+  ;; HAS-LOCATION was kept synchronized while the tray moved, so retracting ON leaves that
+  ;; rider on the ground at the release location.  Any stack above the rider stays intact.
   (if (placement-choice-allowed ?agent ?object ?place)
     (do (not (holding ?agent ?object))
         (has-location ?object ?location)
+        (if (tray ?object)
+          (if (bind (on $rider ?object))
+            (not (on $rider ?object))))
         (if (not (eql ?place 'ground))
           (on ?object ?place)))
     (inconsistent-state)))

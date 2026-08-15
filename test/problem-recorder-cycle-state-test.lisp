@@ -3,9 +3,10 @@
 ;;; Focused characterization of planner-native recorder cycle state.  The test applies the
 ;;; real START-RECORDER and STOP-RECORDER actions to small states, without asking search to
 ;;; parse multiple windows (that is Stage 2).  It verifies count materialization, maximum
-;;; enforcement, physical closure, cross-layer boundary rejection, ghost disappearance,
-;;; persistent ordinary latch state, recording-shadow reseeding, and a second clean fork
-;;; from a changed live baseline.  Expected ordinary harness path length: zero.
+;;; enforcement, physical cross-layer boundary rejection, nonphysical cross-layer link
+;;; removal, ghost disappearance, persistent ordinary latch state, recording-shadow
+;;; reseeding, and a second clean fork from a changed live baseline.  Expected ordinary
+;;; harness path length: zero.
 
 (in-package :ww)
 
@@ -139,6 +140,22 @@
     (and (recorder-cross-layer-boundary-reference-p opened)
          (recorder-cycle-action-rejected-p
            opened '(stop-recorder ghost-agent)))))
+
+
+(define-test-claim recorder-cycle-drops-cross-layer-pairing
+  (let ((opened
+          (recorder-cycle-apply *start-state* '(start-recorder live-agent))))
+    ;; PAIRED is intentionally synthetic here: the boundary policy operates on stored
+    ;; relation names and recorder sides, independently of the beam-relay capability.
+    (add-proposition '(paired live-box ghost-box) (problem-state.idb opened))
+    (invalidate-problem-state-hash opened)
+    (let ((closed
+            (recorder-cycle-apply opened '(stop-recorder ghost-agent))))
+      (and (not (recorder-cross-layer-boundary-reference-p opened))
+           (recorder-cycle-boundary-closed-p closed)
+           (not (recorder-cycle-state-fact-p
+                  closed '(paired live-box ghost-box)))
+           (not (recorder-state-contains-ghost-reference-p closed))))))
 
 
 (define-test-claim recorder-cycle-requires-physical-closure

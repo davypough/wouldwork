@@ -16,7 +16,7 @@
 
 (ww-set *progress-reporting-interval* 1000000)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 14)
 
 
 (defparameter *max-pairings* 2)

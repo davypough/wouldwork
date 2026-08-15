@@ -64,14 +64,17 @@
 
 
 (defun recorder-boundary-reference-relations ()
-  "Relations whose live/ghost dependencies cannot cross a disappearing boundary."
-  (append '(paired holding on)
+  "Physical relations whose live/ghost dependencies cannot cross a disappearing boundary."
+  ;; A PAIRED link may safely disappear with its ghost endpoint; it neither supports nor
+  ;; relocates the surviving live connector.  HOLDING and ON would leave physical state
+  ;; undefined, so those dependencies must be resolved before STOP-RECORDER.
+  (append '(holding on)
           (copy-list (gethash 'holding *bijective-relations*))
           (copy-list (gethash 'on *bijective-relations*))))
 
 
 (defun recorder-cross-layer-boundary-reference-p (state)
-  "Whether STATE contains a live/ghost support, pairing, or holding dependency."
+  "Whether STATE contains a live/ghost support or holding dependency."
   (let ((relations (recorder-boundary-reference-relations)))
     (some (lambda (proposition)
             (and (member (first proposition) relations)

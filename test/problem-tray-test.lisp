@@ -13,9 +13,8 @@
 ;;;      BEARER-AGENT carries the loaded tray to a new, higher location (via a minimal
 ;;;      problem-local move action isolating apply-agent-configuration! from any general
 ;;;      mobility technology), then puts the loaded tray down.  The box's has-location and
-;;;      elevation follow the tray throughout, and putting the tray down while still loaded
-;;;      succeeds -- confirmed by the box remaining ON the tray with the tray's elevation
-;;;      dropping from the holder's top level to its own grounded, zero-thickness level.
+;;;      elevation follow the tray while held; putting the tray down unloads the box onto
+;;;      the ground at the destination and leaves the grounded tray clear.
 ;;;   4. PICKUP-TRAY's not-already-held guard: unlike other cargo, a held tray keeps its
 ;;;      has-location, so a tray already held by one agent cannot be independently picked
 ;;;      up by another merely because it still resolves a location.
@@ -137,6 +136,26 @@
          (apply (action.pre-defun-name action) state args))))
 
 
+(define-test-claim tray-support-requires-holder
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location cascade-box cascade-origin)
+          (has-location cascade-tray cascade-origin)
+          (on cascade-box cascade-tray))
+        :checks '(physical-state-init-check)))
+    'init-check-failure
+    :containing "unheld tray"
+    :check 'physical-state-init-check)
+  (null
+    (validate-init-literals
+      '((holding bearer-agent cascade-tray)
+        (has-location cascade-tray cascade-origin)
+        (has-location cascade-box cascade-origin)
+        (on cascade-box cascade-tray))
+      :checks '(physical-state-init-check))))
+
+
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
@@ -159,17 +178,18 @@
            (and (not (eql ?support 'put-plate))
                 (on held-only-tray ?support))))
 
-    ;; Cascade, post-sequence: BEARER-AGENT and its (still loaded) tray have both
-    ;; moved; CASCADE-BOX followed throughout and now sits at the tray's grounded,
-    ;; zero-thickness level rather than the holder's former top level.
+    ;; Cascade, post-sequence: BEARER-AGENT and its tray have both moved; CASCADE-BOX
+    ;; followed while the tray was held, then landed on the ground when the tray was put
+    ;; down.
     (has-location bearer-agent cascade-destination)
     (not (holding bearer-agent cascade-tray))
     (has-location cascade-tray cascade-destination)
     (not (exists (?support support)
            (on cascade-tray ?support)))
     (not (holding loader-agent cascade-box))
-    (on cascade-box cascade-tray)
-    (not (cleartop cascade-tray))
+    (not (exists (?support support)
+           (on cascade-box ?support)))
+    (cleartop cascade-tray)
     (has-location cascade-box cascade-destination)
     (= (occupant-elevation bearer-agent) 3)
     (= (support-top-elevation cascade-tray) 3)

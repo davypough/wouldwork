@@ -40,6 +40,23 @@
                  (positive-init-literals-with-relation 'on literals)))
 
 
+(define-init-check-helper init-held-objects (literals)
+  (let ((held-objects (make-hash-table :test #'equal)))
+    (dolist (literal (positive-init-literals-with-relation 'holding literals)
+                     held-objects)
+      (setf (gethash (third (init-literal-proposition literal)) held-objects) t))))
+
+
+(define-init-check-helper init-check-tray-support-held
+    (literal support held-objects)
+  (when (and (init-type-member-p support 'tray)
+             (not (gethash support held-objects)))
+    (fail-init-check nil "~%DEFINE-INIT places an object on an unheld tray.~%~
+            Literal: ~S~%~
+            Tray:    ~S"
+           literal support)))
+
+
 (define-init-check-helper init-check-object-not-held-and-has-location (literals locations)
   ;; A tray is the one deviation: it keeps its has-location fact even while held (synced
   ;; to its holder's location), so a support-occupant resting on it keeps resolving a
@@ -117,6 +134,7 @@
   (let ((locations (init-literal-map 'has-location literals 1 2))
         (positions (init-literal-map 'has-position literals 1 2))
         (on-map (init-literal-map 'on literals 1 2))
+        (held-objects (init-held-objects literals))
         (support-occupants (make-hash-table :test #'equal)))
     (init-check-object-not-held-and-has-location literals locations)
     (dolist (literal (init-binary-on-literals literals))
@@ -129,11 +147,11 @@
                     Literal: ~S~%~
                     Object:  ~S"
                    literal object))
+          (init-check-tray-support-held literal support held-objects)
           (when location-consistency-required-p
             (init-check-support-has-one-object
               literal object support support-occupants)
             (init-check-on-location-consistency
               literal object support locations positions)))
         (init-check-on-cycle literal object on-map)))))
-
 

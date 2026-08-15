@@ -7,10 +7,11 @@
 ;;; place an object on any currently-held tray (see -placement's held-tray clause), and
 ;;; that object's has-location tracks the holder's as it moves (see
 ;;; -configuration-transition's relocation cascade).  A tray resting on the ground is
-;;; inert -- nothing can be placed on it there -- and it keeps its has-location fact even
-;;; while held, the one deviation from held cargo having no location, so that its
+;;; inert: putting it down unloads its rider onto the ground at the tray's current
+;;; location, and nothing can be placed on it there.  A tray keeps its has-location fact
+;;; even while held, the one deviation from held cargo having no location, so that its
 ;;; occupant's has-location consumers (beam-relay, visibility, etc.) keep working
-;;; unchanged.
+;;; unchanged while the tray is held.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location; tray is declared optional here
@@ -56,10 +57,10 @@
 
 (define-action put-tray
   ;; Place a held tray on the ground or on a clear support at a reachable location
-  ;; (including the agent's own): one successor per legal placement-options result.  A
-  ;; tray may be loaded when put down -- its occupant's has-location is already correct,
-  ;; kept synced throughout by the relocation cascade, so it simply lands wherever the
-  ;; tray does; support-top-elevation's grounded-tray branch takes over from that instant.
+  ;; (including the agent's own): one successor per legal placement-options result.
+  ;; PLACE-HELD-OBJECT! unloads any rider because a tray is a support only while held; the
+  ;; relocation cascade has already kept the rider at the release location, where it lands
+  ;; on the ground.
   1
   (?agent agent ?tray tray ?location location)
   (and (holding ?agent ?tray)
