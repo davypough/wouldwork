@@ -1,7 +1,9 @@
 ;;; Filename: -recorder-solution.lisp
 
-;;; Recorder path services: optional recording-prefix pruning, automatic exact live/ghost
-;;; interleaving canonicalization, candidate validation, and the three-phase report.  Nested
+;;; Recorder path services: multi-window parsing, mandatory completed-cycle validation and
+;;; no-progress rejection, closed-boundary cycle-resource dominance, optional open
+;;; recording-prefix pruning, automatic exact live/ghost interleaving canonicalization,
+;;; candidate validation, and integrated multi-cycle reporting.  Nested
 ;;; by recorder.lisp, whose public assembly installs pruning, validation, reporting,
 ;;; and goal chaining after all recorder components have been defined.  Lower-level tests may
 ;;; include this file for its mechanics without installing those public services.  Nothing
@@ -15,16 +17,10 @@
 ;;; genuinely closed session) RECORDING-IN-PROGRESS, which is session lifecycle state, not
 ;;; one of the per-apparatus shadow views above.
 ;;;
-;;; A recording is closed by moving back to a recorder and stopping it, which gives a
-;;; problem two sensible places to stop searching.  The default is to stop when the problem's
-;;; own goal is met, leaving the ghost wherever its last useful action left it; the recording
-;;; is still performable because the ghost can move back afterward, and the report supplies
-;;; that return trip.  A problem that would rather see the return spelled out in the solution
-;;; path adds GHOST-STOPS-RECORDER as a goal conjunct and pays the extra actions.
-;;; VALIDATE-RECORDER-SOLUTION enforces only the weaker of the two -- a validator vetoes
-;;; every candidate, so it must admit both styles -- and RECORDING-AGENT-CAN-CLOSE is that
-;;; weaker rule.  A ghost already standing on a recorder satisfies it trivially, so the
-;;; conjunct strengthens the goal without ever contradicting the validator.
+;;; Every intermediate recording is physically closed by STOP-RECORDER.  The parser also
+;;; admits a final open cycle when the problem goal is reached first; its isolated recording
+;;; must be executable, but physical closure is not added to that goal.  A problem that wants
+;;; the final return and stop spelled out adds GHOST-STOPS-RECORDER as a goal conjunct.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -location ((has-location ...)); -position (recorder has-position role);
@@ -40,8 +36,12 @@
 ;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
 ;;;              recording-agent-return-route, recording-agent-at-recorder,
 ;;;              recording-agent-empty-handed
-;;;   functions: validate-recorder-solution, build-recorder-report, print-recorder-report;
-;;;              validate-recorder-recording-prefix;
+;;;   functions: parse-recorder-path, validate-recorder-solution,
+;;;              validate-recorder-cycle-boundary-prefix,
+;;;              validate-recorder-recording-prefix,
+;;;              recorder-boundary-identity-state,
+;;;              prune-recorder-boundary-dominated-successor-p,
+;;;              build-recorder-report, print-recorder-report;
 ;;;              automatic recorder interleaving pruning;
 ;;;              recorder-recording-path, recorder-recording-window,
 ;;;              recorder-recording-snapshot and their helpers locate the real
@@ -65,22 +65,12 @@
 
 
 (define-query ghost-stops-recorder ()
-  ;; Optional goal conjunct, and the closure the recorder-cycle-chaining machinery requires
-  ;; before treating a search as a genuinely closed cycle.  Position and holding alone are
-  ;; not enough: recording must actually have been stopped by a real STOP-RECORDER action,
-  ;; not merely be positionally consistent with having stopped, or a chained cycle could
-  ;; commit a boundary where recording never genuinely closed.  Every mapped ghost agent
-  ;; has moved back to a recorder empty-handed, so the return trip -- and any cargo it had
-  ;; to set down first -- appears in the solution path and its length counts toward
-  ;; min-length.  A problem that omits this conjunct stops at its own goal and lets the
-  ;; report supply the return instead.  Place it after the problem's own goal literals: the
-  ;; conjunction is evaluated in order, so this walks the ghost roster only on states that
-  ;; already qualify.
-  (and (not (recording-in-progress))
-       (forall (?agent agent)
-         (or (not (ghost-recording-object ?agent))
-             (and (recording-agent-at-recorder ?agent)
-                  (recording-agent-empty-handed ?agent))))))
+  ;; STOP-RECORDER alone creates this marker, after its precondition has established
+  ;; physical closure.  Its atomic followup removes all ghost state and normalizes the
+  ;; recording shadow, so the marker is meaningful without a positional ghost test.
+  (and (recorder-cycle-closed)
+       (not (recording-in-progress))
+       (recorder-closed-ghost-free)))
 
 
 (define-query recording-agent-can-close (?agent agent)
@@ -126,7 +116,7 @@
       (and (has-position ?recorder ?location)
            (has-location ?agent ?location)))))
 
-;;;; CANDIDATE VALIDATION AND TWO-PHASE REPORT ;;;;
+;;;; CANDIDATE VALIDATION AND REPORTING ;;;;
 
 
 (defun recorder-move-agents (move)
@@ -195,7 +185,8 @@
 (defun recorder-interleaving-other-prefix-validation-enabled-p ()
   "Whether certification must construct alternate paths for a non-recorder policy."
   (search-prefix-validation-enabled-p
-    '(validate-recorder-recording-prefix)))
+    '(validate-recorder-cycle-boundary-prefix
+      validate-recorder-recording-prefix)))
 
 
 (defun recorder-interleaving-state-valid-p (state path)
@@ -208,7 +199,8 @@
                 (funcall (symbol-function invariant) state))
               *global-invariants*)
        (candidate-search-prefix-valid-p
-         path state '(validate-recorder-recording-prefix))))
+         path state '(validate-recorder-cycle-boundary-prefix
+                      validate-recorder-recording-prefix))))
 
 
 (defun recorder-interleaving-equivalent-state-p (state1 state2)
@@ -294,6 +286,91 @@
     (first (second move))))
 
 
+(defstruct (recorder-path-cycle (:conc-name recorder-path-cycle.))
+  "One parsed recorder cycle in an integrated planner path."
+  number
+  setup
+  start
+  moves
+  stop)
+
+
+(defun recorder-boundary-error (cycle detail)
+  "Return a cycle-numbered malformed-boundary diagnostic."
+  (list :phase :recording
+        :reason :invalid-boundary
+        :cycle cycle
+        :detail detail))
+
+
+(defun parse-recorder-path (start-state integrated-path)
+  "Parse INTEGRATED-PATH into ordered recorder cycles and trailing setup.
+
+Returns three values: cycles, trailing setup moves, and a diagnostic.  An authored start
+state with RECORDING-IN-PROGRESS supplies one legacy implicit open cycle."
+  (let* ((cycles-used
+           (funcall (symbol-function 'recorder-cycle-count) start-state))
+         (open-cycle
+           (when (member '(recording-in-progress)
+                         (database start-state)
+                         :test #'equal)
+             (make-recorder-path-cycle
+               :number (max 1 cycles-used)
+               :setup nil
+               :start nil
+               :moves nil
+               :stop nil)))
+         (cycles nil)
+         (setup-reversed nil))
+    (when (> cycles-used *max-recorder-cycles*)
+      (return-from parse-recorder-path
+        (values nil nil
+                (recorder-boundary-error cycles-used :maximum-exceeded))))
+    (dolist (move integrated-path)
+      (case (recorder-move-action-name move)
+        (start-recorder
+          (when open-cycle
+            (return-from parse-recorder-path
+              (values nil nil
+                      (recorder-boundary-error
+                        (recorder-path-cycle.number open-cycle)
+                        :multiple-starts))))
+          (incf cycles-used)
+          (when (> cycles-used *max-recorder-cycles*)
+            (return-from parse-recorder-path
+              (values nil nil
+                      (recorder-boundary-error
+                        cycles-used :maximum-exceeded))))
+          (setf open-cycle
+                (make-recorder-path-cycle
+                  :number cycles-used
+                  :setup (nreverse setup-reversed)
+                  :start move
+                  :moves nil
+                  :stop nil)
+                setup-reversed nil))
+        (stop-recorder
+          (unless open-cycle
+            (return-from parse-recorder-path
+              (values nil nil
+                      (recorder-boundary-error
+                        (1+ cycles-used) :stop-without-start))))
+          (setf (recorder-path-cycle.moves open-cycle)
+                (nreverse (recorder-path-cycle.moves open-cycle))
+                (recorder-path-cycle.stop open-cycle) move)
+          (push open-cycle cycles)
+          (setf open-cycle nil))
+        (otherwise
+          (if open-cycle
+            (push move (recorder-path-cycle.moves open-cycle))
+            (push move setup-reversed)))))
+    (when open-cycle
+      (setf (recorder-path-cycle.moves open-cycle)
+            (nreverse (recorder-path-cycle.moves open-cycle)))
+      (push open-cycle cycles))
+    (values (nreverse cycles) (nreverse setup-reversed) nil)))
+
+
 (defun recorder-explicit-start (integrated-path)
   "The real START-RECORDER move in INTEGRATED-PATH, or NIL when none was searched."
   (find 'start-recorder integrated-path :key #'recorder-move-action-name))
@@ -304,27 +381,10 @@
   (find 'stop-recorder integrated-path :key #'recorder-move-action-name))
 
 
-(defun recorder-boundary-diagnostic (integrated-path)
-  "Return a diagnostic when INTEGRATED-PATH does not contain one well-ordered session."
-  (let ((start-positions nil)
-        (stop-positions nil))
-    (loop for move in integrated-path
-          for position from 0
-          for action = (recorder-move-action-name move)
-          when (eql action 'start-recorder)
-            do (push position start-positions)
-          when (eql action 'stop-recorder)
-            do (push position stop-positions))
-    (cond
-      ((> (length start-positions) 1)
-       '(:phase :recording :reason :invalid-boundary :detail :multiple-starts))
-      ((> (length stop-positions) 1)
-       '(:phase :recording :reason :invalid-boundary :detail :multiple-stops))
-      ((and stop-positions (null start-positions))
-       '(:phase :recording :reason :invalid-boundary :detail :stop-without-start))
-      ((and start-positions stop-positions
-            (< (first stop-positions) (first start-positions)))
-       '(:phase :recording :reason :invalid-boundary :detail :stop-before-start)))))
+(defun recorder-boundary-diagnostic
+    (integrated-path &optional (start-state *start-state*))
+  "Return the state-machine parser diagnostic for INTEGRATED-PATH, if any."
+  (nth-value 2 (parse-recorder-path start-state integrated-path)))
 
 
 (defun recorder-path-after (integrated-path move)
@@ -376,12 +436,242 @@ real action was searched."
             (and explicit-stop (list explicit-stop)))))
 
 
-(defun recorder-action-failure-diagnostic (phase validation)
-  (list :phase phase
-        :reason :action-failed
-        :step (action-sequence-validation-failure-index validation)
-        :action (action-sequence-validation-failure-action validation)
-        :detail (action-sequence-validation-failure-reason validation)))
+(defun recorder-action-failure-diagnostic (phase validation &optional cycle)
+  (append
+    (list :phase phase
+          :reason :action-failed
+          :step (action-sequence-validation-failure-index validation)
+          :action (action-sequence-validation-failure-action validation)
+          :detail (action-sequence-validation-failure-reason validation))
+    (when cycle (list :cycle cycle))))
+
+
+(defun recorder-path-before-cycle (integrated-path cycle)
+  "Return the integrated prefix strictly before CYCLE's explicit start."
+  (let ((start (recorder-path-cycle.start cycle)))
+    (and start (recorder-path-before integrated-path start))))
+
+
+(defun recorder-path-cycle-recording-path (state cycle)
+  "Return CYCLE's isolated start, ghost moves, and optional stop sequence."
+  (append
+    (when (recorder-path-cycle.start cycle)
+      (list (recorder-path-cycle.start cycle)))
+    (recorder-path-moves-on-side
+      state (recorder-path-cycle.moves cycle) :ghost)
+    (when (recorder-path-cycle.stop cycle)
+      (list (recorder-path-cycle.stop cycle)))))
+
+
+(defun recorder-path-cycle-snapshot (start-state integrated-path cycle)
+  "Return CYCLE's pre-start snapshot and any cycle-numbered replay diagnostic."
+  (unless (recorder-path-cycle.start cycle)
+    (return-from recorder-path-cycle-snapshot
+      (values (copy-problem-state start-state) nil)))
+  (let ((validation
+          (validate-action-sequence
+            start-state (recorder-path-before-cycle integrated-path cycle))))
+    (if (action-sequence-validation-success-p validation)
+      (values (action-sequence-validation-final-state validation) nil)
+      (values nil
+              (recorder-action-failure-diagnostic
+                :snapshot validation (recorder-path-cycle.number cycle))))))
+
+
+(defun recorder-boundary-identity-state (state)
+  "Return a copy of closed STATE with only its consumed-cycle resource removed.
+
+The open/closed marker, live state, ghost state, recording shadow, and every ordinary
+dynamic relation remain part of identity.  The cycle count is excluded because it is a
+monotone search resource: otherwise equal closed boundaries compare it by dominance."
+  (let ((identity-state (copy-problem-state state)))
+    (dolist (proposition (database identity-state))
+      (when (eql (first proposition) 'recorder-cycles-used)
+        (delete-proposition proposition (problem-state.idb identity-state))))
+    (invalidate-problem-state-hash identity-state)
+    identity-state))
+
+
+(defun recorder-boundary-identity-equal-p (identity1 identity2)
+  "Whether two already-projected recorder boundary states are equal."
+  (if (use-canonical-symmetry-p)
+    (canonical-state-equal-p identity1 identity2)
+    (equalp (problem-state.idb identity1)
+            (problem-state.idb identity2))))
+
+
+(defun recorder-boundary-equivalent-p (state1 state2)
+  "Whether closed states have the same future-facing state apart from cycle usage."
+  (let ((identity1 (recorder-boundary-identity-state state1))
+        (identity2 (recorder-boundary-identity-state state2)))
+    (recorder-boundary-identity-equal-p identity1 identity2)))
+
+
+(defun recorder-cycle-objective-improved-p (start-state end-state)
+  "Whether END-STATE strictly improves the active non-length objective."
+  (case *solution-type*
+    (min-time
+     (< (problem-state.time end-state)
+        (problem-state.time start-state)))
+    (min-value
+     (< (problem-state.value end-state)
+        (problem-state.value start-state)))
+    (max-value
+     (> (problem-state.value end-state)
+        (problem-state.value start-state)))
+    (otherwise nil)))
+
+
+(defun recorder-completed-cycle-made-progress-p (start-state end-state)
+  "Whether a completed cycle changes persistent state or improves its objective.
+
+Wouldwork permits graph search to ignore elapsed time only when there are no exogenous
+happenings.  With happenings present, even an otherwise unchanged cycle may advance toward
+an event, so this conservative test retains it."
+  (or *happening-names*
+      (recorder-cycle-objective-improved-p start-state end-state)
+      (not (recorder-boundary-equivalent-p start-state end-state))))
+
+
+(defun recorder-no-progress-diagnostic (cycle)
+  (list :phase :recording
+        :reason :no-persistent-progress
+        :cycle (recorder-path-cycle.number cycle)))
+
+
+(defstruct (recorder-boundary-dominance-entry
+             (:conc-name recorder-boundary-dominance-entry.))
+  "One nondominated normalized boundary in the current graph search."
+  identity-state
+  cycles-used
+  cost)
+
+
+(defvar *recorder-boundary-dominance-table*
+  (make-hash-table :test #'eql)
+  "Search-wide Pareto frontier keyed by recorder boundary identity hash.")
+
+
+(defvar *recorder-boundary-dominance-pruned* 0
+  "Number of generated boundaries rejected by recorder cycle-resource dominance.")
+
+
+(defun reset-recorder-boundary-dominance ()
+  "Clear recorder boundary dominance state before a new search."
+  (setf *recorder-boundary-dominance-table*
+        (make-hash-table :test #'eql)
+        *recorder-boundary-dominance-pruned* 0))
+
+
+(defun recorder-boundary-dominance-enabled-p ()
+  "Whether this search can safely discard resource-dominated closed boundaries."
+  (and (> *max-recorder-cycles* 1)
+       (eql *tree-or-graph* 'graph)
+       (not *hybrid-mode*)
+       (null *happening-names*)
+       (member *solution-type*
+               '(first min-length min-time min-value max-value))))
+
+
+(defun recorder-normalized-boundary-p (state)
+  "Whether STATE is a ghost-free boundary at which cycle dominance applies."
+  (and (not (member '(recording-in-progress)
+                    (database state)
+                    :test #'equal))
+       (funcall (symbol-function 'recorder-closed-ghost-free) state)))
+
+
+(defun recorder-boundary-dominance-cost (state depth)
+  "Return a lower-is-better scalar for the active graph-search objective."
+  (case *solution-type*
+    ((first min-length) depth)
+    (min-time (problem-state.time state))
+    (min-value (problem-state.value state))
+    (max-value (- (problem-state.value state)))))
+
+
+(defun recorder-boundary-entry-matches-p (entry identity-state)
+  (recorder-boundary-identity-equal-p
+    (recorder-boundary-dominance-entry.identity-state entry)
+    identity-state))
+
+
+(defun recorder-boundary-entry-dominates-p (entry cycles-used cost)
+  "Whether ENTRY has strictly more cycle capacity and no worse path cost."
+  (and (< (recorder-boundary-dominance-entry.cycles-used entry)
+          cycles-used)
+       (<= (recorder-boundary-dominance-entry.cost entry) cost)))
+
+
+(defun recorder-boundary-candidate-dominates-p (cycles-used cost entry)
+  "Whether the candidate has strictly more cycle capacity and no worse path cost."
+  (and (< cycles-used
+          (recorder-boundary-dominance-entry.cycles-used entry))
+       (<= cost (recorder-boundary-dominance-entry.cost entry))))
+
+
+(defun update-recorder-boundary-dominance
+    (identity-state cycles-used cost)
+  "Record a nondominated boundary, returning true when an earlier entry dominates it."
+  (ensure-idb-hash identity-state)
+  (let* ((key (problem-state.idb-hash identity-state))
+         (bucket (gethash key *recorder-boundary-dominance-table*))
+         (matches
+           (remove-if-not
+             (lambda (entry)
+               (recorder-boundary-entry-matches-p entry identity-state))
+             bucket)))
+    (when (some (lambda (entry)
+                  (recorder-boundary-entry-dominates-p
+                    entry cycles-used cost))
+                matches)
+      (incf *recorder-boundary-dominance-pruned*)
+      (return-from update-recorder-boundary-dominance t))
+    (when (some (lambda (entry)
+                  (and (= cycles-used
+                          (recorder-boundary-dominance-entry.cycles-used entry))
+                       (<= (recorder-boundary-dominance-entry.cost entry)
+                           cost)))
+                matches)
+      ;; Ordinary graph duplicate handling owns equal-resource rejection.  The dominance
+      ;; frontier merely keeps its best representative for comparisons with other counts.
+      (return-from update-recorder-boundary-dominance nil))
+    (let ((new-bucket
+            (remove-if
+              (lambda (entry)
+                (and (recorder-boundary-entry-matches-p entry identity-state)
+                     (or
+                       (recorder-boundary-candidate-dominates-p
+                         cycles-used cost entry)
+                       (and (= cycles-used
+                               (recorder-boundary-dominance-entry.cycles-used entry))
+                            (<= cost
+                                (recorder-boundary-dominance-entry.cost entry))))))
+              bucket)))
+      (push
+        (make-recorder-boundary-dominance-entry
+          :identity-state identity-state
+          :cycles-used cycles-used
+          :cost cost)
+        new-bucket)
+      (setf (gethash key *recorder-boundary-dominance-table*) new-bucket))
+    nil))
+
+
+(defun prune-recorder-boundary-dominated-successor-p
+    (current-node successor-state)
+  "Discard a normalized boundary dominated by an equal state with fewer cycles used."
+  (unless (recorder-normalized-boundary-p successor-state)
+    (return-from prune-recorder-boundary-dominated-successor-p nil))
+  (let ((identity-state (recorder-boundary-identity-state successor-state))
+        (cycles-used
+          (funcall (symbol-function 'recorder-cycle-count) successor-state))
+        (cost
+          (recorder-boundary-dominance-cost
+            successor-state (1+ (node.depth current-node)))))
+    (bt:with-lock-held (*search-lock*)
+      (update-recorder-boundary-dominance
+        identity-state cycles-used cost))))
 
 
 (defun recorder-recording-snapshot (start-state integrated-path)
@@ -390,15 +680,14 @@ real action was searched."
 An explicit recording begins from the result of replaying every pre-recording action from
 START-STATE.  The legacy form with no explicit START-RECORDER continues to use START-STATE
 directly, because its focused tests author the already-open recording state there."
-  (unless (recorder-explicit-start integrated-path)
-    (return-from recorder-recording-snapshot
-      (values (copy-problem-state start-state) nil)))
-  (let ((validation
-          (validate-action-sequence
-            start-state (recorder-pre-recording-path integrated-path))))
-    (if (action-sequence-validation-success-p validation)
-      (values (action-sequence-validation-final-state validation) nil)
-      (values nil (recorder-action-failure-diagnostic :snapshot validation)))))
+  (multiple-value-bind (cycles trailing-setup diagnostic)
+      (parse-recorder-path start-state integrated-path)
+    (declare (ignore trailing-setup))
+    (when diagnostic
+      (return-from recorder-recording-snapshot (values nil diagnostic)))
+    (if cycles
+      (recorder-path-cycle-snapshot start-state integrated-path (first cycles))
+      (values (copy-problem-state start-state) nil))))
 
 
 (defun recorder-recording-agents (state)
@@ -412,6 +701,17 @@ directly, because its focused tests author the already-open recording state ther
 (defun recorder-prefix-pruning-enabled-p ()
   "Whether recorder recording-prefix pruning is enabled for the current search."
   *recorder-prefix-pruning*)
+
+
+(defun recorder-cycle-boundary-validation-enabled-p ()
+  "Completed recorder cycles are always validated during search."
+  t)
+
+
+(defun recorder-stop-prefix-trigger-p (start-state newest-move current-state)
+  "Whether NEWEST-MOVE closes a cycle and therefore needs mandatory validation."
+  (declare (ignore start-state current-state))
+  (eql (recorder-move-action-name newest-move) 'stop-recorder))
 
 
 (defun recorder-recording-prefix-changed-p (start-state integrated-path)
@@ -429,6 +729,60 @@ cannot alter a recording prefix already accepted at its preceding ghost move."
               (recorder-move-agents move)))))
 
 
+(defun validate-recorder-path-cycle (start-state integrated-path cycle)
+  "Validate CYCLE's isolated recording from its exact integrated snapshot."
+  (multiple-value-bind (snapshot-state snapshot-diagnostic)
+      (recorder-path-cycle-snapshot start-state integrated-path cycle)
+    (when snapshot-diagnostic
+      (return-from validate-recorder-path-cycle
+        (values nil snapshot-diagnostic)))
+    (let* ((cycle-number (recorder-path-cycle.number cycle))
+           (recording-path
+             (recorder-path-cycle-recording-path snapshot-state cycle))
+           (validation
+             (validate-action-sequence snapshot-state recording-path)))
+      (unless (action-sequence-validation-success-p validation)
+        (return-from validate-recorder-path-cycle
+          (values nil
+                  (recorder-action-failure-diagnostic
+                    :recording validation cycle-number))))
+      (unless (recorder-recording-agents
+                (action-sequence-validation-final-state validation))
+        (return-from validate-recorder-path-cycle
+          (values nil
+                  (list :phase :recording
+                        :reason :no-recording-agent
+                        :cycle cycle-number))))
+      (values t nil snapshot-state))))
+
+
+(defun validate-recorder-cycle-boundary-prefix
+    (start-state integrated-path current-state)
+  "Validate the completed cycle ending at the newest STOP-RECORDER successor."
+  (multiple-value-bind (cycles trailing-setup diagnostic)
+      (parse-recorder-path start-state integrated-path)
+    (declare (ignore trailing-setup))
+    (when diagnostic
+      (return-from validate-recorder-cycle-boundary-prefix
+        (values nil diagnostic)))
+    (let ((cycle (car (last cycles))))
+      (unless (and cycle (recorder-path-cycle.stop cycle))
+        (return-from validate-recorder-cycle-boundary-prefix
+          (values nil
+                  (recorder-boundary-error
+                    (if cycle (recorder-path-cycle.number cycle) 1)
+                    :stop-without-start))))
+      (multiple-value-bind (valid-p cycle-diagnostic snapshot-state)
+          (validate-recorder-path-cycle start-state integrated-path cycle)
+        (unless valid-p
+          (return-from validate-recorder-cycle-boundary-prefix
+            (values nil cycle-diagnostic)))
+        (if (recorder-completed-cycle-made-progress-p
+              snapshot-state current-state)
+          (values t nil)
+          (values nil (recorder-no-progress-diagnostic cycle)))))))
+
+
 (defun validate-recorder-recording-prefix (start-state integrated-path current-state)
   "Accept a search prefix while its isolated recording sub-path remains replayable.
 
@@ -441,62 +795,39 @@ Once an action in the isolated recording sequence fails, however, extending the 
   (declare (ignore current-state))
   (unless (recorder-recording-prefix-changed-p start-state integrated-path)
     (return-from validate-recorder-recording-prefix (values t nil)))
-  (let ((boundary-diagnostic (recorder-boundary-diagnostic integrated-path)))
+  (multiple-value-bind (cycles trailing-setup boundary-diagnostic)
+      (parse-recorder-path start-state integrated-path)
+    (declare (ignore trailing-setup))
     (when boundary-diagnostic
       (return-from validate-recorder-recording-prefix
-        (values nil boundary-diagnostic))))
-  (multiple-value-bind (snapshot-state snapshot-diagnostic)
-      (recorder-recording-snapshot start-state integrated-path)
-    (when snapshot-diagnostic
-      (return-from validate-recorder-recording-prefix
-        (values nil snapshot-diagnostic)))
-    (let ((recording-validation
-            (validate-action-sequence
-              snapshot-state
-              (recorder-recording-path snapshot-state integrated-path))))
-      (if (action-sequence-validation-success-p recording-validation)
-        (values t nil)
-        (values nil
-                (recorder-action-failure-diagnostic
-                  :recording recording-validation))))))
+        (values nil boundary-diagnostic)))
+    (let ((open-cycle
+            (find-if-not #'recorder-path-cycle.stop cycles :from-end t)))
+      (if open-cycle
+        (validate-recorder-path-cycle start-state integrated-path open-cycle)
+        (values t nil)))))
 
 
 (defun validate-recorder-solution (start-state integrated-path goal-state)
-  "Validate recording and playback under the recorder's snapshot-reset semantics.
+  "Validate every recording cycle and the complete integrated playback path.
 
-When the path contains a real START-RECORDER, its pre-recording prefix is first replayed
-from START-STATE to reconstruct the snapshot captured immediately before that action.  The
-recording path -- START-RECORDER, its ghost moves, and STOP-RECORDER when present -- is
-then replayed from that snapshot.  The legacy no-explicit-start form continues to replay
-its ghost moves directly from START-STATE.  The search terminates as soon as the problem's
-own goal is met; a ghost left holding cargo or away from a recorder no longer vetoes that
-candidate.  A problem that wants the return trip spelled out in the solution path adds
-GHOST-STOPS-RECORDER as a goal conjunct instead -- the playback goal check below enforces
-it directly.  Playback independently replays the complete integrated path from START-STATE
-under the ordinary action rules."
+Each completed or final open cycle is replayed independently from the snapshot immediately
+before its own START-RECORDER.  That snapshot includes every preceding integrated cycle,
+its atomic stop normalization, and the following setup.  The final playback check then
+replays the whole path once and applies the problem goal."
   (declare (ignore goal-state))
-  (let ((boundary-diagnostic (recorder-boundary-diagnostic integrated-path)))
+  (multiple-value-bind (cycles trailing-setup boundary-diagnostic)
+      (parse-recorder-path start-state integrated-path)
+    (declare (ignore trailing-setup))
     (when boundary-diagnostic
-      (return-from validate-recorder-solution (values nil boundary-diagnostic))))
-  (multiple-value-bind (snapshot-state snapshot-diagnostic)
-      (recorder-recording-snapshot start-state integrated-path)
-    (when snapshot-diagnostic
-      (return-from validate-recorder-solution (values nil snapshot-diagnostic)))
-    (let* ((ghost-path
-             (recorder-recording-path snapshot-state integrated-path))
-           (recording-validation
-             (validate-action-sequence snapshot-state ghost-path)))
-      (unless (action-sequence-validation-success-p recording-validation)
-        (return-from validate-recorder-solution
-          (values nil
-                  (recorder-action-failure-diagnostic
-                    :recording recording-validation))))
-      (let* ((recording-state
-               (action-sequence-validation-final-state recording-validation))
-             (recording-agents (recorder-recording-agents recording-state)))
-        (when (null recording-agents)
+      (return-from validate-recorder-solution
+        (values nil boundary-diagnostic)))
+    (dolist (cycle cycles)
+      (multiple-value-bind (valid-p diagnostic)
+          (validate-recorder-path-cycle start-state integrated-path cycle)
+        (unless valid-p
           (return-from validate-recorder-solution
-            (values nil '(:phase :recording :reason :no-recording-agent))))))
+            (values nil diagnostic)))))
     (let ((playback-validation
             (validate-action-sequence
               start-state integrated-path
@@ -512,19 +843,17 @@ under the ordinary action rules."
       (values t nil))))
 
 
-(defun recorder-recording-sequence (state integrated-path)
-  "Extract ghost moves within the recording window, replace each live-action block with one
-PAUSE marker, and open/close with the real START-RECORDER/STOP-RECORDER moves when the
-searched path contains them.  Any pre-recording moves before a real START-RECORDER fall
-outside the window entirely, rather than appearing as an inferred leading pause.  Falls
-back to a synthesized opening marker, and to a synthesized closing marker plus whatever
-return move the searched path stopped short of, exactly as before real actions existed,
-when the corresponding real move is absent."
-  (let* ((explicit-start (recorder-explicit-start integrated-path))
-         (explicit-stop (recorder-explicit-stop integrated-path))
-         (sequence (list (or explicit-start '(start-recorder))))
+(defun recorder-cycle-recording-sequence (state cycle)
+  "Build CYCLE's recording-side presentation from its accepted path segment.
+
+Each contiguous live block becomes one PAUSE marker.  Real boundary actions remain in
+place.  A legacy implicit opening or final goal-terminated closing is synthesized only in
+the report; an open cycle also receives whatever ghost return moves STATE can supply."
+  (let* ((start (recorder-path-cycle.start cycle))
+         (stop (recorder-path-cycle.stop cycle))
+         (sequence (list (or start '(start-recorder))))
          (previous-side nil))
-    (dolist (move (recorder-recording-window integrated-path))
+    (dolist (move (recorder-path-cycle.moves cycle))
       (let ((side (recorder-report-move-side state move)))
         (when (and (eql side :live)
                    (not (eql previous-side :live)))
@@ -533,8 +862,8 @@ when the corresponding real move is absent."
           (setf sequence (nconc sequence (list move))))
         (setf previous-side side)))
     (nconc sequence
-           (if explicit-stop
-             (list explicit-stop)
+           (if stop
+             (list stop)
              (nconc (recorder-return-moves state) (list '(stop-recorder)))))))
 
 
@@ -552,14 +881,13 @@ markers, not planner actions, and carry no step number for that reason."
           collect (cons 'move move)))
 
 
-(defun recorder-playback-sequence (state integrated-path)
-  "Retain moves inside the recorder window, pausing live blocks and resuming ghost blocks.
+(defun recorder-cycle-playback-sequence (state cycle)
+  "Present CYCLE's in-window moves, pausing live blocks and resuming ghost blocks.
 
-Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback actions.  The
-legacy form with no explicit start retains the whole integrated path."
+Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback actions."
   (let ((sequence nil)
         (previous-side nil))
-    (dolist (move (recorder-recording-window integrated-path) sequence)
+    (dolist (move (recorder-path-cycle.moves cycle) sequence)
       (let ((side (recorder-report-move-side state move)))
         (when (not (eql side previous-side))
           (cond
@@ -571,34 +899,179 @@ legacy form with no explicit start retains the whole integrated path."
         (setf previous-side side)))))
 
 
-(defun build-recorder-report (&optional (solution (first *solution-paths*)))
-  "Build setup, recording, and playback sequences for a completed integrated SOLUTION.
+(defun recorder-cycle-integrated-path (cycle)
+  "Return CYCLE's searched setup, opening, window, and optional closing in order."
+  (append
+    (recorder-path-cycle.setup cycle)
+    (when (recorder-path-cycle.start cycle)
+      (list (recorder-path-cycle.start cycle)))
+    (recorder-path-cycle.moves cycle)
+    (when (recorder-path-cycle.stop cycle)
+      (list (recorder-path-cycle.stop cycle)))))
 
-The returned plist retains the original path under :INTEGRATED and provides the derived
-sequences under :SETUP, :RECORDING, and :PLAYBACK.  Report markers are not planner actions."
+
+(defun recorder-report-metrics (start-state end-state depth)
+  "Return path-local DEPTH, elapsed time, and value change between two states."
+  (list :depth depth
+        :elapsed-time (- (problem-state.time end-state)
+                         (problem-state.time start-state))
+        :value-change (- (problem-state.value end-state)
+                         (problem-state.value start-state))))
+
+
+(defun replay-recorder-report-segment (start-state path description)
+  "Replay PATH for reporting, surfacing an accepted-path inconsistency as an error."
+  (let ((validation (validate-action-sequence start-state path)))
+    (unless (action-sequence-validation-success-p validation)
+      (error "Recorder report cannot replay ~A at step ~D, action ~S: ~S"
+             description
+             (action-sequence-validation-failure-index validation)
+             (action-sequence-validation-failure-action validation)
+             (action-sequence-validation-failure-reason validation)))
+    (action-sequence-validation-final-state validation)))
+
+
+(defun build-recorder-cycle-report (start-state cycle)
+  "Build one path-derived cycle report and return it with the cycle's ending state."
+  (let* ((path (recorder-cycle-integrated-path cycle))
+         (number (recorder-path-cycle.number cycle))
+         (end-state
+           (replay-recorder-report-segment
+             start-state path (format nil "recorder cycle ~D" number)))
+         (metrics (recorder-report-metrics start-state end-state (length path))))
+    (values
+      (append
+        (list :number number
+              :integrated path
+              :setup (recorder-path-cycle.setup cycle)
+              :recording (recorder-cycle-recording-sequence end-state cycle)
+              :playback (recorder-cycle-playback-sequence end-state cycle)
+              :closure (if (recorder-path-cycle.stop cycle)
+                         :explicit
+                         :synthesized))
+        metrics)
+      end-state)))
+
+
+(defun recorder-report-cycles (start-state cycles)
+  "Build ordered CYCLES by replaying each one from its preceding accepted boundary."
+  (let ((reports nil)
+        (current-state start-state))
+    (dolist (cycle cycles)
+      (multiple-value-bind (report end-state)
+          (build-recorder-cycle-report current-state cycle)
+        (push report reports)
+        (setf current-state end-state)))
+    (values (nreverse reports) current-state)))
+
+
+(defun recorder-legacy-report-cycle (path)
+  "Represent the pre-boundary report form as one synthesized cycle."
+  (make-recorder-path-cycle
+    :number 1
+    :setup nil
+    :start nil
+    :moves path
+    :stop nil))
+
+
+(defun recorder-complete-solution-metrics (solution)
+  "Return totals recorded for the complete accepted planner solution."
+  (list :depth (solution.depth solution)
+        :elapsed-time (- (solution.time solution)
+                         (problem-state.time *start-state*))
+        :value-change (- (solution.value solution)
+                         (problem-state.value *start-state*))))
+
+
+(defun build-recorder-report (&optional (solution (first *solution-paths*)))
+  "Build a complete path-derived recorder report for integrated SOLUTION.
+
+The original path remains under :INTEGRATED.  :CYCLES contains one ordered report per
+setup/start/window/stop segment, :TRAILING-SETUP preserves searched actions after the last
+closed cycle, and :TOTALS describes the complete solution.  A legacy path without an
+explicit boundary is represented as one synthesized cycle.  Single-cycle reports retain
+the top-level :SETUP, :RECORDING, and :PLAYBACK aliases used by guided chaining.  Report
+markers are not planner actions and do not contribute to any metric."
   (unless solution
     (error "No completed solution is available for a recorder report."))
   (unless (solution-p solution)
     (error "Recorder report requires a SOLUTION, not ~S" solution))
-  (let ((path (solution.path solution))
-        (state (solution.goal solution)))
-    (list :integrated path
-          :setup (recorder-pre-recording-path path)
-          :recording (recorder-recording-sequence state path)
-          :playback (recorder-playback-sequence state path))))
+  (let ((path (solution.path solution)))
+    (multiple-value-bind (cycles trailing-setup diagnostic)
+        (parse-recorder-path *start-state* path)
+      (when diagnostic
+        (error "Recorder report cannot parse the integrated path: ~S" diagnostic))
+      (let ((report-cycles (or cycles (list (recorder-legacy-report-cycle path))))
+            (report-trailing-setup (and cycles trailing-setup)))
+        (multiple-value-bind (cycle-reports cycle-end-state)
+            (recorder-report-cycles *start-state* report-cycles)
+          (let* ((trailing-end-state
+                   (replay-recorder-report-segment
+                     cycle-end-state report-trailing-setup
+                     "trailing recorder setup"))
+                 (trailing-metrics
+                   (recorder-report-metrics
+                     cycle-end-state trailing-end-state
+                     (length report-trailing-setup)))
+                 (report
+                   (list :integrated path
+                         :cycles cycle-reports
+                         :cycle-count (length cycle-reports)
+                         :trailing-setup report-trailing-setup
+                         :trailing-metrics trailing-metrics
+                         :totals (recorder-complete-solution-metrics solution))))
+            (when (= (length cycle-reports) 1)
+              (let ((cycle (first cycle-reports)))
+                (setf report
+                      (append report
+                              (list :setup (getf cycle :setup)
+                                    :recording (getf cycle :recording)
+                                    :playback (getf cycle :playback))))))
+            report))))))
+
+
+(defun print-recorder-report-sequence (heading sequence stream)
+  "Print HEADING and every entry in one report SEQUENCE."
+  (format stream "~&~%~A:~%" heading)
+  (dolist (entry sequence)
+    (format stream "~S~%" entry)))
+
+
+(defun print-recorder-report-metrics (heading metrics stream)
+  "Print one compact local or total recorder metric line."
+  (format stream
+          "~&~A: depth ~D, elapsed time ~S, value change ~S.~%"
+          heading
+          (getf metrics :depth)
+          (getf metrics :elapsed-time)
+          (getf metrics :value-change)))
+
+
+(defun print-recorder-cycle-report (cycle stream)
+  "Print the three phases, closure status, and local metrics for CYCLE."
+  (print-recorder-report-sequence "Setup phase" (getf cycle :setup) stream)
+  (print-recorder-report-sequence "Recording phase" (getf cycle :recording) stream)
+  (print-recorder-report-sequence "Playback phase" (getf cycle :playback) stream)
+  (format stream "~&Closure: ~(~A~).~%" (getf cycle :closure))
+  (print-recorder-report-metrics "Cycle metrics" cycle stream))
 
 
 (defun print-recorder-report
     (&optional (solution (first *solution-paths*)) (stream *standard-output*))
-  "Print and return the three-phase report derived from SOLUTION."
-  (let ((report (build-recorder-report solution)))
-    (format stream "~&~%Setup phase:~%")
-    (dolist (entry (getf report :setup))
-      (format stream "~S~%" entry))
-    (format stream "~&~%Recording phase:~%")
-    (dolist (entry (getf report :recording))
-      (format stream "~S~%" entry))
-    (format stream "~&~%Playback phase:~%")
-    (dolist (entry (getf report :playback))
-      (format stream "~S~%" entry))
+  "Print and return SOLUTION's complete single- or multi-cycle recorder report."
+  (let* ((report (build-recorder-report solution))
+         (cycles (getf report :cycles)))
+    (if (= (length cycles) 1)
+      (print-recorder-cycle-report (first cycles) stream)
+      (dolist (cycle cycles)
+        (format stream "~&~%Recorder cycle ~D:~%" (getf cycle :number))
+        (print-recorder-cycle-report cycle stream)))
+    (when (getf report :trailing-setup)
+      (print-recorder-report-sequence
+        "Trailing setup" (getf report :trailing-setup) stream)
+      (print-recorder-report-metrics
+        "Trailing metrics" (getf report :trailing-metrics) stream))
+    (print-recorder-report-metrics
+      "Complete solution totals" (getf report :totals) stream)
     report))

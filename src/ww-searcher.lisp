@@ -242,6 +242,7 @@
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
   (setf *hybrid-mode* (initialize-hybrid-mode))
+  (reset-search-successor-pruners)
   (setf *open* 
       (hs::make-hstack :table (make-hash-table :test 'eql
                                                :synchronized nil)
@@ -670,15 +671,17 @@ Standard search has one parent path.  Hybrid ALL-PATHS search keeps the successo
 when at least one path through its parent DAG remains viable."
   (unless (search-prefix-validation-enabled-p)
     (return-from successor-search-prefix-valid-p t))
-  (let ((move (record-move succ-state))
-        (parent-paths
-          (if *hybrid-mode*
-            (enumerate-paths-to-node current-node)
-            (list (record-solution-path current-node)))))
-    (some (lambda (parent-path)
-            (candidate-search-prefix-valid-p
-              (append parent-path (list move)) succ-state))
-          parent-paths)))
+  (let ((move (record-move succ-state)))
+    (unless (search-prefix-validation-required-p move succ-state)
+      (return-from successor-search-prefix-valid-p t))
+    (let ((parent-paths
+            (if *hybrid-mode*
+              (enumerate-paths-to-node current-node)
+              (list (record-solution-path current-node)))))
+      (some (lambda (parent-path)
+              (candidate-search-prefix-valid-p
+                (append parent-path (list move)) succ-state))
+            parent-paths))))
 
 
 (defun process-successors (succ-states current-node open)

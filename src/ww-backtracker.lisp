@@ -171,6 +171,9 @@
                             ((bt-choice-inconsistent-p choice)
                              (increment-global *inconsistent-states-dropped* 1))
                             ((and (search-prefix-validation-enabled-p)
+                                  (search-prefix-validation-required-p
+                                    (record-move *backtrack-state*)
+                                    *backtrack-state*)
                                   (not (candidate-search-prefix-valid-p
                                          (reconstruct-solution-path)
                                          *backtrack-state*)))

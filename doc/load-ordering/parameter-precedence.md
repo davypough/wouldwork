@@ -46,7 +46,7 @@ effect until `vals.lisp` is discarded or re-saved.
 
 ## What `vals.lisp` persists
 
-`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 14-element list.
+`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 16-element list.
 Position matters — `read-init-vals` indexes into it directly.
 
 | Pos | Parameter | Default |
@@ -65,6 +65,8 @@ Position matters — `read-init-vals` indexes into it directly.
 | 11 | `*debug*` | `0` |
 | 12 | `*goal*` | `nil` |
 | 13 | `*threads*` | `0` |
+| 14 | `*recorder-prefix-pruning*` | `nil` |
+| 15 | `*max-recorder-cycles*` | `1` |
 
 Defaults live in `*default-parameters*` in the same save/read order. `read-globals` pads a short
 list from the defaults tail, so adding a parameter to the end of the list does not invalidate an
@@ -74,7 +76,7 @@ existing `vals.lisp`.
 parameter — `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
 `*bound-refresh-interval*`, `*donation-check-interval*`, `*donation-threshold*`,
 `*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. Setting one of these calls
-`save-globals`, which writes the 14-element list and silently omits it. Those values survive a
+`save-globals`, which writes the 16-element list and silently omits it. Those values survive a
 `(refresh)` but not a restart.
 
 ---
@@ -88,7 +90,7 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
-| `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*` | yes | yes | `save-globals` + reprint |
+| `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*recorder-prefix-pruning*`, `*max-recorder-cycles*` | yes | yes | `save-globals` + reprint |
 | `*solution-type*` | yes | yes | as above; warns if `backtracking` is paired with an optimizing type |
 | `*num-closed-shards*` | yes | yes | as above; also recomputes `*closed-shard-mask*` |
 | `*tree-or-graph*` | yes | yes | as above; refuses `graph` under `backtracking` |
@@ -158,7 +160,7 @@ it."**
 Working as designed. `(refresh)` skips problem-file `ww-set` forms; `(stage)` applies them.
 
 **"I tuned `*tasks-per-thread*`, restarted SBCL, and it's back to default."**
-It isn't in the 14-element `vals.lisp` list. Nothing outside that list persists.
+It isn't in the 16-element `vals.lisp` list. Nothing outside that list persists.
 
 **"Setting `*threads*` reloaded the whole system."**
 Only because the value crossed 0. Within either regime it is a plain assignment.

@@ -27,8 +27,10 @@
 ;;; PROVIDES:
 ;;;   type     : recorder, connector, tray (optional)
 ;;;   relation : recording-copy> (live mobile-object -> ghost mobile-object);
-;;;              recording-in-progress
+;;;              recording-in-progress, recorder-cycles-used,
+;;;              recorder-cycle-closed
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side;
+;;;              recorder-cycle-count;
 ;;;              overrides recording-shadow-object, recording-shadow-object-present,
 ;;;              object-manipulation-allowed, support-use-allowed, and
 ;;;              connector-pairing-allowed
@@ -52,7 +54,9 @@
 
 
 (define-dynamic-relations
-  (recording-in-progress))
+  (recording-in-progress)
+  (recorder-cycles-used $fixnum)
+  (recorder-cycle-closed))
 
 
 (register-symmetry-coupling 'recording-copy>)
@@ -82,8 +86,7 @@
     (dolist (proposition (list-database idb))
       (when (eql (first proposition) relation)
         (delete-proposition proposition idb))))
-  (setf (problem-state.idb-hash state) nil)
-  state)
+  (invalidate-problem-state-hash state))
 
 
 (define-query live-recording-object (?object mobile-object)
@@ -103,16 +106,28 @@
            (ghost-recording-object ?object2))))
 
 
+(define-query recorder-cycle-count ()
+  ;; A pre-counter open state is one already-started legacy cycle.  A closed legacy state
+  ;; has used none.  Materializing the count at the next transition makes both forms enter
+  ;; the new state model without a compatibility layer outside the planner state.
+  (if (bind (recorder-cycles-used $count))
+    $count
+    (if (recording-in-progress) 1 0)))
+
+
 (define-query recording-shadow-object (?object)
   (and (mobile-object ?object)
        (ghost-recording-object ?object)))
 
 
 (define-query recording-shadow-object-present (?object)
-  ;; Fixed apparatus and genuinely unmapped objects exist in both views.  Of each mapped
-  ;; pair, only the ghost copy existed while the recording was made.
+  ;; Fixed apparatus and genuinely unmapped objects exist in both views.  An explicit
+  ;; closed-cycle marker removes mapped ghosts from the recording view.  Its absence also
+  ;; preserves the legacy shadow-only view used by focused capability characterizations
+  ;; that do not install the recorder session actions.
   (or (not (mobile-object ?object))
-      (ghost-recording-object ?object)
+      (and (not (recorder-cycle-closed))
+           (ghost-recording-object ?object))
       (and (not (live-recording-object ?object))
            (not (ghost-recording-object ?object)))))
 

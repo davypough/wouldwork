@@ -1,8 +1,9 @@
 ;;; Filename: -recorder-plate-shadow.lisp
 
 ;;; Recording-side plate state.  Shared ON facts carry both playback and recording
-;;; occupants; this component filters occupancy to mapped ghosts and maintains a distinct
-;;; pressure/toggle reading for the recording view.
+;;; occupants.  An open cycle reads mapped ghosts; a closed cycle reads their live
+;;; counterparts, which seed the stable recording pressure/toggle state for the next
+;;; start.  The resulting shadow remains distinct from ordinary plate state.
 ;;;
 ;;; REQUIRES:
 ;;;   nested      : -recorder-core (ghost identity); -support-occupancy (plate types, ON);
@@ -33,8 +34,11 @@
 
 (define-query recording-plate-occupied (?plate plate)
   (exists (?occupant support-occupant)
-    (and (ghost-recording-object ?occupant)
-         (on ?occupant ?plate))))
+    (and (on ?occupant ?plate)
+         (or (and (recorder-cycle-closed)
+                  (live-recording-object ?occupant))
+             (and (not (recorder-cycle-closed))
+                  (ghost-recording-object ?occupant))))))
 
 
 (defun reset-recording-plate-shadow! (state)
@@ -47,9 +51,9 @@
 (defun seed-recording-plate-shadow! (state)
   "Seed recording plate memory from the new playback baseline.
 
-The toggle value starts from the ordinary latch.  Depression starts from ghost-only
-occupancy so the first propagation pass does not mistake an already occupied plate for a
-new clear-to-depressed edge."
+The toggle value starts from the ordinary latch.  Depression starts from the active view:
+freshly forked ghosts for an open cycle, or live playback state after a stop.  The first
+propagation pass therefore cannot mistake an already occupied plate for a new edge."
   (let* ((idb (problem-state.idb state))
          (propositions (list-database idb)))
     (dolist (plate (gethash 'toggle-plate *types*))
@@ -58,14 +62,13 @@ new clear-to-depressed edge."
     (dolist (plate (gethash 'plate *types*))
       (when (funcall (symbol-function 'recording-plate-occupied) state plate)
         (add-proposition (list 'recording-depressed plate) idb))))
-  (setf (problem-state.idb-hash state) nil)
-  state)
+  (invalidate-problem-state-hash state))
 
 
 (define-update update-recording-plate-status! ()
-  ;; The recording view contains only mapped ghost occupants.  During initialization its
-  ;; toggle latch starts from the authored playback latch; afterward it changes only on a
-  ;; ghost-only clear-to-depressed transition.
+  ;; An open or legacy view contains mapped ghost occupants.  An explicit stopped boundary
+  ;; reads live playback occupants so its seeded edge memory remains stable under the same
+  ;; propagation update.
   (doall (?plate plate)
     (do (if (and *applying-init-action*
                  (toggle-plate ?plate))

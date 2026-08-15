@@ -78,6 +78,8 @@
                   (unless (successor-search-prefix-valid-p node succ-state)
                     (incf *search-prefix-pruned*)
                     (return-from process-succ))
+                  (when (search-successor-pruned-p node succ-state)
+                    (return-from process-succ))
                   ;; Goal check during task generation
                   (when (goal succ-state)
                     (let ((goal-node
@@ -294,6 +296,9 @@
 
         (unless (successor-search-prefix-valid-p current-node succ-state)
           (increment-global *search-prefix-pruned* 1)
+          (return-from process-one))
+
+        (when (search-successor-pruned-p current-node succ-state)
           (return-from process-one))
         
         ;; Optimization bound check

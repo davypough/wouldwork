@@ -25,6 +25,7 @@
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
   (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
+  (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*)
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
@@ -187,9 +188,10 @@
 
 
 (defstruct (search-prefix-validator (:conc-name search-prefix-validator.))
-  "A path-prefix validator and the zero-argument predicate that enables it."
+  "A path-prefix validator, its enabling predicate, and optional newest-move trigger."
   validator
-  enabled-p)
+  enabled-p
+  trigger-p)
 
 
 (sb-ext:defglobal *search-prefix-validators* nil
@@ -197,22 +199,25 @@
 
 
 (defstruct (search-successor-pruner (:conc-name search-successor-pruner.))
-  "A successor rejection predicate and its zero-argument enabling predicate."
+  "A successor rejection predicate, enabling predicate, and optional search resetter."
   pruner
-  enabled-p)
+  enabled-p
+  resetter)
 
 
 (sb-ext:defglobal *search-successor-pruners* nil
   "Problem-local policies that may reject generated successor states.")
 
 
-(defun register-search-successor-pruner (pruner enabled-p)
+(defun register-search-successor-pruner (pruner enabled-p &optional resetter)
   "Register a problem-local successor rejection policy.
 
 PRUNER receives CURRENT-NODE and SUCCESSOR-STATE and returns true only when that
 successor may be discarded.  ENABLED-P prevents disabled policies from entering the
-search hot path.  Both function arguments must name already-defined functions."
-  (dolist (function-name (list pruner enabled-p))
+search hot path.  RESETTER, when supplied, is called before every search.  Pruners used
+in parallel search must synchronize their own mutable policy state.  Every supplied
+function argument must name an already-defined function."
+  (dolist (function-name (remove nil (list pruner enabled-p resetter)))
     (unless (and (symbolp function-name) (fboundp function-name))
       (error "Search-successor pruner requires a defined function: ~S"
              function-name)))
@@ -222,8 +227,18 @@ search hot path.  Both function arguments must name already-defined functions."
           (append *search-successor-pruners*
                   (list (make-search-successor-pruner
                           :pruner pruner
-                          :enabled-p enabled-p)))))
+                          :enabled-p enabled-p
+                          :resetter resetter)))))
   pruner)
+
+
+(defun reset-search-successor-pruners ()
+  "Reset every registered successor policy before a new search begins."
+  (dolist (entry *search-successor-pruners*)
+    (when (search-successor-pruner.resetter entry)
+      (funcall
+        (symbol-function (search-successor-pruner.resetter entry)))))
+  nil)
 
 
 (defun search-successor-pruned-p (current-node successor-state)
@@ -237,14 +252,15 @@ search hot path.  Both function arguments must name already-defined functions."
         *search-successor-pruners*))
 
 
-(defun register-search-prefix-validator (validator enabled-p)
+(defun register-search-prefix-validator (validator enabled-p &optional trigger-p)
   "Register VALIDATOR for search-time path-prefix pruning.
 
 VALIDATOR receives START-STATE, PATH, and CURRENT-STATE and returns true while the
 prefix can still lead to a valid solution.  ENABLED-P is a zero-argument function
-symbol, allowing a disabled technology option to avoid path reconstruction and
-validation.  Both functions must be read-only and safe to call concurrently."
-  (dolist (function-name (list validator enabled-p))
+symbol.  TRIGGER-P, when supplied, receives START-STATE, the newest MOVE, and
+CURRENT-STATE; returning NIL avoids reconstructing and validating an irrelevant path.
+All supplied functions must be read-only and safe to call concurrently."
+  (dolist (function-name (remove nil (list validator enabled-p trigger-p)))
     (unless (and (symbolp function-name) (fboundp function-name))
       (error "Search-prefix validator requires a defined function: ~S" function-name)))
   (unless (find validator *search-prefix-validators*
@@ -253,7 +269,8 @@ validation.  Both functions must be read-only and safe to call concurrently."
           (append *search-prefix-validators*
                   (list (make-search-prefix-validator
                           :validator validator
-                          :enabled-p enabled-p)))))
+                          :enabled-p enabled-p
+                          :trigger-p trigger-p)))))
   validator)
 
 
@@ -268,19 +285,44 @@ validation.  Both functions must be read-only and safe to call concurrently."
         *search-prefix-validators*))
 
 
+(defun search-prefix-validator-triggered-p
+    (entry newest-move current-state)
+  "Whether enabled validator ENTRY is interested in NEWEST-MOVE."
+  (let ((trigger-p (search-prefix-validator.trigger-p entry)))
+    (or (null trigger-p)
+        (funcall (symbol-function trigger-p)
+                 *start-state* newest-move current-state))))
+
+
+(defun search-prefix-validation-required-p
+    (newest-move current-state &optional excluded-validators)
+  "Whether any enabled non-excluded validator needs the path ending in NEWEST-MOVE."
+  (some (lambda (entry)
+          (let ((validator (search-prefix-validator.validator entry)))
+            (and (not (member validator excluded-validators :test #'eq))
+                 (funcall
+                   (symbol-function (search-prefix-validator.enabled-p entry)))
+                 (search-prefix-validator-triggered-p
+                   entry newest-move current-state))))
+        *search-prefix-validators*))
+
+
 (defun candidate-search-prefix-valid-p
     (path current-state &optional excluded-validators)
   "Whether every enabled non-excluded validator accepts PATH ending at CURRENT-STATE."
-  (dolist (entry *search-prefix-validators* t)
-    (let ((validator (search-prefix-validator.validator entry)))
-      (when (and (not (member validator excluded-validators :test #'eq))
-                 (funcall
-                   (symbol-function
-                     (search-prefix-validator.enabled-p entry))))
-        (unless (funcall
-                  (symbol-function validator)
-                  *start-state* path current-state)
-          (return nil))))))
+  (let ((newest-move (car (last path))))
+    (dolist (entry *search-prefix-validators* t)
+      (let ((validator (search-prefix-validator.validator entry)))
+        (when (and (not (member validator excluded-validators :test #'eq))
+                   (funcall
+                     (symbol-function
+                       (search-prefix-validator.enabled-p entry)))
+                   (search-prefix-validator-triggered-p
+                     entry newest-move current-state))
+          (unless (funcall
+                    (symbol-function validator)
+                    *start-state* path current-state)
+            (return nil)))))))
 
 
 (sb-ext:defglobal *goal-chaining-checkpoint-extensions* nil
@@ -442,6 +484,9 @@ treat their arguments as read-only and be safe to call concurrently."
 
 (defvar *recorder-prefix-pruning* nil
   "When T, recorder technology prunes paths whose recording prefix cannot replay.")
+
+(defvar *max-recorder-cycles* 1
+  "Maximum number of START-RECORDER actions permitted in one search path.")
 
 (defvar *max-pairings* nil
   "Maximum pairings per connector, or NIL until beam-relay supplies its default.")
@@ -707,6 +752,7 @@ treat their arguments as read-only and be safe to call concurrently."
             *auto-wait* nil
             *symmetry-pruning* nil
             *recorder-prefix-pruning* nil
+            *max-recorder-cycles* 1
             *max-pairings* nil)
       ;; Ensure debug feature flag is cleared
       (setf *features* (remove :ww-debug *features*)))))

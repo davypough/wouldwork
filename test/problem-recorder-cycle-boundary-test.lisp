@@ -1,10 +1,11 @@
 ;;; Filename: problem-recorder-cycle-boundary-test.lisp
 
-;;; Zero-action characterization of the chained recorder boundary contract.  The playback
-;;; baseline has a latched, ghost-occupied toggle plate, one powered receiver/gate/gears
-;;; lane, and one unpowered lane.  A synthetic preceding-cycle state inverts every
-;;; recording shadow fact.  Preparation must leave that boundary untouched, copy it, seed
-;;; the plate's stateful edge memory, and derive the remaining shadow from the new baseline.
+;;; Zero-action characterization of closed recorder normalization.  The authored state has
+;;; a latched, ghost-occupied toggle plate, one powered receiver/gate/gears lane, and one
+;;; unpowered lane.  A synthetic STOP boundary removes that ghost state, then the fixture
+;;; inverts every recording-shadow fact.  Preparation must leave the boundary untouched,
+;;; copy it, seed the plate's stateful edge memory from the live baseline, and derive the
+;;; remaining shadow.
 ;;; Expected minimum path length: zero.
 
 (in-package :ww)
@@ -93,6 +94,8 @@
 
 (define-test-helper corrupted-recorder-cycle-boundary ()
   (let ((state (copy-problem-state *start-state*)))
+    (add-recorder-boundary-fact! state '(recorder-cycle-closed))
+    (close-recorder-cycle-state! state)
     (dolist (proposition
               '((recording-depressed cycle-plate)
                 (recording-latched cycle-plate)
@@ -115,11 +118,8 @@
 
 
 (define-test-helper open-recorder-cycle-boundary ()
-  (let ((state (copy-problem-state *start-state*)))
-    (delete-recorder-boundary-fact!
-      state '(has-location ghost-agent recorder-site))
-    (add-recorder-boundary-fact!
-      state '(has-location ghost-agent away-site))
+  (let ((state (corrupted-recorder-cycle-boundary)))
+    (delete-recorder-boundary-fact! state '(recorder-cycle-closed))
     state))
 
 
@@ -154,7 +154,7 @@
       (not (eq (problem-state.idb boundary) (problem-state.idb prepared)))
       (equal before (list-database (problem-state.idb boundary)))
 
-      (recorder-boundary-fact-p prepared '(recording-depressed cycle-plate))
+      (not (recorder-boundary-fact-p prepared '(recording-depressed cycle-plate)))
       (recorder-boundary-fact-p prepared '(recording-latched cycle-plate))
       (recorder-boundary-fact-p prepared '(recording-active powered-receiver))
       (recorder-boundary-fact-p prepared '(recording-open powered-gate))
@@ -171,6 +171,10 @@
       (= (problem-state.time prepared) 12.5)
       (= (problem-state.value prepared) 7.0)
       (recorder-cycle-boundary-closed-p prepared)
+      (not (recorder-state-contains-ghost-reference-p prepared))
+      (not (recorder-boundary-fact-p
+             prepared '(has-location ghost-agent recorder-site)))
+      (not (recorder-boundary-fact-p prepared '(on1 ghost-agent cycle-plate)))
       (not (state-is-inconsistent prepared))
       (equal (getf report :recording)
              '((start-recorder) (stop-recorder))))))

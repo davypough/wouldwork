@@ -3,7 +3,8 @@
 ;;; Recording session lifecycle.  START-RECORDER and STOP-RECORDER are real planner
 ;;; actions, not report-only markers: the search itself chooses when a recording session
 ;;; opens and closes, giving ghost-state forking a well-defined, path-local moment instead
-;;; of an inferred one.  START-RECORDER's effect is the fork required by rules 5 and 11 of
+;;; of an inferred one.  START-RECORDER counts the cycle in planner state, clears the
+;;; preceding closed marker, and performs the fork required by rules 5 and 11 of
 ;;; tech/Recorder-ghost operations in the Talos Principle.txt -- every mapped ghost object
 ;;; inherits its live counterpart's CURRENT has-location, holding, on, paired, jamming, and
 ;;; mounted-on state at the exact moment recording starts, not whatever -- if anything --
@@ -42,22 +43,18 @@
 ;;; -recorder-controls-shadow's existing nesting.
 ;;;
 ;;; REQUIRES:
-;;;   nested : -recorder-core (RECORDING-COPY>, RECORDING-IN-PROGRESS, shadow lifecycle
-;;;            registry); -recorder-solution (RECORDING-AGENT-AT-RECORDER,
-;;;            RECORDING-AGENT-EMPTY-HANDED); -location (HAS-LOCATION); -holding (HOLDING);
-;;;            -support-occupancy (ON); -propagation
+;;;   nested : -recorder-cycle-boundary (cycle count, physical closure, ghost removal,
+;;;            and shadow normalization); -location (HAS-LOCATION); -holding (HOLDING);
+;;;            -support-occupancy (ON)
 ;;; PROVIDES:
 ;;;   relations : paired, jamming, mounted-on -- redeclared, not owned, here, and only when
 ;;;               their own composite argument type is already present
 ;;;   actions   : start-recorder, stop-recorder
-;;;   lifecycle : reset-recording-session!
 
-(include-tech -recorder-core)
-(include-tech -recorder-solution)
+(include-tech -recorder-cycle-boundary)
 (include-tech -location)
 (include-tech -holding)
 (include-tech -support-occupancy)
-(include-tech -propagation)
 
 (in-package :ww)
 
@@ -118,9 +115,16 @@
     '(and (live-recording-object ?agent)
           (not (recording-in-progress))
           (recording-agent-at-recorder ?agent)
-          (recording-agent-empty-handed ?agent))
+          (recording-agent-empty-handed ?agent)
+          (recorder-closed-ghost-free)
+          (assign $cycles-used (recorder-cycle-count))
+          (assign $objective-value (problem-state.value state))
+          (< $cycles-used *max-recorder-cycles*))
     '(">" ?agent "starts the recorder")
     `(assert
+       (assign $next-cycle (1+ $cycles-used))
+       (recorder-cycles-used $next-cycle)
+       (not (recorder-cycle-closed))
        (recording-in-progress)
        ;; has-location: every mapped mobile object, wherever it currently stands
        (doall (?live mobile-object)
@@ -141,7 +145,7 @@
                (on $ghost $support-ghost)
                (on $ghost $support)))))
        ,@optional-forks
-       (finally (propagate-changes!)))))
+       (finally (normalize-recorder-cycle-shadow!)))))
 
 
 (define-action stop-recorder
@@ -149,17 +153,11 @@
   (?agent agent)
   (and (ghost-recording-object ?agent)
        (recording-in-progress)
-       (recording-agent-at-recorder ?agent)
-       (recording-agent-empty-handed ?agent))
+       (recorder-cycle-boundary-safe)
+       (assign $cycles-used (recorder-cycle-count))
+       (assign $objective-value (problem-state.value state)))
   (">" ?agent "stops the recorder")
   (assert (not (recording-in-progress))
-          (finally (propagate-changes!))))
-
-
-(defun reset-recording-session! (state)
-  "Clear the recording-session flag inherited from the preceding cycle."
-  (clear-recorder-shadow-relation! state 'recording-in-progress))
-
-
-(register-recorder-shadow-lifecycle
-  'recording-session 'reset-recording-session!)
+          (recorder-cycles-used $cycles-used)
+          (recorder-cycle-closed)
+          (finally (close-recorder-cycle-state!))))

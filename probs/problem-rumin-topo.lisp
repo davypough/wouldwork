@@ -16,7 +16,7 @@
 
 (ww-set *progress-reporting-interval* 1000000)
 
-(ww-set *depth-cutoff* 13)
+(ww-set *depth-cutoff* 15)
 
 
 (defparameter *max-pairings* 2)
@@ -69,8 +69,8 @@
   ;; Movable objects.  Ghosts (agent1*, connector1*, connector2*, box1*, tray1*) have no
   ;; initial location: START-RECORDER forks each one from its live counterpart's current
   ;; state when the search finds it, per rule 5 -- a ghost does not exist beforehand.
-  (has-location agent1 location1)
-  (has-location connector1 location1)
+  (has-location agent1 location3)
+  (has-location connector1 location13)
   (has-location connector2 location10)
   (has-location box1 location7)
   (has-location tray1 location13)
@@ -90,10 +90,10 @@
   (has-position recorder1 location3)
 
   ;; Representative location coordinates
-  (location-coords> location1 8 14)
+  (location-coords> location1 21 10)
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
-  (location-coords> location4 8 9)
+  (location-coords> location4 8 10)
   (location-coords> location5 17 151/10)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
@@ -180,8 +180,7 @@
   ;; Authorized elevation changes
   (jump-via location8 () location9)
   (jump-via location4 () location2)
-  (stairs-via location1 () location4)
-  (stairs-via location4 () location13)
+  (stairs-via location2 () location4)
 
   ;; Nearby manipulation across boundaries
   (reach-via location4 () location2)
@@ -201,5 +200,6 @@
 
 
 (define-goal
-  (open gate1)
+  (and (has-location agent1 location1)
+       (ghost-stops-recorder))
 )

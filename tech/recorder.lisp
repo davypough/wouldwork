@@ -6,14 +6,21 @@
 ;;; recorder-specific prefix pruning, interleaving audit/pruning, candidate validation,
 ;;; solution reporting, and goal chaining after all implementations have been defined.
 ;;;
-;;; Recorder cycle chaining is explicit rather than planner-native.  Each SOLVE-SUBGOAL
-;;; searches and commits at most one intermediate recording cycle, and the following SOLVE
-;;; searches and commits the final cycle.  An initial SOLVE remains an ordinary whole-problem
-;;; search.  Every searched cycle physically returns its ghosts to a recorder before its
-;;; integrated playback state can become a boundary.  An intermediate commit preserves that
-;;; playback state, discards the completed program, and prepares a fresh capability-owned
-;;; recording shadow for the next call.  Cycles are optimized only within their own searches;
-;;; the retained history and cumulative metrics do not imply global optimality or completeness.
+;;; Recorder start/stop transitions and their cycle count are planner-native and repeatable.
+;;; The path parser accepts repeated setup/start/window/stop cycles and an optional
+;;; final open window.  Every generated STOP successor validates its just-completed isolated
+;;; recording and rejects a closed cycle without persistent progress before goal or duplicate
+;;; processing.  At equal normalized boundaries, an equal-or-cheaper path with fewer cycles
+;;; used dominates one with more cycles.  Final candidate validation checks all cycles plus
+;;; the complete integrated path.  One ordinary SOLVE therefore optimizes across every
+;;; permitted cycle.  The report reconstructs every cycle and its local metrics from the
+;;; accepted path while retaining complete-solution totals.
+;;;
+;;; Recorder cycle chaining remains an explicitly guided convenience.  Each SOLVE-SUBGOAL
+;;; is capped at and required to consume exactly one additional cycle, and the following
+;;; SOLVE does the same for the final cycle.  The configured maximum limits the complete
+;;; guided history.  Its retained history is locally optimized per search and makes no
+;;; global claim.
 ;;;
 ;;; The component order preserves the established propagation seed:
 ;;; ordinary receiver state, recording plate state, recording receiver state, recording
@@ -29,8 +36,9 @@
 ;;;   -recorder-jamming-shadow     : ghost-filtered RECORDING-JAMMED
 ;;;   -recorder-gate-shadow        : RECORDING-OPEN and gate-view hook
 ;;;   -recorder-wall-gears-shadow  : RECORDING-TURNING and gears-view hook
-;;;   -recorder-solution           : prefix validation, interleaving audit/pruning,
-;;;                                  candidate validation, and three-phase report
+;;;   -recorder-solution           : multi-window parsing, mandatory stop validation,
+;;;                                  optional open-prefix validation, interleaving
+;;;                                  audit/pruning, candidate validation, and report
 ;;;   -recorder-session            : START-RECORDER / STOP-RECORDER actions and the
 ;;;                                  live-to-ghost state fork; nests -recorder-solution,
 ;;;                                  so its own list position is a readability choice, not
@@ -65,11 +73,19 @@
 ;; live/ghost interleaving pruning is automatic on the supported serial search path.
 (register-solution-validator 'validate-recorder-solution)
 (register-search-prefix-validator
+  'validate-recorder-cycle-boundary-prefix
+  'recorder-cycle-boundary-validation-enabled-p
+  'recorder-stop-prefix-trigger-p)
+(register-search-prefix-validator
   'validate-recorder-recording-prefix
   'recorder-prefix-pruning-enabled-p)
 (register-search-successor-pruner
   'prune-recorder-interleaving-successor-p
   'recorder-interleaving-pruning-enabled-p)
+(register-search-successor-pruner
+  'prune-recorder-boundary-dominated-successor-p
+  'recorder-boundary-dominance-enabled-p
+  'reset-recorder-boundary-dominance)
 (register-solution-report-printer 'print-recorder-report)
 (register-goal-chaining-policy
   'solve-recorder-subgoal-form

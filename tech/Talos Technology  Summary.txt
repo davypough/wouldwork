@@ -76,6 +76,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (on $support-occupant $support :bijective)  ;reverse lookup via cleartop
 (open gate)
 (paired connector terminus)  ;undirected; stored connector-first
+(recorder-cycle-closed)  ;set only by a physically valid stop-recorder boundary
+(recorder-cycles-used $fixnum)  ;planner-state count incremented by start-recorder
 (recording-in-progress)  ;true between start-recorder and stop-recorder
 (turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
 
@@ -163,5 +165,6 @@ wall-repeater 1
 8. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
 
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
+*max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path; a cycle counts when it starts
 *max-pairings* 3  ;tech/beam-relay.lisp; max PAIRED termini a connector may hold at once; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
 *vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap an agent can act across vertically -- reaching to pick up or place cargo above or below its own elevation, or jumping up onto a higher support or clearing a barrier -- independent of the agent's own declared height; jump.lisp reuses this parameter rather than defining its own

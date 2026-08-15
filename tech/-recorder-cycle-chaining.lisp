@@ -1,8 +1,9 @@
 ;;; Filename: -recorder-cycle-chaining.lisp
 
 ;;; Explicit recorder orchestration behind the generic goal-chaining interface.  Each
-;;; dispatched call searches exactly one closed, validator-approved recorder cycle.  An
-;;; intermediate cycle commits its integrated playback boundary immediately, retains an
+;;; dispatched call requires and searches exactly one new closed, validator-approved
+;;; recorder cycle.  An intermediate cycle commits its integrated playback boundary
+;;; immediately, retains an
 ;;; independent history record, prepares a fresh recording shadow, and discards the
 ;;; just-searched program.
 ;;; The final operation records the last cycle but retains its ordinary solution result.
@@ -80,19 +81,35 @@
 
 
 (defun validate-recorder-cycle-orchestration ()
-  "Require a fresh serial baseline and active recorder candidate validation."
+  "Validate a guided baseline and return the one permitted next cycle number."
   (validate-continuation-preconditions)
   (unless (member 'validate-recorder-solution *solution-validators*)
     (error "Recorder cycle solving requires the services installed by (include-tech recorder)."))
   (when *solutions-valid*
     (error "A completed solution is still active. Undo or stage a fresh recorder chain ~
             before starting another recorder cycle."))
-  t)
+  (when (member '(recording-in-progress) (database *start-state*) :test #'equal)
+    (error "Guided recorder chaining requires a closed starting state."))
+  (unless (funcall (symbol-function 'recorder-closed-ghost-free) *start-state*)
+    (error "Guided recorder chaining cannot start from stale ghost state."))
+  (let ((next-cycle
+          (1+ (funcall (symbol-function 'recorder-cycle-count) *start-state*))))
+    (when (> next-cycle *max-recorder-cycles*)
+      (error "Guided recorder cycle ~D exceeds *MAX-RECORDER-CYCLES* = ~D."
+             next-cycle *max-recorder-cycles*))
+    next-cycle))
 
 
 (defun recorder-cycle-final-goal ()
   "Return the original problem goal, or the current goal for a single-cycle solve."
   (copy-tree (or *final-goal* *goal*)))
+
+
+(defun recorder-guided-cycle-goal (subgoal cycle-number)
+  "Require SUBGOAL at the closed end of exactly the next guided recorder cycle."
+  `(and ,(copy-tree subgoal)
+        (recorder-cycles-used ,cycle-number)
+        (ghost-stops-recorder)))
 
 
 (defun make-committed-recorder-cycle (subgoal closed-goal)
@@ -110,6 +127,9 @@
            (- (solution.value solution) (problem-state.value *start-state*))))
     (unless (recorder-cycle-boundary-closed-p boundary)
       (error "Validated recorder cycle ended at an open boundary."))
+    (unless (= (getf report :cycle-count) 1)
+      (error "A guided recorder search must commit exactly one cycle, not ~D."
+             (getf report :cycle-count)))
     (make-recorder-cycle-record
       :subgoal (copy-tree subgoal)
       :closed-goal (copy-tree closed-goal)
@@ -128,14 +148,6 @@
         (+ value-change (if previous (recorder-cycle-record.cumulative-value previous) 0)))))
 
 
-(defun print-recorder-chain-sequence (heading sequence stream)
-  "Print HEADING followed by every entry in a recorder chain SEQUENCE."
-  (format stream "~&~%~A:~%" heading)
-  (dolist (entry sequence)
-    (format stream "~S~%" entry))
-  sequence)
-
-
 (defun print-recorder-cycle-record (record cycle-number stream)
   "Print one committed recorder cycle RECORD."
   (format stream "~&~%Cycle ~D~%" cycle-number)
@@ -145,11 +157,13 @@
           (recorder-cycle-record.depth record)
           (recorder-cycle-record.elapsed-time record)
           (recorder-cycle-record.value-change record))
-  (let ((report (recorder-cycle-record.report record)))
-    (print-recorder-chain-sequence "Integrated sequence" (getf report :integrated) stream)
-    (print-recorder-chain-sequence "Setup sequence" (getf report :setup) stream)
-    (print-recorder-chain-sequence "Recording sequence" (getf report :recording) stream)
-    (print-recorder-chain-sequence "Playback sequence" (getf report :playback) stream))
+  (let* ((report (recorder-cycle-record.report record))
+         (cycles (getf report :cycles)))
+    (unless (= (length cycles) 1)
+      (error "A guided recorder record must contain exactly one cycle."))
+    (print-recorder-report-sequence
+      "Integrated sequence" (getf report :integrated) stream)
+    (print-recorder-cycle-report (first cycles) stream))
   record)
 
 
@@ -223,45 +237,48 @@
       (setf *solution-report-printers* saved-printers))))
 
 
-(defun run-recorder-cycle-search (subgoal final-p)
+(defun run-recorder-cycle-search (subgoal final-p cycle-number)
   "Search and commit one closed recorder SUBGOAL, final when FINAL-P is true."
-  (let* ((closed-goal (recorder-cycle-goal subgoal))
+  (let* ((closed-goal (recorder-guided-cycle-goal subgoal cycle-number))
          (completed nil))
-    (unwind-protect
-        (progn
-          (install-compiled-goal closed-goal)
-          (run-recorder-cycle-planner)
-          (let ((record
-                  (when *solutions-valid*
-                    (if final-p
-                      (commit-final-recorder-cycle subgoal closed-goal)
-                      (commit-intermediate-recorder-cycle subgoal closed-goal)))))
-            (setf completed t)
-            (unless record
-              (format t "~&Recorder cycle produced no solution. Retry this cycle, or use ~
-                         (ww-undo) to restore the preceding session.~%"))
-            (when record
-              (print-recorder-chain-report))
-            t))
-      (unless completed
-        (setf *solution-paths* nil
-              *solutions-valid* nil)
-        (format t "~&Recorder cycle interrupted. Use (ww-undo) to restore the preceding ~
-                   session.~%")))))
+    ;; The stateful configured maximum still limits the complete guided history.  This
+    ;; narrower dynamic limit prevents one guided call from consuming later cycle slots.
+    (let ((*max-recorder-cycles* cycle-number))
+      (unwind-protect
+          (progn
+            (install-compiled-goal closed-goal)
+            (run-recorder-cycle-planner)
+            (let ((record
+                    (when *solutions-valid*
+                      (if final-p
+                        (commit-final-recorder-cycle subgoal closed-goal)
+                        (commit-intermediate-recorder-cycle subgoal closed-goal)))))
+              (setf completed t)
+              (unless record
+                (format t "~&Recorder cycle produced no solution. Retry this cycle, or use ~
+                           (ww-undo) to restore the preceding session.~%"))
+              (when record
+                (print-recorder-chain-report))
+              t))
+        (unless completed
+          (setf *solution-paths* nil
+                *solutions-valid* nil)
+          (format t "~&Recorder cycle interrupted. Use (ww-undo) to restore the preceding ~
+                     session.~%"))))))
 
 
 (defun solve-recorder-subgoal-form (goal-form)
   "Solve and commit one closed intermediate recorder cycle for GOAL-FORM."
-  (validate-recorder-cycle-orchestration)
-  (save-undo-checkpoint)
-  (unless *final-goal*
-    (setf *final-goal* (copy-tree *goal*)))
-  (run-recorder-cycle-search goal-form nil))
+  (let ((cycle-number (validate-recorder-cycle-orchestration)))
+    (save-undo-checkpoint)
+    (unless *final-goal*
+      (setf *final-goal* (copy-tree *goal*)))
+    (run-recorder-cycle-search goal-form nil cycle-number)))
 
 
 (defun solve-recorder-final ()
   "Solve and commit the original goal as the final closed recorder cycle."
-  (validate-recorder-cycle-orchestration)
-  (let ((goal-form (recorder-cycle-final-goal)))
+  (let ((cycle-number (validate-recorder-cycle-orchestration))
+        (goal-form (recorder-cycle-final-goal)))
     (save-undo-checkpoint)
-    (run-recorder-cycle-search goal-form t)))
+    (run-recorder-cycle-search goal-form t cycle-number)))

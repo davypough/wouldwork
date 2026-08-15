@@ -5,22 +5,99 @@
 ;;; mapped ghost agent to a recorder.  Report-only return markers therefore never become a
 ;;; committed boundary by accident.
 ;;;
-;;; Preparing the next cycle operates on a fresh copy of that closed integrated playback
-;;; state.  Every stateful shadow component resets its own relations; all resets finish
-;;; before any component seeds stateful memory; ordinary propagation then derives the
-;;; remaining shadow.  The chosen solution and its report boundary remain immutable.
+;;; STOP-RECORDER performs the same normalization directly in its successor: it removes
+;;; every dynamic ghost reference, resets every capability-owned recording shadow, seeds
+;;; stateful memory from the committed live playback baseline, and propagates consequences.
+;;; PREPARE-RECORDER-CYCLE-STATE remains the copy-preserving entry point used by guided
+;;; chaining, but delegates to that shared normalization.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -recorder-core (lifecycle registry); -recorder-solution
 ;;;            (GHOST-STOPS-RECORDER); -propagation
 ;;; PROVIDES:
-;;;   functions : recorder-cycle-goal, prepare-recorder-cycle-state
+;;;   queries   : recorder-cycle-boundary-safe, recorder-closed-ghost-free
+;;;   functions : recorder-cycle-goal, close-recorder-cycle-state!,
+;;;               normalize-recorder-cycle-shadow!, prepare-recorder-cycle-state
 
 (include-tech -recorder-core)
 (include-tech -recorder-solution)
 (include-tech -propagation)
 
 (in-package :ww)
+
+
+(defun recorder-object-side (state object)
+  "Return OBJECT's mapped recorder side, or NIL when it is fixed or unmapped."
+  (when (member object (gethash 'mobile-object *types*))
+    (cond
+      ((funcall (symbol-function 'live-recording-object) state object) :live)
+      ((funcall (symbol-function 'ghost-recording-object) state object) :ghost))))
+
+
+(defun recorder-value-contains-ghost-p (state value)
+  "Whether VALUE, including a nested list value, names a mapped ghost."
+  (if (consp value)
+    (or (recorder-value-contains-ghost-p state (car value))
+        (recorder-value-contains-ghost-p state (cdr value)))
+    (eql (recorder-object-side state value) :ghost)))
+
+
+(defun recorder-state-contains-ghost-reference-p (state)
+  "Whether STATE's dynamic database contains any reference to a mapped ghost."
+  (some (lambda (proposition)
+          (recorder-value-contains-ghost-p state (rest proposition)))
+        (list-database (problem-state.idb state))))
+
+
+(define-query recorder-closed-ghost-free ()
+  (not (recorder-state-contains-ghost-reference-p state)))
+
+
+(defun recorder-cross-layer-arguments-p (state arguments)
+  "Whether ARGUMENTS contain both live and ghost mapped objects."
+  (and (some (lambda (argument)
+               (eql (recorder-object-side state argument) :live))
+             arguments)
+       (some (lambda (argument)
+               (eql (recorder-object-side state argument) :ghost))
+             arguments)))
+
+
+(defun recorder-boundary-reference-relations ()
+  "Relations whose live/ghost dependencies cannot cross a disappearing boundary."
+  (append '(paired holding on)
+          (copy-list (gethash 'holding *bijective-relations*))
+          (copy-list (gethash 'on *bijective-relations*))))
+
+
+(defun recorder-cross-layer-boundary-reference-p (state)
+  "Whether STATE contains a live/ghost support, pairing, or holding dependency."
+  (let ((relations (recorder-boundary-reference-relations)))
+    (some (lambda (proposition)
+            (and (member (first proposition) relations)
+                 (recorder-cross-layer-arguments-p state (rest proposition))))
+          (list-database (problem-state.idb state)))))
+
+
+(defun recorder-cycle-agents-ready-p (state)
+  "Whether every mapped ghost agent is at a recorder and empty-handed."
+  (every (lambda (agent)
+           (or (not (eql (recorder-object-side state agent) :ghost))
+               (and (funcall (symbol-function 'recording-agent-at-recorder)
+                             state agent)
+                    (funcall (symbol-function 'recording-agent-empty-handed)
+                             state agent))))
+         (gethash 'agent *types*)))
+
+
+(defun recorder-cycle-boundary-safe-p (state)
+  "Whether an open cycle can close without preserving a cross-layer dependency."
+  (and (recorder-cycle-agents-ready-p state)
+       (not (recorder-cross-layer-boundary-reference-p state))))
+
+
+(define-query recorder-cycle-boundary-safe ()
+  (recorder-cycle-boundary-safe-p state))
 
 
 (defun recorder-cycle-goal (subgoal)
@@ -53,19 +130,47 @@
        (not (state-is-inconsistent state))))
 
 
+(defun normalize-recorder-cycle-shadow! (state)
+  "Reset, seed, and propagate every recording shadow in STATE."
+  (reset-recorder-cycle-shadow! state)
+  (seed-recorder-cycle-shadow! state)
+  (unless (recorder-cycle-state-consistent-p state)
+    (add-proposition '(inconsistent-state) (problem-state.idb state))
+    (invalidate-problem-state-hash state))
+  state)
+
+
+(defun remove-recorder-ghost-state! (state)
+  "Remove every dynamic proposition that refers to a mapped ghost."
+  (let ((idb (problem-state.idb state)))
+    (dolist (proposition (list-database idb))
+      (when (recorder-value-contains-ghost-p state (rest proposition))
+        (delete-proposition proposition idb))))
+  (invalidate-problem-state-hash state))
+
+
+(defun close-recorder-cycle-state! (state)
+  "Remove completed ghosts and normalize the recording view from live persistent state."
+  (remove-recorder-ghost-state! state)
+  (normalize-recorder-cycle-shadow! state)
+  (when (recorder-state-contains-ghost-reference-p state)
+    (add-proposition '(inconsistent-state) (problem-state.idb state))
+    (invalidate-problem-state-hash state))
+  state)
+
+
 (defun prepare-recorder-cycle-state (boundary-state)
   "Return a fresh next-cycle state from closed integrated BOUNDARY-STATE.
 
 The original state is never modified.  Preparation fails if the accepted cycle was not
-physically closed, shadow propagation is inconsistent, or normalization makes the state no
-longer ready to start a recorder cycle."
+explicitly closed, shadow propagation is inconsistent, or normalization retains a dynamic
+ghost reference."
   (unless (recorder-cycle-boundary-closed-p boundary-state)
-    (error "Recorder cycle boundary is open; every mapped ghost agent must be at a recorder."))
+    (error "Recorder cycle boundary was not produced by STOP-RECORDER."))
   (let ((prepared-state (copy-problem-state boundary-state)))
-    (reset-recorder-cycle-shadow! prepared-state)
-    (seed-recorder-cycle-shadow! prepared-state)
-    (unless (recorder-cycle-state-consistent-p prepared-state)
+    (close-recorder-cycle-state! prepared-state)
+    (when (state-is-inconsistent prepared-state)
       (error "Recorder cycle shadow did not propagate to a consistent state."))
     (unless (recorder-cycle-boundary-closed-p prepared-state)
-      (error "Recorder cycle preparation moved a ghost agent away from every recorder."))
+      (error "Recorder cycle preparation did not retain a closed ghost-free boundary."))
     prepared-state))
