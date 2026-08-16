@@ -325,6 +325,25 @@
         (probe-file (merge-pathnames filename (merge-pathnames "test/" root))))))
 
 
+(defun instance-problem-file (root)
+  "Return the src/problem<suffix>.lisp pathname under ROOT where the currently staged
+   problem is spliced and compiled.  Suffixed by CL-USER::*WW-INSTANCE-SUFFIX*, set once
+   at image startup from the WOULDWORK_INSTANCE environment variable in wouldwork.asd, so
+   a process started with that variable set never splices or compiles over a concurrently
+   running process's problem file."
+  (merge-pathnames
+    (concatenate 'string "problem" cl-user::*ww-instance-suffix* ".lisp")
+    (merge-pathnames "src/" root)))
+
+
+(defun instance-vals-file (root)
+  "Return the vals<suffix>.lisp pathname under ROOT where the current settings snapshot is
+   saved.  Suffixed the same way as INSTANCE-PROBLEM-FILE, for the same reason."
+  (merge-pathnames
+    (concatenate 'string "vals" cl-user::*ww-instance-suffix* ".lisp")
+    root))
+
+
 (defun snapshot-source-file (snapshot-file)
   "Return the source problem file recorded in SNAPSHOT-FILE's leading Filename
    header (eg, ';;; Filename: problem-claustro4.lisp'), resolved in the standard
@@ -345,8 +364,8 @@
    Allows recovery if wouldwork loading fails with error in problem file."
   (format t "~%Loading wouldwork defaults...~2%")
   (let* ((root (asdf:system-source-directory :wouldwork))
-         (problem-file (merge-pathnames "src/problem.lisp" root))
-         (vals-file (merge-pathnames "vals.lisp" root))
+         (problem-file (instance-problem-file root))
+         (vals-file (instance-vals-file root))
          (ww-pkg (find-package :ww))
          (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
     (when (and refreshing-sym (boundp refreshing-sym))
@@ -376,6 +395,20 @@
 
 
 (pushnew 'cleanup-resources sb-ext:*exit-hooks*)
+
+
+(defun cleanup-instance-files ()
+  "Delete this process's own instance-suffixed problem and vals files on exit, so a
+   concurrently-run WOULDWORK_INSTANCE process leaves no trace once it closes.  A no-op
+   for the default, unsuffixed process, since problem.lisp and vals.lisp are its
+   permanent files, not scratch."
+  (unless (zerop (length cl-user::*ww-instance-suffix*))
+    (let ((root (asdf:system-source-directory :wouldwork)))
+      (uiop:delete-file-if-exists (instance-problem-file root))
+      (uiop:delete-file-if-exists (instance-vals-file root)))))
+
+
+(pushnew 'cleanup-instance-files sb-ext:*exit-hooks*)
 
 
 ;Mainly for debugging
@@ -614,7 +647,7 @@
    moments ago -- see *staging-trace-already-shown*.  Always returns NIL in this case."
   (if problem-name-designator
     (let* ((root (asdf:system-source-directory :wouldwork))
-           (target-file (merge-pathnames "problem.lisp" (merge-pathnames "src/" root)))
+           (target-file (instance-problem-file root))
            (problem-file (resolve-problem-file (string problem-name-designator))))
       (when problem-file
         (copy-problem-with-tech-includes problem-file target-file)
@@ -623,9 +656,8 @@
         (setf *staging-trace-already-shown* t))
       problem-file)
     (let* ((root (asdf:system-source-directory :wouldwork))
-           (src-dir (merge-pathnames "src/" root))
-           (problem-file (merge-pathnames "problem.lisp" src-dir))
-           (vals-file (merge-pathnames "vals.lisp" root))
+           (problem-file (instance-problem-file root))
+           (vals-file (instance-vals-file root))
            (blocks3-file (problem-source-file "problem-blocks3.lisp"))
            (vals-problem-name (read-init-vals vals-file))
            (vals-problem-file (problem-source-file

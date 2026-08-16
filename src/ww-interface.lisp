@@ -26,10 +26,12 @@
   "Default parameter values in save/read order")
 
 
-(defparameter *globals-file* 
-  (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))
+(defparameter *globals-file*
+  (instance-vals-file (asdf:system-source-directory :wouldwork))
   "In the vals.lisp file of this package the values of parameters
-     are stored as a list.
+     are stored as a list.  The filename carries CL-USER::*WW-INSTANCE-SUFFIX* when the
+     WOULDWORK_INSTANCE environment variable is set, so a concurrently-run SBCL process
+     keeps its own settings file.
    This should preserve when reloading the package for problems
    the values of these global variables.")
 

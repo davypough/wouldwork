@@ -45,8 +45,12 @@
    Allows recovery if wouldwork loading fails with error in problem file."
   (format t "~%Loading wouldwork defaults...~2%")
   (let* ((root (asdf:system-source-directory :wouldwork))
-         (problem-file (merge-pathnames "src/problem.lisp" root))
-         (vals-file (merge-pathnames "vals.lisp" root))
+         (problem-file (merge-pathnames
+                          (concatenate 'string "src/problem" cl-user::*ww-instance-suffix* ".lisp")
+                          root))
+         (vals-file (merge-pathnames
+                       (concatenate 'string "vals" cl-user::*ww-instance-suffix* ".lisp")
+                       root))
          (ww-pkg (find-package :ww))
          (refreshing-sym (and ww-pkg (find-symbol "*REFRESHING*" ww-pkg))))
     (when (and refreshing-sym (boundp refreshing-sym))

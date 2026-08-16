@@ -119,8 +119,9 @@
 
 (defun cleanup-test-files ()
   "Delete temporary problem.lisp and vals.lisp files"
-  (uiop:delete-file-if-exists (in-src "problem.lisp"))
-  (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
+  (let ((root (asdf:system-source-directory :wouldwork)))
+    (uiop:delete-file-if-exists (instance-problem-file root))
+    (uiop:delete-file-if-exists (instance-vals-file root))))
 
 
 (defun print-test-header (problem-name &optional (algorithm ""))
@@ -174,7 +175,7 @@
 
                  (when should-process
                    (reset-parameters)  ; RESET PARAMETERS BEFORE EACH TEST
-                   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+                   (uiop:delete-file-if-exists (instance-vals-file (asdf:system-source-directory :wouldwork)))
                    (load-problem problem-name)
                    (incf problems-processed)
                    (ww-solve)
@@ -439,7 +440,7 @@
                        (t nil))))
                  (when should-process
                    (reset-parameters)
-                   (uiop:delete-file-if-exists (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork)))
+                   (uiop:delete-file-if-exists (instance-vals-file (asdf:system-source-directory :wouldwork)))
                    ;; Load silently to acquire native settings from define-problem,
                    ;; suppressing the initial depth-first parameter display.
                    ;; Justified here as this is a test routine only.

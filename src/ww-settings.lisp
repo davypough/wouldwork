@@ -733,8 +733,7 @@ treat their arguments as read-only and be safe to call concurrently."
 ;; This ensures clean initialization for new problems without carrying over
 ;; settings from previous problem.lisp files
 (eval-when (:load-toplevel :execute)
-  (let ((vals-file (merge-pathnames "vals.lisp" 
-                                    (asdf:system-source-directory :wouldwork))))
+  (let ((vals-file (instance-vals-file (asdf:system-source-directory :wouldwork))))
     (unless (probe-file vals-file)
       ;; No vals.lisp exists, reset to defaults before problem.lisp loads
       (setf *problem-name* 'unspecified

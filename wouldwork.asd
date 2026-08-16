@@ -6,6 +6,19 @@
 (in-package :asdf-user)
 
 
+;; Distinguishes concurrently-run SBCL processes so each stages and compiles its own
+;; problem<suffix>.lisp / vals<suffix>.lisp instead of contending over the same two files.
+;; Set the WOULDWORK_INSTANCE environment variable before starting a second SBCL process
+;; against this same checkout; leave it unset for normal single-process use, which reduces
+;; the suffix to "" and reproduces today's plain problem.lisp / vals.lisp filenames exactly.
+;; Lives in CL-USER, not WOULDWORK, because this form and everything below it in this file
+;; runs before ww-packages.lisp defines the :wouldwork package.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar cl-user::*ww-instance-suffix*
+    (let ((instance (uiop:getenv "WOULDWORK_INSTANCE")))
+      (if instance (concatenate 'string "-" instance) ""))))
+
+
 (defclass always-compile-file (asdf:cl-source-file)
   ()
   (:documentation "A source file that is always compiled, regardless of timestamps."))
@@ -14,6 +27,15 @@
 (defmethod asdf:operation-done-p ((o asdf:compile-op) (c always-compile-file))
   "Always return NIL to force recompilation."
   nil)
+
+
+(defmethod asdf:component-pathname ((c always-compile-file))
+  "Resolve to problem<suffix>.lisp, where <suffix> is CL-USER::*WW-INSTANCE-SUFFIX*, so
+   concurrently-run SBCL processes compile and stage independent problem files."
+  (let ((default-pathname (call-next-method)))
+    (make-pathname
+      :name (concatenate 'string (pathname-name default-pathname) cl-user::*ww-instance-suffix*)
+      :defaults default-pathname)))
 
 
 ;; Use *load-pathname* instead of asdf:system-source-directory to avoid circular dependency.
@@ -29,13 +51,17 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let* ((root (make-pathname :name nil :type nil :defaults *load-pathname*))
          (src-dir (merge-pathnames "src/" root))
-         (problem-file (merge-pathnames "problem.lisp" src-dir))
+         (problem-file (merge-pathnames
+                          (concatenate 'string "problem" cl-user::*ww-instance-suffix* ".lisp")
+                          src-dir))
          (blocks3-file (merge-pathnames "problem-blocks3.lisp" (merge-pathnames "probs/" root)))
-         (vals-file (merge-pathnames "vals.lisp" root)))
+         (vals-file (merge-pathnames
+                       (concatenate 'string "vals" cl-user::*ww-instance-suffix* ".lisp")
+                       root)))
     (unless (probe-file problem-file)
-      ;; No problem.lisp exists, copy default
+      ;; No problem<suffix>.lisp exists, copy default
       (uiop:copy-file blocks3-file problem-file)
-      ;; Delete vals.lisp to force rebuild
+      ;; Delete vals<suffix>.lisp to force rebuild
       (uiop:delete-file-if-exists vals-file))))
 
 
@@ -84,12 +110,15 @@
 		                     (:file "ww-command-tests")
 		                     (:file "ww-enumerator-build")
 		                     (:file "ww-enumerator-run")
-		                     (always-compile-file "problem" :around-compile 
+		                     (always-compile-file "problem" :around-compile
                                       (lambda (thunk)
                                         (setf (symbol-value (find-symbol "*WW-LOADING*" "WOULDWORK")) t)
                                         (funcall (symbol-function
                                                    (find-symbol "PRESCAN-PROBLEM-FILE" "WOULDWORK"))
-                                                 (asdf:system-relative-pathname :wouldwork "src/problem.lisp"))
+                                                 (asdf:system-relative-pathname
+                                                   :wouldwork
+                                                   (concatenate 'string "src/problem"
+                                                                cl-user::*ww-instance-suffix* ".lisp")))
                                         (funcall thunk)))
                              (:file "ww-action-trace")
                              (:file "ww-goal-chaining")
