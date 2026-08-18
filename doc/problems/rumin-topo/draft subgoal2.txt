@@ -1,0 +1,19 @@
+agent starts recorder.
+ghost relocates to loc13, picks up connector1* and pairs it with receiver1.
+ghost picks up tray1* and relocates to loc2.
+agent picks up connector1, pairs it with transmitter1 and connector1*, and places it on tray1*, opening gate1.
+agent picks up tray1 and relocates to loc1.
+ghost relocates to loc3, opening gate2.
+agent puts tray1 on plate1, opening gate3.
+agent picks up box1 and places box1 at loc8.
+agent picks up tray1, jumps on box1, and puts tray1 on plate2, opening gate4.
+agent picks up connector2 and places it at loc1.
+agent picks up tray1 and places it on plate3.
+agent picks up box1 and places it at loc13.
+agent picks up connector2 and places it at loc13.
+agent resumes & recording stops.  [gate1 closes]  [connector1 drops at loc2]
+agent picks up connector2 and pairs it with receiver1.
+agent picks up box1 and places it at loc2.
+agent picks up connector1, pairs it with transmitter1 and connector2, and places it on box1.  [gate1 reopens]
+agent starts recorder.
+ghost

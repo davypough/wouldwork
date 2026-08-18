@@ -584,6 +584,13 @@ treat their arguments as read-only and be safe to call concurrently."
 (defparameter *actions* nil  ;don't use define-global
   "List of all potential actions.")
 
+(defparameter *deferred-action-installers* nil  ;don't use define-global
+  "Installer functions, in registration order, for actions whose definition depends on
+   technologies that may be spliced after the file defining them.  INIT drains this list
+   before ordering *actions*, so a deferred action sees every type, relation, and instance
+   the problem declares regardless of the order its (include-tech ...) directives appear
+   in.")
+
 (sb-ext:defglobal *init-actions* nil
   "List of all initialization actions.")
 

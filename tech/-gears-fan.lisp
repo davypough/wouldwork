@@ -92,6 +92,7 @@
 (include-tech -reachability)
 (include-tech -pickup)
 (include-tech -recording-shadow-policy)
+(include-tech -recorder-fork-registry)
 
 (in-package :ww)
 
@@ -111,6 +112,15 @@
   (turning (either floor-gears wall-gears angled-gears
                    floor-blower wall-blower angled-blower))
   (blowing (either fan floor-blower wall-blower angled-blower)))
+
+
+;; MOUNTED-ON's contribution to the recorder's ghost fork, registered here because this
+;; file owns the relation.  The gears are never themselves mapped.
+(register-recorder-fork-clause 'mounted-on
+  '(doall (?live fan)
+     (if (bind (recording-copy> ?live $ghost))
+       (if (bind (mounted-on ?live $gears))
+         (mounted-on $ghost $gears)))))
 
 
 (define-derived-relations

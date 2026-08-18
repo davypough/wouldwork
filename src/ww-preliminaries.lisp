@@ -555,6 +555,8 @@
     (setf *update-names* nil))
   (when (and (boundp '*actions*) (listp *actions*))
     (setf *actions* nil))
+  (when (and (boundp '*deferred-action-installers*) (listp *deferred-action-installers*))
+    (setf *deferred-action-installers* nil))
   (when (and (boundp '*init-actions*) (listp *init-actions*))
     (setf *init-actions* nil))
   (when (and (boundp '*init-checks*) (listp *init-checks*))

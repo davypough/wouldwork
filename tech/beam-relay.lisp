@@ -46,6 +46,7 @@
 (include-tech -reachability)
 (include-tech -pickup)
 (include-tech -beam-relay-init-checks)
+(include-tech -recorder-fork-registry)
 
 (in-package :ww)
 
@@ -69,6 +70,29 @@
 
 (define-derived-relations
   color)
+
+
+;; PAIRED's contribution to the recorder's ghost fork, registered here because this file
+;; owns the relation.  PAIRED declares no fluent argument -- either side may be a plain
+;; connector or fixed apparatus -- so BIND cannot extract a terminus the way JAMMING and
+;; MOUNTED-ON allow.  The clause instead walks every stored (connector terminus) pair
+;; directly.  A connector-to-connector pairing may have been stored with either connector
+;; first, depending on which one was placed second, so both sides are substituted with
+;; their own ghost independently; a side with no ghost keeps its live value, which covers
+;; shared fixed apparatus and any unmapped connector.  $CONNECTOR-GHOST and
+;; $TERMINUS-GHOST are cleared per iteration because effect variables outlive a DOALL pass.
+(register-recorder-fork-clause 'paired
+  '(doall (?connector connector)
+     (doall (?terminus terminus)
+       (if (paired ?connector ?terminus)
+         (do (assign $connector-ghost nil)
+             (assign $terminus-ghost nil)
+             (if (bind (recording-copy> ?connector $connector-ghost))
+               (if (bind (recording-copy> ?terminus $terminus-ghost))
+                 (paired $connector-ghost $terminus-ghost)
+                 (paired $connector-ghost ?terminus))
+               (if (bind (recording-copy> ?terminus $terminus-ghost))
+                 (paired ?connector $terminus-ghost))))))))
 
 
 ;;;; ACTIONS ;;;;

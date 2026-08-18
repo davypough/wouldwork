@@ -37,6 +37,7 @@
 (include-tech -reachability)
 (include-tech -visibility)
 (include-tech -pickup)
+(include-tech -recorder-fork-registry)
 
 (in-package :ww)
 
@@ -51,6 +52,15 @@
 
 (define-dynamic-relations
   (jamming jammer $target))
+
+
+;; JAMMING's contribution to the recorder's ghost fork, registered here because this file
+;; owns the relation.  The target (gate/wall-gears/wall-blower) is never itself mapped.
+(register-recorder-fork-clause 'jamming
+  '(doall (?live jammer)
+     (if (bind (recording-copy> ?live $ghost))
+       (if (bind (jamming ?live $target))
+         (jamming $ghost $target)))))
 
 
 (define-static-relations

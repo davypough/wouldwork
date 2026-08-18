@@ -22,39 +22,38 @@
 ;;; unrelated (recording-side beam power reaching one receiver).
 ;;;
 ;;; CONNECTOR, JAMMER, and FAN are redeclared optional here (idempotent and order-
-;;; independent, per tech/README.html).  PAIRED, JAMMING, and MOUNTED-ON cannot be
-;;; redeclared unconditionally the same way: each takes a composite TERMINUS / TARGET /
-;;; GEARS argument type that only exists when the relation's real owner (beam-relay.lisp,
-;;; jammer.lisp, -gears-fan.lisp) is also included, and a problem may type CONNECTOR or FAN
-;;; instances without including that behavioral tech at all -- test/problem-recorder-test.lisp
-;;; does exactly this, to exercise RECORDING-COPY>'s own mapping machinery in isolation.  The
-;;; empty-domain quantifier guard that protects a relation reference when a TYPE has no
-;;; instances does not help here, since CONNECTOR and FAN are not empty in that test.
+;;; independent, per tech/README.html).  PAIRED, JAMMING, and MOUNTED-ON are not: each is
+;;; owned by a technology a recorder problem may or may not include (beam-relay.lisp,
+;;; jammer.lisp, -gears-fan.lisp), and a problem may type CONNECTOR or FAN instances
+;;; without including that behavioral tech at all -- test/problem-recorder-test.lisp does
+;;; exactly this, to exercise RECORDING-COPY>'s own mapping machinery in isolation.  Each
+;;; owner therefore contributes its own fork clause through -recorder-fork-registry, and
+;;; this file collects whatever was registered.  HAS-LOCATION, HOLDING, and ON need no such
+;;; treatment -- they are already unconditionally available in any recorder problem via
+;;; -recorder-core, -recorder-solution, and -recorder-controls-shadow's existing nesting.
 ;;;
-;;; So START-RECORDER's relation declaration and its three optional fork clauses are built
-;;; below with ordinary Lisp, calling INSTALL-DYNAMIC-RELATIONS and INSTALL-ACTION directly
-;;; instead of going through the DEFINE-DYNAMIC-RELATIONS / DEFINE-ACTION macros -- both
-;;; macros only quote their argument text and call these same functions, so nothing is lost.
-;;; Each composite type's presence in *TYPES* is checked once and reused for both the
-;;; relation declaration and the fork clause that depends on it, since a relation and its
-;;; own composite argument type are always declared together in the same owning file.
-;;; HAS-LOCATION, HOLDING, and ON need no such guard -- they are already unconditionally
-;;; available in any recorder problem via -recorder-core, -recorder-solution, and
-;;; -recorder-controls-shadow's existing nesting.
+;;; START-RECORDER is installed by INIT rather than at this file's splice position, through
+;;; REGISTER-DEFERRED-ACTION-INSTALLER.  (include-tech ...) splices textually in whatever
+;;; order a problem lists its directives, so anything this file inspects at splice time sees
+;;; only the technologies that happen to precede it.  Deferring installation lets the action
+;;; see every registered clause, and every type and relation, no matter where a problem
+;;; lists (include-tech recorder).  STOP-RECORDER depends on none of that and stays an
+;;; ordinary DEFINE-ACTION below.  INSTALL-ACTION is called directly rather than through
+;;; DEFINE-ACTION only because the effect is assembled from registered clauses; the macro
+;;; just quotes its argument text and calls the same function, so nothing is lost.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -recorder-cycle-boundary (cycle count, physical closure, ghost removal,
 ;;;            and shadow normalization); -location (HAS-LOCATION); -holding (HOLDING);
-;;;            -support-occupancy (ON)
+;;;            -support-occupancy (ON); -recorder-fork-registry (optional fork clauses)
 ;;; PROVIDES:
-;;;   relations : paired, jamming, mounted-on -- redeclared, not owned, here, and only when
-;;;               their own composite argument type is already present
 ;;;   actions   : start-recorder, stop-recorder
 
 (include-tech -recorder-cycle-boundary)
 (include-tech -location)
 (include-tech -holding)
 (include-tech -support-occupancy)
+(include-tech -recorder-fork-registry)
 
 (in-package :ww)
 
@@ -62,52 +61,10 @@
 (define-optional-types recorder connector jammer fan)
 
 
-(let* ((paired-p (nth-value 1 (gethash 'terminus *types*)))
-       (jamming-p (nth-value 1 (gethash 'target *types*)))
-       (mounting-p (nth-value 1 (gethash 'gears *types*)))
-       relations
-       optional-forks)
-  ;; Each composite argument type's presence stands in for its relation's own owning tech
-  ;; being included, since a relation and its composite argument type are always declared
-  ;; together in the same file (TERMINUS with PAIRED in beam-relay.lisp; TARGET with
-  ;; JAMMING in jammer.lisp; GEARS with MOUNTED-ON in -gears-fan.lisp).
-  (when paired-p
-    (push '(paired connector terminus) relations)
-    ;; paired: PAIRED declares no fluent argument -- either side may be a plain connector
-    ;; or fixed apparatus -- so BIND cannot extract a terminus the way it does for JAMMING
-    ;; and MOUNTED-ON below.  The fork instead walks every stored (connector terminus)
-    ;; pair directly.  A connector-to-connector pairing may have been stored with either
-    ;; connector first, depending on which one was placed second during the recording, so
-    ;; both sides are substituted with their own ghost independently; a side with no ghost
-    ;; keeps its live value, which covers shared fixed apparatus and any unmapped connector.
-    (push '(doall (?connector connector)
-             (doall (?terminus terminus)
-               (if (paired ?connector ?terminus)
-                 (if (bind (recording-copy> ?connector $connector-ghost))
-                   (if (bind (recording-copy> ?terminus $terminus-ghost))
-                     (paired $connector-ghost $terminus-ghost)
-                     (paired $connector-ghost ?terminus))
-                   (if (bind (recording-copy> ?terminus $terminus-ghost))
-                     (paired ?connector $terminus-ghost))))))
-          optional-forks))
-  (when jamming-p
-    (push '(jamming jammer $target) relations)
-    ;; jamming: the target (gate/wall-gears/wall-blower) is never itself mapped
-    (push '(doall (?live jammer)
-             (if (bind (recording-copy> ?live $ghost))
-               (if (bind (jamming ?live $target))
-                 (jamming $ghost $target))))
-          optional-forks))
-  (when mounting-p
-    (push '(mounted-on fan $gears) relations)
-    ;; mounted-on: the gears are never themselves mapped
-    (push '(doall (?live fan)
-             (if (bind (recording-copy> ?live $ghost))
-               (if (bind (mounted-on ?live $gears))
-                 (mounted-on $ghost $gears))))
-          optional-forks))
-  (when relations
-    (install-dynamic-relations relations))
+(defun install-start-recorder ()
+  "Install START-RECORDER, splicing in every fork clause its relation's owner registered.
+   Called from INIT rather than at splice position, so the effect sees every technology the
+   problem included regardless of the order it listed them in."
   (install-action
     'start-recorder
     1
@@ -131,21 +88,35 @@
          (if (bind (recording-copy> ?live $ghost))
            (if (bind (has-location ?live $loc))
              (has-location $ghost $loc))))
-       ;; holding: mirror both the holder and whatever it currently holds
+       ;; holding: mirror both the holder and whatever it currently holds.  The held object
+       ;; is quantified rather than bound, so RECORDING-COPY>'s bijective lookup takes a
+       ;; non-$ first argument and resolves live -> ghost at compile time.  Binding the
+       ;; cargo into a $-variable instead would leave both of that lookup's arguments
+       ;; $-variables, deferring the direction to a runtime test that demands exactly one
+       ;; of them bound -- and effect variables outlive a DOALL iteration, so the ghost
+       ;; from a preceding iteration would still be bound when the next one arrived.
        (doall (?live mobile-object)
-         (if (bind (recording-copy> ?live $ghost))
-           (if (bind (holding ?live $cargo))
-             (if (bind (recording-copy> $cargo $cargo-ghost))
-               (holding $ghost $cargo-ghost)))))
-       ;; on: the support itself may or may not be a mapped mobile object
+         (doall (?cargo cargo)
+           (if (holding ?live ?cargo)
+             (if (bind (recording-copy> ?live $ghost))
+               (if (bind (recording-copy> ?cargo $cargo-ghost))
+                 (holding $ghost $cargo-ghost))))))
+       ;; on: the support itself may or may not be a mapped mobile object, and is
+       ;; quantified for the same reason as the cargo above.  A support with no ghost keeps
+       ;; its live value, which covers every fixed support -- a plate, a gears-mounted fan,
+       ;; a fixed blower.
        (doall (?live mobile-object)
-         (if (bind (recording-copy> ?live $ghost))
-           (if (bind (on ?live $support))
-             (if (bind (recording-copy> $support $support-ghost))
-               (on $ghost $support-ghost)
-               (on $ghost $support)))))
-       ,@optional-forks
+         (doall (?support support)
+           (if (on ?live ?support)
+             (if (bind (recording-copy> ?live $ghost))
+               (if (bind (recording-copy> ?support $support-ghost))
+                 (on $ghost $support-ghost)
+                 (on $ghost ?support))))))
+       ,@(mapcar #'cdr *recorder-fork-clauses*)
        (finally (normalize-recorder-cycle-shadow!)))))
+
+
+(register-deferred-action-installer 'install-start-recorder)
 
 
 (define-action stop-recorder

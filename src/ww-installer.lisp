@@ -614,6 +614,26 @@
   `(install-action ',name ,duration ',pre-params ',precondition ',eff-params ',effect))
 
 
+(defun register-deferred-action-installer (installer)
+  "Register INSTALLER to build its action during INIT instead of at splice position.  A
+   technology whose action depends on another technology it must not (include-tech ...) --
+   because that dependency is optional -- cannot know at splice time whether the other one
+   has been spliced yet, since (include-tech ...) expands textually in whatever order a
+   problem lists its directives.  Deferring the installation to INIT removes the question."
+  (when (member installer *deferred-action-installers*)
+    (error "Deferred action installer registered twice: ~S." installer))
+  (setf *deferred-action-installers*
+        (append *deferred-action-installers* (list installer)))
+  installer)
+
+
+(defun run-deferred-action-installers ()
+  "Run every registered deferred installer in registration order, then clear the list."
+  (dolist (installer *deferred-action-installers*)
+    (funcall installer))
+  (setf *deferred-action-installers* nil))
+
+
 (defun install-action (name duration pre-params precondition eff-params effect)
   (format t "~&Installing ~A action..." name)
   (let ((pre-param-types (nth-value 1 (dissect-pre-params

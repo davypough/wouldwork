@@ -14,6 +14,7 @@
 
 (defun init ()
   (format t "~&Initializing...")
+  (run-deferred-action-installers)  ;before *actions* is ordered; every technology is spliced by now
   (setf *query-names* (nreverse *query-names*))
   (setf *update-names* (nreverse *update-names*))
   (setf *actions* (nreverse *actions*))  ;prioritize actions to problem spec
