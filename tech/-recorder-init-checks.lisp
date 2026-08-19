@@ -2,6 +2,11 @@
 
 ;;; Initialization validation for -recorder-core identity, exhaustive cargo copying,
 ;;; recording-layer isolation, and the explicitly supported shadow components.
+;;;
+;;; These checks read raw DEFINE-INIT literals, which by this point include whatever
+;;; DERIVE-RECORDING-COPY-LITERALS derived from asterisk-named ghosts.  A failure therefore
+;;; usually means a missing or misnamed type instance rather than a missing literal, and the
+;;; messages below say so.
 
 
 (in-package :ww)
@@ -74,10 +79,12 @@
   "Require every cargo instance to occur on exactly one side of a copy pair."
   (dolist (object (init-type-instances 'cargo))
     (unless (init-recording-side object live-objects ghost-objects)
-      (fail-init-check nil "~%Recorder cargo is missing from RECORDING-COPY>.~%~
+      (fail-init-check nil "~%Recorder cargo has no recording copy.~%~
               Object: ~S~%~
-              Every cargo object must be a live or ghost endpoint.  Fixed combined ~
-              blowers are shared BLOWER objects, not cargo fans."
+              Every cargo object must be a live or ghost endpoint.  Declare the ghost by ~
+              adding the same name with a trailing asterisk to the object's type, or state ~
+              a RECORDING-COPY> literal.  Fixed combined blowers are shared BLOWER ~
+              objects, not cargo fans."
              object))))
 
 
@@ -105,7 +112,8 @@
         (fail-init-check nil "~%HAS-LOCATION gives an unmapped mobile object physical state.~%~
                 Literal: ~S~%~
                 Object:  ~S~%~
-                Every located mobile object in a recorder problem needs a RECORDING-COPY> pair."
+                Every located mobile object in a recorder problem needs a recording copy -- ~
+                the same name with a trailing asterisk, declared in the object's own type."
                literal object)))))
 
 

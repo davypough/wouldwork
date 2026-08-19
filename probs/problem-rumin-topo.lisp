@@ -71,21 +71,16 @@
 
 
 (define-init
-  ;; Movable objects.  Ghosts (agent1*, connector1*, connector2*, box1*, tray1*) have no
-  ;; initial location: START-RECORDER forks each one from its live counterpart's current
-  ;; state when the search finds it, per rule 5 -- a ghost does not exist beforehand.
+  ;; Movable objects.  The asterisk names in DEFINE-TYPES above are the recording copies:
+  ;; the recorder derives each RECORDING-COPY> pair from them, so no mapping is declared
+  ;; here.  Ghosts have no initial location either -- START-RECORDER forks each one from its
+  ;; live counterpart's current state when the search finds it, per rule 5, and a ghost does
+  ;; not exist beforehand.
   (has-location agent1 location3)
   (has-location connector1 location13)
   (has-location connector2 location10)
   (has-location box1 location7)
   (has-location tray1 location13)
-
-  ;; Ghost definitions
-  (recording-copy> agent1 agent1*)
-  (recording-copy> connector1 connector1*)
-  (recording-copy> connector2 connector2*)
-  (recording-copy> box1 box1*)
-  (recording-copy> tray1 tray1*)
 
   ;; Fixed-position objects and initial support occupancy
   (has-position pplate1 location6)
@@ -204,7 +199,7 @@
 
   ;; Nearby manipulation across boundaries
   (reach-via location4 () location2)
-  (reach-via> location15 () location14)  ;reach down from the loc15 ledge
+  (reach-via location15 () location14)  ;across the loc15 ledge; the vertical tests bound each direction
 )
 
 

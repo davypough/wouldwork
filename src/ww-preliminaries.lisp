@@ -561,6 +561,8 @@
     (setf *init-actions* nil))
   (when (and (boundp '*init-checks*) (listp *init-checks*))
     (setf *init-checks* nil))
+  (when (and (boundp '*init-literal-generators*) (listp *init-literal-generators*))
+    (setf *init-literal-generators* nil))
   (when (and (boundp '*problem-function-names*)
              (listp *problem-function-names*))
     (setf *problem-function-names* nil))

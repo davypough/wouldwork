@@ -158,7 +158,7 @@
         '((recording-copy> live-agent ghost-agent))
         :checks '(recorder-init-check)))
     'init-check-failure
-    :containing "cargo is missing"
+    :containing "cargo has no recording copy"
     :check 'recorder-init-check))
 
 

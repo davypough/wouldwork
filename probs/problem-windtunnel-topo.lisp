@@ -54,15 +54,13 @@
 
 
 (define-init
-  ;; Dynamic state (agent-manipulable or derived).  Ghosts (agent1*, connector1*) have no
-  ;; initial location: START-RECORDER forks each one from its live counterpart's current
-  ;; state when the search finds it, per rule 5 -- a ghost does not exist beforehand.
+  ;; Dynamic state (agent-manipulable or derived).  The asterisk names in DEFINE-TYPES above
+  ;; are the recording copies: the recorder derives each RECORDING-COPY> pair from them, so
+  ;; no mapping is declared here.  Ghosts have no initial location either -- START-RECORDER
+  ;; forks each one from its live counterpart's current state when the search finds it, per
+  ;; rule 5, and a ghost does not exist beforehand.
   (has-location agent1 location1)
   (has-location connector1 location1)
-
-  ;; Explicit recorder identity
-  (recording-copy> agent1 agent1*)
-  (recording-copy> connector1 connector1*)
 
   ;; Static spatial configuration
   (location-coords> location1  4 20)

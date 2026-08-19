@@ -49,6 +49,28 @@
   check)
 
 
+(defun register-init-literal-generator (generator)
+  "Register GENERATOR to derive additional DEFINE-INIT literals from the problem's declared
+   types.  A technology whose identity mapping is fully determined by the problem's own type
+   declarations can derive that mapping here instead of requiring every problem to restate
+   it.  Generators run before CHECK-PROPOSITION and before any registered check, so derived
+   tuples reach relation indexes and initialization checks exactly as authored ones do."
+  (register-problem-function generator)
+  (when (member generator *init-literal-generators*)
+    (error "Initialization literal generator is registered more than once: ~S" generator))
+  (setf *init-literal-generators*
+        (append *init-literal-generators* (list generator)))
+  generator)
+
+
+(defun generate-init-literals (literals)
+  "Return LITERALS extended with whatever the registered generators derive, in registration
+   order.  Each generator sees every literal derived before it, so one generator can decline
+   to duplicate a tuple another already supplied."
+  (dolist (generator *init-literal-generators* literals)
+    (setf literals (append literals (funcall generator literals)))))
+
+
 (defun run-init-checks (literals &optional (checks *init-checks*))
   "Run registered initialization checks in declaration order."
   (dolist (check checks)

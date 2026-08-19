@@ -1,10 +1,19 @@
 ;;; Filename: -recorder-core.lisp
 
-;;; Recorder identity and cross-layer interaction policy.  RECORDING-COPY> explicitly maps
-;;; each live mobile object to the ghost that replays it.  The relation is directional and
+;;; Recorder identity and cross-layer interaction policy.  RECORDING-COPY> maps each live
+;;; mobile object to the ghost that replays it.  The relation is directional and
 ;;; one-to-one, with static indexes in both directions; recorder initialization adds the disjoint,
 ;;; leaf-category-compatible, and exhaustive loose-cargo invariants.  The relation also
 ;;; registers its ordered tuples as coupled symmetry rows.
+;;;
+;;; A problem need not state the mapping.  DERIVE-RECORDING-COPY-LITERALS below reads it off
+;;; the problem's own DEFINE-TYPES: a mobile object whose name ends in an asterisk is the
+;;; recording copy of the object named without it.  The mapping carries no information the
+;;; type declarations lack, because INIT-CHECK-RECORDING-CARGO-COMPLETENESS and
+;;; INIT-CHECK-RECORDING-LOCATIONS already require every cargo instance and every located
+;;; mobile object to sit on one side of a pair -- a problem has no freedom to map less than
+;;; all of them.  An explicit RECORDING-COPY> literal remains legal and suppresses derivation
+;;; for the objects it names, which is what lets a problem use unstarred ghost names.
 ;;;
 ;;; This file deliberately owns no apparatus shadow state and no propagation update.  It
 ;;; identifies the recording view, selects which mapped objects existed in that view, and
@@ -29,6 +38,7 @@
 ;;;   relation : recording-copy> (indexed live mobile-object -> ghost mobile-object);
 ;;;              recording-in-progress, recorder-cycles-used,
 ;;;              recorder-cycle-closed
+;;;   generator: derive-recording-copy-literals (asterisk-named ghosts -> recording-copy>)
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side,
 ;;;              recording-shadow-view-object;
 ;;;              recorder-cycle-count;
@@ -61,6 +71,44 @@
 
 
 (register-symmetry-coupling 'recording-copy>)
+
+
+(defun derive-recording-copy-literals (literals)
+  "Derive (RECORDING-COPY> <live> <live>*) for every mobile object whose name ends in an
+   asterisk, so a problem that declares the ghost instance need not also declare the mapping.
+   Runs as an initialization literal generator, before CHECK-PROPOSITION and before any
+   initialization check, so a derived tuple reaches the relation's bijective indexes and
+   every recorder check exactly as an authored one would.  A pair the problem states
+   explicitly is left alone: the derived duplicate would collide on RECORDING-COPY>'s
+   bijective storage keys, and a problem naming its ghosts some other way -- as the recorder
+   characterization problems in test/ do -- must keep stating them.  A trailing asterisk with
+   no live counterpart is an authoring error, since every ghost replays something."
+  (let ((instances (init-type-instances 'mobile-object))
+        (mapped (make-hash-table :test #'eq))
+        (derived nil))
+    (dolist (literal (positive-init-literals-with-relation 'recording-copy> literals))
+      (let ((proposition (init-literal-proposition literal)))
+        (setf (gethash (second proposition) mapped) t)
+        (setf (gethash (third proposition) mapped) t)))
+    (dolist (ghost instances (nreverse derived))
+      (let ((name (symbol-name ghost)))
+        (when (and (> (length name) 1)
+                   (char= (char name (1- (length name))) #\*))
+          (let* ((live-name (subseq name 0 (1- (length name))))
+                 (live (find-symbol live-name (symbol-package ghost))))
+            (unless (member live instances)
+              (error "~%A ghost mobile object has no live counterpart.~%~
+                      Ghost object: ~S~%~
+                      Expected:     ~A~%~
+                      A trailing asterisk names the recording copy of the object without ~
+                      it, so both must be instances of the same type."
+                     ghost live-name))
+            (unless (or (gethash ghost mapped)
+                        (gethash live mapped))
+              (push (list 'recording-copy> live ghost) derived))))))))
+
+
+(register-init-literal-generator 'derive-recording-copy-literals)
 
 
 (defvar *recorder-shadow-lifecycles* nil

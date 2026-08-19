@@ -125,7 +125,7 @@
           (recording-copy> live-connector ghost-connector))
         :checks '(recorder-init-check)))
     'init-check-failure
-    :containing "Recorder cargo is missing from RECORDING-COPY>"
+    :containing "Recorder cargo has no recording copy"
     :check 'recorder-init-check))
 
 

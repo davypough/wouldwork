@@ -2,7 +2,8 @@
 
 ;;; Placement substrate: where a carried object may be set down -- a plate, a floor-mounted
 ;;; fan, a fixed floor/angled blower, a clear box top, another agent's currently-held tray,
-;;; or bare ground -- gated by cleartop and the agent's vertical reach.  A fan qualifies as
+;;; or bare ground -- gated by cleartop and the agent's placement reach, which bounds how far
+;;; above the agent a resting place may be but never how far below it.  A fan qualifies as
 ;;; a support only while mounted on gears: a loose fan is mere cargo, like a connector, and
 ;;; a wall-mounted fan has no has-location.  A fixed floor/angled blower exposes the same
 ;;; flush support surface through its fixed position.  A tray qualifies as a support only
@@ -16,7 +17,7 @@
 ;;;   types     : agent, location
 ;;;   nested    : -support-elevation (support occupancy, location, position, height,
 ;;;               elevation, support-top-elevation, occupant-elevation, and
-;;;               within-agent-vertical-reach); -holding (cargo, holding)
+;;;               within-agent-placement-reach); -holding (cargo, holding)
 ;;; PROVIDES:
 ;;;   queries   : placement-choice-allowed -- shared policy gate used by both option
 ;;;               generation and the placement update
@@ -50,13 +51,14 @@
   ;; Every plate/fan/box/ground placement at ?location currently legal for ?agent,
   ;; excluding ?self as a candidate support (relevant only when ?self can itself be a box
   ;; or fan; harmless otherwise, since ?self can never be eql to a differently-typed
-  ;; candidate).
+  ;; candidate).  Each candidate resting place is gated by WITHIN-AGENT-PLACEMENT-REACH, so
+  ;; a place below the agent is always offered and one above it only within reach.
   (do (assign $places nil)
       (doall (?plate plate)
         (if (and (has-position ?plate ?location)
                  (cleartop ?plate)
                  (placement-choice-allowed ?agent ?self ?plate)
-                 (within-agent-vertical-reach ?agent (support-top-elevation ?plate)))
+                 (within-agent-placement-reach ?agent (support-top-elevation ?plate)))
           (assign $places (cons ?plate $places))))
       (doall (?fan fan)
         (if (and (different ?fan ?self)
@@ -64,22 +66,22 @@
                  (has-location ?fan ?location)  ;and a wall-mounted fan has no has-location, so floor-mounted only
                  (cleartop ?fan)
                  (placement-choice-allowed ?agent ?self ?fan)
-                 (within-agent-vertical-reach ?agent (support-top-elevation ?fan)))
+                 (within-agent-placement-reach ?agent (support-top-elevation ?fan)))
           (assign $places (cons ?fan $places))))
       (doall (?fixed (either floor-blower angled-blower))
         (if (and (different ?fixed ?self)
                  (has-position ?fixed ?location)
                  (cleartop ?fixed)
                  (placement-choice-allowed ?agent ?self ?fixed)
-                 (within-agent-vertical-reach ?agent
-                                                (support-top-elevation ?fixed)))
+                 (within-agent-placement-reach ?agent
+                                                 (support-top-elevation ?fixed)))
           (assign $places (cons ?fixed $places))))
       (doall (?support-box box)
         (if (and (different ?support-box ?self)
                  (has-location ?support-box ?location)
                  (cleartop ?support-box)
                  (placement-choice-allowed ?agent ?self ?support-box)
-                 (within-agent-vertical-reach ?agent (support-top-elevation ?support-box)))
+                 (within-agent-placement-reach ?agent (support-top-elevation ?support-box)))
           (assign $places (cons ?support-box $places))))
       (doall (?tray tray)
         (if (and (different ?tray ?self)
@@ -87,10 +89,10 @@
                  (has-location ?tray ?location)  ;co-located with ?agent (synced to the holder's location)
                  (cleartop ?tray)
                  (placement-choice-allowed ?agent ?self ?tray)
-                 (within-agent-vertical-reach ?agent (support-top-elevation ?tray)))
+                 (within-agent-placement-reach ?agent (support-top-elevation ?tray)))
           (assign $places (cons ?tray $places))))
       (if (and (placement-choice-allowed ?agent ?self 'ground)
-               (within-agent-vertical-reach ?agent (location-elevation ?location)))
+               (within-agent-placement-reach ?agent (location-elevation ?location)))
         (assign $places (cons 'ground $places)))
       $places))
 

@@ -9,13 +9,14 @@
 ;;;             (cargo, holding -- needed to find a tray's holder)
 ;;; PROVIDES:
 ;;;   parameter : *vertical-reach-limit*, default 1 -- the maximum elevation gap an agent
-;;;               can act across vertically: reaching to pick up or place cargo above or
-;;;               below its own elevation, or jumping up onto a higher support or clearing
-;;;               a barrier (jump.lisp reuses this parameter rather than defining its own).
-;;;               Independent of the agent's own declared height.  A problem overrides it
-;;;               with its own DEFPARAMETER.
+;;;               can act across vertically: lifting cargo above or below its own elevation,
+;;;               raising cargo onto a higher resting place, or jumping up onto a higher
+;;;               support or clearing a barrier (jump.lisp reuses this parameter rather than
+;;;               defining its own).  Independent of the agent's own declared height.  A
+;;;               problem overrides it with its own DEFPARAMETER.
 ;;;   queries   : support-top-elevation, tray-top-elevation, occupant-elevation,
-;;;               within-agent-vertical-reach
+;;;               within-agent-vertical-reach (symmetric, for lifting),
+;;;               within-agent-placement-reach (one-sided, for setting down)
 
 (include-tech -support-occupancy)
 (include-tech -location)
@@ -31,11 +32,13 @@
 
 
 (defvar *vertical-reach-limit* 1
-  "Maximum elevation gap an agent can act across vertically -- reaching to pick up or place
-   cargo above or below its own elevation, or jumping up onto a higher support or clearing a
-   barrier -- independent of the agent's own declared height.  Reach is symmetric: an object
-   resting more than this far below the agent's elevation is out of reach exactly as one more
-   than this far above it is.  Problem files can override this.")
+  "Maximum elevation gap an agent can act across vertically -- lifting cargo above or below
+   its own elevation, raising cargo onto a higher resting place, or jumping up onto a higher
+   support or clearing a barrier -- independent of the agent's own declared height.  Lifting
+   is symmetric: an object resting more than this far below the agent's elevation is out of
+   reach exactly as one more than this far above it is.  Setting an object down is not: only
+   the upward direction is bounded, since a drop needs no reach at all.  Problem files can
+   override this.")
 
 
 (define-query support-top-elevation (?support support)
@@ -75,8 +78,19 @@
 
 
 (define-query within-agent-vertical-reach (?agent agent ?target-elevation)
-  ;; Cargo pickup and placement use one vertical-reach convention: measure from the agent's
-  ;; standing elevation, capped by *vertical-reach-limit* in either direction, independent
-  ;; of the agent's own declared height.
+  ;; The lifting convention, used by cargo pickup and by any fixture an agent must reach to
+  ;; manipulate: measure from the agent's standing elevation, capped by
+  ;; *vertical-reach-limit* in either direction, independent of the agent's own declared
+  ;; height.  Setting cargo down uses WITHIN-AGENT-PLACEMENT-REACH instead.
   (<= (abs (- ?target-elevation (occupant-elevation ?agent)))
+      *vertical-reach-limit*))
+
+
+(define-query within-agent-placement-reach (?agent agent ?target-elevation)
+  ;; The setting-down convention, one-sided where lifting is symmetric: an agent can lower or
+  ;; drop cargo any distance below its own standing elevation, since gravity does the work,
+  ;; but can only raise a resting place *vertical-reach-limit* above itself.  Recovering what
+  ;; it dropped is the symmetric WITHIN-AGENT-VERTICAL-REACH test, so a drop down a ledge is
+  ;; deliberately not reversible from where the agent stands.
+  (<= (- ?target-elevation (occupant-elevation ?agent))
       *vertical-reach-limit*))

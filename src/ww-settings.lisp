@@ -598,6 +598,11 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *init-checks* nil
   "Technology-owned functions that validate raw DEFINE-INIT literals.")
 
+(sb-ext:defglobal *init-literal-generators* nil
+  "Technology-owned functions that derive additional DEFINE-INIT literals from the
+   problem's declared types.  They run before any literal is checked or installed, so a
+   derived literal is indistinguishable from an authored one to every later stage.")
+
 (sb-ext:defglobal *problem-function-names* nil
   "Problem-local Lisp functions removed when another problem is staged.")
 

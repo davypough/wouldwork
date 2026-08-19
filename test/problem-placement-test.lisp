@@ -11,9 +11,10 @@
 ;;;      supports, a loose fan, a wall-mounted fan, a grounded (inert) tray, and the
 ;;;      candidate object itself -- including a currently-held tray offered as a target
 ;;;      for itself.
-;;;   3. Symmetric vertical reach: ground and a plate are offered exactly one unit
-;;;      above and below an explicitly height-two agent, but no option is offered two
-;;;      units away.
+;;;   3. The two reach conventions: lifting is symmetric, so WITHIN-AGENT-VERTICAL-REACH
+;;;      accepts one unit above and below an explicitly height-two agent and rejects two
+;;;      in either direction, while placement is one-sided, so ground and a plate are
+;;;      offered one unit above, one unit below, and two units below, but never two above.
 ;;;
 ;;; Only the first scenario changes state.  Its goal verifies PLACE-HELD-OBJECT! releases
 ;;; the hold, establishes the location and fan support, and leaves no competing support
@@ -250,13 +251,19 @@
     (not (exists (?a agent) (holding ?a matrix-loose-tray)))
     (has-location matrix-loose-tray matrix-site)
 
-    ;; Absolute reach is inclusive in both directions and rejects one unit beyond.
+    ;; Lifting reach is inclusive in both directions and rejects one unit beyond, while
+    ;; placement reach bounds only the upward direction -- a resting place any distance
+    ;; below the agent takes no reach at all.
     (holding boundary-agent boundary-probe-box)
     (= (occupant-elevation boundary-agent) 5)
     (within-agent-vertical-reach boundary-agent 6)
     (within-agent-vertical-reach boundary-agent 4)
     (not (within-agent-vertical-reach boundary-agent 7))
     (not (within-agent-vertical-reach boundary-agent 3))
+    (within-agent-placement-reach boundary-agent 6)
+    (within-agent-placement-reach boundary-agent 4)
+    (not (within-agent-placement-reach boundary-agent 7))
+    (within-agent-placement-reach boundary-agent 3)
     (do (assign $upper
                 (placement-options
                   boundary-agent upper-boundary boundary-probe-box))
@@ -271,8 +278,12 @@
              (member 'lower-boundary-plate $lower)))
     (not (placement-options
            boundary-agent too-high-boundary boundary-probe-box))
-    (not (placement-options
-           boundary-agent too-low-boundary boundary-probe-box))
+    (do (assign $too-low
+                (placement-options
+                  boundary-agent too-low-boundary boundary-probe-box))
+        (and (= (length $too-low) 2)
+             (member 'ground $too-low)
+             (member 'too-low-plate $too-low)))
 
     ;; The shared clear control remains inert, keeping every fan fixture stopped.
     (cleartop control-plate)
