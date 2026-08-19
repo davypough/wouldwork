@@ -37,7 +37,7 @@
   edge (edge1 edge2 edge3 edge4 edge5)
   location (location1 location2 location3 location4 location5
             location6 location7 location8 location9 location10
-            location11 location12 location13 location14 location15 location16)
+            location11 location12 location13 location14 location15 location16 location17)
   pressure-plate (pplate1 pplate2 pplate3 pplate4)
   box (box1 box1*)
   connector (connector1 connector2 connector1* connector2*)
@@ -113,6 +113,7 @@
   (location-coords> location14 349/10 9)
   (location-coords> location15 34 2)
   (location-coords> location16 31 2)
+  (location-coords> location17 18 5)
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
   ;; unambiguously on the intended side of its adjacent boundary.
@@ -131,12 +132,15 @@
   (has-elevation receiver1 3/2)
   (has-elevation transmitter1 3/2)
   (has-elevation transmitter2 3/2)
+  (has-elevation location15 2)
+  (has-elevation location16 2)
 
   ;; Nondefault heights.
   (has-height wall10 3/2)
   (has-height wall11 3/2)
   (has-height wall12 3/2)
   (has-height wall13 3/2)
+  (has-height edge5 2)
 
   ;; Gate controllers
   (controls ((receiver1)) gate1 normal)
@@ -200,6 +204,7 @@
 
   ;; Nearby manipulation across boundaries
   (reach-via location4 () location2)
+  (reach-via> location15 () location14)  ;reach down from the loc15 ledge
 )
 
 
@@ -216,7 +221,7 @@
 
 
 (define-goal
-  (and (open gate5)  ;(holding agent1 connector2)
+  (and (has-location agent1 location16)
        ;(ghost-stops-recorder)
   )
 )

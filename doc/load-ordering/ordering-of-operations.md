@@ -162,6 +162,7 @@ the last component in the Stage 1 list.
 
 | # | Step | Notes |
 |---|---|---|
+| 0 | `run-deferred-action-installers` | `ww-installer.lisp`; drains `*deferred-action-installers*` before the `nreverse` below, so a deferred action is installed with every type, relation and instance already present. See Trap 10 |
 | 1 | `nreverse` `*query-names*`, `*update-names*`, `*actions*`, `*init-actions*` | After this, `*init-actions*` is in splice/file order |
 | 2 | `report-propagation-diagnostics` | `ww-propagation-order.lisp`; a reaction-order violation **errors here**, deliberately before init-actions run |
 | 3 | `install-derived-propagation-driver` | `ww-propagation-order.lisp`; replaces the sentinel `propagate-consequences!` with an order derived from splice order. Silent no-op if the problem authored its own driver |
@@ -242,6 +243,36 @@ also errors past 999 total planning objects.
 **9. The `.asd` bootstrap cannot splice.**
 `problem-blocks3.lisp` must stay free of `include-tech` directives. Documented in the `.asd`
 comment; nothing enforces it mechanically.
+
+**10. Sibling `(include-tech ...)` order is the problem author's, and nothing checks it.**
+`write-tech-include` (`ww-preliminaries.lisp`) is a purely textual, depth-first expander: nested
+includes are inlined before the rest of their includer, each technology is spliced once at its
+first mention, and top-level directives are expanded in the order the problem file lists them.
+No dependency ordering is computed anywhere. A technology therefore sees only what happens to
+precede it — and Trap 3 means it cannot tell "type absent" from "type declared but not yet
+populated", because pre-scan has already made the name exist with an empty domain.
+
+This is a real bug that shipped. `-recorder-session.lisp` guarded its optional `paired` fork
+clause on `(nth-value 1 (gethash 'terminus *types*))` — the *name*, true from pre-scan onward —
+while the clause body needed `terminus`'s *instances*, which only exist once `beam-relay.lisp` is
+spliced. `probs/problem-rumin-topo.lisp` listed `(include-tech recorder)` above
+`(include-tech beam-relay)`, so START-RECORDER installed a fork whose `(doall (?terminus terminus))`
+ranged over nothing. Ghost connectors forked with no pairings at all, silently, in flat
+contradiction of the file's own docstring and of rule 11 of the recorder specification.
+
+**The fix, and the pattern to reuse.** Do not test for a peer technology's presence at splice
+position. Instead:
+
+- the technology that *owns* the optional relation registers its own contribution — see
+  `tech/-recorder-fork-registry.lisp`, which both sides `include-tech`, so whichever is spliced
+  first brings it in and deduplication hands the second the same registry;
+- the technology that *consumes* the contributions defers building its action to `init` via
+  `register-deferred-action-installer` (Stage 5, step 0), by which point every technology has been
+  spliced, every type populated, and every relation declared.
+
+`-recorder-session.lisp` now does both, and its three relation redeclarations are gone — each
+owner already declares its own. Include order no longer affects the result. The same shape applies
+to any future action whose definition depends on an optional peer.
 
 ---
 
