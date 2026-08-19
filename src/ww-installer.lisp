@@ -883,12 +883,13 @@
   ;(declare (special *relations* *db* *static-db*))
   (format t "~&Creating initial propositional database...")
   (check-type literals cons)
-  (let ((literals (generate-init-literals
-                    (mapcar (lambda (literal)
-                              (if (eql (char (format nil "~S" literal) 0) #\`)
-                                (eval literal)
-                                literal))
-                            literals))))
+  (let ((literals (mapcar #'pad-init-literal
+                          (generate-init-literals
+                            (mapcar (lambda (literal)
+                                      (if (eql (char (format nil "~S" literal) 0) #\`)
+                                        (eval literal)
+                                        literal))
+                                    literals)))))
     (dolist (literal literals)
       (if (eql (car literal) 'not)
         (check-proposition (second literal))

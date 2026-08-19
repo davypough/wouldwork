@@ -71,6 +71,54 @@
     (setf literals (append literals (funcall generator literals)))))
 
 
+(defun register-init-literal-defaults (relation &rest defaults)
+  "Declare DEFAULTS for RELATION's trailing arguments, letting a DEFINE-INIT literal omit
+   them.  DEFAULTS are given in argument order and cover the last (LENGTH DEFAULTS)
+   positions of RELATION's signature; a literal may stop anywhere inside that suffix but
+   nowhere before it.  Padding runs ahead of CHECK-PROPOSITION and of every registered
+   check, so an omitted argument is type-checked, validated, and stored exactly as a
+   written one.  The technology owning RELATION registers its defaults beside the
+   relation's own declaration; the engine attaches no meaning to any particular value."
+  (let ((signature (init-relation-signature relation)))
+    (unless (consp signature)
+      (error "Init-literal defaults must name a declared relation with typed arguments: ~S"
+             relation))
+    (unless (<= (length defaults) (length signature))
+      (error "Relation ~A takes ~D argument~:P, but ~D default~:P were registered for it."
+             relation (length signature) (length defaults)))
+    (when (nth-value 1 (gethash relation *init-literal-defaults*))
+      (error "Init-literal defaults are registered more than once for relation ~A."
+             relation))
+    (setf (gethash relation *init-literal-defaults*) defaults)
+    relation))
+
+
+(defun pad-init-literal (literal)
+  "Return LITERAL with any omitted trailing arguments supplied from its relation's
+   registered defaults."
+  (if (and (consp literal)
+           (eql (car literal) 'not))
+    (list 'not (pad-init-proposition (second literal)))
+    (pad-init-proposition literal)))
+
+
+(defun pad-init-proposition (proposition)
+  "Return PROPOSITION extended with the registered defaults for whichever trailing
+   arguments it omits.  A relation with no registered defaults is returned unchanged, so
+   the fluentless lookup keys CHECK-PROPOSITION tolerates elsewhere are unaffected."
+  (let ((defaults (gethash (car proposition) *init-literal-defaults*)))
+    (when (null defaults)
+      (return-from pad-init-proposition proposition))
+    (let* ((arity (length (init-relation-signature (car proposition))))
+           (missing (- arity (length (cdr proposition)))))
+      (unless (<= 0 missing (length defaults))
+        (error "~%The DEFINE-INIT literal ~S supplies ~D of ~A's ~D arguments.~%~
+                Only its last ~D argument~:P may be omitted."
+               proposition (length (cdr proposition)) (car proposition)
+               arity (length defaults)))
+      (append proposition (last defaults missing)))))
+
+
 (defun run-init-checks (literals &optional (checks *init-checks*))
   "Run registered initialization checks in declaration order."
   (dolist (check checks)

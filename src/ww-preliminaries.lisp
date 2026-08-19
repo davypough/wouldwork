@@ -492,6 +492,8 @@
     (clrhash *complements*))
   (when (and (boundp '*fluent-relation-indices*) (hash-table-p *fluent-relation-indices*))
     (clrhash *fluent-relation-indices*))
+  (when (and (boundp '*init-literal-defaults*) (hash-table-p *init-literal-defaults*))
+    (clrhash *init-literal-defaults*))
   (when (and (boundp '*bijective-relations*) (hash-table-p *bijective-relations*))
     (clrhash *bijective-relations*))
   (when (and (boundp '*bijective-canonical*) (hash-table-p *bijective-canonical*))

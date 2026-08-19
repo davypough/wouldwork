@@ -603,6 +603,13 @@ treat their arguments as read-only and be safe to call concurrently."
    problem's declared types.  They run before any literal is checked or installed, so a
    derived literal is indistinguishable from an authored one to every later stage.")
 
+(sb-ext:defglobal *init-literal-defaults*
+  (make-hash-table :test #'eq :size 32 :rehash-threshold 1.0)
+  "Default values for a relation's trailing arguments, keyed by relation name.  A
+   DEFINE-INIT literal omitting those arguments is padded with them before any literal is
+   checked or installed, so every later stage sees one arity.  The owning technology
+   registers its own relation's defaults; the engine attaches no meaning to any of them.")
+
 (sb-ext:defglobal *problem-function-names* nil
   "Problem-local Lisp functions removed when another problem is staged.")
 
