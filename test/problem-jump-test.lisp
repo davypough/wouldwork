@@ -316,7 +316,7 @@
     (cleartop transfer-source-box)
     (not (cleartop transfer-target-box))
     (on transfer-target-box transfer-base-box)
-    (= (support-top-elevation transfer-target-box) 4)
+    (= (top transfer-target-box) 4)
     (jump-via transfer-start () transfer-goal)
     (jump-via transfer-goal () transfer-start)
 

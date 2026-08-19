@@ -204,7 +204,7 @@
        (= (blower-elevation wgears1) 1)
        (= (declared-height box1) 1)
        (= (location-elevation reverse-fan) 0)
-       (= (support-top-elevation fgears2) 0)
+       (= (top fgears2) 0)
        (= (blower-elevation wgears2) 1)
        (= (declared-height box2) 1)
        (= (location-elevation reverse-far) 10)))

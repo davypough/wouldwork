@@ -119,8 +119,8 @@
       (not (on moving-box source-box))
       (cleartop source-box)
       (not (cleartop target-box))
-      (= (support-top-elevation source-box) 1)
-      (= (support-top-elevation target-box) 1)
+      (= (top source-box) 1)
+      (= (top target-box) 1)
       (= (occupant-elevation moving-box) 1)
 
       ;; Putting the independent held box on the plate depresses it.
@@ -140,7 +140,7 @@
       ;; HIGH-BOX is clear, but elevation two is just beyond the fixed unit
       ;; vertical reach, regardless of the agent's explicit height two.
       (cleartop high-box)
-      (= (support-top-elevation high-support) 2)
+      (= (top high-support) 2)
       (= (occupant-elevation high-box) 2)
       (not (within-agent-vertical-reach high-agent 2))
       (not (pickup-clear high-agent high-site high-box high-site))

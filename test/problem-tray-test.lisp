@@ -192,7 +192,7 @@
     (cleartop cascade-tray)
     (has-location cascade-box cascade-destination)
     (= (occupant-elevation bearer-agent) 3)
-    (= (support-top-elevation cascade-tray) 3)
+    (= (top cascade-tray) 3)
     (= (occupant-elevation cascade-box) 3)
 
     ;; Negative: ALREADY-HELD-TRAY resolves a location but is not pickable by

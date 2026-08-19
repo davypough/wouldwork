@@ -140,7 +140,7 @@
   (and
     ;; Raised support and stack transport.
     (= (location-elevation raised1) 4)
-    (= (support-top-elevation box3) 7)
+    (= (top box3) 7)
     (turning gears1)
     (blowing fan1)
     (has-location fan1 source1)

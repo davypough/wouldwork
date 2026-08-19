@@ -143,20 +143,20 @@
 
     ;; Explicit nonzero plate elevation and every recursive intermediate result.
     (= (location-elevation stack-site) 3)
-    (= (support-top-elevation base-plate) 3)
+    (= (top base-plate) 3)
     (= (occupant-elevation base-box) 3)
     (= (declared-height base-box) 2)
-    (= (support-top-elevation base-box) 5)
+    (= (top base-box) 5)
 
     ;; A fan is a zero-thickness movable support even when it rests on a box.
     (= (occupant-elevation middle-fan) 5)
-    (= (support-top-elevation middle-fan) 5)
+    (= (top middle-fan) 5)
 
     ;; The omitted box height uses the exact default of one.
     (not (bind (has-height upper-box $upper-box-height)))
     (= (declared-height upper-box) 1)
     (= (occupant-elevation upper-box) 5)
-    (= (support-top-elevation upper-box) 6)
+    (= (top upper-box) 6)
 
     ;; The omitted agent height uses the exact default of 3/2.
     (not (bind (has-height stack-agent $stack-agent-height)))
@@ -179,14 +179,14 @@
     (not (exists (?support support)
            (on ground-fan ?support)))
     (= (occupant-elevation ground-fan) 4)
-    (= (support-top-elevation ground-fan) 4)
+    (= (top ground-fan) 4)
 
     (not (exists (?support support)
            (on ground-box ?support)))
     (not (bind (has-height ground-box $ground-box-height)))
     (= (declared-height ground-box) 1)
     (= (occupant-elevation ground-box) 4)
-    (= (support-top-elevation ground-box) 5)
+    (= (top ground-box) 5)
 
     ;; A grounded tray is inert, like a resting fan: zero-thickness, contributing
     ;; nothing beyond its own resting level.
@@ -194,7 +194,7 @@
     (not (exists (?support support)
            (on ground-tray ?support)))
     (= (occupant-elevation ground-tray) 4)
-    (= (support-top-elevation ground-tray) 4)
+    (= (top ground-tray) 4)
 
     ;; A held tray's top is its holder's own top level, zero added for the tray
     ;; itself; an occupant resting on it chains through the ordinary recursion.
@@ -204,11 +204,11 @@
     (= (location-elevation tray-holding-site) 2)
     (= (occupant-elevation tray-holding-agent) 2)
     (= (declared-height tray-holding-agent) 3/2)
-    (= (support-top-elevation held-tray) 7/2)
+    (= (top held-tray) 7/2)
     (support-elevation-only-on tray-occupant-box held-tray)
     (= (occupant-elevation tray-occupant-box) 7/2)
     (= (declared-height tray-occupant-box) 1)
-    (= (support-top-elevation tray-occupant-box) 9/2)
+    (= (top tray-occupant-box) 9/2)
 
     ;; The three achievable connector anchor heights, as offsets from ANCHOR-SITE's
     ;; floor elevation of two.  A connector's anchor is its own standing elevation

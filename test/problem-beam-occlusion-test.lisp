@@ -149,7 +149,7 @@
 
     ;; ON takes precedence over the connector's coincident location fact.
     (beam-occlusion-only-on supported-connector connector-support-box)
-    (= (support-top-elevation connector-support-box) 2)
+    (= (top connector-support-box) 2)
     (= (occupant-elevation supported-connector) 2)
     (= (declared-height supported-connector) 3)
     (beam-blocker-spans-elevation supported-connector 2)

@@ -175,7 +175,7 @@
     (has-location lifecycle-fan lifecycle-target)
     (not (cleartop lifecycle-fan))
     (= (occupant-elevation lifecycle-agent) 1)
-    (= (support-top-elevation lifecycle-fan) 0)
+    (= (top lifecycle-fan) 0)
     (within-agent-vertical-reach lifecycle-agent 0)
 
     ;; The matrix probe remains held while its direct query returns exactly one

@@ -21,7 +21,7 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and wall are declared optional here
 ;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
-;;;               support-top-elevation, occupant-elevation, and *vertical-reach-limit*,
+;;;               top, occupant-elevation, and *vertical-reach-limit*,
 ;;;               which this file reuses rather than defining its own jump-specific
 ;;;               parameter); -passability (holding and obstacle-clear); -threat (safe --
 ;;;               true unless an armed gun or other threat endangers the landing location);
@@ -201,7 +201,7 @@
       (assign $source-elevation
               (if (eql $source-place 'ground)
                 (location-elevation $source-location)
-                (support-top-elevation $source-place)))
+                (top $source-place)))
       (assign $transitions nil)
 
       ;; Local box mounts and transfers.  A box may itself be part of a stack; its top
@@ -212,7 +212,7 @@
                  (cleartop ?box)
                  (support-use-allowed ?agent ?box)
                  (jump-elevation-reachable
-                   ?agent $source-elevation (support-top-elevation ?box)))
+                   ?agent $source-elevation (top ?box)))
           (assign $transitions
                   (cons
                     (list 'jump ?source-configuration nil
@@ -239,7 +239,7 @@
           (do (assign $destination-configuration
                       (list $destination ?landing-box))
               (assign $target-elevation
-                      (support-top-elevation ?landing-box))
+                      (top ?landing-box))
               (assign $symmetric-transition nil)
               (assign $directional-transition nil)
               (if (bind (jump-via

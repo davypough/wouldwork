@@ -14,7 +14,8 @@
 ;;;              identically by box, jammer, walkability, and ladder.  Gears are not a
 ;;;              support: only a fan can occupy them, via -gears-fan's (mounted-on ...)
 ;;;              attachment rather than (on ...).  A tray is a support only while held; on
-;;;              the ground it is inert (see support-top-elevation)
+;;;              the ground it is inert (see -vertical's BASE, which gives a held tray
+;;;              its holder's top and a grounded one its own location's level)
 ;;;   relation : (on $support-occupant $support :bijective)  --  also declared identically
 ;;;              by box, jammer, walkability, and ladder; multiple techs both read
 ;;;              and write it.  Bijective so CLEARTOP can look up a support's occupant

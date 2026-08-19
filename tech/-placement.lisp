@@ -16,7 +16,7 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location
 ;;;   nested    : -support-elevation (support occupancy, location, position, height,
-;;;               elevation, support-top-elevation, occupant-elevation, and
+;;;               elevation, top, occupant-elevation, and
 ;;;               within-agent-placement-reach); -holding (cargo, holding)
 ;;; PROVIDES:
 ;;;   queries   : placement-choice-allowed -- shared policy gate used by both option
@@ -58,7 +58,7 @@
         (if (and (has-position ?plate ?location)
                  (cleartop ?plate)
                  (placement-choice-allowed ?agent ?self ?plate)
-                 (within-agent-placement-reach ?agent (support-top-elevation ?plate)))
+                 (within-agent-placement-reach ?agent (top ?plate)))
           (assign $places (cons ?plate $places))))
       (doall (?fan fan)
         (if (and (different ?fan ?self)
@@ -66,7 +66,7 @@
                  (has-location ?fan ?location)  ;and a wall-mounted fan has no has-location, so floor-mounted only
                  (cleartop ?fan)
                  (placement-choice-allowed ?agent ?self ?fan)
-                 (within-agent-placement-reach ?agent (support-top-elevation ?fan)))
+                 (within-agent-placement-reach ?agent (top ?fan)))
           (assign $places (cons ?fan $places))))
       (doall (?fixed (either floor-blower angled-blower))
         (if (and (different ?fixed ?self)
@@ -74,14 +74,14 @@
                  (cleartop ?fixed)
                  (placement-choice-allowed ?agent ?self ?fixed)
                  (within-agent-placement-reach ?agent
-                                                 (support-top-elevation ?fixed)))
+                                                 (top ?fixed)))
           (assign $places (cons ?fixed $places))))
       (doall (?support-box box)
         (if (and (different ?support-box ?self)
                  (has-location ?support-box ?location)
                  (cleartop ?support-box)
                  (placement-choice-allowed ?agent ?self ?support-box)
-                 (within-agent-placement-reach ?agent (support-top-elevation ?support-box)))
+                 (within-agent-placement-reach ?agent (top ?support-box)))
           (assign $places (cons ?support-box $places))))
       (doall (?tray tray)
         (if (and (different ?tray ?self)
@@ -89,7 +89,7 @@
                  (has-location ?tray ?location)  ;co-located with ?agent (synced to the holder's location)
                  (cleartop ?tray)
                  (placement-choice-allowed ?agent ?self ?tray)
-                 (within-agent-placement-reach ?agent (support-top-elevation ?tray)))
+                 (within-agent-placement-reach ?agent (top ?tray)))
           (assign $places (cons ?tray $places))))
       (if (and (placement-choice-allowed ?agent ?self 'ground)
                (within-agent-placement-reach ?agent (location-elevation ?location)))
@@ -102,7 +102,7 @@
   ;; an object will have after PLACE-HELD-OBJECT!, before its own height is added.
   (if (eql ?place 'ground)
     (location-elevation ?location)
-    (support-top-elevation ?place)))
+    (top ?place)))
 
 
 (define-update place-held-object!
