@@ -16,6 +16,13 @@
 ;;;   4. A held tray's top rides its holder's own top level -- occupant-elevation
 ;;;      plus declared-height, zero added for the tray itself -- and an occupant
 ;;;      resting on the held tray chains through the ordinary recursion.
+;;;   5. The three achievable connector anchor heights, all at one site so they read
+;;;      as offsets from a single floor: a connector on the ground anchors at the
+;;;      floor plus one, on a box at plus two, and on a tray held by a standing agent
+;;;      at plus five halves.  These are the empirically established values the
+;;;      vertical model must keep reproducing; the third is the one that currently
+;;;      depends on a dedicated held-tray branch rather than falling out of the
+;;;      ordinary support recursion.
 ;;;
 ;;; The characterization goal verifies the authored support chain, the absence of
 ;;; competing support and height facts, all exact intermediate elevations, fan and
@@ -43,12 +50,13 @@
 
 
 (define-types
-  agent (stack-agent ground-agent tray-holding-agent)
-  location (stack-site default-site raised-ground-site tray-holding-site)
+  agent (stack-agent ground-agent tray-holding-agent anchor-agent)
+  location (stack-site default-site raised-ground-site tray-holding-site anchor-site)
   pressure-plate (base-plate)
-  box (base-box upper-box ground-box tray-occupant-box)
+  box (base-box upper-box ground-box tray-occupant-box anchor-box)
   fan (middle-fan ground-fan)
-  tray (held-tray ground-tray))
+  tray (held-tray ground-tray anchor-tray)
+  connector (ground-connector box-connector tray-connector))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -95,7 +103,21 @@
   (holding tray-holding-agent held-tray)
   (has-location held-tray tray-holding-site)
   (has-location tray-occupant-box tray-holding-site)
-  (on tray-occupant-box held-tray))
+  (on tray-occupant-box held-tray)
+
+  ;; The three achievable connector anchor heights, gathered at one site so each
+  ;; reads directly as an offset from that site's floor.  ANCHOR-BOX and every
+  ;; connector take the default height of one; ANCHOR-AGENT takes the default 3/2.
+  (has-elevation anchor-site 2)
+  (has-location anchor-agent anchor-site)
+  (holding anchor-agent anchor-tray)
+  (has-location anchor-tray anchor-site)
+  (has-location anchor-box anchor-site)
+  (has-location ground-connector anchor-site)
+  (has-location box-connector anchor-site)
+  (on box-connector anchor-box)
+  (has-location tray-connector anchor-site)
+  (on tray-connector anchor-tray))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -186,7 +208,34 @@
     (support-elevation-only-on tray-occupant-box held-tray)
     (= (occupant-elevation tray-occupant-box) 7/2)
     (= (declared-height tray-occupant-box) 1)
-    (= (support-top-elevation tray-occupant-box) 9/2)))
+    (= (support-top-elevation tray-occupant-box) 9/2)
+
+    ;; The three achievable connector anchor heights, as offsets from ANCHOR-SITE's
+    ;; floor elevation of two.  A connector's anchor is its own standing elevation
+    ;; plus its declared height, so each pair below pins the standing elevation and
+    ;; the anchor it yields: ground gives floor + 1, a box floor + 2, and a tray held
+    ;; by a standing agent floor + 5/2.
+    (= (location-elevation anchor-site) 2)
+    (= (occupant-elevation anchor-agent) 2)
+
+    (not (exists (?support support)
+           (on ground-connector ?support)))
+    (= (occupant-elevation ground-connector) 2)
+    (= (+ (occupant-elevation ground-connector)
+          (declared-height ground-connector))
+       3)
+
+    (support-elevation-only-on box-connector anchor-box)
+    (= (occupant-elevation box-connector) 3)
+    (= (+ (occupant-elevation box-connector)
+          (declared-height box-connector))
+       4)
+
+    (support-elevation-only-on tray-connector anchor-tray)
+    (= (occupant-elevation tray-connector) 7/2)
+    (= (+ (occupant-elevation tray-connector)
+          (declared-height tray-connector))
+       9/2)))
 
 
 (define-goal
