@@ -17,6 +17,7 @@
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -passability)
+(include-tech -vertical)
 (include-tech -elevation)
 (include-tech -walkability)
 (include-tech -walkability-coordinates)

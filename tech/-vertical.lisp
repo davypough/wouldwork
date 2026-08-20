@@ -34,7 +34,7 @@
 ;;;   types     : vertical-object  --  everything with a place in the vertical model
 ;;;   parameter : *vertical-type-constants*  --  per-type height default, axis, and
 ;;;               base default
-;;;   queries   : base, top, fixed-base, object-height
+;;;   queries   : base, top, fixed-base, object-height, location-elevation
 ;;;
 ;;; WALL-GEARS and WALL-BLOWER are deliberately absent from the table.  Their
 ;;; HAS-ELEVATION is a stream elevation read by -gears-fan's BLOWER-ELEVATION, not the
@@ -142,6 +142,15 @@
       (if (bind (has-elevation ?object $level))
         $level
         (fourth (vertical-type-entry ?object))))))
+
+
+(define-query location-elevation (?location location)
+  ;; A location's own floor level.  This is just BASE narrowed to a location, and exists
+  ;; as a named seam rather than inlined at its callers so that a technology can override
+  ;; the level for its own domain without every caller having to know: -floor-blowing
+  ;; redefines it so an undeclared location that some floor drive aims at hovers in the
+  ;; air rather than sitting on the ground.
+  (base ?location))
 
 
 (define-query top (?object vertical-object)

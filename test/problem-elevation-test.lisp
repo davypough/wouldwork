@@ -7,14 +7,15 @@
 ;;;   location, gate, screen, wall, edge, transmitter, receiver, gun, wall-gears,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
-;;; The characterization goal verifies exact authored bindings and the generic default
-;;; of zero, for every leaf of ELEVATED-OBJECT.  This substrate no longer owns any
-;;; role-specific anchor rule: REPEATER-MOUNT-ELEVATION, REPEATER-ANCHOR-ELEVATION,
-;;; FIXTURE-ELEVATION, and APPARATUS-ANCHOR-ELEVATION were four per-type ways of reaching
-;;; a base or a top, and -vertical's BASE and TOP now compute both from one table.  Their
-;;; behavior, including the mounting defaults that moved into APPARATUS-COORDS>, is pinned
-;;; by problem-vertical-test.  What remains here is the authored fact and its zero default.
-;;; Initial and final states are identical.  Expected minimum path length: zero.
+;;; What this file pins is the relation itself: its schema, its type domain, exact
+;;; binding of authored values, and the absence of any fact for an undeclared fixture.
+;;; This substrate no longer owns a query at all.  OBJECT-ELEVATION, LOCATION-ELEVATION,
+;;; and the four role-specific anchor rules -- REPEATER-MOUNT-ELEVATION,
+;;; REPEATER-ANCHOR-ELEVATION, FIXTURE-ELEVATION, APPARATUS-ANCHOR-ELEVATION -- were six
+;;; per-type ways of reaching a base or a top, and -vertical's BASE and TOP now compute
+;;; both for every type from one table.  Their behavior, including the mounting defaults
+;;; that moved into APPARATUS-COORDS>, is pinned by problem-vertical-test.  Initial and
+;;; final states are identical.  Expected minimum path length: zero.
 
 (in-package :ww)
 
@@ -96,14 +97,11 @@
   (and
     (has-elevation ?object ?expected-elevation)
     (do (bind (has-elevation ?object $bound-elevation))
-        (= $bound-elevation ?expected-elevation))
-    (= (object-elevation ?object) ?expected-elevation)))
+        (= $bound-elevation ?expected-elevation))))
 
 
-(define-query default-elevation-valid (?object elevated-object)
-  (and
-    (not (bind (has-elevation ?object $authored-elevation)))
-    (= (object-elevation ?object) 0)))
+(define-query absent-elevation-valid (?object elevated-object)
+  (not (bind (has-elevation ?object $authored-elevation))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -125,44 +123,43 @@
     (explicit-elevation-valid explicit-floor-repeater 10)
     (explicit-elevation-valid explicit-wall-repeater 11)
 
-    (default-elevation-valid default-location)
-    (default-elevation-valid default-gate)
-    (default-elevation-valid default-screen)
-    (default-elevation-valid default-wall)
-    (default-elevation-valid default-edge)
-    (default-elevation-valid default-transmitter)
-    (default-elevation-valid default-receiver)
-    (default-elevation-valid default-gun)
-    (default-elevation-valid default-wall-gears)
-    (default-elevation-valid default-wall-blower)
-    (default-elevation-valid default-floor-repeater)
-    (default-elevation-valid default-wall-repeater)
+    (absent-elevation-valid default-location)
+    (absent-elevation-valid default-gate)
+    (absent-elevation-valid default-screen)
+    (absent-elevation-valid default-wall)
+    (absent-elevation-valid default-edge)
+    (absent-elevation-valid default-transmitter)
+    (absent-elevation-valid default-receiver)
+    (absent-elevation-valid default-gun)
+    (absent-elevation-valid default-wall-gears)
+    (absent-elevation-valid default-wall-blower)
+    (absent-elevation-valid default-floor-repeater)
+    (absent-elevation-valid default-wall-repeater)
 
-    ;; Location and gate retain the generic zero-default convention.
-    (= (location-elevation explicit-location) 2)
-    (= (location-elevation default-location) 0)
-    (= (object-elevation explicit-gate) 3)
-    (= (object-elevation default-gate) 0)
+    ;; What an object with no authored fact is worth is -vertical's business, not this
+    ;; relation's: BASE resolves a location through LOCATION-COORDS>, a wall-mounted
+    ;; fixture through APPARATUS-COORDS>, and anything else through the base-default
+    ;; column of *VERTICAL-TYPE-CONSTANTS*.  problem-vertical-test pins all three.
+    (not (bind (has-elevation default-location $any-location-level)))
+    (not (bind (has-elevation default-wall-repeater $any-repeater-level)))))
 
-    ;; Every remaining leaf reads its authored fact, or zero.  The functional and
-    ;; mounting defaults these fixtures used to carry are properties of their
-    ;; coordinates now, not of HAS-ELEVATION, and this problem authors no coordinates.
-    (= (object-elevation explicit-transmitter) 7)
-    (= (object-elevation default-transmitter) 0)
-    (= (object-elevation explicit-receiver) 8)
-    (= (object-elevation default-receiver) 0)
-    (= (object-elevation explicit-gun) 13)
-    (= (object-elevation default-gun) 0)
-    (= (object-elevation explicit-floor-repeater) 10)
-    (= (object-elevation default-floor-repeater) 0)
-    (= (object-elevation explicit-wall-repeater) 11)
-    (= (object-elevation default-wall-repeater) 0)
 
-    ;; HAS-HEIGHT is readable but contributes nothing here: height is -vertical's
-    ;; concern, and this substrate reports base alone.
-    (= (declared-height explicit-floor-repeater) 2)
-    (= (declared-height explicit-wall-repeater) 7)
-    (= (declared-height default-wall-repeater) 9)))
+(define-test-claim elevation-relation-contract
+  (expect-relation-schema
+    'has-elevation :static '(elevated-object rational)
+    :fluent-indices '(2))
+  (expect-condition
+    (lambda ()
+      (check-proposition '(has-elevation explicit-location 2.0)))
+    'error
+    :containing "not of specified type RATIONAL")
+  (expect-condition
+    (lambda ()
+      (check-init-duplicate-fluent-keys
+        '((has-elevation explicit-location 2)
+          (has-elevation explicit-location 3))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key"))
 
 
 (define-goal

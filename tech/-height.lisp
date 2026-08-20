@@ -1,20 +1,14 @@
 ;;; Filename: -height.lisp
 
-;;; Height substrate: the physical height of a heighted object, used for vertical reach,
+;;; Height substrate: the authored height of a heighted object, used for vertical reach,
 ;;; vaulting, and line-of-sight clearance checks.  This file owns the heighted-object type
-;;; composition, the
-;;; (has-height ...) relation, and the shared declared-or-default query, declared identically
-;;; by every tech file that reads or writes it -- box, jump, jammer, and beam-direct --
-;;; so consumers nest-include this file instead of each re-declaring the same union, relation,
-;;; or default-fallback query.
+;;; composition and the (has-height ...) relation, declared identically by every tech file
+;;; that reads or writes it -- box, jump, jammer, and beam-direct -- so consumers
+;;; nest-include this file instead of each re-declaring the same union and relation.
 ;;;
-;;; declared-height is superseded by -vertical's OBJECT-HEIGHT, which reads the same
-;;; HAS-HEIGHT facts against a wider per-type constant table and returns identical values
-;;; for every heighted-object leaf.  Two callers still need it: REPEATER-ANCHOR-ELEVATION
-;;; in -elevation.lisp, which -vertical nests and so cannot call back into, and any
-;;; problem including -height or elevation without the support stack that carries
-;;; -vertical.  Both go when -elevation's anchor queries go.  Its defaults are gate,
-;;; screen, and wall 4; edge 3/2; agent 3/2; and box, jammer, connector, and repeater 1.
+;;; The DECLARED-HEIGHT query is gone: -vertical's OBJECT-HEIGHT reads the same HAS-HEIGHT
+;;; facts against the per-type constant table, returning identical values for every
+;;; heighted-object leaf and covering the types this union never included.
 ;;; A repeater's height follows its mounting axis: vertical for a floor-repeater and
 ;;; horizontal for a wall-repeater.
 ;;;
@@ -24,8 +18,7 @@
 ;;;              floor-repeater wall-repeater) -- what can have a declared height;
 ;;;              optional subtypes absent from the problem resolve to nil, a no-op
 ;;;   relation : (has-height heighted-object $rational)
-;;;   query    : declared-height  --  declared value, or role default (gate/screen/wall 4,
-;;;              edge 3/2, agent 3/2, box/jammer/connector/repeater 1)
+;;;   query    : none.  Heights are read through -vertical's OBJECT-HEIGHT.
 
 (in-package :ww)
 
@@ -41,18 +34,3 @@
 
 (define-static-relations
   (has-height heighted-object $rational))
-
-
-(define-query declared-height (?object heighted-object)
-  ;; Declared physical height, or the shared role default when undeclared.  Gate, screen,
-  ;; and wall use 4; edge uses 3/2; agent uses 3/2; box, jammer, connector, and repeaters
-  ;; use 1.
-  (if (bind (has-height ?object $h))
-    $h
-    (if (or (gate ?object) (screen ?object) (wall ?object))
-      4
-      (if (edge ?object)
-        3/2
-        (if (agent ?object)
-          3/2
-          1)))))

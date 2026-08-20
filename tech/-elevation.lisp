@@ -20,9 +20,9 @@
 ;;;   types    : elevated-object (either location gate screen wall edge transmitter
 ;;;              receiver gun wall-gears wall-blower floor-repeater wall-repeater)
 ;;;   relation : (has-elevation elevated-object $rational)
-;;;   queries  : object-elevation, location-elevation  --  both superseded by -vertical's
-;;;              BASE; retained for -floor-blowing's hover override of LOCATION-ELEVATION
-;;;              and for problems including this substrate without the vertical model
+;;;   queries  : none.  OBJECT-ELEVATION and LOCATION-ELEVATION are gone with the anchor
+;;;              queries; -vertical's BASE reads this relation directly, and owns
+;;;              LOCATION-ELEVATION as the seam -floor-blowing overrides
 
 (include-tech -height)
 (include-tech -location-coordinates)
@@ -43,32 +43,3 @@
 
 (define-static-relations
   (has-elevation elevated-object $rational))  ;fixed base/anchor level; absent default depends on role
-
-
-(defparameter *object-elevation-cache* (make-hash-table :test #'eq)
-  "Memoizes OBJECT-ELEVATION by object.  HAS-ELEVATION is static -- fixed for the whole
-   problem instance and never asserted or retracted by any update -- so each object's
-   elevation only needs computing once.  DEFPARAMETER (not DEFVAR) so the cache resets
-   every time this file is respliced and loaded for a (possibly different) problem.")
-
-
-(define-query object-elevation (?object elevated-object)
-  ;; Declared fixed level of an elevated object, or zero if none was asserted.
-  ;; Cached: see *OBJECT-ELEVATION-CACHE*.
-  (multiple-value-bind (cached present) (gethash ?object *object-elevation-cache*)
-    (if present
-      cached
-      (setf (gethash ?object *object-elevation-cache*)
-            (if (bind (has-elevation ?object $level))
-              $level
-              0)))))
-
-
-(define-query location-elevation (?location location)
-  ;; A location's own floor level: LOCATION-COORDS>'s optional third coordinate, or
-  ;; HAS-ELEVATION in a problem carrying no coordinates, or zero.  -vertical's FIXED-BASE
-  ;; resolves the same two sources the same way for every kind of object; both go when
-  ;; this file's queries do.
-  (if (bind (location-coords> ?location $x $y $z))
-    $z
-    (object-elevation ?location)))

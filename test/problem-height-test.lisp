@@ -1,17 +1,19 @@
 ;;; Filename: problem-height-test.lisp
 
-;;; Dedicated zero-action regression for the shared -height role.  A complete
-;;; matrix gives every HEIGHTED-OBJECT leaf one explicit-height fixture and one
-;;; fixture with no authored HAS-HEIGHT fact:
+;;; Dedicated zero-action regression for the -height relation.  A complete matrix gives
+;;; every HEIGHTED-OBJECT leaf one explicit-height fixture and one fixture with no
+;;; authored HAS-HEIGHT fact:
 ;;;
 ;;;   agent, box, jammer, connector, gate, screen, wall, edge,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
-;;; Distinct explicit values verify exact binding and DECLARED-HEIGHT lookup.  The
-;;; explicit agent has height two, distinct from the default agent height.  Undeclared
-;;; agent and edge fixtures default to 3/2; gate, screen, and wall share the default 4.
-;;; Initial and final states are
-;;; identical.  Expected minimum path length: zero.
+;;; What this file pins is the relation itself: its schema, its type domain, exact
+;;; binding of authored values including fractional ones, and the absence of any fact
+;;; for an undeclared fixture.  The per-type height defaults are no longer this
+;;; substrate's business -- they live in -vertical's *VERTICAL-TYPE-CONSTANTS* and are
+;;; pinned by problem-vertical-test, which is also the only place an unauthored height
+;;; resolves to a number at all.  Initial and final states are identical.  Expected
+;;; minimum path length: zero.
 
 (in-package :ww)
 
@@ -75,19 +77,15 @@
 ;;;; CHARACTERIZATION HELPERS ;;;;
 
 
-(define-query explicit-height-valid
-    (?object heighted-object ?expected-height)
+(define-query explicit-height-valid (?object heighted-object ?expected-height)
   (and
     (has-height ?object ?expected-height)
     (do (bind (has-height ?object $bound-height))
-        (= $bound-height ?expected-height))
-    (= (declared-height ?object) ?expected-height)))
+        (= $bound-height ?expected-height))))
 
 
-(define-query default-height-valid (?object heighted-object ?expected-height)
-  (and
-    (not (bind (has-height ?object $authored-height)))
-    (= (declared-height ?object) ?expected-height)))
+(define-query absent-height-valid (?object heighted-object)
+  (not (bind (has-height ?object $authored-height))))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
@@ -107,18 +105,37 @@
     (explicit-height-valid explicit-floor-repeater 9)
     (explicit-height-valid explicit-wall-repeater 10)
 
-    ;; Box, jammer, connector, and repeaters default to one; gate, screen, and wall
-    ;; default to four; edge and agent both default to 3/2.
-    (default-height-valid default-agent 3/2)
-    (default-height-valid default-box 1)
-    (default-height-valid default-jammer 1)
-    (default-height-valid default-connector 1)
-    (default-height-valid default-gate 4)
-    (default-height-valid default-screen 4)
-    (default-height-valid default-wall 4)
-    (default-height-valid default-edge 3/2)
-    (default-height-valid default-floor-repeater 1)
-    (default-height-valid default-wall-repeater 1)))
+    ;; No fixture without an authored fact has one.  What such a fixture is *worth*
+    ;; is -vertical's business, not this relation's, and is pinned by
+    ;; problem-vertical-test's height table.
+    (absent-height-valid default-agent)
+    (absent-height-valid default-box)
+    (absent-height-valid default-jammer)
+    (absent-height-valid default-connector)
+    (absent-height-valid default-gate)
+    (absent-height-valid default-screen)
+    (absent-height-valid default-wall)
+    (absent-height-valid default-edge)
+    (absent-height-valid default-floor-repeater)
+    (absent-height-valid default-wall-repeater)))
+
+
+(define-test-claim height-relation-contract
+  (expect-relation-schema
+    'has-height :static '(heighted-object rational)
+    :fluent-indices '(2))
+  (expect-condition
+    (lambda ()
+      (check-proposition '(has-height explicit-agent 1.5)))
+    'error
+    :containing "not of specified type RATIONAL")
+  (expect-condition
+    (lambda ()
+      (check-init-duplicate-fluent-keys
+        '((has-height explicit-agent 2)
+          (has-height explicit-agent 3))))
+    'error
+    :containing "Duplicate DEFINE-INIT fluent key"))
 
 
 (define-goal

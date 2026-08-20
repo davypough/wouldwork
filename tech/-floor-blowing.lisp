@@ -23,31 +23,30 @@
 ;;;   driver    : the derived propagation driver calls update-floor-blowing-status!
 ;;;               after update-blower-status!
 ;;; PROVIDES:
-;;;   query     : location-elevation -- an undeclared floor-stream destination defaults
-;;;               to the in-air hover elevation 10
+;;;   query     : location-elevation -- overrides -vertical's seam so an undeclared
+;;;               floor-stream destination defaults to the in-air hover elevation 10
 ;;;   updates   : update-floor-blowing-status!, blow-occupants-away!, drop-occupants!
 
 (include-tech -propagation)
 (include-tech -gears-fan)
-(include-tech -location-coordinates)
+(include-tech -vertical)
 
 (in-package :ww)
 
 
 (define-query location-elevation (?location location)
-  ;; Overrides -elevation's ground default of 0: an undeclared location that is some
-  ;; floor drive's aimed-at destination floats at the default in-the-air hover level of
-  ;; 10.  An authored level always wins, whether written as LOCATION-COORDS>'s third
-  ;; coordinate or as HAS-ELEVATION.  Wall destinations remain ordinary ground locations.
-  (if (bind (location-coords> ?location $x $y $z))
-    $z
-    (if (bind (has-elevation ?location $level))
-      $level
-      (if (exists (?g (either floor-gears floor-blower))
+  ;; Overrides -vertical's plain BASE lookup: an undeclared location that is some floor
+  ;; drive's aimed-at destination floats at the default in-the-air hover level of 10.  An
+  ;; authored level always wins, whether written as LOCATION-COORDS>'s third coordinate or
+  ;; as HAS-ELEVATION.  Wall destinations remain ordinary ground locations.
+  (if (or (bind (location-coords> ?location $x $y $z))
+          (bind (has-elevation ?location $level)))
+    (base ?location)
+    (if (exists (?g (either floor-gears floor-blower))
           (and (bind (aimed-at ?g $dest))
-                 (eql $dest ?location)))
-        10
-        0))))
+               (eql $dest ?location)))
+      10
+      0)))
 
 
 (define-update update-floor-blowing-status! ()
