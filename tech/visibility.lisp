@@ -1,67 +1,83 @@
 ;;; Filename: visibility.lisp
 
 ;;; Visibility background capability: whether a fixture or another location is in sight from
-;;; a location.  LOS-TO-APPARATUS covers point apparatus (transmitter, receiver, repeater,
-;;; or gun); LOS-TO-TARGET covers gate, what jammer's jam-target aims at
-;;; (a gears jam target instead resolves through its HAS-POSITION location's ordinary
-;;; LOS-TO-LOCATION entry -- gears hang at a location, not along a segment -- so
-;;; LOS-TO-TARGET remains gate-only).
-;;; A connector-to-connector pairing never consults either -- it resolves through a connector's
-;;; own location via LOS-TO-LOCATION instead.  A sightline must exist in the LOS tables.  A
-;;; LOS-TO-APPARATUS/LOS-TO-LOCATION occluder list may
-;;; also carry location entries (-beam-los-coordinates' own location-occlusion test, within
-;;; *beam-occlusion-tolerance*); VISIBLE itself always treats a location occluder as clear.
-;;; VISIBLE is ordinary opaque sight; VISIBLE-FOR-OBJECT selects gate openness for an actor's
-;;; playback or recording view.  POTENTIALLY-VISIBLE remains actor-independent because it
-;;; recognizes structural pairing through finite barriers.  BEAM-VISIBLE is the
-;;; elevation-aware sibling beam-relay's own hops use instead; BEAM-VISIBLE-FOR-OBJECT is
-;;; its actor/view-aware form.
-;;; Given both endpoints' live elevations, it checks every static barrier crossing and also
-;;; blocks on a location occluder whose beam-blocker spans the beam's interpolated elevation
-;;; (-beam-occlusion's beam-blocker-occludes-location, -beam-interpolation's live
-;;; beam-elevation-at-location).  ELEVATION-VISIBLE-FOR-OBJECT applies the same static
-;;; crossing rule to jammer sight without treating intervening movable objects as blockers.
+;;; a location.  One relation carries every sightline, and one query answers every sightline
+;;; question, under a policy:
 ;;;
-;;; The los tables may be hand-authored, or -- when the problem asserts WALL-SEGMENT>,
+;;;   (los-via <endpoint> <occluders> <endpoint>)
+;;;
+;;; The three relations this replaced -- LOS-TO-APPARATUS, LOS-TO-TARGET, LOS-TO-LOCATION --
+;;; differed only in the type of the far endpoint, and every consumer bound all three in
+;;; turn and took whichever matched, which is the clearest possible evidence that the
+;;; distinction carried no information.  LOS-VIA's two endpoints share one type, so the
+;;; engine mirrors it: a sightline is symmetric, which the old shape could only express for
+;;; the location-to-location case, where both argument types happened to coincide.
+;;; LOS-BARRIER-CROSSINGS> stays directed -- its records carry a parameter measured along
+;;; the beam from the near endpoint, so orientation is part of their meaning.
+;;;
+;;; The occluder payload is a flat conjunction, deliberately unlike -traversal's DNF.  A
+;;; traversal may take alternative routes, so its payload is a family of clauses; a
+;;; sightline is a straight line and has exactly one path, so every occluder on it must be
+;;; transparent.  Nothing here is a "clause".
+;;;
+;;; An authored sightline always starts at a location -- the spot an agent, connector or
+;;; jammer occupies -- and the init check enforces that on the literal.  The far endpoint is
+;;; a point apparatus (transmitter, receiver, repeater, gun), a gate that a jammer aims at,
+;;; or another location.  A gears jam target instead resolves through its HAS-POSITION
+;;; location's own sightline, since gears hang at a location rather than along a segment.  A
+;;; connector-to-connector pairing likewise resolves through each connector's location.
+;;;
+;;; THE THREE POLICIES.  What the old VISIBLE, ELEVATION-VISIBLE-FOR-OBJECT and BEAM-VISIBLE
+;;; really differed in was two independent rules, and only three of the four combinations
+;;; are used:
+;;;
+;;;                     segment crossings                 location occluders
+;;;   :sight            any non-gate crossing blocks      always clear
+;;;   :elevation        tested at the crossing's own      always clear
+;;;                     interpolated elevation
+;;;   :beam             the same elevation test           blocks when a beam-blocker there
+;;;                                                       spans the interpolated elevation
+;;;
+;;; :SIGHT is ordinary opaque sight, which never clears a wall, edge or boundary by height.
+;;; :ELEVATION is height-aware visual sight for a viewer and target whose elevations are
+;;; known, used by jammer, and it deliberately does not treat intervening movable occupants
+;;; as blockers.  :BEAM is what a relay hop uses, and is the only policy that consults a
+;;; location occluder at all.
+;;;
+;;; A hand-authored LOS fact has no crossing geometry, which LOS-BARRIER-CROSSINGS reports
+;;; as :UNRECORDED, distinguishing it from a coordinate-derived sightline whose crossing
+;;; list is genuinely empty.  Under every policy an :UNRECORDED sightline falls back to the
+;;; legacy rule: its gate occluders must be open.
+;;;
+;;; The LOS table may be hand-authored, or -- when the problem asserts WALL-SEGMENT>,
 ;;; EDGE-SEGMENT>, or BOUNDARY-WALL -- derived from raw 2D segment geometry by nested
 ;;; -beam-los-coordinates (entirely inert otherwise), mirroring walkability's own nested
-;;; -walkability-coordinates deriving
-;;; WALK-VIA.  This file owns the los relations, so it owns their coordinate derivation too;
-;;; beam-direct also records every authored fixed coupling's segment crossings through this
-;;; interface; beam-relay and beam-crossing consume location sightlines (beam-crossing's own
-;;; -beam-crossing-coordinates re-nests it only to guarantee LOS derivation splices before
-;;; its crossing derivation; splicing is deduplicated, so that is never a second copy).  A
-;;; hand-authored problem may list a location as an occluder exactly as it would a gate; that
-;;; location, and both of the beam's own endpoints, still need LOCATION-COORDS>/APPARATUS-
-;;; COORDS> asserted -- beam-visible's elevation interpolation reads them live regardless of
-;;; whether the LOS fact itself was hand-authored or coordinate-derived.
+;;; -walkability-coordinates.  This file owns the relation, so it owns its coordinate
+;;; derivation too; beam-direct also records every authored fixed coupling's segment
+;;; crossings through this interface; beam-relay and beam-crossing consume location
+;;; sightlines.  A hand-authored problem may list a location as an occluder exactly as it
+;;; would a gate; that location, and both of the beam's own endpoints, still need
+;;; LOCATION-COORDS>/APPARATUS-COORDS> asserted -- the elevation interpolation reads them
+;;; live regardless of whether the LOS fact was authored or derived.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, receiver, and apparatus are declared
 ;;;               optional/composite here through nested -visibility
 ;;;   nested    : -visibility (apparatus and the null-default visible/beam-visible
-;;;               interface);
-;;;               -gate (gate optional type, (open gate) relation) -- shared with gate,
-;;;               walkability (via -passability), reachability, beam-direct, and
-;;;               beam-crossing, which all nest -gate instead of hand-declaring it;
-;;;               -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>,
-;;;               WALL-SEGMENT>, EDGE-SEGMENT>, GATE-SEGMENT>, BOUNDARY-WALL;
-;;;               DERIVE-LOS-FROM-SEGMENTS;
-;;;               live BEAM-COORDINATES-ELEVATION-AT);
-;;;               -beam-interpolation (the sloped-beam elevation hook);
-;;;               -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)
+;;;               interface); -gate (gate optional type, (open gate) relation);
+;;;               -beam-los-coordinates (LOS-ENDPOINT; APPARATUS-COORDS>, the segment
+;;;               relations, *BOUNDARY-WALL-HEIGHT*, DERIVE-LOS-FROM-SEGMENTS, live
+;;;               BEAM-COORDINATES-ELEVATION-AT); -beam-interpolation (the sloped-beam
+;;;               elevation hook); -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)
 ;;; PROVIDES:
-;;;   relations : (los-to-apparatus location $list apparatus)  -- $list items are gate or
-;;;               location names,
-;;;               (los-to-target location $list gate)  -- $list items are gate names only,
-;;;               (los-to-location location $list location)  -- $list items are gate or
-;;;               location names,
+;;;   relations : (los-via visibility-object $list visibility-object)  --  symmetric;
+;;;               $list items are gate or location names,
 ;;;               (los-barrier-crossings> los-endpoint $list visibility-object) -- oriented
 ;;;               static wall/edge/gate/boundary crossing records, including fixed couplings
-;;;   queries   : visible, visible-for-object, and potentially-visible (override
-;;;               -visibility's null defaults), beam-visible and beam-visible-for-object
-;;;               (override -visibility's null defaults), elevation-visible-for-object,
-;;;               visible-clear
+;;;   queries   : los-clear-for-object (the one sightline test, under a policy); visible,
+;;;               visible-for-object, potentially-visible, beam-visible,
+;;;               beam-visible-for-object, elevation-visible-for-object (all overriding
+;;;               -visibility's null defaults); visible-clear
 
 (include-tech -visibility)
 (include-tech -gate)
@@ -79,9 +95,9 @@
 
 
 (define-static-relations
-  (los-to-apparatus location $list apparatus)  ;per-location occluders on a sightline to a connector/beam-relay apparatus
-  (los-to-target location $list gate)  ;per-location occluders on a sightline to a jammer target
-  (los-to-location location $list location)  ;symmetric per-pair occluders for location-to-location sightlines
+  ;; Symmetric: both endpoints share one type, so the engine mirrors each fact.  $list is a
+  ;; flat conjunction of gate and location occluders -- every one must be transparent.
+  (los-via visibility-object $list visibility-object)
   ;; Directed, oriented records: (:kind identity parameter x1 y1 x2 y2).  An empty list
   ;; marks a coordinate-derived sightline with no segment crossings; absence means the LOS
   ;; fact was hand-authored and retains its legacy gate-only behavior.
@@ -89,12 +105,93 @@
 
 
 (define-init-check visibility-init-check (literals)
+  (:consumes gate location)
   (check-init-list-relation-items-have-types
-    literals 'los-to-apparatus '(gate location))
-  (check-init-list-relation-items-have-types
-    literals 'los-to-target '(gate))
-  (check-init-list-relation-items-have-types
-    literals 'los-to-location '(gate location)))
+    literals 'los-via '(gate location))
+  (check-init-los-starts-at-location literals))
+
+
+(define-init-check-helper check-init-los-starts-at-location (literals)
+  "An authored sightline runs from the spot an actor occupies to whatever it is looking at,
+   so its first argument is a location.  The relation is symmetric and the engine stores the
+   mirror image itself, so authoring the reverse form as well is redundant rather than
+   wrong -- but authoring one whose *near* end is an apparatus or a gate says nothing anyone
+   can stand at, and is refused here."
+  (dolist (literal (positive-init-literals-with-relation 'los-via literals))
+    (let ((near (second (init-literal-proposition literal))))
+      (unless (init-type-member-p near 'location)
+        (fail-init-check literal
+          "~%A sightline's near endpoint must be a location, not ~S.~%~
+           LOS-VIA is symmetric, so the engine already stores the reverse direction; write ~
+           each sightline once, from the location an actor occupies."
+          near)))))
+
+
+;;;; SIGHTLINE TEST ;;;;
+
+
+(define-query los-clear-for-object
+    (?view ?location location ?object visibility-object
+     ?near-elevation ?far-elevation ?policy)
+  ;; The one sightline test.  A sightline must exist -- an empty occluder list is a direct,
+  ;; always-clear line -- and it is clear when its segment crossings and its occluders both
+  ;; pass under ?POLICY.  The NIL view reads ordinary playback state; a recording view
+  ;; selects recording-side gate transparency and excludes mapped live blockers.
+  ;; ?NEAR-ELEVATION and ?FAR-ELEVATION are computed Lisp values with no Wouldwork object
+  ;; type, and go unread under :SIGHT.
+  (and (bind (los-via ?location $occluders ?object))
+       (assign $crossings (los-barrier-crossings ?location ?object))
+       (los-crossings-clear-for-object
+         ?view $crossings ?near-elevation ?far-elevation ?policy)
+       (los-occluders-clear-for-object
+         ?view $occluders $crossings ?location ?near-elevation ?object ?far-elevation
+         ?policy)))
+
+
+(define-query los-crossings-clear-for-object
+    (?view ?crossings ?near-elevation ?far-elevation ?policy)
+  ;; A hand-authored sightline has no crossing geometry at all, so there is nothing to test
+  ;; and its occluder list carries the whole rule.  Otherwise ordinary sight refuses any
+  ;; crossing that is not a gate, while the two elevation-aware policies test each crossing
+  ;; against its barrier's own vertical span.
+  (if (eql ?crossings :unrecorded)
+    t
+    (if (eql ?policy :sight)
+      (ww-loop for $crossing in ?crossings
+               always (eql (first $crossing) :gate))
+      (recorded-barriers-clear-for-object
+        ?view ?crossings ?near-elevation ?far-elevation))))
+
+
+(define-query los-occluders-clear-for-object
+    (?view ?occluders ?crossings ?location ?near-elevation ?object ?far-elevation ?policy)
+  ;; A gate occluder is checked whenever the sightline carries no crossing geometry, and
+  ;; under :SIGHT always -- ordinary sight has no exact crossing parameter to have evaluated
+  ;; it at.  A coordinate-derived gate crossing under an elevation policy was already
+  ;; evaluated at its exact parameter above, so testing openness again here would double the
+  ;; rule.  A location occluder matters only to a beam.
+  (ww-loop for $o in ?occluders
+           always (if (gate $o)
+                    (if (or (eql ?crossings :unrecorded)
+                            (eql ?policy :sight))
+                      (gate-open-for-object ?view $o)
+                      t)
+                    (if (eql ?policy :beam)
+                      (not (los-location-occluded
+                             ?view $o ?location ?near-elevation ?object ?far-elevation))
+                      t))))
+
+
+(define-query los-location-occluded
+    (?view ?occluder location ?location location ?near-elevation ?object ?far-elevation)
+  ;; True when something standing at ?OCCLUDER spans the beam's own interpolated elevation
+  ;; where it passes over that spot.  A recording view excludes mapped live blockers.
+  (do (assign $elevation
+              (beam-elevation-at-location
+                ?occluder ?location ?near-elevation ?object ?far-elevation))
+      (if (recording-shadow-object ?view)
+        (beam-blocker-occludes-location-for-object ?view ?occluder $elevation)
+        (beam-blocker-occludes-location ?occluder $elevation))))
 
 
 (define-query los-barrier-crossings
@@ -106,6 +203,13 @@
     :unrecorded))
 
 
+(define-query recorded-barriers-clear-for-object
+    (?view ?crossings ?near-elevation ?far-elevation)
+  (ww-loop for $crossing in ?crossings
+           always (barrier-crossing-clear-for-object
+                    ?view $crossing ?near-elevation ?far-elevation)))
+
+
 (define-query barrier-crossing-clear-for-object
     (?view ?crossing ?near-elevation ?far-elevation)
   (do (assign $kind (first ?crossing))
@@ -115,7 +219,10 @@
               (+ ?near-elevation
                  (* $parameter (- ?far-elevation ?near-elevation))))
       ;; An open gate has no vertical span.  All other segment barriers use an inclusive
-      ;; base-to-top blocking interval: equality with either boundary still blocks.
+      ;; base-to-top blocking interval: equality with either boundary still blocks.  The
+      ;; boundary polygon is the one barrier with no named object, so its base and height
+      ;; come from the ground and from -segment-geometry's *BOUNDARY-WALL-HEIGHT* rather
+      ;; than from -vertical's per-type table.
       (if (and (eql $kind :gate)
                (gate-open-for-object ?view $barrier))
         t
@@ -125,121 +232,10 @@
                       (base $barrier)))
             (assign $height
                     (if (eql $kind :boundary)
-                      6
+                      *boundary-wall-height*
                       (object-height $barrier)))
             (or (< $crossing-elevation $base-elevation)
                 (> $crossing-elevation (+ $base-elevation $height)))))))
-
-
-(define-query recorded-barriers-clear-for-object
-    (?view ?crossings ?near-elevation ?far-elevation)
-  (ww-loop for $crossing in ?crossings
-           always (barrier-crossing-clear-for-object
-                    ?view $crossing ?near-elevation ?far-elevation)))
-
-
-(define-query visible
-    (?location location ?object visibility-object)
-  (visible-for-object nil ?location ?object))
-
-
-(define-query visible-for-object
-    (?view ?location location ?object visibility-object)
-  ;; A sightline must exist (an empty occluder list is a direct, always-clear line); it is
-  ;; clear iff every occluder gate is open in ?view's environmental layer and no retained
-  ;; solid segment crosses it.  The NIL view used by VISIBLE reads ordinary playback state.
-  ;; Endpoint-elevation-blind: a location occluder is always clear here.  ?object is an
-  ;; apparatus (los-to-apparatus), a jammer
-  ;; target (los-to-target), or another location (los-to-location); at most one matches,
-  ;; so try all three in turn.  BEAM-VISIBLE-FOR-OBJECT is the elevation-aware sibling that
-  ;; additionally tests a location occluder, for consuming roles that carry both endpoints'
-  ;; live elevations.
-  (and (or (bind (los-to-apparatus ?location $occluders ?object))
-           (bind (los-to-target ?location $occluders ?object))
-           (bind (los-to-location ?location $occluders ?object)))
-       (assign $crossings (los-barrier-crossings ?location ?object))
-       ;; Ordinary sight never clears a wall, edge, or boundary by height.  Coordinate-
-       ;; derived gate crossings continue to be governed by the familiar occluder list.
-       (or (eql $crossings :unrecorded)
-           (ww-loop for $crossing in $crossings
-                    always (eql (first $crossing) :gate)))
-       (ww-loop for $o in $occluders
-                always (if (gate $o)
-                         (gate-open-for-object ?view $o)
-                         t))))
-
-
-(define-query beam-visible
-    (?location location
-     ?near-elevation
-     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
-     ?far-elevation)
-  ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
-  ;; therefore deliberately have no Wouldwork object type.
-  ;;
-  ;; Elevation-aware sibling of visible, for a relay hop whose two live endpoint elevations
-  ;; the caller already knows.  No los-to-target branch here: a jammer
-  ;; target never carries a location occluder to test in the first place, so jammer uses
-  ;; ELEVATION-VISIBLE-FOR-OBJECT.  A location occluder blocks iff some beam-blocker there
-  ;; spans the beam's own interpolated elevation at that point.
-  (beam-visible-for-object
-    nil ?location ?near-elevation ?object ?far-elevation))
-
-
-(define-query beam-visible-for-object
-    (?view
-     ?location location
-     ?near-elevation
-     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
-     ?far-elevation)
-  ;; A beam's recording view uses recording-side gate transparency and excludes mapped
-  ;; live blockers.  The ordinary NIL view retains the shared playback environment.
-  (and
-       (or (bind (los-to-apparatus ?location $occluders ?object))
-           (bind (los-to-location ?location $occluders ?object)))
-       (assign $crossings (los-barrier-crossings ?location ?object))
-       (or (eql $crossings :unrecorded)
-           (recorded-barriers-clear-for-object
-             ?view $crossings ?near-elevation ?far-elevation))
-       (ww-loop for $o in $occluders
-                always
-                  (if (gate $o)
-                    ;; Coordinate-derived gate crossings were already evaluated at their
-                    ;; exact parameter above.  A hand-authored gate still has no crossing
-                    ;; geometry and therefore retains the legacy open-only rule.
-                    (if (eql $crossings :unrecorded)
-                      (gate-open-for-object ?view $o)
-                      t)
-                    (not (if (recording-shadow-object ?view)
-                           (beam-blocker-occludes-location-for-object
-                             ?view $o
-                             (beam-elevation-at-location
-                               $o ?location ?near-elevation ?object ?far-elevation))
-                           (beam-blocker-occludes-location
-                             $o
-                             (beam-elevation-at-location
-                               $o ?location ?near-elevation ?object ?far-elevation))))))))
-
-
-(define-query elevation-visible-for-object
-    (?view
-     ?location location
-     ?near-elevation
-     ?object visibility-object
-     ?far-elevation)
-  ;; Height-aware visual sight for a source and target whose viewing elevations are known.
-  ;; Unlike beam visibility, intervening movable occupants do not block this sightline.
-  (and (or (bind (los-to-apparatus ?location $occluders ?object))
-           (bind (los-to-target ?location $occluders ?object))
-           (bind (los-to-location ?location $occluders ?object)))
-       (assign $crossings (los-barrier-crossings ?location ?object))
-       (if (eql $crossings :unrecorded)
-         (ww-loop for $o in $occluders
-                  always (if (gate $o)
-                           (gate-open-for-object ?view $o)
-                           t))
-         (recorded-barriers-clear-for-object
-           ?view $crossings ?near-elevation ?far-elevation))))
 
 
 (define-query beam-elevation-at-location
@@ -254,14 +250,60 @@
       ?location ?from ?near-elevation ?to ?far-elevation)))
 
 
+;;;; THE THREE POLICIES ;;;;
+
+
+(define-query visible
+    (?location location ?object visibility-object)
+  (visible-for-object nil ?location ?object))
+
+
+(define-query visible-for-object
+    (?view ?location location ?object visibility-object)
+  ;; Ordinary opaque sight, elevation-blind at both ends: no crossing clears by height and
+  ;; a location occluder is always transparent.  The elevations therefore go unread.
+  (los-clear-for-object ?view ?location ?object nil nil :sight))
+
+
+(define-query beam-visible
+    (?location location
+     ?near-elevation
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
+     ?far-elevation)
+  (beam-visible-for-object
+    nil ?location ?near-elevation ?object ?far-elevation))
+
+
+(define-query beam-visible-for-object
+    (?view
+     ?location location
+     ?near-elevation
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
+     ?far-elevation)
+  ;; A relay hop, whose two live endpoint elevations the caller already knows.  The only
+  ;; policy that consults a location occluder: one blocks when a beam-blocker standing there
+  ;; spans the beam's interpolated elevation at that point.
+  (los-clear-for-object
+    ?view ?location ?object ?near-elevation ?far-elevation :beam))
+
+
+(define-query elevation-visible-for-object
+    (?view
+     ?location location
+     ?near-elevation
+     ?object visibility-object
+     ?far-elevation)
+  ;; Height-aware visual sight for a viewer and target whose elevations are known -- jammer
+  ;; sight.  Unlike a beam, intervening movable occupants do not block it.
+  (los-clear-for-object
+    ?view ?location ?object ?near-elevation ?far-elevation :elevation))
+
+
 (define-query potentially-visible
     (?location location ?object visibility-object)
   ;; Structural LOS ignores whether its authored gate occluders are currently open.  Relay
-  ;; pairing selection uses this query; operational sight checks use the appropriate ordinary
-  ;; or elevation-aware query instead.
-  (or (bind (los-to-apparatus ?location $occluders ?object))
-      (bind (los-to-target ?location $occluders ?object))
-      (bind (los-to-location ?location $occluders ?object))))
+  ;; pairing selection uses this; operational sight uses one of the policies above.
+  (bind (los-via ?location $occluders ?object)))
 
 
 (define-query visible-clear (?occluder gate)

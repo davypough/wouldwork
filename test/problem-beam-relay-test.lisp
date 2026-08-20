@@ -87,8 +87,8 @@
   (paired lifecycle-connector old-source)
   (paired incoming-connector lifecycle-connector)
   (has-chroma old-source amber)
-  (los-to-apparatus old-view () old-source)
-  (los-to-location old-view () origin)
+  (los-via old-view () old-source)
+  (los-via old-view () origin)
 
   ;; The reconnect destination is within manipulation reach.  From ORIGIN exactly three
   ;; apparatus termini are structurally visible: the useful red source/receiver pair and
@@ -99,12 +99,12 @@
   (has-chroma new-receiver red)
   (has-chroma decoy-source blue)
   (has-chroma invisible-source green)
-  (los-to-apparatus origin () new-source)
-  (los-to-apparatus origin () new-receiver)
-  (los-to-apparatus origin (closed-gate) decoy-source)
-  (los-to-apparatus target () new-source)
-  (los-to-apparatus target () new-receiver)
-  (los-to-apparatus target (closed-gate) decoy-source)
+  (los-via origin () new-source)
+  (los-via origin () new-receiver)
+  (los-via origin (closed-gate) decoy-source)
+  (los-via target () new-source)
+  (los-via target () new-receiver)
+  (los-via target (closed-gate) decoy-source)
 
   ;; An unlit connector already at TARGET does not block placement, but is not itself a
   ;; connectable terminus there because connector-to-connector links require distinct
@@ -116,7 +116,7 @@
   (has-location lit-blocker-connector lit-site)
   (paired lit-blocker-connector blocker-source)
   (has-chroma blocker-source green)
-  (los-to-apparatus lit-site () blocker-source)
+  (los-via lit-site () blocker-source)
 
   ;; Independent PUT-CONNECTOR fixture.  It begins held, has a reachable destination plate,
   ;; and has no pairing sightlines, so only the ordinary unpaired placement is relevant.

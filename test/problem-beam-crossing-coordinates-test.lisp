@@ -72,11 +72,11 @@
 
   ;; Hand-authored LOS isolates crossing-coordinate derivation from the raw
   ;; wall-to-LOS derivation covered by problem-beam-los-coordinates-test.
-  (los-to-location main-left (gate1 split-marker gate2) main-right)
-  (los-to-location vertical1-bottom () vertical1-top)
-  (los-to-location vertical2-bottom () vertical2-top)
-  (los-to-location vertical3-bottom () vertical3-top)
-  (los-to-location endpoint-bottom () endpoint-top)
+  (los-via main-left (gate1 split-marker gate2) main-right)
+  (los-via vertical1-bottom () vertical1-top)
+  (los-via vertical2-bottom () vertical2-top)
+  (los-via vertical3-bottom () vertical3-top)
+  (los-via endpoint-bottom () endpoint-top)
 
   ;; Gate1 lies between CROSSING1/CROSSING2; gate2 lies between
   ;; CROSSING2/CROSSING3.

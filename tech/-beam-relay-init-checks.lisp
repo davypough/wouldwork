@@ -92,35 +92,13 @@
                edges))))
 
 
-(define-init-check-helper init-los-to-apparatus-p (location apparatus literals)
-  (some (lambda (literal)
-          (destructuring-bind (los-location occluders los-apparatus)
-              (rest (init-literal-proposition literal))
-            (declare (ignore occluders))
-            (and (eql location los-location)
-                 (eql apparatus los-apparatus))))
-        (init-literals-with-relation 'los-to-apparatus literals)))
-
-
-(define-init-check-helper init-los-to-location-p (location1 location2 literals)
-  (some (lambda (literal)
-          (destructuring-bind (los-location1 occluders los-location2)
-              (rest (init-literal-proposition literal))
-            (declare (ignore occluders))
-            (or (and (eql location1 los-location1)
-                     (eql location2 los-location2))
-                (and (eql location1 los-location2)
-                     (eql location2 los-location1)))))
-        (init-literals-with-relation 'los-to-location literals)))
-
-
 (define-init-check-helper init-apparatus-has-potential-sightline-p (apparatus literals)
   (some (lambda (literal)
           (destructuring-bind (los-location occluders los-apparatus)
               (rest (init-literal-proposition literal))
             (declare (ignore los-location occluders))
             (eql apparatus los-apparatus)))
-        (positive-init-literals-with-relation 'los-to-apparatus literals)))
+        (positive-init-literals-with-relation 'los-via literals)))
 
 
 (define-init-check-helper init-location-has-potential-sightline-p (location literals)
@@ -130,13 +108,13 @@
             (declare (ignore occluders))
             (or (eql location los-location1)
                 (eql location los-location2))))
-        (positive-init-literals-with-relation 'los-to-location literals)))
+        (positive-init-literals-with-relation 'los-via literals)))
 
 
 (define-init-check-helper init-check-paired-apparatus-sightline
     (literal connector apparatus literals)
   (unless (init-apparatus-has-potential-sightline-p apparatus literals)
-    (fail-init-check nil "~%PAIRED apparatus target has no potential LOS-TO-APPARATUS from any location.~%~
+    (fail-init-check nil "~%PAIRED apparatus target has no potential LOS-VIA from any location.~%~
             Literal:   ~S~%~
             Connector: ~S~%~
             Target:    ~S"
@@ -153,7 +131,7 @@
             Location:  ~S"
            literal connector terminus connector-location))
   (unless (init-location-has-potential-sightline-p terminus-location literals)
-    (fail-init-check nil "~%PAIRED connector target location has no potential LOS-TO-LOCATION from any location.~%~
+    (fail-init-check nil "~%PAIRED connector target location has no potential LOS-VIA from any location.~%~
             Literal:            ~S~%~
             Connector:          ~S~%~
             Connector location: ~S~%~

@@ -96,12 +96,12 @@
 
   ;; The live gate jam itself also crosses SIGHT-GATE.  The ghost gate jam is direct so it
   ;; can establish the positive recording-side gate result independently of that disparity.
-  (los-to-target live-gate-site (sight-gate) live-target-gate)
-  (los-to-target ghost-gate-site () ghost-target-gate)
+  (los-via live-gate-site (sight-gate) live-target-gate)
+  (los-via ghost-gate-site () ghost-target-gate)
 
   ;; Equivalent probe sightlines differ only by the actor's environmental view.
-  (los-to-target live-visibility-site (sight-gate) visibility-probe-gate)
-  (los-to-target ghost-visibility-site (sight-gate) visibility-probe-gate)
+  (los-via live-visibility-site (sight-gate) visibility-probe-gate)
+  (los-via ghost-visibility-site (sight-gate) visibility-probe-gate)
 
   ;; Exact-location placement exercises wall-gears jamming without an unrelated LOS
   ;; dependency.  Both devices are uncontrolled and therefore initially turn in both views.

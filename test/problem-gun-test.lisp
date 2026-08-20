@@ -76,9 +76,9 @@
 
   ;; Jam-target sightlines.  gun1 and gun2 have clear authored LOS.  gun3 has structural
   ;; LOS from blocked-site, but its sole occluder gate is closed.
-  (los-to-apparatus start () gun1)
-  (los-to-apparatus disallowed-site () gun2)
-  (los-to-apparatus blocked-site (gate1) gun3)
+  (los-via start () gun1)
+  (los-via disallowed-site () gun2)
+  (los-via blocked-site (gate1) gun3)
   (jam-disallowed> goal disallowed-site gun2)
 
   ;; Uncontrolled and controlled kill zones.  gun1 deliberately threatens two

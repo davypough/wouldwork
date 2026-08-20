@@ -75,14 +75,14 @@
   (has-location gate-agent gate-site)
   (holding gate-agent gate-jammer)
   (has-position gate-plate gate-site)
-  (los-to-target gate-site () gate-target)
+  (los-via gate-site () gate-target)
 
   ;; Wall gears target: the jammer remains at the distinct vantage and sees the
   ;; gears through their fixed-position location.
   (has-location wall-agent wall-vantage)
   (holding wall-agent wall-jammer)
   (has-position wall-target wall-gears-site)
-  (los-to-location wall-vantage () wall-gears-site)
+  (los-via wall-vantage () wall-gears-site)
 
   ;; Floor gears target: exact placement/fixture location equality is sufficient;
   ;; no LOS fact is authored for this lane.

@@ -103,9 +103,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (has-position fixed-position-object $location)
 (jam-disallowed> location location target)
 (location-coords> location $rational $rational $rational)  ;third is the location's own level, optional, default 0
-(los-to-apparatus location $list apparatus)
-(los-to-location location $list location)
-(los-to-target location $list gate)
+(los-via visibility-object $list visibility-object)  ;symmetric sightline; $list is a flat conjunction of gate and location occluders, all of which must be transparent
 (los-barrier-crossings> los-endpoint $list visibility-object)  ;directed records (:kind identity parameter x1 y1 x2 y2), including fixed couplings and gate targets
 (reach-via location $list location)  ;authorizes manipulation across a barrier, not movement; deliberately not a traversal mode
 (reach-via> location $list location)  ;directional reach, reacher first; for a one-way opening only, never for a height difference
@@ -176,7 +174,7 @@ far the rod projects from its wall and enters no computation.
 
 Outside the table:
 
-boundary-wall 6  ;LOS-only height default; a boundary polygon has no named object for has-height
+boundary-wall *boundary-wall-height*, default 6  ;the polygon has no named object for has-height; see section 7
 wall-gears 1, wall-blower 1  ;their has-elevation is the emitted STREAM elevation, read by
                              ;-gears-fan's blower-elevation, not the base of a solid; both
                              ;are deliberately absent from the table above
@@ -184,6 +182,7 @@ wall-gears 1, wall-blower 1  ;their has-elevation is the emitted STREAM elevatio
 7. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
 
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
+*boundary-wall-height* 6  ;tech/-segment-geometry.lisp; the boundary polygon's LOS height -- the one barrier with no named object, so it can carry no has-height and has no entry in the vertical type table
 *max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path; a cycle counts when it starts
 *max-pairings* 3  ;tech/beam-relay.lisp; max PAIRED termini a connector may hold at once; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
 *vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap an agent can act across vertically -- reaching to pick up or place cargo above or below its own elevation, or jumping up onto a higher support or clearing a barrier -- independent of the agent's own declared height; jump.lisp reuses this parameter rather than defining its own

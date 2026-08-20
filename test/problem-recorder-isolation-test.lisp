@@ -125,9 +125,9 @@
   (holding ghost-pair-agent ghost-pair-connector)
   (has-location live-target-connector live-target-site)
   (has-location ghost-target-connector ghost-target-site)
-  (los-to-location pair-origin () live-target-site)
-  (los-to-location pair-origin () ghost-target-site)
-  (los-to-apparatus pair-origin () shared-transmitter))
+  (los-via pair-origin () live-target-site)
+  (los-via pair-origin () ghost-target-site)
+  (los-via pair-origin () shared-transmitter))
 
 
 ;;;; CHARACTERIZATION HELPERS ;;;;

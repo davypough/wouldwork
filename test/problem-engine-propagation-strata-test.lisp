@@ -129,7 +129,7 @@
 (include-tech wall-blower)   ;turning; blowing; update-blower-status!; update-wall-blower-status!
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step configuration transitions
-(include-tech visibility)    ;los-to-apparatus; visible; visible-clear
+(include-tech visibility)    ;los-via; visible; visible-clear
 (include-tech walkability)  ;walking mode; mobility-results; traversable; move
 
 
@@ -164,8 +164,8 @@
   ;; -beam-los-coordinates derivation is inert and these facts stand as written.  west
   ;; sees transmitter1 directly; the sightline from west to receiver1 runs through gate1,
   ;; which is what makes the plate load-bearing.
-  (los-to-apparatus west () transmitter1)
-  (los-to-apparatus west (gate1) receiver1)
+  (los-via west () transmitter1)
+  (los-via west (gate1) receiver1)
 
   ;; Control wiring: the plate opens the gate, the receiver turns the gears.
   (controls ((plate1)) gate1 normal)

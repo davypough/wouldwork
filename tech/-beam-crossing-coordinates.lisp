@@ -2,7 +2,7 @@
 
 ;;; Beam crossing coordinates substrate: computes CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>
 ;;; from the beam geometry -beam-los-coordinates.lisp already derived (or the problem hand-
-;;; authored) as LOS-TO-APPARATUS/LOS-TO-LOCATION, for a problem that would rather author 2D
+;;; authored) as LOS-VIA, for a problem that would rather author 2D
 ;;; positions than hand-list which crossings lie on which beam and in what order.  Nested under
 ;;; beam-crossing-tech only -- unlike -beam-los-coordinates, this file's derivations are never
 ;;; useful to a problem that includes beam-direct alone, since CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-
@@ -31,8 +31,7 @@
 ;;; beam-direct retain them separately and decide vertical clearance at runtime.
 ;;; Without a populated BEAM-CROSSINGS-BEFORE-GATE>, BEAM-REACHES-CROSSING's (beam-crossing.lisp) own
 ;;; gate check is vacuously satisfied, so a beam paired through a gate stays live for cutting
-;;; along its full geometric length even after the gate closes.  A LOS-TO-APPARATUS/LOS-TO-
-;;; LOCATION occluder list may also carry location entries (-beam-los-coordinates' own
+;;; along its full geometric length even after the gate closes.  A LOS-VIA occluder list may also carry location entries (-beam-los-coordinates' own
 ;;; location-occlusion test); DERIVE-BEAM-CROSSINGS-BEFORE-GATE's three loops below skip any
 ;;; occluder that is not a gate, since a location entry has no GATE-SEGMENT> fact to split
 ;;; a beam's crossing set at.
@@ -42,7 +41,7 @@
 ;;;
 ;;; REQUIRES:
 ;;;   nested    : -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
-;;;               POSITION>; LOS-TO-APPARATUS/LOS-TO-LOCATION, hand-authored or derived)
+;;;               POSITION>; LOS-VIA, hand-authored or derived)
 ;;;   relations : crossings-along-beam>, beam-crossings-before-gate>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
 ;;; PROVIDES:
@@ -180,7 +179,7 @@
 (define-query beam-coordinates-potential-beams ()
   ;; Canonical deterministic order: transmitter -> location, location -> receiver,
   ;; location -> repeater, then location -> location in declared type order
-  ;; (los-to-location is symmetric at runtime, so the type-order test avoids counting each
+  ;; (los-via is symmetric at runtime, so the type-order test avoids counting each
   ;; L-L pair twice), and finally the fixed COUPLED beams.  The location families come from
   ;; structural LOS relations that retain finite barrier crossings; direct beams have
   ;; no LOS fact to enumerate from -- their existence is authored as COUPLED -- so they are
@@ -190,21 +189,21 @@
   (do (assign $beams nil)
       (doall (?location location)
         (doall (?transmitter transmitter)
-          (if (bind (los-to-apparatus ?location $gates ?transmitter))
+          (if (bind (los-via ?location $gates ?transmitter))
             (push (list ?transmitter ?location) $beams))))
       (doall (?location location)
         (doall (?receiver receiver)
-          (if (bind (los-to-apparatus ?location $gates ?receiver))
+          (if (bind (los-via ?location $gates ?receiver))
             (push (list ?location ?receiver) $beams))))
       (doall (?location location)
         (doall (?repeater repeater)
-          (if (bind (los-to-apparatus ?location $gates ?repeater))
+          (if (bind (los-via ?location $gates ?repeater))
             (push (list ?location ?repeater) $beams))))
       (doall (?source location)
         (doall (?destination location)
           (if (and (member ?destination
                            (rest (member ?source (gethash 'location *types*))))
-                   (bind (los-to-location ?source $gates ?destination)))
+                   (bind (los-via ?source $gates ?destination)))
             (push (list ?source ?destination) $beams))))
       (append (reverse $beams) (beam-coordinates-coupled-beams))))
 
@@ -243,7 +242,7 @@
   ;; Runs only when the problem has authored APPARATUS-COORDS> or LOCATION-COORDS> facts --
   ;; inert otherwise, so a purely topological problem (hand-authoring CROSSINGS-ALONG-
   ;; BEAM> directly) is entirely unaffected.  Computes every proper beam intersection from
-  ;; the authored sightlines (LOS-TO-APPARATUS, LOS-TO-LOCATION) and coordinates, mints
+  ;; the authored sightlines (LOS-VIA) and coordinates, mints
   ;; one crossing per intersection, publishes the pool as CURRENT-BEAM-CROSSINGS, and asserts
   ;; CROSSINGS-ALONG-BEAM> accordingly.  CURRENT-BEAM-CROSSINGS is asserted before the
   ;; per-beam loop below purely for readability; nothing in this effect reads it back, but
@@ -298,13 +297,11 @@
   ;; BEAM-CROSSINGS-BEFORE-GATE> fact per gate, each with that gate's own cutoff -- correct
   ;; because BEAM-REACHES-CROSSING already ORs the blocking test across every gate.
   ;; Runs only when the problem has asserted GATE-SEGMENT> -- inert otherwise.  Needs
-  ;; GATE-SEGMENT> for the actual gate segment coordinates (the LOS-TO-APPARATUS/LOS-TO-
-  ;; LOCATION occluder list only has gate names), so, unlike ESTABLISH-BEAM-COORDINATES,
+  ;; GATE-SEGMENT> for the actual gate segment coordinates (the LOS-VIA occluder list only has gate names), so, unlike ESTABLISH-BEAM-COORDINATES,
   ;; can't run for a problem that hand-authors its own gate-conditioned LOS facts without
   ;; also supplying the geometry -- such a problem simply leaves BEAM-CROSSINGS-BEFORE-GATE>
   ;; unpopulated.  Defined here, after
-  ;; -beam-los-coordinates' own DERIVE-LOS-FROM-SEGMENTS (needs LOS-TO-APPARATUS/LOS-TO-
-  ;; LOCATION populated) -- file/load order, same as that init-action's own commentary
+  ;; -beam-los-coordinates' own DERIVE-LOS-FROM-SEGMENTS (needs LOS-VIA populated) -- file/load order, same as that init-action's own commentary
   ;; explains.  Reads the crossing pool back from CURRENT-BEAM-CROSSINGS rather than minting
   ;; its own: the crossings this splits must be the very objects CROSSINGS-ALONG-BEAM>
   ;; already names, and a second call to BEAM-COORDINATES-DERIVE-CROSSING-RECORDS would
@@ -328,7 +325,7 @@
                   $beams $positions $beam-crossings))
         (doall (?location location)
           (doall (?transmitter transmitter)
-            (if (bind (los-to-apparatus ?location $beam-gates ?transmitter))
+            (if (bind (los-via ?location $beam-gates ?transmitter))
               (ww-loop for $gate-name in $beam-gates
                        do (if (gate $gate-name)
                             (do (assign $gate-record (assoc $gate-name $gates))
@@ -342,7 +339,7 @@
                                   ?transmitter (car $split) $gate-name ?location)))))))
         (doall (?location location)
           (doall (?receiver receiver)
-            (if (bind (los-to-apparatus ?location $beam-gates ?receiver))
+            (if (bind (los-via ?location $beam-gates ?receiver))
               (ww-loop for $gate-name in $beam-gates
                        do (if (gate $gate-name)
                             (do (assign $gate-record (assoc $gate-name $gates))
@@ -358,7 +355,7 @@
           (doall (?destination location)
             (if (and (member ?destination
                              (rest (member ?source (gethash 'location *types*))))
-                     (bind (los-to-location ?source $beam-gates ?destination)))
+                     (bind (los-via ?source $beam-gates ?destination)))
               (ww-loop for $gate-name in $beam-gates
                        do (if (gate $gate-name)
                             (do (assign $gate-record (assoc $gate-name $gates))

@@ -90,15 +90,15 @@
   ;; mapped live blocker, which was absent from the recording phase.
   (paired ghost-recording-connector recording-transmitter)
   (paired ghost-recording-connector recording-receiver)
-  (los-to-apparatus recording-relay-site () recording-transmitter)
-  (los-to-apparatus recording-relay-site (blocker-site) recording-receiver)
+  (los-via recording-relay-site () recording-transmitter)
+  (los-via recording-relay-site (blocker-site) recording-receiver)
 
   ;; The second relay exists only on the mapped live side, so it powers shared playback
   ;; while contributing nothing to recording-side receiver state.
   (paired live-playback-connector playback-transmitter)
   (paired live-playback-connector playback-receiver)
-  (los-to-apparatus playback-relay-site () playback-transmitter)
-  (los-to-apparatus playback-relay-site () playback-receiver)
+  (los-via playback-relay-site () playback-transmitter)
+  (los-via playback-relay-site () playback-receiver)
 
   (current-phase phase0))
 

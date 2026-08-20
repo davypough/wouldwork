@@ -1,13 +1,13 @@
 ;;; Filename: -beam-los-coordinates.lisp
 
-;;; Beam LOS coordinates substrate: derives LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION
+;;; Beam LOS coordinates substrate: derives LOS-VIA
 ;;; from raw WALL-SEGMENT>/EDGE-SEGMENT>/GATE-SEGMENT>/BOUNDARY-WALL segment geometry, for a
 ;;; problem that would rather author 2D positions than hand-list sightlines.  Nested under
 ;;; visibility-tech (the owner of the los relations derived here) and beam-crossing-tech (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
-;;; asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL, so a problem that hand-authors its own LOS-TO-
-;;; APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION facts instead is unaffected.  No problem currently
+;;; asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL, so a problem that hand-authors its own LOS-VIA
+;;; facts instead is unaffected.  No problem currently
 ;;; takes that hand-authored path -- corner-topo and claustro-topo both supply WALL-SEGMENT>
 ;;; facts and derive.  Walls, edges, gates, and boundary segments retain their static 2D
 ;;; crossings for runtime vertical-clearance checks.  Edges have the same finite-height
@@ -18,9 +18,9 @@
 ;;; substrate, so a location's position is entered once even when a problem uses both
 ;;; capabilities) for location endpoints, and APPARATUS-COORDS> (declared here) for
 ;;; transmitter/receiver/repeater/gun functional points -- a problem with pure location-to-location
-;;; beams and no fixtures never needs APPARATUS-COORDS> at all.  A gun's LOS-TO-
-;;; APPARATUS entries are derived the same way a receiver's are (gated on a jammer
-;;; being present, like LOS-TO-TARGET, since nothing but jam-target ever reads them).
+;;; beams and no fixtures never needs APPARATUS-COORDS> at all.  A gun's sightlines are
+;;; derived the same way a receiver's are, gated on a jammer being present -- as the
+;;; gate sightlines are, since nothing but jam-target ever reads either.
 ;;;
 ;;; DERIVE-LOS-FROM-SEGMENTS tests every location<->apparatus, location<->gate, and
 ;;; location<->location pair against that geometry, recording every finite barrier crossing
@@ -30,7 +30,7 @@
 ;;; corner, since the neighboring wall already covers that point; a beam endpoint that lies
 ;;; exactly on a wall or gate, corner or interior, is an authoring error (see BEAM-
 ;;; COORDINATES-OBSTACLE-INTERSECTION-PARAMETER).  A gate has no APPARATUS-COORDS> of its
-;;; own -- it is authored as an extended segment, not a point endpoint -- so its LOS-TO-TARGET
+;;; own -- it is authored as an extended segment, not a point endpoint -- so its LOS-VIA
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
 ;;; repeats its first -- each consecutive polygon edge contributes its own retained crossing.
@@ -47,7 +47,7 @@
 ;;; default 1/2, a half-unit radius; a problem overrides it with its own DEFPARAMETER).  A
 ;;; qualifying location is appended to the occluder list as a bare location name, exactly like
 ;;; a qualifying gate; distances are compared squared throughout to stay in exact rational
-;;; arithmetic.  The location<->gate (LOS-TO-TARGET) and location<->gun branches deliberately
+;;; arithmetic.  The location<->gate (LOS-VIA) and location<->gun branches deliberately
 ;;; do not gain this test -- nothing but jam-target ever reads either, and a jammer's line to
 ;;; its target is not blocked by intervening objects, by design.
 ;;;
@@ -68,7 +68,7 @@
 ;;;   types     : location  --  declared by the problem; transmitter, receiver, repeater, gun
 ;;;               declared optional by -visibility/-beam-substrate, sibling nested
 ;;;               includes of the parent techs
-;;;   relations : los-to-apparatus, los-to-target, los-to-location  --  declared by
+;;;   relations : los-via, los-via, los-via  --  declared by
 ;;;               visibility-tech, this file's primary parent; a beam-crossing problem
 ;;;               reaching this file through -beam-crossing-coordinates must still include
 ;;;               visibility for these relations to exist
@@ -83,14 +83,14 @@
 ;;;               gun location);
 ;;;               jammer and gun
 ;;;               declared optional here only to gate DERIVE-LOS-FROM-SEGMENTS's
-;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
+;;;               LOS-VIA derivations below, so a problem with
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
 ;;;   nested    : -apparatus-coordinates (apparatus-coords>, formerly declared here)
 ;;;   relations : wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
 ;;;               to no facts; a problem that asserts wall-segment>, edge-segment>, or
 ;;;               boundary-wall gets
-;;;               LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION derived automatically
+;;;               LOS-VIA derived automatically
 ;;;               instead of hand-authoring them; boundary-wall additionally folds its
 ;;;               polygon edges into that derivation's finite-barrier crossings
 ;;;   functions : beam-coordinates-coupled-beams -- stable raw enumeration shared with
@@ -99,7 +99,7 @@
 ;;;               (query-time, not just init-time) coordinate lookup and interpolation,
 ;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
 ;;;               location occluder exactly as for a derived one, so a problem that hand-
-;;;               authors LOS-TO-APPARATUS/LOS-TO-LOCATION directly (bypassing WALL-SEGMENT>
+;;;               authors LOS-VIA directly (bypassing WALL-SEGMENT>
 ;;;               derivation) can still list a location as an occluder -- it still needs
 ;;;               LOCATION-COORDS>/APPARATUS-COORDS> asserted for that location and for both
 ;;;               of the beam's own endpoints, even though DERIVE-LOS-FROM-SEGMENTS itself
@@ -155,7 +155,7 @@
 (defun beam-coordinates-gate-midpoint (gate-record)
   ;; Returns GATE-RECORD's own (x y) midpoint -- a gate has no APPARATUS-COORDS> of its own,
   ;; since it is authored as an extended segment rather than a point endpoint, so its
-  ;; LOS-TO-TARGET entries (DERIVE-LOS-FROM-SEGMENTS, below) use this single reference
+  ;; LOS-VIA entries (DERIVE-LOS-FROM-SEGMENTS, below) use this single reference
   ;; point in its place.
   (list (/ (+ (second gate-record) (fourth gate-record)) 2)
         (/ (+ (third gate-record) (fifth gate-record)) 2)))
@@ -390,13 +390,13 @@
 
 
 (define-init-action derive-los-from-segments
-  ;; Derives LOS-TO-APPARATUS/LOS-TO-LOCATION, and LOS-TO-TARGET/gun's LOS-TO-APPARATUS
-  ;; entries when a jammer is present, from wall/edge/gate/boundary raw segment
+  ;; Derives every LOS-VIA sightline -- to apparatus, to another location, and, when a
+  ;; jammer is present, to a gate or gun -- from wall/edge/gate/boundary raw segment
   ;; geometry, when the problem supplies it, instead of requiring them hand-authored.
-  ;; LOS-TO-TARGET and gun's LOS-TO-APPARATUS entries are both gated on (exists (?j
+  ;; The gate and gun sightlines are both gated on (exists (?j
   ;; jammer) t): nothing but jam-target ever consumes a location<->gate or location<->gun
   ;; sightline, so a problem without a jammer (like corner-topo) skips both derivations
-  ;; entirely rather than asserting facts no query ever reads.  A gate's own LOS-TO-TARGET
+  ;; entirely rather than asserting facts no query ever reads.  A gate's own LOS-VIA
   ;; entries use BEAM-COORDINATES-GATE-MIDPOINT as their reference point, since a gate is
   ;; authored as an extended segment rather than
   ;; a point endpoint.  When the problem also asserts BOUNDARY-WALL, each polygon edge
@@ -410,7 +410,7 @@
   ;; -beam-crossing-coordinates' own ESTABLISH-BEAM-COORDINATES when that file is also
   ;; spliced: init-actions run in file/load order (see that init-action's own commentary
   ;; there on DO-INIT-ACTION-UPDATES), not by the numeric-looking argument below, and
-  ;; ESTABLISH-BEAM-COORDINATES reads LOS-TO-APPARATUS/LOS-TO-LOCATION to enumerate its own
+  ;; ESTABLISH-BEAM-COORDINATES reads LOS-VIA to enumerate its own
   ;; beam set.  Ends with its own CONVERT-DATABASES-TO-INTEGERS for the same reason that
   ;; init-action does -- so the facts asserted here are visible to its own later BIND calls.
   ;;
@@ -447,7 +447,7 @@
                 (assign $location-occluders
                         (beam-coordinates-location-occluders
                           $beam $positions $locations *beam-occlusion-tolerance*))
-                (los-to-apparatus ?location
+                (los-via ?location
                                   (append (beam-coordinates-gate-occluders $crossings)
                                           $location-occluders)
                                   ?transmitter)
@@ -461,7 +461,7 @@
                 (assign $location-occluders
                         (beam-coordinates-location-occluders
                           $beam $positions $locations *beam-occlusion-tolerance*))
-                (los-to-apparatus ?location
+                (los-via ?location
                                   (append (beam-coordinates-gate-occluders $crossings)
                                           $location-occluders)
                                   ?receiver)
@@ -475,7 +475,7 @@
                 (assign $location-occluders
                         (beam-coordinates-location-occluders
                           $beam $positions $locations *beam-occlusion-tolerance*))
-                (los-to-apparatus ?location
+                (los-via ?location
                                   (append (beam-coordinates-gate-occluders $crossings)
                                           $location-occluders)
                                   ?repeater)
@@ -488,7 +488,7 @@
                               (beam-coordinates-barrier-crossings
                                 $beam $target-positions $walls $edges
                                 $boundary-segments $gates))
-                      (los-to-target ?location
+                      (los-via ?location
                                      (beam-coordinates-gate-occluders $crossings)
                                      ?gate)
                       (los-barrier-crossings> ?location $crossings ?gate))))
@@ -498,7 +498,7 @@
                       (assign $crossings
                               (beam-coordinates-barrier-crossings
                                 $beam $positions $walls $edges $boundary-segments $gates))
-                      (los-to-apparatus ?location
+                      (los-via ?location
                                         (beam-coordinates-gate-occluders $crossings)
                                         ?gun)
                       (los-barrier-crossings> ?location $crossings ?gun))))))
@@ -513,7 +513,7 @@
                   (assign $location-occluders
                           (beam-coordinates-location-occluders
                             $beam $positions $locations *beam-occlusion-tolerance*))
-                  (los-to-location ?source
+                  (los-via ?source
                                    (append (beam-coordinates-gate-occluders $crossings)
                                            $location-occluders)
                                    ?destination)

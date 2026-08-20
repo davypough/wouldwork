@@ -75,27 +75,27 @@
   (open open-gate1)
   (open open-gate2)
 
-  (los-to-apparatus apparatus-direct-site () direct-receiver)
-  (los-to-apparatus
+  (los-via apparatus-direct-site () direct-receiver)
+  (los-via
     apparatus-open-site
     (open-gate1 open-gate2)
     open-receiver)
-  (los-to-apparatus
+  (los-via
     apparatus-mixed-site
     (open-gate1 closed-gate)
     mixed-receiver)
 
-  (los-to-target target-direct-site () direct-target-gate)
-  (los-to-target
+  (los-via target-direct-site () direct-target-gate)
+  (los-via
     target-blocked-site
     (closed-gate)
     blocked-target-gate)
 
-  (los-to-location clear-left () clear-right)
-  (los-to-location open-left (open-gate1) open-right)
-  (los-to-location blocked-left (closed-gate) blocked-right)
+  (los-via clear-left () clear-right)
+  (los-via open-left (open-gate1) open-right)
+  (los-via blocked-left (closed-gate) blocked-right)
 
-  (los-to-apparatus beam-source (beam-mid) beam-receiver)
+  (los-via beam-source (beam-mid) beam-receiver)
   (location-coords> beam-source 0 0)
   (location-coords> beam-mid 5 0)
   (apparatus-coords> beam-receiver 10 0))

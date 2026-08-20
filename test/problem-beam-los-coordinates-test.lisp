@@ -181,11 +181,11 @@
 (define-query beam-los-coordinates-scenarios-valid ()
   (and
     ;; Direct derivation for each ordinary apparatus family.
-    (bind (los-to-apparatus clear-site $transmitter-occluders clear-transmitter))
+    (bind (los-via clear-site $transmitter-occluders clear-transmitter))
     (null $transmitter-occluders)
-    (bind (los-to-apparatus clear-site $receiver-occluders clear-receiver))
+    (bind (los-via clear-site $receiver-occluders clear-receiver))
     (null $receiver-occluders)
-    (bind (los-to-apparatus clear-site $repeater-occluders clear-repeater))
+    (bind (los-via clear-site $repeater-occluders clear-repeater))
     (null $repeater-occluders)
     (visible clear-site clear-transmitter)
     (visible clear-site clear-receiver)
@@ -218,7 +218,7 @@
     (beam-visible edge-interior-site 5/2 edge-interior-receiver 5/2)
 
     ;; Proper gate crossings retain structural LOS with exact conditional occluders.
-    (bind (los-to-apparatus
+    (bind (los-via
             closed-gate-site $closed-occluders closed-gate-receiver))
     (equal $closed-occluders '(closed-gate))
     (potentially-visible closed-gate-site closed-gate-receiver)
@@ -227,7 +227,7 @@
     (not (beam-visible closed-gate-site 4 closed-gate-receiver 4))
     (beam-visible closed-gate-site 5 closed-gate-receiver 5)
 
-    (bind (los-to-apparatus
+    (bind (los-via
             open-gate-site $open-occluders open-gate-receiver))
     (equal $open-occluders '(open-gate))
     (potentially-visible open-gate-site open-gate-receiver)
@@ -236,22 +236,22 @@
     (open open-gate)
 
     ;; A gate intersection at the gate segment's endpoint is deliberately strict.
-    (bind (los-to-apparatus
+    (bind (los-via
             gate-corner-site $corner-occluders gate-corner-receiver))
     (null $corner-occluders)
     (visible gate-corner-site gate-corner-receiver)
 
     ;; The exactly-half-unit candidate is included.  The farther and endpoint-
     ;; projected candidates must remain absent from this exact singleton list.
-    (bind (los-to-location tolerance-left $tolerance-occluders tolerance-right))
+    (bind (los-via tolerance-left $tolerance-occluders tolerance-right))
     (equal $tolerance-occluders '(tolerance-edge))
-    (bind (los-to-location tolerance-right $reverse-occluders tolerance-left))
+    (bind (los-via tolerance-right $reverse-occluders tolerance-left))
     (equal $reverse-occluders '(tolerance-edge))
     (potentially-visible tolerance-left tolerance-right)
     (visible tolerance-left tolerance-right)
 
     ;; Coincident endpoints have no horizontal interior in which anything can occlude.
-    (bind (los-to-location
+    (bind (los-via
             tolerance-left $coincident-occluders tolerance-endpoint))
     (null $coincident-occluders)
 
@@ -272,12 +272,12 @@
 
     ;; Gate midpoint/self-segment handling and the jammer-specific exclusions:
     ;; intervening locations do not enter target-gate or gun occluder lists.
-    (bind (los-to-target target-site $target-occluders target-gate))
+    (bind (los-via target-site $target-occluders target-gate))
     (null $target-occluders)
     (visible target-site target-gate)
     (not (open target-gate))
 
-    (bind (los-to-apparatus gun-site $gun-occluders test-gun))
+    (bind (los-via gun-site $gun-occluders test-gun))
     (null $gun-occluders)
     (visible gun-site test-gun)
 

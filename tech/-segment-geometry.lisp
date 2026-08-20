@@ -24,6 +24,15 @@
   (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
 
 
+(defvar *boundary-wall-height* 6
+  "The boundary polygon's height, for the sightline crossing test.  A boundary is the only
+   barrier with no named object, so it can carry no HAS-HEIGHT and has no entry in
+   -vertical's per-type table; this parameter is where its height lives instead, rather than
+   as a bare literal inside the crossing test where it could silently drift from the
+   documented default.  Its base is 0 by definition -- a boundary is the room's silhouette,
+   standing on the ground.  A problem can override this with its own DEFPARAMETER.")
+
+
 ;;;; SEGMENT GATHERING ;;;;
 
 

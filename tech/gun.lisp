@@ -12,7 +12,7 @@
 ;;; coordinates' apparatus-coords>) rather than with HAS-POSITION: nothing can ever
 ;;; occupy a gun's mounting point, since it isn't a location at all.  Jammed via
 ;;; jammer.lisp's target union; jam-target's LOS check reads it through visible/
-;;; los-to-apparatus, the same as a gate, not through has-position like gears -- this
+;;; los-via, the same as a gate, not through has-position like gears -- this
 ;;; file doesn't need to nest -visibility/-beam-los-coordinates itself, since it never
 ;;; calls visible; that machinery arrives transitively through jammer.lisp (and, for real
 ;;; geometric derivation rather than hand-authored LOS facts, the public visibility tech).

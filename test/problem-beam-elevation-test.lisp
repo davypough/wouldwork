@@ -88,7 +88,7 @@
 
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; compute-relay-lighting; relay-beam-reaches-receiver
-(include-tech visibility)    ;los-to-apparatus; los-to-location; visible; beam-visible
+(include-tech visibility)    ;los-via; los-via; visible; beam-visible
 (include-tech walkability)   ;walking mode; mobility-results; traversable; move
 
 
@@ -118,9 +118,9 @@
   (paired connector1 transmitter1)
   (paired connector2 connector1)
   (paired connector2 receiver1)
-  (los-to-apparatus low () transmitter1)
-  (los-to-apparatus high () receiver1)
-  (los-to-location low (mid) high)
+  (los-via low () transmitter1)
+  (los-via high () receiver1)
+  (los-via low (mid) high)
 
   ;; Coordinates for the low<->high beam and its one occluder candidate, mid -- all
   ;; beam-visible's live elevation interpolation needs (low/high's own sightlines to
@@ -155,9 +155,9 @@
   (paired connector3 transmitter2)
   (paired connector4 connector3)
   (paired connector4 receiver2)
-  (los-to-apparatus low2 () transmitter2)
-  (los-to-apparatus high2 () receiver2)
-  (los-to-location low2 (mid2) high2)
+  (los-via low2 () transmitter2)
+  (los-via high2 () receiver2)
+  (los-via low2 (mid2) high2)
 
   (location-coords> low2 0 10)
   (location-coords> mid2 5 52/5)

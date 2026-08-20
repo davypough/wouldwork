@@ -94,8 +94,8 @@
   (has-chroma paired-receiver green)
   (paired connector1 paired-source)
   (paired connector1 paired-repeater)
-  (los-to-apparatus paired-location () paired-source)
-  (los-to-apparatus paired-location () paired-repeater)
+  (los-via paired-location () paired-source)
+  (los-via paired-location () paired-repeater)
   (coupled paired-repeater paired-receiver)
   (beam-via paired-repeater () paired-receiver)
 

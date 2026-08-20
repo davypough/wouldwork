@@ -66,7 +66,7 @@
   (has-location jammer1 lower1)
   (has-location fan1 lower1)
   (has-position gears1 lower1)
-  (los-to-apparatus lower1 () gun1)
+  (los-via lower1 () gun1)
   (mounted-on fan1 gears1)
   (threatens gun1 loft)
   (aimed-at gears1 loft)

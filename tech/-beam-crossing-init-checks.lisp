@@ -49,31 +49,26 @@
 
 
 (define-init-check-helper init-occluders-for-directed-beam (source destination literals)
-  (let ((source-location-p (init-type-member-p source 'location))
-        (destination-location-p (init-type-member-p destination 'location)))
-    (cond
-      ((and source-location-p destination-location-p)
-       (init-first-matching-list-value
-         'los-to-location literals
-         (lambda (prop)
-           (or (and (eql (second prop) source)
-                    (eql (fourth prop) destination))
-               (and (eql (second prop) destination)
-                    (eql (fourth prop) source))))))
-      ((or source-location-p destination-location-p)
-       (let ((location (if source-location-p source destination))
-             (apparatus (if source-location-p destination source)))
-         (init-first-matching-list-value
-           'los-to-apparatus literals
-           (lambda (prop)
-             (and (eql (second prop) location)
-                  (eql (fourth prop) apparatus))))))
-      (t
-       (init-first-matching-list-value
-         'beam-via literals
-         (lambda (prop)
-           (and (eql (second prop) source)
-                (eql (fourth prop) destination))))))))
+  "The occluder list guarding a beam between SOURCE and DESTINATION.  A hop with a location
+   at either end is guarded by its sightline, and LOS-VIA records that once for both
+   directions, so the lookup is order-agnostic -- which is why the location-to-location and
+   location-to-apparatus cases, separate relations before Phase 5, are now one branch.  A
+   fixed apparatus-to-apparatus coupling has no sightline fact and is guarded by its own
+   BEAM-VIA corridor instead."
+  (if (or (init-type-member-p source 'location)
+          (init-type-member-p destination 'location))
+    (init-first-matching-list-value
+      'los-via literals
+      (lambda (prop)
+        (or (and (eql (second prop) source)
+                 (eql (fourth prop) destination))
+            (and (eql (second prop) destination)
+                 (eql (fourth prop) source)))))
+    (init-first-matching-list-value
+      'beam-via literals
+      (lambda (prop)
+        (and (eql (second prop) source)
+             (eql (fourth prop) destination))))))
 
 
 (define-init-check-helper init-defined-beam-crossings (literals)
