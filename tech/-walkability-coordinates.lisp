@@ -92,7 +92,10 @@
 ;;;               that asserts wall-segment>, edge-segment>, or boundary-wall gets
 ;;;               WALK-VIA/WALK-VIA> derived automatically instead of hand-authoring them
 ;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
-;;;               redefined by -stream-passability where wall blowers exist
+;;;               redefined by -stream-passability where wall blowers exist;
+;;;               terrain-complaints  --  default no complaints; redefined by
+;;;               -terrain-consistency, which nests this file and -vertical, to
+;;;               cross-check authored levels against the arrangement below
 ;;;   init      : derive-walk-via-from-segments
 
 (include-tech -walkability)
@@ -135,7 +138,11 @@
          (sources (remove-duplicates
                     (loop for (nil zone-list nil) in memberships append zone-list)))
          (families (walkability-coordinates-family-table edges sources)))
-    (list :memberships memberships :families families)))
+    ;; XS, YS, and ZONES are carried alongside the pairwise results so a consumer can
+    ;; ask which zones flank a given segment interval, as -terrain-consistency does;
+    ;; WALKABILITY-COORDINATES-PAIR-SPEC reads only the first two keys.
+    (list :memberships memberships :families families
+          :xs xs :ys ys :zones zones)))
 
 
 (defun walkability-coordinates-pair-spec (arrangement loc-a loc-b)
@@ -617,6 +624,29 @@
       $specs))
 
 
+(define-query terrain-complaints (?arrangement)
+  ;; Default: nothing to say about the vertical dimension.  -terrain-consistency, which
+  ;; nests this file and -vertical, redefines this to return one complaint string per
+  ;; authored level the arrangement contradicts -- so walking derivation stays usable in
+  ;; a problem carrying no vertical model at all, exactly as the stream seam above keeps
+  ;; it usable with no blowers.
+  (do (assign $unexamined ?arrangement)
+      (assign $complaints nil)
+      $complaints))
+
+
+(defun report-terrain-complaints (complaints)
+  "Signal every terrain-consistency complaint the arrangement produced, together rather
+   than one run at a time.  Each is an authored vertical fact the derived walking
+   arrangement contradicts; see -terrain-consistency for what determines each one and
+   for the cases it deliberately abstains on."
+  (error "~%Terrain consistency check failed.~%~%~{~A~%~%~}~
+          Each complaint above names an authored level or span that the derived walking ~
+          arrangement contradicts.  Fix the authored fact, or -- where the geometry ~
+          genuinely carries the level change -- add the authored traversal that crosses it."
+         complaints))
+
+
 ;;;; INITIALIZATION ;;;;
 
 
@@ -647,6 +677,9 @@
         (assign $positions (walkability-coordinates-location-coords))
         (assign $arrangement (walkability-coordinates-build-arrangement
                                $positions $walls $gates $windows $screens $stream-specs $boundary))
+        (assign $terrain-complaints (terrain-complaints $arrangement))
+        (if $terrain-complaints
+          (report-terrain-complaints $terrain-complaints))
         (doall (?source location)
           (doall (?destination location)
             (if (member ?destination

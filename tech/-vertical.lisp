@@ -84,7 +84,7 @@
     (wall              4   :vertical   0)
     (edge              3/2 :vertical   0)
     (floor-repeater    1   :vertical   0)   ;stands on the floor
-    (wall-repeater     1   :horizontal 1)   ;height is projection from the wall, not lift
+    (wall-repeater     1   :horizontal 1)   ;projection from its wall; descriptive only
     (transmitter       0   :none       1)
     (receiver          0   :none       1)
     (gun               0   :none       1))
@@ -97,7 +97,12 @@
    problem write the level inline, and this table supplies it when the problem carries no
    coordinates at all.  The types are disjoint leaves, so an object matches at most one
    entry and the order is presentational only.  A problem overrides any height for an
-   individual object with HAS-HEIGHT, and any base with the coordinates or HAS-ELEVATION.")
+   individual object with HAS-HEIGHT, and any base with the coordinates or HAS-ELEVATION.
+   A height on a non-vertical axis is DESCRIPTIVE ONLY: TOP ignores it, and every other
+   OBJECT-HEIGHT consumer takes an argument type that admits no such object, so the number
+   records the object's shape without entering any computation.  See repeater.lisp for the
+   one instance -- a wall-repeater's projection from its wall -- and for why Phase 2
+   declined to cross-check it against the coordinates.")
 
 
 (defparameter *vertical-type-cache* (make-hash-table :test #'eq)

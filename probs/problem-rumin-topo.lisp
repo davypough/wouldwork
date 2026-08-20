@@ -66,6 +66,7 @@
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
+(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 ;;;; INITIALIZATION ;;;;
 

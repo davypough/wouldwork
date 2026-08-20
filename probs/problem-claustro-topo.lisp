@@ -62,6 +62,7 @@
 (include-tech visibility)
 (include-tech reachability)
 (include-tech ladder)
+(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; INITIALIZATION ;;;;
