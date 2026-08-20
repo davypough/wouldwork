@@ -161,7 +161,7 @@
   ;; gears w) fact) -- see -stream-passability and -walkability-coordinates.  The
   ;; swept location is standable only while its stream is off (every edge to it is
   ;; gears-gated); each zone flanking a band's side curtains instead gets a free
-  ;; one-way walk-via> ride edge to the stream's destination -- step in laterally and
+  ;; one-way directed WALKING ride edge to the stream's destination -- step in laterally and
   ;; be carried there while blowing, or walk the same trip across the dead band.
 )
 

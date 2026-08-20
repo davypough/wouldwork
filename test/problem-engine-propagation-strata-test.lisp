@@ -130,7 +130,7 @@
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step configuration transitions
 (include-tech visibility)    ;los-to-apparatus; visible; visible-clear
-(include-tech walkability)  ;walk-via; mobility-results; traversable; move
+(include-tech walkability)  ;walking mode; mobility-results; traversable; move
 
 
 ;;;; INITIALIZATION ;;;;
@@ -150,7 +150,7 @@
   ;; declares no has-elevation, so its stream works at the default elevation 1 and strikes
   ;; anything standing on mid's floor.  east has no walking edge: the stream is the only
   ;; way in, and nothing walks back out.
-  (walk-via west ((gate1)) mid)
+  (traversal-via walking west ((gate1)) mid)
 
   ;; Beam wiring.  The pairings are authored rather than built by connect-connector, so
   ;; the relay chain transmitter1 -> connector1 -> receiver1 is live from the first pass

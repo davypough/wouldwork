@@ -45,23 +45,23 @@
   (has-location box2 location10)
   (has-elevation location12 2)
   (has-elevation location13 2)
-  (jump-via location10 () location12)
-  (walk-via location12 () location13)
-  (jump-via location13 () location11)
+  (traversal-via jumping location10 () location12)
+  (traversal-via walking location12 () location13)
+  (traversal-via jumping location13 () location11)
 
   ;; The real problem's directed, exactly-positioned, empty-handed ladder traversal.
   (has-location ladder-agent location7)
   (has-position ladder1 location7)
-  (climb-via> location7 (ladder1) location1)
+  (traversal-via> climbing location7 ((ladder1)) location1)
 
   ;; Variant lane: stairs deliberately supply the two-unit ascent without a support-state
   ;; boundary, so the entire stairs/walk/downward-jump route is one transparent MOVE.
   (has-location stairs-agent stairs10)
   (has-elevation stairs12 2)
   (has-elevation stairs13 2)
-  (stairs-via stairs10 () stairs12)
-  (walk-via stairs12 () stairs13)
-  (jump-via stairs13 () stairs11))
+  (traversal-via stairway stairs10 () stairs12)
+  (traversal-via walking stairs12 () stairs13)
+  (traversal-via jumping stairs13 () stairs11))
 
 
 (define-init-action initialize-derived-state
@@ -90,7 +90,8 @@
 
 (define-test-claim claustro-ladder-contract
   (equal
-    (ladder-traversal-segments *start-state* 'ladder-agent 'location7)
+    (remove-if-not (lambda (segment) (eql (first segment) 'ladder))
+                   (traversal-segments *start-state* 'ladder-agent 'location7))
     '((ladder location7 (ladder1) location1)))
   (equal
     (assoc 'location1

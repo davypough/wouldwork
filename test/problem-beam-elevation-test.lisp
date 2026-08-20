@@ -89,7 +89,7 @@
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; compute-relay-lighting; relay-beam-reaches-receiver
 (include-tech visibility)    ;los-to-apparatus; los-to-location; visible; beam-visible
-(include-tech walkability)   ;walk-via; mobility-results; traversable; move
+(include-tech walkability)   ;walking mode; mobility-results; traversable; move
 
 
 ;;;; INITIALIZATION ;;;;
@@ -131,8 +131,8 @@
   (location-coords> high 10 0)
 
   ;; Walking topology: low -> mid direct, mid -> goal only once gate1 opens.
-  (walk-via low () mid)
-  (walk-via mid ((gate1)) goal)
+  (traversal-via walking low () mid)
+  (traversal-via walking mid ((gate1)) goal)
 
   ;; gate1 opens once receiver1 activates.
   (controls ((receiver1)) gate1 normal)
@@ -163,8 +163,8 @@
   (location-coords> mid2 5 52/5)
   (location-coords> high2 10 10)
 
-  (walk-via low2 () mid2)
-  (walk-via mid2 ((gate2)) blocked-goal)
+  (traversal-via walking low2 () mid2)
+  (traversal-via walking mid2 ((gate2)) blocked-goal)
   (controls ((receiver2)) gate2 normal)
 )
 

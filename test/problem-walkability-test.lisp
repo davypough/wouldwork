@@ -58,32 +58,32 @@
   (open open-gate)
   (open open-gate-b)
 
-  (walk-via> main-start () main-mid)
-  (walk-via main-mid
+  (traversal-via> walking main-start () main-mid)
+  (traversal-via walking main-mid
             ((closed-gate) (open-gate screen1) (open-gate-b))
             main-goal)
 
   ;; Two equal-length routes exercise the lexical tie-break; the separate
   ;; direct edge proves that segment count takes precedence over lexical order.
-  (walk-via> canonical-start () canonical-a)
-  (walk-via> canonical-a () canonical-goal)
-  (walk-via> canonical-start () canonical-b)
-  (walk-via> canonical-b () canonical-goal)
-  (walk-via> shortest-start () shortest-mid)
-  (walk-via> shortest-mid () shortest-goal)
-  (walk-via> shortest-start () shortest-goal)
+  (traversal-via> walking canonical-start () canonical-a)
+  (traversal-via> walking canonical-a () canonical-goal)
+  (traversal-via> walking canonical-start () canonical-b)
+  (traversal-via> walking canonical-b () canonical-goal)
+  (traversal-via> walking shortest-start () shortest-mid)
+  (traversal-via> walking shortest-mid () shortest-goal)
+  (traversal-via> walking shortest-start () shortest-goal)
 
-  (walk-via screen-start ((open-gate screen1)) screen-goal)
-  (walk-via ladder-start ((open-gate ladder1)) ladder-goal)
-  (walk-via closed-start ((closed-gate)) closed-goal)
+  (traversal-via walking screen-start ((open-gate screen1)) screen-goal)
+  (traversal-via walking ladder-start ((open-gate ladder1)) ladder-goal)
+  (traversal-via walking closed-start ((closed-gate)) closed-goal)
 
   (has-elevation level-start 2)
   (has-elevation level-peer 2)
   (has-elevation level-high 3)
-  (walk-via level-start () level-peer)
-  (walk-via level-start () level-high)
+  (traversal-via walking level-start () level-peer)
+  (traversal-via walking level-start () level-high)
 
-  (walk-via supported-start () supported-goal))
+  (traversal-via walking supported-start () supported-goal))
 
 (define-init-action initialize-derived-state
   0

@@ -1,49 +1,47 @@
 ;;; Filename: jump.lisp
 
-;;; Jumping technology: contribute grounded jumps across authored edges to the mobility
-;;; closure, or provide one explicit agent-configuration transition.  Support-changing
-;;; landings may be local ground, remote ground, or a clear box top.  Level and downward
-;;; landings are unrestricted; upward landings -- whether reaching a higher support or
-;;; clearing a vaultable barrier's top -- are limited to *vertical-reach-limit* (default
-;;; 1), independent of the jumping agent's own declared height.
+;;; Jumping mobility mode, plus the explicit support-changing transitions only jumping
+;;; provides.  Registers the one predicate that makes a traversal edge a jump: the landing
+;;; may rise no more than *vertical-reach-limit* above the launch, and every feature in the
+;;; chosen clause that is not currently passable must be low enough to clear within that
+;;; same bound.  Level and downward landings are unrestricted.
+;;;
 ;;; Jumping handles exclusively elevation-related moves: local support changes involve box
 ;;; tops only (mounting and dismounting flush supports like plates and gears-mounted fans
 ;;; belongs to the step technology; a fan resting on a box top is not a jump landing).
 ;;; Open gates and passable screens impose no clearance requirement.  Closed gates,
 ;;; non-passable screens, and walls contribute their top elevations; a multi-feature jump
-;;; must clear the highest feature that is not currently passable, within that same fixed
-;;; elevation limit.
+;;; must clear the highest feature that is not currently passable.
+;;;
 ;;; Each produced segment or transition is tagged JUMP when nothing required clearance, or
 ;;; VAULT when some feature genuinely did (accounting for passability) -- a move-type label
-;;; a printed route displays alongside WALK, STAIRS, and CLIMB; it does not affect
-;;; feasibility.
+;;; a printed route displays alongside WALK, STAIRS, and LADDER.  It is a label on the
+;;; segment, not a mode: both come from the one authored JUMPING edge, and which one a
+;;; crossing earns depends on the state it is evaluated in.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and wall are declared optional here
-;;;   nested    : -support-elevation (support occupancy, location, height, elevation,
-;;;               top, base, and *vertical-reach-limit*,
-;;;               which this file reuses rather than defining its own jump-specific
-;;;               parameter); -passability (holding and obstacle-clear); -threat (safe --
-;;;               true unless an armed gun or other threat endangers the landing location);
-;;;               -mobility-action
+;;;   nested    : -support-elevation (support occupancy, location, height, elevation, top,
+;;;               base, and *vertical-reach-limit*, which this file reuses rather than
+;;;               defining its own jump-specific parameter); -passability (holding and
+;;;               obstacle-clear); -threat (safe); -traversal; -mobility-action
 ;;; PROVIDES:
 ;;;   types     : box, wall  --  declared optional; jumping remains usable without them
 ;;;               vaultable-object (either gate screen wall)
-;;;   relations : (jump-via location $list location)
-;;;               (jump-via> location $list location)
+;;;   mode      : jumping, registered with -traversal
 ;;;   queries   : jump-elevation-reachable, vaultable-object-passable,
 ;;;               jump-barrier-top-elevation, vaultable-object-list,
 ;;;               jump-required-clearance-height, jump-path-clear,
-;;;               jump-traversal-segments, jump-configuration-transitions
-;;;   provider  : jump-traversal-segments registered with -mobility
-;;;               jump-configuration-transitions registered with
+;;;               jump-configuration-transitions
+;;;   provider  : jump-configuration-transitions registered with
 ;;;               -configuration-transition
-;;;   action    : move (grounded mobility and explicit support changes)
+;;;   action    : move (grounded routes and support changes)
 
 (include-tech -vertical)
 (include-tech -support-elevation)
 (include-tech -passability)
 (include-tech -threat)
+(include-tech -traversal)
 (include-tech -mobility-action)
 
 (in-package :ww)
@@ -54,19 +52,6 @@
 
 (define-types
   vaultable-object (either gate screen wall))
-
-
-(define-static-relations
-  (jump-via location $list location)  ;symmetric jump edge; $list = path features
-  (jump-via> location $list location))  ;directed jump edge; $list = path features
-
-
-(define-init-check jump-init-check (literals)
-  (:consumes gate screen wall)
-  (check-init-list-relation-items-have-types
-    literals 'jump-via '(gate screen wall))
-  (check-init-list-relation-items-have-types
-    literals 'jump-via> '(gate screen wall)))
 
 
 (define-query jump-elevation-reachable
@@ -101,7 +86,7 @@
 (define-query jump-required-clearance-height (?agent agent ?features)
   ;; Passable features need no clearance.  Every remaining feature is physically vaulted, so
   ;; the required clearance is the highest of their top elevations.  NIL means all features
-  ;; are currently passable or the edge has no features.
+  ;; are currently passable or the clause is empty.
   (do (assign $required nil)
       (ww-loop for $feature in ?features
                do (if (not (vaultable-object-passable ?agent $feature))
@@ -127,72 +112,74 @@
                *vertical-reach-limit*))))
 
 
-(define-problem-helper jump-segment-for-features
-    (state agent source destination features)
-  "Return a normalized JUMP or VAULT segment for a feasible grounded traversal.  The
-   move-type tag is VAULT when some feature genuinely required clearance for this agent,
-   else JUMP."
-  (let ((canonical-features (canonical-enabling-means features))
+(define-problem-helper jump-segment-for-clause
+    (state agent source destination clause)
+  "Return a normalized JUMP or VAULT segment when CLAUSE's features can be cleared from
+   SOURCE's level and the landing is within reach.  The label is VAULT when some feature
+   genuinely required clearance for this agent, else JUMP."
+  (let ((features (canonical-enabling-means clause))
         (source-elevation
           (funcall (symbol-function 'location-elevation) state source))
         (target-elevation
           (funcall (symbol-function 'location-elevation) state destination)))
     (when (and
             (funcall (symbol-function 'jump-path-clear)
-                     state agent source-elevation canonical-features)
+                     state agent source-elevation features)
             (funcall (symbol-function 'jump-elevation-reachable)
                      state agent source-elevation target-elevation)
             (funcall (symbol-function 'safe) state destination))
       (list (if (funcall (symbol-function 'jump-required-clearance-height)
-                         state agent canonical-features)
+                         state agent features)
               'vault
               'jump)
-            source canonical-features destination))))
+            source features destination))))
 
 
-(define-query jump-traversal-segments (?agent agent ?from location)
-  (do (assign $segments nil)
-      (doall (?to location)
-        (do (assign $symmetric-segment nil)
-            (assign $directional-segment nil)
-            (if (bind (jump-via ?from $symmetric-features ?to))
-              (assign $symmetric-segment
-                      (jump-segment-for-features
-                        state ?agent ?from ?to $symmetric-features)))
-            (if (bind (jump-via> ?from $directional-features ?to))
-              (assign $directional-segment
-                      (jump-segment-for-features
-                        state ?agent ?from ?to $directional-features)))
-            (if $symmetric-segment
-              (assign $segments (cons $symmetric-segment $segments)))
-            (if $directional-segment
-              (assign $segments (cons $directional-segment $segments)))))
-      $segments))
+(register-traversal-mode 'jumping 'jump-segment-for-clause
+                         '(gate screen wall))
 
 
-(register-mobility-provider 'jump-traversal-segments)
+;;;; SUPPORT-CHANGING TRANSITIONS ;;;;
+;;;; Landing on or stepping off a support is a configuration change rather than a move
+;;;; between locations, so it cannot go through -traversal's segment provider: a
+;;;; transition's endpoints are (location place) configurations.  The authored edges are
+;;;; the same JUMPING ones, read here with the same clause selection.
 
 
-(define-problem-helper jump-configuration-transition-for-features
+(define-problem-helper jump-configuration-transition-for-clause
     (state agent source-configuration source-elevation
-           destination-configuration target-elevation features)
-  "Return one feasible support-changing JUMP or VAULT transition across an authored edge.
-   The move-type tag is VAULT when some feature genuinely required clearance for this
-   agent, else JUMP."
-  (let ((canonical-features (canonical-enabling-means features))
+           destination-configuration target-elevation clause)
+  "Return one feasible support-changing JUMP or VAULT transition across CLAUSE, or NIL."
+  (let ((features (canonical-enabling-means clause))
         (destination (first destination-configuration)))
     (when (and
             (funcall (symbol-function 'jump-path-clear)
-                     state agent source-elevation canonical-features)
+                     state agent source-elevation features)
             (funcall (symbol-function 'jump-elevation-reachable)
                      state agent source-elevation target-elevation)
             (funcall (symbol-function 'safe) state destination))
       (list (if (funcall (symbol-function 'jump-required-clearance-height)
-                         state agent canonical-features)
+                         state agent features)
               'vault
               'jump)
-            source-configuration canonical-features
+            source-configuration features
             destination-configuration))))
+
+
+(define-problem-helper jump-configuration-transition-for-family
+    (state agent source-configuration source-elevation
+           destination-configuration target-elevation family)
+  "The first transition FAMILY's clauses permit, in canonical order, or NIL.  The
+   configuration twin of -traversal's TRAVERSAL-SEGMENT-FOR-FAMILY, which cannot serve
+   here because these endpoints are configurations rather than locations."
+  (loop for clause in (if family
+                        (traversal-canonical-family family)
+                        (list nil))
+        for transition = (jump-configuration-transition-for-clause
+                           state agent source-configuration source-elevation
+                           destination-configuration target-elevation clause)
+        when transition
+          return transition))
 
 
 (define-query jump-configuration-transitions
@@ -206,7 +193,7 @@
       (assign $transitions nil)
 
       ;; Local box mounts and transfers.  A box may itself be part of a stack; its top
-      ;; elevation already follows that support chain through SUPPORT-TOP-ELEVATION.
+      ;; elevation already follows that support chain through TOP.
       (doall (?box box)
         (if (and (has-location ?box $source-location)
                  (different ?box $source-place)
@@ -242,30 +229,30 @@
               (assign $target-elevation
                       (top ?landing-box))
               (assign $symmetric-transition nil)
-              (assign $directional-transition nil)
-              (if (bind (jump-via
-                          $source-location $symmetric-features $destination))
+              (assign $directed-transition nil)
+              (if (bind (traversal-via
+                          jumping $source-location $symmetric-family $destination))
                 (assign $symmetric-transition
-                        (jump-configuration-transition-for-features
+                        (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
-                          $symmetric-features)))
-              (if (bind (jump-via>
-                          $source-location $directional-features $destination))
-                (assign $directional-transition
-                        (jump-configuration-transition-for-features
+                          $symmetric-family)))
+              (if (bind (traversal-via>
+                          jumping $source-location $directed-family $destination))
+                (assign $directed-transition
+                        (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
-                          $directional-features)))
+                          $directed-family)))
               (if $symmetric-transition
                 (assign $transitions
                         (cons $symmetric-transition $transitions)))
-              (if $directional-transition
+              (if $directed-transition
                 (assign $transitions
-                        (cons $directional-transition $transitions))))))
+                        (cons $directed-transition $transitions))))))
 
-      ;; Only a supported source uses an authored jump edge to land on remote ground;
-      ;; grounded versions of the same edges belong to the mobility provider.
+      ;; Only a supported source uses an authored jumping edge to land on remote ground;
+      ;; grounded versions of the same edges belong to -traversal's segment provider.
       (if (not (eql $source-place 'ground))
         (doall (?destination location)
           (do (assign $destination-configuration
@@ -273,27 +260,27 @@
               (assign $target-elevation
                       (location-elevation ?destination))
               (assign $symmetric-transition nil)
-              (assign $directional-transition nil)
-              (if (bind (jump-via
-                          $source-location $symmetric-features ?destination))
+              (assign $directed-transition nil)
+              (if (bind (traversal-via
+                          jumping $source-location $symmetric-family ?destination))
                 (assign $symmetric-transition
-                        (jump-configuration-transition-for-features
+                        (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
-                          $symmetric-features)))
-              (if (bind (jump-via>
-                          $source-location $directional-features ?destination))
-                (assign $directional-transition
-                        (jump-configuration-transition-for-features
+                          $symmetric-family)))
+              (if (bind (traversal-via>
+                          jumping $source-location $directed-family ?destination))
+                (assign $directed-transition
+                        (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
-                          $directional-features)))
+                          $directed-family)))
               (if $symmetric-transition
                 (assign $transitions
                         (cons $symmetric-transition $transitions)))
-              (if $directional-transition
+              (if $directed-transition
                 (assign $transitions
-                        (cons $directional-transition $transitions))))))
+                        (cons $directed-transition $transitions))))))
       $transitions))
 
 

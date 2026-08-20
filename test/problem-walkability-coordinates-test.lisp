@@ -150,7 +150,7 @@
 
 (define-query coordinate-walk-via-family-is
     (?from location ?to location ?expected)
-  (do (bind (walk-via ?from $actual ?to))
+  (do (bind (traversal-via walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
@@ -203,13 +203,13 @@
 
     ;; Ordinary segment geometry is symmetric and emits no directional facts.
     (not (exists (?from location ?to location)
-           (bind (walk-via> ?from $directional-family ?to))))
+           (bind (traversal-via> walking ?from $directional-family ?to))))
 
     ;; The wall/edge/window island has no derived edge to any other location.
     (not (exists (?other location)
-           (bind (walk-via sealed-site $sealed-family ?other))))
+           (bind (traversal-via walking sealed-site $sealed-family ?other))))
     (not (exists (?other location)
-           (bind (walk-via> sealed-site $sealed-directional-family ?other))))
+           (bind (traversal-via> walking sealed-site $sealed-directional-family ?other))))
 
     ;; MAIN-AGENT passes GATE-A and then the screen, reaching every non-sealed
     ;; location.  No extra location may leak into its exact six-location closure.

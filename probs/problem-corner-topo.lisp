@@ -86,7 +86,7 @@
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect connector actions
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
-(include-tech walkability)          ;walk-via; mobility-results; traversable; one-step-walkable; move
+(include-tech walkability)          ;walking mode; mobility-results; traversable; one-step-walkable; move
 (include-tech visibility)            ;los-to-apparatus; los-to-location; visible; visible-clear
 (include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
@@ -114,7 +114,7 @@
   ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS retains each polygon crossing, so ordinary low sight outside
   ;; this silhouette is blocked exactly like an internal wall segment.  Not
-  ;; currently consulted by walkability's own coordinate derivation (walk-via).  This
+  ;; currently consulted by walkability's own coordinate derivation.  This
   ;; rectangle fully encloses the map and is convex, so it's functionally inert here (a
   ;; straight line between two interior points of a convex boundary wall can never cross it).
   (boundary-wall

@@ -56,43 +56,43 @@
   (has-location climber entry)
   (has-position ladder1 lower)
   (has-position ladder2 middle)
-  (walk-via> entry () lower)
-  (climb-via> lower (ladder1 screen1) middle)
-  (climb-via> middle (ladder2) upper)
-  (walk-via> upper () goal)
+  (traversal-via> walking entry () lower)
+  (traversal-via> climbing lower ((ladder1 screen1)) middle)
+  (traversal-via> climbing middle ((ladder2)) upper)
+  (traversal-via> walking upper () goal)
 
   ;; Carrying blocks the ladder itself.
   (has-location carrying-agent carry-start)
   (holding carrying-agent carried-box)
   (has-position ladder3 carry-start)
-  (climb-via> carry-start (ladder3) carry-goal)
+  (traversal-via> climbing carry-start ((ladder3)) carry-goal)
 
   ;; The closure describes hypothetical ground travel, while MOVE enforces actual grounding.
   (has-location supported-agent supported-start)
   (has-location support-box supported-start)
   (on supported-agent support-box)
   (has-position ladder4 supported-start)
-  (climb-via> supported-start (ladder4) supported-goal)
+  (traversal-via> climbing supported-start ((ladder4)) supported-goal)
 
   ;; The edge starts where the agent stands, but its named ladder is fixed elsewhere.
   (has-location misplaced-agent misplaced-start)
   (has-position ladder5 misplaced-ladder-site)
-  (climb-via> misplaced-start (ladder5) misplaced-goal)
+  (traversal-via> climbing misplaced-start ((ladder5)) misplaced-goal)
 
   ;; The ladder is correctly positioned but absent from the edge's clear means list.
   (has-location unlisted-agent unlisted-start)
   (has-position ladder6 unlisted-start)
-  (climb-via> unlisted-start (unlisted-screen) unlisted-goal)
+  (traversal-via> climbing unlisted-start ((unlisted-screen)) unlisted-goal)
 
   ;; Every item in the flat means conjunction must pass.
   (has-location gate-agent gate-start)
   (has-position ladder7 gate-start)
-  (climb-via> gate-start (ladder7 closed-gate) gate-goal)
+  (traversal-via> climbing gate-start ((ladder7 closed-gate)) gate-goal)
 
   ;; A clear edge may not land at a lethal destination.
   (has-location unsafe-agent unsafe-start)
   (has-position ladder8 unsafe-start)
-  (climb-via> unsafe-start (ladder8) unsafe-goal)
+  (traversal-via> climbing unsafe-start ((ladder8)) unsafe-goal)
   (threatens unsafe-gun unsafe-goal)
 
   ;; Two listed and positioned ladders are effect-equivalent.  The provider must select
@@ -100,8 +100,8 @@
   (has-location canonical-agent canonical-start)
   (has-position canonical-ladder-a canonical-start)
   (has-position canonical-ladder-b canonical-start)
-  (climb-via> canonical-start
-              (canonical-ladder-b canonical-ladder-a)
+  (traversal-via> climbing canonical-start
+              ((canonical-ladder-b canonical-ladder-a))
               canonical-goal))
 
 

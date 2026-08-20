@@ -106,7 +106,7 @@
   ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS retains each polygon crossing, so ordinary low sight outside
   ;; this silhouette is blocked exactly like an internal wall segment.
-  ;; tech/-walkability-coordinates.lisp's own WALK-VIA derivation folds it in the same way, so
+  ;; tech/-walkability-coordinates.lisp's own walking derivation folds it in the same way, so
   ;; walking across this silhouette is blocked too.
   (boundary-wall
     ((0 10) (11 10) (11 5) (16 5)
@@ -120,19 +120,19 @@
   ;; location10, sealing against the boundary at y 10 and 17.  Walking across the slab
   ;; at ground level is thereby blocked on that side; the elevation-2 crossing
   ;; location12 <-> location13 lies entirely inside the footprint (gated by
-  ;; gate8/gate9), and the level change onto the slab is the authored jump-via edge
+  ;; gate8/gate9), and the level change onto the slab is the authored JUMPING edge
   ;; below.  This is EDGE, not WALL: it marks the vertical boundary between two
   ;; different-elevation regions rather than a freestanding linear partition, so it
-  ;; carries no height and takes no part in vaulting -- the jump-via edge below crosses
+  ;; carries no height and takes no part in vaulting -- the JUMPING edge below crosses
   ;; it with an empty feature list, not as a vaultable-object.
   ;;
   ;; The slab's west side, location13 <-> location11, carries no edge at all: it is
-  ;; instead the authored stairs-via crossing below, unconditional in both directions
+  ;; instead the authored STAIRWAY crossing below, unconditional in both directions
   ;; and blind to the elevation difference by design (tech/stairs.lisp).  With no edge
   ;; there, -walkability-coordinates.lisp's zone flood-fill merges location11 into the
-  ;; slab's own 2D zone and derives a WALK-VIA fact between them; that fact is inert --
-  ;; walking-segment-for-family's elevation-equality check always rejects it as a usable
-  ;; WALK, since the two locations sit at different elevations -- so stairs-via remains
+  ;; slab's own 2D zone and derives a WALKING edge between them; that edge is inert --
+  ;; walking-segment-for-clause's elevation-equality check always rejects it as a usable
+  ;; WALK, since the two locations sit at different elevations -- so the STAIRWAY edge remains
   ;; the only way to actually cross.
   (wall-segment> wall1 24 0 24 2)
   (wall-segment> wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
@@ -182,9 +182,9 @@
   (jam-disallowed> location7 location1 gate4)
 
   ;; Specifically authorized acts and activities between locations
-  (climb-via> location7 (ladder1) location1)
-  (jump-via location10 () location12)  ;authorized elevation change
-  (stairs-via location13 () location11)  ;authorized elevation change, unrestricted both ways
+  (traversal-via> climbing location7 ((ladder1)) location1)
+  (traversal-via jumping location10 () location12)  ;authorized elevation change
+  (traversal-via stairway location13 () location11)  ;authorized elevation change, unrestricted both ways
   (reach-via location1 () location7)  ;authorizes manipulation
   (reach-via location2 (gate2 gate3) location3)
   (beam-via transmitter1 (gate1 location2) receiver1)  ;authorizes direct beam

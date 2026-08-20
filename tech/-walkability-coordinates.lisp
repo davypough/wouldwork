@@ -1,11 +1,12 @@
 ;;; Filename: -walkability-coordinates.lisp
 
-;;; Walkability coordinates substrate: derives WALK-VIA (and, for rides into an
-;;; air stream's destination, WALK-VIA>) from raw segment geometry, for a problem that
+;;; Walkability coordinates substrate: derives the WALKING traversal edges (and, for
+;;; rides into an air stream's destination, their directed form) from raw segment
+;;; geometry, for a problem that
 ;;; would rather author 2D positions than hand-list which locations can walk to which.
 ;;; Nested under public walkability and under -stream-passability; entirely inert unless
 ;;; the problem actually asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL -- a
-;;; problem that hand-authors WALK-VIA directly is unaffected.  Edge segments block
+;;; problem that hand-authors its walking edges directly is unaffected.  Edge segments block
 ;;; walking exactly like wall segments -- both feed the same solids list below.  LOS gives
 ;;; edges finite height, but walking remains elevation-blind and jumping excludes edges.
 ;;;
@@ -20,7 +21,7 @@
 ;;; united across open intervals form zones; door intervals between distinct zones form
 ;;; a labeled zone graph.  For every zone pair, a fixpoint over antichains of door-sets
 ;;; computes ALL subset-minimal door-sets -- each a set of doors sufficient for some
-;;; physical route -- and a location pair's WALK-VIA value is that family in DNF: ()
+;;; physical route -- and a location pair's TRAVERSAL-VIA value is that family in DNF: ()
 ;;; still means direct/unguarded, and a nonempty value is a list of clauses, OR over
 ;;; clauses, AND within (matching the CONTROLS convention).  Families are emitted in
 ;;; canonical order (doors within a clause by name; clauses by length then
@@ -52,7 +53,7 @@
 ;;; while blowing, stepping laterally into the flow carries the walker to the
 ;;; destination; while off, the same trip is an ordinary walk across the dead band; so
 ;;; the unconditional edge is correct in both regimes, and such pairs are emitted as
-;;; directional WALK-VIA> facts (rides widen inbound, never outbound).  The front
+;;; directional TRAVERSAL-VIA> facts (rides widen inbound, never outbound).  The front
 ;;; curtain grants no ride -- walking in against the flow is barred like any other
 ;;; gears-gated crossing.  Any other location inside a
 ;;; band, on a covered solid interval, inside a gate/screen doorway, at a corner whose
@@ -65,7 +66,7 @@
 ;;; elevated platform's ground-level footprint as wall or edge segments (edge is the
 ;;; better fit -- it is precisely the vertical surface between two different-elevation
 ;;; regions), keep the platform's own locations inside that footprint, and connect the
-;;; levels only with authored stairs-via, jump-via, or climb-via> edges (which this
+;;; levels only with authored STAIRWAY, JUMPING, or CLIMBING edges (which this
 ;;; derivation never touches); ONE-STEP-WALKABLE's
 ;;; elevation-equality check rejects any derived edge between different levels.  See
 ;;; problem-claustro-topo's slab (edge1/edge2) for the pattern.
@@ -84,21 +85,21 @@
 ;;;   types     : location  --  declared by the problem, as walkability itself already
 ;;;               requires; screen declared optional by nested -passability, spliced by
 ;;;               walkability.lisp before this file
-;;;   nested    : -walkability (WALK-VIA/WALK-VIA> topology relations);
+;;;   nested    : -traversal (TRAVERSAL-VIA/TRAVERSAL-VIA> and the DNF family algebra);
 ;;;               -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
 ;;;   relations : wall-segment>, edge-segment>, gate-segment>, window-segment>,
 ;;;               screen-segment>, boundary-wall  --  default to no facts; a problem
-;;;               that asserts wall-segment>, edge-segment>, or boundary-wall gets
-;;;               WALK-VIA/WALK-VIA> derived automatically instead of hand-authoring them
+;;;               that asserts wall-segment>, edge-segment>, or boundary-wall gets its
+;;;               WALKING traversal edges derived automatically rather than authored
 ;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
 ;;;               redefined by -stream-passability where wall blowers exist;
 ;;;               terrain-complaints  --  default no complaints; redefined by
 ;;;               -terrain-consistency, which nests this file and -vertical, to
 ;;;               cross-check authored levels against the arrangement below
-;;;   init      : derive-walk-via-from-segments
+;;;   init      : derive-walking-from-segments
 
-(include-tech -walkability)
+(include-tech -traversal)
 (include-tech -location-coordinates)
 (include-tech -segment-geometry)
 
@@ -148,7 +149,7 @@
 (defun walkability-coordinates-pair-spec (arrangement loc-a loc-b)
   ;; Resolves one location pair against the arrangement.  Returns NIL if no zone pair
   ;; across the two memberships is connected (blocked -- no fact), (:sym family) for an
-  ;; ordinary symmetric WALK-VIA, or (:dir family-a->b family-b->a) when either endpoint
+  ;; ordinary symmetric TRAVERSAL-VIA, or (:dir family-a->b family-b->a) when either endpoint
   ;; is a stream destination whose ride edges widen its inbound direction: the inbound
   ;; family additionally unions the source's families to the destination's ride zones
   ;; (riding the stream in from a side, or walking the same route while it is off), so
@@ -165,17 +166,17 @@
         (let ((fam (gethash (list za zb) families)))
           (when fam
             (setf connected t)
-            (setf base (walkability-family-union base fam))))))
+            (setf base (traversal-family-union base fam))))))
     (when connected
       (let ((into-b (walkability-coordinates-ride-augmented-family
                       base (second entry-a) (third entry-b) families))
             (into-a (walkability-coordinates-ride-augmented-family
                       base (second entry-b) (third entry-a) families)))
         (if (equal into-a into-b)
-          (list :sym (walkability-normalize-family into-a))
+          (list :sym (traversal-normalize-family into-a))
           (list :dir
-                (walkability-normalize-family into-b)
-                (walkability-normalize-family into-a)))))))
+                (traversal-normalize-family into-b)
+                (traversal-normalize-family into-a)))))))
 
 
 (defun walkability-coordinates-ride-augmented-family (base source-zones ride-zones families)
@@ -189,7 +190,7 @@
       (dolist (ride-zone ride-zones)
         (let ((fam (gethash (list source-zone ride-zone) families)))
           (when fam
-            (setf family (walkability-family-union family fam))))))
+            (setf family (traversal-family-union family fam))))))
     family))
 
 
@@ -428,8 +429,8 @@
         (let ((from-family (gethash (first direction) fams)))
           (when from-family
             (let* ((to (second direction))
-                   (candidate (walkability-family-add-obstacle from-family door))
-                   (merged (walkability-family-union
+                   (candidate (traversal-family-add-obstacle from-family door))
+                   (merged (traversal-family-union
                              (gethash to fams) candidate)))
               (when (> (length merged) 32)
                 (error "The minimal door-set family between two zones exceeds 32 ~
@@ -650,14 +651,15 @@
 ;;;; INITIALIZATION ;;;;
 
 
-(define-init-action derive-walk-via-from-segments
-  ;; Derives WALK-VIA (and WALK-VIA> for rides into stream destinations) from the
+(define-init-action derive-walking-from-segments
+  ;; Derives the WALKING traversal edges (and their directed form for rides into stream
+  ;; destinations) from the
   ;; problem's raw segment geometry -- see the file header for the region-connectivity
   ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT>, EDGE-SEGMENT>,
-  ;; or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own WALK-VIA
-  ;; facts is unaffected.  Only one direction per symmetric pair is asserted: WALK-VIA
+  ;; or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own walking
+  ;; edges is unaffected.  Only one direction per symmetric pair is asserted: TRAVERSAL-VIA
   ;; has no ">" suffix, so WW mirrors it both ways itself; a pair whose ride edges
-  ;; widen a destination's inbound direction gets its two explicit WALK-VIA>
+  ;; widen a destination's inbound direction gets its two explicit TRAVERSAL-VIA>
   ;; directions instead, never both kinds.
   0
   ()
@@ -689,9 +691,9 @@
                   (if $spec
                     (if (eql (first $spec) :sym)
                       (do (assign $family (second $spec))
-                          (walk-via ?source $family ?destination))
+                          (traversal-via walking ?source $family ?destination))
                       (do (assign $forward (second $spec))
                           (assign $backward (third $spec))
-                          (walk-via> ?source $forward ?destination)
-                          (walk-via> ?destination $backward ?source))))))))
+                          (traversal-via> walking ?source $forward ?destination)
+                          (traversal-via> walking ?destination $backward ?source))))))))
         (convert-databases-to-integers))))

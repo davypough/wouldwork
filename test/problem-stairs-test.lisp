@@ -59,29 +59,29 @@
   (has-elevation stairs-foot 0)
   (has-elevation stairs-top 20)
   (has-elevation main-goal 20)
-  (walk-via> main-start () stairs-foot)
-  (stairs-via stairs-foot (open-gate) stairs-top)
-  (walk-via> stairs-top () main-goal)
+  (traversal-via> walking main-start () stairs-foot)
+  (traversal-via stairway stairs-foot ((open-gate)) stairs-top)
+  (traversal-via> walking stairs-top () main-goal)
 
-  (stairs-via> directional-low () directional-high)
+  (traversal-via> stairway directional-low () directional-high)
 
   ;; Carrying is allowed on unobstructed stairs.  A screen uses the shared
   ;; passability rule and therefore requires empty hands.
-  (stairs-via carrying-low () carrying-high)
-  (stairs-via screen-low (screen1) screen-high)
-  (stairs-via closed-low (closed-gate) closed-high)
+  (traversal-via stairway carrying-low () carrying-high)
+  (traversal-via stairway screen-low ((screen1)) screen-high)
+  (traversal-via stairway closed-low ((closed-gate)) closed-high)
 
   ;; An unsafe landing cannot become a closure through-node.
-  (stairs-via unsafe-low () unsafe-middle)
-  (walk-via unsafe-middle () unsafe-goal)
+  (traversal-via stairway unsafe-low () unsafe-middle)
+  (traversal-via walking unsafe-middle () unsafe-goal)
 
   ;; Equal-length heterogeneous routes retain one deterministic witness.
-  (stairs-via> canonical-start () canonical-a)
-  (stairs-via> canonical-start () canonical-b)
-  (walk-via> canonical-a () canonical-goal)
-  (walk-via> canonical-b () canonical-goal)
+  (traversal-via> stairway canonical-start () canonical-a)
+  (traversal-via> stairway canonical-start () canonical-b)
+  (traversal-via> walking canonical-a () canonical-goal)
+  (traversal-via> walking canonical-b () canonical-goal)
 
-  (stairs-via supported-low () supported-high))
+  (traversal-via stairway supported-low () supported-high))
 
 
 (define-init-action initialize-derived-state

@@ -183,12 +183,12 @@
   (window-segment> window1 19 4 19 7)
 
   ;; Authorized elevation changes
-  (jump-via location8 () location9)
-  (jump-via location2 () location4)
-  (stairs-via location2 () location4)
-  (stairs-via location9 () location10)
-  (climb-via> location5 (ladder1) location13)
-  (climb-via> location14 (ladder2) location15)
+  (traversal-via jumping location8 () location9)
+  (traversal-via jumping location2 () location4)
+  (traversal-via stairway location2 () location4)
+  (traversal-via stairway location9 () location10)
+  (traversal-via> climbing location5 ((ladder1)) location13)
+  (traversal-via> climbing location14 ((ladder2)) location15)
 
   ;; Nearby manipulation across boundaries
   (reach-via location4 () location2)

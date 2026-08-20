@@ -39,7 +39,7 @@
   (recording-copy> operator-alpha playback-echo)
   (has-position recorder1 site-a)
   (has-location operator-alpha site-a)
-  (walk-via site-a () site-b))
+  (traversal-via walking site-a () site-b))
 
 
 (define-action prepare-report

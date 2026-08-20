@@ -1,17 +1,22 @@
 ;;; Filename: walkability.lisp
 
-;;; Walking mobility provider.  Enabled WALK-VIA/WALK-VIA> edges become normalized WALK
-;;; traversal segments.  The central mobility closure composes them and MOVE applies one
-;;; canonical route per grounded destination.
+;;; Walking mobility mode.  Registers the one predicate that makes a traversal edge a
+;;; walk: the two endpoints must sit at the same level, and the clause's doors must be
+;;; passable.  Everything else -- the relation, the iteration over modes and destinations,
+;;; the choice among a family's clauses -- belongs to -traversal, which every mode shares.
+;;;
+;;; Walking is the only mode with an elevation *equality* test, and that is what makes the
+;;; coordinate derivation safe: -walkability-coordinates is elevation-blind and happily
+;;; emits an edge between two locations at different levels, which ONE-STEP-WALKABLE then
+;;; refuses.  -terrain-consistency exists to catch such an edge being the only way across.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -support-occupancy; -location; -passability; -elevation;
-;;;               -walkability; -walkability-coordinates; -threat; -mobility-action
+;;;   nested    : -support-occupancy; -location; -passability; -vertical; -elevation;
+;;;               -traversal; -walkability-coordinates; -threat; -mobility-action
 ;;; PROVIDES:
-;;;   relations : (walk-via location $list location), (walk-via> location $list location)
-;;;   queries   : walking-traversal-segments, one-step-walkable
-;;;   provider  : walking-traversal-segments registered with -mobility
+;;;   mode      : walking, registered with -traversal
+;;;   queries   : one-step-walkable
 ;;;   action    : move (from -mobility-action)
 
 (include-tech -support-occupancy)
@@ -19,7 +24,7 @@
 (include-tech -passability)
 (include-tech -vertical)
 (include-tech -elevation)
-(include-tech -walkability)
+(include-tech -traversal)
 (include-tech -walkability-coordinates)
 (include-tech -threat)
 (include-tech -mobility-action)
@@ -27,47 +32,26 @@
 (in-package :ww)
 
 
-(define-problem-helper walking-segment-for-family
-    (state agent source destination family)
-  "Return a normalized WALK segment using the canonical passing DNF clause."
+(define-problem-helper walking-segment-for-clause
+    (state agent source destination clause)
+  "Return a normalized WALK segment when CLAUSE's doors are all passable and the endpoints
+   share a level.  An empty clause is the direct, unguarded case: ALL-CLEAR reads it as
+   clear, so the level test alone decides."
   (when (and (= (funcall (symbol-function 'location-elevation) state source)
                 (funcall (symbol-function 'location-elevation) state destination))
+             (funcall (symbol-function 'all-clear) state agent clause)
              (funcall (symbol-function 'safe) state destination))
-    (cond ((null family)
-           (list 'walk source nil destination))
-          (t
-           (let ((passing
-                   (remove-if-not
-                     (lambda (clause)
-                       (funcall (symbol-function 'all-clear) state agent clause))
-                     (walkability-canonical-family family))))
-             (when passing
-               (list 'walk source (first passing) destination)))))))
+    (list 'walk source clause destination)))
 
 
-(define-query walking-traversal-segments (?agent agent ?from location)
-  (do (assign $segments nil)
-      (doall (?to location)
-        (do (assign $symmetric-segment nil)
-            (assign $directional-segment nil)
-            (if (bind (walk-via ?from $symmetric-family ?to))
-              (assign $symmetric-segment
-                      (walking-segment-for-family
-                        state ?agent ?from ?to $symmetric-family)))
-            (if (bind (walk-via> ?from $directional-family ?to))
-              (assign $directional-segment
-                      (walking-segment-for-family
-                        state ?agent ?from ?to $directional-family)))
-            (if $symmetric-segment
-              (assign $segments (cons $symmetric-segment $segments)))
-            (if $directional-segment
-              (assign $segments (cons $directional-segment $segments)))))
-      $segments))
-
-
-(register-mobility-provider 'walking-traversal-segments)
+(register-traversal-mode 'walking 'walking-segment-for-clause
+                         '(gate screen ladder gears))
 
 
 (define-query one-step-walkable (?agent agent ?from location ?to location)
-  (ww-loop for $segment in (walking-traversal-segments ?agent ?from)
-           thereis (eql (fourth $segment) ?to)))
+  ;; Restricted to WALK segments on purpose.  The shared provider now returns every mode's
+  ;; segments, and a caller asking whether two locations are one *walk* apart -- the
+  ;; elevation-equality question -- must not be answered by a stairs or ladder edge.
+  (ww-loop for $segment in (traversal-segments ?agent ?from)
+           thereis (and (eql (first $segment) 'walk)
+                        (eql (fourth $segment) ?to))))

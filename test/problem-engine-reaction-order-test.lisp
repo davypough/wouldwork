@@ -73,7 +73,7 @@
 (include-tech wall-blower)   ;update-wall-blower-status!; sweep-occupants-away!
 (include-tech box)           ;pickup-box; put-box
 (include-tech step)          ;step configuration transitions
-(include-tech walkability)  ;walk-via; mobility-results; traversable; move
+(include-tech walkability)  ;walking mode; mobility-results; traversable; move
 
 
 ;;;; INITIALIZATION ;;;;
