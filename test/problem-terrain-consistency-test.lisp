@@ -6,8 +6,10 @@
 ;;;
 ;;;   1. GROUND1/GROUND2 at level 0, west of EDGE1, and SLAB1/SLAB2 at level 3/2 east of
 ;;;      it.  Every interval EDGE1 covers flanks one single-level zone on each side, so
-;;;      the edge check is determinate there: EDGE1's base must be 0 and its top 3/2,
-;;;      which the type table's default edge height of 3/2 supplies.
+;;;      both edge checks are determinate there: EDGE1's base must be 0 and its top 3/2,
+;;;      which the type table's default edge height of 3/2 supplies, and its step must be
+;;;      crossed -- by the one authored STAIRS-VIA between GROUND1 and SLAB1, since the
+;;;      check asks that a crossing exist and never where.
 ;;;   2. STAIR-LOW at 0 and STAIR-HIGH at 2 share the third compartment's zone.  Nothing
 ;;;      separates them geometrically, so the derived WALK-VIA between them is dead --
 ;;;      ONE-STEP-WALKABLE rejects a step between levels -- and the authored STAIRS-VIA is
@@ -92,7 +94,12 @@
 
   ;; The authored crossing that makes compartment 3's level difference legitimate.
   ;; Removing it is what the zone check exists to catch.
-  (stairs-via stair-low () stair-high))
+  (stairs-via stair-low () stair-high)
+
+  ;; The crossing over EDGE1's step.  The traversability check asks only that one exist,
+  ;; not that every flanking pair carry one, so this single edge between GROUND1 and SLAB1
+  ;; covers the whole edge; removing it is what that check exists to catch.
+  (stairs-via ground1 () slab1))
 
 
 ;;;; CHARACTERIZATION FIXTURES ;;;;
@@ -169,6 +176,49 @@
           '((edge1 0 2))
           (terrain-zone-levels (terrain-test-arrangement)
                                (terrain-test-drifted-levels))))
+
+  ;; EDGE1's step is crossed, so the traversability check is satisfied -- by the single
+  ;; authored STAIRS-VIA between GROUND1 and SLAB1, not by every flanking pair carrying one.
+  (null (terrain-uncrossed-edge-complaints
+          (terrain-test-arrangement) (terrain-test-edges)
+          (terrain-zone-levels (terrain-test-arrangement) (terrain-test-levels))
+          (terrain-location-zones (terrain-test-arrangement))
+          (terrain-test-levels)
+          (terrain-level-changes)))
+
+  ;; With nothing crossing it, the same edge is refused, and the complaint names both
+  ;; sides so the author knows which pair to join.
+  (search "EDGE1"
+          (first (terrain-uncrossed-edge-complaints
+                   (terrain-test-arrangement) (terrain-test-edges)
+                   (terrain-zone-levels (terrain-test-arrangement) (terrain-test-levels))
+                   (terrain-location-zones (terrain-test-arrangement))
+                   (terrain-test-levels)
+                   nil)))
+  (search "SLAB1"
+          (first (terrain-uncrossed-edge-complaints
+                   (terrain-test-arrangement) (terrain-test-edges)
+                   (terrain-zone-levels (terrain-test-arrangement) (terrain-test-levels))
+                   (terrain-location-zones (terrain-test-arrangement))
+                   (terrain-test-levels)
+                   nil)))
+
+  ;; The traversability check abstains exactly where the span check does: with a flank no
+  ;; longer naming one level, an uncrossed EDGE1 raises nothing.
+  (null (terrain-uncrossed-edge-complaints
+          (terrain-test-arrangement) (terrain-test-edges)
+          (terrain-zone-levels (terrain-test-arrangement)
+                               (terrain-test-drifted-levels))
+          (terrain-location-zones (terrain-test-arrangement))
+          (terrain-test-drifted-levels)
+          nil))
+
+  ;; A problem with no floor drive contributes no ride, so the level-change set is exactly
+  ;; the authored traversals.  phobia-topo is where the ride branch actually carries an
+  ;; agent, ten units up to a loft with no traversal relation authored anywhere.
+  (null (terrain-floor-drive-rides))
+  (= (length (terrain-level-changes))
+     (length (terrain-authored-level-changes)))
 
   ;; A location whose level drifts away from its zone, with no authored crossing, is
   ;; refused and named.

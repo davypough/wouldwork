@@ -48,6 +48,7 @@
 (include-tech visibility)
 (include-tech walkability)
 (include-tech recorder)
+(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; INITIALIZATION ;;;;

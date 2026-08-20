@@ -3,34 +3,49 @@
 ;;; Terrain-consistency substrate: cross-checks the authored vertical facts against the
 ;;; walking arrangement -walkability-coordinates already derives, so a level that has
 ;;; drifted out of agreement with the geometry around it fails at initialization instead
-;;; of quietly producing an unreachable location or a mismeasured barrier.  Two checks,
-;;; both of which ABSTAIN wherever the arrangement cannot settle the question -- an
+;;; of quietly producing an unreachable location or a mismeasured barrier.  Three checks,
+;;; all of which ABSTAIN wherever the arrangement cannot settle the question -- an
 ;;; abstention is not a pass, it is the honest answer when the geometry names no level on
 ;;; one side of the thing being checked.
 ;;;
-;;;   Edge span.  An EDGE is the vertical surface between two regions of different
-;;;   elevation, so its BASE is the lower of the two levels it separates and its TOP the
-;;;   higher.  Every grid interval an edge covers flanks two cells; an interval whose two
-;;;   flanking zones each carry locations, and whose locations within each zone agree on
-;;;   one level, names a determinate step.  An edge with no determinate interval is left
-;;;   alone, and so is one whose determinate intervals name different steps -- an edge
-;;;   running along a staircase separates no single pair of levels.
+;;; A level STEP is the shared notion behind all three: an edge's grid interval flanks two
+;;; cells, and when each flanking zone carries locations that agree on one level, and the
+;;; two levels differ, that interval names a determinate step.  An edge whose intervals
+;;; name no step, or more than one, settles nothing -- an edge running the length of a
+;;; staircase separates no single pair of levels -- and every check below then leaves it
+;;; alone.
+;;;
+;;;   Edge span.  An EDGE is the vertical surface between the two regions it separates, so
+;;;   its BASE is the lower level of its step and its TOP the higher.
+;;;
+;;;   Edge traversability.  A step is only terrain if something can cross it.  An edge
+;;;   naming a determinate step must have some level change joining a location in one of
+;;;   its flanking zones to a location in the other -- otherwise the map has a wall the
+;;;   author drew as a step.  Which pairs may cross is the author's choice, not the
+;;;   geometry's: measured across the topology problems, one edge is crossed at exactly one
+;;;   of the several location pairs whose line of centres passes through it.  So this asks
+;;;   only that a crossing exist, never where.
 ;;;
 ;;;   Zone levels.  Locations in one zone are joined by derived WALK-VIA facts, and
 ;;;   ONE-STEP-WALKABLE rejects every one of those that crosses a level change.  A zone
 ;;;   holding more than one level is therefore walking-disconnected across that
-;;;   difference unless an authored level change spans it.  Grouping a zone's locations
-;;;   by level, the groups must be joined by authored STAIRS-VIA, JUMP-VIA, or
-;;;   CLIMB-VIA> edges; a location whose level has drifted leaves its own group unjoined
-;;;   and is reachable by nothing.
+;;;   difference unless a level change spans it.  Grouping a zone's locations by level, the
+;;;   groups must be joined; a location whose level has drifted leaves its own group
+;;;   unjoined and is reachable by nothing.
+;;;
+;;; A LEVEL CHANGE, for the last two checks, is an authored STAIRS-VIA, JUMP-VIA or
+;;; CLIMB-VIA> edge, or a floor drive's lift -- a floor-mounted fan or fixed floor blower
+;;; launches its occupants from its own location to its AIMED-AT destination, which is how
+;;; phobia-topo's agent reaches a loft ten units up with no traversal relation authored
+;;; anywhere.  REACH-VIA is not one: reaching across a step moves nobody over it.
 ;;;
 ;;; Same-zone locations at different levels are deliberate, not exceptional, so the zone
-;;; check is a connectivity condition over level groups rather than an equality.  Both
-;;; coordinate-authored problems rely on that: claustro-topo's slab zone holds location11
-;;; at 0 and location13 at 3/2, joined by STAIRS-VIA because the slab's west side carries
-;;; no edge segment on purpose; rumin-topo's zone 1 holds three ground locations and two
-;;; at 3/2, joined by the STAIRS-VIA and JUMP-VIA pair between location2 and location4.
-;;; An equality rule would reject both.
+;;; check is a connectivity condition over level groups rather than an equality:
+;;; claustro-topo's slab zone holds location11 at 0 and location13 at 3/2, joined by
+;;; STAIRS-VIA because the slab's west side carries no edge segment on purpose, and
+;;; rumin-topo's zone 1 holds three ground locations and two at 3/2, joined by the
+;;; STAIRS-VIA and JUMP-VIA pair between location2 and location4.  An equality rule would
+;;; reject both.
 ;;;
 ;;; Only a problem that includes this file is checked, so walkability's own coordinate
 ;;; derivation stays usable with no vertical model at all.
@@ -41,7 +56,7 @@
 ;;;               and -segment-geometry's EDGE-SEGMENT>); -vertical (BASE, TOP)
 ;;; PROVIDES:
 ;;;   query     : terrain-complaints  --  overrides -walkability-coordinates' empty
-;;;               default with the two cross-checks above
+;;;               default with the three cross-checks above
 ;;;   parameter : *terrain-level-change-relations*
 
 (include-tech -walkability-coordinates)
@@ -52,17 +67,18 @@
 
 (defparameter *terrain-level-change-relations*
   '(stairs-via stairs-via> jump-via jump-via> climb-via>)
-  "The authored traversal relations whose endpoints may sit at different levels.
-   WALK-VIA is excluded because it is derived and elevation-blind -- it is precisely the
-   relation whose dead edges this file detects -- and REACH-VIA because reaching over a
-   barrier moves nobody.  A relation belonging to a technology the problem did not
-   include is simply absent from *STATIC-RELATIONS* and contributes nothing, which is why
-   this file needs no dependency on stairs, jump, or ladder.  Phase 4's single traversal
-   relation would replace this list with a test on the segment's mode.")
+  "The authored traversal relations that carry a mover across a level change.  WALK-VIA is
+   excluded because it is derived and elevation-blind -- it is precisely the relation whose
+   dead edges this file detects -- and REACH-VIA because reaching across a step moves
+   nobody over it.  A relation belonging to a technology the problem did not include is
+   simply absent from *STATIC-RELATIONS* and contributes nothing, which is why this file
+   needs no dependency on stairs, jump, or ladder.  Floor drives lift their occupants too
+   and are gathered separately, from AIMED-AT rather than from this list.  Phase 4's single
+   traversal relation would replace the list with a test on the segment's mode.")
 
 
 (define-query terrain-complaints (?arrangement)
-  ;; Overrides -walkability-coordinates' empty seam.  Gathers the vertical facts the two
+  ;; Overrides -walkability-coordinates' empty seam.  Gathers the vertical facts the three
   ;; checks read -- every location's level and every edge's span, both straight out of
   ;; -vertical, so this file states no elevation rule of its own -- and hands them to the
   ;; plain-Lisp analysis below with the arrangement they are checked against.
@@ -96,15 +112,17 @@
 
 
 (defun terrain-arrangement-complaints (arrangement edges spans levels)
-  "Every complaint the two checks raise against ARRANGEMENT, as ready-to-print strings.
+  "Every complaint the three checks raise against ARRANGEMENT, as ready-to-print strings.
    EDGES are (name x1 y1 x2 y2) records, SPANS (edge base top), and LEVELS a
    (location . level) alist.  Returns NIL when everything agrees or nothing is
    determinable; -walkability-coordinates signals whatever comes back."
   (let ((zone-levels (terrain-zone-levels arrangement levels))
-        (zone-of (terrain-location-zones arrangement)))
+        (zone-of (terrain-location-zones arrangement))
+        (changes (terrain-level-changes)))
     (append (terrain-edge-complaints arrangement edges spans zone-levels)
-            (terrain-zone-complaints zone-levels zone-of levels
-                                     (terrain-authored-level-changes)))))
+            (terrain-uncrossed-edge-complaints arrangement edges zone-levels
+                                               zone-of levels changes)
+            (terrain-zone-complaints zone-levels zone-of levels changes))))
 
 
 (defun terrain-edge-complaints (arrangement edges spans zone-levels)
@@ -138,35 +156,104 @@
               (- (cdr (first steps)) (car (first steps)))))))
 
 
+(defun terrain-uncrossed-edge-complaints (arrangement edges zone-levels zone-of levels changes)
+  "One complaint per edge naming a determinate level step that nothing crosses."
+  (loop for record in edges
+        for complaint = (terrain-uncrossed-edge-complaint
+                          arrangement record zone-levels zone-of levels changes)
+        when complaint
+          collect complaint))
+
+
+(defun terrain-uncrossed-edge-complaint
+    (arrangement record zone-levels zone-of levels changes)
+  "The complaint RECORD's edge raises when its step has no crossing, or NIL.  Abstains on
+   the same determinacy rule the span check uses, so an edge the arrangement cannot pin to
+   one step is left alone here too."
+  (let ((steps (terrain-edge-steps arrangement record zone-levels))
+        (pairs (terrain-edge-zone-pairs arrangement record)))
+    (when (and steps (null (rest steps))
+               (not (terrain-zone-pairs-crossed-p pairs zone-of changes)))
+      (format nil
+              "EDGE ~A separates level ~A from level ~A, but nothing crosses it.~%~
+               No STAIRS-VIA, JUMP-VIA or CLIMB-VIA> joins a location on one side to a ~
+               location on the other, and no floor drive lifts anything across, so the ~
+               step is there and impassable.~%~
+               Locations at level ~A: ~{~A~^, ~}~%~
+               Locations at level ~A: ~{~A~^, ~}~%~
+               Author a crossing between one of each, or make the segment a WALL if the ~
+               step is meant to be a dead end."
+              (first record) (car (first steps)) (cdr (first steps))
+              (car (first steps))
+              (terrain-locations-in-zones (mapcar #'first pairs) levels zone-of)
+              (cdr (first steps))
+              (terrain-locations-in-zones (mapcar #'second pairs) levels zone-of)))))
+
+
+(defun terrain-zone-pairs-crossed-p (pairs zone-of changes)
+  "True when some level change joins a location in one zone of some PAIRS entry to a
+   location in the other, either way round."
+  (some (lambda (change)
+          (some (lambda (pair)
+                  (terrain-change-spans-pair-p change pair zone-of))
+                pairs))
+        changes))
+
+
+(defun terrain-change-spans-pair-p (change pair zone-of)
+  "True when CHANGE's two endpoints sit in PAIR's two zones, in either order."
+  (let ((from (gethash (first change) zone-of))
+        (to (gethash (second change) zone-of)))
+    (or (and (member (first pair) from) (member (second pair) to))
+        (and (member (second pair) from) (member (first pair) to)))))
+
+
+(defun terrain-locations-in-zones (zones levels zone-of)
+  "The locations belonging to any of ZONES, naming a complaint's candidates rather than
+   leaving the author to work out which side is which."
+  (loop for entry in levels
+        when (intersection zones (gethash (first entry) zone-of))
+          collect (first entry)))
+
+
 (defun terrain-edge-steps (arrangement record zone-levels)
   "The distinct level steps RECORD's grid intervals determine, each a (lower . higher)
    pair, in the order the intervals run."
   (let ((steps nil))
-    (dolist (key (walkability-coordinates-segment-interval-keys
-                   record (getf arrangement :xs) (getf arrangement :ys)))
-      (pushnew (terrain-interval-step key (getf arrangement :zones) zone-levels)
-               steps
-               :test #'equal))
+    (dolist (pair (terrain-edge-zone-pairs arrangement record))
+      (pushnew (terrain-zone-pair-step pair zone-levels) steps :test #'equal))
     (remove nil (nreverse steps))))
 
 
-(defun terrain-interval-step (key zones zone-levels)
-  "The (lower . higher) level pair grid interval KEY determines, or NIL when either
-   flanking zone holds no location or holds locations at more than one level, or when the
-   two flanks agree -- an interval between equal levels separates nothing vertical."
-  (destructuring-bind (axis line cross) key
-    (let ((near (gethash (if (eql axis :v)
-                           (aref zones line cross)
-                           (aref zones cross line))
-                         zone-levels))
-          (far (gethash (if (eql axis :v)
-                          (aref zones (1+ line) cross)
-                          (aref zones cross (1+ line)))
-                        zone-levels)))
-      (when (and near far (null (rest near)) (null (rest far))
-                 (/= (first near) (first far)))
-        (cons (min (first near) (first far))
-              (max (first near) (first far)))))))
+(defun terrain-edge-zone-pairs (arrangement record)
+  "The distinct (near far) zone pairs RECORD's grid intervals flank, indexed the way
+   WALKABILITY-COORDINATES-DOOR-EDGES indexes a door's two sides."
+  (let ((zones (getf arrangement :zones))
+        (pairs nil))
+    (dolist (key (walkability-coordinates-segment-interval-keys
+                   record (getf arrangement :xs) (getf arrangement :ys)))
+      (destructuring-bind (axis line cross) key
+        (pushnew (list (if (eql axis :v)
+                         (aref zones line cross)
+                         (aref zones cross line))
+                       (if (eql axis :v)
+                         (aref zones (1+ line) cross)
+                         (aref zones cross (1+ line))))
+                 pairs
+                 :test #'equal)))
+    (nreverse pairs)))
+
+
+(defun terrain-zone-pair-step (pair zone-levels)
+  "The (lower . higher) level pair PAIR's two zones determine, or NIL when either holds no
+   location or holds locations at more than one level, or when the two agree -- flanks at
+   equal levels separate nothing vertical."
+  (let ((near (gethash (first pair) zone-levels))
+        (far (gethash (second pair) zone-levels)))
+    (when (and near far (null (rest near)) (null (rest far))
+               (/= (first near) (first far)))
+      (cons (min (first near) (first far))
+            (max (first near) (first far))))))
 
 
 (defun terrain-zone-complaints (zone-levels zone-of levels changes)
@@ -186,7 +273,8 @@
                               Every derived WALK-VIA across a level change is dead -- ~
                               ONE-STEP-WALKABLE rejects a step between levels -- so ~
                               either the level is wrong, or the crossing needs an ~
-                              authored STAIRS-VIA, JUMP-VIA, or CLIMB-VIA>."
+                              authored STAIRS-VIA, JUMP-VIA or CLIMB-VIA>, or a floor ~
+                              drive aimed at it."
                              zone present (length unjoined) unjoined
                              (terrain-zone-locations-at zone unjoined levels zone-of))
                      complaints))
@@ -264,6 +352,13 @@
       (setf (gethash (first entry) table) (second entry)))))
 
 
+(defun terrain-level-changes ()
+  "Every static pair of locations something can cross a level change between: the authored
+   traversals, plus the floor drives that lift whatever rests on them."
+  (append (terrain-authored-level-changes)
+          (terrain-floor-drive-rides)))
+
+
 (defun terrain-authored-level-changes ()
   "Every authored traversal that could cross a level change, as (source destination).
    Read straight from the static database rather than through relation binds, so a
@@ -274,3 +369,30 @@
                     (member (first key) *terrain-level-change-relations*))
             do (push (list (second key) (third key)) changes))
     changes))
+
+
+(defun terrain-floor-drive-rides ()
+  "Every floor drive's (swept-location destination) pair.  A floor-mounted fan or a fixed
+   floor blower launches the occupants resting on it to the drive's AIMED-AT destination
+   and sustains them there, so that pair carries a mover across a level change exactly as
+   an authored traversal does -- see -floor-blowing.  Read from the static database by name
+   like the traversals above, so a problem with no gears technology contributes nothing."
+  (let ((swept (make-hash-table :test #'eq))
+        (rides nil))
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
+          when (and (consp key) (eql (first key) 'has-position))
+            do (setf (gethash (second key) swept) (first value)))
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
+          when (and (consp key)
+                    (eql (first key) 'aimed-at)
+                    (terrain-lifting-drive-p (second key))
+                    (gethash (second key) swept))
+            do (push (list (gethash (second key) swept) (first value)) rides))
+    rides))
+
+
+(defun terrain-lifting-drive-p (drive)
+  "True when DRIVE raises its occupants rather than pushing them along their own level.  A
+   wall or angled drive blows horizontally and crosses no step."
+  (or (member drive (gethash 'floor-gears *types*))
+      (member drive (gethash 'floor-blower *types*))))

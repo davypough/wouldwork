@@ -88,6 +88,7 @@
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
 (include-tech walkability)          ;walk-via; mobility-results; traversable; one-step-walkable; move
 (include-tech visibility)            ;los-to-apparatus; los-to-location; visible; visible-clear
+(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; INITIALIZATION ;;;;

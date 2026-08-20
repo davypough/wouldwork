@@ -55,6 +55,7 @@
 (include-tech beam-relay)
 (include-tech visibility)
 (include-tech walkability)
+(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; HEURISTIC ;;;;
@@ -99,10 +100,14 @@
   (location-coords> location8 30 115/10)
   (location-coords> location9 241/10 115/10)
   (location-coords> location10 241/10 6)
-  (location-coords> location11 241/10 6)
+  ;; The loft, directly above location10: same x,y, ten units up.  The level has to be
+  ;; written here rather than left to -floor-blowing's hover default, because that default
+  ;; only covers a drive destination carrying no coordinates at all -- and this one carries
+  ;; coordinates, so BASE reads their third argument and would otherwise put the loft on
+  ;; the ground.
+  (location-coords> location11 241/10 6 10)
   (location-coords> location12 7 8)  ;station: sees transmitter1 (up x=7 through the curtain gaps), receiver1, gate1, and gate2 through open gate1
   (location-coords> location13 239/10 19)  ;station in the north alcove: sees wblower2 (down x=23.9 past wall3's west end) and receiver2, so wblower2 can be jammed from the east side of its band
-  (has-elevation location11 10)  ;do I need to specify this since it is the default
   (apparatus-coords> transmitter1 7 169/10)
   (apparatus-coords> receiver1 11/10 9)
   (apparatus-coords> receiver2 23 209/10)

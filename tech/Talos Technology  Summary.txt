@@ -58,6 +58,7 @@ target (either gate floor-gears wall-gears floor-blower wall-blower gun)
 terminus (either transmitter receiver connector floor-repeater wall-repeater)
 threat (either gun)
 vaultable-object (either gate screen wall)
+vertical-object (either location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun pressure-plate toggle-plate floor-blower angled-blower)
 visibility-object (either gate transmitter receiver floor-repeater wall-repeater gun location)
 
 3. Dynamic Relations
@@ -84,7 +85,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 4. Static Relations
 
 (aimed-at (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower) $location)
-(apparatus-coords> (either transmitter receiver floor-repeater wall-repeater gun) $rational $rational)
+(apparatus-coords> (either transmitter receiver floor-repeater wall-repeater gun) $rational $rational $rational)  ;third is the mounting level, optional, default 1; a floor-repeater does not read it
 (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
 (beam-via fixed-beam-source $list fixed-beam-sink)
 (boundary-wall $list)  ;axis-aligned point list, explicitly closed by repeating the first point; used by LOS and walk-via derivation
@@ -103,7 +104,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (jam-disallowed> location location target)
 (jump-via location $list location)
 (jump-via> location $list location)
-(location-coords> location $rational $rational)
+(location-coords> location $rational $rational $rational)  ;third is the location's own level, optional, default 0
 (los-to-apparatus location $list apparatus)
 (los-to-location location $list location)
 (los-to-target location $list gate)
@@ -139,30 +140,51 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (start-recorder ">" ?agent "starts the recorder")
 (stop-recorder ">" ?agent "stops the recorder")
 
-6. Default Type Heights
+6. Vertical Type Constants (*vertical-type-constants*, tech/-vertical.lisp)
 
-agent 3/2
-box 1
-connector 1
-edge 3/2
-gate 4
-jammer 1
-repeater 1
-screen 4
-wall 4
-boundary-wall 6  ;LOS-only default; a boundary-wall polygon has no named object for has-height
+An object's height is its extent along its own axis; its base is the absolute level of its
+lowest point; its top is base plus height on a :vertical axis and base alone otherwise.
+Base is structural, not declared: an object resting on something takes that support's top,
+following on, holding, has-location, has-position, and bottoming out at a location's own
+level.  Only an object resting on nothing uses the base default below.
 
-7. Default Type Elevations
+  TYPE              HEIGHT  AXIS         BASE
+  location          0       :none        0     ;a location is a point; its level is its own
+  agent             3/2     :vertical    0
+  box               1       :vertical    0
+  connector         1       :vertical    0
+  jammer            1       :vertical    0
+  tray              0       :vertical    0     ;zero-thickness: top flush with base
+  fan               0       :vertical    0
+  pressure-plate    0       :vertical    0     ;flush with the floor it is positioned on
+  toggle-plate      0       :vertical    0
+  floor-blower      0       :vertical    0
+  angled-blower     0       :vertical    0
+  gate              4       :vertical    0
+  screen            4       :vertical    0
+  wall              4       :vertical    0
+  edge              3/2     :vertical    0
+  floor-repeater    1       :vertical    0     ;stands on the floor
+  wall-repeater     1       :horizontal  1     ;projection from its wall; descriptive only
+  transmitter       0       :none        1
+  receiver          0       :none        1
+  gun               0       :none        1
 
-floor-repeater 0 (base; beam anchor = base + height)
-gun 1
-receiver 1
-transmitter 1
-wall-blower 1  ;stream elevation (blower-elevation); tech/-gears-fan.lisp
-wall-gears 1  ;stream elevation (blower-elevation); tech/-gears-fan.lisp
-wall-repeater 1
+A problem overrides any height with has-height, and any base with the third coordinate of
+location-coords>/apparatus-coords> or with has-elevation; the coordinate substrates refuse
+an object that names its level both ways with different numbers.  A height on a
+non-vertical axis is descriptive only -- top ignores it, and no other object-height
+consumer's argument type admits such an object -- so a wall-repeater's height records how
+far the rod projects from its wall and enters no computation.
 
-8. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
+Outside the table:
+
+boundary-wall 6  ;LOS-only height default; a boundary polygon has no named object for has-height
+wall-gears 1, wall-blower 1  ;their has-elevation is the emitted STREAM elevation, read by
+                             ;-gears-fan's blower-elevation, not the base of a solid; both
+                             ;are deliberately absent from the table above
+
+7. Tunable Defaults (DEFVAR/DEFPARAMETER, overridable per problem)
 
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
 *max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path; a cycle counts when it starts
