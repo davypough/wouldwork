@@ -29,6 +29,7 @@
 
 (include-tech -propagation)
 (include-tech -gears-fan)
+(include-tech -location-coordinates)
 
 (in-package :ww)
 
@@ -36,15 +37,17 @@
 (define-query location-elevation (?location location)
   ;; Overrides -elevation's ground default of 0: an undeclared location that is some
   ;; floor drive's aimed-at destination floats at the default in-the-air hover level of
-  ;; 10.  A declared has-elevation fact always wins.  Wall destinations remain ordinary
-  ;; ground locations.
-  (if (bind (has-elevation ?location $level))
-    $level
-    (if (exists (?g (either floor-gears floor-blower))
+  ;; 10.  An authored level always wins, whether written as LOCATION-COORDS>'s third
+  ;; coordinate or as HAS-ELEVATION.  Wall destinations remain ordinary ground locations.
+  (if (bind (location-coords> ?location $x $y $z))
+    $z
+    (if (bind (has-elevation ?location $level))
+      $level
+      (if (exists (?g (either floor-gears floor-blower))
           (and (bind (aimed-at ?g $dest))
-               (eql $dest ?location)))
-      10
-      0)))
+                 (eql $dest ?location)))
+        10
+        0))))
 
 
 (define-update update-floor-blowing-status! ()

@@ -91,23 +91,24 @@
   (has-position ladder2 location14)
   (has-position recorder1 location3)
 
-  ;; Representative location coordinates
+  ;; Representative location coordinates.  The optional third coordinate is the
+  ;; location's own level, default 0.
   (location-coords> location1 21 10)
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
-  (location-coords> location4 8 10)
+  (location-coords> location4 8 10 3/2)
   (location-coords> location5 17 151/10)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
   (location-coords> location8 241/10 6)
-  (location-coords> location9 23 6)
+  (location-coords> location9 23 6 3/2)
   (location-coords> location10 20 5)
   (location-coords> location11 31 10)
   (location-coords> location12 32 5)
-  (location-coords> location13 11 9)
+  (location-coords> location13 11 9 3/2)
   (location-coords> location14 349/10 9)
-  (location-coords> location15 34 2)
-  (location-coords> location16 31 2)
+  (location-coords> location15 34 2 2)
+  (location-coords> location16 31 2 2)
   (location-coords> location17 18 5)
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
@@ -117,18 +118,12 @@
   (apparatus-coords> receiver1 13 149/10)
   (apparatus-coords> receiver2 31 41/10)
 
-  ;; Nondefault elevations.  Other locations, gates, and screens default to 0.
-  ;; Transmitters and receivers default to elevation 1.
-  (has-elevation location4 3/2)
-  (has-elevation location9 3/2)
-  ;(has-elevation location10 3/2)
-  (has-elevation location13 3/2)
+  ;; Nondefault base elevations of segment fixtures.  Other gates and screens default
+  ;; to 0.  Location levels are the third LOCATION-COORDS> coordinate above.
   (has-elevation gate4 3/2)
   (has-elevation receiver1 3/2)
   (has-elevation transmitter1 3/2)
   (has-elevation transmitter2 3/2)
-  (has-elevation location15 2)
-  (has-elevation location16 2)
 
   ;; Nondefault heights.
   (has-height wall10 3/2)

@@ -68,8 +68,9 @@
 (define-init-check-helper init-location-coords-map (literals)
   (let ((map (make-hash-table :test #'eql)))
     (dolist (literal (init-literals-with-relation 'location-coords> literals))
-      (destructuring-bind (location x y)
+      (destructuring-bind (location x y z)
           (rest (init-literal-proposition literal))
+        (declare (ignore z))
         (setf (gethash location map) (list x y))))
     map))
 

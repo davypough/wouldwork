@@ -82,10 +82,9 @@
   (has-position ladder1 location7)
   (on box1 plate1)
 
-  ;; Nondefault elevations.  Other locations, gates, and screens default to 0.
-  ;; Transmitters and receivers default to elevation 1.
-  (has-elevation location12 3/2)
-  (has-elevation location13 3/2)
+  ;; Nondefault base elevations of segment fixtures.  Other gates and screens default
+  ;; to 0.  Location levels are the third LOCATION-COORDS> coordinate, defaulting to 0;
+  ;; transmitters and receivers default to elevation 1.
   (has-elevation gate8 3/2)
   (has-elevation gate9 3/2)
 
@@ -116,7 +115,7 @@
   ;; non-walkable window.  wall3 caps the notch shared with problem-corner-topo.lisp
   ;; (same segment declared there) so LOS/walkability derivations here see it too.
   ;; edge1 is the ground-level footprint of the raised slab that location12, location13,
-  ;; gate8, and gate9 sit on (elevation 2): its east edge, between location12 and
+  ;; gate8, and gate9 sit on (elevation 3/2): its east edge, between location12 and
   ;; location10, sealing against the boundary at y 10 and 17.  Walking across the slab
   ;; at ground level is thereby blocked on that side; the elevation-2 crossing
   ;; location12 <-> location13 lies entirely inside the footprint (gated by
@@ -169,8 +168,8 @@
   (location-coords> location9 13 13)
   (location-coords> location10 8 13)
   (location-coords> location11 1 13)
-  (location-coords> location12 6 13)
-  (location-coords> location13 4 13)
+  (location-coords> location12 6 13 3/2)   ;third coordinate is the location's own level
+  (location-coords> location13 4 13 3/2)
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
   ;; unambiguously on the intended side of its adjacent boundary.

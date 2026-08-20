@@ -18,6 +18,7 @@
 ;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
 
 (include-tech -height)
+(include-tech -location-coordinates)
 
 (in-package :ww)
 
@@ -57,8 +58,13 @@
 
 
 (define-query location-elevation (?location location)
-  ;; Declared floor level of a location, or zero if none was asserted (ordinary ground).
-  (object-elevation ?location))
+  ;; A location's own floor level: LOCATION-COORDS>'s optional third coordinate, or
+  ;; HAS-ELEVATION in a problem carrying no coordinates, or zero.  -vertical's FIXED-BASE
+  ;; resolves the same two sources the same way for every kind of object; both go when
+  ;; this file's queries do.
+  (if (bind (location-coords> ?location $x $y $z))
+    $z
+    (object-elevation ?location)))
 
 
 (define-query repeater-mount-elevation (?repeater repeater)

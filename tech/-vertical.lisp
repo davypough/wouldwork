@@ -14,8 +14,9 @@
 ;;; Base is structural rather than declared.  An object that rests on something derives
 ;;; its base from that support's top, following ON, then HOLDING, then HAS-LOCATION, then
 ;;; HAS-POSITION, bottoming out at a location's own level.  An object fixed in space has
-;;; its base authored through HAS-ELEVATION or defaulted to zero.  No declaration
-;;; distinguishes the two cases -- the object's structure does.  "Anchor" is not a
+;;; its base authored -- a location as LOCATION-COORDS>'s optional third coordinate,
+;;; anything else as HAS-ELEVATION -- or defaulted to zero.  No declaration distinguishes
+;;; the resting case from the fixed one; the object's structure does.  "Anchor" is not a
 ;;; separate concept here: a beam anchor is always the anchoring object's TOP.
 ;;;
 ;;; The three achievable connector anchor heights fall out of this with no special case,
@@ -25,12 +26,13 @@
 ;;; zero-thickness tray's top is the same, and the connector's top is floor + 5/2.
 ;;;
 ;;; REQUIRES:
-;;;   nested   : -height (has-height), -elevation (has-elevation), -support-occupancy (on),
-;;;              -location (has-location), -position (has-position), -holding (holding)
+;;;   nested   : -height (has-height), -elevation (has-elevation), -location-coordinates
+;;;              (location-coords>), -support-occupancy (on), -location (has-location),
+;;;              -position (has-position), -holding (holding)
 ;;; PROVIDES:
 ;;;   types     : vertical-object  --  everything with a place in the vertical model
 ;;;   parameter : *vertical-type-constants*  --  per-type height default and axis
-;;;   queries   : base, top, object-height
+;;;   queries   : base, top, fixed-base, object-height
 ;;;
 ;;; WALL-GEARS and WALL-BLOWER are deliberately absent from the table.  Their
 ;;; HAS-ELEVATION is a stream elevation read by -gears-fan's BLOWER-ELEVATION, not the
@@ -38,6 +40,7 @@
 
 (include-tech -height)
 (include-tech -elevation)
+(include-tech -location-coordinates)
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -position)
@@ -97,12 +100,12 @@
 
 
 (define-query base (?object vertical-object)
-  ;; The absolute level of the object's lowest point.  An object resting on a support
-  ;; takes that support's top; a held object takes its holder's top; an object merely at
-  ;; a location or positioned at one takes that location's own level; and an object fixed
-  ;; in space takes its authored level, or zero.  ON precedes HAS-LOCATION because a
-  ;; movable occupant keeps its location fact while resting on a support, and HOLDING
-  ;; precedes it for the same reason.
+  ;; The absolute level of the object's lowest point, derived from whatever the object
+  ;; rests on.  An object resting on a support takes that support's top; a held object
+  ;; takes its holder's top; an object merely at a location or positioned at one takes
+  ;; that location's own level.  ON precedes HAS-LOCATION because a movable occupant
+  ;; keeps its location fact while resting on a support, and HOLDING precedes it for the
+  ;; same reason.  An object resting on nothing is fixed in space; see FIXED-BASE.
   (if (bind (on ?object $support))
     (top $support)
     (if (bind (holding $holder ?object))
@@ -111,9 +114,19 @@
         (base $location)
         (if (bind (has-position ?object $site))
           (base $site)
-          (if (bind (has-elevation ?object $level))
-            $level
-            0))))))
+          (fixed-base ?object))))))
+
+
+(define-query fixed-base (?object vertical-object)
+  ;; The authored level of an object that rests on nothing.  A location carries its own
+  ;; level as LOCATION-COORDS>'s third coordinate; everything else, and a location in a
+  ;; problem with no coordinate geometry, uses HAS-ELEVATION.  Both default to zero, and
+  ;; -location-coordinates cross-checks a location that declares the level twice.
+  (if (bind (location-coords> ?object $x $y $z))
+    $z
+    (if (bind (has-elevation ?object $level))
+      $level
+      0)))
 
 
 (define-query top (?object vertical-object)
