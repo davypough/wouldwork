@@ -17,7 +17,10 @@
 ;;;      the ground at the destination and leaves the grounded tray clear.
 ;;;   4. PICKUP-TRAY's not-already-held guard: unlike other cargo, a held tray keeps its
 ;;;      has-location, so a tray already held by one agent cannot be independently picked
-;;;      up by another merely because it still resolves a location.
+;;;      up by another merely because it still resolves a location.  OWNER-AGENT is given
+;;;      height 1 so the tray it holds sits exactly at THIEF-AGENT's reach boundary: the
+;;;      guard must be what refuses the pickup, not the reach test incidentally failing,
+;;;      or dropping the guard would go unnoticed.
 ;;;
 ;;; Only the first three scenarios change state.  Expected minimum path length: five
 ;;; actions -- one PICKUP-TRAY, one PUT-TRAY, and the cascade's PUT-BOX/CARRY-MOVE/PUT-TRAY
@@ -112,7 +115,10 @@
 
   ;; Negative fixture: ALREADY-HELD-TRAY is held by OWNER-AGENT but, being a tray,
   ;; still resolves a has-location at THEFT-SITE, co-located with THIEF-AGENT.
+  ;; OWNER-AGENT's height puts the held tray at THIEF-AGENT's exact reach boundary, so
+  ;; only the not-already-held guard can refuse the pickup.
   (has-location owner-agent theft-site)
+  (has-height owner-agent 1)
   (has-location thief-agent theft-site)
   (holding owner-agent already-held-tray)
   (has-location already-held-tray theft-site))
@@ -191,15 +197,19 @@
            (on cascade-box ?support)))
     (cleartop cascade-tray)
     (has-location cascade-box cascade-destination)
-    (= (occupant-elevation bearer-agent) 3)
+    (= (base bearer-agent) 3)
     (= (top cascade-tray) 3)
-    (= (occupant-elevation cascade-box) 3)
+    (= (base cascade-box) 3)
 
     ;; Negative: ALREADY-HELD-TRAY resolves a location but is not pickable by
-    ;; THIEF-AGENT, since it is already held by OWNER-AGENT.
+    ;; THIEF-AGENT, since it is already held by OWNER-AGENT.  The tray sits at the exact
+    ;; reach boundary, so the refusal is attributable to the guard alone.
     (holding owner-agent already-held-tray)
     (has-location already-held-tray theft-site)
     (has-location thief-agent theft-site)
+    (= (base thief-agent) 0)
+    (= (base already-held-tray) 1)
+    (within-agent-vertical-reach thief-agent (base already-held-tray))
     (not (tray-action-applicable-p
            state 'pickup-tray '(thief-agent already-held-tray)))))
 

@@ -74,8 +74,8 @@
     (equal $crossings
            '((:wall height-wall 1/2 5 -1 5 3)
              (:gate sight-gate 7/10 7 -1 7 3)))
-    (= (declared-height height-wall) 4)
-    (= (declared-height sight-gate) 4)
+    (= (object-height height-wall) 4)
+    (= (object-height sight-gate) 4)
     (not (open sight-gate))
 
     ;; The actual elevated support clears strictly above the wall.  The ground option and

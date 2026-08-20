@@ -339,7 +339,7 @@
 
     ;; Inclusive upward boundary and just-over rejection for the fixed, agent-independent
     ;; elevation limit; unrestricted downward movement.
-    (= (occupant-elevation boundary-agent) 2)
+    (= (base boundary-agent) 2)
     (jump-elevation-reachable boundary-agent 2 3)
     (not (jump-elevation-reachable boundary-agent 2 4))
     (jump-elevation-reachable boundary-agent 2 -100)
@@ -364,10 +364,10 @@
 
     ;; Barrier default, explicit override, top elevation, feature typing, and maximum
     ;; non-passable height.  The passable screen contributes nothing to the mixed list.
-    (= (declared-height default-gate) 4)
-    (= (declared-height passable-screen) 4)
-    (= (declared-height default-wall) 4)
-    (= (declared-height vault-wall) 2)
+    (= (object-height default-gate) 4)
+    (= (object-height passable-screen) 4)
+    (= (object-height default-wall) 4)
+    (= (object-height vault-wall) 2)
     (= (jump-barrier-top-elevation vault-wall) 2)
     (vaultable-object-list '(passable-screen default-wall))
     (vaultable-object-passable screen-probe-agent passable-screen)
@@ -421,7 +421,7 @@
 
 (define-query-mutation jump-elevation-uses-actual-source jump-elevation-reachable
   (?agent agent ?source-elevation ?target-elevation)
-  (<= (- ?target-elevation (occupant-elevation ?agent))
+  (<= (- ?target-elevation (base ?agent))
       *vertical-reach-limit*)
   "Ignores the explicit hypothetical source elevation.  The stairs-then-jump
    route must then fail from the agent's actual pre-move elevation.")
@@ -433,7 +433,7 @@
        (assign $required
                (jump-required-clearance-height ?agent ?features))
        (or (not $required)
-           (<= (- $required (occupant-elevation ?agent))
+           (<= (- $required (base ?agent))
                *vertical-reach-limit*)))
   "Ignores the explicit hypothetical source elevation for path clearance.  The
    elevated intermediate jump and the explicit-source probes must detect it.")

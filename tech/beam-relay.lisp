@@ -40,6 +40,7 @@
 (include-tech -beam-substrate)
 (include-tech -placement)
 (include-tech -visibility)
+(include-tech -vertical)
 (include-tech -support-elevation)
 (include-tech -elevation)
 (include-tech -mobility)
@@ -317,8 +318,8 @@
              (receiver ?anchor))
          (fixture-elevation ?anchor))
         ((connector ?anchor)
-         (+ (occupant-elevation ?anchor)
-            (declared-height ?anchor)))
+         (+ (base ?anchor)
+            (object-height ?anchor)))
         (t
          (repeater-anchor-elevation ?anchor))))
 

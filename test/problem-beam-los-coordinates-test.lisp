@@ -206,14 +206,14 @@
     ;; remains inclusive in 2D, just as before.
     (potentially-visible wall-corner-site wall-corner-receiver)
     (not (visible wall-corner-site wall-corner-receiver))
-    (= (declared-height corner-wall) 4)
+    (= (object-height corner-wall) 4)
     (not (beam-visible wall-corner-site 4 wall-corner-receiver 4))
     (beam-visible wall-corner-site 5 wall-corner-receiver 5)
 
     ;; An undeclared edge defaults to height 3/2.
     (potentially-visible edge-interior-site edge-interior-receiver)
     (not (visible edge-interior-site edge-interior-receiver))
-    (= (declared-height interior-edge) 3/2)
+    (= (object-height interior-edge) 3/2)
     (not (beam-visible edge-interior-site 3/2 edge-interior-receiver 3/2))
     (beam-visible edge-interior-site 5/2 edge-interior-receiver 5/2)
 

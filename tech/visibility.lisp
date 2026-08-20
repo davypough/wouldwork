@@ -67,6 +67,7 @@
 (include-tech -gate)
 (include-tech -beam-los-coordinates)
 (include-tech -beam-interpolation)
+(include-tech -vertical)
 (include-tech -beam-occlusion)
 
 (in-package :ww)
@@ -125,7 +126,7 @@
             (assign $height
                     (if (eql $kind :boundary)
                       6
-                      (declared-height $barrier)))
+                      (object-height $barrier)))
             (or (< $crossing-elevation $base-elevation)
                 (> $crossing-elevation (+ $base-elevation $height)))))))
 

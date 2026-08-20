@@ -121,7 +121,7 @@
       (not (cleartop target-box))
       (= (top source-box) 1)
       (= (top target-box) 1)
-      (= (occupant-elevation moving-box) 1)
+      (= (base moving-box) 1)
 
       ;; Putting the independent held box on the plate depresses it.
       (not (holding plate-agent plate-box))
@@ -141,7 +141,7 @@
       ;; vertical reach, regardless of the agent's explicit height two.
       (cleartop high-box)
       (= (top high-support) 2)
-      (= (occupant-elevation high-box) 2)
+      (= (base high-box) 2)
       (not (within-agent-vertical-reach high-agent 2))
       (not (pickup-clear high-agent high-site high-box high-site))
       (not (box-action-applicable-p state 'pickup-box '(high-agent high-box)))

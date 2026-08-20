@@ -139,12 +139,18 @@
 
 (defun vertical-type-entry (object)
   "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS) entry from *VERTICAL-TYPE-CONSTANTS*.
-   The table's types are disjoint leaves, so the first match is the only match.
-   Memoized; see *VERTICAL-TYPE-CACHE*."
+   The table's types are disjoint leaves, so the first match is the only match.  An
+   object outside the table has no place in the vertical model, which is an authoring
+   error rather than a zero height -- saying so here is what keeps a mistargeted caller
+   from silently reading NIL.  Memoized; see *VERTICAL-TYPE-CACHE*."
   (multiple-value-bind (cached present) (gethash object *vertical-type-cache*)
     (if present
       cached
       (setf (gethash object *vertical-type-cache*)
-            (find-if (lambda (entry)
-                       (member object (gethash (first entry) *types*)))
-                     *vertical-type-constants*)))))
+            (or (find-if (lambda (entry)
+                           (member object (gethash (first entry) *types*)))
+                         *vertical-type-constants*)
+                (error "~%No vertical type constants are defined for ~S.~%~
+                        Every object reaching BASE, TOP, or OBJECT-HEIGHT must belong to ~
+                        one of the leaf types in *VERTICAL-TYPE-CONSTANTS*."
+                       object))))))

@@ -150,10 +150,10 @@
 
 (define-query fixed-beam-barrier-scenarios-valid ()
   (and
-    (= (declared-height default-wall) 4)
-    (= (declared-height short-wall) 1)
-    (= (declared-height finite-edge) 3/2)
-    (= (declared-height height-gate) 4)
+    (= (object-height default-wall) 4)
+    (= (object-height short-wall) 1)
+    (= (object-height finite-edge) 3/2)
+    (= (object-height height-gate) 4)
 
     ;; Equality with the default wall top blocks; strictly above it clears.
     (not (fixed-beam-corridor-clear wall-top-source wall-top-receiver))

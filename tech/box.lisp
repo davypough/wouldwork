@@ -46,7 +46,7 @@
   ;; Place a held box on the ground or on a clear support at a reachable location (including
   ;; the agent's own): one successor per legal placement-options result.  Each destination is
   ;; gated by manual reach -- its resting level must be within the agent's height
-  ;; (declared-height) of the agent's own level.
+  ;; (object-height) of the agent's own level.
   1
   (?agent agent ?box box ?location location)
   (and (holding ?agent ?box)

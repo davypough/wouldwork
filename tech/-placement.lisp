@@ -16,7 +16,7 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location
 ;;;   nested    : -support-elevation (support occupancy, location, position, height,
-;;;               elevation, top, occupant-elevation, and
+;;;               elevation, top, base, and
 ;;;               within-agent-placement-reach); -holding (cargo, holding)
 ;;; PROVIDES:
 ;;;   queries   : placement-choice-allowed -- shared policy gate used by both option

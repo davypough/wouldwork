@@ -8,8 +8,13 @@
 ;;; so consumers nest-include this file instead of each re-declaring the same union, relation,
 ;;; or default-fallback query.
 ;;;
-;;; declared-height defaults gate, screen, and wall to 4; edge to 3/2; agent to 3/2; and
-;;; box, jammer, connector, and repeater to 1.
+;;; declared-height is superseded by -vertical's OBJECT-HEIGHT, which reads the same
+;;; HAS-HEIGHT facts against a wider per-type constant table and returns identical values
+;;; for every heighted-object leaf.  Two callers still need it: REPEATER-ANCHOR-ELEVATION
+;;; in -elevation.lisp, which -vertical nests and so cannot call back into, and any
+;;; problem including -height or elevation without the support stack that carries
+;;; -vertical.  Both go when -elevation's anchor queries go.  Its defaults are gate,
+;;; screen, and wall 4; edge 3/2; agent 3/2; and box, jammer, connector, and repeater 1.
 ;;; A repeater's height follows its mounting axis: vertical for a floor-repeater and
 ;;; horizontal for a wall-repeater.
 ;;;

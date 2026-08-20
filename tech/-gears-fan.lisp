@@ -82,6 +82,7 @@
 ;;;               read by wall-blower's sweep and angled-blower's arc)
 ;;;   actions   : pickup-fan, put-fan, mount-fan
 
+(include-tech -vertical)
 (include-tech -propagation)
 (include-tech -support-occupancy)
 (include-tech -location)

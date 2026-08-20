@@ -118,8 +118,8 @@
 (define-query stable-beam-occlusion-scenarios-valid ()
   (and
     ;; Raised agent: both boundaries are inclusive; adjacent values are clear.
-    (= (occupant-elevation raised-agent) 3)
-    (= (declared-height raised-agent) 2)
+    (= (base raised-agent) 3)
+    (= (object-height raised-agent) 2)
     (beam-blocker-spans-elevation raised-agent 3)
     (beam-blocker-spans-elevation raised-agent 5)
     (not (beam-blocker-spans-elevation raised-agent 2))
@@ -132,15 +132,15 @@
     ;; Default height is one.  At elevation two only TALL-BOX spans, which is
     ;; sufficient for the existential location query.
     (not (bind (has-height default-box $default-box-height)))
-    (= (occupant-elevation default-box) 0)
-    (= (declared-height default-box) 1)
+    (= (base default-box) 0)
+    (= (object-height default-box) 1)
     (beam-blocker-spans-elevation default-box 0)
     (beam-blocker-spans-elevation default-box 1)
     (not (beam-blocker-spans-elevation default-box -1))
     (not (beam-blocker-spans-elevation default-box 2))
 
-    (= (occupant-elevation tall-box) 0)
-    (= (declared-height tall-box) 3)
+    (= (base tall-box) 0)
+    (= (object-height tall-box) 3)
     (beam-blocker-spans-elevation tall-box 2)
     (beam-blocker-occludes-location mixed-box-site 2)
     (beam-blocker-occludes-location mixed-box-site 3)
@@ -150,8 +150,8 @@
     ;; ON takes precedence over the connector's coincident location fact.
     (beam-occlusion-only-on supported-connector connector-support-box)
     (= (top connector-support-box) 2)
-    (= (occupant-elevation supported-connector) 2)
-    (= (declared-height supported-connector) 3)
+    (= (base supported-connector) 2)
+    (= (object-height supported-connector) 3)
     (beam-blocker-spans-elevation supported-connector 2)
     (beam-blocker-spans-elevation supported-connector 5)
     (not (beam-blocker-spans-elevation supported-connector 1))
@@ -174,8 +174,8 @@
            (on lifecycle-jammer ?support)))
 
     ;; The same unit-height jammer now spans [7,8].
-    (= (occupant-elevation lifecycle-jammer) 7)
-    (= (declared-height lifecycle-jammer) 1)
+    (= (base lifecycle-jammer) 7)
+    (= (object-height lifecycle-jammer) 1)
     (beam-blocker-spans-elevation lifecycle-jammer 7)
     (beam-blocker-spans-elevation lifecycle-jammer 8)
     (not (beam-blocker-spans-elevation lifecycle-jammer 6))

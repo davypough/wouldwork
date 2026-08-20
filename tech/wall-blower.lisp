@@ -54,6 +54,7 @@
 ;;;   updates   : update-wall-blower-status!, sweep-occupants-away!
 
 (include-tech -propagation)
+(include-tech -vertical)
 (include-tech -gears-fan)
 (include-tech -stream-passability)
 
@@ -97,8 +98,8 @@
                  (bind (has-location ?x $x-location))
                  (eql $x-location $swept)
                  (blower-active-for-object ?x ?drive))
-          (do (assign $standing (occupant-elevation ?x))
-              (assign $height (declared-height ?x))
+          (do (assign $standing (base ?x))
+              (assign $height (object-height ?x))
               (if (and (< $standing $stream)
                        (<= $stream (+ $standing $height)))
                 (do (if (bind (on ?x $support))

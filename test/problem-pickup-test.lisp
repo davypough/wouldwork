@@ -113,44 +113,44 @@
     ;; authored same-level reach edge.
     (not (exists (?cargo cargo)
            (holding boundary-agent ?cargo)))
-    (= (occupant-elevation boundary-agent) 5)
-    (= (declared-height boundary-agent) 2)
+    (= (base boundary-agent) 5)
+    (= (object-height boundary-agent) 2)
 
-    (= (occupant-elevation identity-box) 5)
+    (= (base identity-box) 5)
     (reachable boundary-origin boundary-origin)
     (pickup-clear
       boundary-agent boundary-origin identity-box boundary-origin)
 
-    (= (occupant-elevation upper-box) 6)
+    (= (base upper-box) 6)
     (reachable upper-site boundary-origin)
     (within-agent-vertical-reach boundary-agent 6)
     (pickup-clear boundary-agent boundary-origin upper-box upper-site)
 
-    (= (occupant-elevation lower-jammer) 4)
+    (= (base lower-jammer) 4)
     (reachable lower-site boundary-origin)
     (within-agent-vertical-reach boundary-agent 4)
     (pickup-clear boundary-agent boundary-origin lower-jammer lower-site)
 
-    (= (occupant-elevation same-level-connector) 5)
+    (= (base same-level-connector) 5)
     (reachable same-level-site boundary-origin)
     (pickup-clear
       boundary-agent boundary-origin same-level-connector same-level-site)
 
     ;; One unit beyond either inclusive boundary fails only vertical reach.
-    (= (occupant-elevation too-high-box) 7)
+    (= (base too-high-box) 7)
     (reachable too-high-site boundary-origin)
     (not (within-agent-vertical-reach boundary-agent 7))
     (not (pickup-clear
            boundary-agent boundary-origin too-high-box too-high-site))
 
-    (= (occupant-elevation too-low-jammer) 3)
+    (= (base too-low-jammer) 3)
     (reachable too-low-site boundary-origin)
     (not (within-agent-vertical-reach boundary-agent 3))
     (not (pickup-clear
            boundary-agent boundary-origin too-low-jammer too-low-site))
 
     ;; Reachability is independently necessary even at the agent's own elevation.
-    (= (occupant-elevation disconnected-connector) 5)
+    (= (base disconnected-connector) 5)
     (within-agent-vertical-reach boundary-agent 5)
     (not (reachable disconnected-site boundary-origin))
     (not (pickup-clear
@@ -160,11 +160,11 @@
     ;; Holding any cargo independently rejects an otherwise valid identity pickup.
     (holding holding-agent held-box)
     (has-location available-connector holding-site)
-    (= (occupant-elevation holding-agent)
-       (occupant-elevation available-connector))
+    (= (base holding-agent)
+       (base available-connector))
     (reachable holding-site holding-site)
     (within-agent-vertical-reach
-      holding-agent (occupant-elevation available-connector))
+      holding-agent (base available-connector))
     (not (pickup-clear
            holding-agent holding-site available-connector holding-site))
 
@@ -175,7 +175,7 @@
     (not (cleartop occupied-box))
     (reachable occupied-site occupied-site)
     (within-agent-vertical-reach
-      occupancy-agent (occupant-elevation occupied-box))
+      occupancy-agent (base occupied-box))
     (pickup-clear
       occupancy-agent occupied-site occupied-box occupied-site)))
 

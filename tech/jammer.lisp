@@ -33,6 +33,7 @@
 ;;;               jammer-visible-placement-options
 ;;;   actions   : pickup-jammer, put-jammer, jam-target
 
+(include-tech -vertical)
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -visibility)
@@ -71,7 +72,7 @@
   ;; Point fixtures use their functional elevation.  Extended gates are aimed at their
   ;; vertical midpoint.  Gears use the same working level as their mounted fan.
   (if (gate ?target)
-    (+ (object-elevation ?target) (/ (declared-height ?target) 2))
+    (+ (object-elevation ?target) (/ (object-height ?target) 2))
     (if (gun ?target)
       (fixture-elevation ?target)
       (if (or (wall-gears ?target)
@@ -85,7 +86,7 @@
     (?view ?location location ?place ?jammer jammer ?target target)
   (do (assign $jammer-elevation
               (+ (placement-elevation ?location ?place)
-                 (declared-height ?jammer)))
+                 (object-height ?jammer)))
       (assign $target-elevation (jammer-target-elevation ?target))
       (if (or (gate ?target) (gun ?target))
         (elevation-visible-for-object

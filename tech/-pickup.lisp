@@ -10,7 +10,7 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -placement (holding, occupant-elevation, within-agent-vertical-reach);
+;;;   nested    : -placement (holding, base, within-agent-vertical-reach);
 ;;;               -reachability (reachable); -interaction-policy arrives through
 ;;;               -placement's support substrate (object-manipulation-allowed)
 ;;; PROVIDES:
@@ -27,4 +27,4 @@
   (and (object-manipulation-allowed ?agent ?object)
        (not (bind (holding ?agent $any-held-object)))
        (reachable ?object-location ?a-location)
-       (within-agent-vertical-reach ?agent (occupant-elevation ?object))))
+       (within-agent-vertical-reach ?agent (base ?object))))

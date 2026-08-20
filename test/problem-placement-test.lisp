@@ -174,7 +174,7 @@
     (mounted-on lifecycle-fan lifecycle-gears)
     (has-location lifecycle-fan lifecycle-target)
     (not (cleartop lifecycle-fan))
-    (= (occupant-elevation lifecycle-agent) 1)
+    (= (base lifecycle-agent) 1)
     (= (top lifecycle-fan) 0)
     (within-agent-vertical-reach lifecycle-agent 0)
 
@@ -255,7 +255,7 @@
     ;; placement reach bounds only the upward direction -- a resting place any distance
     ;; below the agent takes no reach at all.
     (holding boundary-agent boundary-probe-box)
-    (= (occupant-elevation boundary-agent) 5)
+    (= (base boundary-agent) 5)
     (within-agent-vertical-reach boundary-agent 6)
     (within-agent-vertical-reach boundary-agent 4)
     (not (within-agent-vertical-reach boundary-agent 7))

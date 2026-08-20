@@ -10,9 +10,9 @@
 ;;;   types  : location, agent  --  box, jammer, connector are declared optional wherever
 ;;;            the including tech (beam-direct today) declares them; not redeclared here,
 ;;;            mirroring how -support-occupancy.lisp's own composite types work
-;;;   nested : -support-elevation (occupant-elevation, chained through box/fan support;
+;;;   nested : -vertical (base, chained through box/fan support;
 ;;;            plate support does not raise); -height (heighted-object, has-height,
-;;;            declared-height); -location (mobile-object, (has-location ...));
+;;;            object-height); -location (mobile-object, (has-location ...));
 ;;;            -recording-shadow-policy (recording-side object presence)
 ;;; PROVIDES:
 ;;;   types    : beam-blocker (either agent box jammer connector)  --  what can occlude a
@@ -20,6 +20,7 @@
 ;;;   queries  : beam-blocker-occludes-location,
 ;;;              beam-blocker-occludes-location-for-object, beam-blocker-spans-elevation
 
+(include-tech -vertical)
 (include-tech -support-elevation)
 (include-tech -height)
 (include-tech -location)
@@ -51,9 +52,9 @@
 
 
 (define-query beam-blocker-spans-elevation (?blocker beam-blocker ?beam-elevation)
-  ;; True iff ?blocker's own vertical span -- occupant-elevation up to occupant-elevation
-  ;; plus its own declared-height -- covers ?beam-elevation.  Occupant-elevation (from
+  ;; True iff ?blocker's own vertical span -- base up to base
+  ;; plus its own object-height -- covers ?beam-elevation.  Occupant-elevation (from
   ;; -support-elevation) chains through box/fan support; plate support does not raise it.
-  (do (assign $base-level (occupant-elevation ?blocker))
+  (do (assign $base-level (base ?blocker))
       (and (<= $base-level ?beam-elevation)
-           (<= ?beam-elevation (+ $base-level (declared-height ?blocker))))))
+           (<= ?beam-elevation (+ $base-level (object-height ?blocker))))))
