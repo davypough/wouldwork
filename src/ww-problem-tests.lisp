@@ -405,6 +405,180 @@
       (read in))))
 
 
+;;; TOPO TEST ;;;
+
+
+(defparameter *topo-derived-relations*
+  '(traversal-via traversal-via> los-via los-barrier-crossings>
+    beam-crossing> crossings-along-beam> beam-crossings-before-gate>)
+  "The relations the coordinate derivations produce.  Every one is derived rather than
+   authored, so anything that moves in them means a derivation moved -- which is the thing
+   the topo problems have no other guard against, since none of them is in (TEST-TALOS).")
+
+
+(defun test-topo ()
+  "Stage every probs/problem-*-topo.lisp and check the geometry it derives against a
+   recorded expectation.  These five are the live Talos work, and none of them is in
+   (TEST-TALOS) -- which is how problem-phobia-topo staged with an initialization error
+   across two whole phases before anyone noticed.  Staging alone runs every init check and
+   every coordinate derivation; the recorded expectation additionally pins what those
+   derivations produced, so one that quietly starts emitting different facts fails here
+   rather than in a search weeks later.
+
+   No search is run.  These problems take minutes each to solve, and this suite is meant to
+   stay cheap enough to run after every change to tech/.
+
+   Expectations live in problem-test-topo-geometry.lisp beside the system: recorded on the
+   first run, compared on every later one.  After a change that legitimately moves the
+   geometry, delete that file, re-run to re-record, and say in the commit what moved and
+   why."
+  (let* ((problem-files
+           (sort (directory (merge-pathnames "problem-*-topo.lisp"
+                                             (get-probs-folder-path)))
+                 #'string-lessp
+                 :key #'file-namestring))
+         (geometry-file (merge-pathnames "problem-test-topo-geometry.lisp"
+                                         (asdf:system-source-directory :wouldwork)))
+         (recording (not (probe-file geometry-file)))
+         (recorded (if recording
+                     (make-hash-table :test #'equal)
+                     (read-hash-table-from-file geometry-file)))
+         failed-problems)
+    (unwind-protect
+      (progn
+        (dolist (problem-file problem-files)
+          (let ((problem-name (parse-problem-name (file-namestring problem-file))))
+            (print-test-header problem-name "TOPO")
+            (when (topo-problem-failed-p
+                    problem-name
+                    (format nil "probs/~A" (file-namestring problem-file))
+                    recorded recording)
+              (push problem-name failed-problems))))
+        (when recording
+          (write-hash-table-to-file recorded geometry-file)
+          (format t "~%Recorded derived geometry in ~A~%" geometry-file))
+        (format t "~%~%Final Summary:~%")
+        (format t "Total topo problems staged: ~D~%" (length problem-files))
+        (format t "Failures: ~D~%" (length failed-problems))
+        (format t "Failed problems: ~A~%" (reverse failed-problems))
+        (format t "Overall: ~:[FAILED~;PASSED~]~%" (null failed-problems))
+        (null failed-problems))
+      (cleanup-test-files))))
+
+
+(defun topo-problem-failed-p (problem-name problem-path recorded recording)
+  "Stage one topo problem and compare its derived geometry with the recorded expectation.  A
+   staging error is reported and attributed rather than allowed to halt the run, so one
+   broken problem never hides the state of the other four -- the failure mode this whole
+   suite exists to close."
+  (handler-case
+      (progn
+        (%stage problem-path)
+        (let ((geometry (topo-derived-geometry)))
+          (cond (recording
+                 (setf (gethash problem-name recorded) geometry)
+                 (format t "~%Recording derived geometry for ~A:~%~{  ~A~%~}"
+                         problem-name (topo-geometry-report geometry))
+                 nil)
+                ((equal geometry (gethash problem-name recorded))
+                 (format t "~%~A derived geometry matches:~%~{  ~A~%~}"
+                         problem-name (topo-geometry-report geometry))
+                 nil)
+                (t
+                 (format t "~%~A derived geometry changed:~%~{~A~%~}"
+                         problem-name
+                         (topo-geometry-differences
+                           (gethash problem-name recorded) geometry))
+                 t))))
+    (error (condition)
+      (format t "~%Topo problem ~A failed to stage:~%~A~%" problem-name condition)
+      t)))
+
+
+(defun topo-derived-geometry ()
+  "What the staged problem's coordinate derivations produced: one (relation count digest)
+   entry per derived relation, ordered by relation name.
+
+   The count is what a failure report quotes, because a number that moved from 48 to 63 says
+   something a digest never can.  The digest is what makes the check exact: a derivation that
+   swapped two rows of one relation, or changed a payload without changing how many rows
+   there are, leaves every count alone and would otherwise pass unnoticed.
+
+   A relation the problem's technologies never declared contributes no entry rather than a
+   zero, so giving one problem a new capability leaves the other four's expectations
+   untouched."
+  (let ((grouped (make-hash-table :test #'eq))
+        (*print-case* :upcase)
+        (*print-pretty* nil)
+        (*package* (find-package :ww)))
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
+          when (and (consp key)
+                    (member (first key) *topo-derived-relations*))
+            do (push (format nil "~S = ~S" key value)
+                     (gethash (first key) grouped)))
+    (sort (loop for relation being the hash-keys of grouped using (hash-value rows)
+                collect (list relation
+                              (length rows)
+                              (topo-row-digest (sort rows #'string<))))
+          #'string<
+          :key (lambda (entry)
+                 (symbol-name (first entry))))))
+
+
+(defun topo-row-digest (rows)
+  "A 64-bit FNV-1a digest of ROWS, which must already be sorted.  Computed arithmetically
+   rather than with SXHASH, whose value is implementation- and version-dependent: a recorded
+   expectation has to stay comparable between the maintainer's Lisp and any other.  Each row
+   is terminated before the next is folded in, so two different row lists cannot digest alike
+   merely by concatenating the same way."
+  (let ((digest 14695981039346656037))
+    (dolist (row rows digest)
+      (loop for character across row
+            do (setf digest (ldb (byte 64 0)
+                                 (* (logxor digest (char-code character))
+                                    1099511628211))))
+      (setf digest (ldb (byte 64 0)
+                        (* (logxor digest (char-code #\Newline))
+                           1099511628211))))))
+
+
+(defun topo-geometry-report (geometry)
+  "GEOMETRY as one readable line per relation, for a recording or matching run."
+  (loop for (relation count digest) in geometry
+        collect (format nil "~A: ~D row~:P, digest ~(~16,'0X~)" relation count digest)))
+
+
+(defun topo-geometry-differences (expected actual)
+  "One line per derived relation whose count or contents changed, naming the relation and
+   saying which of the two moved.  A count that moved is nearly always an authoring change;
+   a count that held while the digest moved is a derivation change, and the two want looking
+   at in quite different places."
+  (let ((relations (sort (remove-duplicates
+                           (append (mapcar #'first expected)
+                                   (mapcar #'first actual)))
+                         #'string<
+                         :key #'symbol-name))
+        (differences nil))
+    (dolist (relation relations (nreverse differences))
+      (let ((was (assoc relation expected))
+            (now (assoc relation actual)))
+        (cond ((null was)
+               (push (format nil "  ~A: newly derived, ~D row~:P" relation (second now))
+                     differences))
+              ((null now)
+               (push (format nil "  ~A: no longer derived, was ~D row~:P"
+                             relation (second was))
+                     differences))
+              ((/= (second was) (second now))
+               (push (format nil "  ~A: ~D row~:P, was ~D"
+                             relation (second now) (second was))
+                     differences))
+              ((/= (third was) (third now))
+               (push (format nil "  ~A: ~D row~:P as before, but their contents changed"
+                             relation (second now))
+                     differences)))))))
+
+
 ;;; BACKTRACKING TEST ;;;
 
 

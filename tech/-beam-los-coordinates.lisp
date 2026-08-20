@@ -183,6 +183,32 @@
                       (first point2) (second point2))))
 
 
+(defun beam-coordinates-segment-intersection-parameters (x1 y1 x2 y2 x3 y3 x4 y4)
+  "The point where the infinite lines through (X1 Y1)-(X2 Y2) and (X3 Y3)-(X4 Y4) meet,
+   returned as two parameters: the first measured along the first segment, the second along
+   the second.  NIL when the two are parallel or collinear, the only case with no single
+   meeting point.  Every value is an exact rational, so a caller's containment tests are
+   exact too.
+
+   Deliberately says nothing about whether that point lies *within* either segment.  Its two
+   callers disagree about exactly that, and about what an endpoint landing on the other
+   segment means, which is the part that belongs to them:
+   BEAM-COORDINATES-OBSTACLE-INTERSECTION-PARAMETER treats a beam endpoint on an obstacle as
+   an authoring error and lets a wall's own endpoint block, while
+   -beam-crossing-coordinates' BEAM-COORDINATES-PROPER-INTERSECTION-PARAMETERS wants a
+   strict interior crossing on both sides and rejects beams sharing an endpoint outright."
+  (let* ((dx1 (- x2 x1))
+         (dy1 (- y2 y1))
+         (dx2 (- x4 x3))
+         (dy2 (- y4 y3))
+         (offset-x (- x3 x1))
+         (offset-y (- y3 y1))
+         (denominator (- (* dx1 dy2) (* dy1 dx2))))
+    (unless (zerop denominator)
+      (values (/ (- (* offset-x dy2) (* offset-y dx2)) denominator)
+              (/ (- (* offset-x dy1) (* offset-y dx1)) denominator)))))
+
+
 (defun beam-coordinates-obstacle-intersection-parameter (beam positions obstacle &optional endpoints-block)
   ;; Returns BEAM's own parameter (0 < t < 1) where OBSTACLE -- an (name x1 y1 x2 y2)
   ;; wall, edge, gate, or boundary segment record -- crosses BEAM's interior, or nil if it
@@ -201,28 +227,15 @@
   ;; exactly on OBSTACLE's own segment, corner or interior: a fixture must always be
   ;; offset off every segment barrier it sits beside, never placed on one, so this is an
   ;; authoring mistake to catch, not a case to silently resolve either way.
-  (let* ((position1 (beam-coordinates-position (first beam) positions))
-         (position2 (beam-coordinates-position (second beam) positions))
-         (x1 (first position1))
-         (y1 (second position1))
-         (x2 (first position2))
-         (y2 (second position2))
-         (x3 (second obstacle))
-         (y3 (third obstacle))
-         (x4 (fourth obstacle))
-         (y4 (fifth obstacle))
-         (dx1 (- x2 x1))
-         (dy1 (- y2 y1))
-         (dx2 (- x4 x3))
-         (dy2 (- y4 y3))
-         (offset-x (- x3 x1))
-         (offset-y (- y3 y1))
-         (denominator (- (* dx1 dy2) (* dy1 dx2))))
-    (unless (zerop denominator)
-      (let ((parameter1 (/ (- (* offset-x dy2) (* offset-y dx2))
-                           denominator))
-            (parameter2 (/ (- (* offset-x dy1) (* offset-y dx1))
-                           denominator)))
+  (let ((position1 (beam-coordinates-position (first beam) positions))
+        (position2 (beam-coordinates-position (second beam) positions)))
+    (multiple-value-bind (parameter1 parameter2)
+        (beam-coordinates-segment-intersection-parameters
+          (first position1) (second position1)
+          (first position2) (second position2)
+          (second obstacle) (third obstacle)
+          (fourth obstacle) (fifth obstacle))
+      (when parameter1
         (when (and (<= 0 parameter2 1) (or (zerop parameter1) (= parameter1 1)))
           (error "Beam endpoint ~A lies exactly on obstacle ~A; offset the fixture or ~
                   location off the barrier segment instead of leaving it on one."
