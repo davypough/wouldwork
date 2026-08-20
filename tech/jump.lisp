@@ -89,7 +89,7 @@
 
 
 (define-query jump-barrier-top-elevation (?feature vaultable-object)
-  (+ (object-elevation ?feature)
+  (+ (base ?feature)
      (object-height ?feature)))
 
 

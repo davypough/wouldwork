@@ -100,8 +100,8 @@
 
 (define-query fixed-beam-elevation-at
     (?from fixed-beam-source ?obstacle location ?to fixed-beam-sink)
-  (do (assign $from-elevation (apparatus-anchor-elevation ?from))
-      (assign $to-elevation (apparatus-anchor-elevation ?to))
+  (do (assign $from-elevation (top ?from))
+      (assign $to-elevation (top ?to))
       (beam-elevation-at-location
         ?obstacle ?from $from-elevation ?to $to-elevation)))
 
@@ -140,8 +140,8 @@
      ?from fixed-beam-source
      ?crossings
      ?to fixed-beam-sink)
-  (do (assign $from-elevation (apparatus-anchor-elevation ?from))
-      (assign $to-elevation (apparatus-anchor-elevation ?to))
+  (do (assign $from-elevation (top ?from))
+      (assign $to-elevation (top ?to))
       (recorded-barriers-clear-for-object
         ?view ?crossings $from-elevation $to-elevation)))
 

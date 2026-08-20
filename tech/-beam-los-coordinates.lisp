@@ -86,8 +86,8 @@
 ;;;               LOS-TO-TARGET/gun LOS-TO-APPARATUS derivations below, so a problem with
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
-;;;   relations : apparatus-coords> (transmitter/receiver/repeater/gun functional point),
-;;;               wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
+;;;   nested    : -apparatus-coordinates (apparatus-coords>, formerly declared here)
+;;;   relations : wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
 ;;;               to no facts; a problem that asserts wall-segment>, edge-segment>, or
 ;;;               boundary-wall gets
 ;;;               LOS-TO-APPARATUS/LOS-TO-TARGET/LOS-TO-LOCATION derived automatically
@@ -107,6 +107,7 @@
 ;;;   init      : derive-los-from-segments
 
 (include-tech -location-coordinates)
+(include-tech -apparatus-coordinates)
 (include-tech -segment-geometry)
 
 (in-package :ww)
@@ -133,12 +134,6 @@
   repeater (either floor-repeater wall-repeater)
   los-endpoint
     (either transmitter receiver floor-repeater wall-repeater gun location))
-
-
-(define-static-relations
-  (apparatus-coords>
-    (either transmitter receiver floor-repeater wall-repeater gun)
-    $rational $rational))
 
 
 (defvar *beam-occlusion-tolerance* 1/2

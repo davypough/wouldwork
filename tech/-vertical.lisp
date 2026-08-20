@@ -27,11 +27,13 @@
 ;;;
 ;;; REQUIRES:
 ;;;   nested   : -height (has-height), -elevation (has-elevation), -location-coordinates
-;;;              (location-coords>), -support-occupancy (on), -location (has-location),
-;;;              -position (has-position), -holding (holding)
+;;;              (location-coords>), -apparatus-coordinates (apparatus-coords>),
+;;;              -support-occupancy (on), -location (has-location), -position
+;;;              (has-position), -holding (holding)
 ;;; PROVIDES:
 ;;;   types     : vertical-object  --  everything with a place in the vertical model
-;;;   parameter : *vertical-type-constants*  --  per-type height default and axis
+;;;   parameter : *vertical-type-constants*  --  per-type height default, axis, and
+;;;               base default
 ;;;   queries   : base, top, fixed-base, object-height
 ;;;
 ;;; WALL-GEARS and WALL-BLOWER are deliberately absent from the table.  Their
@@ -41,6 +43,7 @@
 (include-tech -height)
 (include-tech -elevation)
 (include-tech -location-coordinates)
+(include-tech -apparatus-coordinates)
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -position)
@@ -65,32 +68,36 @@
 
 
 (defparameter *vertical-type-constants*
-  '((location          0   :none)       ;a location is a point; its level is its own
-    (agent             3/2 :vertical)
-    (box               1   :vertical)
-    (connector         1   :vertical)
-    (jammer            1   :vertical)
-    (tray              0   :vertical)   ;zero-thickness: a top flush with its base
-    (fan               0   :vertical)
-    (pressure-plate    0   :vertical)   ;flush with the floor it is positioned on
-    (toggle-plate      0   :vertical)
-    (floor-blower      0   :vertical)
-    (angled-blower     0   :vertical)
-    (gate              4   :vertical)
-    (screen            4   :vertical)
-    (wall              4   :vertical)
-    (edge              3/2 :vertical)
-    (floor-repeater    1   :vertical)
-    (wall-repeater     1   :horizontal) ;height is projection from the wall, not lift
-    (transmitter       0   :none)
-    (receiver          0   :none)
-    (gun               0   :none))
-  "Per-type height default and axis, in (TYPE HEIGHT-DEFAULT AXIS) form.  The axis says
+  '((location          0   :none       0)   ;a location is a point; its level is its own
+    (agent             3/2 :vertical   0)
+    (box               1   :vertical   0)
+    (connector         1   :vertical   0)
+    (jammer            1   :vertical   0)
+    (tray              0   :vertical   0)   ;zero-thickness: a top flush with its base
+    (fan               0   :vertical   0)
+    (pressure-plate    0   :vertical   0)   ;flush with the floor it is positioned on
+    (toggle-plate      0   :vertical   0)
+    (floor-blower      0   :vertical   0)
+    (angled-blower     0   :vertical   0)
+    (gate              4   :vertical   0)
+    (screen            4   :vertical   0)
+    (wall              4   :vertical   0)
+    (edge              3/2 :vertical   0)
+    (floor-repeater    1   :vertical   0)   ;stands on the floor
+    (wall-repeater     1   :horizontal 1)   ;height is projection from the wall, not lift
+    (transmitter       0   :none       1)
+    (receiver          0   :none       1)
+    (gun               0   :none       1))
+  "Per-type constants, in (TYPE HEIGHT-DEFAULT AXIS BASE-DEFAULT) form.  The axis says
    whether an object's height raises its top above its base: :VERTICAL does, :HORIZONTAL
-   and :NONE do not.  The types are disjoint leaves, so an object matches at most one
+   and :NONE do not.  The base default is where an object of that type sits when nothing
+   says otherwise: 0 for anything standing on a floor, and 1 for wall-mounted apparatus,
+   which hangs at about chest height.  That 1 is the same number APPARATUS-COORDS>
+   registers as its third coordinate's default, for the same reason -- the relation lets a
+   problem write the level inline, and this table supplies it when the problem carries no
+   coordinates at all.  The types are disjoint leaves, so an object matches at most one
    entry and the order is presentational only.  A problem overrides any height for an
-   individual object with HAS-HEIGHT; the defaults here are what an unauthored object of
-   that type is worth.")
+   individual object with HAS-HEIGHT, and any base with the coordinates or HAS-ELEVATION.")
 
 
 (defparameter *vertical-type-cache* (make-hash-table :test #'eq)
@@ -118,15 +125,23 @@
 
 
 (define-query fixed-base (?object vertical-object)
-  ;; The authored level of an object that rests on nothing.  A location carries its own
-  ;; level as LOCATION-COORDS>'s third coordinate; everything else, and a location in a
-  ;; problem with no coordinate geometry, uses HAS-ELEVATION.  Both default to zero, and
-  ;; -location-coordinates cross-checks a location that declares the level twice.
+  ;; The authored level of an object that rests on nothing.  A location carries its level
+  ;; as LOCATION-COORDS>'s third coordinate and a wall-mounted fixture as
+  ;; APPARATUS-COORDS>'s, each defaulting per relation.  Everything else -- a segment
+  ;; fixture, a floor repeater, or anything at all in a problem carrying no coordinates --
+  ;; uses HAS-ELEVATION, and an object with none of the three falls back to its type's
+  ;; base default.  A floor repeater is excluded from the mounting coordinate on purpose:
+  ;; it stands on the floor, so its base defaults to 0 rather than to the wall-mounting
+  ;; default of 1.  The two coordinate substrates cross-check anything that declares its
+  ;; level twice.
   (if (bind (location-coords> ?object $x $y $z))
     $z
-    (if (bind (has-elevation ?object $level))
-      $level
-      0)))
+    (if (and (not (floor-repeater ?object))
+             (bind (apparatus-coords> ?object $ax $ay $az)))
+      $az
+      (if (bind (has-elevation ?object $level))
+        $level
+        (fourth (vertical-type-entry ?object))))))
 
 
 (define-query top (?object vertical-object)
@@ -151,7 +166,7 @@
 
 
 (defun vertical-type-entry (object)
-  "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS) entry from *VERTICAL-TYPE-CONSTANTS*.
+  "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS BASE-DEFAULT) entry from *VERTICAL-TYPE-CONSTANTS*.
    The table's types are disjoint leaves, so the first match is the only match.  An
    object outside the table has no place in the vertical model, which is an authoring
    error rather than a zero height -- saying so here is what keeps a mistargeted caller

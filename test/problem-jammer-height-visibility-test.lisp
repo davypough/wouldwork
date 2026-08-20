@@ -48,11 +48,10 @@
   (has-location height-box height-site)
   (has-height height-box 4)
 
-  (has-elevation height-gun 5)
 
   (location-coords> height-site 0 0)
   (location-coords> low-probe-site 0 2)
-  (apparatus-coords> height-gun 10 0)
+  (apparatus-coords> height-gun 10 0 5)
   (wall-segment> height-wall 5 -1 5 3)
   (gate-segment> sight-gate 7 -1 7 3))
 

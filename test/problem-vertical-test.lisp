@@ -20,13 +20,13 @@
 ;;;      TOP with no held-tray special case, which is the property the refactor exists to
 ;;;      establish.
 ;;;
-;;; Two deliberate divergences from the queries -vertical will eventually replace.  A
-;;; transmitter, receiver, or gun has base zero here, not the functional elevation of one
-;;; that FIXTURE-ELEVATION supplies, and a wall repeater's base defaults to zero rather
-;;; than one.  Both of those defaults belong to the apparatus's own coordinate relation,
-;;; not to HAS-ELEVATION, and move to APPARATUS-COORDS>'s optional third coordinate when
-;;; the coordinate relations absorb their z.  Until then the old queries keep supplying
-;;; the old defaults and these fixtures pin the new meaning.
+;;; Wall-mounted apparatus -- transmitter, receiver, gun, wall repeater -- defaults to
+;;; base 1, the level FIXTURE-ELEVATION and REPEATER-MOUNT-ELEVATION used to supply.  That
+;;; default now lives in two places that must agree: APPARATUS-COORDS>'s optional third
+;;; coordinate, for a problem that writes the level inline, and the base-default column of
+;;; *VERTICAL-TYPE-CONSTANTS*, for a problem carrying no coordinates at all.  This problem
+;;; authors no coordinates, so it pins the table's copy; problem-repeater-test and
+;;; problem-fixed-beam-barrier-test pin the relation's.
 ;;;
 ;;; Initial and final states are identical.  Expected minimum path length: zero.
 
@@ -149,12 +149,12 @@
     (= (base explicit-wall-repeater) 11)
     (= (top explicit-wall-repeater) 11)
     (not (= (top explicit-wall-repeater) 18))
-    (= (base default-wall-repeater) 0)
-    (= (top default-wall-repeater) 0)
+    (= (base default-wall-repeater) 1)
+    (= (top default-wall-repeater) 1)
     (= (base explicit-transmitter) 7)
     (= (top explicit-transmitter) 7)
-    (= (base default-transmitter) 0)
-    (= (top default-transmitter) 0)
+    (= (base default-transmitter) 1)
+    (= (top default-transmitter) 1)
 
     ;; 3. The structural base, one route at a time.
     ;; A location is a point: its base is its own level and its top adds nothing.

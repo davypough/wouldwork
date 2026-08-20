@@ -28,7 +28,7 @@
 ;;;   queries    : relay-beam-reaches-receiver,
 ;;;                recording-shadow-relay-beam-reaches-receiver,
 ;;;                compute-relay-lighting, compute-relay-lighting-for-object,
-;;;                relay-anchor, beam-anchor-elevation, relay-linked,
+;;;                relay-anchor, relay-linked,
 ;;;                relay-link-clear, relay-link-clear-for-object,
 ;;;                paired-relay-visible, paired-relay-visible-for-object,
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
@@ -192,8 +192,8 @@
                           (paired ?relay ?receiver)
                           (bind (has-location ?relay $location))
                           (beam-visible
-                            $location (beam-anchor-elevation ?relay)
-                            ?receiver (fixture-elevation ?receiver))
+                            $location (top ?relay)
+                            ?receiver (top ?receiver))
                           (not (beam-cut $location ?receiver)))
                      (and (repeater ?relay)
                           (coupled ?relay ?receiver)
@@ -216,8 +216,8 @@
                           (paired ?relay ?receiver)
                           (bind (has-location ?relay $location))
                           (beam-visible-for-object
-                            ?view $location (beam-anchor-elevation ?relay)
-                            ?receiver (fixture-elevation ?receiver)))
+                            ?view $location (top ?relay)
+                            ?receiver (top ?receiver)))
                      (and (repeater ?relay)
                           (coupled ?relay ?receiver)
                           (fixed-beam-corridor-clear-for-object
@@ -312,18 +312,6 @@
     ?relay))
 
 
-(define-query beam-anchor-elevation
-    (?anchor (either transmitter receiver connector floor-repeater wall-repeater))
-  (cond ((or (transmitter ?anchor)
-             (receiver ?anchor))
-         (fixture-elevation ?anchor))
-        ((connector ?anchor)
-         (+ (base ?anchor)
-            (object-height ?anchor)))
-        (t
-         (repeater-anchor-elevation ?anchor))))
-
-
 (define-query relay-linked
     (?source (either transmitter connector floor-repeater wall-repeater) ?target relay)
   ;; PAIRED is structurally undirected but is always stored with a connector first.
@@ -381,12 +369,12 @@
   ;; orient the test from whichever endpoint is the connector.
   (if (connector ?target)
     (beam-visible-for-object
-      ?view ?target-anchor (beam-anchor-elevation ?target)
-      ?source-anchor (beam-anchor-elevation ?source))
+      ?view ?target-anchor (top ?target)
+      ?source-anchor (top ?source))
     (do (connector ?source)
         (beam-visible-for-object
-          ?view ?source-anchor (beam-anchor-elevation ?source)
-          ?target-anchor (beam-anchor-elevation ?target)))))
+          ?view ?source-anchor (top ?source)
+          ?target-anchor (top ?target)))))
 
 
 (define-query relay-beam-live-for-cutting

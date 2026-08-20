@@ -113,17 +113,14 @@
 
   ;; Exact beam-fixture coordinates.  The 1/10 offsets place each fixture
   ;; unambiguously on the intended side of its adjacent boundary.
-  (apparatus-coords> transmitter1 69/10 17)
-  (apparatus-coords> transmitter2 69/10 2)
-  (apparatus-coords> receiver1 13 149/10)
+  (apparatus-coords> transmitter1 69/10 17 3/2)
+  (apparatus-coords> transmitter2 69/10 2 3/2)
+  (apparatus-coords> receiver1 13 149/10 3/2)
   (apparatus-coords> receiver2 31 41/10)
 
   ;; Nondefault base elevations of segment fixtures.  Other gates and screens default
   ;; to 0.  Location levels are the third LOCATION-COORDS> coordinate above.
   (has-elevation gate4 3/2)
-  (has-elevation receiver1 3/2)
-  (has-elevation transmitter1 3/2)
-  (has-elevation transmitter2 3/2)
 
   ;; Nondefault heights.
   (has-height wall10 3/2)

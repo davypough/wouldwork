@@ -124,20 +124,16 @@
   ;; The first blocker ends at elevation 1; the second ends exactly at elevation 2.
   (has-chroma sloped-clear-source red)
   (has-chroma sloped-clear-receiver red)
-  (has-elevation sloped-clear-source 1)
-  (has-elevation sloped-clear-receiver 3)
   (has-location sloped-clear-blocker sloped-clear-mid)
   (has-height sloped-clear-blocker 1)
   (coupled sloped-clear-source sloped-clear-receiver)
   (beam-via sloped-clear-source (sloped-clear-mid) sloped-clear-receiver)
-  (apparatus-coords> sloped-clear-source 0 0)
+  (apparatus-coords> sloped-clear-source 0 0 1)
   (location-coords> sloped-clear-mid 5 0)
-  (apparatus-coords> sloped-clear-receiver 10 0)
+  (apparatus-coords> sloped-clear-receiver 10 0 3)
 
   (has-chroma sloped-blocked-source red)
   (has-chroma sloped-blocked-receiver red)
-  (has-elevation sloped-blocked-source 1)
-  (has-elevation sloped-blocked-receiver 3)
   (has-location sloped-blocked-blocker sloped-blocked-mid)
   (has-height sloped-blocked-blocker 2)
   (coupled sloped-blocked-source sloped-blocked-receiver)
@@ -145,9 +141,9 @@
     sloped-blocked-source
     (sloped-blocked-mid)
     sloped-blocked-receiver)
-  (apparatus-coords> sloped-blocked-source 0 10)
+  (apparatus-coords> sloped-blocked-source 0 10 1)
   (location-coords> sloped-blocked-mid 5 10)
-  (apparatus-coords> sloped-blocked-receiver 10 10)
+  (apparatus-coords> sloped-blocked-receiver 10 10 3)
 
   ;; A transmitter -> repeater corridor is direct cutting liveness.  In the reverse role,
   ;; a repeater remains a valid fixed-beam source for corridor structure, but beam-direct's
@@ -262,14 +258,14 @@
     (not (active sloped-blocked-receiver))
 
     ;; Endpoint direction: transmitter -> repeater is direct cutting liveness.
-    (= (apparatus-anchor-elevation repeater-target) 1)
+    (= (top repeater-target) 1)
     (fixed-beam-corridor-clear repeater-target-source repeater-target)
     (direct-beam-live-for-cutting repeater-target-source repeater-target)
     (not (beam-cut repeater-target-source repeater-target))
 
     ;; Repeater -> receiver remains structurally valid, but direct cutting liveness is
     ;; transmitter-only and the direct receiver query enumerates transmitters only.
-    (= (apparatus-anchor-elevation repeater-origin) 1)
+    (= (top repeater-origin) 1)
     (fixed-beam-corridor-clear
       repeater-origin repeater-origin-receiver)
     (not (direct-beam-live-for-cutting

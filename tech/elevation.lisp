@@ -6,9 +6,10 @@
 ;;;
 ;;; PROVIDES:
 ;;;   via -elevation: elevated-object, has-elevation, object-elevation,
-;;;                   location-elevation, fixture-elevation
-;;;                   (locations and barriers, including walls, default to base 0;
-;;;                    transmitters/receivers/guns default to functional elevation 1)
+;;;                   location-elevation  --  the authored base level of an object with no
+;;;                   coordinate relation of its own, default 0.  A problem needing the
+;;;                   full vertical model (base, top, per-type heights and axes) includes
+;;;                   -vertical instead, which nests this substrate.
 
 (include-tech -elevation)
 

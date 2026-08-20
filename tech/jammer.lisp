@@ -72,9 +72,9 @@
   ;; Point fixtures use their functional elevation.  Extended gates are aimed at their
   ;; vertical midpoint.  Gears use the same working level as their mounted fan.
   (if (gate ?target)
-    (+ (object-elevation ?target) (/ (object-height ?target) 2))
+    (+ (base ?target) (/ (object-height ?target) 2))
     (if (gun ?target)
-      (fixture-elevation ?target)
+      (top ?target)
       (if (or (wall-gears ?target)
               (wall-blower ?target))
         (if (bind (has-elevation ?target $level)) $level 1)

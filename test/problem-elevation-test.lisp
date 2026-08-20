@@ -7,12 +7,14 @@
 ;;;   location, gate, screen, wall, edge, transmitter, receiver, gun, wall-gears,
 ;;;   floor-repeater, and wall-repeater.
 ;;;
-;;; The characterization goal verifies exact authored bindings, the generic
-;;; default of zero, and every role-specific lookup.  In particular,
-;;; transmitter/receiver/gun functional anchors default to one despite their generic
-;;; elevation of zero; a floor repeater's anchor is its base plus height; and a
-;;; wall repeater's height is horizontal and cannot raise its anchor.  Initial
-;;; and final states are identical.  Expected minimum path length: zero.
+;;; The characterization goal verifies exact authored bindings and the generic default
+;;; of zero, for every leaf of ELEVATED-OBJECT.  This substrate no longer owns any
+;;; role-specific anchor rule: REPEATER-MOUNT-ELEVATION, REPEATER-ANCHOR-ELEVATION,
+;;; FIXTURE-ELEVATION, and APPARATUS-ANCHOR-ELEVATION were four per-type ways of reaching
+;;; a base or a top, and -vertical's BASE and TOP now compute both from one table.  Their
+;;; behavior, including the mounting defaults that moved into APPARATUS-COORDS>, is pinned
+;;; by problem-vertical-test.  What remains here is the authored fact and its zero default.
+;;; Initial and final states are identical.  Expected minimum path length: zero.
 
 (in-package :ww)
 
@@ -139,53 +141,28 @@
     ;; Location and gate retain the generic zero-default convention.
     (= (location-elevation explicit-location) 2)
     (= (location-elevation default-location) 0)
-    (= (fixture-elevation explicit-gate) 3)
-    (= (fixture-elevation default-gate) 0)
+    (= (object-elevation explicit-gate) 3)
+    (= (object-elevation default-gate) 0)
 
-    ;; Point apparatus defaults its functional anchor to one, not its generic
-    ;; OBJECT-ELEVATION result of zero.
-    (= (fixture-elevation explicit-transmitter) 7)
-    (= (apparatus-anchor-elevation explicit-transmitter) 7)
-    (= (fixture-elevation default-transmitter) 1)
-    (= (apparatus-anchor-elevation default-transmitter) 1)
-    (= (fixture-elevation explicit-receiver) 8)
-    (= (apparatus-anchor-elevation explicit-receiver) 8)
-    (= (fixture-elevation default-receiver) 1)
-    (= (apparatus-anchor-elevation default-receiver) 1)
-    (= (fixture-elevation explicit-gun) 13)
-    (= (apparatus-anchor-elevation explicit-gun) 13)
-    (= (fixture-elevation default-gun) 1)
-    (= (apparatus-anchor-elevation default-gun) 1)
+    ;; Every remaining leaf reads its authored fact, or zero.  The functional and
+    ;; mounting defaults these fixtures used to carry are properties of their
+    ;; coordinates now, not of HAS-ELEVATION, and this problem authors no coordinates.
+    (= (object-elevation explicit-transmitter) 7)
+    (= (object-elevation default-transmitter) 0)
+    (= (object-elevation explicit-receiver) 8)
+    (= (object-elevation default-receiver) 0)
+    (= (object-elevation explicit-gun) 13)
+    (= (object-elevation default-gun) 0)
+    (= (object-elevation explicit-floor-repeater) 10)
+    (= (object-elevation default-floor-repeater) 0)
+    (= (object-elevation explicit-wall-repeater) 11)
+    (= (object-elevation default-wall-repeater) 0)
 
-    ;; Floor-mounted: base 10 + height 2, and default base 0 + default height 1.
-    (= (repeater-mount-elevation explicit-floor-repeater) 10)
+    ;; HAS-HEIGHT is readable but contributes nothing here: height is -vertical's
+    ;; concern, and this substrate reports base alone.
     (= (declared-height explicit-floor-repeater) 2)
-    (= (repeater-anchor-elevation explicit-floor-repeater) 12)
-    (= (fixture-elevation explicit-floor-repeater) 12)
-    (= (apparatus-anchor-elevation explicit-floor-repeater) 12)
-
-    (not (bind (has-height default-floor-repeater $default-floor-height)))
-    (= (repeater-mount-elevation default-floor-repeater) 0)
-    (= (declared-height default-floor-repeater) 1)
-    (= (repeater-anchor-elevation default-floor-repeater) 1)
-    (= (fixture-elevation default-floor-repeater) 1)
-    (= (apparatus-anchor-elevation default-floor-repeater) 1)
-
-    ;; Wall-mounted: both explicit heights are horizontal projections.  Neither
-    ;; may be added to the explicit or default mounting elevation.
     (= (declared-height explicit-wall-repeater) 7)
-    (= (repeater-mount-elevation explicit-wall-repeater) 11)
-    (= (repeater-anchor-elevation explicit-wall-repeater) 11)
-    (not (= (repeater-anchor-elevation explicit-wall-repeater) 18))
-    (= (fixture-elevation explicit-wall-repeater) 11)
-    (= (apparatus-anchor-elevation explicit-wall-repeater) 11)
-
-    (= (declared-height default-wall-repeater) 9)
-    (= (repeater-mount-elevation default-wall-repeater) 1)
-    (= (repeater-anchor-elevation default-wall-repeater) 1)
-    (not (= (repeater-anchor-elevation default-wall-repeater) 10))
-    (= (fixture-elevation default-wall-repeater) 1)
-    (= (apparatus-anchor-elevation default-wall-repeater) 1)))
+    (= (declared-height default-wall-repeater) 9)))
 
 
 (define-goal

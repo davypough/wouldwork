@@ -1,21 +1,28 @@
 ;;; Filename: -elevation.lisp
 
-;;; Elevation substrate: the fixed vertical level of a location's own floor, a fixed
-;;; obstacle's base, or a fixed fixture's beam/sightline anchor.  Locations and barrier
-;;; fixtures default to base elevation 0; transmitter, receiver, and gun functional anchors
-;;; default to elevation 1.  A floor-repeater's declared elevation is its base level (default 0) and
-;;; its anchor adds its declared height; a wall-repeater's declared elevation is directly
-;;; its mounting/anchor level (default 1).  Nondefault objects assert an explicit fact.
+;;; Elevation substrate: the authored base level of an object that carries no coordinate
+;;; relation of its own -- a segment fixture (gate, screen, wall, edge), a floor repeater,
+;;; or anything at all in a problem with no coordinate geometry.  Default 0.
+;;;
+;;; A location's level is LOCATION-COORDS>'s optional third coordinate and a wall-mounted
+;;; fixture's is APPARATUS-COORDS>'s; both cross-check against HAS-ELEVATION rather than
+;;; silently preferring one.  The role-branching anchor queries that used to live here --
+;;; REPEATER-MOUNT-ELEVATION, REPEATER-ANCHOR-ELEVATION, FIXTURE-ELEVATION, and
+;;; APPARATUS-ANCHOR-ELEVATION -- are gone: each was a per-type rule for reaching a base or
+;;; a top, and -vertical's BASE and TOP now compute both for every type from one table.
+;;;
+;;; WALL-GEARS and WALL-BLOWER keep HAS-ELEVATION for a different quantity entirely: the
+;;; elevation of the air stream they emit, read by -gears-fan's BLOWER-ELEVATION.  They
+;;; have no base in the vertical model and are absent from -vertical's table.
 ;;;
 ;;; PROVIDES:
-;;;   nested   : -height (repeater, declared-height)
+;;;   nested   : -height, -location-coordinates
 ;;;   types    : elevated-object (either location gate screen wall edge transmitter
-;;;              receiver gun wall-gears wall-blower floor-repeater wall-repeater)  --
-;;;              wall gears and fixed wall blowers may declare their stream elevation
-;;;              (default 1, via -gears-fan's blower-elevation)
+;;;              receiver gun wall-gears wall-blower floor-repeater wall-repeater)
 ;;;   relation : (has-elevation elevated-object $rational)
-;;;   queries  : object-elevation, location-elevation, repeater-mount-elevation,
-;;;              repeater-anchor-elevation, fixture-elevation, apparatus-anchor-elevation
+;;;   queries  : object-elevation, location-elevation  --  both superseded by -vertical's
+;;;              BASE; retained for -floor-blowing's hover override of LOCATION-ELEVATION
+;;;              and for problems including this substrate without the vertical model
 
 (include-tech -height)
 (include-tech -location-coordinates)
@@ -65,62 +72,3 @@
   (if (bind (location-coords> ?location $x $y $z))
     $z
     (object-elevation ?location)))
-
-
-(define-query repeater-mount-elevation (?repeater repeater)
-  ;; HAS-ELEVATION names the base level of a floor repeater and the mounting/anchor level
-  ;; of a wall repeater.  The omitted-value default therefore depends on orientation.
-  (do (assign $floor-mounted (floor-repeater ?repeater))
-      (assign $wall-mounted (wall-repeater ?repeater))
-      (if (eql $floor-mounted $wall-mounted)
-        (error "~%Repeater must have exactly one mounting orientation.~%~
-                Repeater: ~S"
-               ?repeater))
-      (if (bind (has-elevation ?repeater $level))
-        $level
-        (if $floor-mounted 0 1))))
-
-
-(define-query repeater-anchor-elevation (?repeater repeater)
-  ;; A floor repeater stands vertically, so its tip is one declared height above its base.
-  ;; A wall repeater extends horizontally, leaving its tip at its mounting elevation.
-  (if (floor-repeater ?repeater)
-    (+ (repeater-mount-elevation ?repeater)
-       (declared-height ?repeater))
-    (repeater-mount-elevation ?repeater)))
-
-
-(defparameter *fixture-elevation-cache* (make-hash-table :test #'eq)
-  "Memoizes FIXTURE-ELEVATION by fixture.  Every fact it can read -- HAS-ELEVATION,
-   HAS-HEIGHT (via REPEATER-ANCHOR-ELEVATION), and fixed type membership -- is static,
-   so the result never changes during a search.  Reset on every load; see
-   *OBJECT-ELEVATION-CACHE*.")
-
-
-(define-query fixture-elevation
-    (?fixture (either gate transmitter receiver gun floor-repeater wall-repeater))
-  ;; Declared fixed-fixture level.  Gates use base elevation 0, point-apparatus anchors
-  ;; default to 1, and repeaters use their mounting-dependent anchor rule.
-  ;; Cached: see *FIXTURE-ELEVATION-CACHE*.
-  (multiple-value-bind (cached present) (gethash ?fixture *fixture-elevation-cache*)
-    (if present
-      cached
-      (setf (gethash ?fixture *fixture-elevation-cache*)
-            (if (repeater ?fixture)
-              (repeater-anchor-elevation ?fixture)
-              (if (bind (has-elevation ?fixture $level))
-                $level
-                (if (or (transmitter ?fixture)
-                        (receiver ?fixture)
-                        (gun ?fixture))
-                  1
-                  0)))))))
-
-
-(define-query apparatus-anchor-elevation
-    (?apparatus (either transmitter receiver gun floor-repeater wall-repeater))
-  ;; The vertical coordinate paired with APPARATUS-COORDS>'s horizontal functional point.
-  ;; Transmitters, receivers, and guns are point apparatus; repeaters apply their mounting rule.
-  (if (repeater ?apparatus)
-    (repeater-anchor-elevation ?apparatus)
-    (fixture-elevation ?apparatus)))

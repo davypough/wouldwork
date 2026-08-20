@@ -71,8 +71,6 @@
   ;; Floor-mounted: base 3 plus height 2 gives anchor elevation 5.
   (has-elevation floor-repeater1 3)
   (has-height floor-repeater1 2)
-  (has-elevation floor-source 5)
-  (has-elevation floor-receiver 5)
   (has-chroma floor-source amber)
   (has-chroma floor-receiver amber)
   (coupled floor-source floor-repeater1)
@@ -139,9 +137,9 @@
   ;; APPARATUS-COORDS> names every apparatus functional point.  The horizontal bands keep
   ;; the independent scenarios from crossing accidentally; only the two diagonal first
   ;; hops at y=60..70 cross.  Repeaters have no HAS-LOCATION, including floor repeaters.
-  (apparatus-coords> floor-source 0 0)
+  (apparatus-coords> floor-source 0 0 5)
   (apparatus-coords> floor-repeater1 10 0)
-  (apparatus-coords> floor-receiver 20 0)
+  (apparatus-coords> floor-receiver 20 0 5)
   (apparatus-coords> wall-source 0 10)
   (apparatus-coords> wall-repeater1 10 10)
   (apparatus-coords> wall-receiver 20 10)
@@ -199,8 +197,8 @@
 
 
 (define-query repeater-scenarios-valid ()
-  (and (= (repeater-anchor-elevation floor-repeater1) 5)
-       (= (repeater-anchor-elevation wall-repeater1) 1)
+  (and (= (top floor-repeater1) 5)
+       (= (top wall-repeater1) 1)
        (color floor-repeater1 amber)
        (active floor-receiver)
        (color wall-repeater1 violet)

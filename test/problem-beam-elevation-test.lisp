@@ -185,16 +185,16 @@
   (and
     ;; Positive lane: connector-top anchors put the beam at 5/2, above box2.
     (has-location agent1 goal)
-    (= (beam-anchor-elevation connector1) 1)
-    (= (beam-anchor-elevation connector2) 4)
+    (= (top connector1) 1)
+    (= (top connector2) 4)
     (= (beam-elevation-at-location
-         mid low (beam-anchor-elevation connector1)
-         high (beam-anchor-elevation connector2))
+         mid low (top connector1)
+         high (top connector2))
        5/2)
     (not (beam-blocker-occludes-location mid 5/2))
     (beam-visible
-      low (beam-anchor-elevation connector1)
-      high (beam-anchor-elevation connector2))
+      low (top connector1)
+      high (top connector2))
     (color connector1 blue)
     (color connector2 blue)
     (active receiver1)
@@ -203,16 +203,16 @@
 
     ;; Blocked lane: the beam meets box4 exactly at its inclusive height-2 boundary.
     (has-location agent2 low2)
-    (= (beam-anchor-elevation connector3) 1)
-    (= (beam-anchor-elevation connector4) 3)
+    (= (top connector3) 1)
+    (= (top connector4) 3)
     (= (beam-elevation-at-location
-         mid2 low2 (beam-anchor-elevation connector3)
-         high2 (beam-anchor-elevation connector4))
+         mid2 low2 (top connector3)
+         high2 (top connector4))
        2)
     (beam-blocker-occludes-location mid2 2)
     (not (beam-visible
-           low2 (beam-anchor-elevation connector3)
-           high2 (beam-anchor-elevation connector4)))
+           low2 (top connector3)
+           high2 (top connector4)))
     (color connector3 red)
     (not (exists (?h hue)
            (color connector4 ?h)))

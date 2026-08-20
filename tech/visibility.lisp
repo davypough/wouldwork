@@ -122,7 +122,7 @@
         (do (assign $base-elevation
                     (if (eql $kind :boundary)
                       0
-                      (object-elevation $barrier)))
+                      (base $barrier)))
             (assign $height
                     (if (eql $kind :boundary)
                       6
