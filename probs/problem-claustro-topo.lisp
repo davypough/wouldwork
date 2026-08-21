@@ -82,12 +82,6 @@
   (has-position ladder1 location7)
   (on box1 plate1)
 
-  ;; Nondefault base elevations of segment fixtures.  Other gates and screens default
-  ;; to 0.  Location levels are the third LOCATION-COORDS> coordinate, defaulting to 0;
-  ;; transmitters and receivers default to elevation 1.
-  (has-elevation gate8 3/2)
-  (has-elevation gate9 3/2)
-
   ;; Gate controllers
   (controls ((receiver1)) gate2 normal)
   (controls ((receiver1)) gate3 normal)
@@ -150,8 +144,8 @@
   (gate-segment> gate5 16 10 16 17)
   (gate-segment> gate6 101/10 10 101/10 17)
   (gate-segment> gate7 99/10 10 99/10 17)
-  (gate-segment> gate8 51/10 10 51/10 17)
-  (gate-segment> gate9 49/10 10 49/10 17)
+  (gate-segment> gate8 51/10 10 51/10 17 3/2)
+  (gate-segment> gate9 49/10 10 49/10 17 3/2)
 
   ;; Screen1 lies south of gate4, preserving the area2 -> area3
   ;; traversal order gate4, then screen1.

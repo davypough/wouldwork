@@ -11,7 +11,8 @@
 ;;;      top, however large the authored value.  Point apparatus has no extent at all.
 ;;;   3. The structural base.  Every route is exercised in turn -- resting ON a support,
 ;;;      being HELD, sitting at a HAS-LOCATION, being positioned by HAS-POSITION, and
-;;;      falling back to an authored or defaulted HAS-ELEVATION -- including the two
+;;;      falling back to an authored coordinate, HAS-ELEVATION, or type default --
+;;;      including the two
 ;;;      precedence cases, where an occupant keeps its location fact while resting on a
 ;;;      support and a held tray keeps its own while being carried.
 ;;;   4. The acceptance check.  The three achievable connector anchor heights, all at
@@ -87,7 +88,7 @@
 
   ;; Fixtures fixed in space.  Distinct values make each authored branch independently
   ;; observable, and each explicit height is chosen to differ from its type default.
-  (has-elevation explicit-gate 3)
+  (gate-segment> explicit-gate 0 0 0 1 3)
   (has-height explicit-gate 5)
   (has-elevation explicit-floor-repeater 10)
   (has-height explicit-floor-repeater 2)
@@ -172,7 +173,7 @@
     (= (base raised-site) 2)
     (= (top raised-site) 2)
 
-    ;; A fixture fixed in space takes its authored level, or zero.
+    ;; A fixture fixed in space takes its authored segment level, or zero.
     (= (base default-gate) 0)
     (= (top default-gate) 4)
     (= (base explicit-gate) 3)

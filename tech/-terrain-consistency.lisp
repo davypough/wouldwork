@@ -192,8 +192,9 @@
               "EDGE ~A runs from base ~A to top ~A, but the zones it separates sit at ~
                levels ~A and ~A.~%~
                An edge is the vertical surface between two elevations, so its base must ~
-               equal the lower level and its top the higher.  Set its HAS-ELEVATION to ~A ~
-               and its HAS-HEIGHT to ~A, or correct the location levels on either side."
+               equal the lower level and its top the higher.  Set its segment base ~
+               coordinate to ~A and its HAS-HEIGHT to ~A, or correct the location levels ~
+               on either side."
               (first record) (second span) (third span)
               (car (first steps)) (cdr (first steps))
               (car (first steps))

@@ -430,9 +430,9 @@
   0
   ()
   (or (exists (?wall wall)
-        (bind (wall-segment> ?wall $x1 $y1 $x2 $y2)))
+        (bind (wall-segment> ?wall $x1 $y1 $x2 $y2 $z)))
       (exists (?edge edge)
-        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2)))
+        (bind (edge-segment> ?edge $x1 $y1 $x2 $y2 $z)))
       (bind (boundary-wall $some-boundary-points)))
   ()
   (assert

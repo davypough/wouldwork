@@ -120,25 +120,48 @@
 
 (define-test-claim individual-segment-schema
   (expect-relation-schema
-    'wall-segment> :static '(wall rational rational rational rational)
-    :fluent-indices '(2 3 4 5))
+    'wall-segment> :static '(wall rational rational rational rational rational)
+    :fluent-indices '(2 3 4 5 6))
   (expect-relation-schema
-    'edge-segment> :static '(edge rational rational rational rational)
-    :fluent-indices '(2 3 4 5))
+    'edge-segment> :static '(edge rational rational rational rational rational)
+    :fluent-indices '(2 3 4 5 6))
   (expect-relation-schema
-    'gate-segment> :static '(gate rational rational rational rational)
-    :fluent-indices '(2 3 4 5))
+    'gate-segment> :static '(gate rational rational rational rational rational)
+    :fluent-indices '(2 3 4 5 6))
   (expect-relation-schema
-    'window-segment> :static '(window rational rational rational rational)
-    :fluent-indices '(2 3 4 5))
+    'window-segment> :static '(window rational rational rational rational rational)
+    :fluent-indices '(2 3 4 5 6))
   (expect-relation-schema
-    'screen-segment> :static '(screen rational rational rational rational)
-    :fluent-indices '(2 3 4 5))
+    'screen-segment> :static '(screen rational rational rational rational rational)
+    :fluent-indices '(2 3 4 5 6))
+  (equal (gethash 'wall-segment> *init-literal-defaults*) '(0))
+  (equal (gethash 'edge-segment> *init-literal-defaults*) '(0))
+  (equal (gethash 'gate-segment> *init-literal-defaults*) '(0))
+  (equal (gethash 'window-segment> *init-literal-defaults*) '(0))
+  (equal (gethash 'screen-segment> *init-literal-defaults*) '(0))
+  (equal (pad-init-literal '(wall-segment> first-lower 4 0 4 1))
+         '(wall-segment> first-lower 4 0 4 1 0))
+  (equal (pad-init-literal '(gate-segment> gate-a 4 1 4 2 3/2))
+         '(gate-segment> gate-a 4 1 4 2 3/2))
   (expect-relation-absent 'wall-segments)
   (expect-relation-absent 'edge-segments)
   (expect-relation-absent 'gate-segments)
   (expect-relation-absent 'window-segments)
   (expect-relation-absent 'screen-segments))
+
+
+(define-test-claim segment-level-agreement-check
+  (null
+    (check-init-segment-level-agreement
+      '((gate-segment> gate-a 4 1 4 2 3/2)
+        (has-elevation gate-a 3/2))))
+  (expect-condition
+    (lambda ()
+      (check-init-segment-level-agreement
+        '((gate-segment> gate-a 4 1 4 2 3/2)
+          (has-elevation gate-a 2))))
+    'error
+    :containing "is given two different base levels"))
 
 
 (define-test-claim walkability-diagonal-boundary-rejected

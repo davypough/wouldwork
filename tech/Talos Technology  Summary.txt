@@ -95,8 +95,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (crossings-along-beam> los-endpoint $list los-endpoint)
 (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
 (current-beam-crossings $list)
-(edge-segment> edge $rational $rational $rational $rational)
-(gate-segment> gate $rational $rational $rational $rational)
+(edge-segment> edge $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
+(gate-segment> gate $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (has-chroma (either transmitter receiver) $hue)
 (has-elevation elevated-object $rational)
 (has-height heighted-object $rational)
@@ -108,13 +108,13 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (reach-via location $list location)  ;authorizes manipulation across a barrier, not movement; deliberately not a traversal mode
 (reach-via> location $list location)  ;directional reach, reacher first; for a one-way opening only, never for a height difference
 (recording-copy> $mobile-object $mobile-object :bijective)  ;indexed one-to-one live -> ghost mapping
-(screen-segment> screen $rational $rational $rational $rational)
+(screen-segment> screen $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (stream-width (either wall-gears wall-blower) $rational)  ;default 3 units
 (threatens threat location)
 (traverse-via traversal-mode location $list location)  ;symmetric traversal edge; $list is DNF: () direct, else OR over clauses, AND within
 (traverse-via> traversal-mode location $list location)  ;directed traversal edge, source first, same $list convention
-(wall-segment> wall $rational $rational $rational $rational)
-(window-segment> window $rational $rational $rational $rational)
+(wall-segment> wall $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
+(window-segment> window $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 
 5. Actions
 
@@ -165,9 +165,10 @@ level.  Only an object resting on nothing uses the base default below.
   receiver          0       :none        1
   gun               0       :none        1
 
-A problem overrides any height with has-height, and any base with the third coordinate of
-location-coords>/apparatus-coords> or with has-elevation; the coordinate substrates refuse
-an object that names its level both ways with different numbers.  A height on a
+A problem overrides any height with has-height, and any base with the level coordinate of
+location-coords>, apparatus-coords>, or a named segment relation, or with has-elevation in
+a coordinate-free model; the coordinate substrates refuse an object that names its level
+both ways with different numbers.  A height on a
 non-vertical axis is descriptive only -- top ignores it, and no other object-height
 consumer's argument type admits such an object -- so a wall-repeater's height records how
 far the rod projects from its wall and enters no computation.

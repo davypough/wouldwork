@@ -1,13 +1,14 @@
 ;;; Filename: -elevation.lisp
 
 ;;; Elevation substrate: the authored base level of an object that carries no coordinate
-;;; relation of its own -- a segment fixture (gate, screen, wall, edge), a floor repeater,
+;;; relation of its own -- a floor repeater, a segment fixture in a coordinate-free model,
 ;;; or another ELEVATED-OBJECT in a problem with no coordinate geometry.  Default depends
 ;;; on the object's vertical role.
 ;;;
-;;; A location's level is LOCATION-COORDS>'s optional third coordinate and a wall-mounted
-;;; fixture's is APPARATUS-COORDS>'s; both cross-check against HAS-ELEVATION rather than
-;;; silently preferring one.  The role-branching anchor queries that used to live here --
+;;; A location's level is LOCATION-COORDS>'s optional third coordinate, a wall-mounted
+;;; fixture's is APPARATUS-COORDS>'s, and a named segment's is its trailing coordinate;
+;;; each cross-checks against HAS-ELEVATION rather than silently preferring one.  The
+;;; role-branching anchor queries that used to live here --
 ;;; REPEATER-MOUNT-ELEVATION, REPEATER-ANCHOR-ELEVATION, FIXTURE-ELEVATION, and
 ;;; APPARATUS-ANCHOR-ELEVATION -- are gone: each was a per-type rule for reaching a base or
 ;;; a top, and -vertical's BASE and TOP now compute both for every type from one table.

@@ -307,7 +307,7 @@
   0
   ()
   (exists (?gate gate)
-    (bind (gate-segment> ?gate $x1 $y1 $x2 $y2)))
+    (bind (gate-segment> ?gate $x1 $y1 $x2 $y2 $z)))
   ()
   (assert
     (do (assign $gates (gate-segment-records))

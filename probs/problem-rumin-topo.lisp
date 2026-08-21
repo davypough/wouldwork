@@ -120,10 +120,6 @@
   (apparatus-coords> receiver1 13 149/10 3/2)
   (apparatus-coords> receiver2 31 41/10)
 
-  ;; Nondefault base elevations of segment fixtures.  Other gates and screens default
-  ;; to 0.  Location levels are the third LOCATION-COORDS> coordinate above.
-  (has-elevation gate4 3/2)
-
   ;; Nondefault heights.
   (has-height wall10 3/2)
   (has-height wall11 3/2)
@@ -177,7 +173,7 @@
   (gate-segment> gate1 19 7 19 12)
   (gate-segment> gate2 19 12 23 12)
   (gate-segment> gate3 23 15 23 18)
-  (gate-segment> gate4 22 4 22 7)
+  (gate-segment> gate4 22 4 22 7 3/2)
   (gate-segment> gate5 33 8 33 11)
   (gate-segment> gate6 33 1 33 4)
 

@@ -14,10 +14,11 @@
 ;;; Base is structural rather than declared.  An object that rests on something derives
 ;;; its base from that support's top, following ON, then HOLDING, then HAS-LOCATION, then
 ;;; HAS-POSITION, bottoming out at a location's own level.  An object fixed in space has
-;;; its base authored -- a location as LOCATION-COORDS>'s optional third coordinate,
-;;; anything else as HAS-ELEVATION -- or defaulted to zero.  No declaration distinguishes
-;;; the resting case from the fixed one; the object's structure does.  "Anchor" is not a
-;;; separate concept here: a beam anchor is always the anchoring object's TOP.
+;;; its base authored -- a location or apparatus through its point coordinates, a named
+;;; segment through its shared endpoint z, and anything without coordinates through
+;;; HAS-ELEVATION -- or defaulted by type.  No declaration distinguishes the resting case
+;;; from the fixed one; the object's structure does.  "Anchor" is not a separate concept
+;;; here: a beam anchor is always the anchoring object's TOP.
 ;;;
 ;;; The three achievable connector anchor heights fall out of this with no special case,
 ;;; measured from the floor the agent stands on: on the ground, base = floor and
@@ -28,6 +29,7 @@
 ;;; REQUIRES:
 ;;;   nested   : -height (has-height), -elevation (has-elevation), -location-coordinates
 ;;;              (location-coords>), -apparatus-coordinates (apparatus-coords>),
+;;;              -segment-geometry (named segment coordinates),
 ;;;              -support-occupancy (on), -location (has-location), -position
 ;;;              (has-position), -holding (holding)
 ;;; PROVIDES:
@@ -44,6 +46,7 @@
 (include-tech -elevation)
 (include-tech -location-coordinates)
 (include-tech -apparatus-coordinates)
+(include-tech -segment-geometry)
 (include-tech -support-occupancy)
 (include-tech -location)
 (include-tech -position)
@@ -133,22 +136,25 @@
 
 (define-query fixed-base (?object vertical-object)
   ;; The authored level of an object that rests on nothing.  A location carries its level
-  ;; as LOCATION-COORDS>'s third coordinate and a wall-mounted fixture as
-  ;; APPARATUS-COORDS>'s, each defaulting per relation.  Everything else -- a segment
-  ;; fixture, a floor repeater, or anything at all in a problem carrying no coordinates --
-  ;; uses HAS-ELEVATION, and an object with none of the three falls back to its type's
-  ;; base default.  A floor repeater is excluded from the mounting coordinate on purpose:
+  ;; as LOCATION-COORDS>'s third coordinate, a wall-mounted fixture as APPARATUS-COORDS>'s,
+  ;; and a named segment as its segment relation's trailing coordinate, each defaulting per
+  ;; relation.  A coordinate-free fixture or floor repeater uses HAS-ELEVATION, and an
+  ;; object with no authored base falls back to its type's base default.  A floor repeater
+  ;; is excluded from the mounting coordinate on purpose:
   ;; it stands on the floor, so its base defaults to 0 rather than to the wall-mounting
-  ;; default of 1.  The two coordinate substrates cross-check anything that declares its
-  ;; level twice.
-  (if (bind (location-coords> ?object $x $y $z))
-    $z
-    (if (and (not (floor-repeater ?object))
-             (bind (apparatus-coords> ?object $ax $ay $az)))
-      $az
-      (if (bind (has-elevation ?object $level))
-        $level
-        (fourth (vertical-type-entry ?object))))))
+  ;; default of 1.  The coordinate substrates cross-check anything that declares its level
+  ;; twice.
+  (cond
+    ((bind (location-coords> ?object $x $y $z)) $z)
+    ((and (not (floor-repeater ?object))
+          (bind (apparatus-coords> ?object $ax $ay $az)))
+     $az)
+    ((bind (wall-segment> ?object $wx1 $wy1 $wx2 $wy2 $wz)) $wz)
+    ((bind (edge-segment> ?object $ex1 $ey1 $ex2 $ey2 $ez)) $ez)
+    ((bind (gate-segment> ?object $gx1 $gy1 $gx2 $gy2 $gz)) $gz)
+    ((bind (screen-segment> ?object $sx1 $sy1 $sx2 $sy2 $sz)) $sz)
+    ((bind (has-elevation ?object $level)) $level)
+    (t (fourth (vertical-type-entry ?object)))))
 
 
 (define-query location-elevation (?location location)

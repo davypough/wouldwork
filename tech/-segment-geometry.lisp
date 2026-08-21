@@ -2,11 +2,15 @@
 
 ;;; Shared coordinate segment geometry: typed, individually authored wall/edge/gate/window/
 ;;; screen segments, the ordered boundary polygon, list-gathering queries for the geometry
-;;; algorithms, and initialization validation.  A wall is a vertical linear partition; an
-;;; edge is a vertical surface separating two regions of different elevation (eg, the
-;;; ground-level footprint of a raised slab).  Both block walking identically and both have
-;;; finite height for LOS.  Only wall participates in vaulting: an edge is not a physical
-;;; feature whose top an agent can vault onto, so jump.lisp deliberately excludes it.
+;;; algorithms, and initialization validation.  Each named segment stores two horizontal
+;;; endpoints plus their shared base z; the trailing z may be omitted and defaults to 0.
+;;; The gathering queries deliberately return planar (name x1 y1 x2 y2) records because
+;;; walking arrangements and line intersections operate on the horizontal footprint.
+;;; A wall is a vertical linear partition; an edge is a vertical surface separating two
+;;; regions of different elevation (eg, the ground-level footprint of a raised slab).  Both
+;;; block walking identically and both have finite height for LOS.  Only wall participates
+;;; in vaulting: an edge is not a physical feature whose top an agent can vault onto, so
+;;; jump.lisp deliberately excludes it.
 
 
 (in-package :ww)
@@ -16,12 +20,19 @@
 
 
 (define-static-relations
-  (wall-segment> wall $rational $rational $rational $rational)
-  (edge-segment> edge $rational $rational $rational $rational)
-  (gate-segment> gate $rational $rational $rational $rational)
-  (window-segment> window $rational $rational $rational $rational)
-  (screen-segment> screen $rational $rational $rational $rational)
+  (wall-segment> wall $rational $rational $rational $rational $rational)
+  (edge-segment> edge $rational $rational $rational $rational $rational)
+  (gate-segment> gate $rational $rational $rational $rational $rational)
+  (window-segment> window $rational $rational $rational $rational $rational)
+  (screen-segment> screen $rational $rational $rational $rational $rational)
   (boundary-wall $list))  ;closed polygon ((x1 y1) ... (x1 y1)); final point must repeat first
+
+
+(register-init-literal-defaults 'wall-segment> 0)
+(register-init-literal-defaults 'edge-segment> 0)
+(register-init-literal-defaults 'gate-segment> 0)
+(register-init-literal-defaults 'window-segment> 0)
+(register-init-literal-defaults 'screen-segment> 0)
 
 
 ;;;; SEGMENT GATHERING ;;;;
@@ -30,7 +41,7 @@
 (define-query wall-segment-records ()
   (do (assign $records nil)
       (doall (?wall wall)
-        (if (bind (wall-segment> ?wall $x1 $y1 $x2 $y2))
+        (if (bind (wall-segment> ?wall $x1 $y1 $x2 $y2 $z))
           (push (list ?wall $x1 $y1 $x2 $y2) $records)))
       $records))
 
@@ -38,7 +49,7 @@
 (define-query edge-segment-records ()
   (do (assign $records nil)
       (doall (?edge edge)
-        (if (bind (edge-segment> ?edge $x1 $y1 $x2 $y2))
+        (if (bind (edge-segment> ?edge $x1 $y1 $x2 $y2 $z))
           (push (list ?edge $x1 $y1 $x2 $y2) $records)))
       $records))
 
@@ -46,7 +57,7 @@
 (define-query gate-segment-records ()
   (do (assign $records nil)
       (doall (?gate gate)
-        (if (bind (gate-segment> ?gate $x1 $y1 $x2 $y2))
+        (if (bind (gate-segment> ?gate $x1 $y1 $x2 $y2 $z))
           (push (list ?gate $x1 $y1 $x2 $y2) $records)))
       $records))
 
@@ -54,7 +65,7 @@
 (define-query window-segment-records ()
   (do (assign $records nil)
       (doall (?window window)
-        (if (bind (window-segment> ?window $x1 $y1 $x2 $y2))
+        (if (bind (window-segment> ?window $x1 $y1 $x2 $y2 $z))
           (push (list ?window $x1 $y1 $x2 $y2) $records)))
       $records))
 
@@ -62,7 +73,7 @@
 (define-query screen-segment-records ()
   (do (assign $records nil)
       (doall (?screen screen)
-        (if (bind (screen-segment> ?screen $x1 $y1 $x2 $y2))
+        (if (bind (screen-segment> ?screen $x1 $y1 $x2 $y2 $z))
           (push (list ?screen $x1 $y1 $x2 $y2) $records)))
       $records))
 
@@ -73,6 +84,7 @@
 (define-init-check segment-geometry-init-check (literals)
   (check-init-boundary-walls literals)
   (check-init-segment-geometry literals)
+  (check-init-segment-level-agreement literals)
   (check-init-segment-names-unique literals)
   (check-init-segment-types-covered literals))
 
@@ -160,6 +172,27 @@
               Record: ~S~%~
               Segments must be horizontal (y1 = y2) or vertical (x1 = x2)."
              kind record))))
+
+
+(define-init-check-helper check-init-segment-level-agreement (literals)
+  "A named segment's base is its trailing coordinate.  A segment naming both that and
+   HAS-ELEVATION must name the same number: BASE reads the coordinate first, so a
+   disagreement would otherwise leave an ignored authored fact in the problem."
+  (let ((coordinate-levels (make-hash-table :test #'eql)))
+    (dolist (entry (init-segment-relation-types))
+      (dolist (record (init-segment-records (car entry) literals))
+        (setf (gethash (first record) coordinate-levels) (sixth record))))
+    (dolist (literal (positive-init-literals-with-relation 'has-elevation literals))
+      (destructuring-bind (object level) (rest (init-literal-proposition literal))
+        (multiple-value-bind (coordinate-level presentp)
+            (gethash object coordinate-levels)
+          (when (and presentp (/= coordinate-level level))
+            (fail-init-check literal
+                             "~%Segment ~S is given two different base levels.~%~
+                              Segment coordinate: ~S~%~
+                              HAS-ELEVATION:      ~S~%~
+                              Write the level once, in the segment coordinates."
+                             object coordinate-level level)))))))
 
 
 (define-init-check-helper check-init-segment-names-unique (literals)
