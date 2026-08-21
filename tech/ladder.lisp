@@ -15,13 +15,21 @@
 ;;; Climbing is directed: CLIMB is authored as TRAVERSAL-VIA>, since a ladder that carries
 ;;; an agent up need not carry it down the same way.
 ;;;
+;;; Grounded climbs remain transparent mobility and may compose with adjacent grounded
+;;; segments.  A supported agent instead crosses exactly one support-state boundary: this
+;;; file exposes a singleton transition from its current support to ground at the climb's
+;;; destination, using the same ladder, passability, and safety checks as the grounded edge.
+;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  ladder is declared optional here and by -passability
 ;;;   nested    : -position; -passability; -threat; -traversal; -mobility-action
 ;;; PROVIDES:
 ;;;   types     : ladder  --  declared optional; the two declarations resolve compatibly
 ;;;   mode      : climbing, registered with -traversal
-;;;   queries   : usable-ladder-at-source, positioned-ladders-for-means
+;;;   queries   : usable-ladder-at-source, positioned-ladders-for-means,
+;;;               ladder-configuration-transitions
+;;;   provider  : ladder-configuration-transitions registered with
+;;;               -configuration-transition
 ;;;   init      : ladder-init-check
 ;;;   action    : move (from -mobility-action)
 
@@ -75,6 +83,49 @@
 
 (register-traversal-mode 'climbing 'ladder-segment-for-clause
                          '(gate screen ladder))
+
+
+;;;; SUPPORT-CHANGING TRANSITIONS ;;;;
+
+
+(define-problem-helper ladder-configuration-transition-for-family
+    (state agent source-configuration destination family)
+  "Return the first feasible supported-source LADDER transition in FAMILY, or NIL."
+  (let ((source (first source-configuration))
+        (destination-configuration (list destination 'ground)))
+    (loop for clause in (if family
+                          (traversal-canonical-family family)
+                          (list nil))
+          for segment = (ladder-segment-for-clause
+                          state agent source destination clause)
+          when segment
+            return (list 'ladder
+                         source-configuration
+                         (third segment)
+                         destination-configuration))))
+
+
+(define-query ladder-configuration-transitions
+    (?agent agent ?source-configuration)
+  (do (assign $source (first ?source-configuration))
+      (assign $source-place (second ?source-configuration))
+      (assign $transitions nil)
+      (if (not (eql $source-place 'ground))
+        (doall (?destination location)
+          (if (bind (traversal-via>
+                      climbing $source $family ?destination))
+            (do (assign $transition
+                        (ladder-configuration-transition-for-family
+                          state ?agent ?source-configuration
+                          ?destination $family))
+                (if $transition
+                  (assign $transitions
+                          (cons $transition $transitions)))))))
+      $transitions))
+
+
+(register-configuration-transition-provider
+  'ladder-configuration-transitions)
 
 
 ;;;; INITIALIZATION VALIDATION ;;;;

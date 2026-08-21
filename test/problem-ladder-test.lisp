@@ -9,9 +9,9 @@
 ;;; Independent probes reject carrying cargo, crossing a closed gate, and landing at a lethal
 ;;; destination.  Two valid climbs contain decoy ladders that respectively violate exact
 ;;; positioning and means-list membership, while isolated initialization probes reject edges
-;;; having no valid source ladder at all.  A supported agent retains a hypothetical grounded
-;;; closure but cannot invoke MOVE until an explicit configuration transition leaves the
-;;; support.
+;;; having no valid source ladder at all.  A supported agent climbs through an explicit
+;;; singleton configuration transition, leaving its support and landing on destination ground
+;;; without composing farther through the transparent grounded closure in the same MOVE.
 ;;;
 ;;; Expected minimum solution: one MOVE from ENTRY to GOAL with the complete four-segment
 ;;; route witness.
@@ -33,7 +33,7 @@
          unlisted-agent gate-agent unsafe-agent canonical-agent)
   location (entry lower middle upper goal
             carry-start carry-goal
-            supported-start supported-goal
+            supported-start supported-goal supported-beyond
             misplaced-start misplaced-ladder-site misplaced-goal
             unlisted-start unlisted-goal
             gate-start gate-goal
@@ -70,12 +70,14 @@
   (has-position ladder3 carry-start)
   (traversal-via> climbing carry-start ((ladder3)) carry-goal)
 
-  ;; The closure describes hypothetical ground travel, while MOVE enforces actual grounding.
+  ;; A supported source uses one explicit ladder configuration transition.  The walking edge
+  ;; beyond its landing proves that transition remains a single support-state boundary.
   (has-location supported-agent supported-start)
   (has-location support-box supported-start)
   (on supported-agent support-box)
   (has-position ladder4 supported-start)
   (traversal-via> climbing supported-start ((ladder4)) supported-goal)
+  (traversal-via> walking supported-goal () supported-beyond)
 
   ;; A misplaced listed ladder is only a decoy; the source-positioned listed ladder must
   ;; provide the valid segment.
@@ -135,12 +137,20 @@
               (apply (action.eff-defun-name action) state pre-result)))))))
 
 
+(define-test-helper ladder-test-route-endpoint-location (route)
+  "Return ROUTE's final location from either a grounded or configuration endpoint."
+  (let ((endpoint (fourth (car (last route)))))
+    (if (consp endpoint)
+      (first endpoint)
+      endpoint)))
+
+
 (define-test-helper ladder-test-updates-to (state agent destination)
   "Return AGENT's MOVE updates whose endpoint is DESTINATION."
   (remove-if-not
     (lambda (update)
-      (eql (fourth
-             (car (last (second (update.instantiations update)))))
+      (eql (ladder-test-route-endpoint-location
+             (second (update.instantiations update)))
            destination))
     (ladder-test-move-updates state agent)))
 
@@ -222,10 +232,45 @@
          (eql (first failure) :state-mismatch))))
 
 
+(define-test-claim ladder-supported-source-transition
+  (equal
+    (configuration-transition-results *start-state* 'supported-agent)
+    '((ladder
+        (supported-start support-box)
+        (ladder4)
+        (supported-goal ground))))
+  (let ((landing-updates
+          (ladder-test-updates-to
+            *start-state* 'supported-agent 'supported-goal)))
+    (and (= (length landing-updates) 1)
+         (equal
+           (second (update.instantiations (first landing-updates)))
+           '((ladder
+               (supported-start support-box)
+               (ladder4)
+               (supported-goal ground))))
+         (not
+           (ladder-test-updates-to
+             *start-state* 'supported-agent 'supported-beyond))))
+  (multiple-value-bind (state success-p failure)
+      (apply-action-to-state
+        '(move supported-agent
+          ((ladder
+             (supported-start support-box)
+             (ladder4)
+             (supported-goal ground))))
+        *start-state*
+        nil)
+    (declare (ignore failure))
+    (and success-p
+         (equal
+           (agent-configuration state 'supported-agent)
+           '(supported-goal ground)))))
+
+
 (define-test-claim ladder-action-boundaries-are-preserved
   (and (not (find 'use-ladder *actions* :key #'action.name))
        (not (ladder-test-move-updates *start-state* 'carrying-agent))
-       (not (ladder-test-move-updates *start-state* 'supported-agent))
        (not (ladder-test-move-updates *start-state* 'gate-agent))
        (not (ladder-test-move-updates *start-state* 'unsafe-agent))))
 
@@ -297,11 +342,18 @@
     (not (all-clear carrying-agent '(unlisted-screen)))
     (not (traversable carrying-agent carry-start carry-goal))
 
-    ;; The provider is grounded in configuration space; MOVE owns the check that the
-    ;; actual agent is currently grounded.
+    ;; The transparent closure still describes hypothetical ground travel through and beyond
+    ;; the climb, while the actual supported agent gets exactly one configuration transition.
     (has-location supported-agent supported-start)
     (on supported-agent support-box)
     (traversable supported-agent supported-start supported-goal)
+    (traversable supported-agent supported-start supported-beyond)
+    (equal
+      (configuration-transition-results supported-agent)
+      '((ladder
+          (supported-start support-box)
+          (ladder4)
+          (supported-goal ground))))
 
     ;; Valid edges ignore decoys that fail one of the provider's two requirements.
     (has-position ladder5 misplaced-ladder-site)
