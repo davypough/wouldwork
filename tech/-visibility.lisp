@@ -7,14 +7,12 @@
 ;;; REQUIRES:
 ;;;   type     : location
 ;;; PROVIDES:
-;;;   types    : apparatus (either transmitter receiver floor-repeater wall-repeater gun);
-;;;              gate, transmitter, receiver, both repeater leaf types, and gun are optional.
-;;;              APPARATUS-COORDS> names each apparatus's functional point: beam
-;;;              emission/reception/relay for beam apparatus, and the firing/targeting point
-;;;              for a gun.
+;;;   types    : repeater (either floor-repeater wall-repeater); gate, transmitter,
+;;;              receiver, both repeater leaf types, and gun are optional.
 ;;;   queries  : visible, visible-for-object, potentially-visible, beam-visible,
 ;;;              beam-visible-for-object, elevation-visible-for-object -- null defaults,
-;;;              overridden by visibility.
+;;;              overridden by visibility.  Their target domains list the point-apparatus
+;;;              leaf types directly rather than introducing an unused composite alias.
 ;;;              The FOR-OBJECT forms select actor/view-specific gate state.  Their typed
 ;;;              object parameters remain valid when an optional type has no objects: the
 ;;;              query is still installed and its null body returns NIL; only iteration
@@ -29,11 +27,6 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater))
-
-
-(define-types
-  apparatus
-    (either transmitter receiver floor-repeater wall-repeater gun))
 
 
 (define-query visible
@@ -60,8 +53,8 @@
      ?near-elevation
      ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
-  ;; Locations/apparatus are Wouldwork objects. Elevations are computed Lisp values and
-  ;; therefore deliberately have no Wouldwork object type.
+  ;; Locations and point apparatus are Wouldwork objects. Elevations are computed Lisp
+  ;; values and therefore deliberately have no Wouldwork object type.
   (do ?location ?near-elevation ?object ?far-elevation nil))
 
 

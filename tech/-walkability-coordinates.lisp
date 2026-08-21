@@ -97,7 +97,7 @@
 ;;;               redefined by -stream-passability where wall blowers exist;
 ;;;               terrain-complaints  --  default no complaints; redefined by
 ;;;               -terrain-consistency, which nests this file and -vertical, to
-;;;               cross-check authored levels against the arrangement below
+;;;               check the universal edge-span invariant against the arrangement below
 ;;;   init      : derive-walking-from-segments
 
 (include-tech -traversal)
@@ -629,23 +629,22 @@
 (define-query terrain-complaints (?arrangement)
   ;; Default: nothing to say about the vertical dimension.  -terrain-consistency, which
   ;; nests this file and -vertical, redefines this to return one complaint string per
-  ;; authored level the arrangement contradicts -- so walking derivation stays usable in
-  ;; a problem carrying no vertical model at all, exactly as the stream seam above keeps
-  ;; it usable with no blowers.
+  ;; edge span the arrangement contradicts -- so walking derivation stays usable in a
+  ;; problem carrying no vertical model at all, exactly as the stream seam above keeps it
+  ;; usable with no blowers.
   (do (assign $unexamined ?arrangement)
       (assign $complaints nil)
       $complaints))
 
 
 (defun report-terrain-complaints (complaints)
-  "Signal every terrain-consistency complaint the arrangement produced, together rather
-   than one run at a time.  Each is an authored vertical fact the derived walking
-   arrangement contradicts; see -terrain-consistency for what determines each one and
-   for the cases it deliberately abstains on."
+  "Signal every terrain-consistency complaint together rather than one run at a time.
+   See -terrain-consistency for the automatic invariant, the topology-review policies,
+   and the cases where each deliberately abstains."
   (error "~%Terrain consistency check failed.~%~%~{~A~%~%~}~
-          Each complaint above names an authored level or span that the derived walking ~
-          arrangement contradicts.  Fix the authored fact, or -- where the geometry ~
-          genuinely carries the level change -- add the authored traversal that crosses it."
+          Each complaint above names an authored span that contradicts the derived walking ~
+          arrangement, or a topology-review connectivity requirement that is unsatisfied. ~
+          Fix the authored fact or add the missing traversal described above."
          complaints))
 
 

@@ -421,9 +421,11 @@
    recorded expectation.  These five are the live Talos work, and none of them is in
    (TEST-TALOS) -- which is how problem-phobia-topo staged with an initialization error
    across two whole phases before anyone noticed.  Staging alone runs every init check and
-   every coordinate derivation; the recorded expectation additionally pins what those
-   derivations produced, so one that quietly starts emitting different facts fails here
-   rather than in a search weeks later.
+   every coordinate derivation and the universal terrain invariant.  The suite then applies
+   the topology-specific terrain connectivity policy before comparing the recorded
+   expectation.  That expectation additionally pins what the derivations produced, so one
+   that quietly starts emitting different facts fails here rather than in a search weeks
+   later.
 
    No search is run.  These problems take minutes each to solve, and this suite is meant to
    stay cheap enough to run after every change to tech/.
@@ -474,6 +476,7 @@
   (handler-case
       (progn
         (%stage problem-path)
+        (validate-topo-terrain)
         (let ((geometry (topo-derived-geometry)))
           (cond (recording
                  (setf (gethash problem-name recorded) geometry)
@@ -493,6 +496,18 @@
     (error (condition)
       (format t "~%Topo problem ~A failed to stage:~%~A~%" problem-name condition)
       t)))
+
+
+(defun validate-topo-terrain ()
+  "Apply the terrain connectivity assumptions that distinguish complete *-TOPO specs from
+   focused walking technology models.  WALKABILITY supplies the checker internally; a
+   problem specification never includes that latent substrate itself."
+  (unless (fboundp 'terrain-policy-complaints-for-state)
+    (error "A topology problem must include WALKABILITY for terrain validation."))
+  (let ((complaints
+          (funcall (symbol-function 'terrain-policy-complaints-for-state) *start-state*)))
+    (when complaints
+      (report-terrain-complaints complaints))))
 
 
 (defun topo-derived-geometry ()

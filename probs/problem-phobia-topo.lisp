@@ -20,7 +20,7 @@
 (ww-set *depth-cutoff* 20)
 
 
-(defparameter *max-pairings* 2)  ;rename to max-connector-pairings for clarity
+(defparameter *max-pairings* 2)  ;each connector needs at most one source and one target
 
 
 ;;;; TYPES ;;;;
@@ -55,20 +55,22 @@
 (include-tech beam-relay)
 (include-tech visibility)
 (include-tech walkability)
-(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; HEURISTIC ;;;;
 
 
 (define-query heuristic? ()
-  ;Manhattan distance from agent1's current location to the loft (location11).
-  ;Lower is better; biases DFS/B&B to try the location10->location11 direction first.
-  (do (bind (has-location agent1 $agent-loc))
-      (bind (location-coords> $agent-loc $x $y))
-      (bind (location-coords> location11 $goal-x $goal-y))
-      (+ (abs (- $x $goal-x))
-         (abs (- $y $goal-y)))))
+  ;; Manhattan distance from agent1's current location to the loft.  It is meaningful only
+  ;; for the final goal; the two intermediate testing goals receive neutral ordering rather
+  ;; than being guided toward a different objective.
+  (if (equal *goal* '(has-location agent1 location11))
+    (do (bind (has-location agent1 $agent-loc))
+        (bind (location-coords> $agent-loc $x $y))
+        (bind (location-coords> location11 $goal-x $goal-y))
+        (+ (abs (- $x $goal-x))
+           (abs (- $y $goal-y))))
+    0))
 
 
 ;;;; INITIALIZATION ;;;;
@@ -179,14 +181,23 @@
 
 
 (define-goal
-  ;; Ride fgears1's air stream to the loft: mount a fan on fgears1 at location10, step
-  ;; onto it, and the ensuing propagation launches the agent to location11 (elevation 10).
-  ;; Hovering there is sustained only while the stream blows, so no blowing conjunct is
-  ;; needed: if the stream stopped, drop-occupants! would return the agent to location10
+  ;; Keep exactly one alternative active.  The short forms support incremental testing of
+  ;; this otherwise long-running topology problem.
+
+  ;; First subgoal: acquire the connector needed for the receiver network.
+  (holding agent1 connector2)
+
+  ;; Second subgoal: establish the north-alcove setup that disables wblower2.
+  ;; (and (active receiver2)
+  ;;      (has-location agent1 location13)
+  ;;      (has-location jammer1 location13)
+  ;;      (has-location fan1 location13)
+  ;;      (jamming jammer1 wblower2))
+
+  ;; Final goal: ride fgears1's air stream to the loft.  Mount a fan on fgears1 at
+  ;; location10 and step onto it; propagation launches the agent to location11 at elevation
+  ;; 10.  Hovering there is sustained only while the stream blows, so no BLOWING conjunct
+  ;; is needed: if the stream stopped, DROP-OCCUPANTS! would return the agent to location10
   ;; before any goal check.
-  (holding agent1 connector2)  ;first subgoal
-  ;(has-location agent1 location11)  ;final goal
+  ;; (has-location agent1 location11)
 )
-
-
-  ;(and (active receiver2) (has-location agent1 location13) (has-location jammer1 location13) (has-location fan1 location13) (jamming jammer1 wblower2))  ;second subgoal

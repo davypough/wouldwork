@@ -348,7 +348,7 @@ Mixed object/value example:
 (define-query beam-visible
     (?location location
      ?near-elevation
-     ?object (either apparatus location)
+     ?object (either transmitter receiver floor-repeater wall-repeater gun location)
      ?far-elevation)
   ...)
 ```

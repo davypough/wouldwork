@@ -16,6 +16,8 @@
 
 (ww-set *progress-reporting-interval* 1000000)
 
+;; Bound automatic searches over individual recorder-cycle subgoals.  The known
+;; direct solution is 90 actions and is validated independently of this cutoff.
 (ww-set *depth-cutoff* 25)
 
 (ww-set *max-recorder-cycles* 2)
@@ -38,7 +40,7 @@
   location (location1 location2 location3 location4 location5
             location6 location7 location8 location9 location10
             location11 location12 location13 location14 location15 location16 location17)
-  pressure-plate (pplate1 pplate2 pplate3 pplate4)
+  pressure-plate (plate1 plate2 plate3 plate4)
   box (box1 box1*)
   connector (connector1 connector2 connector1* connector2*)
   tray (tray1 tray1*)
@@ -66,7 +68,6 @@
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
-(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 ;;;; INITIALIZATION ;;;;
 
@@ -84,10 +85,10 @@
   (has-location tray1 location13)
 
   ;; Fixed-position objects and initial support occupancy
-  (has-position pplate1 location6)
-  (has-position pplate2 location9)
-  (has-position pplate3 location12)
-  (has-position pplate4 location15)
+  (has-position plate1 location6)
+  (has-position plate2 location9)
+  (has-position plate3 location12)
+  (has-position plate4 location15)
   (has-position ladder1 location5)
   (has-position ladder2 location14)
   (has-position recorder1 location3)
@@ -133,10 +134,10 @@
   ;; Gate controllers
   (controls ((receiver1)) gate1 normal)
   (controls ((receiver1)) gate2 inverted)
-  (controls ((pplate1)) gate3 normal)
-  (controls ((pplate2)) gate4 normal)
-  (controls ((receiver2 pplate3)) gate5 normal)
-  (controls ((pplate4)) gate6 normal)
+  (controls ((plate1)) gate3 normal)
+  (controls ((plate2)) gate4 normal)
+  (controls ((receiver2 plate3)) gate5 normal)
+  (controls ((plate4)) gate6 normal)
 
   ;; Apparatus properties
   (has-chroma transmitter1 blue)
@@ -208,6 +209,9 @@
 ;;;; GOAL ;;;;
 
 
+;; Leave GHOST-STOPS-RECORDER disabled to test immediate satisfaction, where
+;; the final recorder cycle may remain open.  Enable it to test explicit ghost
+;; completion, where the final cycle must be closed.
 (define-goal
   (and (has-location agent1 location16)
        ;(ghost-stops-recorder)

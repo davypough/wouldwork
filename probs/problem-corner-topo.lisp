@@ -6,8 +6,10 @@
 ;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-BEAM-CROSSINGS-BEFORE-GATE mint the
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-walkability-coordinates.lisp's DERIVE-WALKING-FROM-SEGMENTS derives walking
-;;; TRAVERSAL-VIA facts -- all from the raw segment geometry below (same shape as
-;;; problem-corner.lisp's).  The two beam derivations read the authored
+;;; TRAVERSAL-VIA facts -- all from the raw segment geometry below.  This is the fuller
+;;; topology-diagram geometry, not the reduced internal-segment model in
+;;; problem-corner.lisp; the two files describe the same puzzle but are not
+;;; coordinate-identical.  The two beam derivations read the authored
 ;;; WALL-SEGMENT>/GATE-SEGMENT> facts and BOUNDARY-WALL (this problem has no EDGE-SEGMENT>
 ;;; facts); WINDOW-SEGMENT> is consulted only by the walking derivation, whose
 ;;; side-of-partition-line classification reflects that walking connectivity is a
@@ -88,7 +90,6 @@
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
 (include-tech walkability)          ;walking mode; mobility-results; traversable; one-step-walkable; move
 (include-tech visibility)            ;los-via; visible; visible-clear
-(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; INITIALIZATION ;;;;
@@ -126,8 +127,10 @@
   ;; coordinates.lisp) and DERIVE-BEAM-CROSSINGS-BEFORE-GATE (tech/-beam-crossing-
   ;; coordinates.lisp) below.  wall1/gate1 split at
   ;; y=11/2 keeps all three gate1-conditioned beams below the split and the location1-
-  ;; >receiver2 wall crossing above it, so neither segment is
-  ;; fragmented.
+  ;; >receiver2 wall crossing above it, so neither segment is fragmented.  wall3 caps the
+  ;; notch shared with problem-claustro-topo.lisp.  No current authored endpoint sightline
+  ;; crosses it, but it remains part of the given map geometry rather than being removed
+  ;; merely because this problem's present locations do not use it.
   (wall-segment> wall1 8 11/2 8 8)
   (wall-segment> wall2 8 0 8 3)
   (wall-segment> wall3 11 10 16 10)

@@ -244,6 +244,47 @@
            (action-sequence-validation-final-state validation)))))
 
 
+(define-test-claim recorder-open-and-explicitly-closed-goals
+  (let* ((open-path (recorder-three-window-path t))
+         (closed-path (recorder-three-window-path))
+         (open-playback (recorder-path-validation open-path))
+         (closed-playback (recorder-path-validation closed-path))
+         (original-goal (copy-tree *goal*)))
+    (and
+      (action-sequence-validation-success-p open-playback)
+      (action-sequence-validation-success-p closed-playback)
+      (unwind-protect
+        (progn
+          ;; The ordinary goal accepts the final recording as soon as its useful ghost
+          ;; action completes, without inventing a STOP-RECORDER move.
+          (install-compiled-goal '(third-recorded))
+          (multiple-value-bind (open-valid-p open-diagnostic)
+              (validate-recorder-solution
+                *start-state* open-path
+                (action-sequence-validation-final-state open-playback))
+            (and open-valid-p
+                 (null open-diagnostic)
+                 ;; Strengthening the same goal requires the authored return/stop ending.
+                 (progn
+                   (install-compiled-goal
+                     '(and (third-recorded) (ghost-stops-recorder)))
+                   t)
+                 (multiple-value-bind (closed-valid-p closed-diagnostic)
+                     (validate-recorder-solution
+                       *start-state* closed-path
+                       (action-sequence-validation-final-state closed-playback))
+                   (and closed-valid-p
+                        (null closed-diagnostic)))
+                 (multiple-value-bind (open-valid-p open-diagnostic)
+                     (validate-recorder-solution
+                       *start-state* open-path
+                       (action-sequence-validation-final-state open-playback))
+                   (and (not open-valid-p)
+                        (equal open-diagnostic
+                               '(:phase :playback :reason :goal-not-satisfied)))))))
+        (install-compiled-goal original-goal)))))
+
+
 (define-test-claim recorder-malformed-window-diagnostics
   (let ((diagnostic
           (recorder-boundary-diagnostic

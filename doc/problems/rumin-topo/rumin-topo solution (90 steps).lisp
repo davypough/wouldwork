@@ -8,9 +8,10 @@
 ;;;
 ;;; Depends on:
 ;;;   * location17 at (18 5), in front of window1
-;;;   * (has-elevation location15 2) (has-elevation location16 2) (has-height edge5 2)
-;;;   * (reach-via> location15 () location14)
-;;;   * tech/reachability.lisp extended with the directional REACH-VIA> relation
+;;;   * elevation 2 as the third coordinate of location15 and location16; edge5 height 2
+;;;   * (reach-via location15 () location14)
+;;;   * tech/reachability.lisp supplies symmetric REACH-VIA positional permission;
+;;;     vertical reach independently limits manipulation from either side
 ;;;
 ;;; Structure:
 ;;;    1-52   cycle 1: ghost holds tray1* at loc2 to open gate1; agent ferries tray1, box1
@@ -20,22 +21,22 @@
 ;;;   55-56   return to the recorder and open cycle 2
 ;;;   57-76   cycle 2: hand blue to the ghosts, build the red chain, gate5 opens
 ;;;   77-85   stage box1 at loc14 with tray1 on top, climb ladder2 to the loc15 ledge
-;;;   86-88   reach down for the tray, load pplate4, walk through gate6 to loc16
+;;;   86-88   reach down for the tray, load plate4, walk through gate6 to loc16
 ;;;   89-90   ghost returns to the recorder and stops, closing cycle 2
 ;;;
 ;;; The last two actions matter for goal chaining.  SOLVE-RECORDER-FINAL strengthens the
 ;;; problem goal with (ghost-stops-recorder) exactly as SOLVE-SUBGOAL does, so a solution
 ;;; whose final cycle stays open cannot be produced by the chaining facility.  Closing here
 ;;; is safe: gate5 shuts and the red chain dies when the ghosts are removed, but the agent
-;;; is already through gate6, and gate6 is held by the live tray1 on pplate4.
+;;; is already through gate6, and gate6 is held by the live tray1 on plate4.
 ;;;
 ;;; Red chain (no hop crosses gate1):
 ;;;   transmitter2 -> connector1*  @loc2  on box1*    anchor 2
 ;;;                -> connector2*  @loc17 on ground   anchor 1
-;;;                -> connector1   @loc9  on pplate2  anchor 5/2  (opens gate4 itself)
+;;;                -> connector1   @loc9  on plate2  anchor 5/2  (opens gate4 itself)
 ;;;                -> connector2   @loc11 on ground   anchor 1
 ;;;                -> receiver2
-;;; pplate3 is held down by tray1*, so gate5 stays open through the final leg.
+;;; plate3 is held down by tray1*, so gate5 stays open through the final leg.
 ;;;
 ;;; The final leg turns on the elevation split.  On the loc15 ledge the agent is at
 ;;; elevation 2; tray1 resting on box1 at loc14 is at 1, a gap of exactly
@@ -43,8 +44,9 @@
 ;;; out of reach -- verified directly:
 ;;;     PICKUP-CLEAR tray1 from loc15 = T
 ;;;     PICKUP-CLEAR box1  from loc15 = NIL
-;;; REACH-VIA> supplies only the one-way positional permission; the vertical bound is the
-;;; separate WITHIN-AGENT-VERTICAL-REACH test.
+;;; REACH-VIA supplies symmetric positional permission.  The separate
+;;; WITHIN-AGENT-VERTICAL-REACH test determines what can actually be manipulated from
+;;; either side.
 
 (validate-solution
   (START-RECORDER AGENT1)
@@ -62,7 +64,7 @@
   (MOVE AGENT1 ((WALK LOCATION13 NIL LOCATION4) (JUMP LOCATION4 NIL LOCATION2) (WALK LOCATION2 (GATE1) LOCATION1)))
   (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3)))
   (MOVE AGENT1 ((WALK LOCATION1 (GATE2) LOCATION6)))
-  (PUT-TRAY AGENT1 TRAY1 PPLATE1 LOCATION6)
+  (PUT-TRAY AGENT1 TRAY1 PLATE1 LOCATION6)
   (MOVE AGENT1 ((WALK LOCATION6 (GATE3) LOCATION7)))
   (PICKUP-BOX AGENT1 BOX1 LOCATION7 LOCATION7)
   (MOVE AGENT1 ((WALK LOCATION7 (GATE3) LOCATION6)))
@@ -73,7 +75,7 @@
   (MOVE AGENT1 ((WALK LOCATION6 (GATE2) LOCATION8)))
   (MOVE AGENT1 ((JUMP (LOCATION8 GROUND) NIL (LOCATION8 BOX1))))
   (MOVE AGENT1 ((JUMP (LOCATION8 BOX1) NIL (LOCATION9 GROUND))))
-  (PUT-TRAY AGENT1 TRAY1 PPLATE2 LOCATION9)
+  (PUT-TRAY AGENT1 TRAY1 PLATE2 LOCATION9)
   (MOVE AGENT1 ((STAIRS LOCATION9 NIL LOCATION10)))
   (PICKUP-CONNECTOR AGENT1 CONNECTOR2 LOCATION10)
   (MOVE AGENT1 ((STAIRS LOCATION10 NIL LOCATION9)))
@@ -86,7 +88,7 @@
   (PICKUP-TRAY AGENT1 TRAY1 LOCATION9 LOCATION9)
   (MOVE AGENT1 ((JUMP LOCATION9 NIL LOCATION8)))
   (MOVE AGENT1 ((WALK LOCATION8 NIL LOCATION12)))
-  (PUT-TRAY AGENT1 TRAY1 PPLATE3 LOCATION12)
+  (PUT-TRAY AGENT1 TRAY1 PLATE3 LOCATION12)
   (MOVE AGENT1* ((WALK LOCATION3 NIL LOCATION2)))
   (MOVE AGENT1 ((WALK LOCATION12 NIL LOCATION1)))
   (PICKUP-CONNECTOR AGENT1 CONNECTOR2 LOCATION1)
@@ -114,7 +116,7 @@
   (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION8)
   (MOVE AGENT1 ((JUMP (LOCATION8 GROUND) NIL (LOCATION8 BOX1))))
   (MOVE AGENT1 ((JUMP (LOCATION8 BOX1) NIL (LOCATION9 GROUND))))
-  (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION9 PPLATE2 (CONNECTOR2*))
+  (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION9 PLATE2 (CONNECTOR2*))
   (MOVE AGENT1 ((JUMP LOCATION9 NIL LOCATION8)))
   (MOVE AGENT1 ((WALK LOCATION8 (GATE1) LOCATION17)))
   (PICKUP-CONNECTOR AGENT1 CONNECTOR2 LOCATION17)
@@ -133,7 +135,7 @@
   (PUT-TRAY AGENT1 TRAY1 BOX1 LOCATION14)
   (MOVE AGENT1 ((LADDER LOCATION14 (LADDER2) LOCATION15)))
   (PICKUP-TRAY AGENT1 TRAY1 LOCATION14 LOCATION15)
-  (PUT-TRAY AGENT1 TRAY1 PPLATE4 LOCATION15)
+  (PUT-TRAY AGENT1 TRAY1 PLATE4 LOCATION15)
   (MOVE AGENT1 ((WALK LOCATION15 (GATE6) LOCATION16)))
   (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3)))
   (STOP-RECORDER AGENT1*)

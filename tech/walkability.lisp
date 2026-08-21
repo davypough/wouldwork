@@ -8,15 +8,20 @@
 ;;; Walking is the only mode with an elevation *equality* test, and that is what makes the
 ;;; coordinate derivation safe: -walkability-coordinates is elevation-blind and happily
 ;;; emits an edge between two locations at different levels, which ONE-STEP-WALKABLE then
-;;; refuses.  -terrain-consistency exists to catch such an edge being the only way across.
+;;; refuses.  The nested -terrain-consistency validation automatically checks the universal
+;;; geometric invariant: an edge's vertical span must match the determinate level step it
+;;; separates.  Stronger connectivity assumptions belong to topology-spec review and are
+;;; applied by TEST-TOPO, not by ordinary walking models.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
 ;;;   nested    : -support-occupancy; -location; -passability; -vertical; -elevation;
-;;;               -traversal; -walkability-coordinates; -threat; -mobility-action
+;;;               -traversal; -walkability-coordinates; -terrain-consistency; -threat;
+;;;               -mobility-action
 ;;; PROVIDES:
 ;;;   mode      : walking, registered with -traversal
 ;;;   queries   : one-step-walkable
+;;;   init      : automatic terrain edge-span validation during walking derivation
 ;;;   action    : move (from -mobility-action)
 
 (include-tech -support-occupancy)
@@ -26,6 +31,7 @@
 (include-tech -elevation)
 (include-tech -traversal)
 (include-tech -walkability-coordinates)
+(include-tech -terrain-consistency)
 (include-tech -threat)
 (include-tech -mobility-action)
 

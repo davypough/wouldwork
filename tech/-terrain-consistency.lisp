@@ -1,12 +1,12 @@
 ;;; Filename: -terrain-consistency.lisp
 
-;;; Terrain-consistency substrate: cross-checks the authored vertical facts against the
-;;; walking arrangement -walkability-coordinates already derives, so a level that has
-;;; drifted out of agreement with the geometry around it fails at initialization instead
-;;; of quietly producing an unreachable location or a mismeasured barrier.  Three checks,
-;;; all of which ABSTAIN wherever the arrangement cannot settle the question -- an
-;;; abstention is not a pass, it is the honest answer when the geometry names no level on
-;;; one side of the thing being checked.
+;;; Terrain-consistency substrate: cross-checks authored vertical facts against the walking
+;;; arrangement -walkability-coordinates already derives.  It separates one geometric
+;;; invariant from two topology-review policies.  The invariant runs automatically during
+;;; walking initialization; TEST-TOPO applies the policies after staging each long-running
+;;; topology problem.  All three ABSTAIN wherever the arrangement cannot settle the
+;;; question -- an abstention is not a pass, it is the honest answer when the geometry names
+;;; no level on one side of the thing being checked.
 ;;;
 ;;; A level STEP is the shared notion behind all three: an edge's grid interval flanks two
 ;;; cells, and when each flanking zone carries locations that agree on one level, and the
@@ -50,8 +50,13 @@
 ;;; STAIRWAY and JUMPING pair between location2 and location4.  An equality rule would
 ;;; reject both.
 ;;;
-;;; Only a problem that includes this file is checked, so walkability's own coordinate
-;;; derivation stays usable with no vertical model at all.
+;;; Public WALKABILITY nests this file, so every walking problem receives the edge-span
+;;; invariant automatically.  The two connectivity rules are deliberately not universal:
+;;; a focused model may name locations at different levels specifically to characterize
+;;; that coordinate-derived WALKING is elevation-blind, without claiming a complete route
+;;; between them.  TEST-TOPO applies those stronger rules to the five full topology specs.
+;;; The lower-level -WALKABILITY-COORDINATES substrate remains usable on its own with no
+;;; vertical model and therefore retains its empty TERRAIN-COMPLAINTS seam.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location; edge, declared optional by nested -segment-geometry
@@ -59,7 +64,9 @@
 ;;;               and -segment-geometry's EDGE-SEGMENT>); -vertical (BASE, TOP)
 ;;; PROVIDES:
 ;;;   query     : terrain-complaints  --  overrides -walkability-coordinates' empty
-;;;               default with the three cross-checks above
+;;;               default with the edge-span invariant above
+;;;   functions : terrain-policy-complaints-for-state  --  the two stronger topology
+;;;               review policies for TEST-TOPO
 ;;;   parameter : *terrain-level-change-modes*
 
 (include-tech -walkability-coordinates)
@@ -79,14 +86,13 @@
 
 
 (define-query terrain-complaints (?arrangement)
-  ;; Overrides -walkability-coordinates' empty seam.  Gathers the vertical facts the three
-  ;; checks read -- every location's level and every edge's span, both straight out of
-  ;; -vertical, so this file states no elevation rule of its own -- and hands them to the
-  ;; plain-Lisp analysis below with the arrangement they are checked against.
+  ;; Overrides -walkability-coordinates' empty seam.  The walking initializer enforces the
+  ;; geometric invariant only; TEST-TOPO separately calls the connectivity-policy entry
+  ;; point once the complete topology problem has staged.
   (do (assign $levels (terrain-location-levels))
       (assign $spans (terrain-edge-spans))
       (assign $edges (edge-segment-records))
-      (terrain-arrangement-complaints ?arrangement $edges $spans $levels)))
+      (terrain-arrangement-invariant-complaints ?arrangement $edges $spans $levels)))
 
 
 (define-query terrain-location-levels ()
@@ -116,14 +122,51 @@
   "Every complaint the three checks raise against ARRANGEMENT, as ready-to-print strings.
    EDGES are (name x1 y1 x2 y2) records, SPANS (edge base top), and LEVELS a
    (location . level) alist.  Returns NIL when everything agrees or nothing is
-   determinable; -walkability-coordinates signals whatever comes back."
+   determinable.  This combined entry point supports direct characterization; walking
+   initialization calls the invariant subset, while TEST-TOPO calls the policy subset."
+  (append (terrain-arrangement-invariant-complaints arrangement edges spans levels)
+          (terrain-arrangement-policy-complaints arrangement edges levels)))
+
+
+(defun terrain-arrangement-invariant-complaints (arrangement edges spans levels)
+  "Complaints where an edge's authored vertical span contradicts its determinate step.
+   This is safe for every walking model and therefore runs during coordinate initialization."
+  (terrain-edge-complaints arrangement edges spans
+                           (terrain-zone-levels arrangement levels)))
+
+
+(defun terrain-arrangement-policy-complaints (arrangement edges levels)
+  "Topology-review complaints requiring every determinate step and every level group to be
+   connected by an authored level change.  These rules assume the locations describe a
+   complete traversable topology, which is true of the *-TOPO specs but not of every focused
+   technology model."
   (let ((zone-levels (terrain-zone-levels arrangement levels))
         (zone-of (terrain-location-zones arrangement))
         (changes (terrain-level-changes)))
-    (append (terrain-edge-complaints arrangement edges spans zone-levels)
-            (terrain-uncrossed-edge-complaints arrangement edges zone-levels
+    (append (terrain-uncrossed-edge-complaints arrangement edges zone-levels
                                                zone-of levels changes)
             (terrain-zone-complaints zone-levels zone-of levels changes))))
+
+
+(defun terrain-policy-complaints-for-state (state)
+  "The stronger terrain-policy complaints for a fully staged topology problem."
+  (let ((arrangement (terrain-arrangement-for-state state))
+        (edges (funcall (symbol-function 'edge-segment-records) state))
+        (levels (funcall (symbol-function 'terrain-location-levels) state)))
+    (terrain-arrangement-policy-complaints arrangement edges levels)))
+
+
+(defun terrain-arrangement-for-state (state)
+  "Rebuild the walking arrangement represented by STATE for post-staging validation."
+  (walkability-coordinates-build-arrangement
+    (funcall (symbol-function 'walkability-coordinates-location-coords) state)
+    (append (funcall (symbol-function 'wall-segment-records) state)
+            (funcall (symbol-function 'edge-segment-records) state))
+    (funcall (symbol-function 'gate-segment-records) state)
+    (funcall (symbol-function 'window-segment-records) state)
+    (funcall (symbol-function 'screen-segment-records) state)
+    (funcall (symbol-function 'walkability-coordinates-stream-specs) state)
+    (car (gethash '(boundary-wall) *static-db*))))
 
 
 (defun terrain-edge-complaints (arrangement edges spans zone-levels)

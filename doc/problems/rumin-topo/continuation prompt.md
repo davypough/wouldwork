@@ -59,10 +59,10 @@ ghost stops at loc3. The subgoal is evaluated at the stop.
 1. Ferry the agent and tray1 east. Ghost holds tray1* at loc2 with connector1 on it, which
    lights blue and opens gate1; agent crosses; ghost drops the tray and stops.
    Subgoal ≈ `(and (has-location tray1 location1) (has-location agent1 location1))`.
-2. tray1 onto pplate1 → gate3 → box1 out of loc7 to loc8. Agent returns west.
+2. tray1 onto plate1 → gate3 → box1 out of loc7 to loc8. Agent returns west.
    Subgoal ≈ `(has-location box1 location8)`.
-3. Jump to loc9, tray1 onto pplate2 → gate4 → connector2 out of loc10 → connector2 to
-   loc17; tray1 onto pplate3. Subgoal ≈ `(and (depressed pplate3) (has-location connector2
+3. Jump to loc9, tray1 onto plate2 → gate4 → connector2 out of loc10 → connector2 to
+   loc17; tray1 onto plate3. Subgoal ≈ `(and (depressed plate3) (has-location connector2
    location17))`.
 4. Rebuild blue with live objects: box1 to loc2, connector1 on it paired to transmitter1 and
    connector2@loc17. Subgoal ≈ `(and (active receiver1) (on connector1 box1))`.
@@ -105,7 +105,7 @@ order — connectors, then receivers, then transmitters, so `(CONNECTOR2 TRANSMI
 `(STAIRS ... NIL ...)`, not `(... (GATE4) ...)`. Routes are the realized ones, so
 `loc8 -> loc13` is three legs via loc2 and the loc2→loc4 stairs. The ladder segment is
 `(LADDER LOCATION14 (LADDER2) LOCATION15)` and plate mounts are
-`(STEP (LOCATION15 GROUND) NIL (LOCATION15 PPLATE4))`.
+`(STEP (LOCATION15 GROUND) NIL (LOCATION15 PLATE4))`.
 
 ## Repo state
 
@@ -118,10 +118,11 @@ Already committed and passing `(test-talos)` — 93 problems, 0 failures, 25 mut
   START-RECORDER ghost fork now defers installation to `init` and collects fork clauses from
   each relation's owner, so `(include-tech ...)` order no longer matters. Documented as
   Trap 10 in `doc/load-ordering/ordering-of-operations.md`.
-- `tech/reachability.lisp` — directional `reach-via>`.
-- `probs/problem-rumin-topo.lisp` — `location17` at (18 5); `(has-elevation location15 2)`,
-  `(has-elevation location16 2)`, `(has-height edge5 2)`; `(reach-via> location15 ()
-  location14)`; `(ww-set *max-recorder-cycles* 2)`.
+- `tech/reachability.lisp` — symmetric `reach-via` positional permission, with vertical
+  reach independently bounding manipulation from either side.
+- `probs/problem-rumin-topo.lisp` — `location17` at (18 5); elevation 2 as the third
+  coordinate of `location15` and `location16`; `(has-height edge5 2)`; `(reach-via
+  location15 () location14)`; `(ww-set *max-recorder-cycles* 2)`.
 
 ## Working agreements
 

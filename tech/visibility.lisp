@@ -62,10 +62,11 @@
 ;;; elevation directly and needs no coordinates.
 ;;;
 ;;; REQUIRES:
-;;;   types     : location  --  gate, transmitter, receiver, and apparatus are declared
-;;;               optional/composite here through nested -visibility
-;;;   nested    : -visibility (apparatus and the null-default visible/beam-visible
-;;;               interface); -gate (gate optional type, (open gate) relation);
+;;;   types     : location  --  gate, transmitter, receiver, both repeater leaves, and gun
+;;;               are declared optional through nested -visibility
+;;;   nested    : -visibility (repeater composite, optional point-apparatus leaf types, and
+;;;               the null-default visible/beam-visible interface); -gate (gate optional
+;;;               type, (open gate) relation);
 ;;;               -beam-los-coordinates (LOS-ENDPOINT; APPARATUS-COORDS>, the segment
 ;;;               relations, *BOUNDARY-WALL-HEIGHT*, DERIVE-LOS-FROM-SEGMENTS, live
 ;;;               BEAM-COORDINATES-ELEVATION-AT); -beam-interpolation (the sloped-beam

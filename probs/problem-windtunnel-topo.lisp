@@ -14,7 +14,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 16)
+(ww-set *depth-cutoff* 16)  ;18 if ghost-stops-recorder
 
 (ww-set *progress-reporting-interval* 3000000)
 
@@ -32,7 +32,7 @@
   transmitter     (transmitter1)
   receiver        (receiver1)
   toggle-plate    (plate1)
-  wall-blower     (wgears1)
+  wall-blower     (blower1)
   hue             (blue)  ;the hue of a transmitter, receiver, repeater, or active connector
   location        (location1 location2 location3 location4 location5 location6))
 
@@ -48,7 +48,6 @@
 (include-tech visibility)
 (include-tech walkability)
 (include-tech recorder)
-(include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
 ;;;; INITIALIZATION ;;;;
@@ -72,7 +71,7 @@
   (location-coords> location6 9 8)
 
   ;; Fixed-position objects
-  (has-position wgears1 location3)
+  (has-position blower1 location3)
   (has-position plate1 location2)
   (has-position recorder1 location1)
 
@@ -81,16 +80,16 @@
   (apparatus-coords> receiver1 21 1/10)
   (apparatus-coords> repeater1 3 8)
   (controls ((plate1)) gate1 normal)
-  (controls ((plate1)) wgears1 normal)
+  (controls ((plate1)) blower1 normal)
   (controls ((receiver1)) gate2 normal)
-  (aimed-at wgears1 location6)
+  (aimed-at blower1 location6)
   (gate-segment> gate1 12 21 12 17)
   (gate-segment> gate2 17 6 17 0)
   (wall-segment> wall1 12 6 19 6)
   (wall-segment> wall2 12 0 12 6)
   (has-chroma transmitter1 blue)
   (has-chroma receiver1 blue)
-  (stream-width wgears1 4)
+  (stream-width blower1 4)
 
   (boundary-wall
     ((0 21) (19 21) (19 17) (12 17) (12 10) (23 10) (23 0) (0 0) (0 21)
@@ -110,6 +109,8 @@
 
 
 (define-goal
+  ;; Leave GHOST-STOPS-RECORDER commented for immediate satisfaction with a final open
+  ;; recording; enable it to test the explicit ghost return and STOP-RECORDER ending.
   (and (has-location agent1 location5)
        ;(ghost-stops-recorder)
   )

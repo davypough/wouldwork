@@ -1,7 +1,7 @@
 ;;; Dedicated zero-action regression for the shared -visibility substrate.
 ;;;
-;;; One instance of every optional apparatus/gate leaf characterizes the exact
-;;; REPEATER and APPARATUS unions.  The goal calls each neutral visibility hook
+;;; One instance of every optional point-apparatus/gate leaf characterizes the REPEATER
+;;; union and the leaf-normal query domains.  The goal calls each neutral visibility hook
 ;;; across every valid target shape and several endpoint elevations; every call
 ;;; must remain false until public visibility overrides the hooks.  It also
 ;;; verifies that the public LOS/coordinate relations, helper queries,
@@ -44,16 +44,10 @@
 
 (define-test-claim visibility-substrate-schema
   (expect-type-absent 'fixture)
+  (expect-type-absent 'apparatus)
   (expect-type-components 'repeater '(floor-repeater wall-repeater))
-  (expect-type-components
-    'apparatus
-    '(transmitter receiver floor-repeater wall-repeater gun))
   (expect-type-instances
     'repeater '(sample-floor-repeater sample-wall-repeater))
-  (expect-type-instances
-    'apparatus
-    '(sample-transmitter sample-receiver
-      sample-floor-repeater sample-wall-repeater sample-gun))
   (expect-relations :static '())
   (expect-relations :dynamic '(inconsistent-state))
   (expect-registered :query 'visible)
@@ -78,7 +72,14 @@
 
 
 (define-query visibility-substrate-apparatus-type-valid
-    (?object apparatus)
+    (?object (either transmitter receiver floor-repeater wall-repeater gun))
+  (do
+    ?object
+    t))
+
+
+(define-query visibility-substrate-repeater-type-valid
+    (?object repeater)
   (do
     ?object
     t))
@@ -95,7 +96,7 @@
 
 
 (define-query visibility-substrate-apparatus-neutral
-    (?object apparatus)
+    (?object (either transmitter receiver floor-repeater wall-repeater gun))
   (and
     (not (visible near-site ?object))
     (not (visible-for-object nil near-site ?object))
@@ -137,6 +138,10 @@
     (visibility-substrate-apparatus-type-valid sample-floor-repeater)
     (visibility-substrate-apparatus-type-valid sample-wall-repeater)
     (visibility-substrate-apparatus-type-valid sample-gun)
+
+    ;; REPEATER is useful as a direct parameter type, not as a member of another EITHER.
+    (visibility-substrate-repeater-type-valid sample-floor-repeater)
+    (visibility-substrate-repeater-type-valid sample-wall-repeater)
 
     ;; Every valid apparatus shape exercises both equal and unequal elevations.
     (visibility-substrate-apparatus-neutral sample-transmitter)

@@ -1,7 +1,8 @@
 ;;; Filename: problem-terrain-consistency-test.lisp
 
-;;; Dedicated regression for the -terrain-consistency substrate: the three cross-checks
-;;; that hold authored levels against the walking arrangement -walkability-coordinates
+;;; Dedicated regression for WALKABILITY's automatic terrain edge-span invariant and the
+;;; two stronger connectivity policies TEST-TOPO applies to complete topology specs.  All
+;;; three hold authored levels against the walking arrangement -walkability-coordinates
 ;;; derives.  The map has three compartments, each exercising one outcome:
 ;;;
 ;;;   1. GROUND1/GROUND2 at level 0, west of EDGE1, and SLAB1/SLAB2 at level 3/2 east of
@@ -65,7 +66,6 @@
 ;;;; TECHNOLOGY INCLUDE ;;;;
 
 
-(include-tech -terrain-consistency)
 (include-tech floor-gears)
 (include-tech walkability)
 (include-tech stairs)
@@ -180,6 +180,14 @@
   ;; The map as authored raises nothing, through the live seam rather than a stand-in.
   (null (funcall (symbol-function 'terrain-complaints)
                  *start-state* (terrain-test-arrangement)))
+
+  ;; The live seam is intentionally narrower than the complete topology policy.  A focused
+  ;; walking model may contain disconnected level groups, but a *-TOPO review may not.
+  (null (terrain-arrangement-invariant-complaints
+          (terrain-test-arrangement) nil nil (terrain-test-drifted-levels)))
+  (search "GROUND2"
+          (first (terrain-arrangement-policy-complaints
+                   (terrain-test-arrangement) nil (terrain-test-drifted-levels))))
 
   ;; EDGE1's intervals name exactly one step, 0 up to 3/2, and its authored span matches.
   (equal (terrain-edge-steps (terrain-test-arrangement)
