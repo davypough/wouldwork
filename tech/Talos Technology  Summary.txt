@@ -7,7 +7,7 @@ angled-gears
 angled-blower
 box
 connector
-crossing  ;a crossing is where two beams intersect
+crossing  ;a proper intersection of two projected 2D beam paths; beam-beam interference is planar
 edge  ;a finite-height vertical surface separating elevations; blocks walking like a wall but is not vaultable
 fan
 floor-gears

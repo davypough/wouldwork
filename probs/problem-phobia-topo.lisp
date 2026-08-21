@@ -80,7 +80,6 @@
   (has-location jammer1 location1)
   (has-location connector1 location6)
   (has-location connector2 location3)
-  (has-location fan1 location2)
 
   ;; Fixed-position objects
   (has-position fgears1 location10)
@@ -117,8 +116,9 @@
   (has-chroma receiver1 red)
   (has-chroma receiver2 red)
   (mounted-on fan1 wgears1)
-  ;; The other three wall blowers are fixed combined units; only fan1 is removable and
-  ;; can be ferried to fgears1.
+  ;; A wall-mounted fan has no HAS-LOCATION until it is picked up and later put down or
+  ;; mounted on floor gears.  The other three wall blowers are fixed combined units;
+  ;; only fan1 is removable and can be ferried to fgears1.
 
   ;; Air stream blowing destination
   (aimed-at wgears1 location1)

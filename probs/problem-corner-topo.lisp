@@ -2,16 +2,16 @@
 
 ;;; Companion to problem-corner.lisp: same puzzle and geometry, but nothing here is
 ;;; hand-authored topology anymore.  tech/-beam-los-coordinates.lisp's DERIVE-LOS-FROM-
-;;; SEGMENTS derives LOS-TO-APPARATUS/LOS-TO-LOCATION; tech/-beam-crossing-
+;;; SEGMENTS derives LOS-VIA; tech/-beam-crossing-
 ;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-BEAM-CROSSINGS-BEFORE-GATE mint the
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
-;;; tech/-walkability-coordinates.lisp's DERIVE-WALK-VIA-FROM-SEGMENTS derives WALK-VIA --
-;;; all from the raw segment geometry below (same shape as problem-corner.lisp's).  The two
-;;; beam derivations read the authored WALL-SEGMENT>/GATE-SEGMENT> facts and BOUNDARY-WALL
-;;; (this problem has no EDGE-SEGMENT> facts); WINDOW-SEGMENT> is
-;;; consulted only by WALK-VIA's, which uses side-of-partition-line classification rather
-;;; than beam intersection -- walking connectivity is a zone-adjacency question, not a
-;;; sightline one (see that file's header for why).
+;;; tech/-walkability-coordinates.lisp's DERIVE-WALKING-FROM-SEGMENTS derives walking
+;;; TRAVERSAL-VIA facts -- all from the raw segment geometry below (same shape as
+;;; problem-corner.lisp's).  The two beam derivations read the authored
+;;; WALL-SEGMENT>/GATE-SEGMENT> facts and BOUNDARY-WALL (this problem has no EDGE-SEGMENT>
+;;; facts); WINDOW-SEGMENT> is consulted only by the walking derivation, whose
+;;; side-of-partition-line classification reflects that walking connectivity is a
+;;; zone-adjacency question, not a sightline one (see that file's header for why).
 ;;;
 ;;; location4 is deliberately moved to (6,8) here (problem-corner.lisp keeps it at (7,8));
 ;;; this is an intentional test-fixture divergence, not a correction.  The wall1/gate1 split
@@ -79,7 +79,7 @@
 ;;;; identity reach, so pickup/connect require the agent's own location exactly as in
 ;;;; corner-topo.  Including the full reachability technology would override that default
 ;;;; and add reach-via edges, but this problem has none.  beam-crossing nests in
-;;;; -beam-coordinates automatically, which (together with -location-coordinates, nested
+;;;; -beam-crossing-coordinates automatically, which (together with -location-coordinates, nested
 ;;;; there too) is what turns the position facts below into CROSSINGS-ALONG-BEAM>.
 
 
@@ -87,7 +87,7 @@
 (include-tech beam-relay)            ;paired; color; pickup/put/connect connector actions
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
 (include-tech walkability)          ;walking mode; mobility-results; traversable; one-step-walkable; move
-(include-tech visibility)            ;los-via; los-via; visible; visible-clear
+(include-tech visibility)            ;los-via; visible; visible-clear
 (include-tech -terrain-consistency)  ;holds the authored levels against the derived zones
 
 
@@ -113,10 +113,11 @@
 
   ;; Boundary wall.  The repeated final point explicitly closes the polygon.  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS retains each polygon crossing, so ordinary low sight outside
-  ;; this silhouette is blocked exactly like an internal wall segment.  Not
-  ;; currently consulted by walkability's own coordinate derivation.  This
-  ;; rectangle fully encloses the map and is convex, so it's functionally inert here (a
-  ;; straight line between two interior points of a convex boundary wall can never cross it).
+  ;; this silhouette is blocked exactly like an internal wall segment.  The walking
+  ;; derivation also uses the polygon as its outer solid boundary.  Because this rectangle
+  ;; is convex and every authored location lies inside it, it introduces no internal
+  ;; walking partition; likewise, a straight sightline between two interior points cannot
+  ;; cross it.
   (boundary-wall
     ((0 0) (12 0) (12 11) (0 11) (0 0)))
 
@@ -134,10 +135,10 @@
   (window-segment> window1 8 8 8 11)
 
   ;; Exact 2D endpoint coordinates, split between LOCATION-COORDS> (locations; shared
-  ;; with walkability-tech's own coordinate needs -- see tech/-location-coordinates.lisp)
+  ;; with walkability.lisp's own coordinate needs -- see tech/-location-coordinates.lisp)
   ;; and APPARATUS-COORDS> (transmitter/receiver only).  tech/-beam-los-coordinates.lisp's
   ;; DERIVE-LOS-FROM-SEGMENTS uses these together with the wall/gate segments above to
-  ;; derive LOS-TO-APPARATUS/LOS-TO-LOCATION, and ESTABLISH-BEAM-COORDINATES uses them again
+  ;; derive LOS-VIA, and ESTABLISH-BEAM-COORDINATES uses them again
   ;; for CROSSINGS-ALONG-BEAM>, before search begins; the coordinates themselves drive
   ;; nothing thereafter.  location4 is at (6,8) here -- a deliberate divergence from
   ;; problem-corner.lisp's (7,8); see file header.

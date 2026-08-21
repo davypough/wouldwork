@@ -155,11 +155,57 @@
     :check 'physical-state-init-check)
   (null
     (validate-init-literals
-      '((holding bearer-agent cascade-tray)
+      '((has-location bearer-agent cascade-origin)
+        (holding bearer-agent cascade-tray)
         (has-location cascade-tray cascade-origin)
         (has-location cascade-box cascade-origin)
         (on cascade-box cascade-tray))
       :checks '(physical-state-init-check))))
+
+
+(define-test-claim held-tray-physical-consistency
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location bearer-agent cascade-origin)
+          (holding bearer-agent cascade-tray))
+        :checks '(physical-state-init-check)))
+    'init-check-failure
+    :containing "held tray has no HAS-LOCATION"
+    :check 'physical-state-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location bearer-agent cascade-origin)
+          (holding bearer-agent cascade-tray)
+          (has-location cascade-tray cascade-destination))
+        :checks '(physical-state-init-check)))
+    'init-check-failure
+    :containing "held tray location does not match its holder location"
+    :check 'physical-state-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location bearer-agent cascade-origin)
+          (holding bearer-agent cascade-tray)
+          (has-location cascade-tray cascade-origin)
+          (has-position put-plate cascade-origin)
+          (on cascade-tray put-plate))
+        :checks '(physical-state-init-check)))
+    'init-check-failure
+    :containing "both held and resting ON a support"
+    :check 'physical-state-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location bearer-agent cascade-origin)
+          (holding bearer-agent cascade-tray)
+          (has-location cascade-tray cascade-origin)
+          (on bearer-agent cascade-tray))
+        :checks '(physical-state-init-check)))
+    'init-check-failure
+    :containing "held tray supports its own holder"
+    :check 'physical-state-init-check))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;

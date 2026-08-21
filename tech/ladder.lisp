@@ -22,6 +22,7 @@
 ;;;   types     : ladder  --  declared optional; the two declarations resolve compatibly
 ;;;   mode      : climbing, registered with -traversal
 ;;;   queries   : usable-ladder-at-source, positioned-ladders-for-means
+;;;   init      : ladder-init-check
 ;;;   action    : move (from -mobility-action)
 
 (include-tech -position)
@@ -74,3 +75,41 @@
 
 (register-traversal-mode 'climbing 'ladder-segment-for-clause
                          '(gate screen ladder))
+
+
+;;;; INITIALIZATION VALIDATION ;;;;
+
+
+(define-init-check ladder-init-check (literals)
+  (:consumes ladder)
+  (check-init-climbing-edges literals))
+
+
+(define-init-check-helper check-init-climbing-edges (literals)
+  "Require every climb to use the directed relation and every alternative clause to name
+   at least one ladder fixed at that edge's source.  A symmetric climb is misleading: the
+   ladder's functional HAS-POSITION can make it usable from only one endpoint.  A clause
+   without a source-positioned ladder can never produce a segment."
+  (dolist (literal
+            (positive-init-literals-with-relation 'traversal-via literals))
+    (when (eql (second (init-literal-proposition literal)) 'climbing)
+      (fail-init-check literal
+        "Climbing traversal must be directed.  Use TRAVERSAL-VIA> with the ladder's location as the source.")))
+  (dolist (literal
+            (positive-init-literals-with-relation 'traversal-via> literals))
+    (destructuring-bind (mode source family destination)
+        (rest (init-literal-proposition literal))
+      (declare (ignore destination))
+      (when (eql mode 'climbing)
+        (dolist (clause (if family family (list nil)))
+          (unless (some (lambda (item)
+                          (and (init-type-member-p item 'ladder)
+                               (some (lambda (position-literal)
+                                       (equal (init-literal-proposition position-literal)
+                                              `(has-position ,item ,source)))
+                                     (positive-init-literals-with-relation
+                                       'has-position literals))))
+                        clause)
+            (fail-init-check literal
+              "Climbing clause ~S has no listed ladder positioned at its source ~S."
+              clause source)))))))

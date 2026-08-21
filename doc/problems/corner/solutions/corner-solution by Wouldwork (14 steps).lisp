@@ -1,4 +1,9 @@
 ;;;; WOULDWORK SOLUTION around the corner
+;;;;
+;;;; LEGACY TRACE: captured from the pre-technology problem-corner.lisp model.  LOC and the
+;;;; CONNECT-TO-N-TERMINUS action family are not current tech syntax and this form cannot be
+;;;; replayed against problem-corner-topo.lisp.  It remains historical solution evidence;
+;;;; the current model uses HAS-LOCATION/ON, CONNECT-CONNECTOR, and route-bearing MOVE.
 
 (1.0 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 AREA1))
 (2.0 (MOVE AGENT1 AREA1 AREA2))

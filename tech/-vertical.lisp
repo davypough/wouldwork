@@ -96,8 +96,10 @@
    registers as its third coordinate's default, for the same reason -- the relation lets a
    problem write the level inline, and this table supplies it when the problem carries no
    coordinates at all.  The types are disjoint leaves, so an object matches at most one
-   entry and the order is presentational only.  A problem overrides any height for an
-   individual object with HAS-HEIGHT, and any base with the coordinates or HAS-ELEVATION.
+   entry and the order is presentational only.  A problem overrides a HEIGHTED-OBJECT's
+   height with HAS-HEIGHT, and an ELEVATED-OBJECT's fixed base with coordinates or
+   HAS-ELEVATION.  Other types intentionally keep the table's fixed height or derive their
+   base structurally.
    A height on a non-vertical axis is DESCRIPTIVE ONLY: TOP ignores it, and every other
    OBJECT-HEIGHT consumer takes an argument type that admits no such object, so the number
    records the object's shape without entering any computation.  See repeater.lisp for the

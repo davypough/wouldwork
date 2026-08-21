@@ -2,8 +2,8 @@
 
 ;;; Location-coordinates substrate: the fixed 2D placement of a location, as its own
 ;;; capability independent of walking, beams, or anything else.  Owns LOCATION-COORDS>
-;;; so that walkability-tech's own coordinate-driven WALK-VIA derivation and beam-
-;;; crossing-tech's -beam-coordinates substrate share one source of truth for where each
+;;; so that -walkability-coordinates' coordinate-driven walking TRAVERSAL-VIA derivation
+;;; and the beam-coordinate substrates share one source of truth for where each
 ;;; location is, without either technology depending on the other.  A problem that only
 ;;; needs walking between locations, with no transmitters/receivers/connectors, never
 ;;; needs to know beam-crossing exists; a problem using both capabilities enters each
@@ -22,6 +22,8 @@
 ;;;   relation  : (location-coords> location $rational $rational $rational)  --  z optional,
 ;;;               defaulting to 0
 ;;;   init      : location-coordinates-init-check
+;;;   init helpers: init-location-xy-map, init-location-level-map -- shared raw-coordinate
+;;;                 lookups for other checks
 
 (in-package :ww)
 
@@ -35,6 +37,32 @@
 
 (define-init-check location-coordinates-init-check (literals)
   (check-init-location-level-agreement literals))
+
+
+(define-init-check-helper init-location-xy-map (literals)
+  "Map every positively authored location to its horizontal coordinate pair."
+  (let ((map (make-hash-table :test #'eql)))
+    (dolist (literal (positive-init-literals-with-relation 'location-coords> literals) map)
+      (destructuring-bind (location x y z)
+          (rest (init-literal-proposition literal))
+        (declare (ignore z))
+        (setf (gethash location map) (list x y))))))
+
+
+(define-init-check-helper init-location-level-map (literals)
+  "Map every location with a positively authored level to that level.  Coordinates take
+   precedence over HAS-ELEVATION, matching BASE; the owning consistency check rejects a
+   disagreement when both are present."
+  (let ((map (make-hash-table :test #'eql)))
+    (dolist (literal (positive-init-literals-with-relation 'has-elevation literals))
+      (destructuring-bind (object level) (rest (init-literal-proposition literal))
+        (when (init-type-member-p object 'location)
+          (setf (gethash object map) level))))
+    (dolist (literal (positive-init-literals-with-relation 'location-coords> literals) map)
+      (destructuring-bind (location x y z)
+          (rest (init-literal-proposition literal))
+        (declare (ignore x y))
+        (setf (gethash location map) z)))))
 
 
 (define-init-check-helper check-init-location-level-agreement (literals)

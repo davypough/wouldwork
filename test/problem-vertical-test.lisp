@@ -58,6 +58,9 @@
   jammer (ground-jammer)
   connector (ground-connector box-connector tray-connector)
   pressure-plate (site-plate)
+  toggle-plate (site-toggle-plate)
+  floor-blower (site-floor-blower)
+  angled-blower (site-angled-blower)
   gate (default-gate explicit-gate)
   screen (default-screen)
   wall (default-wall)
@@ -92,8 +95,12 @@
   (has-height explicit-wall-repeater 7)
   (has-elevation explicit-transmitter 7)
 
-  ;; The positioned route: a plate lies flush on the floor it is positioned at.
+  ;; The positioned route: plates and fixed floor/angled blowers lie flush on the floor
+  ;; where they are positioned.
   (has-position site-plate raised-site)
+  (has-position site-toggle-plate raised-site)
+  (has-position site-floor-blower raised-site)
+  (has-position site-angled-blower raised-site)
 
   ;; The three achievable connector anchor heights, gathered at RAISED-SITE.  Every
   ;; movable occupant keeps its ordinary location fact while resting on a support, so
@@ -127,6 +134,9 @@
     (= (object-height held-tray) 0)
     (= (object-height ground-fan) 0)
     (= (object-height site-plate) 0)
+    (= (object-height site-toggle-plate) 0)
+    (= (object-height site-floor-blower) 0)
+    (= (object-height site-angled-blower) 0)
     (= (object-height default-gate) 4)
     (= (object-height default-screen) 4)
     (= (object-height default-wall) 4)
@@ -171,6 +181,12 @@
     ;; HAS-POSITION resolves through the location it names.
     (= (base site-plate) 2)
     (= (top site-plate) 2)
+    (= (base site-toggle-plate) 2)
+    (= (top site-toggle-plate) 2)
+    (= (base site-floor-blower) 2)
+    (= (top site-floor-blower) 2)
+    (= (base site-angled-blower) 2)
+    (= (top site-angled-blower) 2)
 
     ;; HAS-LOCATION resolves through the location's own level.
     (= (base ground-agent) 0)

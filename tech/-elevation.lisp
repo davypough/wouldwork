@@ -2,7 +2,8 @@
 
 ;;; Elevation substrate: the authored base level of an object that carries no coordinate
 ;;; relation of its own -- a segment fixture (gate, screen, wall, edge), a floor repeater,
-;;; or anything at all in a problem with no coordinate geometry.  Default 0.
+;;; or another ELEVATED-OBJECT in a problem with no coordinate geometry.  Default depends
+;;; on the object's vertical role.
 ;;;
 ;;; A location's level is LOCATION-COORDS>'s optional third coordinate and a wall-mounted
 ;;; fixture's is APPARATUS-COORDS>'s; both cross-check against HAS-ELEVATION rather than

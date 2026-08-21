@@ -15,9 +15,15 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -support-elevation (support occupancy, location, position, height,
-;;;               elevation, top, base, and
-;;;               within-agent-placement-reach); -holding (cargo, holding)
+;;;   nested    : -vertical (top, location-elevation); -support-elevation
+;;;               (within-agent-placement-reach); -support-occupancy
+;;;               (support, on, cleartop); -location (has-location);
+;;;               -position (has-position); -holding (cargo, holding);
+;;;               -interaction-policy (object-manipulation-allowed,
+;;;               support-use-allowed)
+;;;   conditional relation:
+;;;               mounted-on (-gears-fan), guarded by a DOALL over optional FAN;
+;;;               a problem with fans must include a gears/fan technology
 ;;; PROVIDES:
 ;;;   queries   : placement-choice-allowed -- shared policy gate used by both option
 ;;;               generation and the placement update
@@ -30,8 +36,13 @@
 ;;;               unloads it first when it is a tray, and rests it on ?place unless
 ;;;               ?place is 'ground
 
+(include-tech -vertical)
 (include-tech -support-elevation)
+(include-tech -support-occupancy)
+(include-tech -location)
+(include-tech -position)
 (include-tech -holding)
+(include-tech -interaction-policy)
 
 (in-package :ww)
 

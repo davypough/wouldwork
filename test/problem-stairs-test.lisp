@@ -131,7 +131,7 @@
 
 (define-query stairs-scenarios-valid ()
   (and
-    ;; STAIRS-VIA is symmetric; STAIRS-VIA> is not.
+    ;; TRAVERSAL-VIA in stairway mode is symmetric; TRAVERSAL-VIA> is not.
     (traversable main-agent stairs-foot stairs-top)
     (traversable main-agent stairs-top stairs-foot)
     (traversable main-agent directional-low directional-high)

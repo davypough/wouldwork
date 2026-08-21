@@ -10,14 +10,18 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -placement (holding, base, within-agent-vertical-reach);
-;;;               -reachability (reachable); -interaction-policy arrives through
-;;;               -placement's support substrate (object-manipulation-allowed)
+;;;   nested    : -vertical (base); -support-elevation
+;;;               (within-agent-vertical-reach); -holding (cargo, holding);
+;;;               -interaction-policy (object-manipulation-allowed);
+;;;               -reachability (reachable)
 ;;; PROVIDES:
 ;;;   query     : pickup-clear  --  true when ?agent, currently at ?a-location, may
 ;;;               pick up ?object, currently at ?object-location
 
-(include-tech -placement)
+(include-tech -vertical)
+(include-tech -support-elevation)
+(include-tech -holding)
+(include-tech -interaction-policy)
 (include-tech -reachability)
 
 (in-package :ww)

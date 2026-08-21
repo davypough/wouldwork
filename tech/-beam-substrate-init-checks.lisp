@@ -42,7 +42,7 @@
 
 (define-init-check-helper init-chroma-map (literals)
   (let ((chromas (make-hash-table :test #'equal)))
-    (dolist (literal (init-literals-with-relation 'has-chroma literals))
+    (dolist (literal (positive-init-literals-with-relation 'has-chroma literals))
       (destructuring-bind (endpoint hue)
           (rest (init-literal-proposition literal))
         (setf (gethash endpoint chromas) hue)))
@@ -55,7 +55,7 @@
               (rest (init-literal-proposition literal))
             (and (eql source coupled-source)
                  (eql destination coupled-destination))))
-        (init-literals-with-relation 'coupled literals)))
+        (positive-init-literals-with-relation 'coupled literals)))
 
 
 (define-init-check-helper init-beam-via-p (source destination literals)
@@ -65,13 +65,13 @@
             (declare (ignore obstacles))
             (and (eql source beam-source)
                  (eql destination beam-destination))))
-        (init-literals-with-relation 'beam-via literals)))
+        (positive-init-literals-with-relation 'beam-via literals)))
 
 
 (define-init-check-helper check-init-coupled-beam-consistency (literals)
   "Checks directional fixed-apparatus beam declarations and their corridors."
   (let ((chromas (init-chroma-map literals)))
-    (dolist (literal (init-literals-with-relation 'coupled literals))
+    (dolist (literal (positive-init-literals-with-relation 'coupled literals))
       (destructuring-bind (source destination)
           (rest (init-literal-proposition literal))
         (let ((source-hue (gethash source chromas))
@@ -101,7 +101,7 @@
                     Literal:       ~S~%~
                     Expected beam: (BEAM-VIA ~S ... ~S)"
                    literal source destination))))))
-  (dolist (literal (init-literals-with-relation 'beam-via literals))
+  (dolist (literal (positive-init-literals-with-relation 'beam-via literals))
     (destructuring-bind (source obstacles destination)
         (rest (init-literal-proposition literal))
       (declare (ignore obstacles))
@@ -110,4 +110,3 @@
                 Literal:        ~S~%~
                 Expected pair:  (COUPLED ~S ~S)"
                literal source destination)))))
-

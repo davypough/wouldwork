@@ -90,8 +90,8 @@
 ;;;; repeater brings in beam-direct, beam-relay, and visibility together.  visibility is
 ;;;; required even though this problem has no sightlines: beam-crossing nests
 ;;;; -beam-crossing-coordinates, which nests -beam-los-coordinates, whose
-;;;; DERIVE-LOS-FROM-SEGMENTS references LOS-TO-APPARATUS/LOS-TO-LOCATION -- relations
-;;;; only visibility declares.  It stays inert here since no segment-barrier geometry is authored.
+;;;; DERIVE-LOS-FROM-SEGMENTS references LOS-VIA -- a relation only visibility declares.
+;;;; It stays inert here since no segment-barrier geometry is authored.
 
 
 (include-tech repeater)

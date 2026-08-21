@@ -104,6 +104,50 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
+(define-test-claim visibility-authoring-validation
+  (null
+    (validate-init-literals
+      '((los-via clear-left (open-gate1) clear-right))
+      :checks '(visibility-init-check)))
+  ;; Explicitly absent topology is ignored by positive sightline validation.
+  (null
+    (validate-init-literals
+      '((not (los-via clear-left (clear-left clear-left) clear-left)))
+      :checks '(visibility-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((los-via clear-left () clear-left))
+        :checks '(visibility-init-check)))
+    'init-check-failure
+    :containing "same near and far endpoint"
+    :check 'visibility-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((los-via clear-left (open-gate1 open-gate1) clear-right))
+        :checks '(visibility-init-check)))
+    'init-check-failure
+    :containing "repeats an occluder"
+    :check 'visibility-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((los-via clear-left (clear-left) clear-right))
+        :checks '(visibility-init-check)))
+    'init-check-failure
+    :containing "as its own intervening occluder"
+    :check 'visibility-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((los-via clear-left (clear-right) clear-right))
+        :checks '(visibility-init-check)))
+    'init-check-failure
+    :containing "as its own intervening occluder"
+    :check 'visibility-init-check))
+
+
 (define-query visibility-scenarios-valid ()
   (and
     (open open-gate1)

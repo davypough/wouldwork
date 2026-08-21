@@ -74,6 +74,70 @@
                literal object)))))
 
 
+(define-init-check-helper init-check-held-tray-location-consistency (literals locations)
+  "Require a held tray's retained location to match its holder's location."
+  (dolist (literal (positive-init-literals-with-relation 'holding literals))
+    (destructuring-bind (holder object)
+        (rest (init-literal-proposition literal))
+      (when (init-type-member-p object 'tray)
+        (let ((holder-location (gethash holder locations))
+              (tray-location (gethash object locations)))
+          (unless holder-location
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT gives a tray to a holder with no HAS-LOCATION.~%~
+               Holder: ~S~%Tray:   ~S"
+              holder object))
+          (unless tray-location
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT held tray has no HAS-LOCATION.~%~
+               Holder: ~S at ~S~%Tray:   ~S"
+              holder holder-location object))
+          (unless (eql holder-location tray-location)
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT held tray location does not match its holder location.~%~
+               Holder: ~S at ~S~%Tray:   ~S at ~S"
+              holder holder-location object tray-location)))))))
+
+
+(define-init-check-helper init-check-held-object-not-on
+    (literal object support held-objects)
+  (when (gethash object held-objects)
+    (fail-init-check
+      literal
+      "~%DEFINE-INIT object is both held and resting ON a support.~%~
+       Object:  ~S~%Support: ~S"
+      object support)))
+
+
+(define-init-check-helper init-check-held-tray-does-not-support-holder
+    (literal holder tray on-map)
+  "Reject a held tray anywhere below its own holder's ON chain."
+  (let ((current holder))
+    (loop
+      (let ((support (gethash current on-map)))
+        (unless support
+          (return))
+        (when (eql support tray)
+          (fail-init-check
+            literal
+            "~%DEFINE-INIT held tray supports its own holder.~%~
+             Holder: ~S~%Tray:   ~S"
+            holder tray))
+        (setf current support)))))
+
+
+(define-init-check-helper init-check-held-tray-support-cycles (literals on-map)
+  (dolist (literal (positive-init-literals-with-relation 'holding literals))
+    (destructuring-bind (holder object)
+        (rest (init-literal-proposition literal))
+      (when (init-type-member-p object 'tray)
+        (init-check-held-tray-does-not-support-holder
+          literal holder object on-map)))))
+
+
 (define-init-check-helper init-check-support-has-one-object (literal object support support-occupants)
   (let ((occupant (gethash support support-occupants)))
     (when occupant
@@ -137,6 +201,7 @@
         (held-objects (init-held-objects literals))
         (support-occupants (make-hash-table :test #'equal)))
     (init-check-object-not-held-and-has-location literals locations)
+    (init-check-held-tray-location-consistency literals locations)
     (dolist (literal (init-binary-on-literals literals))
       (destructuring-bind (object support)
           (rest (init-literal-proposition literal))
@@ -147,11 +212,13 @@
                     Literal: ~S~%~
                     Object:  ~S"
                    literal object))
+          (init-check-held-object-not-on
+            literal object support held-objects)
           (init-check-tray-support-held literal support held-objects)
           (when location-consistency-required-p
             (init-check-support-has-one-object
               literal object support support-occupants)
             (init-check-on-location-consistency
               literal object support locations positions)))
-        (init-check-on-cycle literal object on-map)))))
-
+        (init-check-on-cycle literal object on-map)))
+    (init-check-held-tray-support-cycles literals on-map)))

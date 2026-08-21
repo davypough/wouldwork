@@ -45,9 +45,10 @@
          angled-mounting-agent wall-mounting-agent)
   location (placing-site floor-pickup-site
             wall-pickup-site wall-pickup-fixture-site
-            angled-mounting-site
-            wall-mounting-site wall-mounting-fixture-site
-            remote-site unused-destination)
+             angled-mounting-site
+             wall-mounting-site wall-mounting-fixture-site
+             remote-site unused-destination unused-destination2
+             unused-destination3 unused-destination4 unused-destination5)
   pressure-plate (placement-plate off-plate)
   box (occupant-box)
   floor-gears (floor-pickup-gears occupied-fan-gears
@@ -90,12 +91,13 @@
   (has-position placement-plate placing-site)
 
   ;; Every gears set has a harmless fixed stream destination, satisfying the blower
-  ;; topology without placing any occupant in an air stream.
+  ;; topology without placing any occupant in an air stream.  Floor drives use distinct
+  ;; destinations because each hover point has exactly one drop-back source.
   (aimed-at floor-pickup-gears unused-destination)
-  (aimed-at fixed-floor-blower unused-destination)
-  (aimed-at occupied-fan-gears unused-destination)
-  (aimed-at occupied-gears unused-destination)
-  (aimed-at remote-gears unused-destination)
+  (aimed-at fixed-floor-blower unused-destination2)
+  (aimed-at occupied-fan-gears unused-destination3)
+  (aimed-at occupied-gears unused-destination4)
+  (aimed-at remote-gears unused-destination5)
   (aimed-at wall-pickup-gears unused-destination)
   (aimed-at wall-mounting-gears unused-destination)
   (aimed-at high-wall-gears unused-destination)
@@ -162,6 +164,81 @@
   (let ((action (find action-name *actions* :key #'action.name)))
     (and (member args (get-precondition-args action state) :test #'equal)
          (apply (action.pre-defun-name action) state args))))
+
+
+;;;; INITIALIZATION VALIDATION ;;;;
+
+
+(define-test-helper gears-fan-valid-mounting-literals ()
+  '((has-position floor-pickup-gears floor-pickup-site)
+    (has-location floor-pickup-fan floor-pickup-site)
+    (mounted-on floor-pickup-fan floor-pickup-gears)
+    (has-position wall-pickup-gears wall-pickup-fixture-site)
+    (mounted-on wall-pickup-fan wall-pickup-gears)))
+
+
+(define-test-claim gears-fan-mounting-validation
+  (null
+    (validate-init-literals
+      (gears-fan-valid-mounting-literals)
+      :checks '(gears-fan-mounting-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (remove '(has-location floor-pickup-fan floor-pickup-site)
+                (gears-fan-valid-mounting-literals)
+                :test #'equal)
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "must have HAS-LOCATION"
+    :check 'gears-fan-mounting-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (substitute '(has-location floor-pickup-fan remote-site)
+                    '(has-location floor-pickup-fan floor-pickup-site)
+                    (gears-fan-valid-mounting-literals)
+                    :test #'equal)
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "does not match its drive location"
+    :check 'gears-fan-mounting-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (cons '(has-location wall-pickup-fan wall-pickup-fixture-site)
+              (gears-fan-valid-mounting-literals))
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "wall-mounted fan must not have HAS-LOCATION"
+    :check 'gears-fan-mounting-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append (gears-fan-valid-mounting-literals)
+                '((mounted-on angled-mounting-fan floor-pickup-gears)))
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "mounts multiple fans on one blower drive"
+    :check 'gears-fan-mounting-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (cons '(holding wall-pickup-agent wall-pickup-fan)
+              (gears-fan-valid-mounting-literals))
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "both held and mounted"
+    :check 'gears-fan-mounting-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (cons '(on floor-pickup-fan placement-plate)
+              (gears-fan-valid-mounting-literals))
+        :checks '(gears-fan-mounting-init-check)))
+    'init-check-failure
+    :containing "both mounted and resting ON a support"
+    :check 'gears-fan-mounting-init-check))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;

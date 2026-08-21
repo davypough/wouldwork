@@ -23,13 +23,15 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -support-occupancy ((on ...), cleartop); -location ((has-location ...));
-;;;               -position ((has-position ...)); -elevation ((has-elevation ...),
-;;;               location-elevation); -controls ((controls ...), energized);
+;;;   nested    : -vertical (top, location-elevation); -propagation (derived-state driver);
+;;;               -support-occupancy ((on ...), cleartop); -location ((has-location ...));
+;;;               -position ((has-position ...)); -elevation ((has-elevation ...));
+;;;               -controls (control-on; its controls relation accepts every drive type);
 ;;;               -placement (placement-options, place-held-object!; nests
 ;;;               -support-elevation and -holding); -reachability (reachable);
 ;;;               -pickup (pickup-clear); -recording-shadow-policy (neutral state-view
-;;;               hooks, overridden by recorder's capability-specific shadows)
+;;;               hooks, overridden by recorder's capability-specific shadows);
+;;;               -recorder-fork-registry (mounted-on fact fork)
 ;;;   conditional relations:
 ;;;               jamming (jammer), guarded by an exists over jammer (gate.lisp's pattern):
 ;;;               a jamming jammer forces a drive stopped in update-blower-status!; jammer is
@@ -64,6 +66,11 @@
 ;;;               (mounted-on fan $gears)  --  the fan's attachment to its gears
 ;;;               (turning (either gears blower)) -- derived by update-blower-status!
 ;;;               (blowing (either fan floor-blower wall-blower angled-blower)) -- derived
+;;;   init checks: gears-fan-init-check -- every drive whose mounting physics is installed
+;;;               has distinct has-position source and aimed-at destination locations;
+;;;               the fluent relation keys reject multiples
+;;;               gears-fan-mounting-init-check -- each gears holds at most one fan,
+;;;               and mounted fan holding/location/support state matches its mounting
 ;;;   query     : blower-drive -- mounted fan's gears, or a fixed blower itself
 ;;;               blower-present -- whether a drive has a removable or built-in fan
 ;;;               blower-elevation -- the working height of a mounted or fixed blower
@@ -133,6 +140,134 @@
   (aimed-at (either floor-gears wall-gears angled-gears
                     floor-blower wall-blower angled-blower)
             $location))
+
+
+(define-init-check gears-fan-init-check (literals)
+  (check-init-blower-drive-endpoint-completeness literals))
+
+
+(define-init-check gears-fan-mounting-init-check (literals)
+  (check-init-mounted-fan-consistency literals))
+
+
+(define-init-check-helper check-init-blower-drive-endpoint-completeness (literals)
+  "Require every drive with installed mounting physics to name distinct endpoints."
+  (dolist (drive (append (init-type-instances 'floor-gears)
+                         (init-type-instances 'wall-gears)
+                         (init-type-instances 'angled-gears)
+                         (init-type-instances 'floor-blower)
+                         (init-type-instances 'wall-blower)
+                         (init-type-instances 'angled-blower)))
+    (when (init-blower-drive-physics-installed-p drive)
+      (let ((source-literal
+              (init-blower-drive-relation-literal 'has-position drive literals))
+            (destination-literal
+              (init-blower-drive-relation-literal 'aimed-at drive literals)))
+        (unless source-literal
+          (fail-init-check
+            nil
+            "~%Blower drive ~S has no HAS-POSITION source.~%~
+             Every installed floor, wall, or angled drive must name exactly one source location."
+            drive))
+        (unless destination-literal
+          (fail-init-check
+            nil
+            "~%Blower drive ~S has no AIMED-AT destination.~%~
+             Every installed floor, wall, or angled drive must name exactly one destination."
+            drive))
+        (when (eql (third (init-literal-proposition source-literal))
+                   (third (init-literal-proposition destination-literal)))
+          (fail-init-check
+            destination-literal
+            "~%Blower drive ~S has the same source and destination location: ~S.~%~
+             A floor, wall, or angled stream must lead away from its source."
+            drive
+            (third (init-literal-proposition source-literal))))))))
+
+
+(define-init-check-helper init-blower-drive-physics-installed-p (drive)
+  (or (and (or (init-type-member-p drive 'floor-gears)
+               (init-type-member-p drive 'floor-blower))
+           (member 'update-floor-blowing-status! *update-names*))
+      (and (or (init-type-member-p drive 'wall-gears)
+               (init-type-member-p drive 'wall-blower))
+           (member 'update-wall-blower-status! *update-names*))
+      (and (or (init-type-member-p drive 'angled-gears)
+               (init-type-member-p drive 'angled-blower))
+           (member 'update-angled-blower-status! *update-names*))))
+
+
+(define-init-check-helper init-blower-drive-relation-literal (relation drive literals)
+  (find drive
+        (positive-init-literals-with-relation relation literals)
+        :test #'eql
+        :key (lambda (literal)
+               (second (init-literal-proposition literal)))))
+
+
+(define-init-check-helper init-blower-drive-related-location (relation drive literals)
+  (let ((literal (init-blower-drive-relation-literal relation drive literals)))
+    (when literal
+      (third (init-literal-proposition literal)))))
+
+
+(define-init-check-helper check-init-mounted-fan-consistency (literals)
+  "Require authored MOUNTED-ON facts to match the state produced by MOUNT-FAN."
+  (let ((locations (init-literal-map 'has-location literals 1 2))
+        (positions (init-literal-map 'has-position literals 1 2))
+        (on-map (init-literal-map 'on literals 1 2))
+        (held-objects (init-held-objects literals))
+        (mounted-drives (make-hash-table :test #'eql)))
+    (dolist (literal (positive-init-literals-with-relation 'mounted-on literals))
+      (destructuring-bind (fan drive) (rest (init-literal-proposition literal))
+        (let ((existing-fan (gethash drive mounted-drives))
+              (source (gethash drive positions))
+              (fan-location (gethash fan locations)))
+          (when existing-fan
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT mounts multiple fans on one blower drive.~%~
+               Drive:      ~S~%First fan:  ~S~%Second fan: ~S"
+              drive existing-fan fan))
+          (setf (gethash drive mounted-drives) fan)
+          (when (gethash fan held-objects)
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT fan is both held and mounted.~%~
+               Fan: ~S~%Drive: ~S"
+              fan drive))
+          (when (gethash fan on-map)
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT fan is both mounted and resting ON a support.~%~
+               Fan: ~S~%Drive: ~S"
+              fan drive))
+          (unless source
+            (fail-init-check
+              literal
+              "~%DEFINE-INIT mounts a fan on gears with no HAS-POSITION source.~%~
+               Fan: ~S~%Drive: ~S"
+              fan drive))
+          (if (or (init-type-member-p drive 'wall-gears)
+                  (init-type-member-p drive 'wall-blower))
+            (when fan-location
+              (fail-init-check
+                literal
+                "~%DEFINE-INIT wall-mounted fan must not have HAS-LOCATION.~%~
+                 Fan: ~S at ~S~%Drive: ~S at ~S"
+                fan fan-location drive source))
+            (if (not fan-location)
+              (fail-init-check
+                literal
+                "~%DEFINE-INIT floor/angled-mounted fan must have HAS-LOCATION.~%~
+                 Fan: ~S~%Drive: ~S at ~S"
+                fan drive source)
+              (unless (eql fan-location source)
+                (fail-init-check
+                  literal
+                  "~%DEFINE-INIT mounted fan location does not match its drive location.~%~
+                   Fan: ~S at ~S~%Drive: ~S at ~S"
+                  fan fan-location drive source)))))))))
 
 
 (define-query blower-drive

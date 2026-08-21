@@ -123,6 +123,50 @@
     (bind (beam-crossings-before-gate> ?from $crossings ?gate ?to))))
 
 
+(define-test-claim beam-crossing-positive-topology-validation
+  ;; An explicit absence defines no crossing and imposes no crossing-topology invariants.
+  (null
+    (validate-init-literals
+      '((not (beam-crossing>
+               phantom-crossing main-left main-right
+               vertical1-bottom vertical1-top)))
+      :checks '(beam-crossing-init-check)))
+  ;; A negative order list cannot index a positive crossing definition.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((beam-crossing>
+            phantom-crossing main-left main-right
+            vertical1-bottom vertical1-top)
+          (not (crossings-along-beam>
+                 main-left (phantom-crossing) main-right))
+          (not (crossings-along-beam>
+                 main-right (phantom-crossing) main-left))
+          (crossings-along-beam>
+            vertical1-bottom (phantom-crossing) vertical1-top)
+          (crossings-along-beam>
+            vertical1-top (phantom-crossing) vertical1-bottom)
+          (los-via main-left () main-right)
+          (los-via vertical1-bottom () vertical1-top))
+        :checks '(beam-crossing-init-check)))
+    'init-check-failure
+    :containing "no CROSSINGS-ALONG-BEAM> entry"
+    :check 'beam-crossing-init-check)
+  ;; Conversely, a negative definition cannot define an item in a positive order list.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((not (beam-crossing>
+                 phantom-crossing main-left main-right
+                 vertical1-bottom vertical1-top))
+          (crossings-along-beam>
+            main-left (phantom-crossing) main-right))
+        :checks '(beam-crossing-init-check)))
+    'init-check-failure
+    :containing "no BEAM-CROSSING> definition"
+    :check 'beam-crossing-init-check))
+
+
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 

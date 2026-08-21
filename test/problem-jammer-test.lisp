@@ -3,7 +3,7 @@
 ;;; Dedicated jammer regression for the target and support branches not directly
 ;;; covered by the gun tests.  Four isolated lanes require:
 ;;;
-;;;   1. JAM-TARGET against a gate through LOS-TO-TARGET, choosing a plate
+;;;   1. JAM-TARGET against a gate through LOS-VIA, choosing a plate
 ;;;      placement so the retained jam both depresses the plate and opens the gate.
 ;;;   2. JAM-TARGET against wall gears from a distinct visible vantage, resolving
 ;;;      sight through the gears' HAS-POSITION location and stopping the gears.
@@ -75,6 +75,8 @@
   (has-location gate-agent gate-site)
   (holding gate-agent gate-jammer)
   (has-position gate-plate gate-site)
+  (has-elevation gate-target 2)
+  (has-height gate-target 6)
   (los-via gate-site () gate-target)
 
   ;; Wall gears target: the jammer remains at the distinct vantage and sees the
@@ -151,6 +153,9 @@
     (depressed gate-plate)
     (jammer-jams-only gate-jammer gate-target)
     (open gate-target)
+    (= (base gate-target) 2)
+    (= (top gate-target) 8)
+    (= (jammer-target-elevation gate-target) 5)
 
     ;; Wall-gears branch: visible from a distinct placement location, then placed
     ;; on bare ground and propagated to the stopped state.
@@ -160,6 +165,8 @@
     (not (exists (?support support)
            (on wall-jammer ?support)))
     (visible wall-vantage wall-gears-site)
+    (= (jammer-target-elevation wall-target)
+       (blower-elevation wall-target))
     (jammer-jams-only wall-jammer wall-target)
     (not (turning wall-target))
 
@@ -170,6 +177,8 @@
     (not (exists (?support support)
            (on floor-jammer ?support)))
     (not (potentially-visible floor-site floor-site))
+    (= (jammer-target-elevation floor-target)
+       (blower-elevation floor-target))
     (jammer-jams-only floor-jammer floor-target)
     (not (turning floor-target))
 

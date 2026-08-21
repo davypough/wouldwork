@@ -7,12 +7,12 @@
 ;;; obstacle sitting between them.
 ;;;
 ;;; Sightlines here are hand-authored, not WALL-SEGMENT>-derived: connect-connector's initial
-;;; PAIRED facts are checked at load time against literal LOS-TO-APPARATUS/LOS-TO-LOCATION
+;;; PAIRED facts are checked at load time against literal LOS-VIA
 ;;; entries in DEFINE-INIT (CHECK-INIT-PAIRED-SIGHTLINES), which run before any coordinate
 ;;; derivation would; a WALL-SEGMENT>-driven problem instead builds its PAIRED facts at solve
 ;;; time via connect-connector, never hand-authoring them in DEFINE-INIT.  low and high both
-;;; get a direct, unoccluded LOS-TO-APPARATUS to their own transmitter/receiver; the
-;;; interesting hop is connector1 -> connector2's own LOS-TO-LOCATION, which names mid as its
+;;; get a direct, unoccluded LOS-VIA to their own transmitter/receiver; the interesting hop
+;;; is connector1 -> connector2's location-to-location LOS-VIA, which names mid as its
 ;;; one occluder candidate.
 ;;;
 ;;; The geometry.  low(0,0), high(10,0); connector1 sits at low with no support (elevation
@@ -88,7 +88,7 @@
 
 (include-tech gate)          ;controls; energized; update-gate-status!
 (include-tech beam-relay)    ;paired; color; compute-relay-lighting; relay-beam-reaches-receiver
-(include-tech visibility)    ;los-via; los-via; visible; beam-visible
+(include-tech visibility)    ;los-via; visible; beam-visible
 (include-tech walkability)   ;walking mode; mobility-results; traversable; move
 
 

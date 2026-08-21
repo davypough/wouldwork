@@ -13,12 +13,14 @@
 ;;; REQUIRES (supplied by other techs):
 ;;;   types     : agent, location; plate comes from nested -plate-types, while jammer
 ;;;               and box are declared optional here
-;;;   nested    : -placement (placement-options, place-held-object!; also brings in
-;;;               support occupancy, location, position, height, elevation, and holding);
+;;;   nested    : -vertical (base, top, object-height, location-elevation);
+;;;               -gears-fan (blower-elevation and controlled drive state);
+;;;               -placement (placement-options, place-held-object!, reach policy, and
+;;;               vertical/support geometry);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -visibility (null-default elevation-visible-for-object interface); -pickup (pickup-clear,
-;;;               shared with box and beam-relay)  --  all shared via nested include-tech
-;;;               rather than local declaration
+;;;               shared with box and beam-relay); -recorder-fork-registry (jamming fact
+;;;               fork)  --  all shared via nested include-tech rather than local declaration
 ;;;   extension : visibility overrides -visibility's null default with authored LOS
 ;;;   driver    : propagate-changes! (master); (jamming ...) is consumed by gate's
 ;;;               update-gate-status!
@@ -34,6 +36,7 @@
 ;;;   actions   : pickup-jammer, put-jammer, jam-target
 
 (include-tech -vertical)
+(include-tech -gears-fan)
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -visibility)
@@ -70,21 +73,24 @@
 
 (define-query jammer-target-elevation (?target target)
   ;; Point fixtures use their functional elevation.  Extended gates are aimed at their
-  ;; vertical midpoint.  Gears use the same working level as their mounted fan.
+  ;; vertical midpoint.  Blower targets delegate to the drive's one shared working level.
   (if (gate ?target)
-    (+ (base ?target) (/ (object-height ?target) 2))
+    (/ (+ (base ?target) (top ?target)) 2)
     (if (gun ?target)
       (top ?target)
-      (if (or (wall-gears ?target)
+      (do (or (floor-gears ?target)
+              (wall-gears ?target)
+              (floor-blower ?target)
               (wall-blower ?target))
-        (if (bind (has-elevation ?target $level)) $level 1)
-        (do (bind (has-position ?target $location))
-            (location-elevation $location))))))
+          (blower-elevation ?target)))))
 
 
 (define-query jammer-target-visible-from-placement
     (?view ?location location ?place ?jammer jammer ?target target)
   (do (assign $jammer-elevation
+              ;; This is the top at a hypothetical placement, not TOP in the current
+              ;; state: the action still holds ?JAMMER while it evaluates its options,
+              ;; so (TOP ?JAMMER) would follow the holder instead of ?PLACE.
               (+ (placement-elevation ?location ?place)
                  (object-height ?jammer)))
       (assign $target-elevation (jammer-target-elevation ?target))

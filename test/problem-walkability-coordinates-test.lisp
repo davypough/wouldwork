@@ -4,15 +4,18 @@
 ;;;
 ;;; A rectangular boundary contains three zones separated by full-height partitions.
 ;;; The first partition has two alternative gates; the second has a gate or screen.
-;;; Exact WALK-VIA families characterize same-zone connectivity, each partition, and
-;;; the four canonical two-obstacle routes across both partitions.  The partitions
-;;; terminate exactly on the boundary, so any endpoint leak changes those families.
+;;; Exact walking TRAVERSAL-VIA families characterize same-zone connectivity, each
+;;; partition, and the four canonical two-obstacle routes across both partitions.  The
+;;; partitions terminate exactly on the boundary, so any endpoint leak changes those
+;;; families.
 ;;;
 ;;; A room sealed by two walls, one edge, and one window must remain disconnected --
 ;;; proving EDGE-SEGMENT> seals a zone exactly like WALL-SEGMENT> does.  Two further
 ;;; locations exercise valid placement exactly on an uncovered induced grid line and
-;;; at an unambiguous induced grid vertex.  With only GATE-A open, an empty-handed
-;;; agent crosses the second partition through SCREEN-A, while a holding agent cannot.
+;;; at an unambiguous induced grid vertex.  A loft shares LEFT-START's x/y coordinates
+;;; but remains a distinct, non-walkable location because its elevation is five.  With
+;;; only GATE-A open, an empty-handed agent crosses the second partition through SCREEN-A,
+;;; while a holding agent cannot.
 ;;; A direct geometry probe confirms that the rectangular-cell derivation preserves
 ;;; the shared BOUNDARY-WALL axis-alignment invariant internally.
 ;;;
@@ -35,7 +38,7 @@
 
 (define-types
   agent (main-agent holding-agent)
-  location (left-start left-peer middle
+  location (left-start left-loft left-peer middle
             right-goal right-line right-vertex sealed-site)
   gate (gate-a gate-b gate-c)
   screen (screen-a)
@@ -92,8 +95,10 @@
   (window-segment> sealed-window 9 5 11 5)
 
   ;; RIGHT-LINE lies exactly on the uncovered y=2 grid line.  RIGHT-VERTEX lies
-  ;; exactly at the uncovered (9,2) grid vertex induced by unrelated segments.
+  ;; exactly at the uncovered (9,2) grid vertex induced by unrelated segments.  LEFT-LOFT
+  ;; deliberately shares LEFT-START's horizontal point while remaining five units above it.
   (location-coords> left-start 2 3)
+  (location-coords> left-loft 2 3 5)
   (location-coords> left-peer 2 4)
   (location-coords> middle 6 3)
   (location-coords> right-goal 10 3)
@@ -148,7 +153,7 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
-(define-query coordinate-walk-via-family-is
+(define-query coordinate-walking-family-is
     (?from location ?to location ?expected)
   (do (bind (traversal-via walking ?from $actual ?to))
       (equal $actual ?expected)))
@@ -168,33 +173,43 @@
 
     ;; Same-zone, uncovered-grid-line, and unambiguous-grid-vertex pairs are
     ;; direct and unguarded.
-    (coordinate-walk-via-family-is left-start left-peer nil)
-    (coordinate-walk-via-family-is right-goal right-line nil)
-    (coordinate-walk-via-family-is right-goal right-vertex nil)
+    (coordinate-walking-family-is left-start left-peer nil)
+    (coordinate-walking-family-is right-goal right-line nil)
+    (coordinate-walking-family-is right-goal right-vertex nil)
+
+    ;; Geometry deliberately ignores z, so coincident LEFT-START/LEFT-LOFT receives the
+    ;; same raw symmetric edge as any same-zone pair.  Walking then compares the two
+    ;; independently authored levels and refuses that candidate in both directions.
+    (coordinate-walking-family-is left-start left-loft nil)
+    (= (location-elevation left-start) 0)
+    (= (location-elevation left-loft) 5)
+    (not (one-step-walkable main-agent left-start left-loft))
+    (not (one-step-walkable main-agent left-loft left-start))
+    (not (traversable main-agent left-start left-loft))
 
     ;; Each partition retains every minimal single-door alternative.
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       left-start middle
       '((gate-a) (gate-b)))
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       middle left-start
       '((gate-a) (gate-b)))
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       middle right-goal
       '((gate-c) (screen-a)))
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       right-goal middle
       '((gate-c) (screen-a)))
 
     ;; Crossing both partitions takes one alternative from each.  Clauses and
     ;; their members must be canonical and deterministic.
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       left-start right-goal
       '((gate-a gate-c)
         (gate-a screen-a)
         (gate-b gate-c)
         (gate-b screen-a)))
-    (coordinate-walk-via-family-is
+    (coordinate-walking-family-is
       right-goal left-start
       '((gate-a gate-c)
         (gate-a screen-a)
@@ -227,6 +242,8 @@
     (member 'right-vertex
             (mobility-locations main-agent left-start))
     (not (member 'sealed-site
+                 (mobility-locations main-agent left-start)))
+    (not (member 'left-loft
                  (mobility-locations main-agent left-start)))
     (one-step-walkable main-agent left-start right-goal)
     (traversable main-agent left-start right-goal)

@@ -2,9 +2,9 @@
 
 Task is to build a Wouldwork Working Reference given a problem spec (and, optionally, an environment diagram). It instructs you to build one markdown **working reference** that co-locates and normalizes the spec's scattered facts, so they can be read off directly during analysis instead of reconstructed from memory.
 
-**Where this fits.** The working reference is the input to analysis, not the analysis itself. Once verified, it feeds `inferring-missing-relations.md`, which uses it to locate an omitted relation in an otherwise-correct spec. For writing a spec in the first place, see `wouldwork-problem-template.md`. For relation signatures, `tech/Talos Technology  Relations.txt` is authoritative.
+**Where this fits.** The working reference is the input to analysis, not the analysis itself. Once verified, it feeds `inferring-missing-relations.md`, which uses it to locate an omitted relation in an otherwise-correct spec. For writing a spec in the first place, see `wouldwork-problem-template.md`. For relation signatures, `tech/Talos Technology  Summary.txt` is authoritative.
 
-> **Status:** Sections 1–3 were rewritten against the current `tech/` relation vocabulary. The previous version named relations (`in-area`, `interface`, `traversable>`, `los-via`, `in-los-group`, `reachable-via`) that exist in no current problem file. Discipline rule 4 and Section 8 were revised: geometry is spec fact in coordinate-derived problems and is no longer quarantined by default.
+> **Status:** Sections 1–3 were rewritten against the current `tech/` relation vocabulary. The previous version used retired area/interface relations (`in-area`, `interface`, `traversable>`, `in-los-group`, `reachable-via`) and an older LOS representation. The current system reuses `los-via` as one unified symmetric endpoint relation. Discipline rule 4 and Section 8 were revised: geometry is spec fact in coordinate-derived problems and is no longer quarantined by default.
 
 ---
 
@@ -22,7 +22,7 @@ Settle this before transcribing anything; it changes what Sections 1–3 can con
 
 **Does the spec assert any `wall-segment>`, `edge-segment>`, or `boundary-wall` facts?**
 
-- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives `walk-via` / `walk-via>`, and `-beam-los-coordinates` derives the `los-to-*` tables and finite-barrier crossing records. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `apparatus-coords>`, `wall-segment>`, `edge-segment>`, `gate-segment>`, `window-segment>`, `screen-segment>`, `boundary-wall`, and relevant elevations/heights — as the authoritative source, and take the derived edges and crossing records from the load printout, marked as derived output.
+- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives the `walking` facts in `traversal-via` / `traversal-via>`, and `-beam-los-coordinates` derives `los-via` plus finite-barrier crossing records. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `apparatus-coords>`, `wall-segment>`, `edge-segment>`, `gate-segment>`, `window-segment>`, `screen-segment>`, `boundary-wall`, and relevant elevations/heights — as the authoritative source, and take the derived edges and crossing records from the load printout, marked as derived output.
 - **No — hand-authored.** The spec states its edges directly. Transcribe them.
 
 Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* hand-authored sightline relations in its own older vocabulary (`los0`/`los1`, `visible0`/`visible1`, `accessible0`/`accessible1`). Transcribe whatever that file actually declares; do not translate it into `tech/` names.
@@ -53,14 +53,14 @@ Then the sections below. Treat them as a **template**: drop any the problem does
 
 ### 1. Mobility network
 
-From the currently installed mobility providers: `walk-via` / `walk-via>`, `stairs-via` / `stairs-via>`, `jump-via` / `jump-via>`, and `climb-via>`, composed by `mobility-results`, `mobility-locations`, and `traversable`. Passability comes from `obstacle-clear` / `all-clear` in `tech/-passability.lisp`.
+From the currently installed traversal modes: `walking`, `stairway`, `jumping`, and `climbing`, all stored in the symmetric `traversal-via` or directed `traversal-via>` relation and composed by `mobility-results`, `mobility-locations`, and `traversable`. Passability comes from `obstacle-clear` / `all-clear` in `tech/-passability.lisp`.
 
-- **The walking clause convention, stated once.** `walk-via` and `walk-via>` values are **DNF door-clause lists**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
-- **Each walking edge** with its clause list. Mark direction: `walk-via` is symmetric; `walk-via>` is directional, and the reverse direction may have a different clause list or none.
-- **Other mobility modes.** Record stairs, jump, and climb edges separately from walking even though the mobility closure composes their grounded traversals. Their values are flat conjunctions, not DNF. Jump feasibility uses the hypothetical source location's floor elevation, the destination floor elevation, and the highest non-passable feature top. A `climb-via>` list must contain a ladder positioned exactly at the segment source; the selected ladder appears first in the route witness. Support-changing jumps and steps are explicit one-transition boundaries rather than mobility segments, but the central action presents both kinds of result as `move`.
-- **The per-kind passability rule** for each obstacle kind the spec actually uses, read from `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **gears** item is an air-stream crossing, passable unless a blowing fan is mounted.
+- **The traversal clause convention, stated once.** Every `traversal-via` and `traversal-via>` value is a **DNF obstacle-clause list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
+- **Each walking edge** as a `walking` fact with its clause list. Mark direction: `traversal-via` is symmetric; `traversal-via>` is directional, and the reverse direction may have a different clause list or none.
+- **Other mobility modes.** Record `stairway`, `jumping`, and `climbing` facts separately from `walking` even though the mobility closure composes their grounded traversals. They use the same DNF shape. Jump feasibility uses the hypothetical source location's floor elevation, the destination floor elevation, and the highest non-passable feature top. Every usable climbing clause must contain a ladder positioned exactly at the segment source; the selected ladder appears first in the route witness. Support-changing jumps and steps are explicit one-transition boundaries rather than mobility segments, but the central action presents both kinds of result as `move`.
+- **The per-kind passability rule** for each obstacle kind the spec actually uses, read from the selected mode and `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **stream device** (gears or fixed blower) follows its current blowing state; and a jump's gates, screens, and walls are path features to pass or clear.
 - **Air streams, if present.** They are derived, not authored: each wall drive's band runs from the solid backstop behind its blower, through its `has-position` swept location, to its `aimed-at` destination, 3 units wide unless `stream-width` overrides. A drive is either mountable `wall-gears` with a removable fan or a fixed `wall-blower`. The swept location is standable exactly while the stream is off.
-- **Flag any location with no walk edge at all**, and any location reachable only by a directional edge.
+- **Flag any location with no `walking` traversal edge at all**, and any location reachable only by a directional edge.
 
 For a coordinate-derived spec, record the geometry inputs and the derived edge count, and note that the edge table comes from the load printout.
 
@@ -74,16 +74,17 @@ From `reach-via` and `reachable-clear` (`tech/reachability.lisp`).
 
 ### 3. Visibility (line of sight) network
 
-From `los-to-location`, `los-to-target`, `los-to-apparatus`, and `visible-clear` (`tech/visibility.lisp`).
+From the symmetric `los-via` relation, its coordinate-derived `los-barrier-crossings>` records, and the visibility-policy queries in `tech/visibility.lisp`.
 
-There are no sightline groups in the current representation — entries are per location, or per location pair.
+There are no sightline groups in the current representation — each entry is one endpoint pair in the shared relation.
 
-- **Split the tables by consuming role**, since that is how the relations are split, and using the wrong one is a common error:
-  - `los-to-target` — a jammer's target. **Gates only.** A gears jam target instead resolves through its `has-position` location's `los-to-location` entry.
-  - `los-to-apparatus` — beam pairing with a transmitter or receiver.
-  - `los-to-location` — everything else, including connector-to-connector pairing.
-- **A location × target table of occluder lists** for each role in use. Use the word-token legend (rule 6): `clear` for an empty list, `(occluders…)` where a sightline exists but is occluded, `none` where there is no entry at all and therefore no sightline. **This table is the historically error-prone one — transcribe it exactly and call it out in the verification request.**
-- **The transparency rule** from `visible-clear`: a sightline must exist in the tables, and is clear iff every occluder is an open gate.
+- **Keep one table, keyed by endpoint rather than consuming role.** Every authored sightline is written once from the location an actor occupies; `los-via` is symmetric, so the engine stores its mirror. The far endpoint identifies how it is used:
+  - a gate is a direct jammer target;
+  - a transmitter, receiver, repeater, or gun is an apparatus endpoint;
+  - a location supports connector-to-connector pairing and a gears target resolved through `has-position`.
+- **A location × visibility-object table of occluder lists.** Use the word-token legend (rule 6): `clear` for an empty list, `(occluders…)` where a sightline exists but carries gates or location candidates, `none` where there is no entry and therefore no sightline. **This table is historically error-prone — transcribe it exactly and call it out in the verification request.**
+- **Record finite-barrier crossings separately.** Coordinate derivation retains walls, edges, gates, and boundary segments in oriented `los-barrier-crossings>` records; do not flatten them into the `los-via` occluder list.
+- **State the policy being applied.** Ordinary `visible` sight never clears a solid crossing by height and requires gate occluders to be open. Beam and elevated-jammer sight can clear finite barriers above their inclusive tops; only beam sight also treats a location occluder as blocked when an occupant there spans the interpolated beam elevation.
 - **Flag any location with no sight data.**
 
 ### 4. Object / role inventory

@@ -79,7 +79,7 @@
    they share a schema-level leaf type.  The latter matters for composed technologies:
    a shared query may guard a branch on a leaf type the current problem declares no
    instances of, leaving the proposition dead there rather than mistyped -- eg,
-   SUPPORT-TOP-ELEVATION's plate branch in a problem with no plates.  Passes leniently
+   PLACEMENT-OPTIONS's pressure-plate branch in a problem with no plates.  Passes leniently
    (returns T) when either side resolves to :unknown, since an inability to reason
    about a type-spec is not evidence of a mismatch."
   (let ((declared-instances (type-spec-instances declared-type))

@@ -61,8 +61,8 @@
   ;; -walkability-coordinates' band derivation.  Missing position, aim, or
   ;; coordinates error immediately -- a wall fan without a located stream is an
   ;; authoring mistake in a coordinate-driven problem.  Only called by
-  ;; DERIVE-WALK-VIA-FROM-SEGMENTS, so a problem without segment geometry (hand-
-  ;; authored walk-via) never evaluates it.
+  ;; DERIVE-WALKING-FROM-SEGMENTS, so a problem without segment geometry (hand-
+  ;; authored walking TRAVERSAL-VIA facts) never evaluates it.
   (do (assign $specs nil)
       (doall (?g (either wall-gears wall-blower))
         (do (if (not (bind (has-position ?g $swept-location)))

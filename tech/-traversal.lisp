@@ -220,7 +220,23 @@
   (:consumes gate screen ladder wall gears
              floor-gears wall-gears angled-gears
              floor-blower wall-blower angled-blower)
+  (check-init-traversal-endpoints literals)
   (check-init-traversal-payloads literals))
+
+
+(define-init-check-helper check-init-traversal-endpoints (literals)
+  "Reject positive traversal self-loops.  Mobility is already reflexive at every location,
+   so such a fact can add no route and would otherwise disappear silently in the visited
+   set of the closure."
+  (dolist (relation '(traversal-via traversal-via>))
+    (dolist (literal (positive-init-literals-with-relation relation literals))
+      (destructuring-bind (mode source clauses destination)
+          (rest (init-literal-proposition literal))
+        (declare (ignore mode clauses))
+        (when (eql source destination)
+          (fail-init-check literal
+            "Traversal source and destination are the same location: ~S.  Mobility is already reflexive; remove the self-loop or correct an endpoint."
+            source))))))
 
 
 (define-init-check-helper check-init-traversal-payloads (literals)

@@ -210,5 +210,41 @@
   (= *max-pairings* 2))
 
 
+(define-test-claim beam-relay-positive-topology-validation
+  (null
+    (validate-init-literals
+      '((has-location lifecycle-connector origin)
+        (paired lifecycle-connector old-source)
+        (los-via old-view () old-source))
+      :checks '(beam-relay-init-check)))
+  ;; An explicit absence is not an authored pairing and imposes no pairing invariants.
+  (null
+    (validate-init-literals
+      '((not (paired lifecycle-connector old-source)))
+      :checks '(beam-relay-init-check)))
+  ;; Likewise, a negative location cannot satisfy a positive pairing's location requirement.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((not (has-location lifecycle-connector origin))
+          (paired lifecycle-connector old-source)
+          (los-via old-view () old-source))
+        :checks '(beam-relay-init-check)))
+    'init-check-failure
+    :containing "PAIRED connector has no HAS-LOCATION"
+    :check 'beam-relay-init-check)
+  ;; Nor can an explicitly absent sightline satisfy a positive apparatus pairing.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location lifecycle-connector origin)
+          (paired lifecycle-connector old-source)
+          (not (los-via old-view () old-source)))
+        :checks '(beam-relay-init-check)))
+    'init-check-failure
+    :containing "target has no potential LOS-VIA"
+    :check 'beam-relay-init-check))
+
+
 (define-goal
   (beam-relay-scenarios-valid))

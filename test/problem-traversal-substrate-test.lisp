@@ -19,6 +19,8 @@
 ;;;      still gets exactly one attempt at an edge that names no obstacle.
 ;;;   4. A fact whose mode no technology registered fails initialization, which is what
 ;;;      catches a JUMPING edge in a problem that never included jump.
+;;;   5. A self-loop fails initialization because mobility is already reflexive and the
+;;;      edge would otherwise vanish silently inside its visited-location closure.
 ;;;
 ;;; The initial and final dynamic states are unchanged by the goal.  Expected minimum
 ;;; path length: zero.
@@ -163,6 +165,16 @@
         :checks '(traversal-init-check)))
     'init-check-failure
     :containing "expected an instance of one of"
+    :check 'traversal-init-check)
+
+  ;; Mobility already returns (ORIGIN NIL), so a self-loop cannot represent movement.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((traversal-via> walking origin () origin))
+        :checks '(traversal-init-check)))
+    'init-check-failure
+    :containing "source and destination are the same location"
     :check 'traversal-init-check))
 
 

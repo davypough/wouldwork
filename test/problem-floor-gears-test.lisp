@@ -11,6 +11,10 @@
 ;;;      fan4 remains mounted.
 ;;;   4. Uncontrolled gears4 turns, but with no mounted fan its box4 likewise falls from
 ;;;      loft4 to base4.
+;;;   5. Initialization requires a source and destination for every floor drive, accepts
+;;;      distinct destinations, and rejects two drives sharing one because hover state
+;;;      otherwise has no unique drop-back source.  It also accepts a geometry-known
+;;;      vertical rise and rejects horizontal displacement or a non-rising destination.
 ;;;
 ;;; The zero-action goal characterizes the derived start state after ordinary propagation,
 ;;; covering sustained hover, stack transport, fan immunity, power-off drop, fan-removal
@@ -107,6 +111,96 @@
   ()
   (assert (propagate-changes!))
 )
+
+
+;;;; INITIALIZATION VALIDATION ;;;;
+
+
+(define-test-helper floor-gears-complete-endpoints ()
+  '((has-position gears1 base1)
+    (aimed-at gears1 loft1)
+    (has-position gears2 base2)
+    (aimed-at gears2 loft2)
+    (has-position gears3 base3)
+    (aimed-at gears3 loft3)
+    (has-position gears4 base4)
+    (aimed-at gears4 loft4)))
+
+
+(define-test-claim floor-gears-endpoint-validation
+  (null
+    (validate-init-literals
+      (floor-gears-complete-endpoints)
+      :checks '(gears-fan-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (remove '(has-position gears1 base1)
+                (floor-gears-complete-endpoints)
+                :test #'equal)
+        :checks '(gears-fan-init-check)))
+    'init-check-failure
+    :containing "has no HAS-POSITION source"
+    :check 'gears-fan-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (remove '(aimed-at gears1 loft1)
+                (floor-gears-complete-endpoints)
+                :test #'equal)
+        :checks '(gears-fan-init-check)))
+    'init-check-failure
+    :containing "has no AIMED-AT destination"
+    :check 'gears-fan-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (substitute '(aimed-at gears2 loft1)
+                    '(aimed-at gears2 loft2)
+                    (floor-gears-complete-endpoints)
+                    :test #'equal)
+        :checks '(floor-blowing-init-check)))
+    'init-check-failure
+    :containing "must not share an AIMED-AT destination"
+    :check 'floor-blowing-init-check)
+
+  (null
+    (validate-init-literals
+      (append
+        (floor-gears-complete-endpoints)
+        '((location-coords> base1 2 3 0)
+          (location-coords> loft1 2 3 7)))
+      :checks '(floor-blowing-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append
+          (floor-gears-complete-endpoints)
+          '((location-coords> base1 2 3 0)
+            (location-coords> loft1 4 3 7)))
+        :checks '(floor-blowing-init-check)))
+    'init-check-failure
+    :containing "must be vertical"
+    :check 'floor-blowing-init-check)
+
+  (null
+    (validate-init-literals
+      (append
+        (floor-gears-complete-endpoints)
+        '((has-elevation base1 2)
+          (has-elevation loft1 3)))
+      :checks '(floor-blowing-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (append
+          (floor-gears-complete-endpoints)
+          '((has-elevation base1 2)
+            (has-elevation loft1 2)))
+        :checks '(floor-blowing-init-check)))
+    'init-check-failure
+    :containing "must be above its source"
+    :check 'floor-blowing-init-check))
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;

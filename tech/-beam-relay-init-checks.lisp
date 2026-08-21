@@ -23,7 +23,7 @@
   (when (init-connector-paired-relation-p)
     (let ((locations (init-literal-map 'has-location literals 1 2))
           (pair-counts (make-hash-table :test #'equal)))
-      (dolist (literal (init-literals-with-relation 'paired literals))
+      (dolist (literal (positive-init-literals-with-relation 'paired literals))
         (destructuring-bind (connector terminus)
             (rest (init-literal-proposition literal))
           (unless (gethash connector locations)
@@ -55,7 +55,7 @@
 
 (define-init-check-helper init-paired-connector-edges (literals)
   (let ((edges (make-hash-table :test #'equal)))
-    (dolist (literal (init-literals-with-relation 'paired literals))
+    (dolist (literal (positive-init-literals-with-relation 'paired literals))
       (destructuring-bind (connector terminus)
           (rest (init-literal-proposition literal))
         (when (init-type-member-p terminus 'connector)
@@ -144,7 +144,7 @@
   "Checks that each initial pairing target has potential sightline topology."
   (when (init-connector-paired-relation-p)
     (let ((locations (init-literal-map 'has-location literals 1 2)))
-      (dolist (literal (init-literals-with-relation 'paired literals))
+      (dolist (literal (positive-init-literals-with-relation 'paired literals))
         (destructuring-bind (connector terminus)
             (rest (init-literal-proposition literal))
           (let ((connector-location (gethash connector locations)))
@@ -161,5 +161,4 @@
                      (init-check-paired-connector-sightline
                        literal connector connector-location
                        terminus terminus-location literals))))))))))))
-
 

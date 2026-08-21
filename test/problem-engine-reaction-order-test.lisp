@@ -21,8 +21,8 @@
 ;;;
 ;;; Forward lane, floor then wall.  BOX1 is placed on the fixed floor blower at PAD0.  The floor reaction
 ;;; launches it to PAD1, whose declared elevation 0 lets WGEARS1's stream at elevation 1
-;;; strike its unit-height body at the inclusive upper boundary, 0 < 1 <= 0 + 1.  The wall
-;;; reaction then sweeps it to FAR later in the same driver pass.
+;;; strike its unit-height body at the inclusive upper boundary, 0 < 1 <= its top of 1.
+;;; The wall reaction then sweeps it to FAR later in the same driver pass.
 ;;;
 ;;; Reverse lane, wall then floor.  BOX2 starts on bare ground at REVERSE-SOURCE, where
 ;;; WGEARS2 sweeps it onto the clear, flush top of FGEARS2 at REVERSE-FAN.  Because the floor
@@ -33,7 +33,7 @@
 ;;; The lanes are isolated: BOX2 is outside the agent's reachable location and every blower
 ;;; is fixed.  One plate controls all four drives, so the expected minimum solution remains
 ;;; three steps: pick up BOX1, put it on FGEARS1, and step onto PLATE1, in
-;;; either viable ordering.  No WALK-VIA is authored.
+;;; either viable ordering.  No walking TRAVERSAL-VIA fact is authored.
 
 
 (in-package :ww)
@@ -200,9 +200,12 @@
                   (on box2 ?support))))
 
        ;; Geometry that makes the two reaction handoffs possible.
+       (= (location-elevation pad0) 0)
        (= (location-elevation pad1) 0)
        (= (blower-elevation wgears1) 1)
        (= (object-height box1) 1)
+       (= (location-elevation far) 0)
+       (= (location-elevation reverse-source) 0)
        (= (location-elevation reverse-fan) 0)
        (= (top fgears2) 0)
        (= (blower-elevation wgears2) 1)

@@ -3,7 +3,7 @@
 ;;; Beam LOS coordinates substrate: derives LOS-VIA
 ;;; from raw WALL-SEGMENT>/EDGE-SEGMENT>/GATE-SEGMENT>/BOUNDARY-WALL segment geometry, for a
 ;;; problem that would rather author 2D positions than hand-list sightlines.  Nested under
-;;; visibility-tech (the owner of the los relations derived here) and beam-crossing-tech (via
+;;; visibility.lisp (the owner of the LOS relations derived here) and beam-crossing.lisp (via
 ;;; -beam-crossing-coordinates, which re-nests it only to guarantee splice order), so it is
 ;;; always present wherever either is included; entirely inert unless the problem actually
 ;;; asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL, so a problem that hand-authors its own LOS-VIA
@@ -14,7 +14,7 @@
 ;;; model as walls for LOS, while remaining excluded from jump feature lists.
 ;;;
 ;;; Endpoint coordinates come from two relations, split by ownership: LOCATION-COORDS>
-;;; (nested from -location-coordinates, shared with walkability-tech's own coordinate
+;;; (nested from -location-coordinates, shared with walkability.lisp's own coordinate
 ;;; substrate, so a location's position is entered once even when a problem uses both
 ;;; capabilities) for location endpoints, and APPARATUS-COORDS> (declared here) for
 ;;; transmitter/receiver/repeater/gun functional points -- a problem with pure location-to-location
@@ -34,10 +34,10 @@
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
 ;;; repeats its first -- each consecutive polygon edge contributes its own retained crossing.
-;;; -walkability-coordinates.lisp's own WALK-VIA derivation folds BOUNDARY-WALL in the same way
+;;; -walkability-coordinates.lisp's walking TRAVERSAL-VIA derivation folds BOUNDARY-WALL in the same way
 ;;; (as a solid boundary segment, alongside WALL-SEGMENT>), so a problem that asserts it gets
 ;;; ordinary LOS and walkability remain blocked at the map's edge automatically, while a
-;;; sufficiently elevated beam or jammer sightline can clear its default height 4.
+;;; sufficiently elevated beam or jammer sightline can clear its default height 6.
 ;;;
 ;;; The location<->apparatus and location<->location branches additionally test every other
 ;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the
@@ -68,8 +68,8 @@
 ;;;   types     : location  --  declared by the problem; transmitter, receiver, repeater, gun
 ;;;               declared optional by -visibility/-beam-substrate, sibling nested
 ;;;               includes of the parent techs
-;;;   relations : los-via, los-via, los-via  --  declared by
-;;;               visibility-tech, this file's primary parent; a beam-crossing problem
+;;;   relations : los-via, los-barrier-crossings>  --  declared by
+;;;               visibility.lisp, this file's primary parent; a beam-crossing problem
 ;;;               reaching this file through -beam-crossing-coordinates must still include
 ;;;               visibility for these relations to exist
 ;;; PROVIDES:
@@ -86,7 +86,8 @@
 ;;;               LOS-VIA derivations below, so a problem with
 ;;;               no jammer never gets location<->gate or location<->gun sightlines
 ;;;               nothing can consume
-;;;   nested    : -apparatus-coordinates (apparatus-coords>, formerly declared here)
+;;;   nested    : -apparatus-coordinates (apparatus-coords>, formerly declared here);
+;;;               -segment-geometry (segment relations, boundary height, and validation)
 ;;;   relations : wall-segment>, edge-segment>, gate-segment>, boundary-wall -- all default
 ;;;               to no facts; a problem that asserts wall-segment>, edge-segment>, or
 ;;;               boundary-wall gets
@@ -100,10 +101,11 @@
 ;;;               read by visibility.lisp's beam-visible; consulted for a hand-authored
 ;;;               location occluder exactly as for a derived one, so a problem that hand-
 ;;;               authors LOS-VIA directly (bypassing WALL-SEGMENT>
-;;;               derivation) can still list a location as an occluder -- it still needs
-;;;               LOCATION-COORDS>/APPARATUS-COORDS> asserted for that location and for both
-;;;               of the beam's own endpoints, even though DERIVE-LOS-FROM-SEGMENTS itself
-;;;               never runs; BEAM-COORDINATES-ENDPOINT-XY errors by name if one is missing
+;;;               derivation) can still list a location as an occluder.  A sloped beam needs
+;;;               LOCATION-COORDS>/APPARATUS-COORDS> asserted for that location and both
+;;;               endpoints even though DERIVE-LOS-FROM-SEGMENTS itself never runs; a
+;;;               horizontal beam needs none.  BEAM-COORDINATES-ENDPOINT-XY errors by name
+;;;               if a coordinate needed for interpolation is missing
 ;;;   init      : derive-los-from-segments
 
 (include-tech -location-coordinates)
@@ -368,8 +370,8 @@
   ;; for a non-location beam endpoint.  Errors by name if the fact is missing, exactly like
   ;; that init-time sibling -- a bare BIND left unguarded here would instead leave $x/$y nil
   ;; and only fail later, confusingly, inside BEAM-COORDINATES-PROJECTION-PARAMETER's
-  ;; arithmetic.  A hand-authored location occluder needs coordinates for itself and both
-  ;; of its beam's endpoints, not just for the LOS pair the fact itself names.
+  ;; arithmetic.  When called for a sloped hand-authored beam, the location occluder needs
+  ;; coordinates for itself and both endpoints, not just for the LOS pair the fact names.
   (if (location ?endpoint)
     (do (or (bind (location-coords> ?endpoint $x $y))
             (error "No LOCATION-COORDS> is defined for location ~A." ?endpoint))

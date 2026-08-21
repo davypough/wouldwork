@@ -1,8 +1,8 @@
 ;;; Filename: problem-claustro-topo.lisp
 
 ;;; Coordinate-driven version of Talos 'Claustrophobia'.
-;;; Raw planar geometry computes the hand-authored beam corridor, visibility tables,
-;;; and walking topology.  Jumping, climbing,
+;;; The fixed BEAM-VIA corridor remains authored, while raw planar geometry derives its
+;;; finite-barrier crossings, the visibility tables, and walking topology.  Jumping, climbing,
 ;;; reachability, and directional jamming exclusions remain explicitly authored
 ;;; because they are not determined by planar geometry alone.
 
@@ -118,13 +118,14 @@
   ;; edge1 is the ground-level footprint of the raised slab that location12, location13,
   ;; gate8, and gate9 sit on (elevation 3/2): its east edge, between location12 and
   ;; location10, sealing against the boundary at y 10 and 17.  Walking across the slab
-  ;; at ground level is thereby blocked on that side; the elevation-2 crossing
+  ;; at ground level is thereby blocked on that side; the elevation-3/2 crossing
   ;; location12 <-> location13 lies entirely inside the footprint (gated by
   ;; gate8/gate9), and the level change onto the slab is the authored JUMPING edge
   ;; below.  This is EDGE, not WALL: it marks the vertical boundary between two
-  ;; different-elevation regions rather than a freestanding linear partition, so it
-  ;; carries no height and takes no part in vaulting -- the JUMPING edge below crosses
-  ;; it with an empty feature list, not as a vaultable-object.
+  ;; different-elevation regions rather than a freestanding linear partition.  Its
+  ;; default height 3/2 spans that step for terrain and LOS checks, but EDGE is absent
+  ;; from jump's vaultable-object type; the JUMPING edge below therefore crosses with an
+  ;; empty feature list rather than treating edge1 as a vault barrier.
   ;;
   ;; The slab's west side, location13 <-> location11, carries no edge at all: it is
   ;; instead the authored STAIRWAY crossing below, unconditional in both directions

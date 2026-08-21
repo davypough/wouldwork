@@ -71,6 +71,60 @@
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 
+(define-test-claim beam-substrate-positive-topology-validation
+  (null
+    (validate-init-literals
+      '((has-chroma sample-transmitter sample-hue)
+        (has-chroma stale-receiver sample-hue)
+        (coupled sample-transmitter stale-receiver)
+        (beam-via sample-transmitter () stale-receiver))
+      :checks '(beam-substrate-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-chroma sample-transmitter sample-hue)
+          (has-chroma stale-receiver sample-hue)
+          (coupled sample-transmitter stale-receiver)
+          (not (beam-via sample-transmitter () stale-receiver)))
+        :checks '(beam-substrate-init-check)))
+    'init-check-failure
+    :containing "has no matching BEAM-VIA corridor"
+    :check 'beam-substrate-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-chroma sample-transmitter sample-hue)
+          (has-chroma stale-receiver sample-hue)
+          (not (coupled sample-transmitter stale-receiver))
+          (beam-via sample-transmitter () stale-receiver))
+        :checks '(beam-substrate-init-check)))
+    'init-check-failure
+    :containing "has no matching COUPLED pair"
+    :check 'beam-substrate-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((not (has-chroma sample-transmitter sample-hue))
+          (has-chroma stale-receiver sample-hue)
+          (coupled sample-transmitter stale-receiver)
+          (beam-via sample-transmitter () stale-receiver))
+        :checks '(beam-substrate-init-check)))
+    'init-check-failure
+    :containing "transmitter has no HAS-CHROMA entry"
+    :check 'beam-substrate-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-chroma sample-transmitter sample-hue)
+          (not (has-chroma stale-receiver sample-hue))
+          (coupled sample-transmitter stale-receiver)
+          (beam-via sample-transmitter () stale-receiver))
+        :checks '(beam-substrate-init-check)))
+    'init-check-failure
+    :containing "receiver has no HAS-CHROMA entry"
+    :check 'beam-substrate-init-check))
+
+
 (define-query beam-substrate-transmitter-type-valid
     (?object transmitter)
   (and

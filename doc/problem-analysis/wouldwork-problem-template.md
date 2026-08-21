@@ -3,15 +3,15 @@
 > **Usage:** Attach this file when starting a new problem specification session.
 > Provide a preliminary description of your problem in the prompt.
 
-> **Status:** Where this file and the *Wouldwork User Manual* disagree, this file is
-> currently the correct one — the Manual has pending updates tracked in
-> `doc/user-manual-sync.md`.
+> **Status:** This file tracks the current Talos `tech/` vocabulary. If it disagrees with
+> the *Wouldwork User Manual* on a technology-based specification, verify the detail against
+> `tech/README.html` and the current technology source.
 
 **Companion documents.** This file covers writing a spec. Once a spec exists and needs
 analysis, `working-reference-builder.md` normalizes its scattered facts into a working
 reference, and `inferring-missing-relations.md` uses that reference to locate an omitted
 relation in a spec that is correct but unsolvable. For the technology library,
-`tech/README.html`; for relation signatures, `tech/Talos Technology  Relations.txt`; for
+`tech/README.html`; for relation signatures, `tech/Talos Technology  Summary.txt`; for
 what the engine does at load time, `../load-ordering/ordering-of-operations.md`.
 
 
@@ -248,8 +248,8 @@ than hand-authoring them:
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect actions
 (include-tech beam-crossing)         ;crossing-active; crossings-along-beam>
-(include-tech walkability)          ;walk-via; mobility-results; traversable; move
-(include-tech visibility)            ;los-to-apparatus; visible; visible-clear
+(include-tech walkability)          ;walking traversal-via; mobility-results; traversable; move
+(include-tech visibility)            ;los-via; visible; visible-clear
 ```
 
 **What it does.** `include-tech` is not a runtime macro. Before compilation, each

@@ -17,7 +17,7 @@
 ;;; about what an agent may do, not a fact about where anything is.
 ;;;
 ;;; REQUIRES:
-;;;   nested  : -vertical (base, top), -support-occupancy, -location, -holding
+;;;   nested  : -vertical (base)
 ;;; PROVIDES:
 ;;;   parameter : *vertical-reach-limit*, default 1 -- the maximum elevation gap an agent
 ;;;               can act across vertically: lifting cargo above or below its own elevation,
@@ -29,9 +29,6 @@
 ;;;               within-agent-placement-reach (one-sided, for setting down)
 
 (include-tech -vertical)
-(include-tech -support-occupancy)
-(include-tech -location)
-(include-tech -holding)
 
 (in-package :ww)
 

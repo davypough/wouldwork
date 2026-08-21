@@ -56,9 +56,10 @@
 ;;; derivation too; beam-direct also records every authored fixed coupling's segment
 ;;; crossings through this interface; beam-relay and beam-crossing consume location
 ;;; sightlines.  A hand-authored problem may list a location as an occluder exactly as it
-;;; would a gate; that location, and both of the beam's own endpoints, still need
-;;; LOCATION-COORDS>/APPARATUS-COORDS> asserted -- the elevation interpolation reads them
-;;; live regardless of whether the LOS fact was authored or derived.
+;;; would a gate.  When the two live endpoint anchors differ in elevation, that location
+;;; and both beam endpoints need LOCATION-COORDS>/APPARATUS-COORDS> so interpolation can
+;;; project the occluder onto the sloped beam.  A horizontal beam returns its shared
+;;; elevation directly and needs no coordinates.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : location  --  gate, transmitter, receiver, and apparatus are declared
@@ -68,7 +69,8 @@
 ;;;               -beam-los-coordinates (LOS-ENDPOINT; APPARATUS-COORDS>, the segment
 ;;;               relations, *BOUNDARY-WALL-HEIGHT*, DERIVE-LOS-FROM-SEGMENTS, live
 ;;;               BEAM-COORDINATES-ELEVATION-AT); -beam-interpolation (the sloped-beam
-;;;               elevation hook); -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)
+;;;               elevation hook); -vertical (base, top);
+;;;               -beam-occlusion (BEAM-BLOCKER-OCCLUDES-LOCATION)
 ;;; PROVIDES:
 ;;;   relations : (los-via visibility-object $list visibility-object)  --  symmetric;
 ;;;               $list items are gate or location names,
@@ -107,8 +109,10 @@
 (define-init-check visibility-init-check (literals)
   (:consumes gate location)
   (check-init-list-relation-items-have-types
-    literals 'los-via '(gate location))
-  (check-init-los-starts-at-location literals))
+    (positive-init-literals-with-relation 'los-via literals)
+    'los-via '(gate location))
+  (check-init-los-starts-at-location literals)
+  (check-init-los-structure literals))
 
 
 (define-init-check-helper check-init-los-starts-at-location (literals)
@@ -125,6 +129,30 @@
            LOS-VIA is symmetric, so the engine already stores the reverse direction; write ~
            each sightline once, from the location an actor occupies."
           near)))))
+
+
+(define-init-check-helper check-init-los-structure (literals)
+  "Reject sightlines with no span and malformed intervening-occluder lists.  Repeating an
+   occluder changes nothing, while naming either endpoint as intervening confuses an anchor
+   with something between the anchors and can make a beam block itself."
+  (dolist (literal (positive-init-literals-with-relation 'los-via literals))
+    (destructuring-bind (near occluders far)
+        (rest (init-literal-proposition literal))
+      (when (eql near far)
+        (fail-init-check literal
+          "LOS-VIA has the same near and far endpoint: ~S.  A sightline must span two distinct endpoints."
+          near))
+      (when (/= (length occluders)
+                (length (remove-duplicates occluders :test #'eql)))
+        (fail-init-check literal
+          "LOS-VIA repeats an occluder: ~S.  List each intervening gate or location once."
+          occluders))
+      (dolist (occluder occluders)
+        (when (or (eql occluder near)
+                  (eql occluder far))
+          (fail-init-check literal
+            "LOS-VIA lists endpoint ~S as its own intervening occluder.  Remove it from ~S."
+            occluder occluders))))))
 
 
 ;;;; SIGHTLINE TEST ;;;;
@@ -230,12 +258,12 @@
                     (if (eql $kind :boundary)
                       0
                       (base $barrier)))
-            (assign $height
+            (assign $top-elevation
                     (if (eql $kind :boundary)
                       *boundary-wall-height*
-                      (object-height $barrier)))
+                      (top $barrier)))
             (or (< $crossing-elevation $base-elevation)
-                (> $crossing-elevation (+ $base-elevation $height)))))))
+                (> $crossing-elevation $top-elevation))))))
 
 
 (define-query beam-elevation-at-location

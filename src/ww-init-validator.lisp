@@ -214,9 +214,11 @@
 
 
 (defun init-literal-map (relation literals key-index value-index)
-  "Build a raw initialization map for two fields of RELATION propositions."
+  "Build a map from two fields of positive RELATION propositions.  Explicit negative
+   literals describe absent facts and must never satisfy a consistency check that asks
+   where an object is, what supports it, or which static topology exists."
   (let ((map (make-hash-table :test #'equal)))
-    (dolist (literal (init-literals-with-relation relation literals))
+    (dolist (literal (positive-init-literals-with-relation relation literals))
       (let ((proposition (init-literal-proposition literal)))
         (setf (gethash (nth key-index proposition) map)
               (nth value-index proposition))))

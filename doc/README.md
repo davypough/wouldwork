@@ -12,7 +12,7 @@ Two other documentation homes sit outside this directory: `tech/README.html` is 
 
 | File | Answers |
 |---|---|
-| `ordering-of-operations.md` | *When* does each thing happen, from ASDF bootstrap to the end of `init()`? Five stages, what each freezes, and nine ordering traps. |
+| `ordering-of-operations.md` | *When* does each thing happen, from ASDF bootstrap to the end of `init()`? Five stages, what each freezes, and ten ordering traps. |
 | `parameter-precedence.md` | *Where did this parameter's value come from, and who wins?* The four value sources, what `vals.lisp` persists, and what `stage` / `refresh` / `ww-reset` each do. |
 
 Read these when a problem loads but behaves as though a form didn't take effect, when a derived table comes back empty, or when a setting keeps reverting.
@@ -39,7 +39,7 @@ Raw analysis material for individual problems: goal deductions, solution traces,
 
 ## Conventions
 
-- **Markdown for anything maintained as reference.** Per `CLAUDE.md`, artifacts meant to be read rather than edited go to `artifacts/` as HTML.
+- **Markdown for anything maintained as reference.** Generated artifacts meant to be read rather than edited go to `artifacts/` as HTML.
 - **Cite files and function names, not line numbers.** Line references go stale on the first edit above them and give no signal when they do. The exception is a within-session transcription check against a file open in front of you.
 - **Name the authoritative source rather than duplicating it.** Where `tech/README.html` or the Manual covers something, point at it.
 - **Say when a document has been superseded.** Several files here were written against representations that no longer exist; where reasoning was worth keeping, it is retained under a header saying so rather than silently left to look current.

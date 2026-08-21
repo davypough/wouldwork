@@ -1,4 +1,9 @@
 ;;;; PERGATORY VIDEO SOLUTION phase 3, around the corner
+;;;;
+;;;; LEGACY TRACE: captured from the pre-technology problem-corner.lisp model.  LOC and the
+;;;; CONNECT-TO-N-TERMINUS action family are not current tech syntax and this form cannot be
+;;;; replayed against problem-corner-topo.lisp.  It remains historical solution evidence;
+;;;; the current model uses HAS-LOCATION/ON, CONNECT-CONNECTOR, and route-bearing MOVE.
 
 ;;;; Note: Action 13 also needs connection to receiver1 (connect-to-4-terminus) to work
 

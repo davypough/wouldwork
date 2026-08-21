@@ -13,9 +13,10 @@
 ;;; REQUIRES:
 ;;;   types      : agent, location -- connector/transmitter/receiver/repeater and related
 ;;;                leaf types are optional through the nested roles
-;;;   nested     : -beam-substrate (beam relations and hooks); -placement;
-;;;                -visibility (null defaults); -support-elevation; -elevation;
-;;;                -mobility; -reachability; -pickup
+;;;   nested     : -propagation (derived-state driver); -beam-substrate (beam relations
+;;;                and hooks); -placement; -visibility (null defaults); -vertical (top);
+;;;                -mobility; -reachability; -pickup; -beam-relay-init-checks;
+;;;                -recorder-fork-registry (paired-fact fork)
 ;;;   parameter  : *max-pairings* -- defaults to 3; connector pairings only; fixed
 ;;;                couplings are unlimited; a problem may set a smaller value first
 ;;;   driver     : propagate-consequences! must call
@@ -41,8 +42,6 @@
 (include-tech -placement)
 (include-tech -visibility)
 (include-tech -vertical)
-(include-tech -support-elevation)
-(include-tech -elevation)
 (include-tech -mobility)
 (include-tech -reachability)
 (include-tech -pickup)

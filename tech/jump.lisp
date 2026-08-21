@@ -21,9 +21,10 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  box and wall are declared optional here
-;;;   nested    : -support-elevation (support occupancy, location, height, elevation, top,
-;;;               base, and *vertical-reach-limit*, which this file reuses rather than
-;;;               defining its own jump-specific parameter); -passability (holding and
+;;;   nested    : -vertical (top, location-elevation);
+;;;               -support-elevation (support occupancy and *vertical-reach-limit*, which
+;;;               this file reuses rather than defining its own jump-specific parameter);
+;;;               -passability (holding and
 ;;;               obstacle-clear); -threat (safe); -traversal; -mobility-action
 ;;; PROVIDES:
 ;;;   types     : box, wall  --  declared optional; jumping remains usable without them
@@ -74,8 +75,7 @@
 
 
 (define-query jump-barrier-top-elevation (?feature vaultable-object)
-  (+ (base ?feature)
-     (object-height ?feature)))
+  (top ?feature))
 
 
 (define-query vaultable-object-list (?features)

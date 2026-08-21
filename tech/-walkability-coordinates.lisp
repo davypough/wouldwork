@@ -68,8 +68,9 @@
 ;;; regions), keep the platform's own locations inside that footprint, and connect the
 ;;; levels only with authored STAIRWAY, JUMPING, or CLIMBING edges (which this
 ;;; derivation never touches); ONE-STEP-WALKABLE's
-;;; elevation-equality check rejects any derived edge between different levels.  See
-;;; problem-claustro-topo's slab (edge1/edge2) for the pattern.
+;;; elevation-equality check rejects any derived edge between different levels, including
+;;; two distinct locations sharing the same x/y point.  See problem-claustro-topo's slab
+;;; (edge1/edge2) and problem-phobia-topo's location10/location11 pair for the patterns.
 ;;;
 ;;; Reuses LOCATION-COORDS> (nested from -location-coordinates, shared with
 ;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Reuses the

@@ -6,10 +6,12 @@
 ;;; are reached only after earlier segments, the route proves exact positioning is evaluated
 ;;; at each hypothetical intermediate source rather than only at the agent's initial location.
 ;;;
-;;; Independent probes reject carrying cargo, using a ladder positioned elsewhere, omitting
-;;; the positioned ladder from the edge means, crossing a closed gate, and landing at a lethal
-;;; destination.  A supported agent retains a hypothetical grounded closure but cannot invoke
-;;; MOVE until an explicit configuration transition leaves the support.
+;;; Independent probes reject carrying cargo, crossing a closed gate, and landing at a lethal
+;;; destination.  Two valid climbs contain decoy ladders that respectively violate exact
+;;; positioning and means-list membership, while isolated initialization probes reject edges
+;;; having no valid source ladder at all.  A supported agent retains a hypothetical grounded
+;;; closure but cannot invoke MOVE until an explicit configuration transition leaves the
+;;; support.
 ;;;
 ;;; Expected minimum solution: one MOVE from ENTRY to GOAL with the complete four-segment
 ;;; route witness.
@@ -38,6 +40,7 @@
             unsafe-start unsafe-goal
             canonical-start canonical-goal)
   ladder (ladder1 ladder2 ladder3 ladder4 ladder5 ladder6 ladder7 ladder8
+          misplaced-source-ladder listed-source-ladder
           canonical-ladder-a canonical-ladder-b)
   screen (screen1 unlisted-screen)
   gate (closed-gate)
@@ -74,15 +77,22 @@
   (has-position ladder4 supported-start)
   (traversal-via> climbing supported-start ((ladder4)) supported-goal)
 
-  ;; The edge starts where the agent stands, but its named ladder is fixed elsewhere.
+  ;; A misplaced listed ladder is only a decoy; the source-positioned listed ladder must
+  ;; provide the valid segment.
   (has-location misplaced-agent misplaced-start)
   (has-position ladder5 misplaced-ladder-site)
-  (traversal-via> climbing misplaced-start ((ladder5)) misplaced-goal)
+  (has-position misplaced-source-ladder misplaced-start)
+  (traversal-via> climbing misplaced-start
+              ((ladder5 misplaced-source-ladder))
+              misplaced-goal)
 
-  ;; The ladder is correctly positioned but absent from the edge's clear means list.
+  ;; A source-positioned ladder omitted from the means list is likewise only a decoy.
   (has-location unlisted-agent unlisted-start)
   (has-position ladder6 unlisted-start)
-  (traversal-via> climbing unlisted-start ((unlisted-screen)) unlisted-goal)
+  (has-position listed-source-ladder unlisted-start)
+  (traversal-via> climbing unlisted-start
+              ((listed-source-ladder unlisted-screen))
+              unlisted-goal)
 
   ;; Every item in the flat means conjunction must pass.
   (has-location gate-agent gate-start)
@@ -159,6 +169,27 @@
                canonical-goal))))))
 
 
+(define-test-claim ladder-provider-respects-position-and-membership
+  (let ((misplaced-updates
+          (ladder-test-updates-to
+            *start-state* 'misplaced-agent 'misplaced-goal))
+        (unlisted-updates
+          (ladder-test-updates-to
+            *start-state* 'unlisted-agent 'unlisted-goal)))
+    (and (= (length misplaced-updates) 1)
+         (equal
+           (second (update.instantiations (first misplaced-updates)))
+           '((ladder misplaced-start
+               (misplaced-source-ladder ladder5)
+               misplaced-goal)))
+         (= (length unlisted-updates) 1)
+         (equal
+           (second (update.instantiations (first unlisted-updates)))
+           '((ladder unlisted-start
+               (listed-source-ladder unlisted-screen)
+               unlisted-goal))))))
+
+
 (define-query ladder-climber-at-goal ()
   (has-location climber goal))
 
@@ -195,10 +226,52 @@
   (and (not (find 'use-ladder *actions* :key #'action.name))
        (not (ladder-test-move-updates *start-state* 'carrying-agent))
        (not (ladder-test-move-updates *start-state* 'supported-agent))
-       (not (ladder-test-move-updates *start-state* 'misplaced-agent))
-       (not (ladder-test-move-updates *start-state* 'unlisted-agent))
        (not (ladder-test-move-updates *start-state* 'gate-agent))
        (not (ladder-test-move-updates *start-state* 'unsafe-agent))))
+
+
+(define-test-claim ladder-authoring-validation
+  (null
+    (validate-init-literals
+      '((has-position ladder6 unlisted-start)
+        (traversal-via> climbing unlisted-start ((ladder6)) unlisted-goal))
+      :checks '(ladder-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder6 unlisted-start)
+          (traversal-via climbing unlisted-start ((ladder6)) unlisted-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "Climbing traversal must be directed"
+    :check 'ladder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder6 unlisted-start)
+          (traversal-via> climbing unlisted-start ((unlisted-screen)) unlisted-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "has no listed ladder positioned at its source"
+    :check 'ladder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder5 misplaced-ladder-site)
+          (traversal-via> climbing misplaced-start ((ladder5)) misplaced-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "has no listed ladder positioned at its source"
+    :check 'ladder-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder6 unlisted-start)
+          (traversal-via> climbing unlisted-start () unlisted-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "Climbing clause NIL"
+    :check 'ladder-init-check))
 
 
 (define-query ladder-scenarios-valid ()
@@ -230,11 +303,11 @@
     (on supported-agent support-box)
     (traversable supported-agent supported-start supported-goal)
 
-    ;; Exact fixture position and membership are both required.
+    ;; Valid edges ignore decoys that fail one of the provider's two requirements.
     (has-position ladder5 misplaced-ladder-site)
-    (not (traversable misplaced-agent misplaced-start misplaced-goal))
+    (traversable misplaced-agent misplaced-start misplaced-goal)
     (all-clear unlisted-agent '(unlisted-screen))
-    (not (traversable unlisted-agent unlisted-start unlisted-goal))
+    (traversable unlisted-agent unlisted-start unlisted-goal)
 
     ;; A closed item blocks the conjunction, and an unsafe destination blocks the segment.
     (not (open closed-gate))

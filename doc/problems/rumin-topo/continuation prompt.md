@@ -6,8 +6,8 @@ Paste the section below into a new session.
 
 ## Task
 
-`probs/problem-rumin-topo.lisp` is solved: `doc/problems/rumin-topo/rumin-topo solution
-(90 steps).lisp` validates end to end, goal `(and (has-location agent1 location16))`.
+`probs/problem-rumin-topo.lisp` is solved: `doc/problems/rumin-topo/rumin-topo solution (90 steps).lisp`
+validates end to end, goal `(and (has-location agent1 location16))`.
 But it uses only **two** recorder cycles, 52 actions and 38 actions, and each
 `(solve-subgoal ...)` chunk must be a whole cycle — so neither chunk is searchable. For
 comparison, the original 14-step subgoal1 search took 450 s.
@@ -20,17 +20,16 @@ Raise `(ww-set *max-recorder-cycles* ...)` in the problem file to match.
 
 ## Run the code, don't reason about it
 
-`CLAUDE.md` → "Running Wouldwork in a Claude cloud session" has the verified recipe for
-building and running wouldwork inside the container: apt for SBCL and the three
-dependencies, the ASDF source-registry, the `device_bash` tar transfer, and the
-`uiop:*compile-file-failure-behaviour*` setting that gets `asdf:load-system` past the
-`ww-set` warnings. Use it. Several confident geometric claims made while designing this
-solution turned out to be wrong; the ones that survived were measured.
+Follow the repository's current agent instructions. From PowerShell in the project
+directory, start `sbcl --dynamic-space-size 4096`, then load Wouldwork and enter its package
+with `(progn (ql:quickload :wouldwork) (in-package :ww))`. Keep that session running while
+performing the related checks. Several confident geometric claims made while designing
+this solution turned out to be wrong; the ones that survived were measured.
 
 Beyond `validate-solution`, `define-query` bodies are callable directly against a state
 built by `validate-action-sequence`:
 `(funcall (symbol-function 'beam-visible) state loc anchor apparatus elev)`, likewise
-`placement-options`, `movement-results`, `pickup-clear`, `reachable`, `occupant-elevation`.
+`placement-options`, `movement-results`, `pickup-clear`, `reachable`, `base`, `top`.
 
 ## How goal chaining actually behaves — this drives the whole design
 
@@ -74,7 +73,7 @@ west — that is the part most likely to break the shape, and the first thing to
 
 ## Measured facts — reuse, don't rederive
 
-Anchor = a connector's beam height = support-top elevation + 1.
+Anchor = a connector's `top` = its structural `base` plus its height (default 1).
 
 - transmitter1 and transmitter2 are beam-visible **only** from loc2 and loc3, and only at
   anchor ≥ 2 (walls 10 and 12 are height 3/2).
@@ -94,7 +93,7 @@ Anchor = a connector's beam height = support-top elevation + 1.
 - **East → west without gate1:** `loc11 →(GATE2)→ loc5 →ladder1→ loc13 → loc4 → loc2`,
   available whenever receiver1 is dark. This is what lets the agent return to the recorder
   to open another cycle.
-- Ladders require empty hands and `climb-via>` is directional, so nothing can be carried up
+- Ladders require empty hands and `traversal-via>` in `climbing` mode is directional, so nothing can be carried up
   to the loc15 ledge and there is no way back down to loc14.
 - The final leg: on the loc15 ledge the agent is at elevation 2; tray1 on box1 at loc14 is
   at 1 (liftable, gap = `*vertical-reach-limit*`); box1 at 0 is not. Verified:
@@ -124,13 +123,9 @@ Already committed and passing `(test-talos)` — 93 problems, 0 failures, 25 mut
   `(has-elevation location16 2)`, `(has-height edge5 2)`; `(reach-via> location15 ()
   location14)`; `(ww-set *max-recorder-cycles* 2)`.
 
-`_to_delete_files/` in the repo root holds superseded docs and the source tarball used to
-move the repo into the container; `device_bash` cannot delete, so they need removing by hand.
-
 ## Working agreements
 
 Locations are the user's guesses and may be proposed freely — objects, wall/gate geometry,
 apparatus coordinates, controller wiring, chromas, elevations and heights are given. See
-`CLAUDE.md` → "Problem Modelling: What Is Given and What Is Ours to Choose". Present whole
-functions when revising code, explain the purpose before editing, and give the exact REPL
-command to run afterwards.
+the repository's current agent instructions for the full modeling and workflow rules.
+Explain the purpose before editing and run the appropriate REPL checks afterwards.

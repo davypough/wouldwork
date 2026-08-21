@@ -1,8 +1,8 @@
 ;;; Filename: tray.lisp
 
 ;;; Tray technology: a carryable, stackable support -- but only while held.  An agent can
-;;; pick up a tray within its own height of reach and put a held tray on the ground, a
-;;; plate, a clear box top, or another agent's currently-held tray, exactly like a box.
+;;; pick up a tray within the fixed vertical reach limit and put a held tray on the ground,
+;;; a plate, a clear box top, or another agent's currently-held tray, exactly like a box.
 ;;; Unlike a box, a tray also supports occupants of its own while held: another agent may
 ;;; place an object on any currently-held tray (see -placement's held-tray clause), and
 ;;; that object's has-location tracks the holder's as it moves (see
@@ -12,11 +12,15 @@
 ;;; even while held, the one deviation from held cargo having no location, so that its
 ;;; occupant's has-location consumers (beam-relay, visibility, etc.) keep working
 ;;; unchanged while the tray is held.
+;;; Initialization therefore requires a held tray's retained HAS-LOCATION to match its
+;;; holder, forbids the held tray from also resting ON something, and rejects any ON chain
+;;; in which the tray would support its own holder; -physical-init-checks owns those shared
+;;; physical-state checks.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location; tray is declared optional here
-;;;   nested    : -placement (placement-options, place-held-object!; also brings in
-;;;               support occupancy, location, position, height, elevation, and holding);
+;;;   nested    : -placement (placement-options, place-held-object!, reach policy, and
+;;;               vertical/support geometry);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -pickup (pickup-clear, shared with box, jammer, and beam-relay)
 ;;;   driver    : propagate-changes! (master)

@@ -12,8 +12,8 @@
 ;;;
 ;;; While the fan's gears turn in an object's environmental view, its air stream sweeps
 ;;; the faced location horizontally at the stream elevation: an object standing at
-;;; elevation s with height h is blown iff
-;;; s < stream <= s + h -- the stream must strike its body.  With unit heights, gears at
+;;; base elevation s is blown iff
+;;; s < stream <= top -- the stream must strike its body.  With unit heights, gears at
 ;;; elevation 1 blow anything standing on the floor, while gears at elevation 2 pass
 ;;; over the floor and blow only objects standing at elevation 1 (e.g. on a box top).  A
 ;;; blown object is torn off whatever support it rests on, relocates to the gears'
@@ -32,15 +32,22 @@
 ;;; makes its faced location impossible to occupy at that level, though traffic below
 ;;; (or above) the stream passes freely.
 ;;;
-;;; Authoring obligation: aimed-at destinations must not chain the swept locations of
-;;; simultaneously-blowing wall fans -- directly, or indirectly by landing on another
-;;; blower's fan -- into a cycle, or propagation's iteration cap trips inconsistent-state.
-;;; Acyclic chains (one fan blowing into another's swept location, or landing on another
-;;; fan's flush top) are fine and settle within the cap (10 iterations).
+;;; Authoring obligations: every drive names its faced/swept location with HAS-POSITION
+;;; and its delivery location with AIMED-AT; -gears-fan's shared init check rejects either
+;;; missing endpoint.  Coordinate-known endpoints are axis-aligned on one floor level: the
+;;; modeled wall stream is horizontal, and its absolute stream elevation must be strictly
+;;; above that floor.  A destination graph may contain a cycle when controls or empty
+;;; streams keep it inert.  What must not occur is an active occupant-transport loop through
+;;; simultaneously blowing fans -- directly, or indirectly by landing on another blower's
+;;; fan.  That state never converges, so propagation's iteration cap marks it inconsistent
+;;; and search discards it.  Active acyclic chains (one fan blowing into another's swept
+;;; location, or landing on another fan's flush top) are fine and settle within the cap.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  wall-gears and fan come from nested -gears-fan
-;;;   nested    : -gears-fan (types, mounted-on, aimed-at, turning/blowing,
+;;;   nested    : -propagation (derived-state driver);
+;;;               -vertical (base, top, location-elevation);
+;;;               -gears-fan (types, mounted-on, aimed-at, turning/blowing,
 ;;;               blower-elevation, landing-support, land-on-support!,
 ;;;               update-blower-status!, relocate-stack!, fan actions; nests
 ;;;               -support-occupancy, -location, -position, -elevation, -controls,
@@ -76,8 +83,8 @@
 
 (define-update sweep-occupants-away! (?drive (either wall-gears wall-blower))
   ;; Blow every occupant of ?gears' faced location whose body the stream strikes -- an
-  ;; object standing at elevation $standing with height $height is blown iff
-  ;; $standing < stream <= $standing + $height -- to the aimed-at destination.  A blown
+  ;; object standing at elevation $standing is blown iff
+  ;; $standing < stream <= its TOP -- to the aimed-at destination.  A blown
   ;; object is torn off whatever support it rests on (plate, box, fan) and relocates via
   ;; relocate-stack!, its own stacked riders traveling still stacked; jamming and
   ;; connector-pairing facts persist through the ride, their effects re-derived by
@@ -99,9 +106,8 @@
                  (eql $x-location $swept)
                  (blower-active-for-object ?x ?drive))
           (do (assign $standing (base ?x))
-              (assign $height (object-height ?x))
               (if (and (< $standing $stream)
-                       (<= $stream (+ $standing $height)))
+                       (<= $stream (top ?x)))
                 (do (if (bind (on ?x $support))
                       (not (on ?x $support)))
                     (relocate-stack! ?x $destination)

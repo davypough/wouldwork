@@ -1,3 +1,9 @@
+LEGACY TRACE — This was captured from the pre-technology problem-corner.lisp model.  Its
+LOC state relation and CONNECT-TO-N-TERMINUS action family are not current tech syntax and
+cannot be replayed against problem-corner-topo.lisp.  It is retained only as historical
+solution evidence; current connector setup uses CONNECT-CONNECTOR, current placement uses
+HAS-LOCATION/ON, and current movement is the route-bearing MOVE action.
+
 * (validate-solution :verbose
 (pickup-connector agent1 connector1 area1)
 (connect-to-2-terminus agent1 connector1 transmitter1 receiver1 area1 ground)

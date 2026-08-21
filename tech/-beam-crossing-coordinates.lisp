@@ -4,14 +4,21 @@
 ;;; from the beam geometry -beam-los-coordinates.lisp already derived (or the problem hand-
 ;;; authored) as LOS-VIA, for a problem that would rather author 2D
 ;;; positions than hand-list which crossings lie on which beam and in what order.  Nested under
-;;; beam-crossing-tech only -- unlike -beam-los-coordinates, this file's derivations are never
+;;; beam-crossing.lisp only -- unlike -beam-los-coordinates, this file's derivations are never
 ;;; useful to a problem that includes beam-direct alone, since CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-
 ;;; BEFORE-GATE> are consumed only by beam-crossing's own BEAM-REACHES-CROSSING.  A problem
 ;;; wanting two crossing direct beams includes both beam-direct and beam-crossing together;
 ;;; splicing is deduplicated per problem copy and this file always nests -beam-los-coordinates
 ;;; as its own first form, so LOS derivation runs before crossing derivation regardless of
-;;; whether visibility-tech (which also nests -beam-los-coordinates, as the owner of the los
+;;; whether visibility.lisp (which also nests -beam-los-coordinates, as the owner of the LOS
 ;;; relations it derives) was listed before or after beam-crossing.
+;;;
+;;; A crossing here is deliberately a proper intersection of two projected 2D paths.  The
+;;; elevation model governs finite barrier clearance and movable-object occlusion, but does
+;;; not filter beam-beam interference by height.  The current crossing technology is used by
+;;; flat corner-topo, where every beam anchor is at the common default elevation; a problem
+;;; that needs beams to pass over one another would require a separate dynamic 3D crossing
+;;; model rather than an incidental change to this static ordering substrate.
 ;;;
 ;;; The problem declares no CROSSING pool at all.  ESTABLISH-BEAM-COORDINATES mints exactly one
 ;;; crossing per computed intersection (BEAM-COORDINATES-DERIVE-CROSSING-RECORDS) and publishes
@@ -20,10 +27,10 @@
 ;;; extension is frozen into every compiled DOALL literal at load time, well before any
 ;;; init-action runs -- so beam-crossing.lisp iterates them through its GET-CURRENT-BEAM-CROSSINGS
 ;;; query instead of over the bare CROSSING type.  Does not assert BEAM-CROSSING> --
-;;; beam-crossing-tech derives that itself, lazily, from whichever facts populate CROSSINGS-
+;;; beam-crossing.lisp derives that itself, lazily, from whichever facts populate CROSSINGS-
 ;;; ALONG-BEAM>, regardless of how they got there.
 ;;;
-;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing-tech, alongside
+;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing.lisp, alongside
 ;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENT>: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
 ;;; the beam -- independently per gate, for a beam conditioned on more than one.  Wall,
@@ -41,7 +48,7 @@
 ;;;
 ;;; REQUIRES:
 ;;;   nested    : -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
-;;;               POSITION>; LOS-VIA, hand-authored or derived)
+;;;               COORDS>; LOS-VIA, hand-authored or derived)
 ;;;   relations : crossings-along-beam>, beam-crossings-before-gate>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
 ;;; PROVIDES:

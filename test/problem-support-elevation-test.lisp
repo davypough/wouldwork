@@ -1,7 +1,7 @@
 ;;; Filename: problem-support-elevation-test.lisp
 
-;;; Dedicated zero-action regression for the shared -support-elevation role.
-;;; Four independent scenarios characterize its complete elevation model:
+;;; Dedicated zero-action regression for -vertical's geometry and -support-elevation's
+;;; reach policy.  Five independent scenarios characterize them:
 ;;;
 ;;;   1. A nonzero-elevation stack chains through plate, explicit-height box,
 ;;;      zero-thickness fan, default-height box, and default-height agent.
@@ -20,9 +20,8 @@
 ;;;      as offsets from a single floor: a connector on the ground anchors at the
 ;;;      floor plus one, on a box at plus two, and on a tray held by a standing agent
 ;;;      at plus five halves.  These are the empirically established values the
-;;;      vertical model must keep reproducing; the third is the one that currently
-;;;      depends on a dedicated held-tray branch rather than falling out of the
-;;;      ordinary support recursion.
+;;;      vertical model must keep reproducing; all three follow the ordinary support
+;;;      recursion.
 ;;;
 ;;; The characterization goal verifies the authored support chain, the absence of
 ;;; competing support and height facts, all exact intermediate elevations, fan and
@@ -211,31 +210,24 @@
     (= (top tray-occupant-box) 9/2)
 
     ;; The three achievable connector anchor heights, as offsets from ANCHOR-SITE's
-    ;; floor elevation of two.  A connector's anchor is its own standing elevation
-    ;; plus its declared height, so each pair below pins the standing elevation and
-    ;; the anchor it yields: ground gives floor + 1, a box floor + 2, and a tray held
-    ;; by a standing agent floor + 5/2.
+    ;; floor elevation of two.  A connector's anchor is its TOP, so each pair below
+    ;; pins the structural base and the public anchor it yields: ground gives floor + 1,
+    ;; a box floor + 2, and a tray held by a standing agent floor + 5/2.
     (= (location-elevation anchor-site) 2)
     (= (base anchor-agent) 2)
 
     (not (exists (?support support)
            (on ground-connector ?support)))
     (= (base ground-connector) 2)
-    (= (+ (base ground-connector)
-          (object-height ground-connector))
-       3)
+    (= (top ground-connector) 3)
 
     (support-elevation-only-on box-connector anchor-box)
     (= (base box-connector) 3)
-    (= (+ (base box-connector)
-          (object-height box-connector))
-       4)
+    (= (top box-connector) 4)
 
     (support-elevation-only-on tray-connector anchor-tray)
     (= (base tray-connector) 7/2)
-    (= (+ (base tray-connector)
-          (object-height tray-connector))
-       9/2)))
+    (= (top tray-connector) 9/2)))
 
 
 (define-goal

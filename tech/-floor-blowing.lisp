@@ -11,6 +11,16 @@
 ;;; back to the drive's location.  The public floor-gears.lisp and floor-blower.lisp
 ;;; technologies both include this file so a problem can name the kind of object it
 ;;; actually declares without duplicating the shared physics.
+;;; Like every blower drive, each floor drive must have exactly one HAS-POSITION source and
+;;; AIMED-AT destination; -gears-fan owns that shared completeness check beside AIMED-AT.
+;;; Each floor drive must also have its own destination.  Hover state records the destination,
+;;; not a launch-source relation, so sharing one destination would make the eventual drop-back
+;;; source ambiguous; FLOOR-BLOWING-INIT-CHECK rejects that floor-only error.
+;;; A floor stream rises vertically.  When both its positioned source and destination have
+;;; LOCATION-COORDS>, the same check therefore requires their x/y coordinates to match.
+;;; Whenever both endpoint levels are authored through coordinates or HAS-ELEVATION, the
+;;; destination must also be strictly above the source.  Problems omitting either piece of
+;;; geometry retain the abstract source/destination representation.
 ;;;
 ;;; A launched box carries its stack.  A jamming jammer or paired connector retains its
 ;;; relation through launch and fall; propagation re-derives the effect from its new
@@ -19,19 +29,107 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location
-;;;   nested    : -gears-fan (types, mounting, shared blower state and cargo actions)
+;;;   nested    : -gears-fan (types, mounting, shared blower state and cargo actions);
+;;;               -vertical (base, location-coords>, has-elevation, and the
+;;;               location-elevation seam overridden here)
 ;;;   driver    : the derived propagation driver calls update-floor-blowing-status!
 ;;;               after update-blower-status!
 ;;; PROVIDES:
 ;;;   query     : location-elevation -- overrides -vertical's seam so an undeclared
 ;;;               floor-stream destination defaults to the in-air hover elevation 10
 ;;;   updates   : update-floor-blowing-status!, blow-occupants-away!, drop-occupants!
+;;;   init check: floor-blowing-init-check -- destinations have unique drive owners,
+;;;               and geometry-known lifts rise vertically
 
 (include-tech -propagation)
 (include-tech -gears-fan)
 (include-tech -vertical)
 
 (in-package :ww)
+
+
+(define-init-check floor-blowing-init-check (literals)
+  (check-init-floor-destinations-have-unique-drives literals)
+  (check-init-floor-drive-geometry literals))
+
+
+(define-init-check-helper check-init-floor-destinations-have-unique-drives (literals)
+  "Reject two floor drives aimed at one destination, whose hover state could not retain a
+   unique drop-back source."
+  (let ((owners (make-hash-table :test #'eq)))
+    (dolist (literal (positive-init-literals-with-relation 'aimed-at literals))
+      (destructuring-bind (drive destination) (rest (init-literal-proposition literal))
+        (when (init-floor-drive-p drive)
+          (check-init-floor-destination-owner literal drive destination owners))))))
+
+
+(define-init-check-helper init-floor-drive-p (drive)
+  (or (init-type-member-p drive 'floor-gears)
+      (init-type-member-p drive 'floor-blower)))
+
+
+(define-init-check-helper check-init-floor-destination-owner
+    (literal drive destination owners)
+  (multiple-value-bind (owner presentp) (gethash destination owners)
+    (when (and presentp (not (eql owner drive)))
+      (fail-init-check
+        literal
+        "~%Floor drives must not share an AIMED-AT destination.~%~
+         Destination:  ~S~%~
+         First drive:  ~S~%~
+         Second drive: ~S~%~
+         A hovering occupant records only its destination, so it would have no unique ~
+         source to return to when the streams stop."
+        destination owner drive))
+    (setf (gethash destination owners) drive)))
+
+
+(define-init-check-helper check-init-floor-drive-geometry (literals)
+  "Require a geometry-known floor stream to rise vertically above its source."
+  (let ((positions (init-literal-map 'has-position literals 1 2))
+        (coordinates (init-location-xy-map literals))
+        (levels (init-location-level-map literals)))
+    (dolist (literal (positive-init-literals-with-relation 'aimed-at literals))
+      (destructuring-bind (drive destination) (rest (init-literal-proposition literal))
+        (when (init-floor-drive-p drive)
+          (let ((source (gethash drive positions)))
+            (check-init-floor-drive-coordinate-pair
+              literal drive source destination coordinates)
+            (check-init-floor-drive-level-pair
+              literal drive source destination levels)))))))
+
+
+(define-init-check-helper check-init-floor-drive-coordinate-pair
+    (literal drive source destination coordinates)
+  (let ((source-point (and source (gethash source coordinates)))
+        (destination-point (gethash destination coordinates)))
+    (when (and source-point destination-point
+               (not (equal source-point destination-point)))
+      (fail-init-check
+        literal
+        "~%A coordinate-known floor stream must be vertical.~%~
+         Drive:       ~S~%~
+         Source:      ~S at ~S~%~
+         Destination: ~S at ~S~%~
+         Give its HAS-POSITION source and AIMED-AT destination the same x/y coordinates."
+        drive source source-point destination destination-point))))
+
+
+(define-init-check-helper check-init-floor-drive-level-pair
+    (literal drive source destination levels)
+  (multiple-value-bind (source-level source-known-p) (gethash source levels)
+    (multiple-value-bind (destination-level destination-known-p)
+        (gethash destination levels)
+      (when (and source-known-p destination-known-p
+                 (not (< source-level destination-level)))
+        (fail-init-check
+          literal
+          "~%A level-known floor stream destination must be above its source.~%~
+           Drive:       ~S~%~
+           Source:      ~S at level ~S~%~
+           Destination: ~S at level ~S~%~
+           Give the destination a strictly greater level."
+          drive source source-level destination destination-level)))))
 
 
 (define-query location-elevation (?location location)

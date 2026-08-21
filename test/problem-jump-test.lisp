@@ -26,7 +26,8 @@
 ;;; directed-edge asymmetry, rejection of an unsafe landing, rejection of an occupied box
 ;;; top while preserving its ground landing, rejection of an over-limit local box mount,
 ;;; exclusive ownership of grounded jumps by mobility rather than the configuration-
-;;; transition substrate, and rejection of an edge instance from a JUMP-VIA feature list --
+;;; transition substrate, and rejection of an edge instance from a jumping TRAVERSAL-VIA
+;;; feature list --
 ;;; VAULTABLE-OBJECT deliberately excludes edge, since an edge has no independent "top" to
 ;;; vault onto.  The move-type tag itself is also characterized: a genuinely vaulting
 ;;; transition (lane 4) is tagged VAULT, while a non-empty but fully passable feature list
@@ -108,7 +109,8 @@
 
   ;; Planned lane 3: both box tops are elevation 4, so the jump between them has zero
   ;; elevation gain and is unaffected by any upward-reach limit.  The edge is authored
-  ;; target-first so the required source-to-target traversal depends on JUMP-VIA symmetry.
+  ;; target-first so the required source-to-target traversal depends on TRAVERSAL-VIA
+  ;; symmetry in jumping mode.
   (has-location transfer-agent transfer-start)
   (has-location transfer-source-box transfer-start)
   (has-height transfer-source-box 4)

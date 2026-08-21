@@ -1,6 +1,6 @@
 ;;; Filename: problem-terrain-consistency-test.lisp
 
-;;; Dedicated regression for the -terrain-consistency substrate: the two cross-checks
+;;; Dedicated regression for the -terrain-consistency substrate: the three cross-checks
 ;;; that hold authored levels against the walking arrangement -walkability-coordinates
 ;;; derives.  The map has three compartments, each exercising one outcome:
 ;;;
@@ -16,6 +16,9 @@
 ;;;      what makes the pair legitimate.  The zone check passes exactly because of it.
 ;;;   3. WALL1 divides compartments 2 and 3.  It is a wall, not an edge, so the edge check
 ;;;      ignores it however its flanking levels read.
+;;;   4. Four drive fixtures pin the static level-change classification: floor gears and a
+;;;      fixed floor blower contribute vertical rides from their own locations to their
+;;;      destinations, while otherwise identical wall and angled drives do not.
 ;;;
 ;;; The claims then drive the analysis directly with doctored inputs, since neither check
 ;;; is an init-literal check and neither can be provoked by a literal alone: an edge whose
@@ -48,15 +51,22 @@
 
 (define-types
   agent    (walker)
-  location (ground1 ground2 slab1 slab2 stair-low stair-high)
+  location (ground1 ground2 slab1 slab2 stair-low stair-high
+            lift-low1 lift-high1 lift-low2 lift-high2)
   edge     (edge1)
-  wall     (wall1))
+  wall     (wall1)
+  floor-gears  (lift-gears)
+  floor-blower (fixed-lift)
+  wall-gears   (wall-drive)
+  angled-gears (angled-drive)
+  fan           (lift-fan))
 
 
 ;;;; TECHNOLOGY INCLUDE ;;;;
 
 
 (include-tech -terrain-consistency)
+(include-tech floor-gears)
 (include-tech walkability)
 (include-tech stairs)
 
@@ -91,6 +101,27 @@
   ;; Compartment 3 holds two levels in one zone, with no segment between them.
   (location-coords> stair-low 25 3 0)
   (location-coords> stair-high 25 7 2)
+
+  ;; The two floor-drive fixtures occupy vertical pairs in that same mixed-level zone.
+  ;; They add no new zone level and do not affect EDGE1's single-level flanks.
+  (location-coords> lift-low1 25 4 0)
+  (location-coords> lift-high1 25 4 2)
+  (location-coords> lift-low2 25 6 0)
+  (location-coords> lift-high2 25 6 2)
+
+  ;; Terrain consistency treats floor gears with an available removable fan as a potential
+  ;; static level change, independently of whether that fan is currently mounted.  Wall
+  ;; and angled drives share the same HAS-POSITION/AIMED-AT representation but move
+  ;; horizontally or along an arc, so they must not be mistaken for terrain lifts.
+  (has-location lift-fan ground2)
+  (has-position lift-gears lift-low1)
+  (aimed-at lift-gears lift-high1)
+  (has-position fixed-lift lift-low2)
+  (aimed-at fixed-lift lift-high2)
+  (has-position wall-drive ground2)
+  (aimed-at wall-drive slab2)
+  (has-position angled-drive slab2)
+  (aimed-at angled-drive ground2)
 
   ;; The authored crossing that makes compartment 3's level difference legitimate.
   ;; Removing it is what the zone check exists to catch.
@@ -178,7 +209,8 @@
                                (terrain-test-drifted-levels))))
 
   ;; EDGE1's step is crossed, so the traversability check is satisfied -- by the single
-  ;; authored STAIRS-VIA between GROUND1 and SLAB1, not by every flanking pair carrying one.
+  ;; authored stairway TRAVERSAL-VIA between GROUND1 and SLAB1, not by every flanking pair
+  ;; carrying one.
   (null (terrain-uncrossed-edge-complaints
           (terrain-test-arrangement) (terrain-test-edges)
           (terrain-zone-levels (terrain-test-arrangement) (terrain-test-levels))
@@ -213,12 +245,15 @@
           (terrain-test-drifted-levels)
           nil))
 
-  ;; A problem with no floor drive contributes no ride, so the level-change set is exactly
-  ;; the authored traversals.  phobia-topo is where the ride branch actually carries an
-  ;; agent, ten units up to a loft with no traversal relation authored anywhere.
-  (null (terrain-floor-drive-rides))
+  ;; Only the two floor drives contribute rides.  Their common representation with the
+  ;; wall and angled fixtures must not broaden the classification.
+  (= (length (terrain-floor-drive-rides)) 2)
+  (member '(lift-low1 lift-high1) (terrain-floor-drive-rides) :test #'equal)
+  (member '(lift-low2 lift-high2) (terrain-floor-drive-rides) :test #'equal)
+  (not (member '(ground2 slab2) (terrain-floor-drive-rides) :test #'equal))
+  (not (member '(slab2 ground2) (terrain-floor-drive-rides) :test #'equal))
   (= (length (terrain-level-changes))
-     (length (terrain-authored-level-changes)))
+     (+ 2 (length (terrain-authored-level-changes))))
 
   ;; A location whose level drifts away from its zone, with no authored crossing, is
   ;; refused and named.
@@ -227,8 +262,9 @@
                    (terrain-test-arrangement) nil nil
                    (terrain-test-drifted-levels))))
 
-  ;; Compartment 3 holds two levels in one zone and raises nothing, because STAIRS-VIA
-  ;; joins them.  That authored fact is the whole difference between it and GROUND2.
+  ;; Compartment 3 holds two levels in one zone and raises nothing, because the stairway
+  ;; TRAVERSAL-VIA joins them.  That authored fact is the whole difference between it and
+  ;; GROUND2.
   (member 'stairway *terrain-level-change-modes*)
   (member '(stair-low stair-high) (terrain-authored-level-changes) :test #'equal)
   (null (terrain-arrangement-complaints
@@ -269,7 +305,7 @@
     (not (bind (traversal-via walking slab2 $partition-doors stair-low)))
 
     ;; The derived edge across compartment 3's level change is dead, which is why the
-    ;; authored STAIRS-VIA has to be there.
+    ;; authored stairway TRAVERSAL-VIA has to be there.
     (not (one-step-walkable walker stair-low stair-high))
     (bind (traversal-via stairway stair-low $stair-means stair-high))
     (null $stair-means)))

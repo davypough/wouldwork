@@ -31,10 +31,14 @@
 ;;; exactly like a fan on floor-gears, and is launched by the ensuing propagation when the gears
 ;;; are turning.
 ;;;
-;;; Authoring obligation: aimed-at destinations must not chain into a cycle across
-;;; simultaneously-blowing angled (or wall) gears, directly or by landing on another
-;;; blower's fan, or propagation's iteration cap trips inconsistent-state.  Acyclic chains
-;;; are fine and settle within the cap (10 iterations).
+;;; Authoring obligations: every drive names its launch location with HAS-POSITION and its
+;;; landing location with AIMED-AT; -gears-fan's shared init check rejects either missing
+;;; endpoint, and coordinate-known endpoints must have horizontal displacement (a vertical
+;;; stream is a floor drive).  A destination graph may contain a cycle when controls keep
+;;; it inert.  What must not occur is an active occupant-transport loop through simultaneously
+;;; blowing angled (or wall) drives, directly or by landing on another blower's fan.  That
+;;; state never converges, so propagation's iteration cap marks it inconsistent and search
+;;; discards it.  Active acyclic chains are fine and settle within the cap.
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location  --  angled-gears and fan come from nested -gears-fan
@@ -46,12 +50,40 @@
 ;;;   driver    : the master propagate-consequences! must call
 ;;;               update-angled-blower-status! after update-blower-status!
 ;;; PROVIDES:
+;;;   init check: angled-blower-init-check -- coordinate-known arcs have horizontal travel
 ;;;   updates   : update-angled-blower-status!, arc-occupants-away!
 
 (include-tech -propagation)
 (include-tech -gears-fan)
 
 (in-package :ww)
+
+
+(define-init-check angled-blower-init-check (literals)
+  (check-init-angled-drive-horizontal-displacement literals))
+
+
+(define-init-check-helper check-init-angled-drive-horizontal-displacement (literals)
+  "Reject a coordinate-known angled stream with no horizontal displacement."
+  (let ((positions (init-location-xy-map literals)))
+    (dolist (drive
+              (append (init-type-instances 'angled-gears)
+                      (init-type-instances 'angled-blower)))
+      (let* ((source
+               (init-blower-drive-related-location 'has-position drive literals))
+             (destination
+               (init-blower-drive-related-location 'aimed-at drive literals))
+             (source-point (and source (gethash source positions)))
+             (destination-point (and destination (gethash destination positions))))
+        (when (and source-point destination-point
+                   (equal source-point destination-point))
+          (fail-init-check
+            nil
+            "~%The angled stream of ~S has no horizontal displacement.~%~
+             Source:      ~S at ~S~%~
+             Destination: ~S at ~S~%~
+             Use a floor drive for a vertical stream, or move the angled destination."
+            drive source source-point destination destination-point))))))
 
 
 (define-update update-angled-blower-status! ()
