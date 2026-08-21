@@ -182,9 +182,9 @@
   (jam-disallowed> location7 location1 gate4)
 
   ;; Specifically authorized acts and activities between locations
-  (traversal-via> climbing location7 ((ladder1)) location1)
-  (traversal-via jumping location10 () location12)  ;authorized elevation change
-  (traversal-via stairway location13 () location11)  ;authorized elevation change, unrestricted both ways
+  (traverse-via> climbing location7 ((ladder1)) location1)
+  (traverse-via jumping location10 () location12)  ;authorized elevation change
+  (traverse-via stairway location13 () location11)  ;authorized elevation change, unrestricted both ways
   (reach-via location1 () location7)  ;authorizes manipulation
   (reach-via location2 (gate2 gate3) location3)
   (beam-via transmitter1 (gate1 location2) receiver1)  ;authorizes direct beam

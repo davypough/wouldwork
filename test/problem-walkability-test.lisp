@@ -58,32 +58,32 @@
   (open open-gate)
   (open open-gate-b)
 
-  (traversal-via> walking main-start () main-mid)
-  (traversal-via walking main-mid
+  (traverse-via> walking main-start () main-mid)
+  (traverse-via walking main-mid
             ((closed-gate) (open-gate screen1) (open-gate-b))
             main-goal)
 
   ;; Two equal-length routes exercise the lexical tie-break; the separate
   ;; direct edge proves that segment count takes precedence over lexical order.
-  (traversal-via> walking canonical-start () canonical-a)
-  (traversal-via> walking canonical-a () canonical-goal)
-  (traversal-via> walking canonical-start () canonical-b)
-  (traversal-via> walking canonical-b () canonical-goal)
-  (traversal-via> walking shortest-start () shortest-mid)
-  (traversal-via> walking shortest-mid () shortest-goal)
-  (traversal-via> walking shortest-start () shortest-goal)
+  (traverse-via> walking canonical-start () canonical-a)
+  (traverse-via> walking canonical-a () canonical-goal)
+  (traverse-via> walking canonical-start () canonical-b)
+  (traverse-via> walking canonical-b () canonical-goal)
+  (traverse-via> walking shortest-start () shortest-mid)
+  (traverse-via> walking shortest-mid () shortest-goal)
+  (traverse-via> walking shortest-start () shortest-goal)
 
-  (traversal-via walking screen-start ((open-gate screen1)) screen-goal)
-  (traversal-via walking ladder-start ((open-gate ladder1)) ladder-goal)
-  (traversal-via walking closed-start ((closed-gate)) closed-goal)
+  (traverse-via walking screen-start ((open-gate screen1)) screen-goal)
+  (traverse-via walking ladder-start ((open-gate ladder1)) ladder-goal)
+  (traverse-via walking closed-start ((closed-gate)) closed-goal)
 
   (has-elevation level-start 2)
   (has-elevation level-peer 2)
   (has-elevation level-high 3)
-  (traversal-via walking level-start () level-peer)
-  (traversal-via walking level-start () level-high)
+  (traverse-via walking level-start () level-peer)
+  (traverse-via walking level-start () level-high)
 
-  (traversal-via walking supported-start () supported-goal))
+  (traverse-via walking supported-start () supported-goal))
 
 (define-init-action initialize-derived-state
   0

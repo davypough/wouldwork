@@ -12,7 +12,7 @@
 ;;; a genuinely alternative set of means rather than a second candidate ladder, which the
 ;;; first clause already expresses by listing both.
 ;;;
-;;; Climbing is directed: CLIMB is authored as TRAVERSAL-VIA>, since a ladder that carries
+;;; Climbing is directed: CLIMB is authored as traverse-via>, since a ladder that carries
 ;;; an agent up need not carry it down the same way.
 ;;;
 ;;; Grounded climbs remain transparent mobility and may compose with adjacent grounded
@@ -112,7 +112,7 @@
       (assign $transitions nil)
       (if (not (eql $source-place 'ground))
         (doall (?destination location)
-          (if (bind (traversal-via>
+          (if (bind (traverse-via>
                       climbing $source $family ?destination))
             (do (assign $transition
                         (ladder-configuration-transition-for-family
@@ -142,12 +142,12 @@
    ladder's functional HAS-POSITION can make it usable from only one endpoint.  A clause
    without a source-positioned ladder can never produce a segment."
   (dolist (literal
-            (positive-init-literals-with-relation 'traversal-via literals))
+            (positive-init-literals-with-relation 'traverse-via literals))
     (when (eql (second (init-literal-proposition literal)) 'climbing)
       (fail-init-check literal
-        "Climbing traversal must be directed.  Use TRAVERSAL-VIA> with the ladder's location as the source.")))
+        "Climbing traversal must be directed.  Use traverse-via> with the ladder's location as the source.")))
   (dolist (literal
-            (positive-init-literals-with-relation 'traversal-via> literals))
+            (positive-init-literals-with-relation 'traverse-via> literals))
     (destructuring-bind (mode source family destination)
         (rest (init-literal-proposition literal))
       (declare (ignore destination))

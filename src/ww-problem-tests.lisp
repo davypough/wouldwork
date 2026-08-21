@@ -409,7 +409,7 @@
 
 
 (defparameter *topo-derived-relations*
-  '(traversal-via traversal-via> los-via los-barrier-crossings>
+  '(traverse-via traverse-via> los-via los-barrier-crossings>
     beam-crossing> crossings-along-beam> beam-crossings-before-gate>)
   "The relations the coordinate derivations produce.  Every one is derived rather than
    authored, so anything that moves in them means a derivation moved -- which is the thing

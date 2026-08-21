@@ -34,7 +34,7 @@
 ;;; entries use BEAM-COORDINATES-GATE-MIDPOINT as a single reference point instead.  When the
 ;;; problem also asserts BOUNDARY-WALL -- a closed polygon whose final point explicitly
 ;;; repeats its first -- each consecutive polygon edge contributes its own retained crossing.
-;;; -walkability-coordinates.lisp's walking TRAVERSAL-VIA derivation folds BOUNDARY-WALL in the same way
+;;; -walkability-coordinates.lisp's walking traverse-via derivation folds BOUNDARY-WALL in the same way
 ;;; (as a solid boundary segment, alongside WALL-SEGMENT>), so a problem that asserts it gets
 ;;; ordinary LOS and walkability remain blocked at the map's edge automatically, while a
 ;;; sufficiently elevated beam or jammer sightline can clear its default height 6.

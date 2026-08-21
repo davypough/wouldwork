@@ -111,8 +111,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (screen-segment> screen $rational $rational $rational $rational)
 (stream-width (either wall-gears wall-blower) $rational)  ;default 3 units
 (threatens threat location)
-(traversal-via traversal-mode location $list location)  ;symmetric traversal edge; $list is DNF: () direct, else OR over clauses, AND within
-(traversal-via> traversal-mode location $list location)  ;directed traversal edge, source first, same $list convention
+(traverse-via traversal-mode location $list location)  ;symmetric traversal edge; $list is DNF: () direct, else OR over clauses, AND within
+(traverse-via> traversal-mode location $list location)  ;directed traversal edge, source first, same $list convention
 (wall-segment> wall $rational $rational $rational $rational)
 (window-segment> window $rational $rational $rational $rational)
 

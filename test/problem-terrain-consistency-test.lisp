@@ -125,12 +125,12 @@
 
   ;; The authored crossing that makes compartment 3's level difference legitimate.
   ;; Removing it is what the zone check exists to catch.
-  (traversal-via stairway stair-low () stair-high)
+  (traverse-via stairway stair-low () stair-high)
 
   ;; The crossing over EDGE1's step.  The traversability check asks only that one exist,
   ;; not that every flanking pair carry one, so this single edge between GROUND1 and SLAB1
   ;; covers the whole edge; removing it is what that check exists to catch.
-  (traversal-via stairway ground1 () slab1))
+  (traverse-via stairway ground1 () slab1))
 
 
 ;;;; CHARACTERIZATION FIXTURES ;;;;
@@ -217,7 +217,7 @@
                                (terrain-test-drifted-levels))))
 
   ;; EDGE1's step is crossed, so the traversability check is satisfied -- by the single
-  ;; authored stairway TRAVERSAL-VIA between GROUND1 and SLAB1, not by every flanking pair
+  ;; authored stairway TRAVERSE-VIA between GROUND1 and SLAB1, not by every flanking pair
   ;; carrying one.
   (null (terrain-uncrossed-edge-complaints
           (terrain-test-arrangement) (terrain-test-edges)
@@ -271,7 +271,7 @@
                    (terrain-test-drifted-levels))))
 
   ;; Compartment 3 holds two levels in one zone and raises nothing, because the stairway
-  ;; TRAVERSAL-VIA joins them.  That authored fact is the whole difference between it and
+  ;; TRAVERSE-VIA joins them.  That authored fact is the whole difference between it and
   ;; GROUND2.
   (member 'stairway *terrain-level-change-modes*)
   (member '(stair-low stair-high) (terrain-authored-level-changes) :test #'equal)
@@ -305,17 +305,17 @@
     (= (top edge1) 3/2)
 
     ;; Walking is derived within a compartment and blocked across EDGE1 and WALL1.
-    (bind (traversal-via walking ground1 $ground-doors ground2))
+    (bind (traverse-via walking ground1 $ground-doors ground2))
     (null $ground-doors)
-    (bind (traversal-via walking stair-low $stair-doors stair-high))
+    (bind (traverse-via walking stair-low $stair-doors stair-high))
     (null $stair-doors)
-    (not (bind (traversal-via walking ground1 $crossing-doors slab1)))
-    (not (bind (traversal-via walking slab2 $partition-doors stair-low)))
+    (not (bind (traverse-via walking ground1 $crossing-doors slab1)))
+    (not (bind (traverse-via walking slab2 $partition-doors stair-low)))
 
     ;; The derived edge across compartment 3's level change is dead, which is why the
-    ;; authored stairway TRAVERSAL-VIA has to be there.
+    ;; authored stairway TRAVERSE-VIA has to be there.
     (not (one-step-walkable walker stair-low stair-high))
-    (bind (traversal-via stairway stair-low $stair-means stair-high))
+    (bind (traverse-via stairway stair-low $stair-means stair-high))
     (null $stair-means)))
 
 

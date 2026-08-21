@@ -7,8 +7,8 @@
 ;;; was never the relation or the iteration; it was one predicate each, and that is all
 ;;; each of them registers here now.
 ;;;
-;;;   (traversal-via  <mode> <source> <dnf> <destination>)   symmetric
-;;;   (traversal-via> <mode> <source> <dnf> <destination>)   directed, source first
+;;;   (traverse-via  <mode> <source> <dnf> <destination>)   symmetric
+;;;   (traverse-via> <mode> <source> <dnf> <destination>)   directed, source first
 ;;;
 ;;; Directionality stays in the name, as everywhere else in this domain: the engine
 ;;; mirrors a relation whose argument types repeat and whose name does not end in ">", and
@@ -41,8 +41,8 @@
 ;;;               whichever technology registered the mode
 ;;; PROVIDES:
 ;;;   types     : traversal-mode (walking stairway jumping climbing)
-;;;   relations : (traversal-via traversal-mode location $list location),
-;;;               (traversal-via> traversal-mode location $list location)
+;;;   relations : (traverse-via traversal-mode location $list location),
+;;;               (traverse-via> traversal-mode location $list location)
 ;;;   queries   : traversal-segments  --  the single mobility provider
 ;;;   init      : traversal-init-check
 ;;;   functions : register-traversal-mode, and the canonical DNF family algebra the
@@ -58,8 +58,8 @@
 
 
 (define-static-relations
-  (traversal-via traversal-mode location $list location)  ;symmetric traversal edge; $list = DNF clauses: () direct, else OR over clauses, AND within
-  (traversal-via> traversal-mode location $list location))  ;directed traversal edge, source first, same $list convention
+  (traverse-via traversal-mode location $list location)  ;symmetric traversal edge; $list = DNF clauses: () direct, else OR over clauses, AND within
+  (traverse-via> traversal-mode location $list location))  ;directed traversal edge, source first, same $list convention
 
 
 ;;;; MODE REGISTRY ;;;;
@@ -93,7 +93,7 @@
   (or (assoc mode *traversal-modes*)
       (error "~%No technology registers the traversal mode ~S.~%~
               Registered modes: ~S~%~
-              A TRAVERSAL-VIA fact naming a mode means including the technology that owns ~
+              A traverse-via fact naming a mode means including the technology that owns ~
               it -- walkability, stairs, jump, or ladder."
              mode (mapcar #'first *traversal-modes*))))
 
@@ -195,11 +195,11 @@
         (doall (?to location)
           (do (assign $symmetric nil)
               (assign $directed nil)
-              (if (bind (traversal-via ?mode ?from $symmetric-family ?to))
+              (if (bind (traverse-via ?mode ?from $symmetric-family ?to))
                 (assign $symmetric
                         (traversal-segment-for-family
                           state ?agent ?mode ?from ?to $symmetric-family)))
-              (if (bind (traversal-via> ?mode ?from $directed-family ?to))
+              (if (bind (traverse-via> ?mode ?from $directed-family ?to))
                 (assign $directed
                         (traversal-segment-for-family
                           state ?agent ?mode ?from ?to $directed-family)))
@@ -228,7 +228,7 @@
   "Reject positive traversal self-loops.  Mobility is already reflexive at every location,
    so such a fact can add no route and would otherwise disappear silently in the visited
    set of the closure."
-  (dolist (relation '(traversal-via traversal-via>))
+  (dolist (relation '(traverse-via traverse-via>))
     (dolist (literal (positive-init-literals-with-relation relation literals))
       (destructuring-bind (mode source clauses destination)
           (rest (init-literal-proposition literal))
@@ -245,7 +245,7 @@
    a walking one, so the permitted set is per mode rather than shared.  A fact naming an
    unregistered mode fails here, which is what catches a JUMPING edge in a problem that
    never included jump."
-  (dolist (relation '(traversal-via traversal-via>))
+  (dolist (relation '(traverse-via traverse-via>))
     (dolist (literal (init-literals-with-relation relation literals))
       (destructuring-bind (mode source clauses destination)
           (rest (init-literal-proposition literal))

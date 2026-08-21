@@ -411,7 +411,7 @@
   (let ((changes nil))
     (loop for key being the hash-keys of *static-db*
           when (and (consp key)
-                    (member (first key) '(traversal-via traversal-via>))
+                    (member (first key) '(traverse-via traverse-via>))
                     (member (second key) *terrain-level-change-modes*))
             do (push (list (third key) (fourth key)) changes))
     changes))

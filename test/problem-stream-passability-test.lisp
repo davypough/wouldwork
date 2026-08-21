@@ -109,13 +109,13 @@
 
 (define-query stream-symmetric-family-is
     (?from location ?to location ?expected)
-  (do (bind (traversal-via walking ?from $actual ?to))
+  (do (bind (traverse-via walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
 (define-query stream-directional-family-is
     (?from location ?to location ?expected)
-  (do (bind (traversal-via> walking ?from $actual ?to))
+  (do (bind (traverse-via> walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
@@ -234,13 +234,13 @@
 
     ;; The solid separator keeps both stream scenarios independent.
     (not (traversable test-agent lower-side upper-side))
-    (not (bind (traversal-via walking lower-side
+    (not (bind (traverse-via walking lower-side
                          $cross-lane-symmetric-family
                          upper-side)))
-    (not (bind (traversal-via> walking lower-side
+    (not (bind (traverse-via> walking lower-side
                           $cross-lane-directional-family
                           upper-side)))
-    (not (bind (traversal-via> walking upper-side
+    (not (bind (traverse-via> walking upper-side
                           $reverse-cross-lane-family
                           lower-side)))))
 

@@ -33,7 +33,7 @@
 ;;; The lanes are isolated: BOX2 is outside the agent's reachable location and every blower
 ;;; is fixed.  One plate controls all four drives, so the expected minimum solution remains
 ;;; three steps: pick up BOX1, put it on FGEARS1, and step onto PLATE1, in
-;;; either viable ordering.  No walking TRAVERSAL-VIA fact is authored.
+;;; either viable ordering.  No walking TRAVERSE-VIA fact is authored.
 
 
 (in-package :ww)

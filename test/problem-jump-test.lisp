@@ -26,7 +26,7 @@
 ;;; directed-edge asymmetry, rejection of an unsafe landing, rejection of an occupied box
 ;;; top while preserving its ground landing, rejection of an over-limit local box mount,
 ;;; exclusive ownership of grounded jumps by mobility rather than the configuration-
-;;; transition substrate, and rejection of an edge instance from a jumping TRAVERSAL-VIA
+;;; transition substrate, and rejection of an edge instance from a jumping TRAVERSE-VIA
 ;;; feature list --
 ;;; VAULTABLE-OBJECT deliberately excludes edge, since an edge has no independent "top" to
 ;;; vault onto.  The move-type tag itself is also characterized: a genuinely vaulting
@@ -100,7 +100,7 @@
   (has-location vault-box vault-start)
   (has-height vault-box 1)
   (has-height vault-wall 2)
-  (traversal-via> jumping vault-start ((vault-wall)) vault-goal)
+  (traverse-via> jumping vault-start ((vault-wall)) vault-goal)
 
   ;; Planned lane 2: the only useful transition is the local box-to-ground drop.
   (has-location drop-agent drop-site)
@@ -109,7 +109,7 @@
 
   ;; Planned lane 3: both box tops are elevation 4, so the jump between them has zero
   ;; elevation gain and is unaffected by any upward-reach limit.  The edge is authored
-  ;; target-first so the required source-to-target traversal depends on TRAVERSAL-VIA
+  ;; target-first so the required source-to-target traversal depends on TRAVERSE-VIA
   ;; symmetry in jumping mode.
   (has-location transfer-agent transfer-start)
   (has-location transfer-source-box transfer-start)
@@ -119,7 +119,7 @@
   (has-height transfer-target-box 3)
   (has-location transfer-base-box transfer-goal)
   (on transfer-target-box transfer-base-box)
-  (traversal-via jumping transfer-goal () transfer-start)
+  (traverse-via jumping transfer-goal () transfer-start)
 
   ;; Planned lane 4: one mobility route first climbs stairs from elevation 0 to 2, then
   ;; jumps to elevation 3 -- exactly the fixed limit above that hypothetical source.  Both
@@ -132,10 +132,10 @@
   (holding carrying-agent carried-box)
   (has-elevation carry-start 2)
   (has-elevation carry-goal 3)
-  (traversal-via> stairway carry-approach () carry-start)
+  (traverse-via> stairway carry-approach () carry-start)
   (has-elevation cargo-screen 1)
   (has-height cargo-screen 2)
-  (traversal-via> jumping carry-start ((vault-wall cargo-screen)) carry-goal)
+  (traverse-via> jumping carry-start ((vault-wall cargo-screen)) carry-goal)
 
   ;; Exact-boundary query probes.  The fixed *vertical-reach-limit* governs both
   ;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR identically: source 2 reaches 3 but not
@@ -149,13 +149,13 @@
   ;; short-circuits vaulting clearance before the fixed elevation limit is ever consulted.
   ;; This probe remains stationary; the goal inspects the generated child.
   (has-location screen-probe-agent screen-probe-start)
-  (traversal-via> jumping screen-probe-start ((passable-screen)) screen-probe-goal)
+  (traverse-via> jumping screen-probe-start ((passable-screen)) screen-probe-goal)
 
   ;; An uncontrolled gun is lethal after initialization, so the transition action must
   ;; produce no child
   ;; at its threatened destination.
   (has-location unsafe-probe-agent unsafe-start)
-  (traversal-via> jumping unsafe-start () unsafe-goal)
+  (traverse-via> jumping unsafe-start () unsafe-goal)
   (threatens unsafe-gun unsafe-goal)
 
   ;; The destination box is occupied by a non-box support occupant.  The edge must still
@@ -164,7 +164,7 @@
   (has-location occupied-target-box occupied-goal)
   (has-location blocking-connector occupied-goal)
   (on blocking-connector occupied-target-box)
-  (traversal-via> jumping occupied-start () occupied-goal)
+  (traverse-via> jumping occupied-start () occupied-goal)
 
   ;; A clear height-2 local box is one unit beyond the fixed *vertical-reach-limit*; the
   ;; mount must fail regardless of any agent's height, since none is consulted.
@@ -177,8 +177,8 @@
   ;; canonicalization must retain only the lexical first.
   (has-location remote-mount-agent remote-mount-start)
   (has-location remote-target-box remote-mount-goal)
-  (traversal-via jumping remote-mount-start () remote-mount-goal)
-  (traversal-via> jumping remote-mount-start ((passable-screen)) remote-mount-goal))
+  (traverse-via jumping remote-mount-start () remote-mount-goal)
+  (traverse-via> jumping remote-mount-start ((passable-screen)) remote-mount-goal))
 
 
 (define-init-action initialize-derived-state
@@ -277,7 +277,7 @@
   ;; A genuine wall passes TRAVERSAL-INIT-CHECK's per-mode clause type check unchanged.
   (null
     (validate-init-literals
-      '((traversal-via jumping vault-start ((default-wall)) vault-goal))
+      '((traverse-via jumping vault-start ((default-wall)) vault-goal))
       :checks '(traversal-init-check)))
   ;; An edge instance in that same list position is rejected: VAULTABLE-OBJECT is
   ;; (either gate screen wall), and edge is deliberately not a member -- it has no
@@ -285,7 +285,7 @@
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((traversal-via jumping vault-start ((probe-edge)) vault-goal))
+        '((traverse-via jumping vault-start ((probe-edge)) vault-goal))
         :checks '(traversal-init-check)))
     'init-check-failure
     :containing "expected an instance of one of"
@@ -302,7 +302,7 @@
     (not (on vault-agent vault-box))
     (has-location vault-box vault-start)
     (cleartop vault-box)
-    (not (traversal-via> jumping vault-goal ((vault-wall)) vault-start))
+    (not (traverse-via> jumping vault-goal ((vault-wall)) vault-start))
 
     ;; Planned lane 2 dropped locally without relocating either participant.
     (has-location drop-agent drop-site)
@@ -319,8 +319,8 @@
     (not (cleartop transfer-target-box))
     (on transfer-target-box transfer-base-box)
     (= (top transfer-target-box) 4)
-    (traversal-via jumping transfer-start () transfer-goal)
-    (traversal-via jumping transfer-goal () transfer-start)
+    (traverse-via jumping transfer-start () transfer-goal)
+    (traverse-via jumping transfer-goal () transfer-start)
 
     ;; Planned lane 4 retained cargo after one composed stairs/jump MOVE.  The canonical
     ;; route proves that the jump provider used the intermediate floor elevation 2 rather

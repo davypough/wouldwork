@@ -230,14 +230,14 @@
                       (top ?landing-box))
               (assign $symmetric-transition nil)
               (assign $directed-transition nil)
-              (if (bind (traversal-via
+              (if (bind (traverse-via
                           jumping $source-location $symmetric-family $destination))
                 (assign $symmetric-transition
                         (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
                           $symmetric-family)))
-              (if (bind (traversal-via>
+              (if (bind (traverse-via>
                           jumping $source-location $directed-family $destination))
                 (assign $directed-transition
                         (jump-configuration-transition-for-family
@@ -261,14 +261,14 @@
                       (location-elevation ?destination))
               (assign $symmetric-transition nil)
               (assign $directed-transition nil)
-              (if (bind (traversal-via
+              (if (bind (traverse-via
                           jumping $source-location $symmetric-family ?destination))
                 (assign $symmetric-transition
                         (jump-configuration-transition-for-family
                           state ?agent ?source-configuration $source-elevation
                           $destination-configuration $target-elevation
                           $symmetric-family)))
-              (if (bind (traversal-via>
+              (if (bind (traverse-via>
                           jumping $source-location $directed-family ?destination))
                 (assign $directed-transition
                         (jump-configuration-transition-for-family

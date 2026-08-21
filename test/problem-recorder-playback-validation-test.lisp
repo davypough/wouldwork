@@ -49,8 +49,8 @@
   (has-location ghost-box recorder-site)
   (has-position recorder1 recorder-site)
   (has-position plate1 recorder-site)
-  (traversal-via walking recorder-site () away-site)
-  (traversal-via> walking away-site () stranded-site))  ;one-way: a ghost that moves in cannot close its recording
+  (traverse-via walking recorder-site () away-site)
+  (traverse-via> walking away-site () stranded-site))  ;one-way: a ghost that moves in cannot close its recording
 
 
 (define-init-action initialize-derived-state

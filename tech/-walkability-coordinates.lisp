@@ -21,7 +21,7 @@
 ;;; united across open intervals form zones; door intervals between distinct zones form
 ;;; a labeled zone graph.  For every zone pair, a fixpoint over antichains of door-sets
 ;;; computes ALL subset-minimal door-sets -- each a set of doors sufficient for some
-;;; physical route -- and a location pair's TRAVERSAL-VIA value is that family in DNF: ()
+;;; physical route -- and a location pair's traverse-via value is that family in DNF: ()
 ;;; still means direct/unguarded, and a nonempty value is a list of clauses, OR over
 ;;; clauses, AND within (matching the CONTROLS convention).  Families are emitted in
 ;;; canonical order (doors within a clause by name; clauses by length then
@@ -53,7 +53,7 @@
 ;;; while blowing, stepping laterally into the flow carries the walker to the
 ;;; destination; while off, the same trip is an ordinary walk across the dead band; so
 ;;; the unconditional edge is correct in both regimes, and such pairs are emitted as
-;;; directional TRAVERSAL-VIA> facts (rides widen inbound, never outbound).  The front
+;;; directional traverse-via> facts (rides widen inbound, never outbound).  The front
 ;;; curtain grants no ride -- walking in against the flow is barred like any other
 ;;; gears-gated crossing.  Any other location inside a
 ;;; band, on a covered solid interval, inside a gate/screen doorway, at a corner whose
@@ -86,7 +86,7 @@
 ;;;   types     : location  --  declared by the problem, as walkability itself already
 ;;;               requires; screen declared optional by nested -passability, spliced by
 ;;;               walkability.lisp before this file
-;;;   nested    : -traversal (TRAVERSAL-VIA/TRAVERSAL-VIA> and the DNF family algebra);
+;;;   nested    : -traversal (traverse-via/traverse-via> and the DNF family algebra);
 ;;;               -location-coordinates (LOCATION-COORDS>)
 ;;; PROVIDES:
 ;;;   relations : wall-segment>, edge-segment>, gate-segment>, window-segment>,
@@ -150,7 +150,7 @@
 (defun walkability-coordinates-pair-spec (arrangement loc-a loc-b)
   ;; Resolves one location pair against the arrangement.  Returns NIL if no zone pair
   ;; across the two memberships is connected (blocked -- no fact), (:sym family) for an
-  ;; ordinary symmetric TRAVERSAL-VIA, or (:dir family-a->b family-b->a) when either endpoint
+  ;; ordinary symmetric traverse-via, or (:dir family-a->b family-b->a) when either endpoint
   ;; is a stream destination whose ride edges widen its inbound direction: the inbound
   ;; family additionally unions the source's families to the destination's ride zones
   ;; (riding the stream in from a side, or walking the same route while it is off), so
@@ -657,9 +657,9 @@
   ;; problem's raw segment geometry -- see the file header for the region-connectivity
   ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT>, EDGE-SEGMENT>,
   ;; or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own walking
-  ;; edges is unaffected.  Only one direction per symmetric pair is asserted: TRAVERSAL-VIA
+  ;; edges is unaffected.  Only one direction per symmetric pair is asserted: traverse-via
   ;; has no ">" suffix, so WW mirrors it both ways itself; a pair whose ride edges
-  ;; widen a destination's inbound direction gets its two explicit TRAVERSAL-VIA>
+  ;; widen a destination's inbound direction gets its two explicit traverse-via>
   ;; directions instead, never both kinds.
   0
   ()
@@ -691,9 +691,9 @@
                   (if $spec
                     (if (eql (first $spec) :sym)
                       (do (assign $family (second $spec))
-                          (traversal-via walking ?source $family ?destination))
+                          (traverse-via walking ?source $family ?destination))
                       (do (assign $forward (second $spec))
                           (assign $backward (third $spec))
-                          (traversal-via> walking ?source $forward ?destination)
-                          (traversal-via> walking ?destination $backward ?source))))))))
+                          (traverse-via> walking ?source $forward ?destination)
+                          (traverse-via> walking ?destination $backward ?source))))))))
         (convert-databases-to-integers))))

@@ -59,29 +59,29 @@
   (has-elevation stairs-foot 0)
   (has-elevation stairs-top 20)
   (has-elevation main-goal 20)
-  (traversal-via> walking main-start () stairs-foot)
-  (traversal-via stairway stairs-foot ((open-gate)) stairs-top)
-  (traversal-via> walking stairs-top () main-goal)
+  (traverse-via> walking main-start () stairs-foot)
+  (traverse-via stairway stairs-foot ((open-gate)) stairs-top)
+  (traverse-via> walking stairs-top () main-goal)
 
-  (traversal-via> stairway directional-low () directional-high)
+  (traverse-via> stairway directional-low () directional-high)
 
   ;; Carrying is allowed on unobstructed stairs.  A screen uses the shared
   ;; passability rule and therefore requires empty hands.
-  (traversal-via stairway carrying-low () carrying-high)
-  (traversal-via stairway screen-low ((screen1)) screen-high)
-  (traversal-via stairway closed-low ((closed-gate)) closed-high)
+  (traverse-via stairway carrying-low () carrying-high)
+  (traverse-via stairway screen-low ((screen1)) screen-high)
+  (traverse-via stairway closed-low ((closed-gate)) closed-high)
 
   ;; An unsafe landing cannot become a closure through-node.
-  (traversal-via stairway unsafe-low () unsafe-middle)
-  (traversal-via walking unsafe-middle () unsafe-goal)
+  (traverse-via stairway unsafe-low () unsafe-middle)
+  (traverse-via walking unsafe-middle () unsafe-goal)
 
   ;; Equal-length heterogeneous routes retain one deterministic witness.
-  (traversal-via> stairway canonical-start () canonical-a)
-  (traversal-via> stairway canonical-start () canonical-b)
-  (traversal-via> walking canonical-a () canonical-goal)
-  (traversal-via> walking canonical-b () canonical-goal)
+  (traverse-via> stairway canonical-start () canonical-a)
+  (traverse-via> stairway canonical-start () canonical-b)
+  (traverse-via> walking canonical-a () canonical-goal)
+  (traverse-via> walking canonical-b () canonical-goal)
 
-  (traversal-via stairway supported-low () supported-high))
+  (traverse-via stairway supported-low () supported-high))
 
 
 (define-init-action initialize-derived-state
@@ -131,7 +131,7 @@
 
 (define-query stairs-scenarios-valid ()
   (and
-    ;; TRAVERSAL-VIA in stairway mode is symmetric; TRAVERSAL-VIA> is not.
+    ;; TRAVERSE-VIA in stairway mode is symmetric; TRAVERSE-VIA> is not.
     (traversable main-agent stairs-foot stairs-top)
     (traversable main-agent stairs-top stairs-foot)
     (traversable main-agent directional-low directional-high)

@@ -6,7 +6,7 @@
 ;;; coordinates.lisp's ESTABLISH-BEAM-COORDINATES and DERIVE-BEAM-CROSSINGS-BEFORE-GATE mint the
 ;;; crossing pool and derive CROSSINGS-ALONG-BEAM>/BEAM-CROSSINGS-BEFORE-GATE>; and
 ;;; tech/-walkability-coordinates.lisp's DERIVE-WALKING-FROM-SEGMENTS derives walking
-;;; TRAVERSAL-VIA facts -- all from the raw segment geometry below.  This is the fuller
+;;; traverse-via facts -- all from the raw segment geometry below.  This is the fuller
 ;;; topology-diagram geometry, not the reduced internal-segment model in
 ;;; problem-corner.lisp; the two files describe the same puzzle but are not
 ;;; coordinate-identical.  The two beam derivations read the authored

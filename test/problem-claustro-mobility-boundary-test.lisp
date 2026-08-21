@@ -45,23 +45,23 @@
   (has-location box2 location10)
   (has-elevation location12 2)
   (has-elevation location13 2)
-  (traversal-via jumping location10 () location12)
-  (traversal-via walking location12 () location13)
-  (traversal-via jumping location13 () location11)
+  (traverse-via jumping location10 () location12)
+  (traverse-via walking location12 () location13)
+  (traverse-via jumping location13 () location11)
 
   ;; The real problem's directed, exactly-positioned, empty-handed ladder traversal.
   (has-location ladder-agent location7)
   (has-position ladder1 location7)
-  (traversal-via> climbing location7 ((ladder1)) location1)
+  (traverse-via> climbing location7 ((ladder1)) location1)
 
   ;; Variant lane: stairs deliberately supply the two-unit ascent without a support-state
   ;; boundary, so the entire stairs/walk/downward-jump route is one transparent MOVE.
   (has-location stairs-agent stairs10)
   (has-elevation stairs12 2)
   (has-elevation stairs13 2)
-  (traversal-via stairway stairs10 () stairs12)
-  (traversal-via walking stairs12 () stairs13)
-  (traversal-via jumping stairs13 () stairs11))
+  (traverse-via stairway stairs10 () stairs12)
+  (traverse-via walking stairs12 () stairs13)
+  (traverse-via jumping stairs13 () stairs11))
 
 
 (define-init-action initialize-derived-state

@@ -131,8 +131,8 @@
   (location-coords> high 10 0)
 
   ;; Walking topology: low -> mid direct, mid -> goal only once gate1 opens.
-  (traversal-via walking low () mid)
-  (traversal-via walking mid ((gate1)) goal)
+  (traverse-via walking low () mid)
+  (traverse-via walking mid ((gate1)) goal)
 
   ;; gate1 opens once receiver1 activates.
   (controls ((receiver1)) gate1 normal)
@@ -163,8 +163,8 @@
   (location-coords> mid2 5 52/5)
   (location-coords> high2 10 10)
 
-  (traversal-via walking low2 () mid2)
-  (traversal-via walking mid2 ((gate2)) blocked-goal)
+  (traverse-via walking low2 () mid2)
+  (traverse-via walking mid2 ((gate2)) blocked-goal)
   (controls ((receiver2)) gate2 normal)
 )
 

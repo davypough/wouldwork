@@ -4,7 +4,7 @@
 ;;;
 ;;; A rectangular boundary contains three zones separated by full-height partitions.
 ;;; The first partition has two alternative gates; the second has a gate or screen.
-;;; Exact walking TRAVERSAL-VIA families characterize same-zone connectivity, each
+;;; Exact walking TRAVERSE-VIA families characterize same-zone connectivity, each
 ;;; partition, and the four canonical two-obstacle routes across both partitions.  The
 ;;; partitions terminate exactly on the boundary, so any endpoint leak changes those
 ;;; families.
@@ -155,7 +155,7 @@
 
 (define-query coordinate-walking-family-is
     (?from location ?to location ?expected)
-  (do (bind (traversal-via walking ?from $actual ?to))
+  (do (bind (traverse-via walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
@@ -218,13 +218,13 @@
 
     ;; Ordinary segment geometry is symmetric and emits no directional facts.
     (not (exists (?from location ?to location)
-           (bind (traversal-via> walking ?from $directional-family ?to))))
+           (bind (traverse-via> walking ?from $directional-family ?to))))
 
     ;; The wall/edge/window island has no derived edge to any other location.
     (not (exists (?other location)
-           (bind (traversal-via walking sealed-site $sealed-family ?other))))
+           (bind (traverse-via walking sealed-site $sealed-family ?other))))
     (not (exists (?other location)
-           (bind (traversal-via> walking sealed-site $sealed-directional-family ?other))))
+           (bind (traverse-via> walking sealed-site $sealed-directional-family ?other))))
 
     ;; MAIN-AGENT passes GATE-A and then the screen, reaching every non-sealed
     ;; location.  No extra location may leak into its exact six-location closure.

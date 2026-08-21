@@ -94,8 +94,8 @@
 
   ;; The lifecycle's walking route and the final-state reach edges used to retrieve
   ;; jammer1 and evaluate the three jam-target placements.
-  (traversal-via walking start () watched)
-  (traversal-via walking watched () goal)
+  (traverse-via walking start () watched)
+  (traverse-via walking watched () goal)
   (reach-via goal () start)
   (reach-via goal () disallowed-site)
   (reach-via goal () blocked-site)

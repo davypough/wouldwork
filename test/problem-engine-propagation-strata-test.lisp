@@ -150,7 +150,7 @@
   ;; declares no has-elevation, so its stream works at the default elevation 1 and strikes
   ;; anything standing on mid's floor.  east has no walking edge: the stream is the only
   ;; way in, and nothing walks back out.
-  (traversal-via walking west ((gate1)) mid)
+  (traverse-via walking west ((gate1)) mid)
 
   ;; Beam wiring.  The pairings are authored rather than built by connect-connector, so
   ;; the relay chain transmitter1 -> connector1 -> receiver1 is live from the first pass

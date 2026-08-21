@@ -7,9 +7,9 @@
 ;;; registers a probe mode of its own rather than including one, so the mechanics are
 ;;; characterized without any elevation, ladder or vault rule mixed in.
 ;;;
-;;;   1. TRAVERSAL-VIA is symmetric: the engine mirrors it because LOCATION is its
+;;;   1. TRAVERSE-VIA is symmetric: the engine mirrors it because LOCATION is its
 ;;;      repeated argument type and its name has no ">" suffix, so prepending the mode
-;;;      leaves the two location positions as the mirrored pair.  TRAVERSAL-VIA> is not
+;;;      leaves the two location positions as the mirrored pair.  TRAVERSE-VIA> is not
 ;;;      mirrored.  Both preserve their DNF payloads opaquely.
 ;;;   2. A payload is a family of clauses: OR over clauses, AND within one.  With DOOR-A
 ;;;      open and DOOR-B/DOOR-C shut, the symmetric edge is crossed by its first clause,
@@ -79,18 +79,18 @@
 (define-init
   (open door-a)
 
-  (traversal-via walking
+  (traverse-via walking
     origin
     ((door-a) (door-b door-c))
     symmetric-neighbor)
 
   ;; Every clause of this one is shut, so the edge exists and is never crossed.
-  (traversal-via walking
+  (traverse-via walking
     origin
     ((door-shut))
     shut-neighbor)
 
-  (traversal-via> walking
+  (traverse-via> walking
     origin
     ()
     directional-neighbor))
@@ -100,12 +100,12 @@
 
 
 (define-query substrate-family-is (?from location ?to location ?expected)
-  (do (bind (traversal-via walking ?from $actual ?to))
+  (do (bind (traverse-via walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
 (define-query substrate-directed-family-is (?from location ?to location ?expected)
-  (do (bind (traversal-via> walking ?from $actual ?to))
+  (do (bind (traverse-via> walking ?from $actual ?to))
       (equal $actual ?expected)))
 
 
@@ -125,13 +125,13 @@
 (define-test-claim traversal-substrate-contract
   ;; The relation installs with the mode leading and the two locations mirrored.
   (expect-relation-schema
-    'traversal-via :static '(traversal-mode location list location)
+    'traverse-via :static '(traversal-mode location list location)
     :fluent-indices '(3))
   (expect-relation-schema
-    'traversal-via> :static '(traversal-mode location list location)
+    'traverse-via> :static '(traversal-mode location list location)
     :fluent-indices '(3))
-  (equal (gethash 'traversal-via *symmetrics*) '((1 3)))
-  (null (gethash 'traversal-via> *symmetrics*))
+  (equal (gethash 'traverse-via *symmetrics*) '((1 3)))
+  (null (gethash 'traverse-via> *symmetrics*))
 
   ;; The substrate registers exactly one mobility provider, however many modes exist.
   (equal *mobility-providers* '(traversal-segments))
@@ -152,7 +152,7 @@
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((traversal-via jumping origin () symmetric-neighbor))
+        '((traverse-via jumping origin () symmetric-neighbor))
         :checks '(traversal-init-check)))
     'error
     :containing "No technology registers the traversal mode")
@@ -161,7 +161,7 @@
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((traversal-via walking origin ((first-agent)) symmetric-neighbor))
+        '((traverse-via walking origin ((first-agent)) symmetric-neighbor))
         :checks '(traversal-init-check)))
     'init-check-failure
     :containing "expected an instance of one of"
@@ -171,7 +171,7 @@
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((traversal-via> walking origin () origin))
+        '((traverse-via> walking origin () origin))
         :checks '(traversal-init-check)))
     'init-check-failure
     :containing "source and destination are the same location"
@@ -183,13 +183,13 @@
 
 (define-query traversal-substrate-scenarios-valid ()
   (and
-    ;; TRAVERSAL-VIA is mirrored and retains its opaque DNF value in both directions.
+    ;; TRAVERSE-VIA is mirrored and retains its opaque DNF value in both directions.
     (substrate-family-is origin symmetric-neighbor '((door-a) (door-b door-c)))
     (substrate-family-is symmetric-neighbor origin '((door-a) (door-b door-c)))
 
-    ;; TRAVERSAL-VIA> retains the direct empty value but never reverses.
+    ;; TRAVERSE-VIA> retains the direct empty value but never reverses.
     (substrate-directed-family-is origin directional-neighbor nil)
-    (not (bind (traversal-via> walking
+    (not (bind (traverse-via> walking
                  directional-neighbor $unexpected-directed-family origin)))
 
     ;; The crossing takes the first clause that passes, and says so in its witness.
