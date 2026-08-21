@@ -19,7 +19,7 @@
 
 (setf *expected-min-length* 4)
 
-(defparameter *max-pairings* 2)
+(ww-set *max-connector-pairings* 2)
 
 
 (define-types

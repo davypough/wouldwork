@@ -6,26 +6,6 @@
 (in-package :wouldwork)
 
 
-(defparameter *default-parameters*
-  '(unspecified      ; *problem-name*
-    0                ; *depth-cutoff*  
-    depth-first      ; *algorithm*
-    graph            ; *tree-or-graph*
-    planning         ; *problem-type*
-    first            ; *solution-type*
-    100000           ; *progress-reporting-interval*
-    nil              ; *randomize-search*
-    -1               ; *branch*
-    nil              ; *probe*
-    nil              ; *symmetry-pruning*
-    0                ; *debug*
-    nil              ; *goal*
-    0                ; *threads*
-    nil              ; *recorder-prefix-pruning*
-    1)               ; *max-recorder-cycles*
-  "Default parameter values in save/read order")
-
-
 (defparameter *globals-file*
   (instance-vals-file (asdf:system-source-directory :wouldwork))
   "In the vals.lisp file of this package the values of parameters
@@ -106,6 +86,10 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
        (ww-set *recorder-prefix-pruning* <t (prune unplayable recording prefixes) or
                                            nil (validate only completed candidates)>)
        (ww-set *max-recorder-cycles* <positive integer limiting recorder starts per path>)
+       (ww-set *max-connector-pairings* <positive integer limiting pairings per connector>)
+       (ww-set *beam-occlusion-tolerance* <non-negative rational distance from a beam line>)
+       (ww-set *boundary-wall-height* <non-negative rational boundary height>)
+       (ww-set *vertical-reach-limit* <non-negative rational elevation gap>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
               see ww-settings.lisp and User Manual for probe format examples
@@ -223,39 +207,13 @@ is staged again.
   
 
 (defun reset-parameters ()
-   "Resets global parameters to defaults"
-  (destructuring-bind 
-       (default-problem-name default-depth-cutoff default-algorithm default-tree-or-graph 
-        default-problem-type default-solution-type default-progress-reporting-interval 
-        default-randomize-search default-branch default-probe default-symmetry-pruning default-debug default-goal
-        default-threads default-recorder-prefix-pruning default-max-recorder-cycles)
-      *default-parameters*
-    (setf *problem-name* default-problem-name
-          *depth-cutoff* default-depth-cutoff  
-          *algorithm* default-algorithm
-          *tree-or-graph* default-tree-or-graph
-          *problem-type* default-problem-type
-          *solution-type* default-solution-type
-          *progress-reporting-interval* default-progress-reporting-interval
-          *randomize-search* default-randomize-search
-          *branch* default-branch
-          *probe* default-probe
-          *symmetry-pruning* default-symmetry-pruning
-          *recorder-prefix-pruning* default-recorder-prefix-pruning
-          *max-recorder-cycles* default-max-recorder-cycles
-          *debug* default-debug
-          *goal* default-goal
-          *threads* default-threads
-          *max-pairings* nil))
-  (setf *features* (remove :ww-debug *features*)))
+  "Reset every managed problem parameter to its authoritative default."
+  (reset-problem-parameters-to-defaults))
 
 
 (defun save-globals ()
   "Save the values of the globals in the vals.lisp file."
-  (save-to-file (list *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
-                      *solution-type* *progress-reporting-interval* *randomize-search* 
-                      *branch* *probe* *symmetry-pruning* *debug* *goal*
-                      *threads* *recorder-prefix-pruning* *max-recorder-cycles*)
+  (save-to-file (mapcar #'symbol-value *persisted-problem-parameters*)
                 *globals-file*))
 
 
@@ -268,27 +226,9 @@ is staged again.
          ;; Recorder interleaving audit and pruning were formerly the final two
          ;; saved settings.  Ignore those retired trailing values until the next save.
          (current-params (subseq padded 0 (length *default-parameters*))))
-    (destructuring-bind 
-         (problem-name depth-cutoff algorithm tree-or-graph problem-type solution-type
-          progress-reporting-interval randomize-search branch probe symmetry-pruning debug goal
-          threads recorder-prefix-pruning max-recorder-cycles)
-        current-params
-      (setf *problem-name* problem-name
-            *depth-cutoff* depth-cutoff
-            *algorithm* algorithm
-            *tree-or-graph* tree-or-graph
-            *problem-type* problem-type
-            *solution-type* solution-type
-            *progress-reporting-interval* progress-reporting-interval
-            *randomize-search* randomize-search
-            *branch* branch
-            *probe* probe
-            *symmetry-pruning* symmetry-pruning
-            *recorder-prefix-pruning* recorder-prefix-pruning
-            *max-recorder-cycles* max-recorder-cycles
-            *debug* debug
-            *goal* goal
-            *threads* threads))))
+    (loop for parameter in *persisted-problem-parameters*
+          for value in current-params
+          do (set parameter value))))
 
 
 ;; -------------------- problem.lisp file handling ------------------------ ;;
@@ -419,23 +359,8 @@ is staged again.
     (format t "~&Enter (list-all-problems) for a complete list of problems." )
       (return-from %stage))
     (uiop:delete-file-if-exists *globals-file*)
-    (setf *problem-name* (intern (string-upcase (pathname-name problem-file)))
-          *depth-cutoff* 0
-          *algorithm* 'depth-first
-          *probe* nil
-          *progress-reporting-interval* 100000
-          *problem-type* 'planning
-          *solution-type* 'first
-          *tree-or-graph* 'graph
-          *debug* 0
-          *branch* -1
-          *randomize-search* nil
-          *symmetry-pruning* nil
-          *recorder-prefix-pruning* nil
-          *max-recorder-cycles* 1
-          *max-pairings* nil
-          *threads* 0
-          *features* (remove :ww-debug *features*))
+    (reset-problem-parameters-to-defaults
+      (intern (string-upcase (pathname-name problem-file))))
     (with-silenced-compilation
       (load-problem problem-name-str))))
 

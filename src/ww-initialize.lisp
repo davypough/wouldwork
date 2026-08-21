@@ -27,7 +27,7 @@
   ;; Restore saved parameters before symmetry detection. During refresh,
   ;; problem-file ww-set forms are skipped, so saving here preserves the
   ;; current settings for later reloads.
-  (let ((vals-file (merge-pathnames "vals.lisp" (asdf:system-source-directory :wouldwork))))
+  (let ((vals-file (instance-vals-file (asdf:system-source-directory :wouldwork))))
     (cond (*refreshing*
            (save-globals))
           ((probe-file vals-file)

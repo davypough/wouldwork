@@ -17,7 +17,7 @@
 ;;;                and hooks); -placement; -visibility (null defaults); -vertical (top);
 ;;;                -mobility; -reachability; -pickup; -beam-relay-init-checks;
 ;;;                -recorder-fork-registry (paired-fact fork)
-;;;   parameter  : *max-pairings* -- defaults to 3; connector pairings only; fixed
+;;;   parameter  : *max-connector-pairings* -- defaults to 3; connector pairings only; fixed
 ;;;                couplings are unlimited; a problem may set a smaller value first
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
@@ -51,7 +51,7 @@
 (in-package :ww)
 
 
-(setf *max-pairings* (or *max-pairings* 3))
+(setf *max-connector-pairings* (or *max-connector-pairings* 3))
 
 
 (define-types
@@ -153,7 +153,7 @@
               ?agent $pairing-vantages ?location $connector ?terminus)
           (assign $connectable (cons ?terminus $connectable))))
       (ww-loop for $selected-termini in
-                 (rest (subsets-up-to $connectable *max-pairings*))
+                 (rest (subsets-up-to $connectable *max-connector-pairings*))
                do (ww-loop for $placement-option in $places
                            do (assert
                                 (assign $termini $selected-termini)

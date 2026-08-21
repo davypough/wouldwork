@@ -27,6 +27,13 @@
          (setf ,param ',val)
          (unless *ww-loading*
            (save-globals)
+            (display-current-parameters)))
+       ((*max-connector-pairings* *beam-occlusion-tolerance*
+         *boundary-wall-height* *vertical-reach-limit*)
+         (setf ,param ',val)
+         ;; A technology-specific problem setting should survive refresh, but not
+         ;; leak into another problem through the persisted globals file.
+         (unless *ww-loading*
            (display-current-parameters)))
        (*num-closed-shards*
          (setf *num-closed-shards* ',val

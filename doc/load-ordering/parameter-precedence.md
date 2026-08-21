@@ -68,16 +68,21 @@ Position matters — `read-init-vals` indexes into it directly.
 | 14 | `*recorder-prefix-pruning*` | `nil` |
 | 15 | `*max-recorder-cycles*` | `1` |
 
-Defaults live in `*default-parameters*` in the same save/read order. `read-globals` pads a short
-list from the defaults tail, so adding a parameter to the end of the list does not invalidate an
-existing `vals.lisp`.
+All managed defaults live in `*problem-parameter-defaults*`; the persisted subset and its
+save/read order live in `*persisted-problem-parameters*`. `*default-parameters*` is derived from
+those two registries. `read-globals` pads a short list from the defaults tail, so adding a
+persisted parameter to the end of the list does not invalidate an existing `vals.lisp`.
 
-**Anything not in this table is not persisted.** That includes every parallel-search tuning
-parameter — `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
+**Anything not in this table is not persisted.** That includes `*auto-wait*`, the
+technology-specific `*max-connector-pairings*`, `*beam-occlusion-tolerance*`,
+`*boundary-wall-height*`, and `*vertical-reach-limit*` parameters, and every parallel-search tuning
+parameter — `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
 `*bound-refresh-interval*`, `*donation-check-interval*`, `*donation-threshold*`,
-`*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. Setting one of these calls
-`save-globals`, which writes the 16-element list and silently omits it. Those values survive a
-`(refresh)` but not a restart.
+`*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. The non-persisted search
+settings call `save-globals`, which writes the 16-element list and silently omits them;
+the technology-specific settings only reprint the current parameters. Their REPL overrides survive a
+`(refresh)`, but not restaging or restart. Staging restores every managed default first and then
+applies the new problem specification's `ww-set` overrides.
 
 ---
 
@@ -91,6 +96,7 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
 | `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*recorder-prefix-pruning*`, `*max-recorder-cycles*` | yes | yes | `save-globals` + reprint |
+| `*max-connector-pairings*`, `*beam-occlusion-tolerance*`, `*boundary-wall-height*`, `*vertical-reach-limit*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; each is displayed only when its consuming technology and relevant problem objects or facts are present |
 | `*solution-type*` | yes | yes | as above; warns if `backtracking` is paired with an optimizing type |
 | `*num-closed-shards*` | yes | yes | as above; also recomputes `*closed-shard-mask*` |
 | `*tree-or-graph*` | yes | yes | as above; refuses `graph` under `backtracking` |

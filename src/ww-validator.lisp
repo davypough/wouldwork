@@ -956,6 +956,12 @@
     (*max-recorder-cycles*
       (unless (and (typep val 'fixnum) (> val 0))
         (error "Can't set *max-recorder-cycles* to ~S. Must be a positive integer." val)))
+    (*max-connector-pairings*
+      (unless (and (typep val 'fixnum) (> val 0))
+        (error "Can't set *max-connector-pairings* to ~S. Must be a positive integer." val)))
+    ((*beam-occlusion-tolerance* *boundary-wall-height* *vertical-reach-limit*)
+      (unless (and (rationalp val) (>= val 0))
+        (error "Can't set ~S to ~S. Must be a non-negative rational." param val)))
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))

@@ -19,7 +19,7 @@
 (ww-set *progress-reporting-interval* 3000000)
 
 
-(defparameter *max-pairings* 2)
+(ww-set *max-connector-pairings* 2)
 
 
 (define-types

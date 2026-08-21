@@ -42,7 +42,7 @@
 
 (defparameter *reversed-pegs* nil)  ;list of pegs in reverse order
 
-(defparameter *depth-cutoff* 7)  ;add when searching bidirectional to partial depth
+(ww-set *depth-cutoff* 7)  ;add when searching bidirectional to partial depth
                           ;DepthBackward + DepthForward = DepthTotal
                           ;remove if full search backward to start state
 

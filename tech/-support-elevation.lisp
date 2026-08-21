@@ -23,8 +23,8 @@
 ;;;               can act across vertically: lifting cargo above or below its own elevation,
 ;;;               raising cargo onto a higher resting place, or jumping up onto a higher
 ;;;               support or clearing a barrier (jump.lisp reuses this parameter rather than
-;;;               defining its own).  Independent of the agent's own declared height.  A
-;;;               problem overrides it with its own DEFPARAMETER.
+;;;               defining its own).  Independent of the agent's own declared height.  It is
+;;;               managed in ww-settings.lisp and a problem overrides it with WW-SET.
 ;;;   queries   : within-agent-vertical-reach (symmetric, for lifting),
 ;;;               within-agent-placement-reach (one-sided, for setting down)
 
@@ -34,16 +34,6 @@
 
 
 (define-optional-types box fan tray)
-
-
-(defvar *vertical-reach-limit* 1
-  "Maximum elevation gap an agent can act across vertically -- lifting cargo above or below
-   its own elevation, raising cargo onto a higher resting place, or jumping up onto a higher
-   support or clearing a barrier -- independent of the agent's own declared height.  Lifting
-   is symmetric: an object resting more than this far below the agent's elevation is out of
-   reach exactly as one more than this far above it is.  Setting an object down is not: only
-   the upward direction is bounded, since a drop needs no reach at all.  Problem files can
-   override this.")
 
 
 (define-query within-agent-vertical-reach (?agent agent ?target-elevation)

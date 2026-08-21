@@ -20,7 +20,7 @@
 (ww-set *depth-cutoff* 20)
 
 
-(defparameter *max-pairings* 2)  ;each connector needs at most one source and one target
+(ww-set *max-connector-pairings* 2)  ;each connector needs at most one source and one target
 
 
 ;;;; TYPES ;;;;

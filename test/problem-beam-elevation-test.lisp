@@ -65,7 +65,7 @@
 (setf *expected-min-length* 1)
 
 
-(defparameter *max-pairings* 2)  ;connector2/4 each pair to a connector and receiver
+(ww-set *max-connector-pairings* 2)  ;connector2/4 each pair to a connector and receiver
 
 
 ;;;; TYPES ;;;;

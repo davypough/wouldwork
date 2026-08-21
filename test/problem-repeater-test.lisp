@@ -33,7 +33,7 @@
 (setf *expected-min-length* 0)
 
 
-(defparameter *max-pairings* 2)
+(ww-set *max-connector-pairings* 2)
 
 
 ;;;; TYPES ;;;;

@@ -100,7 +100,7 @@
 (setf *expected-min-length* 3)
 
 
-(defparameter *max-pairings* 2)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
+(ww-set *max-connector-pairings* 2)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
 
 
 ;;;; TYPES ;;;;

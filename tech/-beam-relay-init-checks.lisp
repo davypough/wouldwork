@@ -44,12 +44,12 @@
                    literal terminus))
           (incf (gethash connector pair-counts 0))))
       (maphash (lambda (connector count)
-                 (when (> count *max-pairings*)
-                   (fail-init-check nil "~%PAIRED connector exceeds *MAX-PAIRINGS*.~%~
+                 (when (> count *max-connector-pairings*)
+                   (fail-init-check nil "~%PAIRED connector exceeds *MAX-CONNECTOR-PAIRINGS*.~%~
                            Connector: ~S~%~
                            Pairings:  ~D~%~
                            Limit:     ~D"
-                          connector count *max-pairings*)))
+                          connector count *max-connector-pairings*)))
                pair-counts))))
 
 
@@ -161,4 +161,3 @@
                      (init-check-paired-connector-sightline
                        literal connector connector-location
                        terminus terminus-location literals))))))))))))
-

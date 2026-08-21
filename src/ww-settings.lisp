@@ -23,9 +23,24 @@
   (format t "~2%Current parameter settings:")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
-           *threads* *randomize-search* *debug* *probe* *goal* *auto-wait* *symmetry-pruning*)
-  (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
-  (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*)
+           *threads* *randomize-search* *debug* *probe* *goal* *symmetry-pruning*)
+  (when *happening-names*
+    (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
+  (when (and (member "recorder" *spliced-tech-names* :test #'string=)
+             (gethash 'recorder *types*))
+    (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
+    (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*))
+  (when (and (member "beam-relay" *spliced-tech-names* :test #'string=)
+             (gethash 'connector *types*))
+    (format t "~&  *MAX-CONNECTOR-PAIRINGS* => ~D" *max-connector-pairings*))
+  (when (and (member "-beam-los-coordinates" *spliced-tech-names* :test #'string=)
+             (gethash 'location *types*))
+    (format t "~&  *BEAM-OCCLUSION-TOLERANCE* => ~A" *beam-occlusion-tolerance*))
+  (when (and (member "visibility" *spliced-tech-names* :test #'string=)
+             (gethash '(boundary-wall) *static-db*))
+    (format t "~&  *BOUNDARY-WALL-HEIGHT* => ~A" *boundary-wall-height*))
+  (when (member "-support-elevation" *spliced-tech-names* :test #'string=)
+    (format t "~&  *VERTICAL-REACH-LIMIT* => ~A" *vertical-reach-limit*))
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
@@ -488,8 +503,111 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *max-recorder-cycles* 1
   "Maximum number of START-RECORDER actions permitted in one search path.")
 
-(defvar *max-pairings* nil
-  "Maximum pairings per connector, or NIL until beam-relay supplies its default.")
+(defvar *max-connector-pairings* nil
+  "Maximum PAIRED termini per connector, or NIL until beam-relay supplies its default.")
+
+(defvar *beam-occlusion-tolerance* 1/2
+  "Maximum perpendicular distance a location may sit off a beam's exact line and still
+   count as a candidate occluder there.")
+
+(defvar *boundary-wall-height* 6
+  "The boundary polygon's height for sightline crossing tests. Its base is 0.")
+
+(defvar *vertical-reach-limit* 1
+  "Maximum elevation gap an agent can act across vertically, independent of height.")
+
+(defvar *split-depth-max* 20
+  "Safety cap on serial task-generation depth.")
+
+(defvar *tasks-per-thread* 8
+  "Target number of generated tasks per parallel worker.")
+
+(defvar *min-tasks* 256
+  "Minimum number of tasks generated for parallel search.")
+
+(defvar *num-closed-shards* 64
+  "Number of shards in the parallel closed table.")
+
+(defvar *closed-shard-mask* 63
+  "Bitmask derived from *NUM-CLOSED-SHARDS* for fast shard selection.")
+
+(defvar *bound-refresh-interval* 1000
+  "Worker cycles between cached branch-and-bound refreshes.")
+
+(defvar *donation-check-interval* 10000
+  "Worker cycles between work-donation checks.")
+
+(defvar *donation-threshold* 256
+  "Minimum local stack size before a worker may donate work.")
+
+(defvar *donation-fraction* 0.2
+  "Fraction of a donating worker's local stack to donate.")
+
+(defvar *enable-work-donation* t
+  "Whether parallel workers may donate work to the shared task queue.")
+
+
+(defparameter *problem-parameter-defaults*
+  '((*problem-name* . unspecified)
+    (*depth-cutoff* . 0)
+    (*algorithm* . depth-first)
+    (*tree-or-graph* . graph)
+    (*problem-type* . planning)
+    (*solution-type* . first)
+    (*progress-reporting-interval* . 100000)
+    (*randomize-search*)
+    (*branch* . -1)
+    (*probe*)
+    (*symmetry-pruning*)
+    (*debug* . 0)
+    (*goal*)
+    (*threads* . 0)
+    (*recorder-prefix-pruning*)
+    (*max-recorder-cycles* . 1)
+    (*auto-wait*)
+    (*max-connector-pairings*)
+    (*beam-occlusion-tolerance* . 1/2)
+    (*boundary-wall-height* . 6)
+    (*vertical-reach-limit* . 1)
+    (*split-depth-max* . 20)
+    (*tasks-per-thread* . 8)
+    (*min-tasks* . 256)
+    (*num-closed-shards* . 64)
+    (*bound-refresh-interval* . 1000)
+    (*donation-check-interval* . 10000)
+    (*donation-threshold* . 256)
+    (*donation-fraction* . 0.2)
+    (*enable-work-donation* . t))
+  "Authoritative defaults restored before staging a problem specification.")
+
+
+(defparameter *persisted-problem-parameters*
+  '(*problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
+    *solution-type* *progress-reporting-interval* *randomize-search* *branch*
+    *probe* *symmetry-pruning* *debug* *goal* *threads*
+    *recorder-prefix-pruning* *max-recorder-cycles*)
+  "Problem parameters saved in VALS.LISP, in positional file order.")
+
+
+(defun problem-parameter-default (parameter)
+  (let ((entry (assoc parameter *problem-parameter-defaults*)))
+    (unless entry
+      (error "No default is registered for problem parameter ~S." parameter))
+    (cdr entry)))
+
+
+(defparameter *default-parameters*
+  (mapcar #'problem-parameter-default *persisted-problem-parameters*)
+  "Persisted problem-parameter defaults in VALS.LISP order.")
+
+
+(defun reset-problem-parameters-to-defaults (&optional (problem-name 'unspecified))
+  "Restore every managed parameter before a new problem specification is loaded."
+  (dolist (entry *problem-parameter-defaults*)
+    (set (car entry) (cdr entry)))
+  (setf *problem-name* problem-name
+        *closed-shard-mask* (1- *num-closed-shards*)
+        *features* (remove :ww-debug *features*)))
 
 (sb-ext:defglobal *types*
   (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
@@ -754,23 +872,4 @@ treat their arguments as read-only and be safe to call concurrently."
 (eval-when (:load-toplevel :execute)
   (let ((vals-file (instance-vals-file (asdf:system-source-directory :wouldwork))))
     (unless (probe-file vals-file)
-      ;; No vals.lisp exists, reset to defaults before problem.lisp loads
-      (setf *problem-name* 'unspecified
-            *depth-cutoff* 0
-            *algorithm* 'depth-first
-            *tree-or-graph* 'graph
-            *problem-type* 'planning
-            *solution-type* 'first
-            *progress-reporting-interval* 100000
-            *randomize-search* nil
-            *branch* -1
-            *probe* nil
-            *debug* 0
-            *goal* nil
-            *auto-wait* nil
-            *symmetry-pruning* nil
-            *recorder-prefix-pruning* nil
-            *max-recorder-cycles* 1
-            *max-pairings* nil)
-      ;; Ensure debug feature flag is cleared
-      (setf *features* (remove :ww-debug *features*)))))
+      (reset-problem-parameters-to-defaults))))

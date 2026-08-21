@@ -155,7 +155,7 @@
 
 
 (define-test-claim beam-relay-default-pairing-limit
-  (= *max-pairings* 3))
+  (= *max-connector-pairings* 3))
 
 
 (define-test-claim recorder-isolation-validation

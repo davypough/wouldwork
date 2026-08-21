@@ -9,30 +9,6 @@
 
 
 ;;; ============================================================
-;;; PARALLEL SEARCH PARAMETERS
-;;; ============================================================
-
-(defparameter *split-depth-max* 20
-  "Safety cap on serial task-generation depth. Expansion continues until
-   the task-count target (* *tasks-per-thread* *threads*) is met or the
-   frontier is exhausted; this cap only fires on problems with very large
-   branching factors where unlimited expansion would be expensive.")
-
-(defparameter *tasks-per-thread* 8
-  "Target multiplier: aim for (* *tasks-per-thread* *threads*) tasks minimum.")
-
-(defparameter *min-tasks* 256
-  "Minimum number of tasks to generate regardless of thread count.")
-
-(defparameter *num-closed-shards* 64
-  "Number of shards for parallel *closed* table. Must be power of 2.
-   Default 64 provides good distribution for up to 64 cores.")
-
-(defparameter *closed-shard-mask* (1- *num-closed-shards*)
-  "Bitmask for fast shard computation: (logand hash mask).")
-
-
-;;; ============================================================
 ;;; TASK QUEUE STRUCTURE
 ;;; ============================================================
 ;;; Thread-safe FIFO queue with blocking pop and termination signaling.
@@ -609,27 +585,6 @@
   (sb-thread:make-mutex :name "best-bound-lock")
   "Protects updates to *best-bound*.")
 
-(defparameter *bound-refresh-interval* 1000
-  "Number of cycles between bound cache refreshes in workers.
-   Lower = more responsive to bound updates, higher = less overhead.")
-
-(defparameter *donation-check-interval* 10000  ;500
-  "Number of cycles between donation eligibility checks.
-   Lower = more responsive load balancing, higher = less overhead.")
-
-(defparameter *donation-threshold* 256  ;32
-  "Minimum local stack size before a worker considers donating work.
-   Must have at least this many nodes to donate.")
-
-(defparameter *donation-fraction* 0.2  ;0.5
-  "Fraction of local stack to donate when donating (0.0 to 1.0).
-   Donates the shallowest nodes (largest subtrees).")
-
-(defparameter *enable-work-donation* t
-  "When T, workers can donate excess work back to the task queue.
-   Set to NIL to disable load balancing (for debugging/comparison).")
-
-
 (defun compute-state-bound-value (state depth)
   "Compute the bound value for STATE at DEPTH based on *solution-type*.
    Returns value in 'lower is better' convention."
@@ -922,7 +877,7 @@
   (format t "  (ww-set *threads* N)    ; Set number of worker threads (0 = serial)~%")
   (format t "  (ww-solve)              ; Run search~%")
   (format t "~%TASK GENERATION:~%")
-  (format t "  *split-depth-max*       ; Max depth for initial task creation (default: 4)~%")
+  (format t "  *split-depth-max*       ; Max depth for initial task creation (default: 20)~%")
   (format t "                          ; Higher = more tasks, more parallelism~%")
   (format t "  *tasks-per-thread*      ; Target tasks per thread (default: 8)~%")
   (format t "  *min-tasks*             ; Minimum tasks regardless of threads (default: 256)~%")
@@ -934,9 +889,9 @@
   (format t "                          ; Lower = more responsive, higher = less overhead~%")
   (format t "~%WORK DONATION (Load Balancing):~%")
   (format t "  *enable-work-donation*  ; Enable/disable donation (default: T)~%")
-  (format t "  *donation-threshold*    ; Min stack size to donate (default: 32)~%")
-  (format t "  *donation-check-interval*; Cycles between donation checks (default: 500)~%")
-  (format t "  *donation-fraction*     ; Fraction to donate (default: 0.5)~%")
+  (format t "  *donation-threshold*    ; Min stack size to donate (default: 256)~%")
+  (format t "  *donation-check-interval*; Cycles between donation checks (default: 10000)~%")
+  (format t "  *donation-fraction*     ; Fraction to donate (default: 0.2)~%")
   (format t "~%TUNING TIPS:~%")
   (format t "  - For problems with uneven branching: lower *donation-threshold*~%")
   (format t "  - For very deep searches: increase *split-depth-max*~%")
@@ -964,8 +919,8 @@
     ;; Check split depth
     (when (< *split-depth-max* 1)
       (push "  - *split-depth-max* should be >= 1" issues))
-    (when (> *split-depth-max* 10)
-      (push "  - *split-depth-max* > 10 may generate excessive tasks" issues))
+    (when (> *split-depth-max* 20)
+      (push "  - *split-depth-max* > 20 may generate excessive tasks" issues))
     
     ;; Check closed shards
     (when (and (> *threads* 0) 
@@ -1111,15 +1066,15 @@
    PRESET can be: :default, :aggressive, :conservative, :debug"
   (ecase preset
     (:default
-     (setf *split-depth-max* 4
+     (setf *split-depth-max* 20
            *tasks-per-thread* 8
            *min-tasks* 256
            *num-closed-shards* 64
            *bound-refresh-interval* 1000
            *enable-work-donation* t
-           *donation-check-interval* 500
-           *donation-threshold* 32
-           *donation-fraction* 0.5)
+           *donation-check-interval* 10000
+           *donation-threshold* 256
+           *donation-fraction* 0.2)
      (format t "~%Applied :default preset~%"))
     
     (:aggressive

@@ -43,8 +43,8 @@
 ;;; location as a candidate occluder: BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM projects the
 ;;; candidate onto the beam's line and accepts it iff that projection falls strictly between
 ;;; the beam's own two endpoints (a location never occludes a beam it terminates) and its
-;;; perpendicular distance from the line is within *BEAM-OCCLUSION-TOLERANCE* (declared below;
-;;; default 1/2, a half-unit radius; a problem overrides it with its own DEFPARAMETER).  A
+;;; perpendicular distance from the line is within *BEAM-OCCLUSION-TOLERANCE* (default 1/2,
+;;; a half-unit radius; a problem overrides it with WW-SET).  A
 ;;; qualifying location is appended to the occluder list as a bare location name, exactly like
 ;;; a qualifying gate; distances are compared squared throughout to stay in exact rational
 ;;; arithmetic.  The location<->gate (LOS-VIA) and location<->gun branches deliberately
@@ -76,9 +76,8 @@
 ;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with walkability, so
 ;;;               a location's coordinates are entered once regardless of which
 ;;;               capabilities the problem uses)
-;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a Talos-problem default, not a
-;;;               core wouldwork setting, so it lives here rather than in ww-settings.lisp;
-;;;               a problem overrides it with its own DEFPARAMETER
+;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- managed as a problem parameter
+;;;               in ww-settings.lisp; a problem overrides it with WW-SET
 ;;;   types     : los-endpoint (either transmitter receiver floor-repeater wall-repeater
 ;;;               gun location);
 ;;;               jammer and gun
@@ -136,12 +135,6 @@
   repeater (either floor-repeater wall-repeater)
   los-endpoint
     (either transmitter receiver floor-repeater wall-repeater gun location))
-
-
-(defvar *beam-occlusion-tolerance* 1/2
-  "Maximum perpendicular distance a location may sit off a beam's exact line and still
-   count as a candidate occluder there (BEAM-COORDINATES-LOCATION-OCCLUDES-BEAM). Default is
-   a half-unit radius. Problem files can override this.")
 
 
 ;;;; GEOMETRY HELPERS ;;;;

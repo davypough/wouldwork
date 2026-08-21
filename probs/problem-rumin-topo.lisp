@@ -23,7 +23,7 @@
 (ww-set *max-recorder-cycles* 2)
 
 
-(defparameter *max-pairings* 2)
+(ww-set *max-connector-pairings* 2)
 
 
 

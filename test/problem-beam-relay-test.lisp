@@ -6,7 +6,7 @@
 ;;;   1. PICKUP-CONNECTOR removing its support occupancy, its outgoing pairing, and a
 ;;;      reverse-oriented pairing where another connector names it as terminus.
 ;;;   2. CONNECT-CONNECTOR selecting exactly two useful termini from three structurally
-;;;      eligible choices at *MAX-PAIRINGS* = 2, then propagating color to a receiver.
+;;;      eligible choices at *MAX-CONNECTOR-PAIRINGS* = 2, then propagating color to a receiver.
 ;;;   3. PUT-CONNECTOR placing an independently held connector on a plate without pairings.
 ;;;   4. CONNECTABLE-LOCATION rejecting a site occupied by a lit connector while accepting
 ;;;      sites occupied only by unlit connectors.
@@ -44,7 +44,7 @@
 (setf *expected-min-length* 3)
 
 
-(defparameter *max-pairings* 2)
+(ww-set *max-connector-pairings* 2)
 
 
 ;;;; TYPES ;;;;
@@ -207,7 +207,7 @@
 
 
 (define-test-claim beam-relay-pairing-limit-override
-  (= *max-pairings* 2))
+  (= *max-connector-pairings* 2))
 
 
 (define-test-claim beam-relay-positive-topology-validation
