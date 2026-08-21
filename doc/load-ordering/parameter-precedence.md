@@ -96,7 +96,7 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
 | `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*recorder-prefix-pruning*`, `*max-recorder-cycles*` | yes | yes | `save-globals` + reprint |
-| `*max-connector-pairings*`, `*beam-occlusion-tolerance*`, `*boundary-wall-height*`, `*vertical-reach-limit*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; each is displayed only when its consuming technology and relevant problem objects or facts are present |
+| `*max-connector-pairings*`, `*beam-occlusion-tolerance*`, `*boundary-wall-height*`, `*vertical-reach-limit*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; each is displayed only when its consuming technology and relevant problem objects or facts are present; vertical reach uses a conservative structural guard for a possible nonzero manipulation, landing, or barrier-clearance comparison and never performs search |
 | `*solution-type*` | yes | yes | as above; warns if `backtracking` is paired with an optimizing type |
 | `*num-closed-shards*` | yes | yes | as above; also recomputes `*closed-shard-mask*` |
 | `*tree-or-graph*` | yes | yes | as above; refuses `graph` under `backtracking` |

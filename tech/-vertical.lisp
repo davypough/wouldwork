@@ -128,9 +128,9 @@
     (if (bind (holding $holder ?object))
       (top $holder)
       (if (bind (has-location ?object $location))
-        (base $location)
+        (fixed-base $location)
         (if (bind (has-position ?object $site))
-          (base $site)
+          (fixed-base $site)
           (fixed-base ?object))))))
 
 

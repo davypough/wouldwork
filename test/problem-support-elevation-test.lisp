@@ -230,5 +230,16 @@
     (= (top tray-connector) 9/2)))
 
 
+(define-test-claim vertical-reach-parameter-relevant-to-raised-supports
+  (vertical-reach-limit-relevant-p *start-state*)
+  (vertical-reach-box-support-values
+    *start-state* '(0) (gethash 'cargo *types*))
+  (vertical-reach-held-tray-values
+    *start-state* '(0) (gethash 'agent *types*) (gethash 'cargo *types*))
+  (search "*VERTICAL-REACH-LIMIT*"
+          (with-output-to-string (*standard-output*)
+            (display-current-parameters))))
+
+
 (define-goal
   (support-elevation-scenarios-valid))

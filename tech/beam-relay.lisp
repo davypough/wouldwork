@@ -205,23 +205,24 @@
 (define-query recording-shadow-relay-beam-reaches-receiver
     (?view ?lighting ?receiver receiver)
   (do (assign $reaches nil)
-      (doall (?relay relay)
-        (if (and (relay-available-for-object ?view ?relay)
-                 (assign $record (assoc ?relay ?lighting))
-                 $record
-                 (bind (has-chroma ?receiver $required-hue))
-                 (eql (second $record) $required-hue)
-                 (or (and (connector ?relay)
-                          (paired ?relay ?receiver)
-                          (bind (has-location ?relay $location))
-                          (beam-visible-for-object
-                            ?view $location (top ?relay)
-                            ?receiver (top ?receiver)))
-                     (and (repeater ?relay)
-                          (coupled ?relay ?receiver)
-                          (fixed-beam-corridor-clear-for-object
-                            ?view ?relay ?receiver))))
-          (assign $reaches t)))
+      ;; Lighting contains only relays available in this view; do not rescan every relay
+      ;; or repeat the recording-shadow presence test here.
+      (ww-loop for $record in ?lighting
+               do (assign $relay (first $record))
+                  (if (and
+                       (bind (has-chroma ?receiver $required-hue))
+                       (eql (second $record) $required-hue)
+                       (or (and (connector $relay)
+                                (paired $relay ?receiver)
+                                (bind (has-location $relay $location))
+                                (beam-visible-for-object
+                                  ?view $location (top $relay)
+                                  ?receiver (top ?receiver)))
+                           (and (repeater $relay)
+                                (coupled $relay ?receiver)
+                                (fixed-beam-corridor-clear-for-object
+                                  ?view $relay ?receiver))))
+                    (assign $reaches t)))
       $reaches))
 
 
@@ -233,6 +234,8 @@
   ;; Breadth-first propagation from every transmitter.  Each lighting record is
   ;; (relay hue distance); frontier records additionally carry the relay's beam endpoint.
   (do (assign $lit nil)
+      ;; The view class is invariant throughout propagation.
+      (assign $recording-view-p (recording-shadow-object ?view))
       (assign $lit-locations nil)
       (assign $visited nil)
       (assign $frontier nil)
@@ -243,7 +246,8 @@
       (ww-loop for $pass from 1 to 99
                do (assign $next-frontier nil)
                   (doall (?target relay)
-                    (if (and (relay-available-for-object ?view ?target)
+                    (if (and (or (not $recording-view-p)
+                                 (recording-shadow-object-present ?target))
                              (not (member ?target $visited)))
                       (do (assign $target-anchor (relay-anchor ?target))
                           (if $target-anchor
@@ -295,11 +299,6 @@
                   (if (not $frontier)
                     (return t)))
       $lit))
-
-
-(define-query relay-available-for-object (?view ?relay relay)
-  (or (not (recording-shadow-object ?view))
-      (recording-shadow-object-present ?relay)))
 
 
 (define-query relay-anchor (?relay relay)

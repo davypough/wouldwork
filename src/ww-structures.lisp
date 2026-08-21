@@ -91,27 +91,13 @@
           (list-database (problem-state.hidb state))))
 
 
-(defun copy-problem-state (state)
-    (make-problem-state
-      :name (problem-state.name state)
-      :instantiations (copy-tree (problem-state.instantiations state))
-      :happenings (copy-tree (problem-state.happenings state))
-      :time (problem-state.time state)
-      :value (problem-state.value state)
-      :heuristic (problem-state.heuristic state)
-      :idb (copy-idb (problem-state.idb state))
-      :hidb (copy-idb (problem-state.hidb state))
-      :idb-hash nil
-      :fixed-idb-hash (problem-state.fixed-idb-hash state)
-      :symmetry-idb (when (problem-state.symmetry-idb state)
-                      (copy-idb (problem-state.symmetry-idb state)))
-      :canonical-symmetry-form :uncached
-      :canonical-form-hash nil))
-
-
-(defun copy-problem-state-without-idb (state)
-  "Copies a problem-state but omits the idb field (leaves it as new empty hash table).
-   Used when the idb will be immediately replaced with a different one."
+(defun %copy-problem-state (state copy-hidb-p)
+  "Build a state copy, optionally sharing its happenings database.
+   COPY-HIDB-P may be false only in a problem with no happenings.  In that mode every
+   generated proposition access names IDB directly, and no planner path can mutate HIDB,
+   so both ordinary and temporary effect states may share the unreachable table."
+  (declare (type problem-state state)
+           (type boolean copy-hidb-p))
   (make-problem-state
     :name (problem-state.name state)
     :instantiations (copy-tree (problem-state.instantiations state))
@@ -119,13 +105,30 @@
     :time (problem-state.time state)
     :value (problem-state.value state)
     :heuristic (problem-state.heuristic state)
-    :idb (make-hash-table :test 'eql :synchronized nil)
-    :hidb (copy-idb (problem-state.hidb state))
+    :idb (copy-idb (problem-state.idb state))
+    :hidb (if copy-hidb-p
+            (copy-idb (problem-state.hidb state))
+            (problem-state.hidb state))
     :idb-hash nil
-    :fixed-idb-hash nil
-    :symmetry-idb nil
+    :fixed-idb-hash (problem-state.fixed-idb-hash state)
+    :symmetry-idb (when (problem-state.symmetry-idb state)
+                    (copy-idb (problem-state.symmetry-idb state)))
     :canonical-symmetry-form :uncached
-    :canonical-form-hash nil))  ; will be recomputed when alist is created
+    :canonical-form-hash nil))
+
+
+(defun copy-problem-state (state)
+  "Copy STATE, sharing its unreachable HIDB only when the problem has no happenings."
+  (declare (type problem-state state))
+  (%copy-problem-state state (and *happening-names* t)))
+
+
+(defun copy-problem-state-for-effect (state copy-hidb-p)
+  "Copy STATE for generated ASSERT evaluation.
+   COPY-HIDB-P is fixed by the translator from whether the staged problem has happenings."
+  (declare (type problem-state state)
+           (type boolean copy-hidb-p))
+  (%copy-problem-state state copy-hidb-p))
 
 
 (defun copy-idb (idb)

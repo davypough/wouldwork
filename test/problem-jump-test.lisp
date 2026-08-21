@@ -404,6 +404,18 @@
   (jump-scenarios-valid))
 
 
+(define-test-claim vertical-reach-parameter-relevant-to-jumping
+  (vertical-reach-limit-relevant-p *start-state*)
+  (some (lambda (fact)
+          (and (member (first fact) '(traverse-via traverse-via>))
+               (eq (second fact) 'jumping)
+               (vertical-reach-jump-fact-relevant-p *start-state* fact)))
+        (list-static-db))
+  (search "*VERTICAL-REACH-LIMIT*"
+          (with-output-to-string (*standard-output*)
+            (display-current-parameters))))
+
+
 ;;;; MUTATION CHARACTERIZATION ;;;;
 
 

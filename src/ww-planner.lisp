@@ -372,7 +372,7 @@
 
 (defun process-followups (net-state updated-db)
   "Triggering forms are saved previously during effect apply.
-   Followups execute on post-happening state, seeing cumulative changes.
+   Followups mutate the post-happening state directly, seeing cumulative changes.
    With no followups, NET-STATE already carries its correct hash components."
   (declare (ignorable updated-db))
   (unless (update.followups updated-db)  ;nothing to do; carried hash already describes net-state
@@ -386,27 +386,23 @@
          (*symmetry-idb-acc* (when canonical-p
                                (problem-state.symmetry-idb net-state)))
          (*symmetry-idb-touched-p* nil))
-    (iter (with state+ = (copy-problem-state-without-idb net-state))
-          (initially (setf (problem-state.idb state+) (problem-state.idb net-state)))
-          (for followup in (update.followups updated-db))
-          #+:ww-debug (when (>= *debug* 4)
-                        (ut::prt followup))
-          (apply (car followup) state+ (cdr followup))
-          (for updated-idb = (problem-state.idb state+))
-          #+:ww-debug (when (>= *debug* 4)
-                        (ut::prt (list-database updated-idb)))
-          (setf (problem-state.idb net-state) updated-idb)
-      (finally (setf (problem-state.idb-hash net-state) *idb-hash-acc*
-                     (problem-state.fixed-idb-hash net-state) *fixed-idb-hash-acc*
-                     (problem-state.symmetry-idb net-state) *symmetry-idb-acc*)
-               ;; NET-STATE already carries create-action-state's canonical form (the
-               ;; parent's, if the action's own assert left the slice untouched); only
-               ;; invalidate it here if a followup (e.g. propagate-changes!) touched it.
-               (when *symmetry-idb-touched-p*
-                 (setf (problem-state.canonical-symmetry-form net-state) :uncached
-                       (problem-state.canonical-form-hash net-state) nil))
-               (validate-carried-hash net-state)  ;debug gate (no-op unless *validate-idb-hash*)
-               (return-from process-followups net-state)))))
+    (dolist (followup (update.followups updated-db))
+      #+:ww-debug (when (>= *debug* 4)
+                    (ut::prt followup))
+      (apply (car followup) net-state (cdr followup))
+      #+:ww-debug (when (>= *debug* 4)
+                    (ut::prt (list-database (problem-state.idb net-state)))))
+    (setf (problem-state.idb-hash net-state) *idb-hash-acc*
+          (problem-state.fixed-idb-hash net-state) *fixed-idb-hash-acc*
+          (problem-state.symmetry-idb net-state) *symmetry-idb-acc*)
+    ;; NET-STATE already carries create-action-state's canonical form (the parent's, if
+    ;; the action's own assert left the slice untouched); only invalidate it here if a
+    ;; followup (e.g. propagate-changes!) touched it.
+    (when *symmetry-idb-touched-p*
+      (setf (problem-state.canonical-symmetry-form net-state) :uncached
+            (problem-state.canonical-form-hash net-state) nil))
+    (validate-carried-hash net-state)  ;debug gate (no-op unless *validate-idb-hash*)
+    net-state))
 
 
 (defun expand (current-node)  ;called from df-bnb1

@@ -960,37 +960,40 @@ predicates stay unknown because their argument may or may not be an instance."
                  (parent-hash (ensure-idb-hash state))
                  (parent-canonical-form (problem-state.canonical-symmetry-form state))
                  (parent-canonical-form-hash (problem-state.canonical-form-hash state))
-                 (state (copy-problem-state state))
-                 (*idb-hash-acc* (unless canonical-p parent-hash))
-                 (*fixed-idb-hash-acc* (when canonical-p
-                                         (problem-state.fixed-idb-hash state)))
-                 (*symmetry-idb-acc* (when canonical-p
-                                       (problem-state.symmetry-idb state)))
-                 (*symmetry-idb-touched-p* nil))
-            ,@(mapcar (lambda (statement)
-                        ;; Bind read-mode to nil only for direct assert statements
-                        (let ((*proposition-read-mode* nil))
-                          (translate statement 'eff)))
-                      (cdr form))
-            (push (make-update :changes (problem-state.idb state)
-                               :hash *idb-hash-acc*
-                               :fixed-idb-hash *fixed-idb-hash-acc*
-                               :symmetry-idb *symmetry-idb-acc*
-                               :canonical-symmetry-form
-                                 (if (and canonical-p (not *symmetry-idb-touched-p*))
-                                     parent-canonical-form
-                                     :uncached)
-                               :canonical-form-hash
-                                 (when (and canonical-p (not *symmetry-idb-touched-p*))
-                                   parent-canonical-form-hash)
-                               :value ,(if *objective-value-p*
-                                         '$objective-value
-                                         0.0)
-                               :instantiations (list ,@*eff-param-vars*)
-                               :followups (nreverse followups)
-                               ,@(when *has-sim-state*
-                                   '(:sim-state $sim-state)))
-                  updated-dbs)))))
+                 (effect-state
+                   (copy-problem-state-for-effect
+                     state ,(and *happening-names* t))))
+            (let ((state effect-state)
+                  (*idb-hash-acc* (unless canonical-p parent-hash))
+                  (*fixed-idb-hash-acc* (when canonical-p
+                                          (problem-state.fixed-idb-hash effect-state)))
+                  (*symmetry-idb-acc* (when canonical-p
+                                        (problem-state.symmetry-idb effect-state)))
+                  (*symmetry-idb-touched-p* nil))
+              ,@(mapcar (lambda (statement)
+                          ;; Bind read-mode to nil only for direct assert statements
+                          (let ((*proposition-read-mode* nil))
+                            (translate statement 'eff)))
+                        (cdr form))
+              (push (make-update :changes (problem-state.idb state)
+                                 :hash *idb-hash-acc*
+                                 :fixed-idb-hash *fixed-idb-hash-acc*
+                                 :symmetry-idb *symmetry-idb-acc*
+                                 :canonical-symmetry-form
+                                   (if (and canonical-p (not *symmetry-idb-touched-p*))
+                                       parent-canonical-form
+                                       :uncached)
+                                 :canonical-form-hash
+                                   (when (and canonical-p (not *symmetry-idb-touched-p*))
+                                     parent-canonical-form-hash)
+                                 :value ,(if *objective-value-p*
+                                           '$objective-value
+                                           0.0)
+                                 :instantiations (list ,@*eff-param-vars*)
+                                 :followups (nreverse followups)
+                                 ,@(when *has-sim-state*
+                                     '(:sim-state $sim-state)))
+                    updated-dbs))))))
 
 
 (defun translate-assert-bt (form flag)

@@ -128,17 +128,11 @@
 (define-test-claim nested-route-copy-contract
   (let* ((original (route-test-child 'route-first))
          (copied (copy-problem-state original))
-         (copied-without-idb (copy-problem-state-without-idb original))
          (original-route (fourth (problem-state.instantiations original)))
-         (copied-route (fourth (problem-state.instantiations copied)))
-         (copied-without-idb-route
-           (fourth (problem-state.instantiations copied-without-idb))))
+         (copied-route (fourth (problem-state.instantiations copied))))
     (when (eq original-route copied-route)
       (error "COPY-PROBLEM-STATE retained a shared nested route."))
-    (when (eq original-route copied-without-idb-route)
-      (error "COPY-PROBLEM-STATE-WITHOUT-IDB retained a shared nested route."))
     (setf (first (first copied-route)) 'changed-mode)
-    (setf (first (first copied-without-idb-route)) 'changed-mode)
     (unless (eql (first (first original-route)) 'walk)
       (error "Mutating a copied route changed the original state."))
     t)
