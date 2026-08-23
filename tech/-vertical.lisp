@@ -36,7 +36,19 @@
 ;;;   types     : vertical-object  --  everything with a place in the vertical model
 ;;;   parameter : *vertical-type-constants*  --  per-type height default, axis, and
 ;;;               base default
-;;;   queries   : base, top, fixed-base, object-height, location-elevation
+;;;   queries   : base, top, fixed-base, object-height, location-elevation,
+;;;               location-level
+;;;
+;;; LOCATION-ELEVATION is memoized, and that is only sound because a location's level
+;;; is state-independent: a location is never ON anything, never held, and has no
+;;; HAS-LOCATION or HAS-POSITION of its own, so all four of BASE's dynamic binds fail
+;;; and it falls through to FIXED-BASE's static coordinate.  The memo therefore sits at
+;;; a fixed entry point, and the overridable rule is the separate LOCATION-LEVEL seam:
+;;; a technology redefines that one, and inherits the memo rather than displacing it.
+;;; The contract a redefinition must keep is that LOCATION-LEVEL reads only static
+;;; relations.  -floor-blowing's override does -- LOCATION-COORDS>, HAS-ELEVATION and
+;;; AIMED-AT are all static.  One that read a dynamic relation would be served a stale
+;;; value here, and would also invalidate -traversal's segment cache downstream.
 ;;;
 ;;; WALL-GEARS and WALL-BLOWER are deliberately absent from the table.  Their
 ;;; HAS-ELEVATION is a stream elevation read by -gears-fan's BLOWER-ELEVATION, not the
@@ -116,6 +128,13 @@
    cache resets every time this file is respliced and loaded for a different problem.")
 
 
+(defparameter *location-elevation-cache* (make-hash-table :test #'eq)
+  "Memoizes LOCATION-ELEVATION by location.  A location's level is state-independent -- see
+   the file header -- so each location is resolved once for the whole problem instance rather
+   than on every mobility query.  DEFPARAMETER (not DEFVAR) so the cache resets every time
+   this file is respliced and loaded for a different problem.")
+
+
 (define-query base (?object vertical-object)
   ;; The absolute level of the object's lowest point, derived from whatever the object
   ;; rests on.  An object resting on a support takes that support's top; a held object
@@ -158,11 +177,20 @@
 
 
 (define-query location-elevation (?location location)
-  ;; A location's own floor level.  This is just BASE narrowed to a location, and exists
-  ;; as a named seam rather than inlined at its callers so that a technology can override
-  ;; the level for its own domain without every caller having to know: -floor-blowing
-  ;; redefines it so an undeclared location that some floor drive aims at hovers in the
-  ;; air rather than sitting on the ground.
+  ;; A location's own floor level: the name every caller uses, and the one place the value
+  ;; is memoized.  It is deliberately not the overridable seam -- an override here would
+  ;; replace the memo along with the rule -- so it delegates to LOCATION-LEVEL and a
+  ;; technology redefines that instead.  See *LOCATION-ELEVATION-CACHE*.
+  (location-elevation-value state ?location))
+
+
+(define-query location-level (?location location)
+  ;; The overridable rule behind LOCATION-ELEVATION: BASE narrowed to a location.  It exists
+  ;; as a named seam rather than inlined at its callers so that a technology can override the
+  ;; level for its own domain without every caller having to know -- -floor-blowing redefines
+  ;; it so an undeclared location that some floor drive aims at hovers in the air rather than
+  ;; sitting on the ground.  A redefinition may read only static relations; see the file
+  ;; header for why.
   (base ?location))
 
 
@@ -204,3 +232,15 @@
                         Every object reaching BASE, TOP, or OBJECT-HEIGHT must belong to ~
                         one of the leaf types in *VERTICAL-TYPE-CONSTANTS*."
                        object))))))
+
+
+(defun location-elevation-value (state location)
+  "Return LOCATION's level, computing it once per location for this problem instance.
+   LOCATION-LEVEL is called through SYMBOL-FUNCTION because it is an overridable seam: the
+   definition that must run is whichever technology installed last, not the one visible when
+   this file compiled.  Memoized; see *LOCATION-ELEVATION-CACHE*."
+  (multiple-value-bind (cached present) (gethash location *location-elevation-cache*)
+    (if present
+      cached
+      (setf (gethash location *location-elevation-cache*)
+            (funcall (symbol-function 'location-level) state location)))))

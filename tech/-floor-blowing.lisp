@@ -31,12 +31,16 @@
 ;;;   types     : agent, location
 ;;;   nested    : -gears-fan (types, mounting, shared blower state and cargo actions);
 ;;;               -vertical (base, location-coords>, has-elevation, and the
-;;;               location-elevation seam overridden here)
+;;;               location-level seam overridden here)
 ;;;   driver    : the derived propagation driver calls update-floor-blowing-status!
 ;;;               after update-blower-status!
 ;;; PROVIDES:
-;;;   query     : location-elevation -- overrides -vertical's seam so an undeclared
-;;;               floor-stream destination defaults to the in-air hover elevation 10
+;;;   query     : location-level -- overrides -vertical's seam so an undeclared
+;;;               floor-stream destination defaults to the in-air hover elevation 10.
+;;;               LOCATION-ELEVATION itself is NOT overridden: it is -vertical's memoizing
+;;;               entry point, and overriding it would discard the memo.  This override
+;;;               reads only static relations -- LOCATION-COORDS>, HAS-ELEVATION, AIMED-AT
+;;;               -- which is what keeps that memo sound
 ;;;   updates   : update-floor-blowing-status!, blow-occupants-away!, drop-occupants!
 ;;;   init check: floor-blowing-init-check -- destinations have unique drive owners,
 ;;;               and geometry-known lifts rise vertically
@@ -132,7 +136,7 @@
           drive source source-level destination destination-level)))))
 
 
-(define-query location-elevation (?location location)
+(define-query location-level (?location location)
   ;; Overrides -vertical's plain BASE lookup: an undeclared location that is some floor
   ;; drive's aimed-at destination floats at the default in-the-air hover level of 10.  An
   ;; authored level always wins, whether written as LOCATION-COORDS>'s third coordinate or
