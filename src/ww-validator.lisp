@@ -950,6 +950,15 @@
                      (format t "~%It's normally inefficient to enable *auto-wait* without exogenous happenings.~%~
                                 Define patrollers or other happening objects first.~2%"))))
     (*symmetry-pruning* nil)
+    (*novelty-pruning*
+      (unless (member val '(nil 1 2))
+        (error "Can't set *novelty-pruning* to ~S. Must be NIL, 1, or 2." val))
+      (unless (or (null val) (zerop *threads*))
+        (error "Can't enable *novelty-pruning* when *threads* is ~S. ~
+                Novelty pruning requires *threads* = 0." *threads*)))
+    (*novelty-partition*
+      (unless (member val '(nil depth query))
+        (error "Can't set *novelty-partition* to ~S. Must be NIL, DEPTH, or QUERY." val)))
     (*recorder-prefix-pruning*
       (unless (typep val 'boolean)
         (error "Can't set *recorder-prefix-pruning* to ~S. Must be either T or NIL." val)))

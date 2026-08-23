@@ -312,6 +312,8 @@
     (setf *inconsistent-states-dropped* 0)
     (setf *lower-bound-pruned* 0)
     (setf *search-prefix-pruned* 0)
+    (setf *successor-policy-pruned* 0)
+    (reset-novelty-pruning)
     (setf *shutdown-requested* nil)
     (clrhash *prop-key-cache*)
     (let* ((start-goal-p (goal (node.state start-node)))
@@ -727,6 +729,8 @@ when at least one path through its parent DAG remains viable."
                         succ-state succ-depth)))))
         (unless (boundp 'goal-fn)
           (process-min-max-value succ-state))
+        (when (novelty-pruned-p succ-state succ-depth)
+          (next-iteration))
         (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
           (when (on-current-path succ-state current-node)
             (increment-global *repeated-states*)
@@ -1376,6 +1380,14 @@ when at least one path through its parent DAG remains viable."
     (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
             *search-prefix-pruned*
             (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
+  (when (> *novelty-pruned* 0)
+    (format t "~2%Novelty pruning discarded ~:D state~:P, ~,1F% of total states."
+            *novelty-pruned*
+            (* 100.0 (/ *novelty-pruned* *total-states-processed*))))
+  (when (> *successor-policy-pruned* 0)
+    (format t "~2%Successor policies pruned ~:D state~:P, ~,1F% of total states."
+            *successor-policy-pruned*
+            (* 100.0 (/ *successor-policy-pruned* *total-states-processed*))))
   (unless (eql *problem-type* 'csp)
     (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
   (print-candidate-solution-validation-statistics)

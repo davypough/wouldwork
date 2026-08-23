@@ -15,7 +15,7 @@
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
          *donation-fraction* *enable-work-donation* *recorder-prefix-pruning*
-         *max-recorder-cycles*)
+         *max-recorder-cycles* *novelty-pruning* *novelty-partition*)
           (setf ,param ',val)
           (unless *ww-loading*
             (save-globals)

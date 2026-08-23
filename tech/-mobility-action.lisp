@@ -50,20 +50,26 @@
 
 
 (define-query movement-results (?agent agent)
-  (do (assign $source-configuration (agent-configuration ?agent))
-      (assign $results
-              (movement-results-in-state
-                state ?agent $source-configuration))
-      $results))
+  ;; A mapped ghost has no HAS-LOCATION until START-RECORDER forks it (rule 5), and an
+  ;; agent that does not exist yet has no mobility.  Without this guard
+  ;; AGENT-CONFIGURATION returns (NIL GROUND) -- BIND's failure is not propagated by DO --
+  ;; and the configuration providers then compute an elevation for the NIL location.
+  (if (bind (has-location ?agent $agent-location))
+    (do (assign $source-configuration (agent-configuration ?agent))
+        (assign $results
+                (movement-results-in-state
+                  state ?agent $source-configuration))
+        $results)))
 
 
 (define-action move
   1
   (?agent agent)
-  (do (assign $source-configuration (agent-configuration ?agent))
-      (assign $movement-results
-              (movement-results-in-state
-                state ?agent $source-configuration)))
+  (and (bind (has-location ?agent $agent-location))
+       (assign $source-configuration (agent-configuration ?agent))
+       (assign $movement-results
+               (movement-results-in-state
+                 state ?agent $source-configuration)))
   (">" ?agent "moves via" $route)
   (ww-loop for $result in $movement-results
            do (assert

@@ -6,3 +6,4 @@ artifacts/
 .claude/
 .agents/
 .asdf-cache/
+_to_delete/

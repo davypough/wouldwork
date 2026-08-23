@@ -24,6 +24,9 @@
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *symmetry-pruning*)
+  (format t "~&  *NOVELTY-PRUNING* => ~A" *novelty-pruning*)
+  (when *novelty-pruning*
+    (format t "~&  *NOVELTY-PARTITION* => ~A" *novelty-partition*))
   (when *happening-names*
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
@@ -260,6 +263,13 @@ function argument must name an already-defined function."
 
 (defun search-successor-pruned-p (current-node successor-state)
   "Whether any enabled problem-local policy rejects SUCCESSOR-STATE."
+  (when (search-successor-policy-rejects-p current-node successor-state)
+    (incf *successor-policy-pruned*)
+    t))
+
+
+(defun search-successor-policy-rejects-p (current-node successor-state)
+  "Whether any enabled problem-local policy rejects SUCCESSOR-STATE, uncounted."
   (some (lambda (entry)
           (and (funcall
                  (symbol-function (search-successor-pruner.enabled-p entry)))
@@ -502,6 +512,17 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *recorder-prefix-pruning* nil
   "When T, recorder technology prunes paths whose recording prefix cannot replay.")
 
+(defvar *novelty-pruning* nil
+  "Width of the novelty test applied to generated states: NIL disables it, 1 keeps only
+   states asserting an atom no earlier state asserted, 2 keeps those plus states asserting
+   a new pair of atoms.  Incomplete by construction -- see NOVELTY-PRUNED-P.")
+
+(defvar *novelty-partition* nil
+  "How generated states are grouped before the novelty test compares them: NIL puts every
+   state in one partition, DEPTH partitions by search depth, and QUERY partitions by the
+   value of a problem-defined NOVELTY-PARTITION? query.  A partition that advances with
+   real progress keeps a must-undo plan alive that one global partition would discard.")
+
 (defvar *max-recorder-cycles* 1
   "Maximum number of START-RECORDER actions permitted in one search path.")
 
@@ -561,6 +582,8 @@ treat their arguments as read-only and be safe to call concurrently."
     (*branch* . -1)
     (*probe*)
     (*symmetry-pruning*)
+    (*novelty-pruning*)
+    (*novelty-partition*)
     (*debug* . 0)
     (*goal*)
     (*threads* . 0)
@@ -850,6 +873,17 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *search-prefix-pruned* 0
   "Count of successor states rejected by enabled search-prefix validators.")
 (declaim (type fixnum *search-prefix-pruned*))
+
+
+(sb-ext:defglobal *novelty-pruned* 0
+  "Count of successor states discarded by the novelty test.")
+(declaim (type fixnum *novelty-pruned*))
+
+
+(sb-ext:defglobal *successor-policy-pruned* 0
+  "Count of successor states rejected by registered search-successor pruners, such as the
+   recorder's live/ghost interleaving canonicalization.")
+(declaim (type fixnum *successor-policy-pruned*))
 
 (sb-ext:defglobal *prop-key-cache* 
   (make-hash-table :test #'equal :synchronized (> *threads* 0))

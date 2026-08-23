@@ -83,6 +83,11 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                5 (step through search)>)
        (ww-set *symmetry-pruning* <t (prune symmetric states) or
                                    nil (don't prune symmetric states>)
+       (ww-set *novelty-pruning* <1 or 2 (discard states asserting no new atom, or no new
+                                  atom pair) or nil (keep every state)>)
+       (ww-set *novelty-partition* <depth (compare states only within a search level),
+                                    query (compare within a NOVELTY-PARTITION? value) or
+                                    nil (compare all states together)>)
        (ww-set *recorder-prefix-pruning* <t (prune unplayable recording prefixes) or
                                            nil (validate only completed candidates)>)
        (ww-set *max-recorder-cycles* <positive integer limiting recorder starts per path>)

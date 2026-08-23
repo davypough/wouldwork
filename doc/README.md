@@ -29,7 +29,7 @@ These form a sequence: write → normalize → diagnose.
 
 ### `search-strategies/` — making a hard problem tractable
 
-`heuristics.md` and `relaxation.md` cover the two most easily confused strategies from the Manual's Part 3 list, with applicability criteria and worked examples. A heuristic changes exploration *order*; a relaxation changes which states are *legal* and requires goal post-validation.
+`heuristics.md`, `relaxation.md` and `novelty.md` cover three strategies that are easily confused, with applicability criteria and worked examples. A heuristic changes exploration *order*; a relaxation changes which states are *legal* and requires goal post-validation; novelty pruning discards states that assert nothing new, needs no gradient and no soundness argument, and in exchange can lose a solution — so a negative result under it is uninformative.
 
 ### `problems/` — per-problem working notes
 
