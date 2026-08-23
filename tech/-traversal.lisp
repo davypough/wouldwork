@@ -43,10 +43,12 @@
 ;;;   types     : traversal-mode (walking stairway jumping climbing)
 ;;;   relations : (traverse-via traversal-mode location $list location),
 ;;;               (traverse-via> traversal-mode location $list location)
-;;;   queries   : traversal-segments  --  the single mobility provider
+;;;   queries   : traversal-segments  --  the single mobility provider, cached;
+;;;               traversal-segments-for-source  --  the computation behind it
 ;;;   init      : traversal-init-check
-;;;   functions : register-traversal-mode, and the canonical DNF family algebra the
-;;;               coordinate zone-graph derivation in -walkability-coordinates uses
+;;;   functions : register-traversal-mode, register-traversal-cache-parameter, and the
+;;;               canonical DNF family algebra the coordinate zone-graph derivation in
+;;;               -walkability-coordinates uses
 
 (include-tech -mobility)
 
@@ -182,14 +184,157 @@
             return segment)))
 
 
+;;;; SEGMENT CACHE ;;;;
+;;;; TRAVERSAL-SEGMENTS is a pure function of the agent, the source location, the value of
+;;;; every parameter a registered builder reads, and the state's projection onto a short
+;;;; list of dynamic relations.  So it is cached by CONTENT: two states projecting alike
+;;;; share an entry, and nothing ever needs invalidating.  Measured on RUMIN-TOPO at
+;;;; depth 8, 831,175 calls collapse to 10 entries.
+;;;;
+;;;; *TRAVERSAL-STATE-DEPENDENCIES* is narrower than the transitive read set, deliberately,
+;;;; and that is the one thing here that could go silently wrong.  A raw-body scan of the
+;;;; builders' call graph also reports HAS-LOCATION and ON, which are reached only through
+;;;; BASE -- of a location in LOCATION-LEVEL, and of a gate, screen or wall in
+;;;; JUMP-BARRIER-TOP-ELEVATION.  None of those object kinds is ever ON anything, held, or
+;;;; given a HAS-LOCATION, so every one of those binds fails and the read is vacuous.  That
+;;;; is an argument about which types reach BASE, not something any static analysis can see,
+;;;; and including the two relations anyway would key the cache on facts that change every
+;;;; move and destroy the hit rate.  *TRAVERSAL-CACHE-PARANOID* exists to hold the argument
+;;;; to account: see the file's companion note in claude/traversal-caching-plan.md.
+;;;;
+;;;; Adding a mode, an obstacle kind, or an override that reads a dynamic relation means
+;;;; adding that relation here.  Run a full suite under the paranoid special afterwards.
+
+(defvar *traversal-cache-enabled* t
+  "Whether TRAVERSAL-SEGMENTS serves cached results.  Set to NIL to compare a run against
+   the uncached computation without editing anything.  DEFVAR, not DEFPARAMETER, unlike the
+   caches below: a switch the user sets once at the REPL must survive the resplice that each
+   later STAGE performs, or it would silently revert partway through a suite run.")
+
+
+(defvar *traversal-cache-paranoid* nil
+  "When true, every cache hit recomputes the value and signals if it differs.  This is the
+   check on *TRAVERSAL-STATE-DEPENDENCIES* being complete, and on the returned lists being
+   treated as read-only by their callers; a run under it is roughly three times slower.
+   DEFVAR for the same reason as *TRAVERSAL-CACHE-ENABLED*, and it matters more here --
+   (TEST-TALOS) stages 102 problems, and a DEFPARAMETER would have been reset to NIL by the
+   first of them, leaving the whole suite silently unchecked.")
+
+
+(defparameter *traversal-state-dependencies*
+  '(open recording-open      ;-gate / gate.lisp, through GATE-OPEN-FOR-OBJECT
+    holding                  ;-holding, through OBSTACLE-CLEAR's screen and ladder arms
+    mounted-on               ;-gears-fan, through BLOWER-PRESENT
+    turning recording-turning ;-gears-fan / -recorder-wall-gears-shadow, through
+                              ;BLOWER-TURNING-FOR-OBJECT
+    lethal)                  ;-threat, through SAFE
+  "The dynamic relations a traversal builder can read.  Each is commented with the
+   technology that owns it and the query that reaches it.  A problem lacking that
+   technology simply never stores facts under the relation, so an entry costs nothing.")
+
+
+(defparameter *traversal-cache-parameters* nil
+  "Special variables whose values a registered builder reads, and which therefore belong in
+   the cache key -- a mid-session WW-SET of one must not be served a stale segment list.
+   Registered by the owning technology, since -TRAVERSAL nests none of them.")
+
+
+(defparameter *traversal-segment-cache*
+  (make-hash-table :test #'equal :synchronized t)
+  "Maps a traversal cache key to its segment list.  DEFPARAMETER so the cache empties every
+   time this file is respliced for a different problem.  Synchronized unconditionally rather
+   than on *THREADS*, because *THREADS* is routinely set at the REPL after staging, by which
+   time this table already exists.")
+
+
+(defparameter *traversal-dependency-key-cache*
+  (make-hash-table :test #'eql :synchronized t)
+  "Maps an idb storage key to whether its relation is in *TRAVERSAL-STATE-DEPENDENCIES*.
+   Classifying a key costs a CONVERT-TO-PROPOSITION, so it is done once per distinct key
+   rather than once per state.")
+
+
+(define-problem-helper register-traversal-cache-parameter (symbol)
+  "Declare that a builder reads SYMBOL's value, so the cache key carries it.  A separate
+   registrar rather than a fifth argument to REGISTER-TRAVERSAL-MODE: the parameter belongs
+   to the technology that reads it, and not every mode has one."
+  (pushnew symbol *traversal-cache-parameters* :test #'eq)
+  symbol)
+
+
+(defun traversal-dependency-key-p (key)
+  "Whether the idb entry stored under KEY belongs to a relation the builders read.  A
+   bijective relation is stored under its two generated index names rather than its own, so
+   the name is resolved back through *BIJECTIVE-CANONICAL* first -- without that step
+   HOLDING, stored as HOLDING1 and HOLDING2, would never match and the cache would ignore
+   what an agent is carrying."
+  (multiple-value-bind (cached present) (gethash key *traversal-dependency-key-cache*)
+    (if present
+      cached
+      (setf (gethash key *traversal-dependency-key-cache*)
+            (let ((name (first (convert-to-proposition key))))
+              (and (member (or (car (gethash name *bijective-canonical*)) name)
+                           *traversal-state-dependencies*)
+                   t))))))
+
+
+(defun traversal-cache-key (state agent source)
+  "STATE's projection onto the declared dependencies, tagged with AGENT, SOURCE, and every
+   registered parameter value.  The projection carries each entry's stored value, not just
+   its presence, so a fluent relation discriminates correctly.  Sorting by storage key makes
+   the list canonical for EQUAL."
+  (let ((projection nil))
+    (maphash (lambda (key value)
+               (when (traversal-dependency-key-p key)
+                 (push (cons key value) projection)))
+             (problem-state.idb state))
+    (list agent source
+          (mapcar #'symbol-value *traversal-cache-parameters*)
+          (sort projection #'< :key #'car))))
+
+
+(defun traversal-segments-value (state agent source)
+  "TRAVERSAL-SEGMENTS-FOR-SOURCE's result for STATE, computed once per distinct cache key.
+   The list and the segments in it are shared between every caller that keys alike and must
+   be treated as read-only; -MOBILITY already COPY-TREEs a segment before extending a route
+   with it, and *TRAVERSAL-CACHE-PARANOID* would catch a caller that stopped doing so."
+  (if (not *traversal-cache-enabled*)
+    (funcall (symbol-function 'traversal-segments-for-source) state agent source)
+    (let ((key (traversal-cache-key state agent source)))
+      (multiple-value-bind (cached present) (gethash key *traversal-segment-cache*)
+        (if present
+          (progn
+            (when *traversal-cache-paranoid*
+              (let ((fresh (funcall (symbol-function 'traversal-segments-for-source)
+                                    state agent source)))
+                (unless (equal fresh cached)
+                  (error "~%Traversal cache returned a stale result.~%~
+                          Agent:  ~S~%Source: ~S~%Cached: ~S~%Fresh:  ~S~%~
+                          Some state the builders read is missing from ~
+                          *TRAVERSAL-STATE-DEPENDENCIES* or *TRAVERSAL-CACHE-PARAMETERS*, ~
+                          or a caller mutated a returned segment."
+                         agent source cached fresh))))
+            cached)
+          (setf (gethash key *traversal-segment-cache*)
+                (funcall (symbol-function 'traversal-segments-for-source)
+                         state agent source)))))))
+
+
 ;;;; SEGMENT PRODUCTION ;;;;
 
 
 (define-query traversal-segments (?agent agent ?from location)
-  ;; The single mobility provider.  Every mode's symmetric and directed edges out of ?FROM,
-  ;; each reduced to at most one segment.  The mode is iterated rather than bound because a
-  ;; fluentless key needs it ground; four binds per location pair replaces the eight the
-  ;; four separate providers used to make.
+  ;; The single mobility provider, and the one place the result is cached.  The computation
+  ;; lives in TRAVERSAL-SEGMENTS-FOR-SOURCE so that every caller -- the mobility closure,
+  ;; ONE-STEP-WALKABLE -- goes through the cache without knowing it exists.
+  (traversal-segments-value state ?agent ?from))
+
+
+(define-query traversal-segments-for-source (?agent agent ?from location)
+  ;; Every mode's symmetric and directed edges out of ?FROM, each reduced to at most one
+  ;; segment.  The mode is iterated rather than bound because a fluentless key needs it
+  ;; ground; four binds per location pair replaces the eight the four separate providers
+  ;; used to make.
   (do (assign $segments nil)
       (doall (?mode traversal-mode)
         (doall (?to location)

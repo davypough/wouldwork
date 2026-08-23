@@ -30,6 +30,7 @@
 ;;;   types     : box, wall  --  declared optional; jumping remains usable without them
 ;;;               vaultable-object (either gate screen wall)
 ;;;   mode      : jumping, registered with -traversal
+;;;   cache     : *vertical-reach-limit*, registered with -traversal's segment cache
 ;;;   queries   : jump-elevation-reachable, vaultable-object-passable,
 ;;;               jump-barrier-top-elevation, vaultable-object-list,
 ;;;               jump-required-clearance-height, jump-path-clear,
@@ -137,6 +138,12 @@
 
 (register-traversal-mode 'jumping 'jump-segment-for-clause
                          '(gate screen wall))
+
+
+;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR both read *VERTICAL-REACH-LIMIT*, so it
+;; belongs in -traversal's segment cache key: changing it at the REPL mid-session must not
+;; be answered from segments computed under the old bound.
+(register-traversal-cache-parameter '*vertical-reach-limit*)
 
 
 ;;;; SUPPORT-CHANGING TRANSITIONS ;;;;
