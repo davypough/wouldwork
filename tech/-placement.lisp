@@ -33,9 +33,14 @@
 ;;;               tray are ever offered
 ;;;               placement-elevation -- the resting base elevation produced by an option
 ;;;   update    : place-held-object!  --  releases ?agent's hold, sets ?object's location,
-;;;               unloads it first when it is a tray, and rests it on ?place unless
-;;;               ?place is 'ground
+;;;               carries a tray's riders to that location and unloads them there, and
+;;;               rests ?object on ?place unless ?place is 'ground
+;;;   nested    : -configuration-transition, for relocate-tray-and-riders!.  That file is
+;;;               where a held tray's stack is kept synced to its holder during movement;
+;;;               the same rule has to hold when the tray is set down, so the two share one
+;;;               relocation update rather than each carrying its own
 
+(include-tech -configuration-transition)
 (include-tech -vertical)
 (include-tech -support-elevation)
 (include-tech -support-occupancy)
@@ -119,12 +124,18 @@
 (define-update place-held-object!
     (?agent agent ?object cargo ?location location ?place)
   ;; ?place is either a support object or the Lisp marker GROUND, so it remains untyped.
-  ;; A tray stops being a support as soon as its holder releases it.  Its direct rider's
-  ;; HAS-LOCATION was kept synchronized while the tray moved, so retracting ON leaves that
-  ;; rider on the ground at the release location.  Any stack above the rider stays intact.
+  ;; A tray stops being a support as soon as its holder releases it, so its direct rider's
+  ;; ON link is retracted here, and any stack above that rider stays intact.  The riders
+  ;; travel with the tray first.  -configuration-transition syncs a held tray's stack to its
+  ;; holder only as the holder moves, and PUT-TRAY reaches across REACHABLE: ?location may
+  ;; be somewhere the holder never walked, so no sync ran for that hop.  Relocating before
+  ;; retracting sets the whole stack down at ?location; retracting first stranded it at the
+  ;; location the tray came from, with its ON link already gone.
   (if (placement-choice-allowed ?agent ?object ?place)
     (do (not (holding ?agent ?object))
         (has-location ?object ?location)
+        (if (tray ?object)
+          (relocate-tray-and-riders! ?object ?location))
         (if (tray ?object)
           (if (bind (on $rider ?object))
             (not (on $rider ?object))))

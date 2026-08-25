@@ -6,11 +6,14 @@
 ;;; (location ground-or-support) configurations and applies exactly one result.
 ;;;
 ;;; REQUIRES:
-;;;   nested   : -mobility; -configuration-transition
+;;;   nested   : -propagation; -mobility; -configuration-transition
+;;;   driver   : propagate-changes! (master), called by MOVE's effect and nested above
+;;;              rather than assumed from a peer
 ;;; PROVIDES:
 ;;;   query    : movement-results
 ;;;   action   : move
 
+(include-tech -propagation)
 (include-tech -mobility)
 (include-tech -configuration-transition)
 

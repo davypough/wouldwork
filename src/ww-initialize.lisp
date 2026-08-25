@@ -52,9 +52,9 @@
     (when *randomize-search*
       (format t "~%NOTE: Defining a heuristic? search function is incompatible with randomize-search setting.")
       (format t "~%Ignoring randomization.~%")))
-  (when (fboundp 'min-steps-remaining?)
+  (when (min-steps-remaining-available-p)
     (format t "~&Applying min-steps-remaining? to start state... = ~A~%"
-              (funcall (symbol-function 'min-steps-remaining?) *start-state*)))
+              (min-steps-remaining-bound *start-state*)))
   (when (fboundp 'bounding-function?)
     (format t "~&Applying bounding function to start state...")
     (multiple-value-setq (*cost* *upper*)
@@ -92,7 +92,8 @@
     (format t "~%Note: heuristic? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
   (when (and (eq *algorithm* 'backtracking) (fboundp 'bounding-function?))
     (format t "~%Note: bounding-function? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'min-steps-remaining?))
+  (when (and (eq *algorithm* 'backtracking)
+             (min-steps-remaining-available-p))
     (format t "~%Note: min-steps-remaining? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
   (when (and (eq *algorithm* 'backtracking)
              (member *solution-type* '(min-length min-time min-value max-value)))

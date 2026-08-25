@@ -49,10 +49,149 @@
   "Variable used to signal threads shutdown, if *threads* > 0")
 
 
+(defvar *min-steps-fallback-mode* :eager)
+(defvar *min-steps-fallback-nonpruning-streak* 0)
+(defvar *min-steps-fallback-sample-countdown* 0)
+(defvar *min-steps-fallback-evaluations* 0)
+(defvar *min-steps-fallback-skipped* 0)
+(defvar *min-steps-fallback-unique-prunes* 0)
+(defvar *min-steps-fallback-reactivations* 0)
+
+
+(defun min-steps-fallback-adaptive-p ()
+  (and *min-steps-remaining-contributors*
+       (fboundp 'min-steps-remaining?)
+       (zerop *threads*)
+       (> *min-steps-fallback-sample-interval* 1)))
+
+
+(defun initialize-min-steps-fallback-adaptation ()
+  (setf *min-steps-fallback-mode*
+          (if (min-steps-fallback-adaptive-p) :active :eager)
+        *min-steps-fallback-nonpruning-streak* 0
+        *min-steps-fallback-sample-countdown* 0
+        *min-steps-fallback-evaluations* 0
+        *min-steps-fallback-skipped* 0
+        *min-steps-fallback-unique-prunes* 0
+        *min-steps-fallback-reactivations* 0))
+
+
+(defun reactivate-min-steps-fallback ()
+  "Resume full aggregate evaluation without clearing cumulative diagnostics."
+  (when (min-steps-fallback-adaptive-p)
+    (setf *min-steps-fallback-mode* :active
+          *min-steps-fallback-nonpruning-streak* 0
+          *min-steps-fallback-sample-countdown* 0)))
+
+
+(defun min-steps-fallback-evaluation-due-p ()
+  (case *min-steps-fallback-mode*
+    ((:eager :active) t)
+    (:sampling
+      (if (zerop *min-steps-fallback-sample-countdown*)
+        t
+        (progn
+          (decf *min-steps-fallback-sample-countdown*)
+          (incf *min-steps-fallback-skipped*)
+          nil)))))
+
+
+(defun note-min-steps-fallback-result (prunes-p)
+  (incf *min-steps-fallback-evaluations*)
+  (cond
+    (prunes-p
+      (incf *min-steps-fallback-unique-prunes*)
+      (when (eq *min-steps-fallback-mode* :sampling)
+        (incf *min-steps-fallback-reactivations*))
+      (reactivate-min-steps-fallback))
+    ((eq *min-steps-fallback-mode* :active)
+      (incf *min-steps-fallback-nonpruning-streak*)
+      (when (>= *min-steps-fallback-nonpruning-streak*
+                *min-steps-fallback-warmup*)
+        (setf *min-steps-fallback-mode* :sampling
+              *min-steps-fallback-sample-countdown*
+                (1- *min-steps-fallback-sample-interval*))))
+    ((eq *min-steps-fallback-mode* :sampling)
+      (setf *min-steps-fallback-sample-countdown*
+            (1- *min-steps-fallback-sample-interval*)))))
+
+
+(defun valid-min-steps-remaining-bound (function-name state)
+  "Evaluate FUNCTION-NAME and require a nonnegative real lower bound."
+  (unless (fboundp function-name)
+    (error "Registered min-steps-remaining contributor is undefined: ~S"
+           function-name))
+  (let ((bound (funcall (symbol-function function-name) state)))
+    (unless (and (realp bound) (not (minusp bound)))
+      (error "~S returned invalid min-steps-remaining bound: ~S"
+             function-name bound))
+    bound))
+
+
+(defun min-steps-remaining-bound-prunes-p (depth bound)
+  "Whether admissible BOUND independently rejects a node at DEPTH."
+  (or (and (> *depth-cutoff* 0)
+           (> (+ depth bound) *depth-cutoff*))
+      (and *solution-paths*
+           (member *solution-type* '(min-length first))
+           (>= (+ depth bound)
+               (solution.depth (first *solution-paths*))))))
+
+
+(defun registered-min-steps-contributor-prunes-p (state depth)
+  "Evaluate cheap contributors in cost order, stopping at the first proof."
+  (loop for entry in *min-steps-remaining-contributors*
+        for function-name = (second entry)
+        for bound = (valid-min-steps-remaining-bound function-name state)
+        when (min-steps-remaining-bound-prunes-p depth bound)
+          return t
+        finally (return nil)))
+
+
+(defun min-steps-remaining-bound (state)
+  "Return the maximum registered and aggregate lower bound for diagnostics."
+  (let ((bound 0))
+    (dolist (entry *min-steps-remaining-contributors*)
+      (setf bound
+            (max bound
+                 (valid-min-steps-remaining-bound (second entry) state))))
+    (when (fboundp 'min-steps-remaining?)
+      (setf bound
+            (max bound
+                 (valid-min-steps-remaining-bound
+                   'min-steps-remaining? state))))
+    bound))
+
+
+(defun min-steps-remaining-prunes-node-p (state depth)
+  "Run cheap bounds first and the aggregate query only when still necessary."
+  (or (registered-min-steps-contributor-prunes-p state depth)
+      (and (fboundp 'min-steps-remaining?)
+           (when (min-steps-fallback-evaluation-due-p)
+             (let ((prunes-p
+                     (min-steps-remaining-bound-prunes-p
+                       depth
+                       (valid-min-steps-remaining-bound
+                         'min-steps-remaining? state))))
+               (unless (eq *min-steps-fallback-mode* :eager)
+                 (note-min-steps-fallback-result prunes-p))
+               prunes-p)))))
+
+
 (defparameter *open* (hs::make-hstack)  ;initialized in dfs
   "The hash-stack structure containing the stack of open nodes as a vector,
    and hash table of idb -> node.")
 (declaim (hs::hstack *open*))
+
+
+(defun initialize-search-progress-timing ()
+  "Start serial and parallel progress windows at the beginning of this search."
+  (let ((now (get-internal-real-time)))
+    (setf *start-time* now
+          *prior-time* now
+          *prior-parallel-progress-time* now
+          *prior-parallel-progress-states* 0
+          *prior-parallel-progress-cycles* 0)))
 
 
 (sb-ext:defglobal *closed* (make-hash-table :synchronized (> *threads* 0))  ;initialized in dfs
@@ -304,13 +443,10 @@
     (reset-candidate-solution-validation-statistics)
     (setf *upper-bound* 1000000)
     (setf *search-tree* nil)
-    (setf *start-time* (get-internal-real-time))
-    (setf *prior-time* 0)
-    (setf *prior-parallel-progress-time* *start-time*)
-    (setf *prior-parallel-progress-states* 0)
-    (setf *prior-parallel-progress-cycles* 0)
+    (initialize-search-progress-timing)
     (setf *inconsistent-states-dropped* 0)
     (setf *lower-bound-pruned* 0)
+    (initialize-min-steps-fallback-adaptation)
     (setf *search-prefix-pruned* 0)
     (setf *successor-policy-pruned* 0)
     (reset-novelty-pruning)
@@ -587,17 +723,15 @@
       (increment-global *depth-cutoff-hits* 1)
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
-    (when (fboundp 'min-steps-remaining?)
-      (let ((lb (funcall (symbol-function 'min-steps-remaining?) (node.state current-node)))
-            (depth (node.depth current-node)))
-        (when (or (and (> *depth-cutoff* 0)
-                       (> (+ depth lb) *depth-cutoff*))
-                  (and *solution-paths*
-                       (member *solution-type* '(min-length first))
-                       (>= (+ depth lb) (solution.depth (first *solution-paths*)))))
-          (increment-global *lower-bound-pruned* 1)
-          (narrate "State pruned by lower bound" (node.state current-node) depth)
-          (return-from df-bnb1 nil))))
+    (when (and (min-steps-remaining-available-p)
+               (min-steps-remaining-prunes-node-p
+                 (node.state current-node)
+                 (node.depth current-node)))
+      (increment-global *lower-bound-pruned* 1)
+      (narrate "State pruned by lower bound"
+               (node.state current-node)
+               (node.depth current-node))
+      (return-from df-bnb1 nil))
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
     ;; Backtrack-triggered wait check
@@ -1376,6 +1510,13 @@ when at least one path through its parent DAG remains viable."
     (format t "~2%min-steps-remaining? pruned ~:D node~:P, ~,1F% of total states."
             *lower-bound-pruned*
             (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
+  (when (> *min-steps-fallback-skipped* 0)
+    (format t
+            "~2%Adaptive aggregate bound: evaluated ~:D, skipped ~:D, uniquely pruned ~:D, reactivated ~:D time~:P."
+            *min-steps-fallback-evaluations*
+            *min-steps-fallback-skipped*
+            *min-steps-fallback-unique-prunes*
+            *min-steps-fallback-reactivations*))
   (when (> *search-prefix-pruned* 0)
     (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
             *search-prefix-pruned*
@@ -1534,6 +1675,7 @@ when at least one path through its parent DAG remains viable."
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solution-paths*)
+    (reactivate-min-steps-fallback)
     (setf *last-improvement-states* *total-states-processed*)
     ;; Replace existing unique solution if new one is better
     (with-search-structures-lock

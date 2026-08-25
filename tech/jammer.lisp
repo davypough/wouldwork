@@ -13,7 +13,9 @@
 ;;; REQUIRES (supplied by other techs):
 ;;;   types     : agent, location; plate comes from nested -plate-types, while jammer
 ;;;               and box are declared optional here
-;;;   nested    : -vertical (base, top, object-height, location-elevation);
+;;;   nested    : -propagation (propagate-changes!, the master driver this file's effects
+;;;               call);
+;;;               -vertical (base, top, object-height, location-elevation);
 ;;;               -gears-fan (blower-elevation and controlled drive state);
 ;;;               -placement (placement-options, place-held-object!, reach policy, and
 ;;;               vertical/support geometry);
@@ -22,8 +24,8 @@
 ;;;               shared with box and beam-relay); -recorder-fork-registry (jamming fact
 ;;;               fork)  --  all shared via nested include-tech rather than local declaration
 ;;;   extension : visibility overrides -visibility's null default with authored LOS
-;;;   driver    : propagate-changes! (master); (jamming ...) is consumed by gate's
-;;;               update-gate-status!
+;;;   driver    : propagate-changes! (master), nested above rather than assumed from a peer;
+;;;               (jamming ...) is consumed by gate's update-gate-status!
 ;;; PROVIDES:
 ;;;   types     : jammer, box -- declared optional here
 ;;;               target (either gate floor-gears wall-gears floor-blower wall-blower gun)
@@ -35,6 +37,7 @@
 ;;;               jammer-visible-placement-options
 ;;;   actions   : pickup-jammer, put-jammer, jam-target
 
+(include-tech -propagation)
 (include-tech -vertical)
 (include-tech -gears-fan)
 (include-tech -placement)

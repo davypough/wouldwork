@@ -1,5 +1,6 @@
-;;; Lower bound for the rumin-topo subgoal chain.  Paste into probs/problem-rumin-topo.lisp
-;;; immediately before the ";;;; GOAL ;;;;" heading.
+;;; Cycle-specific lower-bound supplement for the rumin-topo subgoal chain.  This assumes
+;;; TOPO-LOWER-BOUND is included and is pasted into probs/problem-rumin-topo.lisp immediately
+;;; before the ";;;; GOAL ;;;;" heading.
 ;;;
 ;;; The cycles 3/4 branch (chunk 4) is VERIFIED: admissible at every depth of the known
 ;;; 10-action plan, and it cuts that search from 2.2M states unsolved to 6,472 states / 3 s.
@@ -8,10 +9,12 @@
 
 ;;;; LOWER BOUND ;;;;
 
-;; Admissible lower bound on remaining actions.  Dispatches on RECORDER-CYCLE-COUNT, which
-;; identifies the chunk of the subgoal chain being searched, and returns 0 elsewhere so an
-;; unrelated search is never affected.  Each component counts actions of a disjoint kind
-;; (manipulation of one object / session / agent movement), so the components sum validly.
+;; Cycle-specific supplement to the general LM-cut/finite-resource bound.  TOPO-LOWER-BOUND
+;; registers the cheaper finite-resource term as a search precheck, so this complete
+;; aggregate runs only when that term cannot already prune.  The cycle term dispatches on
+;; RECORDER-CYCLE-COUNT and returns 0 at boundaries it does not cover.  Each component counts
+;; actions of a disjoint kind (manipulation of one object / session / agent movement), so the
+;; components sum validly within the documented chunks.
 
 (define-query rt-some-agent-holds-connector ()
   (exists (?a agent)
@@ -73,7 +76,7 @@
         (bind (has-location box1 $box-location))
         (if (eql $agent-location $box-location) 1 2))))
 
-(define-query min-steps-remaining? ()
+(define-query rt-cycle-min-steps-remaining? ()
   (do (assign $cycles (recorder-cycle-count))
       (if (or (= $cycles 3) (= $cycles 4))
         (+ (rt4-blue-cost) (rt4-plate-cost) (rt4-session-cost) (rt4-move-cost))
@@ -81,3 +84,6 @@
           (+ (rt3-box-cost) (rt3-session-cost) (rt3-move-cost))
           0))))
 
+(define-query min-steps-remaining? ()
+  (max (topo-lm-cut-resource-bound)
+       (rt-cycle-min-steps-remaining?)))

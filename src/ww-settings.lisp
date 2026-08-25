@@ -5,6 +5,37 @@
 (in-package :ww)
 
 
+(defparameter *min-steps-remaining-contributors* nil
+  "Cost-ordered admissible bounds tested before MIN-STEPS-REMAINING?.
+Each entry is (PRIORITY FUNCTION-NAME); lower priorities run first.  A contributor
+accepts one problem state and returns a nonnegative lower bound.  The aggregate
+MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specific terms.")
+
+
+(defun register-min-steps-remaining-contributor
+    (function-name &key (priority 0))
+  "Register FUNCTION-NAME as an admissible cheap pruning precheck."
+  (check-type function-name symbol)
+  (check-type priority integer)
+  (setf *min-steps-remaining-contributors*
+        (remove function-name
+                *min-steps-remaining-contributors*
+                :key #'second
+                :test #'eq))
+  (setf *min-steps-remaining-contributors*
+        (stable-sort
+          (append *min-steps-remaining-contributors*
+                  (list (list priority function-name)))
+          #'<
+          :key #'first))
+  function-name)
+
+
+(defun min-steps-remaining-available-p ()
+  (or *min-steps-remaining-contributors*
+      (fboundp 'min-steps-remaining?)))
+
+
 (unless (boundp '*probe*)
   (defvar *probe* nil
     "Inserts a probe to stop processing at a specific state."))
@@ -51,7 +82,14 @@
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" *happening-names*)
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
-  (format t "~&  MIN STEPS REMAINING? => ~A" (when (fboundp 'min-steps-remaining?) 'YES))
+  (format t "~&  MIN STEPS REMAINING? => ~A"
+          (when (min-steps-remaining-available-p) 'YES))
+  (when (and *min-steps-remaining-contributors*
+             (fboundp 'min-steps-remaining?))
+    (format t "~&  *MIN-STEPS-FALLBACK-WARMUP* => ~:D"
+            *min-steps-fallback-warmup*)
+    (format t "~&  *MIN-STEPS-FALLBACK-SAMPLE-INTERVAL* => ~:D"
+            *min-steps-fallback-sample-interval*))
   (when (> *threads* 0)
     (format t "~&~%  For parallel settings: (display-parallel-parameters)"))
   (terpri) (terpri))
@@ -489,6 +527,13 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *progress-reporting-interval* 100000
   "Print progress during search after each multiple n of states examined.")
 
+(defvar *min-steps-fallback-warmup* 512
+  "Consecutive nonpruning aggregate lower-bound evaluations before sampling begins.")
+
+(defvar *min-steps-fallback-sample-interval* 64
+  "Admitted nodes between aggregate lower-bound samples after an unproductive warmup.
+One preserves eager evaluation; values above one enable adaptive sampling.")
+
 (defvar *randomize-search* nil  ;
   "Set to t or nil.")
 
@@ -578,6 +623,8 @@ treat their arguments as read-only and be safe to call concurrently."
     (*problem-type* . planning)
     (*solution-type* . first)
     (*progress-reporting-interval* . 100000)
+    (*min-steps-fallback-warmup* . 512)
+    (*min-steps-fallback-sample-interval* . 64)
     (*randomize-search*)
     (*branch* . -1)
     (*probe*)
@@ -610,7 +657,8 @@ treat their arguments as read-only and be safe to call concurrently."
   '(*problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
     *solution-type* *progress-reporting-interval* *randomize-search* *branch*
     *probe* *symmetry-pruning* *debug* *goal* *threads*
-    *recorder-prefix-pruning* *max-recorder-cycles*)
+    *recorder-prefix-pruning* *max-recorder-cycles*
+    *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*)
   "Problem parameters saved in VALS.LISP, in positional file order.")
 
 

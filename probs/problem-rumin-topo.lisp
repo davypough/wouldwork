@@ -35,7 +35,7 @@
 ;; state counts with it on and off, zero states pruned, ~25% more wall clock.  Enable it per
 ;; chunk, for a chunk with many ghost moves and long live runs between them.  Still
 ;; unmeasured at depth 30.
-(ww-set *recorder-prefix-pruning* nil)
+(ww-set *recorder-prefix-pruning* t)
 
 ;; Novelty pruning is deliberately NOT set here.  It can discard the only path to a
 ;; solution, so a standing setting would make every "no solution found" uninformative.
@@ -91,6 +91,7 @@
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
+(include-tech topo-lower-bound)
 
 ;;;; INITIALIZATION ;;;;
 
@@ -227,10 +228,10 @@
 
 ;;;; LOWER BOUND ;;;;
 
-;; Admissible lower bound on remaining actions.  Dispatches on RECORDER-CYCLE-COUNT, which
-;; identifies the chunk of the subgoal chain being searched, and returns 0 elsewhere so an
-;; unrelated search is never affected.  Each component counts actions of a disjoint kind
-;; (manipulation of one object / session / agent movement), so the components sum validly.
+;; Cycle-specific supplement to the general LM-cut bound.  It dispatches on
+;; RECORDER-CYCLE-COUNT and returns 0 at boundaries it does not cover.  Each component
+;; counts actions of a disjoint kind (manipulation of one object / session / agent
+;; movement), so the components sum validly within the documented chunks.
 
 (define-query rt-some-agent-holds-connector ()
   (exists (?a agent)
@@ -300,15 +301,14 @@
 ;; states in 32 min with no bound.  Chunk 3: cutoff 15, bound 6, pruning only from depth 9,
 ;; 500,000 states and still running.  A bound that leaves the frontier deep buys little.
 ;;
-;; It is CHUNK-SCOPED.  The terms below were written against the chunk-3 and chunk-4
-;; boundaries and carry no admissibility argument anywhere else.  At the chunk-1 boundary
-;; RECORDER-CYCLE-COUNT is 0 or 1, both tests fall through to 0, and the bound is inert --
-;; it costs one query per node and prunes nothing.  Applied at a boundary it was not written
-;; for it is worse than inert: replaying from action 80 of the 90-step solution, the rt3
-;; terms fired at $cycles = 2 and pruned the goal path, so a solvable search reported none.
-;; When searching a chunk this does not cover, disable it for the run:
-;;     (fmakunbound 'min-steps-remaining?)
-;; Staging the problem again restores it.
+;; The cycle term is CHUNK-SCOPED.  It was written against the chunk-3 and chunk-4
+;; boundaries and carries no admissibility argument anywhere else.  At the chunk-1
+;; boundary RECORDER-CYCLE-COUNT is 0 or 1 and the cycle term falls through to 0, while the
+;; general LM-cut term remains available.  Applied at a boundary it was not written for,
+;; the cycle term is worse than inert: replaying from action 80 of the 90-step solution,
+;; the rt3 terms fired at $cycles = 2 and pruned the goal path, so a solvable search reported
+;; none.  When testing such a boundary, temporarily make RT-CYCLE-MIN-STEPS-REMAINING?
+;; return 0; do not disable the combined MIN-STEPS-REMAINING? query.
 ;;
 ;; Note the branch tests overlap: $cycles = 3 always takes the first arm, so the rt3 arm is
 ;; reachable only at $cycles = 2.  Intended or not, it is what the code does.
@@ -318,13 +318,22 @@
 ;; 9 to 4 or 5 -- the regime that made chunk 4 collapse.  Chunks 1, 2 and 5 have no bound at
 ;; all.  Keep added terms on disjoint action kinds so the sum stays admissible.
 
-(define-query min-steps-remaining? ()
+(define-query rt-cycle-min-steps-remaining? ()
   (do (assign $cycles (recorder-cycle-count))
       (if (or (= $cycles 3) (= $cycles 4))
         (+ (rt4-blue-cost) (rt4-plate-cost) (rt4-session-cost) (rt4-move-cost))
         (if (or (= $cycles 2) (= $cycles 3))
           (+ (rt3-box-cost) (rt3-session-cost) (rt3-move-cost))
           0))))
+
+(define-query min-steps-remaining? ()
+  ;; The cycle-specific term is zero at the first two subgoal boundaries.  LM-cut supplies
+  ;; a general bound there; the finite resource term additionally retains exclusive agent
+  ;; locations.  TOPO-LOWER-BOUND registers that cheaper finite-resource term as a search
+  ;; precheck, so this complete aggregate runs only when the precheck cannot already prune.
+  ;; MAX remains safe wherever the narrower cycle term's documented admissibility applies.
+  (max (topo-lm-cut-resource-bound)
+       (rt-cycle-min-steps-remaining?)))
 
 
 ;;;; GOAL ;;;;

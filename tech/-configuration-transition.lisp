@@ -24,7 +24,8 @@
 ;;;               riders, keeping the tray's has-location synced to its holder's
 ;;;               relocate-tray-and-riders!  --  breadth-first (on ...)-chain relocation,
 ;;;               modeled on -gears-fan's relocate-stack!; kept local so agent movement
-;;;               never depends on optional blower technology
+;;;               never depends on optional blower technology.  -placement nests this file
+;;;               to reuse it when a held tray is released away from where it was picked up
 
 (include-tech -support-occupancy)
 (include-tech -location)
@@ -129,7 +130,8 @@
 
 (define-update relocate-tray-and-riders! (?tray tray ?destination location)
   ;; Move ?tray and, transitively, every occupant riding on it to ?destination, keeping a
-  ;; held tray's has-location synced to its holder's as the holder moves.  Breadth-first
+  ;; held tray's has-location synced to its holder's as the holder moves, and carrying the
+  ;; same stack to the release location when -placement puts the tray down.  Breadth-first
   ;; over the (on ...) links, modeled on -gears-fan's relocate-stack!, so arbitrary stack
   ;; depth needs no recursion.  Kept local rather than calling -gears-fan's version so
   ;; agent movement never depends on optional blower technology.

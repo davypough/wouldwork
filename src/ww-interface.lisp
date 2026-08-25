@@ -75,6 +75,10 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                                  0 (no depth limit)>)
        (ww-set *progress-reporting-interval* <positive integer;
                                               eg, 100000 (how often to report progress)>)
+       (ww-set *min-steps-fallback-warmup* <positive integer; consecutive unproductive
+                                            aggregate-bound checks before sampling>)
+       (ww-set *min-steps-fallback-sample-interval* <positive integer; 1 evaluates every
+                                                     fallback, larger values sample>)
        (ww-set *randomize-search* <t (random depth-first search) or
                                    nil (standard depth-first search)>)
        (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or
@@ -191,10 +195,13 @@ is staged again.
                *symmetry-pruning* ~A~%
                *recorder-prefix-pruning* ~A~%
                *max-recorder-cycles* ~A~%
+               *min-steps-fallback-warmup* ~A~%
+               *min-steps-fallback-sample-interval* ~A~%
                *debug* ~A~2%"
             *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
             *probe* *symmetry-pruning* *recorder-prefix-pruning* *max-recorder-cycles*
+            *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*
             *debug*))
 
 
@@ -222,14 +229,27 @@ is staged again.
                 *globals-file*))
 
 
+(defun retired-recorder-settings-p (params)
+  "Whether PARAMS ends in the former recorder audit/pruning positions."
+  (and (= (length params) 17)
+       (member (nth 15 params) '(nil t))
+       (member (nth 16 params) '(nil t))))
+
+
+(defun migrate-retired-recorder-settings (params)
+  "Replace the two retired recorder values with current trailing defaults."
+  (if (retired-recorder-settings-p params)
+    (append (subseq params 0 15) (nthcdr 15 *default-parameters*))
+    params))
+
+
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
-  (let* ((params (read-from-file *globals-file* *default-parameters*))
+  (let* ((saved-params (read-from-file *globals-file* *default-parameters*))
+         (params (migrate-retired-recorder-settings saved-params))
          (padded (if (< (length params) (length *default-parameters*))
                    (append params (nthcdr (length params) *default-parameters*))
                    params))
-         ;; Recorder interleaving audit and pruning were formerly the final two
-         ;; saved settings.  Ignore those retired trailing values until the next save.
          (current-params (subseq padded 0 (length *default-parameters*))))
     (loop for parameter in *persisted-problem-parameters*
           for value in current-params

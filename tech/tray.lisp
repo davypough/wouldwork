@@ -19,15 +19,18 @@
 ;;;
 ;;; REQUIRES:
 ;;;   types     : agent, location; tray is declared optional here
-;;;   nested    : -placement (placement-options, place-held-object!, reach policy, and
+;;;   nested    : -propagation (propagate-changes!, the master driver this file's effects
+;;;               call);
+;;;               -placement (placement-options, place-held-object!, reach policy, and
 ;;;               vertical/support geometry);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -pickup (pickup-clear, shared with box, jammer, and beam-relay)
-;;;   driver    : propagate-changes! (master)
+;;;   driver    : propagate-changes! (master), nested above rather than assumed from a peer
 ;;; PROVIDES:
 ;;;   types     : tray -- declared optional here
 ;;;   actions   : pickup-tray, put-tray
 
+(include-tech -propagation)
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -pickup)

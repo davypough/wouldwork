@@ -1,9 +1,12 @@
 ;;; Filename: -propagation.lisp
 
 ;;; Propagation substrate: the MASTER PROPAGATION DRIVER itself, contributed by the
-;;; technologies rather than authored by the problem.  Every technology that supplies a
-;;; zero-argument update nests this file, so any problem including any such technology
-;;; receives both driver functions without writing either one.
+;;; technologies rather than authored by the problem.  Every technology that CALLS
+;;; PROPAGATE-CHANGES! nests this file, as does every technology that supplies a
+;;; zero-argument update for the derived sequence to call, so any problem including any such
+;;; technology receives both driver functions without writing either one.  Calling the
+;;; driver is what creates the dependency, not supplying an update: TRAY and BOX supply no
+;;; update of their own, and a problem assembled from them alone still needs this file.
 ;;;
 ;;; PROPAGATE-CHANGES! is the fixpoint loop, and it is fixed.  It was byte-identical in
 ;;; CLAUSTRO-TOPO, CORNER-TOPO, PHOBIA, PROBLEM-FLOOR-GEARS-TEST,

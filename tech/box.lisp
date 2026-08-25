@@ -9,15 +9,18 @@
 ;;; REQUIRES:
 ;;;   types     : agent, location; plate comes from nested -plate-types and box is
 ;;;               declared optional here
-;;;   nested    : -placement (placement-options, place-held-object!, reach policy, and
+;;;   nested    : -propagation (propagate-changes!, the master driver this file's effects
+;;;               call);
+;;;               -placement (placement-options, place-held-object!, reach policy, and
 ;;;               vertical/support geometry);
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -pickup (pickup-clear, shared with jammer and beam-relay)
-;;;   driver    : propagate-changes! (master)
+;;;   driver    : propagate-changes! (master), nested above rather than assumed from a peer
 ;;; PROVIDES:
 ;;;   types     : box -- declared optional here
 ;;;   actions   : pickup-box, put-box
 
+(include-tech -propagation)
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -pickup)

@@ -46,7 +46,7 @@ effect until `vals.lisp` is discarded or re-saved.
 
 ## What `vals.lisp` persists
 
-`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 16-element list.
+`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 18-element list.
 Position matters — `read-init-vals` indexes into it directly.
 
 | Pos | Parameter | Default |
@@ -67,11 +67,15 @@ Position matters — `read-init-vals` indexes into it directly.
 | 13 | `*threads*` | `0` |
 | 14 | `*recorder-prefix-pruning*` | `nil` |
 | 15 | `*max-recorder-cycles*` | `1` |
+| 16 | `*min-steps-fallback-warmup*` | `512` |
+| 17 | `*min-steps-fallback-sample-interval*` | `64` |
 
 All managed defaults live in `*problem-parameter-defaults*`; the persisted subset and its
 save/read order live in `*persisted-problem-parameters*`. `*default-parameters*` is derived from
 those two registries. `read-globals` pads a short list from the defaults tail, so adding a
 persisted parameter to the end of the list does not invalidate an existing `vals.lisp`.
+The loader also recognizes the former 17-value format whose final two positions were the
+retired recorder interleaving flags and replaces that tail with current defaults.
 
 **Anything not in this table is not persisted.** That includes `*auto-wait*`, the
 technology-specific `*max-connector-pairings*`, `*beam-occlusion-tolerance*`,
@@ -79,7 +83,7 @@ technology-specific `*max-connector-pairings*`, `*beam-occlusion-tolerance*`,
 parameter — `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
 `*bound-refresh-interval*`, `*donation-check-interval*`, `*donation-threshold*`,
 `*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. The non-persisted search
-settings call `save-globals`, which writes the 16-element list and silently omits them;
+settings call `save-globals`, which writes the 18-element list and silently omits them;
 the technology-specific settings only reprint the current parameters. Their REPL overrides survive a
 `(refresh)`, but not restaging or restart. Staging restores every managed default first and then
 applies the new problem specification's `ww-set` overrides.
@@ -166,7 +170,7 @@ it."**
 Working as designed. `(refresh)` skips problem-file `ww-set` forms; `(stage)` applies them.
 
 **"I tuned `*tasks-per-thread*`, restarted SBCL, and it's back to default."**
-It isn't in the 16-element `vals.lisp` list. Nothing outside that list persists.
+It isn't in the 18-element `vals.lisp` list. Nothing outside that list persists.
 
 **"Setting `*threads*` reloaded the whole system."**
 Only because the value crossed 0. Within either regime it is a plain assignment.

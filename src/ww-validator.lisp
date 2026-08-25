@@ -918,6 +918,9 @@
     (*progress-reporting-interval* (unless (and (typep val 'fixnum) (> val 0))
                                      (error "Can't set *progress-reporting-interval* to ~S.
                                              Must be an integer > 0." val)))
+    ((*min-steps-fallback-warmup* *min-steps-fallback-sample-interval*)
+      (unless (and (typep val 'fixnum) (> val 0))
+        (error "Can't set ~S to ~S. Must be a positive integer." param val)))
     (*branch* (unless (typep val 'fixnum)
                 (error "Can't set *branch* to ~S. Must be an integer
                         where n < 1 means search all branches." val)))

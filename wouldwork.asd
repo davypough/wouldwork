@@ -93,6 +93,7 @@
 		                     (:file "ww-settings")
 		                     (:file "ww-problem-lifecycle")
 		                     (:file "ww-structures")
+		                     (:file "ww-relaxed-heuristics")
 		                     (:file "ww-converter")
 		                     (:file "ww-validator")
 		                     (:file "ww-frequencies")
