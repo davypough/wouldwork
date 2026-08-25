@@ -109,7 +109,7 @@
   "Require SUBGOAL at the closed end of exactly the next guided recorder cycle."
   `(and ,(copy-tree subgoal)
         (recorder-cycles-used ,cycle-number)
-        (ghost-stops-recorder)))
+        (recorder-cycle-ended)))
 
 
 (defun make-committed-recorder-cycle (subgoal closed-goal)

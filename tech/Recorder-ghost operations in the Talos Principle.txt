@@ -57,5 +57,10 @@ recorded trajectory while the real agent is free to act independently.
 
 24. When the playback phase stops, the ghost and all ghost objects disappear, leaving the real objects and environment in their current condition.  This enables the three-phase  recording cycle to begin anew in the current environment.
 
+24a. During playback, the live agent may immediately cancel the unfinished playback by
+returning to a recorder empty-handed.  Cancellation removes the ghost and every ghost object
+at once, preserves the live objects and environment in their current condition, and permits
+a new recording cycle just like any other playback ending.
+
 25. One recording cycle consists of a pre-recording phase, a recording phase, and a playback phase.  Problem solutions involving several incrementally-progressive cycles are preferred over one extended-action cycle, since this makes planning and validating each cycle easier.
 

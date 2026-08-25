@@ -220,13 +220,13 @@
                 '((4.0 (prepare-second-cycle live-agent))))
          (equal (recorder-path-cycle.setup (third cycles))
                 '((8.0 (prepare-third-cycle live-agent))))
-         (every #'recorder-path-cycle.stop cycles)))
+         (every #'recorder-path-cycle.ending cycles)))
   (multiple-value-bind (cycles trailing-setup diagnostic)
       (parse-recorder-path *start-state* (recorder-three-window-path t))
     (and (null diagnostic)
          (null trailing-setup)
          (= (length cycles) 3)
-         (null (recorder-path-cycle.stop (third cycles))))))
+         (null (recorder-path-cycle.ending (third cycles))))))
 
 
 (define-test-claim recorder-valid-multi-window-paths

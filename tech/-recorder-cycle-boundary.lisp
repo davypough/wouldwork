@@ -1,19 +1,20 @@
 ;;; Filename: -recorder-cycle-boundary.lisp
 
 ;;; Recorder-specific continuation policy.  A chained cycle has a stronger termination
-;;; contract than a standalone recorder solve: its searched path itself returns every
-;;; mapped ghost agent to a recorder.  Report-only return markers therefore never become a
-;;; committed boundary by accident.
+;;; contract than a standalone recorder solve: its searched path itself reaches a normalized
+;;; ending, through either normal ghost STOP or live cancellation.  Report-only return
+;;; markers therefore never become a committed boundary by accident.
 ;;;
-;;; STOP-RECORDER performs the same normalization directly in its successor: it removes
-;;; every dynamic ghost reference, resets every capability-owned recording shadow, seeds
-;;; stateful memory from the committed live playback baseline, and propagates consequences.
+;;; STOP-RECORDER and CANCEL-PLAYBACK perform the same normalization directly in their
+;;; successors: each removes every dynamic ghost reference, resets every capability-owned
+;;; recording shadow, seeds stateful memory from the committed live playback baseline, and
+;;; propagates consequences.
 ;;; PREPARE-RECORDER-CYCLE-STATE remains the copy-preserving entry point used by guided
 ;;; chaining, but delegates to that shared normalization.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -recorder-core (lifecycle registry); -recorder-solution
-;;;            (GHOST-STOPS-RECORDER); -propagation
+;;;            (RECORDER-CYCLE-ENDED); -propagation
 ;;; PROVIDES:
 ;;;   queries   : recorder-cycle-boundary-safe, recorder-closed-ghost-free
 ;;;   functions : recorder-cycle-goal, close-recorder-cycle-state!,
@@ -106,12 +107,12 @@
 (defun recorder-cycle-goal (subgoal)
   "Return SUBGOAL strengthened with the recorder's physical closure requirement."
   `(and ,(copy-tree subgoal)
-        (ghost-stops-recorder)))
+        (recorder-cycle-ended)))
 
 
 (defun recorder-cycle-boundary-closed-p (state)
   "Whether STATE is ready to terminate one cycle and start the next."
-  (funcall (symbol-function 'ghost-stops-recorder) state))
+  (funcall (symbol-function 'recorder-cycle-ended) state))
 
 
 (defun reset-recorder-cycle-shadow! (state)
@@ -153,7 +154,7 @@
 
 
 (defun close-recorder-cycle-state! (state)
-  "Remove completed ghosts and normalize the recording view from live persistent state."
+  "Remove ended or cancelled ghosts and normalize the recording view from live state."
   (remove-recorder-ghost-state! state)
   (normalize-recorder-cycle-shadow! state)
   (when (recorder-state-contains-ghost-reference-p state)
@@ -169,7 +170,7 @@ The original state is never modified.  Preparation fails if the accepted cycle w
 explicitly closed, shadow propagation is inconsistent, or normalization retains a dynamic
 ghost reference."
   (unless (recorder-cycle-boundary-closed-p boundary-state)
-    (error "Recorder cycle boundary was not produced by STOP-RECORDER."))
+    (error "Recorder cycle boundary was not produced by STOP-RECORDER or CANCEL-PLAYBACK."))
   (let ((prepared-state (copy-problem-state boundary-state)))
     (close-recorder-cycle-state! prepared-state)
     (when (state-is-inconsistent prepared-state)

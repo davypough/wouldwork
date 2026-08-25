@@ -225,6 +225,9 @@
                   (topo-relaxed-static-position-facts))))
     (when (member '(recording-in-progress) facts :test #'equal)
       (pushnew '(:recording-in-progress) facts :test #'equal))
+    (when (and (fboundp 'recorder-cycle-ended)
+               (funcall (symbol-function 'recorder-cycle-ended) state))
+      (pushnew '(:recorder-cycle-ended) facts :test #'equal))
     (when (and (fboundp 'ghost-stops-recorder)
                (funcall (symbol-function 'ghost-stops-recorder) state))
       (pushnew '(:ghost-stops-recorder) facts :test #'equal))
@@ -302,6 +305,7 @@ invalidates the cache exactly as *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
                  (not (topo-relaxed-ghost-object-p state (third literal))))
         literal))
     ((open active depressed latched) literal)
+    (recorder-cycle-ended '(:recorder-cycle-ended))
     (ghost-stops-recorder '(:ghost-stops-recorder))
     (otherwise nil)))
 
@@ -972,10 +976,15 @@ risks the count."
 
 
 (define-problem-helper topo-resource-session-cost (goals facts)
-  (if (and (member '(:ghost-stops-recorder) goals :test #'equal)
-           (not (member '(:ghost-stops-recorder) facts :test #'equal)))
-    (if (member '(:recording-in-progress) facts :test #'equal) 1 2)
-    0))
+  (let ((required
+          (cond
+            ((member '(:ghost-stops-recorder) goals :test #'equal)
+             '(:ghost-stops-recorder))
+            ((member '(:recorder-cycle-ended) goals :test #'equal)
+             '(:recorder-cycle-ended)))))
+    (if (and required (not (member required facts :test #'equal)))
+      (if (member '(:recording-in-progress) facts :test #'equal) 1 2)
+      0)))
 
 
 (define-problem-helper topo-finite-resource-bound-components-from-facts
@@ -1076,7 +1085,7 @@ risks the count."
         (plusp (topo-resource-bound-analysis.routing-cost resource-analysis)))
       ((pickup put-ground put-on-at)
         (topo-control-setup-task-object-p (third name) resource-analysis))
-      ((relaxed-start-recorder relaxed-stop-recorder)
+      ((relaxed-start-recorder relaxed-stop-recorder relaxed-cancel-playback)
         (plusp (topo-resource-bound-analysis.session-cost resource-analysis)))
       (otherwise nil))))
 
@@ -1147,7 +1156,7 @@ risks the count."
         (list '(:topo-plate-change) '(:topo-receiver-change)))
       ((normal-controls-open relaxed-open-fallback plate-consequence)
         (list '(:topo-receiver-change)))
-      ((relaxed-start-recorder relaxed-stop-recorder)
+      ((relaxed-start-recorder relaxed-stop-recorder relaxed-cancel-playback)
         (list '(:topo-receiver-change)))
       (relaxed-any-action
         (copy-list *topo-control-typed-trigger-facts*))
@@ -1824,7 +1833,12 @@ not an admissible bound, until the concrete capability proves that separation."
       (make-relaxed-hmax-operator
         :name 'relaxed-stop-recorder
         :preconditions (list '(:recording-in-progress))
-        :effects (list '(:ghost-stops-recorder))))))
+        :effects (list '(:recorder-cycle-ended)
+                       '(:ghost-stops-recorder)))
+      (make-relaxed-hmax-operator
+        :name 'relaxed-cancel-playback
+        :preconditions (list '(:recording-in-progress))
+        :effects (list '(:recorder-cycle-ended))))))
 
 
 (define-problem-helper topo-relaxed-add-action-triggers! (operators)

@@ -131,7 +131,7 @@
 
 (define-test-claim recorder-cycle-boundary-policy
   (equal (recorder-cycle-goal '(always-true))
-         '(and (always-true) (ghost-stops-recorder)))
+         '(and (always-true) (recorder-cycle-ended)))
   (equal *recorder-shadow-lifecycles*
          '((plate reset-recording-plate-shadow! seed-recording-plate-shadow!)
            (receiver reset-recording-receiver-shadow! nil)

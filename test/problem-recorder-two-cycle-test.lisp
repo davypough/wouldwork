@@ -201,6 +201,23 @@
     (7.0 (stop-recorder ghost-agent))))
 
 
+(define-test-helper recorder-two-cycle-native-path-p (path)
+  (and
+    (= (length path) 7)
+    (equal (subseq path 0 3)
+           '((1.0 (start-recorder live-agent))
+             (2.0 (prime-playback-latch ghost-agent))
+             (3.0 (latch-playback-gate live-agent))))
+    (member (fourth path)
+            '((4.0 (stop-recorder ghost-agent))
+              (4.0 (cancel-playback live-agent)))
+            :test #'equal)
+    (equal (subseq path 4)
+           '((5.0 (start-recorder live-agent))
+             (6.0 (use-recording-gate ghost-agent))
+             (7.0 (stop-recorder ghost-agent))))))
+
+
 (define-test-helper recorder-two-cycle-native-solution-p (solution)
   (when solution
     (let* ((path (solution.path solution))
@@ -208,11 +225,13 @@
            (cycles (getf report :cycles)))
       (and
         (= (solution.depth solution) 7)
-        (equal path (recorder-two-cycle-native-path))
+        (recorder-two-cycle-native-path-p path)
         (validate-recorder-solution *start-state* path (solution.goal solution))
         (= (getf report :cycle-count) 2)
         (equal (mapcar (lambda (cycle) (getf cycle :closure)) cycles)
-               '(:explicit :explicit))
+               (if (recorder-cycle-cancellation-p (fourth path))
+                 '(:cancelled :explicit)
+                 '(:explicit :explicit)))
         (equal (mapcar (lambda (cycle) (getf cycle :depth)) cycles)
                '(4 3))
         (equal (mapcar (lambda (cycle) (getf cycle :elapsed-time)) cycles)

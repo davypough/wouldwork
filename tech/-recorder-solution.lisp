@@ -17,7 +17,8 @@
 ;;; genuinely closed session) RECORDING-IN-PROGRESS, which is session lifecycle state, not
 ;;; one of the per-apparatus shadow views above.
 ;;;
-;;; Every intermediate recording is physically closed by STOP-RECORDER.  The parser also
+;;; Every intermediate recording is physically ended by STOP-RECORDER or CANCEL-PLAYBACK.
+;;; The parser also
 ;;; admits a final open cycle when the problem goal is reached first; its isolated recording
 ;;; must be executable, but physical closure is not added to that goal.  A problem that wants
 ;;; the final return and stop spelled out adds GHOST-STOPS-RECORDER as a goal conjunct.
@@ -33,7 +34,8 @@
 ;;;   soft   : -recorder-core's identity queries and RECORDING-IN-PROGRESS, assembled by
 ;;;            recorder.lisp before this component
 ;;; PROVIDES:
-;;;   queries  : ghost-stops-recorder (optional goal conjunct), recording-agent-can-close,
+;;;   queries  : recorder-cycle-ended (generic closed-cycle goal), ghost-stops-recorder
+;;;              (strict normal-stop goal), recording-agent-can-close,
 ;;;              recording-agent-return-route, recording-agent-at-recorder,
 ;;;              recording-agent-empty-handed
 ;;;   functions: parse-recorder-path, validate-recorder-solution,
@@ -45,7 +47,8 @@
 ;;;              automatic recorder interleaving pruning;
 ;;;              recorder-recording-path, recorder-recording-window,
 ;;;              recorder-recording-snapshot and their helpers locate the real
-;;;              START-RECORDER/STOP-RECORDER moves when the searched path contains them,
+;;;              START-RECORDER and either explicit ending when the searched path contains
+;;;              them,
 ;;;              falling back to the whole path when it does not
 
 (include-tech -location)
@@ -64,13 +67,20 @@
   (not (bind (holding ?agent $anything))))
 
 
-(define-query ghost-stops-recorder ()
-  ;; STOP-RECORDER alone creates this marker, after its precondition has established
-  ;; physical closure.  Its atomic followup removes all ghost state and normalizes the
-  ;; recording shadow, so the marker is meaningful without a positional ghost test.
+(define-query recorder-cycle-ended ()
+  ;; Both a completed ghost recording and a live cancellation create this generic clean
+  ;; boundary.  The action's atomic followup removes all ghost state and normalizes the
+  ;; recording shadow, so no positional ghost test remains meaningful here.
   (and (recorder-cycle-closed)
        (not (recording-in-progress))
        (recorder-closed-ghost-free)))
+
+
+(define-query ghost-stops-recorder ()
+  ;; Retain the stricter condition for goals that specifically require the recorded ghost
+  ;; to reach its authored STOP rather than having the live agent cancel playback.
+  (and (recorder-cycle-stopped-by-ghost)
+       (recorder-cycle-ended)))
 
 
 (define-query recording-agent-can-close (?agent agent)
@@ -173,8 +183,10 @@
   "Whether the adjacent moves form a ghost-before-live canonical-order inversion."
   (let ((first-action (second first-move))
         (second-action (second second-move)))
-    (when (or (member (first first-action) '(start-recorder stop-recorder))
-              (member (first second-action) '(start-recorder stop-recorder)))
+    (when (or (member (first first-action)
+                      '(start-recorder stop-recorder cancel-playback))
+              (member (first second-action)
+                      '(start-recorder stop-recorder cancel-playback)))
       (return-from recorder-interleaving-inversion-p nil))
     (let ((first-side (recorder-interleaving-action-side state first-move))
           (second-side (recorder-interleaving-action-side state second-move)))
@@ -286,13 +298,28 @@
     (first (second move))))
 
 
+(defun recorder-cycle-ending-action-p (action)
+  "Whether ACTION explicitly ends an open recorder cycle."
+  (member action '(stop-recorder cancel-playback)))
+
+
+(defun recorder-cycle-normal-stop-p (move)
+  "Whether MOVE is the recording-side normal STOP-RECORDER boundary."
+  (eql (recorder-move-action-name move) 'stop-recorder))
+
+
+(defun recorder-cycle-cancellation-p (move)
+  "Whether MOVE is the live-side CANCEL-PLAYBACK boundary."
+  (eql (recorder-move-action-name move) 'cancel-playback))
+
+
 (defstruct (recorder-path-cycle (:conc-name recorder-path-cycle.))
   "One parsed recorder cycle in an integrated planner path."
   number
   setup
   start
   moves
-  stop)
+  ending)
 
 
 (defun recorder-boundary-error (cycle detail)
@@ -319,7 +346,7 @@ state with RECORDING-IN-PROGRESS supplies one legacy implicit open cycle."
                :setup nil
                :start nil
                :moves nil
-               :stop nil)))
+               :ending nil)))
          (cycles nil)
          (setup-reversed nil))
     (when (> cycles-used *max-recorder-cycles*)
@@ -347,17 +374,20 @@ state with RECORDING-IN-PROGRESS supplies one legacy implicit open cycle."
                   :setup (nreverse setup-reversed)
                   :start move
                   :moves nil
-                  :stop nil)
+                  :ending nil)
                 setup-reversed nil))
-        (stop-recorder
+        ((stop-recorder cancel-playback)
           (unless open-cycle
             (return-from parse-recorder-path
               (values nil nil
                       (recorder-boundary-error
-                        (1+ cycles-used) :stop-without-start))))
+                        (1+ cycles-used)
+                        (if (eql (recorder-move-action-name move) 'stop-recorder)
+                          :stop-without-start
+                          :cancel-without-start)))))
           (setf (recorder-path-cycle.moves open-cycle)
                 (nreverse (recorder-path-cycle.moves open-cycle))
-                (recorder-path-cycle.stop open-cycle) move)
+                (recorder-path-cycle.ending open-cycle) move)
           (push open-cycle cycles)
           (setf open-cycle nil))
         (otherwise
@@ -379,6 +409,14 @@ state with RECORDING-IN-PROGRESS supplies one legacy implicit open cycle."
 (defun recorder-explicit-stop (integrated-path)
   "The real STOP-RECORDER move in INTEGRATED-PATH, or NIL when none was searched."
   (find 'stop-recorder integrated-path :key #'recorder-move-action-name))
+
+
+(defun recorder-explicit-ending (integrated-path)
+  "The real STOP-RECORDER or CANCEL-PLAYBACK move in INTEGRATED-PATH, if present."
+  (find-if
+    (lambda (move)
+      (recorder-cycle-ending-action-p (recorder-move-action-name move)))
+    integrated-path))
 
 
 (defun recorder-boundary-diagnostic
@@ -411,19 +449,20 @@ There is no pre-recording prefix in the legacy no-explicit-start form."
 
 
 (defun recorder-recording-window (integrated-path)
-  "INTEGRATED-PATH narrowed to strictly between its real START-RECORDER and STOP-RECORDER
+  "INTEGRATED-PATH narrowed to strictly between its real START-RECORDER and explicit ending
 moves.  Either or both edges default to the path's own start/end when the searched path
 never invoked the real action -- exactly the pre-restructuring behavior, where recording
 had no path-local edges at all."
   (recorder-path-before
     (recorder-path-after integrated-path (recorder-explicit-start integrated-path))
-    (recorder-explicit-stop integrated-path)))
+    (recorder-explicit-ending integrated-path)))
 
 
 (defun recorder-recording-path (state integrated-path)
   "The path segment VALIDATE-RECORDER-SOLUTION treats as one recording: the real
 START-RECORDER move when the searched path contains one, every ghost move within the
-window it opens, and the real STOP-RECORDER move when present.  A ghost action's own
+window it opens, and the real STOP-RECORDER move when present.  CANCEL-PLAYBACK belongs
+only to the live playback path.  A ghost action's own
 precondition now requires recording to be in progress, so the isolated replay needs
 START-RECORDER's fork included to be viable at all -- it is no longer purely a ghost-only
 subsequence.  Falls back to the whole path's ghost-only moves, with no edges, when neither
@@ -453,14 +492,14 @@ real action was searched."
 
 
 (defun recorder-path-cycle-recording-path (state cycle)
-  "Return CYCLE's isolated start, ghost moves, and optional stop sequence."
+  "Return CYCLE's isolated start, ghost moves, and optional normal-stop sequence."
   (append
     (when (recorder-path-cycle.start cycle)
       (list (recorder-path-cycle.start cycle)))
     (recorder-path-moves-on-side
       state (recorder-path-cycle.moves cycle) :ghost)
-    (when (recorder-path-cycle.stop cycle)
-      (list (recorder-path-cycle.stop cycle)))))
+    (when (recorder-cycle-normal-stop-p (recorder-path-cycle.ending cycle))
+      (list (recorder-path-cycle.ending cycle)))))
 
 
 (defun recorder-path-cycle-snapshot (start-state integrated-path cycle)
@@ -708,10 +747,10 @@ directly, because its focused tests author the already-open recording state ther
   t)
 
 
-(defun recorder-stop-prefix-trigger-p (start-state newest-move current-state)
-  "Whether NEWEST-MOVE closes a cycle and therefore needs mandatory validation."
+(defun recorder-ending-prefix-trigger-p (start-state newest-move current-state)
+  "Whether NEWEST-MOVE ends a cycle and therefore needs mandatory validation."
   (declare (ignore start-state current-state))
-  (eql (recorder-move-action-name newest-move) 'stop-recorder))
+  (recorder-cycle-ending-action-p (recorder-move-action-name newest-move)))
 
 
 (defun recorder-recording-prefix-changed-p (start-state integrated-path)
@@ -722,7 +761,7 @@ captured when START-RECORDER is eventually checked, while live moves after the s
 cannot alter a recording prefix already accepted at its preceding ghost move."
   (let* ((move (car (last integrated-path)))
          (action (recorder-move-action-name move)))
-    (or (member action '(start-recorder stop-recorder))
+    (or (member action '(start-recorder stop-recorder cancel-playback))
         (some (lambda (agent)
                 (funcall (symbol-function 'ghost-recording-object)
                          start-state agent))
@@ -758,7 +797,7 @@ cannot alter a recording prefix already accepted at its preceding ghost move."
 
 (defun validate-recorder-cycle-boundary-prefix
     (start-state integrated-path current-state)
-  "Validate the completed cycle ending at the newest STOP-RECORDER successor."
+  "Validate the completed cycle ending at the newest explicit boundary successor."
   (multiple-value-bind (cycles trailing-setup diagnostic)
       (parse-recorder-path start-state integrated-path)
     (declare (ignore trailing-setup))
@@ -766,7 +805,7 @@ cannot alter a recording prefix already accepted at its preceding ghost move."
       (return-from validate-recorder-cycle-boundary-prefix
         (values nil diagnostic)))
     (let ((cycle (car (last cycles))))
-      (unless (and cycle (recorder-path-cycle.stop cycle))
+      (unless (and cycle (recorder-path-cycle.ending cycle))
         (return-from validate-recorder-cycle-boundary-prefix
           (values nil
                   (recorder-boundary-error
@@ -802,7 +841,7 @@ Once an action in the isolated recording sequence fails, however, extending the 
       (return-from validate-recorder-recording-prefix
         (values nil boundary-diagnostic)))
     (let ((open-cycle
-            (find-if-not #'recorder-path-cycle.stop cycles :from-end t)))
+            (find-if-not #'recorder-path-cycle.ending cycles :from-end t)))
       (if open-cycle
         (validate-recorder-path-cycle start-state integrated-path open-cycle)
         (values t nil)))))
@@ -850,7 +889,7 @@ Each contiguous live block becomes one PAUSE marker.  Real boundary actions rema
 place.  A legacy implicit opening or final goal-terminated closing is synthesized only in
 the report; an open cycle also receives whatever ghost return moves STATE can supply."
   (let* ((start (recorder-path-cycle.start cycle))
-         (stop (recorder-path-cycle.stop cycle))
+         (ending (recorder-path-cycle.ending cycle))
          (sequence (list (or start '(start-recorder))))
          (previous-side nil))
     (dolist (move (recorder-path-cycle.moves cycle))
@@ -862,9 +901,11 @@ the report; an open cycle also receives whatever ghost return moves STATE can su
           (setf sequence (nconc sequence (list move))))
         (setf previous-side side)))
     (nconc sequence
-           (if stop
-             (list stop)
-             (nconc (recorder-return-moves state) (list '(stop-recorder)))))))
+           (cond
+             ((recorder-cycle-normal-stop-p ending) (list ending))
+             ((recorder-cycle-cancellation-p ending) nil)
+             (t (nconc (recorder-return-moves state)
+                       (list '(stop-recorder))))))))
 
 
 (defun recorder-return-moves (state)
@@ -884,10 +925,17 @@ markers, not planner actions, and carry no step number for that reason."
 (defun recorder-cycle-playback-sequence (state cycle)
   "Present CYCLE's in-window moves, pausing live blocks and resuming ghost blocks.
 
-Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback actions."
+Setup, START-RECORDER, and normal STOP-RECORDER are not playback actions.  A live
+CANCEL-PLAYBACK is the final playback action."
   (let ((sequence nil)
+        (moves
+          (append
+            (recorder-path-cycle.moves cycle)
+            (when (recorder-cycle-cancellation-p
+                    (recorder-path-cycle.ending cycle))
+              (list (recorder-path-cycle.ending cycle)))))
         (previous-side nil))
-    (dolist (move (recorder-path-cycle.moves cycle) sequence)
+    (dolist (move moves sequence)
       (let ((side (recorder-report-move-side state move)))
         (when (not (eql side previous-side))
           (cond
@@ -906,8 +954,8 @@ Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback acti
     (when (recorder-path-cycle.start cycle)
       (list (recorder-path-cycle.start cycle)))
     (recorder-path-cycle.moves cycle)
-    (when (recorder-path-cycle.stop cycle)
-      (list (recorder-path-cycle.stop cycle)))))
+    (when (recorder-path-cycle.ending cycle)
+      (list (recorder-path-cycle.ending cycle)))))
 
 
 (defun recorder-report-metrics (start-state end-state depth)
@@ -946,9 +994,13 @@ Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback acti
               :setup (recorder-path-cycle.setup cycle)
               :recording (recorder-cycle-recording-sequence end-state cycle)
               :playback (recorder-cycle-playback-sequence end-state cycle)
-              :closure (if (recorder-path-cycle.stop cycle)
-                         :explicit
-                         :synthesized))
+              :closure
+              (cond
+                ((recorder-cycle-cancellation-p
+                   (recorder-path-cycle.ending cycle))
+                 :cancelled)
+                ((recorder-path-cycle.ending cycle) :explicit)
+                (t :synthesized)))
         metrics)
       end-state)))
 
@@ -972,7 +1024,7 @@ Setup and explicit START-RECORDER/STOP-RECORDER boundaries are not playback acti
     :setup nil
     :start nil
     :moves path
-    :stop nil))
+    :ending nil))
 
 
 (defun recorder-complete-solution-metrics (solution)

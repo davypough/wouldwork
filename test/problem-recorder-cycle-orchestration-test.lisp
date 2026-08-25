@@ -155,7 +155,7 @@
          (equal *goal*
                 '(and (cycle-at cycle-unreachable)
                       (recorder-cycles-used 1)
-                      (ghost-stops-recorder)))
+                      (recorder-cycle-ended)))
          (= (length *undo-stack*) 1)
          (ww-undo)
          (null *recorder-cycle-history*)
@@ -220,7 +220,7 @@
                (first *recorder-cycle-history*))
              '(and (cycle-at cycle-middle)
                    (recorder-cycles-used 1)
-                   (ghost-stops-recorder)))
+                   (recorder-cycle-ended)))
       (= (funcall (symbol-function 'recorder-cycle-count) *start-state*) 1)
       (equal (getf (recorder-cycle-record.report (first *recorder-cycle-history*))
                    :recording)
@@ -255,7 +255,7 @@
                (second *recorder-cycle-history*))
              '(and (cycle-at cycle-end)
                    (recorder-cycles-used 2)
-                   (ghost-stops-recorder)))
+                   (recorder-cycle-ended)))
       (= (funcall (symbol-function 'recorder-cycle-count)
                   (recorder-cycle-record.boundary-state
                     (second *recorder-cycle-history*)))

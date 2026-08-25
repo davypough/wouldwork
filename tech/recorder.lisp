@@ -6,10 +6,11 @@
 ;;; recorder-specific prefix pruning, interleaving audit/pruning, candidate validation,
 ;;; solution reporting, and goal chaining after all implementations have been defined.
 ;;;
-;;; Recorder start/stop transitions and their cycle count are planner-native and repeatable.
-;;; The path parser accepts repeated setup/start/window/stop cycles and an optional
-;;; final open window.  Every generated STOP successor validates its just-completed isolated
-;;; recording and rejects a closed cycle without persistent progress before goal or duplicate
+;;; Recorder start/stop/cancel transitions and their cycle count are planner-native and
+;;; repeatable.
+;;; The path parser accepts repeated setup/start/window/ending cycles and an optional
+;;; final open window.  Every generated STOP or CANCEL successor validates its just-completed
+;;; cycle and rejects a closed cycle without persistent progress before goal or duplicate
 ;;; processing.  At equal normalized boundaries, an equal-or-cheaper path with fewer cycles
 ;;; used dominates one with more cycles.  Final candidate validation checks all cycles plus
 ;;; the complete integrated path.  One ordinary SOLVE therefore optimizes across every
@@ -36,10 +37,11 @@
 ;;;   -recorder-jamming-shadow     : ghost-filtered RECORDING-JAMMED
 ;;;   -recorder-gate-shadow        : RECORDING-OPEN and gate-view hook
 ;;;   -recorder-wall-gears-shadow  : RECORDING-TURNING and gears-view hook
-;;;   -recorder-solution           : multi-window parsing, mandatory stop validation,
+;;;   -recorder-solution           : multi-window parsing, mandatory ending validation,
 ;;;                                  optional open-prefix validation, interleaving
 ;;;                                  audit/pruning, candidate validation, and report
-;;;   -recorder-session            : START-RECORDER / STOP-RECORDER actions and the
+;;;   -recorder-session            : START-RECORDER / STOP-RECORDER / CANCEL-PLAYBACK
+;;;                                  actions and the
 ;;;                                  live-to-ghost state fork; nests -recorder-solution,
 ;;;                                  so its own list position is a readability choice, not
 ;;;                                  a load-order requirement
@@ -75,7 +77,7 @@
 (register-search-prefix-validator
   'validate-recorder-cycle-boundary-prefix
   'recorder-cycle-boundary-validation-enabled-p
-  'recorder-stop-prefix-trigger-p)
+  'recorder-ending-prefix-trigger-p)
 (register-search-prefix-validator
   'validate-recorder-recording-prefix
   'recorder-prefix-pruning-enabled-p)

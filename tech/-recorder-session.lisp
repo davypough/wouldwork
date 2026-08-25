@@ -1,6 +1,6 @@
 ;;; Filename: -recorder-session.lisp
 
-;;; Recording session lifecycle.  START-RECORDER and STOP-RECORDER are real planner
+;;; Recording session lifecycle.  START-RECORDER, STOP-RECORDER, and CANCEL-PLAYBACK are real planner
 ;;; actions, not report-only markers: the search itself chooses when a recording session
 ;;; opens and closes, giving ghost-state forking a well-defined, path-local moment instead
 ;;; of an inferred one.  START-RECORDER counts the cycle in planner state, clears the
@@ -46,8 +46,12 @@
 ;;;   nested : -recorder-cycle-boundary (cycle count, physical closure, ghost removal,
 ;;;            and shadow normalization); -location (HAS-LOCATION); -holding (HOLDING);
 ;;;            -support-occupancy (ON); -recorder-fork-registry (optional fork clauses)
+;;; CANCEL-PLAYBACK is the live-side early ending.  The empty-handed live agent must reach
+;;; a recorder, but the ghost need not have completed its recording or resolved its cargo:
+;;; cancellation discards the unplayed remainder and every ghost dependency immediately.
+;;;
 ;;; PROVIDES:
-;;;   actions   : start-recorder, stop-recorder
+;;;   actions   : start-recorder, stop-recorder, cancel-playback
 
 (include-tech -recorder-cycle-boundary)
 (include-tech -location)
@@ -82,6 +86,7 @@
        (assign $next-cycle (1+ $cycles-used))
        (recorder-cycles-used $next-cycle)
        (not (recorder-cycle-closed))
+       (not (recorder-cycle-stopped-by-ghost))
        (recording-in-progress)
        ;; has-location: every mapped mobile object, wherever it currently stands
        (doall (?live mobile-object)
@@ -119,6 +124,23 @@
 (register-deferred-action-installer 'install-start-recorder)
 
 
+(define-action cancel-playback
+  1
+  (?agent agent)
+  (and (live-recording-object ?agent)
+       (recording-in-progress)
+       (recording-agent-at-recorder ?agent)
+       (recording-agent-empty-handed ?agent)
+       (assign $cycles-used (recorder-cycle-count))
+       (assign $objective-value (problem-state.value state)))
+  (">" ?agent "cancels recorder playback")
+  (assert (not (recording-in-progress))
+          (recorder-cycles-used $cycles-used)
+          (recorder-cycle-closed)
+          (not (recorder-cycle-stopped-by-ghost))
+          (finally (close-recorder-cycle-state!))))
+
+
 (define-action stop-recorder
   1
   (?agent agent)
@@ -131,4 +153,5 @@
   (assert (not (recording-in-progress))
           (recorder-cycles-used $cycles-used)
           (recorder-cycle-closed)
+          (recorder-cycle-stopped-by-ghost)
           (finally (close-recorder-cycle-state!))))

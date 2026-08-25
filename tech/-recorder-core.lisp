@@ -28,7 +28,7 @@
 ;;;            -interaction-policy (neutral action hooks); -recording-shadow-policy
 ;;;            (neutral environmental-view hooks)
 ;;; RECORDING-IN-PROGRESS is declared here, rather than alongside the START-RECORDER /
-;;; STOP-RECORDER actions that set it (-recorder-session.lisp), because
+;;; STOP-RECORDER / CANCEL-PLAYBACK actions that set it (-recorder-session.lisp), because
 ;;; OBJECT-MANIPULATION-ALLOWED and CONNECTOR-PAIRING-ALLOWED below need to read it, and
 ;;; this file is the first component -recorder.lisp assembles.  -recorder-session.lisp
 ;;; nests this file for the relation, not the other way around.
@@ -37,7 +37,7 @@
 ;;;   type     : recorder, connector, tray (optional)
 ;;;   relation : recording-copy> (indexed live mobile-object -> ghost mobile-object);
 ;;;              recording-in-progress, recorder-cycles-used,
-;;;              recorder-cycle-closed
+;;;              recorder-cycle-closed, recorder-cycle-stopped-by-ghost
 ;;;   generator: derive-recording-copy-literals (asterisk-named ghosts -> recording-copy>)
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side,
 ;;;              recording-shadow-view-object;
@@ -67,7 +67,8 @@
 (define-dynamic-relations
   (recording-in-progress)
   (recorder-cycles-used $fixnum)
-  (recorder-cycle-closed))
+  (recorder-cycle-closed)
+  (recorder-cycle-stopped-by-ghost))
 
 
 (register-symmetry-coupling 'recording-copy>)

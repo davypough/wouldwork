@@ -78,9 +78,10 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (on $support-occupant $support :bijective)  ;reverse lookup via cleartop
 (open gate)
 (paired connector terminus)  ;undirected; stored connector-first
-(recorder-cycle-closed)  ;set only by a physically valid stop-recorder boundary
+(recorder-cycle-closed)  ;set by a normalized stop-recorder or cancel-playback boundary
+(recorder-cycle-stopped-by-ghost)  ;distinguishes normal ghost STOP from live cancellation
 (recorder-cycles-used $fixnum)  ;planner-state count incremented by start-recorder
-(recording-in-progress)  ;true between start-recorder and stop-recorder
+(recording-in-progress)  ;true between start-recorder and either explicit ending
 (turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
 
 4. Static Relations
@@ -134,6 +135,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (put-tray ">" ?agent "puts" ?tray "on" $place "at" ?location)
 (start-recorder ">" ?agent "starts the recorder")
 (stop-recorder ">" ?agent "stops the recorder")
+(cancel-playback ">" ?agent "cancels recorder playback")
 
 6. Vertical Type Constants (*vertical-type-constants*, tech/-vertical.lisp)
 
