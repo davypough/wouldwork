@@ -91,6 +91,30 @@
 (defparameter *topo-resource-routes* nil)
 
 
+(defparameter *topo-resource-recording-sides* nil
+  "Cached live/ghost classification of the staged problem's mapped mobile objects.")
+
+
+(defparameter *topo-resource-recording-sides-built-p* nil
+  "Whether the recording-side cache is compiled, including a legitimately empty one.")
+
+
+(defparameter *topo-resource-side-agents* nil
+  "Cached agents each recording layer admits as a manipulator, keyed by :LIVE and :GHOST.")
+
+
+(defparameter *topo-resource-side-agents-built-p* nil
+  "Whether the per-side agent cache is compiled, including a legitimately empty one.")
+
+
+(defparameter *topo-beam-static-links* nil
+  "Cached static PAIRED and COUPLED facts of the currently staged problem.")
+
+
+(defparameter *topo-beam-static-links-built-p* nil
+  "Whether the static beam-link cache is compiled, including a legitimately empty one.")
+
+
 (defparameter *topo-relaxed-static-propositions* nil
   "Cached decoding of *STATIC-IDB* for the currently staged problem.")
 
@@ -112,9 +136,11 @@
 
 
 (defstruct (topo-resource-task (:conc-name topo-resource-task.))
-  "One cargo-location obligation for the finite-domain routing lower bound."
+  "One cargo-location or agent-location obligation for the finite-domain routing bound."
   object
+  target
   required-agent
+  (eligible-agents :any)  ;:ANY, or the agents one recording side permits
   (pickup-locations nil :type list)
   (finish-locations nil :type list)
   (manipulation-cost 0 :type (integer 0 *)))
@@ -128,6 +154,7 @@
   (tasks nil :type list)
   (manipulation-cost 0 :type (integer 0 *))
   (routing-cost 0 :type (integer 0 *))
+  (barrier-cost 0 :type (integer 0 *))
   (session-cost 0 :type (integer 0 *))
   (total 0 :type (integer 0 *)))
 
@@ -507,11 +534,48 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
 
 (define-problem-helper topo-resource-location-task
     (goal facts locations reaches)
+  "Dispatch one HAS-LOCATION goal to its agent or cargo obligation, or NIL if unsupported.
+
+CARGO is (either box jammer connector fan tray) and excludes AGENT, so an agent's own
+final-position goal previously produced no task at all and cost nothing.  Both kinds route
+through the same finite-domain search, and both are omitted rather than guessed when the
+goal already holds."
+  (let ((object (second goal)))
+    (unless (member goal facts :test #'equal)
+      (cond ((topo-relaxed-object-of-type-p object 'agent)
+             (topo-resource-agent-location-task goal facts))
+            ((topo-relaxed-object-of-type-p object 'cargo)
+             (topo-resource-cargo-location-task goal facts locations reaches))
+            (t nil)))))
+
+
+(define-problem-helper topo-resource-agent-location-task (goal facts)
+  "One agent's own final-position obligation: no manipulation, one repositioning MOVE.
+
+The agent must stand at TARGET itself, so there is no reach vantage to choose and no pickup
+leg.  TOPO-RESOURCE-TASK-TRANSITION-COST then reduces to MOVE(current -> TARGET), since its
+second leg is TARGET -> TARGET and costs zero.  The search may order this task last for an
+agent whose preceding task already finishes at TARGET, so one real MOVE is never charged
+twice."
+  (let* ((object (second goal))
+         (target (third goal))
+         (location (topo-resource-object-location object facts)))
+    (when location
+      (make-topo-resource-task
+        :object object
+        :target target
+        :required-agent object
+        :eligible-agents (list object)
+        :pickup-locations (list target)
+        :finish-locations (list target)
+        :manipulation-cost 0))))
+
+
+(define-problem-helper topo-resource-cargo-location-task
+    (goal facts locations reaches)
   (let ((object (second goal))
         (target (third goal)))
-    (unless (or (member goal facts :test #'equal)
-                (not (topo-relaxed-object-of-type-p object 'cargo))
-                (topo-resource-tray-supported-p object facts))
+    (unless (topo-resource-tray-supported-p object facts)
       (let* ((holder (topo-resource-object-holder object facts))
              (object-location (topo-resource-object-location object facts))
              (holder-location
@@ -531,13 +595,77 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
         (when (and pickup-locations finish-locations)
           (make-topo-resource-task
             :object object
+            :target target
             :required-agent holder
+            :eligible-agents (topo-resource-eligible-agents object)
             :pickup-locations pickup-locations
             :finish-locations finish-locations
             :manipulation-cost
               (if tray-p
                 (if holder 0 1)
                 (if holder 1 2))))))))
+
+
+(define-problem-helper topo-resource-eligible-agents (object)
+  "Agents that OBJECT-MANIPULATION-ALLOWED could admit as manipulators of OBJECT, or :ANY.
+
+tech/-recorder-core.lisp gates every pickup and placement on SAME-RECORDING-SIDE, so a ghost
+agent can never manipulate live cargo and a live agent can never manipulate a ghost copy.
+An unmapped object -- the recorder technology is not installed, or the problem declared no
+ghost for it -- returns :ANY.  That is deliberately more permissive than the engine, which
+forbids manipulating an unmapped object outright, because a wider agent set can only shorten
+the abstract plan.  An empty list is a real answer: no agent may serve the task, and the
+routing search already abstains to zero there."
+  (let ((object-side (gethash object (topo-resource-recording-sides))))
+    (if (null object-side)
+      :any
+      (gethash object-side (topo-resource-side-agents)))))
+
+
+(define-problem-helper topo-resource-side-agents ()
+  "Cache the agents each recording layer admits, keyed by :LIVE and :GHOST.
+
+INIT-TYPE-INSTANCES conses a fresh list on every call, so classifying agents per task per
+node allocated a list the staged problem fixes once.  An unmapped agent appears in both
+lists, matching the permissive treatment TOPO-RESOURCE-ELIGIBLE-AGENTS gives an object the
+recorder never paired."
+  (unless *topo-resource-side-agents-built-p*
+    (let ((table (make-hash-table :test #'eq))
+          (sides (topo-resource-recording-sides))
+          (agents (topo-relaxed-type-instances 'agent)))
+      (dolist (side '(:live :ghost))
+        (setf (gethash side table)
+              (remove-if
+                (lambda (agent)
+                  (let ((agent-side (gethash agent sides)))
+                    (and agent-side (not (eq agent-side side)))))
+                agents)))
+      (setf *topo-resource-side-agents* table
+            *topo-resource-side-agents-built-p* t)))
+  *topo-resource-side-agents*)
+
+
+(define-problem-helper topo-resource-recording-sides ()
+  "Cache each mapped object's recording layer, keyed by object.
+
+RECORDING-COPY> is a static bijective relation derived during initialization, so a problem's
+live/ghost pairing is fixed once staging ends.  INSTALL-STATIC-RELATIONS stores a bijective
+relation only under its two index names, RECORDING-COPY>1 and RECORDING-COPY>2, both keeping
+the public argument order, so the relation's own name never appears in a decoded record and
+*BIJECTIVE-CANONICAL* is what maps an index back to it.  STAGE recreates *STATIC-IDB* and
+reloads this file, so the DEFPARAMETER above invalidates the cache exactly as
+*TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
+  (unless *topo-resource-recording-sides-built-p*
+    (let ((sides (make-hash-table :test #'eq)))
+      (dolist (record (topo-relaxed-static-propositions))
+        (when (eq (or (car (gethash (first record) *bijective-canonical*))
+                      (first record))
+                  'recording-copy>)
+          (setf (gethash (second record) sides) :live
+                (gethash (third record) sides) :ghost)))
+      (setf *topo-resource-recording-sides* sides
+            *topo-resource-recording-sides-built-p* t)))
+  *topo-resource-recording-sides*)
 
 
 (define-problem-helper topo-resource-location-tasks
@@ -597,6 +725,19 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
      (topo-resource-move-cost pickup finish routes)))
 
 
+(define-problem-helper topo-resource-agent-eligible-p (agent task)
+  "Whether AGENT may serve TASK under both the holder and recording-side restrictions.
+
+:ANY eligibility means no recording layer constrains the task, which is the whole answer for
+a problem without the recorder technology.  An empty list means the reverse: nothing may
+serve it, the search finds no candidate, and the abstention below returns zero."
+  (and (or (null (topo-resource-task.required-agent task))
+           (eq agent (topo-resource-task.required-agent task)))
+       (let ((eligible (topo-resource-task.eligible-agents task)))
+         (or (eq eligible :any)
+             (member agent eligible :test #'eq)))))
+
+
 (define-problem-helper topo-resource-routing-search
     (tasks agents positions routes memo)
   (when (null tasks)
@@ -613,9 +754,7 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
           (loop for agent in agents
                 for from in positions
                 for index from 0
-                do (when (or (null (topo-resource-task.required-agent task))
-                             (eq agent
-                                 (topo-resource-task.required-agent task)))
+                do (when (topo-resource-agent-eligible-p agent task)
                      (dolist (pickup
                               (topo-resource-task.pickup-locations task))
                        (dolist (finish
@@ -647,6 +786,191 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
         (make-hash-table :test #'equal)))))
 
 
+(define-problem-helper topo-resource-barrier-cost (tasks facts routes)
+  "Actions that must open a gate every route alternative for some task leg still requires.
+
+TOPO-RESOURCE-MOVE-COST reads only whether a leg has a route, never the gate prerequisites
+its family carries, so a leg whose every clause names a closed gate is charged one MOVE as
+though it were open.  This adds the actions that opening those gates forces.  They are
+disjoint from the other three components: they are neither MOVEs nor session actions, and the
+guards below exclude every placement the manipulation component already charges.  Within one
+task the union of its legs' forced controllers is summed, since distinct controllers take
+distinct actions; across tasks the maximum is taken, since two tasks are frequently blocked
+by the same gate."
+  (if (topo-resource-barrier-supported-p)
+    (let ((agents (topo-resource-located-agents facts))
+          (targets (mapcar #'topo-resource-task.target tasks)))
+      (loop for task in tasks
+            maximize (topo-resource-task-barrier-cost
+                       task facts routes agents targets tasks)))
+    0))
+
+
+(define-problem-helper topo-resource-barrier-supported-p ()
+  "Whether gate prerequisites may be charged at all for the staged problem.
+
+A jammer bypasses either polarity and a domain without the public gate update has unknown
+OPEN writers; TOPO-RELAXED-GATE-CONTROL-OPERATORS gives both an unconstrained one-action
+achiever, so no prerequisite is provably forced."
+  (and (null *happening-names*)
+       (null (topo-relaxed-type-instances 'jammer))
+       (topo-relaxed-update-installed-p 'update-gate-status!)))
+
+
+(define-problem-helper topo-resource-task-barrier-cost
+    (task facts routes agents targets tasks)
+  "Minimum forced-controller cost over TASK's agent, pickup and finish options.
+
+Each option costs the union of the gates its approach leg and its carry leg both force, so a
+gate blocking both is charged once.  An option served by no located eligible agent leaves the
+minimum empty, which is the same abstention the routing search makes."
+  (let ((best nil))
+    (dolist (entry agents)
+      (when (topo-resource-agent-eligible-p (car entry) task)
+        (dolist (pickup (topo-resource-task.pickup-locations task))
+          (dolist (finish (topo-resource-task.finish-locations task))
+            (let ((cost
+                    (topo-resource-controllers-cost
+                      (union
+                        (topo-resource-required-gates (cdr entry) pickup routes facts)
+                        (topo-resource-required-gates pickup finish routes facts)
+                        :test #'eq)
+                      facts targets tasks)))
+              (setf best (if best (min best cost) cost)))))))
+    (or best 0)))
+
+
+(define-problem-helper topo-resource-required-gates (from to routes facts)
+  "Closed gates every route alternative from FROM to TO still requires.
+
+An absent family is the routing abstention TOPO-RESOURCE-MOVE-COST already makes: a
+capability this partial model omits may supply the leg, so nothing is forced.  A family with
+one fully open clause is passable now.  Otherwise a gate present in every clause must be
+opened whichever clause the real route takes, while a gate some clause avoids must not be
+charged.  A NIL payload is one empty clause and is therefore always passable."
+  (let ((family (gethash (list from to) routes)))
+    (if (or (eq from to)
+            (null family)
+            (some (lambda (clause)
+                    (every (lambda (gate)
+                             (member (list 'open gate) facts :test #'equal))
+                           clause))
+                  family))
+      nil
+      (remove-if-not
+        (lambda (gate)
+          (and (not (member (list 'open gate) facts :test #'equal))
+               (every (lambda (clause) (member gate clause :test #'eq)) family)))
+        (reduce (lambda (left right) (union left right :test #'eq))
+                family :initial-value nil)))))
+
+
+(define-problem-helper topo-resource-controllers-cost
+    (gates facts targets tasks)
+  "Sum the cost of the controllers GATES force, counting each controller once.
+
+Distinct controllers take distinct actions -- two plates need two PUTs, a plate and a
+receiver need different actions entirely -- so the union sums without double counting."
+  (let ((controllers nil))
+    (dolist (gate gates)
+      (setf controllers
+            (union controllers
+                   (topo-resource-gate-controllers gate facts)
+                   :test #'eq)))
+    (loop for controller in controllers
+          sum (topo-resource-controller-cost controller facts targets tasks))))
+
+
+(define-problem-helper topo-resource-gate-controllers (gate facts)
+  "Unsatisfied controllers every control clause of the closed GATE needs, or NIL.
+
+An inverted gate needs a delete-aware controller model and a gate outside the public control
+technology has unknown achievers, so both are charged nothing.  Taking the controllers common
+to every clause is exact for the single-clause records that dominate, and stays admissible for
+a disjunction, where a controller some clause avoids is not forced."
+  (let ((record (topo-relaxed-controls-record gate)))
+    (if (or (null record)
+            (not (eq (fourth record) 'normal)))
+      nil
+      (let ((clauses (second record)))
+        (remove-if-not
+          (lambda (controller)
+            (and (not (member (topo-relaxed-controller-fact controller)
+                              facts :test #'equal))
+                 (every (lambda (clause) (member controller clause :test #'eq))
+                        clauses)))
+          (reduce (lambda (left right) (union left right :test #'eq))
+                  clauses :initial-value nil))))))
+
+
+(define-problem-helper topo-resource-controller-cost
+    (controller facts targets tasks)
+  (cond ((topo-relaxed-object-of-type-p controller 'receiver)
+         (topo-resource-receiver-cost controller facts tasks))
+        ((topo-relaxed-object-of-type-p controller 'pressure-plate)
+         (topo-resource-plate-cost controller facts targets))
+        (t 0)))
+
+
+(define-problem-helper topo-resource-receiver-cost (receiver facts tasks)
+  "One CONNECT to light RECEIVER, plus one PICKUP unless a connector is already held.
+
+No permissive structural beam path reaching the receiver means moving an occluder cannot
+create one, so under the standard relay provider at least one CONNECT-CONNECTOR is required.
+The abstentions match TOPO-CONTROL-BEAM-LINK-STATUS: an unmodelled provider, a problem with
+no connector, and a connector whose placement the manipulation component already charges each
+cost nothing.  The structural test is last because it is the only expensive one."
+  (if (or (not (member "beam-relay" *spliced-tech-names* :test #'string=))
+          (not (topo-relaxed-update-installed-p 'update-relay-status!))
+          (not (topo-relaxed-update-installed-p 'update-receiver-status!))
+          (null (topo-relaxed-type-instances 'connector))
+          (topo-resource-charged-type-p tasks 'connector)
+          (topo-beam-structurally-linked-p receiver facts))
+    0
+    (if (topo-resource-holding-type-p facts 'connector) 1 2)))
+
+
+(define-problem-helper topo-resource-plate-cost (plate facts targets)
+  "One PUT onto PLATE, plus one PICKUP unless some agent already holds cargo.
+
+The manipulation component charges each task one PUT that lands its object at the task
+target, so a plate standing anywhere else needs a different PUT.  The PICKUP preceding it is
+likewise followed by the plate PUT rather than by a goal PUT, so it too is distinct.  Where
+the plate does stand at a task target the two may coincide and nothing is charged.  A held
+object suppresses the pickup charge for every plate at once, which understates rather than
+risks the count."
+  (let ((position (topo-resource-object-position plate facts)))
+    (if (or (null position)
+            (member position targets :test #'eq))
+      0
+      (if (topo-resource-holding-type-p facts 'cargo) 1 2))))
+
+
+(define-problem-helper topo-resource-object-position (object facts)
+  (third
+    (find object facts
+          :key (lambda (fact)
+                 (when (eq (first fact) 'has-position)
+                   (second fact)))
+          :test #'eq)))
+
+
+(define-problem-helper topo-resource-holding-type-p (facts type)
+  "Whether any agent currently holds an object of TYPE."
+  (some (lambda (fact)
+          (and (eq (first fact) 'holding)
+               (topo-relaxed-object-of-type-p (third fact) type)))
+        facts))
+
+
+(define-problem-helper topo-resource-charged-type-p (tasks type)
+  "Whether the manipulation component already charges a placement of some object of TYPE."
+  (some (lambda (task)
+          (and (plusp (topo-resource-task.manipulation-cost task))
+               (topo-relaxed-object-of-type-p (topo-resource-task.object task) type)))
+        tasks))
+
+
 (define-problem-helper topo-resource-session-cost (goals facts)
   (if (and (member '(:ghost-stops-recorder) goals :test #'equal)
            (not (member '(:ghost-stops-recorder) facts :test #'equal)))
@@ -656,7 +980,7 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
 
 (define-problem-helper topo-finite-resource-bound-components-from-facts
     (state goal facts)
-  "Return manipulation, routing, and session costs plus their goals and tasks."
+  "Return manipulation, routing, barrier, and session costs plus their goals and tasks."
   (multiple-value-bind (locations reaches routes)
       (topo-resource-ensure-static-context)
     (let* ((goals (topo-relaxed-goal-facts state goal))
@@ -669,33 +993,37 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
                      :initial-value 0))
            (routing-cost
              (topo-resource-routing-cost tasks facts routes))
+           (barrier-cost
+             (topo-resource-barrier-cost tasks facts routes))
            (session-cost
              (topo-resource-session-cost goals facts)))
-      (values manipulation-cost routing-cost session-cost goals tasks))))
+      (values manipulation-cost routing-cost barrier-cost session-cost
+              goals tasks))))
 
 
 (define-problem-helper topo-finite-resource-bound-from-facts
     (state goal facts)
   (multiple-value-bind
-      (manipulation-cost routing-cost session-cost goals tasks)
+      (manipulation-cost routing-cost barrier-cost session-cost goals tasks)
       (topo-finite-resource-bound-components-from-facts state goal facts)
     (declare (ignore goals tasks))
-    (+ manipulation-cost routing-cost session-cost)))
+    (+ manipulation-cost routing-cost barrier-cost session-cost)))
 
 
 (define-problem-helper topo-finite-resource-bound-analysis-from-facts
     (state goal facts)
   "Return the component record corresponding exactly to the numeric resource bound."
   (multiple-value-bind
-      (manipulation-cost routing-cost session-cost goals tasks)
+      (manipulation-cost routing-cost barrier-cost session-cost goals tasks)
       (topo-finite-resource-bound-components-from-facts state goal facts)
     (make-topo-resource-bound-analysis
       :goals goals
       :tasks tasks
       :manipulation-cost manipulation-cost
       :routing-cost routing-cost
+      :barrier-cost barrier-cost
       :session-cost session-cost
-      :total (+ manipulation-cost routing-cost session-cost))))
+      :total (+ manipulation-cost routing-cost barrier-cost session-cost))))
 
 
 (define-problem-helper analyze-topo-finite-resource-bound (state goal)
@@ -711,16 +1039,19 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
   "Print the finite-resource components and retained cargo obligations."
   (let ((analysis (analyze-topo-finite-resource-bound state goal)))
     (format stream
-            "~&Finite-resource total = ~:D: manipulation ~:D, routing ~:D, session ~:D.~%"
+            "~&Finite-resource total = ~:D: manipulation ~:D, routing ~:D, barrier ~:D, ~
+             session ~:D.~%"
             (topo-resource-bound-analysis.total analysis)
             (topo-resource-bound-analysis.manipulation-cost analysis)
             (topo-resource-bound-analysis.routing-cost analysis)
+            (topo-resource-bound-analysis.barrier-cost analysis)
             (topo-resource-bound-analysis.session-cost analysis))
     (dolist (task (topo-resource-bound-analysis.tasks analysis))
       (format stream
-              "  ~S: agent ~S, pickup ~S, finish ~S, manipulation ~:D.~%"
+              "  ~S: agent ~S, eligible ~S, pickup ~S, finish ~S, manipulation ~:D.~%"
               (topo-resource-task.object task)
               (topo-resource-task.required-agent task)
+              (topo-resource-task.eligible-agents task)
               (topo-resource-task.pickup-locations task)
               (topo-resource-task.finish-locations task)
               (topo-resource-task.manipulation-cost task)))
@@ -942,10 +1273,10 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
 PAIRED is structurally undirected and COUPLED is directional, matching beam-relay's
 link semantics.  Ignoring hue, visibility, and blockers makes a positive answer deliberately
 permissive: geometry can then change receiver status without another link action."
-  (let* ((all-facts
-           (union facts (topo-relaxed-static-propositions) :test #'equal))
-         (paired (topo-beam-relation-facts 'paired all-facts))
-         (coupled (topo-beam-relation-facts 'coupled all-facts))
+  (let* ((paired (append (topo-beam-relation-facts 'paired facts)
+                         (topo-beam-static-links 'paired)))
+         (coupled (append (topo-beam-relation-facts 'coupled facts)
+                          (topo-beam-static-links 'coupled)))
          (frontier (copy-list transmitters))
          (visited nil))
     (loop while frontier
@@ -959,6 +1290,22 @@ permissive: geometry can then change receiver status without another link action
                  (unless (member neighbor visited :test #'eq)
                    (push neighbor frontier)))))
     nil))
+
+
+(define-problem-helper topo-beam-static-links (relation)
+  "Cache the authored PAIRED and COUPLED facts, which staging fixes for the whole search.
+
+TOPO-BEAM-STRUCTURALLY-LINKED-P previously unioned the complete static database into its
+fact list on every call, allocating a copy of it to find the handful of link records it
+reads.  Appending instead of unioning is equivalent here: a duplicate link cannot change
+which nodes the beam graph reaches."
+  (unless *topo-beam-static-links-built-p*
+    (let ((statics (topo-relaxed-static-propositions)))
+      (setf *topo-beam-static-links*
+              (list (cons 'paired (topo-beam-relation-facts 'paired statics))
+                    (cons 'coupled (topo-beam-relation-facts 'coupled statics)))
+            *topo-beam-static-links-built-p* t)))
+  (cdr (assoc relation *topo-beam-static-links* :test #'eq)))
 
 
 (define-problem-helper topo-beam-charged-connector-p
