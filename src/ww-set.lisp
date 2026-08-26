@@ -12,11 +12,9 @@
      (check-problem-parameter ',param ',val)  ;catch syntax errors before setting
      (case ',param
        ((*depth-cutoff* *progress-reporting-interval* *randomize-search*
-         *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
-         *donation-fraction* *enable-work-donation* *recorder-prefix-pruning*
-         *max-recorder-cycles* *novelty-pruning* *novelty-partition*)
+         *donation-fraction* *enable-work-donation* *max-recorder-cycles*)
           (setf ,param ',val)
           (unless *ww-loading*
             (save-globals)
@@ -29,8 +27,7 @@
          (unless *ww-loading*
            (save-globals)
             (display-current-parameters)))
-       ((*max-connector-pairings* *beam-occlusion-tolerance*
-         *boundary-wall-height* *vertical-reach-limit*)
+       (*max-connector-pairings*
          (setf ,param ',val)
          ;; A technology-specific problem setting should survive refresh, but not
          ;; leak into another problem through the persisted globals file.

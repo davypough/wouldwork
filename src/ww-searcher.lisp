@@ -52,9 +52,15 @@
 (defvar *min-steps-fallback-mode* :eager)
 (defvar *min-steps-fallback-nonpruning-streak* 0)
 (defvar *min-steps-fallback-sample-countdown* 0)
-(defvar *min-steps-fallback-evaluations* 0)
+;; INCREMENT-GLOBAL expands to SB-EXT:ATOMIC-INCF whenever *THREADS* is positive at
+;; macroexpansion time, and that place must be a DEFGLOBAL declaimed FIXNUM.  The two
+;; counters it touches are therefore globals; the rest stay ordinary specials because
+;; only the serial adaptive path (see MIN-STEPS-FALLBACK-ADAPTIVE-P) ever writes them.
+(sb-ext:defglobal *min-steps-fallback-evaluations* 0)
+(declaim (type fixnum *min-steps-fallback-evaluations*))
+(sb-ext:defglobal *min-steps-fallback-unique-prunes* 0)
+(declaim (type fixnum *min-steps-fallback-unique-prunes*))
 (defvar *min-steps-fallback-skipped* 0)
-(defvar *min-steps-fallback-unique-prunes* 0)
 (defvar *min-steps-fallback-reactivations* 0)
 
 
@@ -63,6 +69,14 @@
        (fboundp 'min-steps-remaining?)
        (zerop *threads*)
        (> *min-steps-fallback-sample-interval* 1)))
+
+
+(defun min-steps-pruning-relevant-p ()
+  "Whether a lower bound could reject a node under the current search limits."
+  (and *min-steps-pruning-enabled*
+       (or (> *depth-cutoff* 0)
+           (and *solution-paths*
+                (member *solution-type* '(min-length first))))))
 
 
 (defun initialize-min-steps-fallback-adaptation ()
@@ -97,10 +111,11 @@
 
 
 (defun note-min-steps-fallback-result (prunes-p)
-  (incf *min-steps-fallback-evaluations*)
+  (increment-global *min-steps-fallback-evaluations* 1)
+  (when prunes-p
+    (increment-global *min-steps-fallback-unique-prunes* 1))
   (cond
-    (prunes-p
-      (incf *min-steps-fallback-unique-prunes*)
+    ((and prunes-p (not (eq *min-steps-fallback-mode* :eager)))
       (when (eq *min-steps-fallback-mode* :sampling)
         (incf *min-steps-fallback-reactivations*))
       (reactivate-min-steps-fallback))
@@ -143,8 +158,10 @@
   (loop for entry in *min-steps-remaining-contributors*
         for function-name = (second entry)
         for bound = (valid-min-steps-remaining-bound function-name state)
+        do (increment-global *min-steps-contributor-evaluations* 1)
         when (min-steps-remaining-bound-prunes-p depth bound)
-          return t
+          do (increment-global *min-steps-contributor-prunes* 1)
+             (return t)
         finally (return nil)))
 
 
@@ -165,17 +182,17 @@
 
 (defun min-steps-remaining-prunes-node-p (state depth)
   "Run cheap bounds first and the aggregate query only when still necessary."
-  (or (registered-min-steps-contributor-prunes-p state depth)
-      (and (fboundp 'min-steps-remaining?)
-           (when (min-steps-fallback-evaluation-due-p)
-             (let ((prunes-p
-                     (min-steps-remaining-bound-prunes-p
-                       depth
-                       (valid-min-steps-remaining-bound
-                         'min-steps-remaining? state))))
-               (unless (eq *min-steps-fallback-mode* :eager)
-                 (note-min-steps-fallback-result prunes-p))
-               prunes-p)))))
+  (and (min-steps-pruning-relevant-p)
+       (or (registered-min-steps-contributor-prunes-p state depth)
+           (and (fboundp 'min-steps-remaining?)
+                (when (min-steps-fallback-evaluation-due-p)
+                  (let ((prunes-p
+                          (min-steps-remaining-bound-prunes-p
+                            depth
+                            (valid-min-steps-remaining-bound
+                              'min-steps-remaining? state))))
+                    (note-min-steps-fallback-result prunes-p)
+                    prunes-p))))))
 
 
 (defparameter *open* (hs::make-hstack)  ;initialized in dfs
@@ -421,7 +438,6 @@
     (setf *prior-total-states-processed* 0)
     (setf *prior-program-cycles* 0)
     (setf *last-improvement-states* 0)
-    (setf *bound-pruned* 0)
     (setf *accumulated-backtrack-distance* 0)
     (setf *num-backtracks* 0)
     (setf *prev-expansion-depth* 0)
@@ -446,10 +462,11 @@
     (initialize-search-progress-timing)
     (setf *inconsistent-states-dropped* 0)
     (setf *lower-bound-pruned* 0)
+    (setf *min-steps-contributor-evaluations* 0)
+    (setf *min-steps-contributor-prunes* 0)
     (initialize-min-steps-fallback-adaptation)
     (setf *search-prefix-pruned* 0)
     (setf *successor-policy-pruned* 0)
-    (reset-novelty-pruning)
     (setf *shutdown-requested* nil)
     (clrhash *prop-key-cache*)
     (let* ((start-goal-p (goal (node.state start-node)))
@@ -723,6 +740,13 @@
       (increment-global *depth-cutoff-hits* 1)
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
+    (when (and *solution-paths*
+               (member *solution-type* '(min-length min-time min-value max-value))
+               (node-descendants-cannot-improve-p current-node))
+      (narrate "Node pruned by incumbent bound"
+               (node.state current-node)
+               (node.depth current-node))
+      (return-from df-bnb1 nil))
     (when (and (min-steps-remaining-available-p)
                (min-steps-remaining-prunes-node-p
                  (node.state current-node)
@@ -837,7 +861,6 @@ when at least one path through its parent DAG remains viable."
           (next-iteration))
         (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
-            (increment-global *bound-pruned* 1)
             (next-iteration)))  ;throw out state if can't better best solution so far
         (when (goal succ-state)
           (let ((goal-node
@@ -863,8 +886,6 @@ when at least one path through its parent DAG remains viable."
                         succ-state succ-depth)))))
         (unless (boundp 'goal-fn)
           (process-min-max-value succ-state))
-        (when (novelty-pruned-p succ-state succ-depth)
-          (next-iteration))
         (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
           (when (on-current-path succ-state current-node)
             (increment-global *repeated-states*)
@@ -1208,6 +1229,30 @@ when at least one path through its parent DAG remains viable."
         (> (problem-state.value succ-state) (solution.value best-solution))))))
 
 
+(defun node-descendants-cannot-improve-p (current-node)
+  "Whether no descendant of CURRENT-NODE can improve on the incumbent solution.
+   Every descendant lies at least one action beyond CURRENT-NODE, so the depth- and
+   time-based objectives charge that action before comparing.  Value-based objectives
+   have no guaranteed per-action increment, so they test the node's own value -- the
+   same predicate PROCESS-SUCCESSORS already applied when this node was generated,
+   re-evaluated against a bound that may have improved while it sat on open.
+   Nodes on open are never themselves usable solutions: PROCESS-SUCCESSORS registers
+   a goal before installing anything, so only descendants are at stake here."
+  (declare (type node current-node))
+  (let ((best-solution (first *solution-paths*))
+        (state (node.state current-node)))
+    (case *solution-type*
+      (min-length
+        (>= (1+ (node.depth current-node)) (solution.depth best-solution)))
+      (min-time
+        (>= (+ (problem-state.time state) *min-action-duration*)
+            (solution.time best-solution)))
+      (min-value
+        (>= (problem-state.value state) (solution.value best-solution)))
+      (max-value
+        (<= (problem-state.value state) (solution.value best-solution))))))
+
+
 (defun update-open-if-succ-better (open-node succ-state)
   "Determines if f-value of successor is better than open state, and updates it."
   (let ((open-state (node.state open-node)))
@@ -1360,13 +1405,6 @@ when at least one path through its parent DAG remains viable."
     succ-node))
 
 
-(defun at-max-depth (succ-depth)
-  "Determines if installing a nongoal successor to the current node will be
-   pointless, based on it being at the max allowable depth."
-  (declare (type fixnum succ-depth))
-  (and (> *depth-cutoff* 0) (>= succ-depth *depth-cutoff*)))
-
-
 (defun best-states-last (state1 state2)
   "Used to sort a list of expanded states according to the user-defined heuristic."
   (declare (type problem-state state1 state2))
@@ -1507,12 +1545,17 @@ when at least one path through its parent DAG remains viable."
     (format t "~%~%Abandoned ~D inconsistent state~:P."
             *inconsistent-states-dropped*))
   (when (> *lower-bound-pruned* 0)
-    (format t "~2%min-steps-remaining? pruned ~:D node~:P, ~,1F% of total states."
+    (format t "~2%Minimum-steps lower bounds pruned ~:D node~:P, ~,1F% of total states."
             *lower-bound-pruned*
             (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
-  (when (> *min-steps-fallback-skipped* 0)
+  (when (> *min-steps-contributor-evaluations* 0)
     (format t
-            "~2%Adaptive aggregate bound: evaluated ~:D, skipped ~:D, uniquely pruned ~:D, reactivated ~:D time~:P."
+            "~2%Registered lower-bound contributors: evaluated ~:D, pruned ~:D."
+            *min-steps-contributor-evaluations*
+            *min-steps-contributor-prunes*))
+  (when (> *min-steps-fallback-evaluations* 0)
+    (format t
+            "~2%Aggregate lower-bound fallback: evaluated ~:D, skipped ~:D, uniquely pruned ~:D, reactivated ~:D time~:P."
             *min-steps-fallback-evaluations*
             *min-steps-fallback-skipped*
             *min-steps-fallback-unique-prunes*
@@ -1521,10 +1564,6 @@ when at least one path through its parent DAG remains viable."
     (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
             *search-prefix-pruned*
             (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
-  (when (> *novelty-pruned* 0)
-    (format t "~2%Novelty pruning discarded ~:D state~:P, ~,1F% of total states."
-            *novelty-pruned*
-            (* 100.0 (/ *novelty-pruned* *total-states-processed*))))
   (when (> *successor-policy-pruned* 0)
     (format t "~2%Successor policies pruned ~:D state~:P, ~,1F% of total states."
             *successor-policy-pruned*
@@ -1844,9 +1883,18 @@ when at least one path through its parent DAG remains viable."
                   (symmetry-pruning-percentage)
                   *symmetry-check-count*))))
     (when (> *lower-bound-pruned* 0)
-      (format t "~%min-steps-remaining? pruned = ~:D (~,1F% of total states)"
+      (format t "~%minimum-steps lower bounds pruned = ~:D (~,1F% of total states)"
               *lower-bound-pruned*
               (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
+    (when (> *min-steps-contributor-evaluations* 0)
+      (format t "~%registered lower-bound contributors: evaluated = ~:D, pruned = ~:D"
+              *min-steps-contributor-evaluations*
+              *min-steps-contributor-prunes*))
+    (when (> *min-steps-fallback-evaluations* 0)
+      (format t "~%aggregate lower-bound fallback: evaluated = ~:D, skipped = ~:D, uniquely pruned = ~:D"
+              *min-steps-fallback-evaluations*
+              *min-steps-fallback-skipped*
+              *min-steps-fallback-unique-prunes*))
     (when (> *search-prefix-pruned* 0)
       (format t "~%search-prefix validation pruned = ~:D (~,1F% of total states)"
               *search-prefix-pruned*
@@ -1869,11 +1917,6 @@ when at least one path through its parent DAG remains viable."
     ;; ===== Optimization =====
     (when (or *hybrid-goals* *solution-paths*)
       (format-best-solution-line (- *total-states-processed* *last-improvement-states*))
-      (when (and (member *solution-type* '(min-length min-time min-value max-value))
-                 (> *bound-pruned* 0))
-        (format t "~%bound-based pruning = ~:D (~,1F% of total states)"
-                *bound-pruned*
-                (* 100.0 (/ *bound-pruned* *total-states-processed*))))
       (when (and (member *solution-type* '(min-value max-value))
                  *solution-paths*
                  (< *upper-bound* 1000000))

@@ -86,10 +86,14 @@
 
 
 (define-test-helper relaxed-bound-short-circuit-test-p ()
-  (let ((saved-solution-paths *solution-paths*))
+  (let ((saved-solution-paths *solution-paths*)
+        (saved-contributor-evaluations *min-steps-contributor-evaluations*)
+        (saved-contributor-prunes *min-steps-contributor-prunes*))
     (unwind-protect
         (progn
-          (setf *solution-paths* nil)
+          (setf *solution-paths* nil
+                *min-steps-contributor-evaluations* 0
+                *min-steps-contributor-prunes* 0)
           (let ((*min-steps-remaining-contributors* nil)
                 (*depth-cutoff* 4)
                 (*min-steps-fallback-mode* :eager)
@@ -113,13 +117,24 @@
                       *relaxed-bound-test-expensive-calls* 0)
                 (min-steps-remaining-prunes-node-p *start-state* 1))
               (= *relaxed-bound-test-cheap-calls* 1)
-              (= *relaxed-bound-test-expensive-calls* 1))))
-      (setf *solution-paths* saved-solution-paths))))
+              (= *relaxed-bound-test-expensive-calls* 1)
+              (= *min-steps-contributor-evaluations* 3)
+              (= *min-steps-contributor-prunes* 2))))
+      (setf *solution-paths* saved-solution-paths
+            *min-steps-contributor-evaluations* saved-contributor-evaluations
+            *min-steps-contributor-prunes* saved-contributor-prunes))))
 
 
 (define-test-helper relaxed-bound-adaptive-fallback-test-p ()
+  ;; *MIN-STEPS-FALLBACK-EVALUATIONS* and *MIN-STEPS-FALLBACK-UNIQUE-PRUNES* are DEFGLOBAL
+  ;; (INCREMENT-GLOBAL's ATOMIC-INCF expansion requires that), so they have no dynamic
+  ;; binding and cannot be LET-bound -- save and restore them instead.
   (let ((saved-solution-paths *solution-paths*)
-        (original-fallback (symbol-function 'min-steps-remaining?)))
+        (saved-fallback-evaluations *min-steps-fallback-evaluations*)
+        (saved-fallback-unique-prunes *min-steps-fallback-unique-prunes*)
+        (original-fallback
+          (when (fboundp 'min-steps-remaining?)
+            (symbol-function 'min-steps-remaining?))))
     (unwind-protect
         (progn
           (setf *solution-paths* nil
@@ -133,9 +148,7 @@
                 (*min-steps-fallback-mode* :eager)
                 (*min-steps-fallback-nonpruning-streak* 0)
                 (*min-steps-fallback-sample-countdown* 0)
-                (*min-steps-fallback-evaluations* 0)
                 (*min-steps-fallback-skipped* 0)
-                (*min-steps-fallback-unique-prunes* 0)
                 (*min-steps-fallback-reactivations* 0)
                 (*relaxed-bound-test-cheap-value* 2)
                 (*relaxed-bound-test-fallback-value* 2)
@@ -166,12 +179,77 @@
               (= *min-steps-fallback-skipped* 4)
               (= *min-steps-fallback-unique-prunes* 2)
               (= *min-steps-fallback-reactivations* 1))))
-      (setf (symbol-function 'min-steps-remaining?) original-fallback
-            *solution-paths* saved-solution-paths))))
+      (if original-fallback
+        (setf (symbol-function 'min-steps-remaining?) original-fallback)
+        (fmakunbound 'min-steps-remaining?))
+      (setf *solution-paths* saved-solution-paths
+            *min-steps-fallback-evaluations* saved-fallback-evaluations
+            *min-steps-fallback-unique-prunes* saved-fallback-unique-prunes))))
+
+
+(define-test-helper relaxed-bound-pruning-relevance-test-p ()
+  (let ((saved-solution-paths *solution-paths*)
+        (saved-contributor-evaluations *min-steps-contributor-evaluations*)
+        (saved-contributor-prunes *min-steps-contributor-prunes*))
+    (unwind-protect
+        (progn
+          (setf *solution-paths* nil
+                *min-steps-contributor-evaluations* 0
+                *min-steps-contributor-prunes* 0)
+          (let ((*min-steps-remaining-contributors* nil)
+                (*solution-type* 'min-length)
+                (*relaxed-bound-test-cheap-value* 4)
+                (*relaxed-bound-test-cheap-calls* 0))
+            (register-min-steps-remaining-contributor
+              'relaxed-bound-test-cheap :priority 10)
+            (and
+              (let ((*depth-cutoff* 0)
+                    (*min-steps-pruning-enabled* t))
+                (not (min-steps-remaining-prunes-node-p *start-state* 1)))
+              (zerop *relaxed-bound-test-cheap-calls*)
+              (let ((*depth-cutoff* 4)
+                    (*min-steps-pruning-enabled* nil))
+                (not (min-steps-remaining-prunes-node-p *start-state* 1)))
+              (zerop *relaxed-bound-test-cheap-calls*)
+              (let ((*depth-cutoff* 4)
+                    (*min-steps-pruning-enabled* t))
+                (min-steps-remaining-prunes-node-p *start-state* 1))
+              (= *relaxed-bound-test-cheap-calls* 1)
+              (progn
+                (setf *solution-paths* (list (make-solution :depth 4)))
+                t)
+              (let ((*depth-cutoff* 0)
+                    (*min-steps-pruning-enabled* t))
+                (min-steps-remaining-prunes-node-p *start-state* 1))
+              (= *relaxed-bound-test-cheap-calls* 2)
+              (= *min-steps-contributor-evaluations* 2)
+              (= *min-steps-contributor-prunes* 2))))
+      (setf *solution-paths* saved-solution-paths
+            *min-steps-contributor-evaluations* saved-contributor-evaluations
+            *min-steps-contributor-prunes* saved-contributor-prunes))))
 
 
 (define-test-helper relaxed-bound-fallback-configuration-test-p ()
   (and
+    *min-steps-pruning-enabled*
+    (= *min-steps-fallback-warmup* 512)
+    (= *min-steps-fallback-sample-interval* 64)
+    (not (assoc '*min-steps-fallback-warmup* *problem-parameter-defaults*))
+    (not (assoc '*min-steps-fallback-sample-interval*
+                *problem-parameter-defaults*))
+    (not (assoc '*min-steps-pruning-enabled* *problem-parameter-defaults*))
+    (not (member '*min-steps-fallback-warmup*
+                 *persisted-problem-parameters*))
+    (not (member '*min-steps-fallback-sample-interval*
+                 *persisted-problem-parameters*))
+    (not (member '*min-steps-pruning-enabled*
+                 *persisted-problem-parameters*))
+    (let ((display
+            (with-output-to-string (*standard-output*)
+              (display-current-parameters))))
+      (and (null (search "MIN-STEPS-FALLBACK-WARMUP" display))
+           (null (search "MIN-STEPS-FALLBACK-SAMPLE-INTERVAL" display))
+           (null (search "MIN-STEPS-PRUNING-ENABLED" display))))
     (let ((*min-steps-remaining-contributors* '((10 some-bound)))
           (*min-steps-fallback-sample-interval* 64)
           (*threads* 1))
@@ -181,9 +259,21 @@
           (*threads* 0))
       (not (min-steps-fallback-adaptive-p)))
     (let ((legacy-params
-            (append (subseq *default-parameters* 0 15) '(nil t))))
+            (append (subseq *default-parameters* 0 14) '(t nil t))))
       (equal (migrate-retired-recorder-settings legacy-params)
-             *default-parameters*))))
+             *default-parameters*))
+    (equal
+      (normalize-persisted-problem-parameters
+        (append (subseq *default-parameters* 0 14) '(t 5 512 64)))
+      (append (subseq *default-parameters* 0 14) '(5)))
+    (equal
+      (normalize-persisted-problem-parameters
+        (append (subseq *default-parameters* 0 14) '(nil 3)))
+      (append (subseq *default-parameters* 0 14) '(3)))
+    (equal
+      (normalize-persisted-problem-parameters
+        (append (subseq *default-parameters* 0 14) '(t)))
+      *default-parameters*)))
 
 
 (define-test-helper relaxed-bound-search-progress-timing-test-p ()
@@ -930,8 +1020,10 @@
 (define-test-claim topo-finite-resource-contract
   (equal (mapcar #'second *min-steps-remaining-contributors*)
          '(topo-finite-resource-bound))
+  (not (fboundp 'min-steps-remaining?))
   (relaxed-bound-short-circuit-test-p)
   (relaxed-bound-adaptive-fallback-test-p)
+  (relaxed-bound-pruning-relevance-test-p)
   (relaxed-bound-fallback-configuration-test-p)
   (relaxed-bound-search-progress-timing-test-p)
   (= (relaxed-resource-test-routing-cost
@@ -950,7 +1042,7 @@
          '(4 3 2 1 0))
   (equal (relaxed-hmax-test-plan-bounds 'topo-lm-cut-resource-bound)
          '(4 3 2 1 0))
-  (equal (relaxed-hmax-test-plan-bounds 'min-steps-remaining?)
+  (equal (relaxed-hmax-test-plan-bounds 'min-steps-remaining-bound)
          '(4 3 2 1 0))
   (relaxed-resource-test-analysis-p)
   (relaxed-control-setup-analysis-p)
@@ -1063,7 +1155,7 @@
            (zerop (relaxed-hmax-operator.cost operator))))
     (relaxed-hmax-model.operators
       (relaxed-topo-test-model-for-goal '(open hmax-controlled-gate))))
-  (loop for bound in (relaxed-hmax-test-plan-bounds 'min-steps-remaining?)
+  (loop for bound in (relaxed-hmax-test-plan-bounds 'min-steps-remaining-bound)
         for exact-remaining from 4 downto 0
         always (<= bound exact-remaining)))
 

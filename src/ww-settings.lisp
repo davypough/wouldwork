@@ -5,6 +5,15 @@
 (in-package :ww)
 
 
+(declaim (special *recorder-prefix-pruning*
+                  *min-steps-fallback-warmup*
+                  *min-steps-fallback-sample-interval*))
+
+
+(defparameter *min-steps-pruning-enabled* t
+  "Technical switch for disabling all lower-bound pruning during comparative runs.")
+
+
 (defparameter *min-steps-remaining-contributors* nil
   "Cost-ordered admissible bounds tested before MIN-STEPS-REMAINING?.
 Each entry is (PRIORITY FUNCTION-NAME); lower priorities run first.  A contributor
@@ -55,28 +64,14 @@ MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specif
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *symmetry-pruning*)
-  (format t "~&  *NOVELTY-PRUNING* => ~A" *novelty-pruning*)
-  (when *novelty-pruning*
-    (format t "~&  *NOVELTY-PARTITION* => ~A" *novelty-partition*))
   (when *happening-names*
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
              (gethash 'recorder *types*))
-    (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*)
     (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*))
   (when (and (member "beam-relay" *spliced-tech-names* :test #'string=)
              (gethash 'connector *types*))
     (format t "~&  *MAX-CONNECTOR-PAIRINGS* => ~D" *max-connector-pairings*))
-  (when (and (member "-beam-los-coordinates" *spliced-tech-names* :test #'string=)
-             (gethash 'location *types*))
-    (format t "~&  *BEAM-OCCLUSION-TOLERANCE* => ~A" *beam-occlusion-tolerance*))
-  (when (and (member "visibility" *spliced-tech-names* :test #'string=)
-             (gethash '(boundary-wall) *static-db*))
-    (format t "~&  *BOUNDARY-WALL-HEIGHT* => ~A" *boundary-wall-height*))
-  (when (and (member "-support-elevation" *spliced-tech-names* :test #'string=)
-             (funcall (symbol-function 'vertical-reach-limit-relevant-p)
-                      *start-state*))
-    (format t "~&  *VERTICAL-REACH-LIMIT* => ~A" *vertical-reach-limit*))
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
@@ -84,12 +79,6 @@ MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specif
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
   (format t "~&  MIN STEPS REMAINING? => ~A"
           (when (min-steps-remaining-available-p) 'YES))
-  (when (and *min-steps-remaining-contributors*
-             (fboundp 'min-steps-remaining?))
-    (format t "~&  *MIN-STEPS-FALLBACK-WARMUP* => ~:D"
-            *min-steps-fallback-warmup*)
-    (format t "~&  *MIN-STEPS-FALLBACK-SAMPLE-INTERVAL* => ~:D"
-            *min-steps-fallback-sample-interval*))
   (when (> *threads* 0)
     (format t "~&~%  For parallel settings: (display-parallel-parameters)"))
   (terpri) (terpri))
@@ -160,11 +149,6 @@ MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specif
    (or hybrid-goal deferral). Used by the progress printout to measure
    'states since last improvement' for plateau detection.")
 (declaim (type fixnum *last-improvement-states*))
-
-(sb-ext:defglobal *bound-pruned* 0
-  "Count of successor states dropped because their f-value could not improve
-   the best solution found so far (the f-value-better check in process-successors).")
-(declaim (type fixnum *bound-pruned*))
 
 (sb-ext:defglobal *accumulated-backtrack-distance* 0
   "Sums the depth-drop of every backtrack event during search. Each time
@@ -527,13 +511,6 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *progress-reporting-interval* 100000
   "Print progress during search after each multiple n of states examined.")
 
-(defvar *min-steps-fallback-warmup* 512
-  "Consecutive nonpruning aggregate lower-bound evaluations before sampling begins.")
-
-(defvar *min-steps-fallback-sample-interval* 64
-  "Admitted nodes between aggregate lower-bound samples after an unproductive warmup.
-One preserves eager evaluation; values above one enable adaptive sampling.")
-
 (defvar *randomize-search* nil  ;
   "Set to t or nil.")
 
@@ -554,35 +531,11 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry families and prune symmetric actions or states.")
 
-(defvar *recorder-prefix-pruning* nil
-  "When T, recorder technology prunes paths whose recording prefix cannot replay.")
-
-(defvar *novelty-pruning* nil
-  "Width of the novelty test applied to generated states: NIL disables it, 1 keeps only
-   states asserting an atom no earlier state asserted, 2 keeps those plus states asserting
-   a new pair of atoms.  Incomplete by construction -- see NOVELTY-PRUNED-P.")
-
-(defvar *novelty-partition* nil
-  "How generated states are grouped before the novelty test compares them: NIL puts every
-   state in one partition, DEPTH partitions by search depth, and QUERY partitions by the
-   value of a problem-defined NOVELTY-PARTITION? query.  A partition that advances with
-   real progress keeps a must-undo plan alive that one global partition would discard.")
-
 (defvar *max-recorder-cycles* 1
   "Maximum number of START-RECORDER actions permitted in one search path.")
 
 (defvar *max-connector-pairings* nil
   "Maximum PAIRED termini per connector, or NIL until beam-relay supplies its default.")
-
-(defvar *beam-occlusion-tolerance* 1/2
-  "Maximum perpendicular distance a location may sit off a beam's exact line and still
-   count as a candidate occluder there.")
-
-(defvar *boundary-wall-height* 6
-  "The boundary polygon's height for sightline crossing tests. Its base is 0.")
-
-(defvar *vertical-reach-limit* 1
-  "Maximum elevation gap an agent can act across vertically, independent of height.")
 
 (defvar *split-depth-max* 20
   "Safety cap on serial task-generation depth.")
@@ -623,24 +576,16 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
     (*problem-type* . planning)
     (*solution-type* . first)
     (*progress-reporting-interval* . 100000)
-    (*min-steps-fallback-warmup* . 512)
-    (*min-steps-fallback-sample-interval* . 64)
     (*randomize-search*)
     (*branch* . -1)
     (*probe*)
     (*symmetry-pruning*)
-    (*novelty-pruning*)
-    (*novelty-partition*)
     (*debug* . 0)
     (*goal*)
     (*threads* . 0)
-    (*recorder-prefix-pruning*)
     (*max-recorder-cycles* . 1)
     (*auto-wait*)
     (*max-connector-pairings*)
-    (*beam-occlusion-tolerance* . 1/2)
-    (*boundary-wall-height* . 6)
-    (*vertical-reach-limit* . 1)
     (*split-depth-max* . 20)
     (*tasks-per-thread* . 8)
     (*min-tasks* . 256)
@@ -657,8 +602,7 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
   '(*problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
     *solution-type* *progress-reporting-interval* *randomize-search* *branch*
     *probe* *symmetry-pruning* *debug* *goal* *threads*
-    *recorder-prefix-pruning* *max-recorder-cycles*
-    *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*)
+    *max-recorder-cycles*)
   "Problem parameters saved in VALS.LISP, in positional file order.")
 
 
@@ -915,17 +859,23 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
 
 
 (sb-ext:defglobal *lower-bound-pruned* 0
-  "Count of nodes pruned by user-defined min-steps-remaining? function.")
+  "Count of nodes pruned by any min-steps-remaining lower bound.")
 (declaim (type fixnum *lower-bound-pruned*))
+
+
+(sb-ext:defglobal *min-steps-contributor-evaluations* 0
+  "Count of registered lower-bound contributor evaluations.")
+(declaim (type fixnum *min-steps-contributor-evaluations*))
+
+
+(sb-ext:defglobal *min-steps-contributor-prunes* 0
+  "Count of nodes pruned by registered lower-bound contributors.")
+(declaim (type fixnum *min-steps-contributor-prunes*))
+
 
 (sb-ext:defglobal *search-prefix-pruned* 0
   "Count of successor states rejected by enabled search-prefix validators.")
 (declaim (type fixnum *search-prefix-pruned*))
-
-
-(sb-ext:defglobal *novelty-pruned* 0
-  "Count of successor states discarded by the novelty test.")
-(declaim (type fixnum *novelty-pruned*))
 
 
 (sb-ext:defglobal *successor-policy-pruned* 0

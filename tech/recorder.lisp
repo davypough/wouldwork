@@ -46,7 +46,7 @@
 ;;;                                  so its own list position is a readability choice, not
 ;;;                                  a load-order requirement
 ;;;   -recorder-cycle-boundary     : closed-cycle goal and fresh-shadow preparation
-;;;   -recorder-cycle-chaining     : one-cycle solve, commit, final solve, and undo history
+;;;   -recorder-cycle-chaining     : sequential checkpoints, cumulative replay, final report
 ;;;   -recorder-init-checks        : mapping, isolation, and supported-scope validation
 ;;;
 ;;; The supported behavior remains unchanged: plates, direct/relay-fed receivers, gates,
@@ -54,6 +54,13 @@
 ;;; beam crossings, floor and angled blowers, threats, receiver-controlled wall gears,
 ;;; movable wall-fan copies, and any other explicitly unsupported combination rather than
 ;;; approximating it at runtime.
+
+(in-package :ww)
+
+
+(defparameter *recorder-prefix-pruning* nil
+  "Whether diagnostic search pruning rejects unplayable open recording prefixes.")
+
 
 (include-tech -recorder-core)
 (include-tech -recorder-controls-shadow)
@@ -65,9 +72,6 @@
 (include-tech -recorder-cycle-boundary)
 (include-tech -recorder-cycle-chaining)
 (include-tech -recorder-init-checks)
-
-(in-package :ww)
-
 
 ;; These registries are reset before every stage.  Keeping installation at the end of the
 ;; public assembly scopes the complete recorder policy to problems that include RECORDER and

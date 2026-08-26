@@ -1,20 +1,21 @@
-;;; Cycle-specific lower-bound supplement for the rumin-topo subgoal chain.  This assumes
-;;; TOPO-LOWER-BOUND is included and is pasted into probs/problem-rumin-topo.lisp immediately
-;;; before the ";;;; GOAL ;;;;" heading.
+;;; Cycle-specific lower-bound supplement for explicit rumin-topo subgoal experiments.
+;;; Temporarily add (include-tech topo-lower-bound) to the problem, then paste this section
+;;; immediately before its ";;;; GOAL ;;;;" heading.  TOPO-LOWER-BOUND independently
+;;; registers the inexpensive finite-resource contributor; this file adds only the
+;;; chunk-specific aggregate fallback.
 ;;;
 ;;; The cycles 3/4 branch (chunk 4) is VERIFIED: admissible at every depth of the known
 ;;; 10-action plan, and it cuts that search from 2.2M states unsolved to 6,472 states / 3 s.
 ;;; The cycles 2/3 branch (chunk 3) is admissible but too weak to pay off yet -- it counts
 ;;; 6 of the true 15 and leaves pruning until depth 9.  See rumin-topo-lower-bound.md.
+;;; Do not install this as a standing Rumin bound: it has rejected a valid suffix when used
+;;; at a recorder boundary outside those chunk-specific admissibility arguments.
 
 ;;;; LOWER BOUND ;;;;
 
-;; Cycle-specific supplement to the general LM-cut/finite-resource bound.  TOPO-LOWER-BOUND
-;; registers the cheaper finite-resource term as a search precheck, so this complete
-;; aggregate runs only when that term cannot already prune.  The cycle term dispatches on
-;; RECORDER-CYCLE-COUNT and returns 0 at boundaries it does not cover.  Each component counts
-;; actions of a disjoint kind (manipulation of one object / session / agent movement), so the
-;; components sum validly within the documented chunks.
+;; The cycle term dispatches on RECORDER-CYCLE-COUNT and returns 0 at boundaries it does not
+;; cover.  Each component counts actions of a disjoint kind (manipulation of one object /
+;; session / agent movement), so the components sum validly within the documented chunks.
 
 (define-query rt-some-agent-holds-connector ()
   (exists (?a agent)
@@ -85,5 +86,4 @@
           0))))
 
 (define-query min-steps-remaining? ()
-  (max (topo-lm-cut-resource-bound)
-       (rt-cycle-min-steps-remaining?)))
+  (rt-cycle-min-steps-remaining?))

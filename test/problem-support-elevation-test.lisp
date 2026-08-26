@@ -231,14 +231,22 @@
 
 
 (define-test-claim vertical-reach-parameter-relevant-to-raised-supports
+  (= *vertical-reach-limit* 1)
+  (not (assoc '*vertical-reach-limit* *problem-parameter-defaults*))
+  (not (member '*vertical-reach-limit* *persisted-problem-parameters*))
+  (expect-condition
+    (lambda ()
+      (check-problem-parameter '*vertical-reach-limit* 1))
+    'error
+    :containing "not a valid parameter name")
   (vertical-reach-limit-relevant-p *start-state*)
   (vertical-reach-box-support-values
     *start-state* '(0) (gethash 'cargo *types*))
   (vertical-reach-held-tray-values
     *start-state* '(0) (gethash 'agent *types*) (gethash 'cargo *types*))
-  (search "*VERTICAL-REACH-LIMIT*"
-          (with-output-to-string (*standard-output*)
-            (display-current-parameters))))
+  (not (search "*VERTICAL-REACH-LIMIT*"
+               (with-output-to-string (*standard-output*)
+                 (display-current-parameters)))))
 
 
 (define-goal

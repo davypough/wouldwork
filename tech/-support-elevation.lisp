@@ -23,17 +23,20 @@
 ;;;               can act across vertically: lifting cargo above or below its own elevation,
 ;;;               raising cargo onto a higher resting place, or jumping up onto a higher
 ;;;               support or clearing a barrier (jump.lisp reuses this parameter rather than
-;;;               defining its own).  Independent of the agent's own declared height.  It is
-;;;               managed in ww-settings.lisp and a problem overrides it with WW-SET.
+;;;               defining its own).  Independent of the agent's own declared height.  A
+;;;               problem may override it with DEFPARAMETER after including its parent tech.
 ;;;   queries   : within-agent-vertical-reach (symmetric, for lifting),
 ;;;               within-agent-placement-reach (one-sided, for setting down)
-;;;   function  : vertical-reach-limit-relevant-p -- conservative staged-model guard for
-;;;               displaying the parameter only when manipulation or jumping has a
-;;;               structurally possible nonzero vertical comparison
+;;;   function  : vertical-reach-limit-relevant-p -- conservative diagnostic for whether
+;;;               manipulation or jumping has a structurally possible nonzero comparison
 
 (include-tech -vertical)
 
 (in-package :ww)
+
+
+(defparameter *vertical-reach-limit* 1
+  "Maximum elevation gap across which an agent may manipulate, land, or clear a barrier.")
 
 
 (define-optional-types box fan tray)
@@ -234,6 +237,6 @@
 (define-problem-helper vertical-reach-limit-relevant-p (state)
   "True when the staged model gives the limit a structurally possible nonzero comparison.
    This deliberately over-approximates reachability; deciding whether such a state is actually
-   reachable would require planning and does not belong in parameter display."
+   reachable would require planning."
   (or (vertical-reach-manipulation-relevant-p state)
       (vertical-reach-jumping-relevant-p state)))

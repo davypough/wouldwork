@@ -92,6 +92,29 @@
 (include-tech walkability)   ;walking mode; mobility-results; traversable; move
 
 
+(define-test-claim beam-occlusion-tolerance-default-contract
+  (= *beam-occlusion-tolerance* 1/2)
+  (= *boundary-wall-height* 6)
+  (not (assoc '*beam-occlusion-tolerance* *problem-parameter-defaults*))
+  (not (assoc '*boundary-wall-height* *problem-parameter-defaults*))
+  (not (member '*beam-occlusion-tolerance* *persisted-problem-parameters*))
+  (not (member '*boundary-wall-height* *persisted-problem-parameters*))
+  (expect-condition
+    (lambda ()
+      (check-problem-parameter '*beam-occlusion-tolerance* 1/2))
+    'error
+    :containing "not a valid parameter name")
+  (expect-condition
+    (lambda ()
+      (check-problem-parameter '*boundary-wall-height* 6))
+    'error
+    :containing "not a valid parameter name")
+  (let ((display (with-output-to-string (*standard-output*)
+                   (display-current-parameters))))
+    (and (null (search "*BEAM-OCCLUSION-TOLERANCE* =>" display))
+         (null (search "*BOUNDARY-WALL-HEIGHT* =>" display)))))
+
+
 ;;;; INITIALIZATION ;;;;
 
 

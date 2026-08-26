@@ -1,9 +1,9 @@
 ;;;; Filename: problem-vertical-reach-relevance-flat-test.lisp
 
-;;; Parameter-display characterization for a flat cargo model.  Pickup and placement
+;;; Technology-override characterization for a flat cargo model.  Pickup and placement
 ;;; splice -support-elevation and genuinely call its reach queries, but every location,
-;;; agent base, cargo base, and usable support top is zero.  Since the managed limit is
-;;; non-negative, no setting can change any vertical comparison in this model.
+;;; agent base, cargo base, and usable support top is zero.  Explicit reach probes distinguish
+;;; the overridden limit without changing the model's zero-action goal.
 
 (in-package :ww)
 
@@ -26,6 +26,8 @@
 (include-tech -pickup)
 (include-tech -placement)
 
+(defparameter *vertical-reach-limit* 3/2)
+
 
 (define-init
   (has-location flat-agent flat-origin)
@@ -36,6 +38,7 @@
 
 
 (define-test-claim vertical-reach-parameter-hidden-for-flat-manipulation
+  (= *vertical-reach-limit* 3/2)
   (not (vertical-reach-limit-relevant-p *start-state*))
   (not (search "*VERTICAL-REACH-LIMIT*"
                (with-output-to-string (*standard-output*)
@@ -43,4 +46,5 @@
 
 
 (define-goal
-  (always-true))
+  (and (within-agent-vertical-reach flat-agent 3/2)
+       (not (within-agent-vertical-reach flat-agent 2))))

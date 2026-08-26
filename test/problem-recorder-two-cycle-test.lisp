@@ -10,8 +10,9 @@
 ;;; gate.  A single integrated window cannot validate the same actions: isolated recording
 ;;; replay omits the live press and therefore sees the original closed recording gate.
 ;;; With a maximum of one cycle there is no solution through depth seven; with two, one
-;;; ordinary SOLVE finds the unique seven-action path.  Guided cycle lengths are four and
-;;; three actions.  The
+;;; ordinary SOLVE finds the unique seven-action path.  Recorder-aware subgoaling instead
+;;; checkpoints the open first cycle after three actions, then transparently closes it and
+;;; enters the second cycle while pursuing the final goal.  The
 ;;; ordinary Talos harness goal is deliberately zero-action: the characterization claim
 ;;; installs the non-flattenable final goal while it exercises the chained solver, then
 ;;; restores the harness goal before TEST-TALOS performs its required ordinary search.
@@ -113,82 +114,26 @@
           :test #'equal))
 
 
-(define-test-helper recorder-two-cycle-first-record-p ()
-  (let* ((record (first *recorder-cycle-history*))
-         (boundary (and record (recorder-cycle-record.boundary-state record)))
-         (report (and record (recorder-cycle-record.report record))))
-    (and record
-         (equal (recorder-cycle-record.subgoal record) '(open cycle-gate))
-         (= (recorder-cycle-record.depth record) 4)
-         (= (recorder-cycle-record.elapsed-time record) 4)
-         (= (recorder-cycle-record.cumulative-depth record) 4)
-         (= (recorder-cycle-record.cumulative-time record) 4)
-         (recorder-two-cycle-fact-p boundary '(latched cycle-plate))
-         (recorder-two-cycle-fact-p boundary '(open cycle-gate))
-         (recorder-two-cycle-fact-p boundary '(recording-latched cycle-plate))
-         (recorder-two-cycle-fact-p boundary '(recording-open cycle-gate))
-         (not (recorder-two-cycle-fact-p boundary '(playback-latch-primed)))
-         (not (recorder-state-contains-ghost-reference-p boundary))
-         (equal (getf report :integrated)
-                '((1.0 (start-recorder live-agent))
-                  (2.0 (prime-playback-latch ghost-agent))
-                  (3.0 (latch-playback-gate live-agent))
-                  (4.0 (stop-recorder ghost-agent))))
-         (equal (getf report :recording)
-                '((1.0 (start-recorder live-agent))
-                  (2.0 (prime-playback-latch ghost-agent))
-                  (pause)
-                  (4.0 (stop-recorder ghost-agent))))
-         (equal (getf report :playback)
-                '((2.0 (prime-playback-latch ghost-agent))
-                  (pause)
-                  (3.0 (latch-playback-gate live-agent)))))))
-
-
-(define-test-helper recorder-two-cycle-prepared-baseline-p ()
+(define-test-helper recorder-two-cycle-open-checkpoint-p ()
   ;; ON is bijective, so the database stores its ON1/ON2 index pair rather than a plain
   ;; (ON ...) tuple; check ON1 (keyed by the occupant) directly.
   (and (recorder-two-cycle-fact-p *start-state* '(on1 live-agent cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(depressed cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(latched cycle-plate))
        (recorder-two-cycle-fact-p *start-state* '(open cycle-gate))
-       (recorder-two-cycle-fact-p
-         *start-state* '(recording-depressed cycle-plate))
-       (recorder-two-cycle-fact-p
-         *start-state* '(recording-latched cycle-plate))
-       (recorder-two-cycle-fact-p *start-state* '(recording-open cycle-gate))
+       (recorder-two-cycle-fact-p *start-state* '(recording-in-progress))
+       (not (recorder-two-cycle-fact-p
+              *start-state* '(recording-latched cycle-plate)))
+       (not (recorder-two-cycle-fact-p
+              *start-state* '(recording-open cycle-gate)))
        (recorder-two-cycle-fact-p
          *start-state* '(current-cycle-status cycle-pending))))
 
 
-(define-test-helper recorder-two-cycle-final-record-p ()
-  (let* ((record (second *recorder-cycle-history*))
-         (boundary (and record (recorder-cycle-record.boundary-state record)))
-         (report (and record (recorder-cycle-record.report record))))
-    (and record
-         (equal (recorder-cycle-record.subgoal record)
-                '(current-cycle-status cycle-complete))
-         (= (recorder-cycle-record.depth record) 3)
-         (= (recorder-cycle-record.elapsed-time record) 3)
-         (= (recorder-cycle-record.cumulative-depth record) 7)
-         (= (recorder-cycle-record.cumulative-time record) 7)
-         (recorder-two-cycle-fact-p boundary '(latched cycle-plate))
-         (recorder-two-cycle-fact-p boundary '(recording-latched cycle-plate))
-         (recorder-two-cycle-fact-p boundary '(open cycle-gate))
-         (recorder-two-cycle-fact-p boundary '(recording-open cycle-gate))
-         (recorder-two-cycle-fact-p
-           boundary '(current-cycle-status cycle-complete))
-         (not (recorder-state-contains-ghost-reference-p boundary))
-         (equal (getf report :integrated)
-                '((5.0 (start-recorder live-agent))
-                  (6.0 (use-recording-gate ghost-agent))
-                  (7.0 (stop-recorder ghost-agent))))
-         (equal (getf report :recording)
-                '((5.0 (start-recorder live-agent))
-                  (6.0 (use-recording-gate ghost-agent))
-                  (7.0 (stop-recorder ghost-agent))))
-         (equal (getf report :playback)
-                '((6.0 (use-recording-gate ghost-agent)))))))
+(define-test-helper recorder-two-cycle-checkpoint-chain-length ()
+  (if *recorder-subgoal-chain*
+    (length (recorder-subgoal-chain.segments *recorder-subgoal-chain*))
+    0))
 
 
 (define-test-helper recorder-two-cycle-native-path ()
@@ -278,7 +223,7 @@
         (solve)
         (setf result
               (and maximum-one-rejected-p
-                   (null *recorder-cycle-history*)
+                   (null *recorder-subgoal-chain*)
                    *solutions-valid*
                    (recorder-two-cycle-native-solution-p
                      (first *solution-paths*)))))
@@ -291,7 +236,44 @@
     result))
 
 
-(define-test-claim recorder-two-cycle-commit-recover-and-undo
+(define-test-helper recorder-two-cycle-checkpoint-solution-p ()
+  (let* ((solution (first *solution-paths*))
+         (origin
+           (and *recorder-subgoal-chain*
+                (recorder-subgoal-chain.origin-state *recorder-subgoal-chain*)))
+         (path (and solution (solution.path solution)))
+         (report
+           (and solution origin
+                (let ((*start-state* origin))
+                  (build-recorder-report solution))))
+         (cycles (and report (getf report :cycles))))
+    (and solution
+         (= (solution.depth solution) 6)
+         (equal (subseq path 0 3)
+                '((1.0 (start-recorder live-agent))
+                  (2.0 (prime-playback-latch ghost-agent))
+                  (3.0 (latch-playback-gate live-agent))))
+         (member (fourth path)
+                 '((4.0 (stop-recorder ghost-agent))
+                   (4.0 (cancel-playback live-agent)))
+                 :test #'equal)
+         (equal (subseq path 4)
+                '((5.0 (start-recorder live-agent))
+                  (6.0 (use-recording-gate ghost-agent))))
+         (= (getf report :cycle-count) 2)
+         (equal (mapcar (lambda (cycle) (getf cycle :closure)) cycles)
+                (if (recorder-cycle-cancellation-p (fourth path))
+                  '(:cancelled :synthesized)
+                  '(:explicit :synthesized)))
+         (equal (mapcar (lambda (cycle) (getf cycle :depth)) cycles)
+                '(4 2))
+         (recorder-two-cycle-fact-p
+           (solution.goal solution) '(current-cycle-status cycle-complete))
+         (recorder-two-cycle-fact-p
+           (solution.goal solution) '(recording-in-progress)))))
+
+
+(define-test-claim recorder-two-cycle-checkpoint-recover-and-undo
   (let ((initial-database (list-database (problem-state.idb *start-state*)))
         (harness-goal (copy-tree *goal*))
         (result nil))
@@ -301,43 +283,47 @@
           (solve-subgoal (open cycle-gate))
           (setf result
             (and
-              (= (length *recorder-cycle-history*) 1)
-              (recorder-two-cycle-first-record-p)
-              (recorder-two-cycle-prepared-baseline-p)
+              (= (recorder-two-cycle-checkpoint-chain-length) 1)
+              (let ((segment
+                      (first
+                        (recorder-subgoal-chain.segments
+                          *recorder-subgoal-chain*))))
+                (and (equal (recorder-subgoal-segment.goal segment)
+                            '(open cycle-gate))
+                     (= (solution.depth
+                          (recorder-subgoal-segment.solution segment)) 3)
+                     (= (recorder-subgoal-segment.cumulative-depth segment) 3)
+                     (recorder-subgoal-segment.recording-open-p segment)))
+              (recorder-two-cycle-open-checkpoint-p)
               (null *solution-paths*)
               (not *solutions-valid*)
 
-              ;; A failed second cycle leaves both the committed history boundary and its
-              ;; freshly seeded next-cycle baseline available.  Undo removes only the
-              ;; failed attempt.
+              ;; A failed continuation leaves the accepted open-cycle checkpoint available.
               (progn
                 (solve-subgoal (current-cycle-status cycle-unreachable))
                 t)
-              (= (length *recorder-cycle-history*) 1)
-              (recorder-two-cycle-first-record-p)
-              (recorder-two-cycle-prepared-baseline-p)
+              (= (recorder-two-cycle-checkpoint-chain-length) 1)
+              (recorder-two-cycle-open-checkpoint-p)
               (ww-undo)
-              (= (length *recorder-cycle-history*) 1)
-              (recorder-two-cycle-first-record-p)
-              (recorder-two-cycle-prepared-baseline-p)
+              (= (recorder-two-cycle-checkpoint-chain-length) 1)
+              (recorder-two-cycle-open-checkpoint-p)
 
+              ;; The final search discovers the remaining first-cycle ending and enters
+              ;; cycle 2 without a user-authored cycle boundary subgoal.
               (progn (solve) t)
-              (= (length *recorder-cycle-history*) 2)
-              (recorder-two-cycle-first-record-p)
-              (recorder-two-cycle-final-record-p)
+              (= (recorder-two-cycle-checkpoint-chain-length) 2)
               *solutions-valid*
-              (= (solution.depth (select-continuation-solution)) 3)
+              (= (solution.depth (select-continuation-solution)) 6)
               (equal *goal* '(current-cycle-status cycle-complete))
+              (recorder-two-cycle-checkpoint-solution-p)
 
-              ;; Undo the final cycle back to the reseeded boundary, then undo cycle 1
-              ;; back to the original closed gate and unlatched recording shadow.
+              ;; Undo restores the open first-cycle checkpoint, then the original state.
               (ww-undo)
-              (= (length *recorder-cycle-history*) 1)
-              (recorder-two-cycle-first-record-p)
-              (recorder-two-cycle-prepared-baseline-p)
+              (= (recorder-two-cycle-checkpoint-chain-length) 1)
+              (recorder-two-cycle-open-checkpoint-p)
               (not *solutions-valid*)
               (ww-undo)
-              (null *recorder-cycle-history*)
+              (null *recorder-subgoal-chain*)
               (null *final-goal*)
               (null *undo-stack*)
               (equal initial-database

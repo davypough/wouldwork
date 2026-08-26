@@ -253,9 +253,9 @@
 (define-test-claim vertical-reach-parameter-relevant-to-gears
   (vertical-reach-gears-values *start-state*)
   (vertical-reach-limit-relevant-p *start-state*)
-  (search "*VERTICAL-REACH-LIMIT*"
-          (with-output-to-string (*standard-output*)
-            (display-current-parameters))))
+  (not (search "*VERTICAL-REACH-LIMIT*"
+               (with-output-to-string (*standard-output*)
+                 (display-current-parameters)))))
 
 
 (define-query gears-fan-scenarios-valid ()

@@ -101,6 +101,13 @@
                          (return-from process-succ))))
                     ;; A rejected nominal goal remains eligible for task generation.
                     )
+                  ;; Best-state tracking for goalless problems.  Task generation
+                  ;; consumes the whole search space when the tree is smaller than
+                  ;; the task target, so omitting this loses every value a
+                  ;; MIN-VALUE/MAX-VALUE problem produces.  Same call, same place,
+                  ;; as PROCESS-SUCCESSORS and WORKER-PROCESS-SUCCESSORS-PHASE1.
+                  (unless (boundp 'goal-fn)
+                    (process-min-max-value succ-state))
                   
                   ;; Tree search: check for cycle on current path
                   (when (eql *tree-or-graph* 'tree)
@@ -230,7 +237,6 @@
           ;; Branch-and-bound pruning using cached bound
           ;; Applies to min-length, min-time, min-value, max-value
           (unless (node-can-improve-bound-p current-node local-bound)
-            (ws-inc-bound-pruned stats)
             (return-from :next-iteration nil))
 
           ;; Expand node
@@ -305,7 +311,6 @@
         (when (and *solution-paths*
                    (member *solution-type* '(min-length min-time min-value max-value)))
           (unless (f-value-better succ-state succ-depth)
-            (ws-inc-bound-pruned stats)
             (return-from process-one)))
         
         ;; Goal check (before duplicate detection - goals always processed)

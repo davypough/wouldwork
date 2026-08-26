@@ -128,7 +128,6 @@
                              (:file "ww-backward")
 		                     (:file "ww-planner")
                              (:file "ww-symmetry")
-                             (:file "ww-novelty")
 		                     (:file "ww-searcher")
                              (:file "ww-backtracker")
                              (:file "ww-parallel-infrastructure")

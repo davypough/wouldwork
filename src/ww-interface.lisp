@@ -75,10 +75,6 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                                  0 (no depth limit)>)
        (ww-set *progress-reporting-interval* <positive integer;
                                               eg, 100000 (how often to report progress)>)
-       (ww-set *min-steps-fallback-warmup* <positive integer; consecutive unproductive
-                                            aggregate-bound checks before sampling>)
-       (ww-set *min-steps-fallback-sample-interval* <positive integer; 1 evaluates every
-                                                     fallback, larger values sample>)
        (ww-set *randomize-search* <t (random depth-first search) or
                                    nil (standard depth-first search)>)
        (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or
@@ -86,19 +82,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
        (ww-set *debug* <one of 0 (no debugging), 1-4 (increasing debugging info),
                                5 (step through search)>)
        (ww-set *symmetry-pruning* <t (prune symmetric states) or
-                                   nil (don't prune symmetric states>)
-       (ww-set *novelty-pruning* <1 or 2 (discard states asserting no new atom, or no new
-                                  atom pair) or nil (keep every state)>)
-       (ww-set *novelty-partition* <depth (compare states only within a search level),
-                                    query (compare within a NOVELTY-PARTITION? value) or
-                                    nil (compare all states together)>)
-       (ww-set *recorder-prefix-pruning* <t (prune unplayable recording prefixes) or
-                                           nil (validate only completed candidates)>)
+                                    nil (don't prune symmetric states>)
        (ww-set *max-recorder-cycles* <positive integer limiting recorder starts per path>)
        (ww-set *max-connector-pairings* <positive integer limiting pairings per connector>)
-       (ww-set *beam-occlusion-tolerance* <non-negative rational distance from a beam line>)
-       (ww-set *boundary-wall-height* <non-negative rational boundary height>)
-       (ww-set *vertical-reach-limit* <non-negative rational elevation gap>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
               see ww-settings.lisp and User Manual for probe format examples
@@ -193,15 +179,11 @@ is staged again.
                *branch* ~A~%
                *probe* ~A~%
                *symmetry-pruning* ~A~%
-               *recorder-prefix-pruning* ~A~%
                *max-recorder-cycles* ~A~%
-               *min-steps-fallback-warmup* ~A~%
-               *min-steps-fallback-sample-interval* ~A~%
                *debug* ~A~2%"
             *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
-            *probe* *symmetry-pruning* *recorder-prefix-pruning* *max-recorder-cycles*
-            *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*
+            *probe* *symmetry-pruning* *max-recorder-cycles*
             *debug*))
 
 
@@ -237,20 +219,37 @@ is staged again.
 
 
 (defun migrate-retired-recorder-settings (params)
-  "Replace the two retired recorder values with current trailing defaults."
-  (if (retired-recorder-settings-p params)
-    (append (subseq params 0 15) (nthcdr 15 *default-parameters*))
-    params))
+  "Remove retired recorder settings while preserving a saved cycle maximum."
+  (cond
+    ((retired-recorder-settings-p params)
+      (append (subseq params 0 14)
+              (nthcdr 14 *default-parameters*)))
+    ((and (>= (length params) 16)
+          (member (nth 14 params) '(nil t))
+          (typep (nth 15 params) '(integer 1 *)))
+      (append (subseq params 0 14) (nthcdr 15 params)))
+    ((and (= (length params) 15)
+          (member (nth 14 params) '(nil t)))
+      (append (subseq params 0 14)
+              (nthcdr 14 *default-parameters*)))
+    (t params)))
+
+
+(defun normalize-persisted-problem-parameters (params)
+  "Migrate old layouts, fill missing defaults, and ignore retired trailing values."
+  (let* ((migrated (migrate-retired-recorder-settings params))
+         (padded (if (< (length migrated) (length *default-parameters*))
+                   (append migrated
+                           (nthcdr (length migrated) *default-parameters*))
+                   migrated)))
+    (subseq padded 0 (length *default-parameters*))))
 
 
 (defun read-globals ()
   "Read and setf values for global variables from vals.lisp file."
   (let* ((saved-params (read-from-file *globals-file* *default-parameters*))
-         (params (migrate-retired-recorder-settings saved-params))
-         (padded (if (< (length params) (length *default-parameters*))
-                   (append params (nthcdr (length params) *default-parameters*))
-                   params))
-         (current-params (subseq padded 0 (length *default-parameters*))))
+         (current-params
+           (normalize-persisted-problem-parameters saved-params)))
     (loop for parameter in *persisted-problem-parameters*
           for value in current-params
           do (set parameter value))))

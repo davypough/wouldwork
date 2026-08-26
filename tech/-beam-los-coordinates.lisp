@@ -44,7 +44,8 @@
 ;;; candidate onto the beam's line and accepts it iff that projection falls strictly between
 ;;; the beam's own two endpoints (a location never occludes a beam it terminates) and its
 ;;; perpendicular distance from the line is within *BEAM-OCCLUSION-TOLERANCE* (default 1/2,
-;;; a half-unit radius; a problem overrides it with WW-SET).  A
+;;; a half-unit radius; a problem may override it with DEFPARAMETER after including its
+;;; parent technology).  A
 ;;; qualifying location is appended to the occluder list as a bare location name, exactly like
 ;;; a qualifying gate; distances are compared squared throughout to stay in exact rational
 ;;; arithmetic.  The location<->gate (LOS-VIA) and location<->gun branches deliberately
@@ -76,8 +77,8 @@
 ;;;   nested    : -location-coordinates (LOCATION-COORDS>; shared with walkability, so
 ;;;               a location's coordinates are entered once regardless of which
 ;;;               capabilities the problem uses)
-;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- managed as a problem parameter
-;;;               in ww-settings.lisp; a problem overrides it with WW-SET
+;;;   parameter : *beam-occlusion-tolerance*, default 1/2 -- a technology-owned geometric
+;;;               tolerance; a problem may override it with DEFPARAMETER after inclusion
 ;;;   types     : los-endpoint (either transmitter receiver floor-repeater wall-repeater
 ;;;               gun location);
 ;;;               jammer and gun
@@ -112,6 +113,10 @@
 (include-tech -segment-geometry)
 
 (in-package :ww)
+
+
+(defparameter *beam-occlusion-tolerance* 1/2
+  "Maximum perpendicular distance from a beam line at which a location can occlude it.")
 
 
 (define-optional-types jammer gun floor-repeater wall-repeater)

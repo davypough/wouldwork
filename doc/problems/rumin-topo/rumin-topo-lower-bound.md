@@ -1,5 +1,13 @@
 # Which lever: `heuristic?`, `min-steps-remaining?`, or something else
 
+> **Current status (2026-08-26):** `problem-rumin-topo.lisp` no longer installs a standing
+> lower bound.  `topo-lower-bound` now registers only its inexpensive finite-resource term
+> for automatic pruning; h-max, LM-cut, beam, and combined estimates are explicit
+> diagnostics.  The chunk-3/chunk-4 cycle supplement remains in
+> `rumin-topo-min-steps-remaining.lisp` for deliberate subgoal experiments only, because it
+> has rejected a valid suffix outside its documented recorder boundaries.  The measurements
+> below are retained as the evidence behind that decision.
+
 Your instinct is right, and the reason is in how the engine consumes each of them.
 
 ## The three levers do different jobs
@@ -34,12 +42,13 @@ domain reasoning that a numeric bound cannot express.
 **Recommendation: `min-steps-remaining?` first, `prune-state?` if it stalls, `heuristic?` not
 at all.**
 
-The current problem combines the general `topo-lm-cut-resource-bound` with the older
-cycle-specific term described below.  The general term is itself the maximum of LM-cut and
-a finite-domain location/resource bound.  The cycle term is zero at the first two subgoal
-boundaries, where the general terms contribute without requiring a Rumin-specific
-configuration.  The outer `max` avoids double-counting actions shared with the cycle term
-and preserves admissibility wherever that term's documented argument applies.
+The measured experimental configuration combined the general
+`topo-lm-cut-resource-bound` with the older cycle-specific term described below.  The
+general term was itself the maximum of LM-cut and a finite-domain location/resource bound.
+The cycle term was zero at the first two subgoal boundaries, where the general terms
+contributed without requiring a Rumin-specific configuration.  The outer `max` avoided
+double-counting actions shared with the cycle term and preserved admissibility only where
+that narrower term's documented argument applied.
 
 ## Initial LM-cut integration result
 

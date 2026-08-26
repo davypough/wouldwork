@@ -507,7 +507,7 @@
   (let ((complaints
           (funcall (symbol-function 'terrain-policy-complaints-for-state) *start-state*)))
     (when complaints
-      (report-terrain-complaints complaints))))
+      (funcall (symbol-function 'report-terrain-complaints) complaints))))
 
 
 (defun topo-derived-geometry ()

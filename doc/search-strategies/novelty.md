@@ -1,5 +1,12 @@
 # Novelty Pruning
 
+> **Retired.** Wouldwork no longer loads or applies novelty pruning and no longer exposes
+> `*novelty-pruning*` or `*novelty-partition*`. The experiment improved some short searches
+> but did not make the problematic long searches practical, and it could discard the only
+> path to a solution. The remainder of this document is retained as historical analysis for
+> a possible future completeness-preserving novelty ordering strategy; its commands are not
+> part of the current interface.
+
 Discard a generated state unless it asserts some small conjunction of atoms that no earlier
 state in the search asserted. Unlike a heuristic, it changes nothing about exploration
 *order*; unlike a relaxation, it changes nothing about which states are *legal*. It simply

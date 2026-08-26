@@ -43,7 +43,7 @@
 ;;;
 ;;; With the patch in place I ran chunk 4 -- the SMALLEST chunk, 10 actions -- for real
 ;;; through SOLVE-SUBGOAL, from the genuine chunk-3 boundary state, graph search,
-;;; *depth-cutoff* 10, *symmetry-pruning* nil, *recorder-prefix-pruning* t:
+;;; *depth-cutoff* 10, *symmetry-pruning* nil, recorder prefix diagnostic enabled:
 ;;;
 ;;;     *solution-type* = first : 2,200,000+ states in 32 min, no solution yet
 ;;;     net average branching factor  = 2.3
@@ -151,7 +151,7 @@
 ;;;   SETTINGS:
 ;;;     (ww-set *depth-cutoff* 30)
 ;;;     (ww-set *solution-type* first)             ; min-length not viable at depth 30
-;;;     (ww-set *recorder-prefix-pruning* t)
+;;;     (defparameter *recorder-prefix-pruning* t) ; after (include-tech recorder)
 ;;;     (ww-set *symmetry-pruning* nil)
 ;;;
 ;;;   SUBGOAL: (and (has-location box1 location8) (has-location tray1 location2))
@@ -196,7 +196,7 @@
 ;;;   SETTINGS:
 ;;;     (ww-set *depth-cutoff* 25)
 ;;;     (ww-set *solution-type* first)             ; min-length not viable at depth 25
-;;;     (ww-set *recorder-prefix-pruning* t)       ; best case: 14 live actions after the
+;;;     (defparameter *recorder-prefix-pruning* t) ; best case: 14 live actions after the
 ;;;     (ww-set *symmetry-pruning* nil)            ;   last ghost move
 ;;;
 ;;;   SUBGOAL: (and (has-location connector2 location17) (paired connector2 receiver1)
@@ -236,7 +236,7 @@
 ;;;   SETTINGS:
 ;;;     (ww-set *depth-cutoff* 15)
 ;;;     (ww-set *solution-type* min-length)        ; borderline; fall back to first if slow
-;;;     (ww-set *recorder-prefix-pruning* t)
+;;;     (defparameter *recorder-prefix-pruning* t)
 ;;;     (ww-set *symmetry-pruning* nil)
 ;;;
 ;;;   SUBGOAL: (and (has-location box1 location2) (has-location connector2 location17)
@@ -272,7 +272,7 @@
 ;;;   SETTINGS:
 ;;;     (ww-set *depth-cutoff* 10)
 ;;;     (ww-set *solution-type* min-length)        ; the one chunk where this is comfortable
-;;;     (ww-set *recorder-prefix-pruning* nil)     ; no ghost moves to prune
+;;;     ;; Leave *recorder-prefix-pruning* at NIL. ; no ghost moves to prune
 ;;;     (ww-set *symmetry-pruning* nil)
 ;;;
 ;;;   SUBGOAL: (and (active receiver1) (depressed plate3) (has-location agent1 location3))
@@ -297,7 +297,7 @@
 ;;;   SETTINGS:
 ;;;     (ww-set *depth-cutoff* 35)
 ;;;     (ww-set *solution-type* first)             ; min-length not viable at depth 35
-;;;     (ww-set *recorder-prefix-pruning* t)       ; 18 live actions after the red switch
+;;;     (defparameter *recorder-prefix-pruning* t) ; 18 live actions after the red switch
 ;;;     (ww-set *symmetry-pruning* nil)
 ;;;
 ;;;   SUBGOAL: the problem goal -- use (solve), not (solve-subgoal)

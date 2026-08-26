@@ -8,7 +8,7 @@
 ;;;      clearance decided from crossing height (including exact-top blocking).
 ;;;   3. Exact gate occluder lists for open and closed gates, plus the strict
 ;;;      gate-endpoint case that must not add an occluder.
-;;;   4. Location occlusion exactly at the inclusive 1/2-unit tolerance, while
+;;;   4. Location occlusion exactly at an overridden inclusive 2/5-unit tolerance, while
 ;;;      excluding a farther location and locations projected at an endpoint.
 ;;;   5. A concave BOUNDARY-WALL retaining both crossings of a sightline that leaves and
 ;;;      re-enters the polygon, with its own default height 6.
@@ -82,6 +82,14 @@
 
 (include-tech visibility)
 
+(defparameter *beam-occlusion-tolerance* 2/5)
+(defparameter *boundary-wall-height* 5)
+
+
+(define-test-claim beam-occlusion-tolerance-override-contract
+  (= *beam-occlusion-tolerance* 2/5)
+  (= *boundary-wall-height* 5))
+
 
 ;;;; INITIALIZATION ;;;;
 
@@ -124,8 +132,8 @@
   (location-coords> gate-corner-site 0 50)
   (location-coords> tolerance-left 0 60)
   (location-coords> tolerance-right 10 60)
-  (location-coords> tolerance-edge 5 121/2)
-  (location-coords> tolerance-outside 5 303/5)
+  (location-coords> tolerance-edge 5 302/5)
+  (location-coords> tolerance-outside 5 1209/20)
   (location-coords> tolerance-endpoint 0 60)
   (location-coords> target-site 0 65)
   (location-coords> target-intervening 5 65)
@@ -241,7 +249,7 @@
     (null $corner-occluders)
     (visible gate-corner-site gate-corner-receiver)
 
-    ;; The exactly-half-unit candidate is included.  The farther and endpoint-
+    ;; The exactly-two-fifths-unit candidate is included.  The farther and endpoint-
     ;; projected candidates must remain absent from this exact singleton list.
     (bind (los-via tolerance-left $tolerance-occluders tolerance-right))
     (equal $tolerance-occluders '(tolerance-edge))
@@ -257,7 +265,7 @@
 
     ;; Both endpoints are inside the boundary, but their line leaves and re-enters through
     ;; the notch.  Both oriented crossing records are retained.  Ordinary sight is opaque;
-    ;; a beam at the default top 6 blocks and one strictly above it clears.
+    ;; a beam at the overridden top 5 blocks and one strictly above it clears.
     (potentially-visible boundary-left boundary-right)
     (potentially-visible boundary-right boundary-left)
     (not (visible boundary-left boundary-right))
@@ -265,10 +273,10 @@
     (bind (los-barrier-crossings>
             boundary-left $boundary-crossings boundary-right))
     (= (length $boundary-crossings) 2)
-    (not (beam-visible boundary-left 6 boundary-right 6))
-    (beam-visible boundary-left 7 boundary-right 7)
-    (not (beam-visible boundary-right 6 boundary-left 6))
-    (beam-visible boundary-right 7 boundary-left 7)
+    (not (beam-visible boundary-left 5 boundary-right 5))
+    (beam-visible boundary-left 6 boundary-right 6)
+    (not (beam-visible boundary-right 5 boundary-left 5))
+    (beam-visible boundary-right 6 boundary-left 6)
 
     ;; Gate midpoint/self-segment handling and the jammer-specific exclusions:
     ;; intervening locations do not enter target-gate or gun occluder lists.

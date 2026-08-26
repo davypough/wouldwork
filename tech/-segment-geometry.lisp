@@ -16,6 +16,10 @@
 (in-package :ww)
 
 
+(defparameter *boundary-wall-height* 6
+  "Height of the unnamed boundary polygon used for line-of-sight clearance.")
+
+
 (define-optional-types wall edge gate window screen)
 
 

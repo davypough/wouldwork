@@ -1,6 +1,8 @@
 ;;; Filename: ww-novelty.lisp
 
-;;; Width-based novelty pruning of generated states.
+;;; Retired width-based novelty pruning experiment.  This file is intentionally absent from
+;;; WOULDWORK.ASD and is retained only as source material for a possible future
+;;; completeness-preserving novelty ordering strategy.
 
 
 (in-package :ww)

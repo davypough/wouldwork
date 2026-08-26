@@ -58,6 +58,10 @@
 
 
 (define-test-helper relaxed-tray-test-chain-operators ()
+  ;; *TOPO-RELAXED-ALL-OPERATORS* is compiled on demand by the relaxed model builder, and no
+  ;; registered search contributor reaches that path.  Build it here rather than relying on a
+  ;; staging side effect of an aggregate MIN-STEPS-REMAINING? this problem does not define.
+  (build-topo-relaxed-hmax-model *start-state* *goal*)
   (remove-if-not
     (lambda (operator)
       (member

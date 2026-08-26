@@ -17,7 +17,6 @@
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 3)
-(ww-set *recorder-prefix-pruning* t)
 
 (setf *expected-min-length* 3)
 
@@ -30,6 +29,8 @@
 
 
 (include-tech recorder)
+
+(defparameter *recorder-prefix-pruning* t)
 
 
 (define-dynamic-relations
@@ -111,6 +112,11 @@
 
 (define-test-claim recorder-prefix-pruning-contract
   *recorder-prefix-pruning*
+  (not (assoc '*recorder-prefix-pruning* *problem-parameter-defaults*))
+  (not (member '*recorder-prefix-pruning* *persisted-problem-parameters*))
+  (let ((display (with-output-to-string (*standard-output*)
+                   (display-current-parameters))))
+    (null (search "*RECORDER-PREFIX-PRUNING* =>" display)))
   (find 'validate-recorder-recording-prefix
         *search-prefix-validators*
         :key #'search-prefix-validator.validator)

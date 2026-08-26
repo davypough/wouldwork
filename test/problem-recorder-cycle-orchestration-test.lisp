@@ -1,12 +1,8 @@
 ;;; Filename: problem-recorder-cycle-orchestration-test.lisp
 
-;;; Focused two-call characterization of recorder-cycle orchestration.  Each cycle has one
-;;; ghost action and ends at the recorder.  The state carried from START through MIDDLE to
-;;; END is intentionally simple; Stage 5 supplies the nontrivial persistent-apparatus
-;;; example.  Here the contract under test is solve, validate, commit, discard, fail,
-;;; rollback, retry final, and undo with history kept in step throughout.
-;;; Expected minimum path length for the staged problem itself: START plus two ghost
-;;; advances in one final open cycle, three actions total.
+;;; Focused characterization of sequential recorder subgoals embedded in one cycle.  The
+;;; first two user checkpoints are reached while recording remains open; the final SOLVE
+;;; appends the required STOP and returns one cumulative, fully replayed solution.
 
 (in-package :ww)
 
@@ -15,10 +11,9 @@
 (ww-set *problem-type* planning)
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
-(ww-set *depth-cutoff* 3)
-(ww-set *max-recorder-cycles* 2)
+(ww-set *depth-cutoff* 4)
 
-(setf *expected-min-length* 3)
+(setf *expected-min-length* 4)
 
 
 (define-types
@@ -60,7 +55,7 @@
        (recording-in-progress)
        (cycle-at cycle-start)
        (recording-agent-at-recorder ?agent))
-  (">" ?agent "commits the first recorder cycle")
+  (">" ?agent "reaches the first embedded checkpoint")
   (assert (not (cycle-at cycle-start))
           (cycle-at cycle-middle)
           (assign $objective-value 7.0)))
@@ -73,7 +68,7 @@
        (recording-in-progress)
        (cycle-at cycle-middle)
        (recording-agent-at-recorder ?agent))
-  (">" ?agent "commits the final recorder cycle")
+  (">" ?agent "reaches the second embedded checkpoint")
   (assert (not (cycle-at cycle-middle))
           (cycle-at cycle-end)
           (assign $objective-value 11.0)))
@@ -85,46 +80,56 @@
           :test #'equal))
 
 
-(define-test-helper recorder-history-boundary-at-p (index stage)
-  (let ((record (nth index *recorder-cycle-history*)))
-    (and record
-         (recorder-orchestration-state-at-p
-           (recorder-cycle-record.boundary-state record)
-           stage))))
+(define-test-helper recorder-orchestration-chain-length ()
+  (if *recorder-subgoal-chain*
+    (length (recorder-subgoal-chain.segments *recorder-subgoal-chain*))
+    0))
 
 
-(define-test-helper recorder-cycle-metrics-p
-    (record depth elapsed-time value-change cumulative-depth cumulative-time cumulative-value)
-  (and (= (recorder-cycle-record.depth record) depth)
-       (= (recorder-cycle-record.elapsed-time record) elapsed-time)
-       (= (recorder-cycle-record.value-change record) value-change)
-       (= (recorder-cycle-record.cumulative-depth record) cumulative-depth)
-       (= (recorder-cycle-record.cumulative-time record) cumulative-time)
-       (= (recorder-cycle-record.cumulative-value record) cumulative-value)))
+(define-test-helper recorder-orchestration-segment (index)
+  (nth index (recorder-subgoal-chain.segments *recorder-subgoal-chain*)))
 
 
-(define-test-helper recorder-chain-report-contract-p ()
-  (let* ((printed
-           (with-output-to-string (stream)
-             (print-recorder-chain-report *recorder-cycle-history* stream)))
-         (cycle-1 (search "Cycle 1" printed))
-         (cycle-2 (search "Cycle 2" printed))
-         (integrated-1 (search "Integrated sequence:" printed :start2 cycle-1))
-         (setup-1 (search "Setup phase:" printed :start2 cycle-1))
-         (recording-1 (search "Recording phase:" printed :start2 cycle-1))
-         (playback-1 (search "Playback phase:" printed :start2 cycle-1))
-         (integrated-2 (search "Integrated sequence:" printed :start2 cycle-2))
-         (setup-2 (search "Setup phase:" printed :start2 cycle-2))
-         (recording-2 (search "Recording phase:" printed :start2 cycle-2))
-         (playback-2 (search "Playback phase:" printed :start2 cycle-2)))
-    (and cycle-1 cycle-2
-         integrated-1 setup-1 recording-1 playback-1
-         integrated-2 setup-2 recording-2 playback-2
-         (< cycle-1 integrated-1 setup-1 recording-1 playback-1 cycle-2
-            integrated-2 setup-2 recording-2 playback-2)
-         (search "Chain totals: depth 6; elapsed time 9.0; value change 11.0" printed)
-         (search "Any optimization is local to its cycle; this chain is not globally optimized."
-                 printed))))
+(define-test-helper recorder-orchestration-path ()
+  '((1.0 (start-recorder live-agent))
+    (3.0 (advance-cycle-to-middle ghost-agent))
+    (6.0 (advance-cycle-to-end ghost-agent))
+    (7.0 (stop-recorder ghost-agent))))
+
+
+(define-test-helper recorder-orchestration-cumulative-solution-p ()
+  (let* ((solution (first *solution-paths*))
+         (origin
+           (and *recorder-subgoal-chain*
+                (recorder-subgoal-chain.origin-state *recorder-subgoal-chain*)))
+         (report
+           (and solution origin
+                (let ((*start-state* origin))
+                  (build-recorder-report solution)))))
+    (and solution
+         (= (solution.depth solution) 4)
+         (= (solution.time solution) 7.0)
+         (= (solution.value solution) 11.0)
+         (equal (solution.path solution) (recorder-orchestration-path))
+         (recorder-orchestration-state-at-p (solution.goal solution) 'cycle-end)
+         (funcall (symbol-function 'ghost-stops-recorder) (solution.goal solution))
+         (= (getf report :cycle-count) 1)
+         (equal (getf (first (getf report :cycles)) :closure) :explicit)
+         (equal (getf report :totals)
+                '(:depth 4 :elapsed-time 7.0 :value-change 11.0)))))
+
+
+(define-test-helper recorder-orchestration-chain-report-p ()
+  (let ((printed
+          (with-output-to-string (stream)
+            (print-recorder-subgoal-chain-report
+              *recorder-subgoal-chain* stream))))
+    (and (search "Checkpoint 1" printed)
+         (search "Checkpoint 2" printed)
+         (search "Checkpoint 3" printed)
+         (search "CYCLE-MIDDLE" printed)
+         (search "CYCLE-END" printed)
+         (search "cumulative depth: 4" printed :test #'char-equal))))
 
 
 (define-test-claim recorder-initial-solve-remains-ordinary
@@ -134,214 +139,102 @@
           (solve)
           (setf ordinary-solve-p
                 (and *solutions-valid*
-                     (= (solution.depth (select-continuation-solution)) 3)
+                     (= (solution.depth (select-continuation-solution)) 4)
                      (null *final-goal*)
-                     (null *recorder-cycle-history*)
+                     (null *recorder-subgoal-chain*)
                      (null *undo-stack*))))
-      ;; An initial SOLVE does not create an undo checkpoint, so discard only its
-      ;; ordinary search result before the remaining claims run.
       (setf *solution-paths* nil
             *solutions-valid* nil))
     ordinary-solve-p))
 
 
-(define-test-claim recorder-cycle-failure-restores-original-session
-  (let ((initial-database (list-database (problem-state.idb *start-state*))))
-    (solve-subgoal (cycle-at cycle-unreachable))
-    (and (null *recorder-cycle-history*)
-         (not *solutions-valid*)
-         (null *solution-paths*)
-         (equal *final-goal* '(cycle-at cycle-end))
-         (equal *goal*
-                '(and (cycle-at cycle-unreachable)
-                      (recorder-cycles-used 1)
-                      (recorder-cycle-ended)))
-         (= (length *undo-stack*) 1)
-         (ww-undo)
-         (null *recorder-cycle-history*)
-         (null *final-goal*)
-         (equal *goal* '(cycle-at cycle-end))
-         (equal initial-database
-                (list-database (problem-state.idb *start-state*)))
-         (null *undo-stack*))))
-
-
-(define-test-claim recorder-guided-maximum-fails-before-checkpoint
-  (let ((exhausted-state (copy-problem-state *start-state*))
-        (original-start-state *start-state*)
-        (original-maximum *max-recorder-cycles*)
-        (original-solutions *solution-paths*)
-        (original-solutions-valid *solutions-valid*)
-        (original-undo-stack *undo-stack*)
-        (result nil))
-    (add-proposition '(recorder-cycles-used 1)
-                     (problem-state.idb exhausted-state))
-    (add-proposition '(recorder-cycle-closed)
-                     (problem-state.idb exhausted-state))
-    (invalidate-problem-state-hash exhausted-state)
-    (unwind-protect
-        (progn
-          (setf *start-state* exhausted-state
-                *max-recorder-cycles* 1
-                *solution-paths* nil
-                *solutions-valid* nil
-                *undo-stack* nil)
-          (setf result
-                (and
-                  (expect-condition
-                    (lambda ()
-                      (solve-recorder-subgoal-form
-                        '(cycle-at cycle-unreachable)))
-                    'error
-                    :containing "exceeds *MAX-RECORDER-CYCLES*")
-                  (null *undo-stack*))))
-      (setf *start-state* original-start-state
-            *max-recorder-cycles* original-maximum
-            *solution-paths* original-solutions
-            *solutions-valid* original-solutions-valid
-            *undo-stack* original-undo-stack))
-    result))
-
-
-(define-test-claim recorder-cycle-commit-final-and-undo
+(define-test-claim recorder-subgoals-remain-inside-open-cycle
   (let ((initial-database (list-database (problem-state.idb *start-state*))))
     (solve-subgoal (cycle-at cycle-middle))
-    (and
-      (= (length *recorder-cycle-history*) 1)
-      (recorder-history-boundary-at-p 0 'cycle-middle)
-      (= (solution.depth
-           (recorder-cycle-record.solution (first *recorder-cycle-history*)))
-         3)
-      (recorder-cycle-metrics-p
-        (first *recorder-cycle-history*) 3 4 7 3 4 7)
-      (equal (recorder-cycle-record.subgoal (first *recorder-cycle-history*))
-             '(cycle-at cycle-middle))
-      (equal (recorder-cycle-record.closed-goal
-               (first *recorder-cycle-history*))
-             '(and (cycle-at cycle-middle)
-                   (recorder-cycles-used 1)
-                   (recorder-cycle-ended)))
-      (= (funcall (symbol-function 'recorder-cycle-count) *start-state*) 1)
-      (equal (getf (recorder-cycle-record.report (first *recorder-cycle-history*))
-                   :recording)
-             '((1.0 (start-recorder live-agent))
-               (3.0 (advance-cycle-to-middle ghost-agent))
-               (4.0 (stop-recorder ghost-agent))))
-      (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
-      (null *solution-paths*)
-      (not *solutions-valid*)
-      (equal *final-goal* '(cycle-at cycle-end))
+    (let ((first-segment (recorder-orchestration-segment 0)))
+      (and
+        (= (recorder-orchestration-chain-length) 1)
+        (equal (recorder-subgoal-segment.goal first-segment)
+               '(cycle-at cycle-middle))
+        (= (solution.depth (recorder-subgoal-segment.solution first-segment)) 2)
+        (= (recorder-subgoal-segment.cumulative-depth first-segment) 2)
+        (recorder-subgoal-segment.recording-open-p first-segment)
+        (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
+        (recorder-state-recording-open-p *start-state*)
+        (null *solution-paths*)
+        (not *solutions-valid*)
+        (equal *final-goal*
+               '(and (cycle-at cycle-end) (ghost-stops-recorder)))
 
-      ;; A failed later cycle leaves the committed first cycle available.  Its checkpoint
-      ;; restores the history as well as the generic planning session.
-      (progn
-        (solve-subgoal (cycle-at cycle-unreachable))
-        t)
-      (= (length *recorder-cycle-history*) 1)
-      (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
-      (ww-undo)
-      (= (length *recorder-cycle-history*) 1)
-      (recorder-history-boundary-at-p 0 'cycle-middle)
-      (recorder-cycle-metrics-p
-        (first *recorder-cycle-history*) 3 4 7 3 4 7)
-      (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
+        (progn (solve-subgoal (cycle-at cycle-end)) t)
+        (= (recorder-orchestration-chain-length) 2)
+        (let ((second-segment (recorder-orchestration-segment 1)))
+          (and (equal (recorder-subgoal-segment.goal second-segment)
+                      '(cycle-at cycle-end))
+               (= (solution.depth
+                    (recorder-subgoal-segment.solution second-segment)) 1)
+               (= (recorder-subgoal-segment.cumulative-depth second-segment) 3)
+               (recorder-subgoal-segment.recording-open-p second-segment)))
+        (recorder-orchestration-state-at-p *start-state* 'cycle-end)
+        (recorder-state-recording-open-p *start-state*)
 
-      (progn (solve) t)
-      (= (length *recorder-cycle-history*) 2)
-      (recorder-history-boundary-at-p 1 'cycle-end)
-      (recorder-cycle-metrics-p
-        (second *recorder-cycle-history*) 3 5 4 6 9 11)
-      (equal (recorder-cycle-record.closed-goal
-               (second *recorder-cycle-history*))
-             '(and (cycle-at cycle-end)
-                   (recorder-cycles-used 2)
-                   (recorder-cycle-ended)))
-      (= (funcall (symbol-function 'recorder-cycle-count)
-                  (recorder-cycle-record.boundary-state
-                    (second *recorder-cycle-history*)))
-         2)
-      (equal (getf (recorder-cycle-record.report (first *recorder-cycle-history*))
-                   :integrated)
-             '((1.0 (start-recorder live-agent))
-               (3.0 (advance-cycle-to-middle ghost-agent))
-               (4.0 (stop-recorder ghost-agent))))
-      (equal (getf (recorder-cycle-record.report (first *recorder-cycle-history*))
-                   :playback)
-             '((3.0 (advance-cycle-to-middle ghost-agent))))
-      (equal (getf (recorder-cycle-record.report (second *recorder-cycle-history*))
-                   :integrated)
-             '((5.0 (start-recorder live-agent))
-               (8.0 (advance-cycle-to-end ghost-agent))
-               (9.0 (stop-recorder ghost-agent))))
-      (equal (getf (recorder-cycle-record.report (second *recorder-cycle-history*))
-                   :recording)
-             '((5.0 (start-recorder live-agent))
-               (8.0 (advance-cycle-to-end ghost-agent))
-               (9.0 (stop-recorder ghost-agent))))
-      (equal (getf (recorder-cycle-record.report (second *recorder-cycle-history*))
-                   :playback)
-             '((8.0 (advance-cycle-to-end ghost-agent))))
-      (recorder-chain-report-contract-p)
-      *solutions-valid*
-      (= (solution.depth (select-continuation-solution)) 3)
-      (null *final-goal*)
-      (equal *goal* '(cycle-at cycle-end))
+        (progn (solve) t)
+        (= (recorder-orchestration-chain-length) 3)
+        *solutions-valid*
+        (null *final-goal*)
+        (equal *goal* '(and (cycle-at cycle-end) (ghost-stops-recorder)))
+        (recorder-orchestration-cumulative-solution-p)
+        (recorder-orchestration-chain-report-p)
 
-      ;; Undo the final cycle, then the first committed cycle.
-      (ww-undo)
-      (= (length *recorder-cycle-history*) 1)
-      (recorder-history-boundary-at-p 0 'cycle-middle)
-      (recorder-cycle-metrics-p
-        (first *recorder-cycle-history*) 3 4 7 3 4 7)
-      (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
-      (not *solutions-valid*)
-      (equal *final-goal* '(cycle-at cycle-end))
-      (ww-undo)
-      (null *recorder-cycle-history*)
-      (null *final-goal*)
-      (equal *goal* '(cycle-at cycle-end))
-      (equal initial-database
-             (list-database (problem-state.idb *start-state*)))
-      (null *undo-stack*))))
+        ;; Undo removes one pasted segment at a time, restoring both the exact open state
+        ;; and the accumulated checkpoint history.
+        (ww-undo)
+        (= (recorder-orchestration-chain-length) 2)
+        (recorder-orchestration-state-at-p *start-state* 'cycle-end)
+        (recorder-state-recording-open-p *start-state*)
+        (not *solutions-valid*)
+        (equal *final-goal*
+               '(and (cycle-at cycle-end) (ghost-stops-recorder)))
+        (ww-undo)
+        (= (recorder-orchestration-chain-length) 1)
+        (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
+        (recorder-state-recording-open-p *start-state*)
+        (ww-undo)
+        (null *recorder-subgoal-chain*)
+        (null *final-goal*)
+        (null *undo-stack*)
+        (equal initial-database
+               (list-database (problem-state.idb *start-state*)))))))
+
+
+(define-test-claim recorder-subgoal-failure-retains-checkpoint
+  (let ((initial-database (list-database (problem-state.idb *start-state*))))
+    (solve-subgoal (cycle-at cycle-middle))
+    (let ((middle-database (list-database (problem-state.idb *start-state*))))
+      (solve-subgoal (cycle-at cycle-unreachable))
+      (and
+        (= (recorder-orchestration-chain-length) 1)
+        (equal middle-database (list-database (problem-state.idb *start-state*)))
+        (not *solutions-valid*)
+        (ww-undo)
+        (= (recorder-orchestration-chain-length) 1)
+        (equal middle-database (list-database (problem-state.idb *start-state*)))
+        (ww-undo)
+        (null *recorder-subgoal-chain*)
+        (null *final-goal*)
+        (null *undo-stack*)
+        (equal initial-database
+               (list-database (problem-state.idb *start-state*)))))))
 
 
 (define-test-claim recorder-public-goal-chaining-dispatch
-  (let ((initial-database (list-database (problem-state.idb *start-state*)))
-        (subgoal-dispatched-p nil)
-        (final-dispatched-p nil))
-    (unwind-protect
-        (progn
-          ;; These are the public goal-chaining commands.  Recorder-enabled problems
-          ;; should give them recorder-cycle semantics without changing the interface.
-          (solve-subgoal (cycle-at cycle-middle))
-          (setf subgoal-dispatched-p
-                (and (= (length *recorder-cycle-history*) 1)
-                     (recorder-history-boundary-at-p 0 'cycle-middle)
-                     (recorder-orchestration-state-at-p *start-state* 'cycle-middle)
-                     (null *solution-paths*)
-                     (not *solutions-valid*)
-                     (equal *final-goal* '(cycle-at cycle-end))))
-
-          (solve)
-          (setf final-dispatched-p
-                (and (= (length *recorder-cycle-history*) 2)
-                     (recorder-history-boundary-at-p 1 'cycle-end)
-                     *solutions-valid*
-                     (= (solution.depth (select-continuation-solution)) 3)
-                     (null *final-goal*)
-                     (equal *goal* '(cycle-at cycle-end)))))
-      ;; Each public chaining call creates one checkpoint.  Restore the staged problem
-      ;; after characterizing automatic recorder dispatch.
-      (loop while *undo-stack* do (ww-undo)))
-    (and subgoal-dispatched-p
-         final-dispatched-p
-         (null *recorder-cycle-history*)
-         (null *final-goal*)
-         (equal *goal* '(cycle-at cycle-end))
-         (equal initial-database
-                (list-database (problem-state.idb *start-state*)))
-         (null *undo-stack*))))
+  (and *goal-chaining-policy*
+       (eql (goal-chaining-policy-subgoal-solver *goal-chaining-policy*)
+            'solve-recorder-subgoal-form)
+       (eql (goal-chaining-policy-final-solver *goal-chaining-policy*)
+            'solve-recorder-final)))
 
 
 (define-goal
-  (cycle-at cycle-end))
+  (and (cycle-at cycle-end)
+       (ghost-stops-recorder)))

@@ -918,9 +918,6 @@
     (*progress-reporting-interval* (unless (and (typep val 'fixnum) (> val 0))
                                      (error "Can't set *progress-reporting-interval* to ~S.
                                              Must be an integer > 0." val)))
-    ((*min-steps-fallback-warmup* *min-steps-fallback-sample-interval*)
-      (unless (and (typep val 'fixnum) (> val 0))
-        (error "Can't set ~S to ~S. Must be a positive integer." param val)))
     (*branch* (unless (typep val 'fixnum)
                 (error "Can't set *branch* to ~S. Must be an integer
                         where n < 1 means search all branches." val)))
@@ -953,27 +950,12 @@
                      (format t "~%It's normally inefficient to enable *auto-wait* without exogenous happenings.~%~
                                 Define patrollers or other happening objects first.~2%"))))
     (*symmetry-pruning* nil)
-    (*novelty-pruning*
-      (unless (member val '(nil 1 2))
-        (error "Can't set *novelty-pruning* to ~S. Must be NIL, 1, or 2." val))
-      (unless (or (null val) (zerop *threads*))
-        (error "Can't enable *novelty-pruning* when *threads* is ~S. ~
-                Novelty pruning requires *threads* = 0." *threads*)))
-    (*novelty-partition*
-      (unless (member val '(nil depth query))
-        (error "Can't set *novelty-partition* to ~S. Must be NIL, DEPTH, or QUERY." val)))
-    (*recorder-prefix-pruning*
-      (unless (typep val 'boolean)
-        (error "Can't set *recorder-prefix-pruning* to ~S. Must be either T or NIL." val)))
     (*max-recorder-cycles*
       (unless (and (typep val 'fixnum) (> val 0))
         (error "Can't set *max-recorder-cycles* to ~S. Must be a positive integer." val)))
     (*max-connector-pairings*
       (unless (and (typep val 'fixnum) (> val 0))
         (error "Can't set *max-connector-pairings* to ~S. Must be a positive integer." val)))
-    ((*beam-occlusion-tolerance* *boundary-wall-height* *vertical-reach-limit*)
-      (unless (and (rationalp val) (>= val 0))
-        (error "Can't set ~S to ~S. Must be a non-negative rational." param val)))
     (*threads*
       (unless (and (typep val 'fixnum) (>= val 0))
         (error "Can't set *threads* to ~S. Must be a non-negative integer." val)))

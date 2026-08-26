@@ -182,10 +182,13 @@ wall-gears 1, wall-blower 1  ;their has-elevation is the emitted STREAM elevatio
                              ;-gears-fan's blower-elevation, not the base of a solid; both
                              ;are deliberately absent from the table above
 
-7. Managed Problem Parameters (WW-SET, restored on staging)
+7. Technology Parameters
 
-*beam-occlusion-tolerance* 1/2  ;src/ww-settings.lisp; consumed by tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
-*boundary-wall-height* 6  ;src/ww-settings.lisp; consumed by tech/visibility.lisp for boundary crossings; the boundary polygon's LOS height -- the one barrier with no named object, so it can carry no has-height and has no entry in the vertical type table
+Technology-owned default (DEFPARAMETER after INCLUDE-TECH to override):
+*beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
+*boundary-wall-height* 6  ;tech/-segment-geometry.lisp; boundary polygon LOS height
+*vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap for manipulation, landing, and barrier clearance
+
+Managed problem parameters (WW-SET, restored on staging):
 *max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path; a cycle counts when it starts
 *max-connector-pairings* 3  ;tech/beam-relay.lisp; max PAIRED termini a connector may hold at once; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
-*vertical-reach-limit* 1  ;src/ww-settings.lisp; consumed by tech/-support-elevation.lisp; max elevation gap an agent can act across vertically -- reaching to pick up or place cargo above or below its own elevation, or jumping up onto a higher support or clearing a barrier -- independent of the agent's own declared height; jump.lisp reuses this parameter rather than defining its own

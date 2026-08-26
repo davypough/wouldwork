@@ -286,7 +286,6 @@
   (duplicate-accumulated-depths 0 :type fixnum)  ; Sum of duplicate-collision termination depths
   (duplicate-num-paths 0 :type fixnum)           ; Number of duplicate-collision terminations
   (depth-cutoff-hits 0 :type fixnum)             ; Nodes blocked by *depth-cutoff*
-  (bound-pruned 0 :type fixnum)                  ; Nodes/successors rejected by branch-and-bound
   (accumulated-backtrack-distance 0 :type fixnum) ; Sum of backtrack-event depth drops
   (num-backtracks 0 :type fixnum)                 ; Count of backtrack events
   (solutions-found 0 :type fixnum)         ; Solutions found by this worker
@@ -325,7 +324,6 @@
         sum (ws-duplicate-accumulated-depths stats) into total-duplicate-depths
         sum (ws-duplicate-num-paths stats) into total-duplicate-paths
         sum (ws-depth-cutoff-hits stats) into total-cutoff-hits
-        sum (ws-bound-pruned stats) into total-bound-pruned
         sum (ws-accumulated-backtrack-distance stats) into total-backtrack-distance
         sum (ws-num-backtracks stats) into total-backtracks
         finally
@@ -338,7 +336,6 @@
         (setf *duplicate-accumulated-depths* (+ *duplicate-accumulated-depths* total-duplicate-depths))
         (setf *duplicate-num-paths* (+ *duplicate-num-paths* total-duplicate-paths))
         (setf *depth-cutoff-hits* (+ *depth-cutoff-hits* total-cutoff-hits))
-        (setf *bound-pruned* (+ *bound-pruned* total-bound-pruned))
         (setf *accumulated-backtrack-distance* (+ *accumulated-backtrack-distance* total-backtrack-distance))
         (setf *num-backtracks* (+ *num-backtracks* total-backtracks))))
 
@@ -377,12 +374,6 @@
   (declare (type worker-stats stats) (type fixnum depth))
   (when (> depth (ws-max-depth stats))
     (setf (ws-max-depth stats) depth)))
-
-
-(defun ws-inc-bound-pruned (stats)
-  "Increment bound-pruned for worker."
-  (declare (type worker-stats stats))
-  (incf (ws-bound-pruned stats)))
 
 
 (defun ws-record-backtrack (stats distance)
@@ -600,18 +591,19 @@
 (defun initial-best-bound ()
   "Return the initial value for *best-bound* based on *solution-type*.
    Preserve any solution recorded before parallel workers start.
-   All optimization types use 'lower is better' convention internally."
+   All optimization types use 'lower is better' convention internally, MAX-VALUE
+   included: COMPUTE-STATE-BOUND-VALUE negates its objective, so a better solution
+   always yields a smaller bound.  The no-solution sentinel is therefore
+   MOST-POSITIVE-FIXNUM for every solution type -- the value each real bound must
+   beat under STATE-BOUND-BETTER-P.  Types that never prune on the bound share it
+   harmlessly, since NODE-CAN-IMPROVE-BOUND-P never consults it for them."
   (if (and *solution-paths*
            (member *solution-type* '(min-length min-time min-value max-value)))
       (reduce #'min *solution-paths*
               :key (lambda (solution)
                      (compute-state-bound-value (solution.goal solution)
                                                 (solution.depth solution))))
-      (case *solution-type*
-        ((first every) most-positive-fixnum)  ; Not used for pruning
-        ((min-length min-time min-value) most-positive-fixnum)
-        (max-value most-negative-fixnum)  ; Will be negated, so this becomes most-positive
-        (otherwise most-positive-fixnum))))
+      most-positive-fixnum))
 
 
 (defun reset-parallel-control-flags ()
@@ -624,18 +616,24 @@
 
 (defun node-can-improve-bound-p (node local-bound)
   "Check if NODE can possibly lead to a solution better than LOCAL-BOUND.
-   Uses optimistic estimate (current depth/value as lower bound on final solution).
+   Every solution reachable from NODE lies at least one action beyond it, so the
+   depth- and time-based objectives charge that action before comparing.  Value-based
+   objectives have no guaranteed per-action increment and test the node's own value.
+   NODE itself is never a usable solution: WORKER-PROCESS-SUCCESSORS-PHASE1 registers
+   a goal before installing anything, so only descendants are at stake here.
+   Mirrors the serial NODE-DESCENDANTS-CANNOT-IMPROVE-P with the sense inverted and
+   the lower-is-better bound convention of *BEST-BOUND*.
    Returns T if worth exploring, NIL if should prune."
   (declare (type node node))
   (case *solution-type*
     ;; For FIRST/EVERY, always explore (no optimization)
     ((first every) t)
-    ;; For MIN-LENGTH, prune if already at or past best depth
-    (min-length 
-     (< (node.depth node) local-bound))
-    ;; For MIN-TIME, prune if current time already >= best
+    ;; For MIN-LENGTH, prune unless one more action still lands short of best depth
+    (min-length
+     (< (1+ (node.depth node)) local-bound))
+    ;; For MIN-TIME, prune unless one more action still lands short of best time
     (min-time
-     (< (problem-state.time (node.state node)) local-bound))
+     (< (+ (problem-state.time (node.state node)) *min-action-duration*) local-bound))
     ;; For MIN-VALUE, prune if current value already >= best
     (min-value
      (< (problem-state.value (node.state node)) local-bound))
@@ -756,7 +754,6 @@
         (total-duplicate-depths 0)
         (total-duplicate-paths 0)
         (total-cutoff-hits 0)
-        (total-bound-pruned 0)
         (total-backtrack-distance 0)
         (total-backtracks 0))
     (loop for stats across *worker-stats-vector*
@@ -769,7 +766,6 @@
              (incf total-duplicate-depths (ws-duplicate-accumulated-depths stats))
              (incf total-duplicate-paths (ws-duplicate-num-paths stats))
              (incf total-cutoff-hits (ws-depth-cutoff-hits stats))
-             (incf total-bound-pruned (ws-bound-pruned stats))
              (incf total-backtrack-distance (ws-accumulated-backtrack-distance stats))
              (incf total-backtracks (ws-num-backtracks stats))
              (setf max-depth (max max-depth (ws-max-depth stats))))
@@ -801,11 +797,7 @@
               (format t "  Current best bound: ~A~%"
                       (if (eql *solution-type* 'max-value)
                           (- bound)
-                          bound))))
-          (when (> total-bound-pruned 0)
-            (format t "  Bound-based pruning: ~:D (~,1F%)~%"
-                    total-bound-pruned
-                    (* 100.0 (/ total-bound-pruned states-so-far)))))
+                          bound)))))
         (when (and (eql *tree-or-graph* 'graph) *closed-shards*)
           (format t "  Closed entries: ~:D~%" (closed-shards-total-count))
           (format t "  Repeated states: ~:D (~,1F%)~%"

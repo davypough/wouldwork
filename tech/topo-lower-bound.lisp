@@ -1,8 +1,10 @@
 ;;; Filename: topo-lower-bound.lisp
 
-;;; Optional, domain-general delete relaxation for topology planning.  The staged problem
-;;; supplies only its ordinary types, traversal facts, state, and active goal; no problem
-;;; object names or coordinate regions are authored here.
+;;; Optional, domain-general lower-bound service for topology planning.  Its inexpensive
+;;; finite-domain resource bound is the only term registered for automatic search pruning.
+;;; Delete-relaxed h-max, LM-cut, beam, and combined queries remain explicit diagnostics.
+;;; The staged problem supplies only its ordinary types, traversal facts, state, and active
+;;; goal; no problem object names or coordinate regions are authored here.
 ;;;
 ;;; The relaxation is deliberately permissive:
 ;;;   - traversal keeps only gate prerequisites and ignores every other obstacle;
@@ -19,11 +21,11 @@
 ;;; supported cargo-location goals.  Its movement, manipulation, and recorder-session costs
 ;;; are disjoint; tray riders, propagating relocators, unsupported goals, and happenings are
 ;;; omitted rather than overestimated.
-;;; Serial depth-first search registers that inexpensive finite-domain term as a cheap
-;;; precheck.  If it independently proves the node cannot fit under the active cutoff or
-;;; incumbent, the engine prunes without evaluating the aggregate LM-cut fallback.  After
-;;; an unproductive warmup, the serial search samples admitted-node fallbacks and immediately
-;;; resumes eager evaluation if one uniquely prunes; parallel search remains eager.
+;;; Search registers that inexpensive finite-domain term as its automatic contributor.  A
+;;; problem may separately define MIN-STEPS-REMAINING? as an aggregate fallback; serial
+;;; depth-first search then samples an unproductive fallback after its technical warmup and
+;;; immediately resumes eager evaluation if one uniquely prunes.  Parallel search remains
+;;; eager.
 ;;; The complete static model is built once, then backward-sliced from the active goal.
 ;;; Per-state evaluation reads only facts used by that goal-relevant operator slice.
 ;;; Each omission can only shorten the abstract plan.  Unsupported goal forms are omitted
@@ -32,8 +34,7 @@
 ;;; PROVIDES:
 ;;;   query : topo-relaxed-hmax-bound, topo-relaxed-lm-cut-bound,
 ;;;           topo-finite-resource-bound, topo-finite-beam-resource-bound,
-;;;           topo-lm-cut-resource-bound,
-;;;           min-steps-remaining? (max of LM-cut and finite-resource)
+;;;           topo-lm-cut-resource-bound
 ;;;   diagnostic : analyze-topo-finite-resource-bound,
 ;;;                report-topo-finite-resource-bound-analysis,
 ;;;                analyze-topo-control-setup,
@@ -42,6 +43,15 @@
 
 
 (in-package :ww)
+
+
+(defparameter *min-steps-fallback-warmup* 512
+  "Consecutive nonpruning aggregate lower-bound evaluations before sampling begins.")
+
+
+(defparameter *min-steps-fallback-sample-interval* 64
+  "Admitted nodes between aggregate lower-bound samples after an unproductive warmup.
+One preserves eager evaluation; values above one enable adaptive sampling.")
 
 
 (defparameter *topo-relaxed-static-operators* nil
@@ -1980,12 +1990,8 @@ not an admissible bound, until the concrete capability proves that separation."
   (topo-lm-cut-resource-bound-for state *goal*))
 
 
-(define-query min-steps-remaining? ()
-  (topo-lm-cut-resource-bound))
-
-
-;; Search evaluates this inexpensive admissible sum before the aggregate query.  When it
-;; already proves pruning, the general contributor interface avoids LM-cut entirely.
+;; This inexpensive admissible sum is the generic Topo search bound.  The relaxed queries
+;; above remain available for explicit analysis or a problem-authored aggregate fallback.
 (register-min-steps-remaining-contributor
   'topo-finite-resource-bound
   :priority 10)

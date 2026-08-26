@@ -7,50 +7,13 @@
 
 
 (ww-set *problem-name* rumin-topo)
-
 (ww-set *problem-type* planning)
-
-(ww-set *solution-type* first)
-
+(ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
-
-(ww-set *progress-reporting-interval* 1000000)  ;~2000 states/sec
-
-(ww-set *max-recorder-cycles* 5)  ;allows 1 per subgoal, 5 total
-
-;; Serial search is required here, not merely preferred: goal chaining, novelty pruning and
-;; the recorder's live/ghost interleaving canonicalization all disable themselves when
-;; *THREADS* is non-zero.  It cannot be set from this file -- unlike its peers, the *THREADS*
-;; branch of WW-SET carries no *WW-LOADING* guard, so it calls DISPLAY-CURRENT-PARAMETERS
-;; while the spliced problem is still loading and dies on a not-yet-defined tech function.
-;; Set it at the REPL after staging:  (ww-set *threads* 0)
-
-;; UNSOUND on this problem, not merely unhelpful.  DETECT-SYMMETRY-GROUPS puts CONNECTOR1,
-;; CONNECTOR1*, CONNECTOR2 and CONNECTOR2* in one interchangeable family, so under graph
-;; search the closed list keys live and ghost states to the same canonical form and can
-;; discard the solution.
-(ww-set *symmetry-pruning* nil)
-
-;; Measured at the action-30 boundary of the 90-step solution, at cutoffs 2 and 3: identical
-;; state counts with it on and off, zero states pruned, ~25% more wall clock.  Enable it per
-;; chunk, for a chunk with many ghost moves and long live runs between them.  Still
-;; unmeasured at depth 30.
-(ww-set *recorder-prefix-pruning* t)
-
-;; Novelty pruning is deliberately NOT set here.  It can discard the only path to a
-;; solution, so a standing setting would make every "no solution found" uninformative.
-;; Enable it per run -- see doc/search-strategies/novelty.md -- with
-;;   (ww-set *novelty-pruning* 2) (ww-set *novelty-partition* depth)
-;; and retro-validate against a known plan before believing a negative result.
-
+(ww-set *progress-reporting-interval* 1000000)
+(ww-set *max-recorder-cycles* 5)  ;at most 5 total START-RECORDER actions, one per subgoal
 (ww-set *max-connector-pairings* 2)
-
-;; Bound automatic searches over individual recorder-cycle subgoals.  The known
-;; direct solution is 90 actions and is validated independently of this cutoff.
-(ww-set *depth-cutoff* 30)
-
-
-;;;; TYPES ;;;;
+(ww-set *depth-cutoff* 15)
 
 
 (define-types
@@ -74,9 +37,6 @@
 )
 
 
-;;;; TECHNOLOGY INCLUDES ;;;;
-
-
 (include-tech gate)
 (include-tech plate)
 (include-tech elevation)
@@ -91,7 +51,8 @@
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
-(include-tech topo-lower-bound)
+(include-tech topo-lower-bound)  ;admissible finite-resource bound; prunes on the cutoff before any solution exists
+
 
 ;;;; INITIALIZATION ;;;;
 
@@ -224,116 +185,6 @@
   ()
   (assert (propagate-changes!))
 )
-
-
-;;;; LOWER BOUND ;;;;
-
-;; Cycle-specific supplement to the general LM-cut bound.  It dispatches on
-;; RECORDER-CYCLE-COUNT and returns 0 at boundaries it does not cover.  Each component
-;; counts actions of a disjoint kind (manipulation of one object / session / agent
-;; movement), so the components sum validly within the documented chunks.
-
-(define-query rt-some-agent-holds-connector ()
-  (exists (?a agent)
-    (exists (?c connector)
-      (holding ?a ?c))))
-
-(define-query rt-some-agent-holds-weight ()
-  (exists (?a agent)
-    (or (exists (?t tray) (holding ?a ?t))
-        (exists (?b box) (holding ?a ?b)))))
-
-(define-query rt4-blue-cost ()
-  ;; RECEIVER1 must end lit.  From dark that needs a CONNECT at minimum, plus a PICKUP
-  ;; unless some agent already holds a connector.  No plate-driven gate occludes the
-  ;; loc2 -> loc17 -> receiver1 chain, so there is no cheaper indirect route to lighting it.
-  (if (active receiver1)
-    0
-    (if (rt-some-agent-holds-connector) 1 2)))
-
-(define-query rt4-plate-cost ()
-  ;; PLATE3 must end depressed.  That needs a PUT at minimum, plus a PICKUP unless some
-  ;; agent already holds something that can weigh a plate down.
-  (if (depressed plate3)
-    0
-    (if (rt-some-agent-holds-weight) 1 2)))
-
-(define-query rt4-session-cost ()
-  ;; Cycle 4 must be opened and closed: one START-RECORDER and one STOP-RECORDER.
-  (do (assign $cycles (recorder-cycle-count))
-      (if (< $cycles 4)
-        2
-        (if (recording-in-progress) 1 0))))
-
-(define-query rt4-move-cost ()
-  ;; The agent must finish at LOCATION3.
-  (do (bind (has-location agent1 $agent-location))
-      (if (eql $agent-location 'location3) 0 1)))
-
-
-(define-query rt3-box-cost ()
-  ;; BOX1 must end at LOCATION2.  Only a live agent can move the live box: a PUT at
-  ;; minimum, plus a PICKUP unless it is already held.
-  (if (has-location box1 location2)
-    0
-    (if (exists (?a agent) (holding ?a box1)) 1 2)))
-
-(define-query rt3-session-cost ()
-  (do (assign $cycles (recorder-cycle-count))
-      (if (< $cycles 3)
-        2
-        (if (recording-in-progress) 1 0))))
-
-(define-query rt3-move-cost ()
-  ;; While BOX1 is not at LOCATION2 the live agent must stand where the box is and then
-  ;; carry it to LOCATION2 -- one move if it is already there, two otherwise.
-  (if (has-location box1 location2)
-    0
-    (do (bind (has-location agent1 $agent-location))
-        (bind (has-location box1 $box-location))
-        (if (eql $agent-location $box-location) 1 2))))
-
-;; USING THIS EFFECTIVELY
-;;
-;; The bound prunes when DEPTH + LB exceeds *DEPTH-CUTOFF*, so what matters is not the
-;; bound's size but where pruning starts, at CUTOFF - LB.  Measured on chunk 4: cutoff 10,
-;; bound 7 at the boundary, pruning from depth 3, 6,472 states in 3 s -- against 2,200,000+
-;; states in 32 min with no bound.  Chunk 3: cutoff 15, bound 6, pruning only from depth 9,
-;; 500,000 states and still running.  A bound that leaves the frontier deep buys little.
-;;
-;; The cycle term is CHUNK-SCOPED.  It was written against the chunk-3 and chunk-4
-;; boundaries and carries no admissibility argument anywhere else.  At the chunk-1
-;; boundary RECORDER-CYCLE-COUNT is 0 or 1 and the cycle term falls through to 0, while the
-;; general LM-cut term remains available.  Applied at a boundary it was not written for,
-;; the cycle term is worse than inert: replaying from action 80 of the 90-step solution,
-;; the rt3 terms fired at $cycles = 2 and pruned the goal path, so a solvable search reported
-;; none.  When testing such a boundary, temporarily make RT-CYCLE-MIN-STEPS-REMAINING?
-;; return 0; do not disable the combined MIN-STEPS-REMAINING? query.
-;;
-;; Note the branch tests overlap: $cycles = 3 always takes the first arm, so the rt3 arm is
-;; reachable only at $cycles = 2.  Intended or not, it is what the code does.
-;;
-;; Open work, in order of value: chunk 3's bound counts only box1's 6 of a true 15 and omits
-;; the forced bootstrap, which would take it to about 10-11 and move the frontier from depth
-;; 9 to 4 or 5 -- the regime that made chunk 4 collapse.  Chunks 1, 2 and 5 have no bound at
-;; all.  Keep added terms on disjoint action kinds so the sum stays admissible.
-
-(define-query rt-cycle-min-steps-remaining? ()
-  (do (assign $cycles (recorder-cycle-count))
-      (if (or (= $cycles 3) (= $cycles 4))
-        (+ (rt4-blue-cost) (rt4-plate-cost) (rt4-session-cost) (rt4-move-cost))
-        (if (or (= $cycles 2) (= $cycles 3))
-          (+ (rt3-box-cost) (rt3-session-cost) (rt3-move-cost))
-          0))))
-
-(define-query min-steps-remaining? ()
-  ;; The cycle-specific term is zero at the first two subgoal boundaries.  LM-cut supplies
-  ;; a general bound there; the finite resource term additionally retains exclusive agent
-  ;; locations.  TOPO-LOWER-BOUND registers that cheaper finite-resource term as a search
-  ;; precheck, so this complete aggregate runs only when the precheck cannot already prune.
-  ;; MAX remains safe wherever the narrower cycle term's documented admissibility applies.
-  (max (topo-lm-cut-resource-bound)
-       (rt-cycle-min-steps-remaining?)))
 
 
 ;;;; GOAL ;;;;
