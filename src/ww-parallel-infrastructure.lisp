@@ -806,14 +806,12 @@
             (format t "  Closed-shard load: max=~:D  min=~:D  skew=~A~%"
                     max-c min-c
                     (if (numberp skew) (format nil "~,2Fx" skew) skew))))
-        (format t "  Average dead-end depth: ~A~%"
-                (if (> total-dead-end-paths 0)
-                    (round (/ total-dead-end-depths total-dead-end-paths))
-                    'pending))
-        (format t "  Average duplicate depth: ~A~%"
-                (if (> total-duplicate-paths 0)
-                    (round (/ total-duplicate-depths total-duplicate-paths))
-                    'pending))
+        (when (> total-dead-end-paths 0)
+          (format t "  Average dead-end depth: ~A~%"
+                  (round (/ total-dead-end-depths total-dead-end-paths))))
+        (when (> total-duplicate-paths 0)
+          (format t "  Average duplicate depth: ~A~%"
+                  (round (/ total-duplicate-depths total-duplicate-paths))))
         (when (> total-cutoff-hits 0)
           (format t "  Depth-cutoff hits: ~:D (~,1F%)~%"
                   total-cutoff-hits

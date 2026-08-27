@@ -185,7 +185,7 @@
   ;; this otherwise long-running topology problem.
 
   ;; First subgoal: acquire the connector needed for the receiver network.
-  (holding agent1 connector2)
+  ;; (holding agent1 connector2)
 
   ;; Second subgoal: establish the north-alcove setup that disables wblower2.
   ;; (and (active receiver2)
@@ -199,5 +199,5 @@
   ;; 10.  Hovering there is sustained only while the stream blows, so no BLOWING conjunct
   ;; is needed: if the stream stopped, DROP-OCCUPANTS! would return the agent to location10
   ;; before any goal check.
-  ;; (has-location agent1 location11)
+   (has-location agent1 location11)
 )

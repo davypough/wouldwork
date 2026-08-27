@@ -1525,14 +1525,12 @@ when at least one path through its parent DAG remains viable."
   (when (eql *tree-or-graph* 'graph)
     (format t "~2%Repeated states = ~:D, ie, ~,1F percent"
               *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
-  (format t "~2%Average dead-end depth = ~A"
-          (if (> *dead-end-num-paths* 0)
-              (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))
-              'pending))
-  (format t "~2%Average duplicate depth = ~A"
-          (if (> *duplicate-num-paths* 0)
-              (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))
-              'pending))
+  (when (> *dead-end-num-paths* 0)
+    (format t "~2%Average dead-end depth = ~A"
+            (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))))
+  (when (> *duplicate-num-paths* 0)
+    (format t "~2%Average duplicate depth = ~A"
+            (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))))
   (when (> *depth-cutoff-hits* 0)
     (format t "~2%Depth-cutoff hits = ~:D, ie, ~,1F percent"
             *depth-cutoff-hits*
@@ -1544,15 +1542,12 @@ when at least one path through its parent DAG remains viable."
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P."
             *inconsistent-states-dropped*))
-  (when (> *lower-bound-pruned* 0)
-    (format t "~2%Minimum-steps lower bounds pruned ~:D node~:P, ~,1F% of total states."
+  (when (or (> *lower-bound-pruned* 0) (> *min-steps-contributor-evaluations* 0))
+    (format t "~2%Min-steps-remaining pruned ~:D node~:P, ~,1F% of total states~@[, in ~:D bound evaluations~]."
             *lower-bound-pruned*
-            (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
-  (when (> *min-steps-contributor-evaluations* 0)
-    (format t
-            "~2%Registered lower-bound contributors: evaluated ~:D, pruned ~:D."
-            *min-steps-contributor-evaluations*
-            *min-steps-contributor-prunes*))
+            (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))
+            (when (> *min-steps-contributor-evaluations* 0)
+              *min-steps-contributor-evaluations*)))
   (when (> *min-steps-fallback-evaluations* 0)
     (format t
             "~2%Aggregate lower-bound fallback: evaluated ~:D, skipped ~:D, uniquely pruned ~:D, reactivated ~:D time~:P."
@@ -1838,14 +1833,12 @@ when at least one path through its parent DAG remains viable."
         (format t "~%effective branching factor (b*) = ~,2F"
                 (compute-effective-branching-factor *total-states-processed*
                                                     *max-depth-explored*))))
-    (format t "~%average dead-end depth = ~A"
-            (if (> *dead-end-num-paths* 0)
-                (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))
-                'pending))
-    (format t "~%average duplicate depth = ~A"
-            (if (> *duplicate-num-paths* 0)
-                (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))
-                'pending))
+    (when (> *dead-end-num-paths* 0)
+      (format t "~%average dead-end depth = ~A"
+              (round (/ *dead-end-accumulated-depths* *dead-end-num-paths*))))
+    (when (> *duplicate-num-paths* 0)
+      (format t "~%average duplicate depth = ~A"
+              (round (/ *duplicate-accumulated-depths* *duplicate-num-paths*))))
     (when (> *depth-cutoff-hits* 0)
       (format t "~%depth-cutoff hits = ~:D (~,1F% of total states)"
               *depth-cutoff-hits*
@@ -1882,14 +1875,12 @@ when at least one path through its parent DAG remains viable."
                   *symmetry-pruning-count*
                   (symmetry-pruning-percentage)
                   *symmetry-check-count*))))
-    (when (> *lower-bound-pruned* 0)
-      (format t "~%minimum-steps lower bounds pruned = ~:D (~,1F% of total states)"
+    (when (or (> *lower-bound-pruned* 0) (> *min-steps-contributor-evaluations* 0))
+      (format t "~%min-steps-remaining pruned = ~:D (~,1F% of total states)~@[ in ~:D bound evaluations~]"
               *lower-bound-pruned*
-              (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))))
-    (when (> *min-steps-contributor-evaluations* 0)
-      (format t "~%registered lower-bound contributors: evaluated = ~:D, pruned = ~:D"
-              *min-steps-contributor-evaluations*
-              *min-steps-contributor-prunes*))
+              (* 100.0 (/ *lower-bound-pruned* *total-states-processed*))
+              (when (> *min-steps-contributor-evaluations* 0)
+                *min-steps-contributor-evaluations*)))
     (when (> *min-steps-fallback-evaluations* 0)
       (format t "~%aggregate lower-bound fallback: evaluated = ~:D, skipped = ~:D, uniquely pruned = ~:D"
               *min-steps-fallback-evaluations*
