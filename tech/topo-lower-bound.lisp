@@ -26,10 +26,12 @@
 ;;; depth-first search then samples an unproductive fallback after its technical warmup and
 ;;; immediately resumes eager evaluation if one uniquely prunes.  Parallel search remains
 ;;; eager.
-;;; The complete static model is built once, then backward-sliced from the active goal.
+;;; The generated static model is built once, then backward-sliced from the active goal.
 ;;; Per-state evaluation reads only facts used by that goal-relevant operator slice.
 ;;; Each omission can only shorten the abstract plan.  Unsupported goal forms are omitted
 ;;; from the partial model and therefore contribute zero rather than risking over-pruning.
+;;; The model is not certified complete for unreachability: problem-defined actions may add
+;;; transitions which are deliberately outside this technology-generated abstraction.
 ;;;
 ;;; PROVIDES:
 ;;;   query : topo-relaxed-hmax-bound, topo-relaxed-lm-cut-bound,
@@ -1948,6 +1950,22 @@ not an admissible bound, until the concrete capability proves that separation."
         :indexed-model *topo-relaxed-static-indexed-model*))))
 
 
+(define-problem-helper screen-topo-candidate-state (state context)
+  "Prove a checkpoint beyond an applicable remaining budget using the admissible
+finite-resource bound.  Without such a budget, abstain."
+  (let ((budget
+          (candidate-screening-context-remaining-depth-budget context)))
+    (when budget
+      (let ((bound
+              (topo-finite-resource-bound-for
+                state (candidate-screening-context-final-goal context))))
+        (when (> bound budget)
+          (make-candidate-screening-result
+            :status :impossible :source :topo-finite-resource-bound
+            :reason :lower-bound-exceeds-budget
+            :evidence (list :lower-bound bound :budget budget)))))))
+
+
 (define-problem-helper analyze-topo-relaxed-lm-cut (state goal)
   "Return the Topo LM-cut value and its domain-independent cut records."
   (let ((model (build-topo-relaxed-hmax-model state goal)))
@@ -1995,3 +2013,9 @@ not an admissible bound, until the concrete capability proves that separation."
 (register-min-steps-remaining-contributor
   'topo-finite-resource-bound
   :priority 10)
+
+
+(register-candidate-state-screener
+  'topo-finite-resource-budget
+  'screen-topo-candidate-state
+  :priority 20)

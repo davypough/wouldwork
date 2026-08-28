@@ -92,7 +92,17 @@
   'prune-recorder-boundary-dominated-successor-p
   'recorder-boundary-dominance-enabled-p
   'reset-recorder-boundary-dominance)
+(register-candidate-state-screener
+  'recorder-cycle-consistency
+  'screen-recorder-candidate-state
+  :priority 10)
 (register-solution-report-printer 'print-recorder-report)
 (register-goal-chaining-policy
   'solve-recorder-subgoal-form
-  'solve-recorder-final)
+  'solve-recorder-final
+  :search-runner 'run-recorder-subgoal-planner
+  :prefix-validator 'validate-recorder-goal-chain-prefix
+  :commit-handler 'commit-recorder-goal-chain
+  :state-context 'recorder-goal-chain-state-context
+  :settings-snapshotter 'snapshot-recorder-goal-chain-settings
+  :settings-runner 'call-with-recorder-goal-chain-settings)

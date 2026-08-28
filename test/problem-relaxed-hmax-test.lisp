@@ -1020,6 +1020,8 @@
 (define-test-claim topo-finite-resource-contract
   (equal (mapcar #'second *min-steps-remaining-contributors*)
          '(topo-finite-resource-bound))
+  (find 'topo-finite-resource-budget *candidate-state-screeners*
+        :key #'candidate-state-screener-name :test #'eq)
   (not (fboundp 'min-steps-remaining?))
   (relaxed-bound-short-circuit-test-p)
   (relaxed-bound-adaptive-fallback-test-p)
@@ -1049,6 +1051,33 @@
   (relaxed-resource-test-happening-abstention-p))
 
 
+(define-test-claim topo-candidate-screening-contract
+  (let ((tight
+          (make-candidate-screening-context
+            :final-goal (copy-tree *goal*)
+            :final-goal-function (symbol-function 'goal-fn)
+            :remaining-depth-budget 3))
+        (exact
+          (make-candidate-screening-context
+            :final-goal (copy-tree *goal*)
+            :final-goal-function (symbol-function 'goal-fn)
+            :remaining-depth-budget 4))
+        (unrestricted
+          (make-candidate-screening-context
+            :final-goal (copy-tree *goal*)
+            :final-goal-function (symbol-function 'goal-fn))))
+    (and
+      (eq (candidate-screening-result-status
+            (screen-candidate-state *start-state* tight))
+          :impossible)
+      (eq (candidate-screening-result-status
+            (screen-candidate-state *start-state* exact))
+          :unknown)
+      (eq (candidate-screening-result-status
+            (screen-candidate-state *start-state* unrestricted))
+          :unknown))))
+
+
 (define-test-claim topo-relaxed-hmax-contract
   (member 'build-topo-relaxed-hmax-model
           *relaxed-hmax-model-builders*
@@ -1060,6 +1089,9 @@
     (and (= cost 3) steps))
   (relaxed-hmax-model.validated-p
     (build-topo-relaxed-hmax-model *start-state* *goal*))
+  (not
+    (relaxed-hmax-model.unreachability-complete-p
+      (build-topo-relaxed-hmax-model *start-state* *goal*)))
   (relaxed-indexed-model-p
     (relaxed-hmax-model.indexed-model
       (build-topo-relaxed-hmax-model *start-state* *goal*)))

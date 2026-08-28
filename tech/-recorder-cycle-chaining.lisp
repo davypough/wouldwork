@@ -122,6 +122,7 @@
 (defun recorder-subgoal-replay-state-equal-p (state1 state2)
   "Whether replayed STATE1 is the same planning checkpoint as recorded STATE2."
   (and (equalp (problem-state.idb state1) (problem-state.idb state2))
+       (equalp (problem-state.hidb state1) (problem-state.hidb state2))
        (= (problem-state.time state1) (problem-state.time state2))
        (= (problem-state.value state1) (problem-state.value state2))
        (equalp (problem-state.happenings state1)
@@ -179,55 +180,6 @@
       (unless valid-p
         (error "Accumulated recorder path was rejected: ~S" diagnostic)))
     solution))
-
-
-(defun start-recorder-subgoal-chain (original-goal)
-  "Create a checkpoint chain rooted at the current staged state."
-  (setf *recorder-subgoal-chain*
-        (make-recorder-subgoal-chain
-          :origin-state (copy-problem-state *start-state*)
-          :original-goal (copy-tree original-goal)
-          :segments nil)))
-
-
-(defun recorder-subgoal-cumulative-metrics (solution)
-  "Return cumulative depth, elapsed time, and value change for SOLUTION."
-  (let ((origin (recorder-subgoal-chain-origin)))
-    (values
-      (solution.depth solution)
-      (- (solution.time solution) (problem-state.time origin))
-      (- (solution.value solution) (problem-state.value origin)))))
-
-
-(defun make-recorder-subgoal-segment-record (goal-form final-p solution)
-  "Build a segment record for GOAL-FORM and selected segment SOLUTION."
-  (let* ((prior-segments (recorder-subgoal-chain-segments))
-         (temporary-segment
-           (make-recorder-subgoal-segment
-             :goal (copy-tree goal-form)
-             :solution (copy-solution-deeply solution)
-             :solution-type *solution-type*
-             :final-p final-p))
-         (segments (append prior-segments (list temporary-segment)))
-         (cumulative-solution
-           (validate-recorder-subgoal-cumulative-path segments)))
-    (multiple-value-bind (depth elapsed-time value-change)
-        (recorder-subgoal-cumulative-metrics cumulative-solution)
-      (setf (recorder-subgoal-segment.cumulative-depth temporary-segment) depth
-            (recorder-subgoal-segment.cumulative-time temporary-segment) elapsed-time
-            (recorder-subgoal-segment.cumulative-value temporary-segment) value-change
-            (recorder-subgoal-segment.cycle-count temporary-segment)
-              (recorder-state-cycle-count (solution.goal solution))
-            (recorder-subgoal-segment.recording-open-p temporary-segment)
-              (not (null (recorder-state-recording-open-p
-                           (solution.goal solution)))))
-      (values temporary-segment cumulative-solution))))
-
-
-(defun append-recorder-subgoal-segment (segment)
-  "Append accepted SEGMENT to the active chain."
-  (setf (recorder-subgoal-chain.segments *recorder-subgoal-chain*)
-        (append (recorder-subgoal-chain-segments) (list segment))))
 
 
 (defun print-recorder-subgoal-status (segment stream)
@@ -311,70 +263,140 @@
       (setf *solution-report-printers* saved-printers))))
 
 
-(defun commit-recorder-subgoal (goal-form final-p)
-  "Commit the selected segment for GOAL-FORM and return its cumulative solution."
-  (let ((selected (copy-solution-deeply (select-continuation-solution))))
-    (multiple-value-bind (segment cumulative-solution)
-        (make-recorder-subgoal-segment-record goal-form final-p selected)
-      (append-recorder-subgoal-segment segment)
-      (print-recorder-subgoal-status segment *standard-output*)
-      (if final-p
-        (progn
-          (install-compiled-goal goal-form)
-          ;; The retained solution is the complete path, so expose the original staged
-          ;; state as its baseline just as an ordinary, unchained solve would.
-          (setf *start-state*
-                  (copy-problem-state (recorder-subgoal-chain-origin))
-                *solution-paths* (list cumulative-solution)
-                *solutions-valid* t
-                *final-goal* nil)
-          (print-recorder-subgoal-chain-report)
-          (print-recorder-report cumulative-solution))
-        (install-recorder-subgoal-baseline (solution.goal selected)))
-      cumulative-solution)))
+(defparameter *recorder-goal-chain-setting-symbols*
+  '(*max-recorder-cycles* *max-connector-pairings* *recorder-prefix-pruning*
+    *min-steps-fallback-warmup* *min-steps-fallback-sample-interval*)
+  "Talos search settings restored when an earlier recorder milestone is revisited.")
 
 
-(defun run-recorder-subgoal-search (goal-form final-p)
-  "Search one user GOAL-FORM, append it to the current chain, and retain its checkpoint."
-  (let ((completed nil))
-    (unwind-protect
-        (progn
-          (install-compiled-goal goal-form)
-          (run-recorder-subgoal-planner)
-          (let ((solution
-                  (when *solutions-valid*
-                    (commit-recorder-subgoal goal-form final-p))))
-            (setf completed t)
-            (unless solution
-              (format t "~&Recorder subgoal produced no solution. Retry from the current ~
-                         checkpoint, or use (ww-undo) to restore the preceding session.~%"))
-            solution))
-      (unless completed
-        (setf *solution-paths* nil
-              *solutions-valid* nil)
-        (format t "~&Recorder subgoal interrupted. Use (ww-undo) to restore the preceding ~
-                   session.~%")))))
+(defun snapshot-recorder-goal-chain-settings ()
+  "Capture bound Talos settings that can affect continuation feasibility."
+  (loop for symbol in *recorder-goal-chain-setting-symbols*
+        when (boundp symbol)
+          collect (cons symbol (copy-tree (symbol-value symbol)))))
+
+
+(defun call-with-recorder-goal-chain-settings (settings thunk)
+  "Call THUNK with recorder/Talos SETTINGS dynamically restored."
+  (progv (mapcar #'car settings) (mapcar #'cdr settings)
+    (funcall thunk)))
+
+
+(defun recorder-goal-chain-state-context (state phases)
+  "Return recorder lifecycle context supplementing the generic exact state key."
+  (declare (ignore phases))
+  (list :cycle-count (recorder-state-cycle-count state)
+        :recording-open-p
+          (not (null (recorder-state-recording-open-p state)))))
+
+
+(defun screen-recorder-candidate-state (state context)
+  "Prove latent recorder inconsistency on an independent normalized copy."
+  (declare (ignore context))
+  (let ((candidate (copy-problem-state state)))
+    (unless (recorder-cycle-state-consistent-p candidate)
+      (make-candidate-screening-result
+        :status :impossible :source :recorder-cycle
+        :reason :inconsistent-recorder-state))))
+
+
+(defun ensure-recorder-chain-for-goal-chain-session (session)
+  "Ensure recorder reporting has the generic SESSION's original baseline."
+  (unless *recorder-subgoal-chain*
+    (setf *recorder-subgoal-chain*
+          (make-recorder-subgoal-chain
+            :origin-state
+              (copy-problem-state (goal-chain-session-origin-state session))
+            :original-goal
+              (copy-tree (goal-chain-session-original-goal session))
+            :segments nil)))
+  *recorder-subgoal-chain*)
+
+
+(defun recorder-phase-solution-type (phase)
+  "Return PHASE's saved solution policy rather than the caller's current setting."
+  (cdr
+    (assoc '*solution-type*
+           (goal-chain-search-settings-bindings
+             (goal-chain-request-settings
+               (goal-chain-phase-request phase))))))
+
+
+(defun recorder-segments-from-goal-chain-phases (session phases)
+  "Project generic PHASES into validated recorder reporting segments."
+  (ensure-recorder-chain-for-goal-chain-session session)
+  (let ((segments nil))
+    (dolist (phase phases)
+      (let* ((request (goal-chain-phase-request phase))
+             (solution (goal-chain-phase-solution phase))
+             (segment
+               (make-recorder-subgoal-segment
+                 :goal (copy-tree (goal-chain-request-goal request))
+                 :solution (copy-solution-deeply solution)
+                 :solution-type (recorder-phase-solution-type phase)
+                 :final-p (goal-chain-request-final-p request))))
+        (setf segments (append segments (list segment)))
+        (setf (recorder-subgoal-segment.cumulative-depth segment)
+                (length (recorder-subgoal-chain-path segments))
+              (recorder-subgoal-segment.cumulative-time segment)
+                (- (solution.time solution)
+                   (problem-state.time (recorder-subgoal-chain-origin)))
+              (recorder-subgoal-segment.cumulative-value segment)
+                (- (solution.value solution)
+                   (problem-state.value (recorder-subgoal-chain-origin)))
+              (recorder-subgoal-segment.cycle-count segment)
+                (recorder-state-cycle-count (solution.goal solution))
+              (recorder-subgoal-segment.recording-open-p segment)
+                (not (null
+                       (recorder-state-recording-open-p
+                         (solution.goal solution)))))))
+    ;; Validate once against the last requested milestone.  Validating each shorter
+    ;; prefix here would incorrectly apply the later goal to earlier checkpoints.
+    (validate-recorder-subgoal-cumulative-path segments)
+    segments))
+
+
+(defun validate-recorder-goal-chain-prefix (session phases)
+  "Require exact cumulative recorder replay for tentative generic PHASES."
+  (recorder-segments-from-goal-chain-phases session phases)
+  t)
+
+
+(defun commit-recorder-goal-chain (session phases final-p)
+  "Replace the recorder projection atomically after generic recovery succeeds."
+  (let* ((segments (recorder-segments-from-goal-chain-phases session phases))
+         (last-segment (car (last segments)))
+         (last-solution (recorder-subgoal-segment.solution last-segment)))
+    (setf (recorder-subgoal-chain.segments *recorder-subgoal-chain*) segments)
+    (print-recorder-subgoal-status last-segment *standard-output*)
+    (if final-p
+      (let ((cumulative-solution
+              (validate-recorder-subgoal-cumulative-path segments)))
+        (install-compiled-goal (goal-chain-session-original-goal session))
+        (setf *start-state*
+                (copy-problem-state (goal-chain-session-origin-state session))
+              *solution-paths* (list cumulative-solution)
+              *solutions-valid* t
+              *final-goal* nil)
+        (print-recorder-subgoal-chain-report)
+        (print-recorder-report cumulative-solution)
+        cumulative-solution)
+      (progn
+        (install-compiled-goal
+          (goal-chain-request-goal (goal-chain-phase-request (car (last phases)))))
+        (install-recorder-subgoal-baseline (solution.goal last-solution))))))
 
 
 (defun solve-recorder-subgoal-form (goal-form)
   "Solve GOAL-FORM as the next certified checkpoint, without forcing a cycle boundary."
   (validate-recorder-subgoal-orchestration)
-  (save-undo-checkpoint)
-  (unless *recorder-subgoal-chain*
-    (start-recorder-subgoal-chain *goal*))
-  (unless *final-goal*
-    (setf *final-goal*
-          (copy-tree
-            (recorder-subgoal-chain.original-goal *recorder-subgoal-chain*))))
-  (run-recorder-subgoal-search goal-form nil))
+  (run-goal-chain-request goal-form nil))
 
 
 (defun solve-recorder-final ()
   "Finish the active checkpoint chain with the original unstrengthened problem goal."
   (validate-recorder-subgoal-orchestration)
-  (unless *recorder-subgoal-chain*
+  (unless *goal-chain-session*
     (error "No recorder subgoal chain is active."))
-  (save-undo-checkpoint)
-  (run-recorder-subgoal-search
-    (copy-tree (recorder-subgoal-chain.original-goal *recorder-subgoal-chain*))
-    t))
+  (run-goal-chain-request
+    (copy-tree (goal-chain-session-original-goal *goal-chain-session*)) t))

@@ -393,7 +393,7 @@
   (when *global-invariants*
     (unless (validate-global-invariants nil *start-state*)
       (format t "~%Invariant validation failed on initial state.~%")
-      (return-from dfs nil)))
+      (return-from dfs :invalid-start)))
   (when (fboundp 'bounding-function?)
     (setf *upper-bound*
           (funcall (symbol-function 'bounding-function?) *start-state*)))
@@ -472,7 +472,9 @@
     (let* ((start-goal-p (goal (node.state start-node)))
            (accepted-start-goal-p
              (and start-goal-p
-                  (candidate-solution-valid-p nil (node.state start-node)))))
+                  (candidate-solution-valid-p nil (node.state start-node))
+                  (not (goal-chain-candidate-rejected-p
+                         nil (node.state start-node))))))
       (when accepted-start-goal-p
         (register-solution start-node))
       (unless (and accepted-start-goal-p
@@ -493,10 +495,14 @@
     (when *hybrid-mode*
       (finalize-hybrid-solutions))
     (let ((*package* (find-package :ww)))  ;avoid printing package prefixes
-      (unless *shutdown-requested*
-        (summarize-search-results (if (solution-count-reached-p)  ; handle fixnum
-                                    'first
-                                    'exhausted))))))
+      (if *shutdown-requested*
+        :shutdown
+        (let ((condition
+                (if (and *solution-paths* (solution-count-reached-p))
+                  'first
+                  'exhausted)))
+          (summarize-search-results condition)
+          (if (eq condition 'first) :solution-limit-reached :exhausted))))))
 
 
 (defun auto-wait-debug-find-prop (props pred &rest prefix)
@@ -844,6 +850,16 @@ when at least one path through its parent DAG remains viable."
             parent-paths))))
 
 
+(defun goal-chain-candidate-rejected-p (path state)
+  "Whether the active milestone search context rejects endpoint STATE.
+
+This check deliberately runs before graph duplicate handling.  A rejected goal state
+is still admitted as an ordinary search successor, because a later descendant may be a
+different acceptable milestone state."
+  (and *goal-chain-candidate-rejector*
+       (funcall *goal-chain-candidate-rejector* path state)))
+
+
 (defun process-successors (succ-states current-node open)
   "Processes successor states: checks goals, handles duplicates, generates nodes.
    In hybrid mode, accumulates parent pointers for multi-path enumeration."
@@ -875,15 +891,21 @@ when at least one path through its parent DAG remains viable."
                ;; a rejected goal prefix can be repaired by later actions.
                (unless *solution-validators*
                  (next-iteration)))
-              ((candidate-solution-valid-p
-                 (candidate-path-to-goal-node goal-node) succ-state)
-               (register-solution goal-node)
-               (if (solution-count-reached-p)
-                 (return-from process-successors '(first))
-                 (next-iteration)))
               (t
-               (narrate "Candidate goal rejected by solution validator"
-                        succ-state succ-depth)))))
+               (let ((candidate-path (candidate-path-to-goal-node goal-node)))
+                 (cond
+                   ((not (candidate-solution-valid-p candidate-path succ-state))
+                    (narrate "Candidate goal rejected by solution validator"
+                             succ-state succ-depth))
+                   ((goal-chain-candidate-rejected-p candidate-path succ-state)
+                    (narrate "Candidate checkpoint rejected for this continuation"
+                             succ-state succ-depth))
+                   (t
+                    (register-solution goal-node)
+                    (if (solution-count-reached-p)
+                      (return-from process-successors '(first))
+                      (next-iteration))))))
+              )))
         (unless (boundp 'goal-fn)
           (process-min-max-value succ-state))
         (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
@@ -1980,17 +2002,48 @@ when at least one path through its parent DAG remains viable."
   ;; Clear here rather than relying on DFS, whose initial-invariant failure exits before
   ;; DFS's own search-statistics reset.
   (setf *solution-paths* nil
-        *solutions-valid* nil)
-  (let ((completed nil))
+        *solutions-valid* nil
+        *last-search-outcome*
+          (make-search-outcome :status :unknown :reason :running))
+  (let ((completed nil)
+        (dfs-result nil))
     (unwind-protect
-        (progn
+        (handler-bind
+            ((storage-condition
+               (lambda (condition)
+                 (declare (ignore condition))
+                 (setf *last-search-outcome*
+                       (make-search-outcome
+                         :status :unknown :reason :out-of-memory))))
+             (serious-condition
+               (lambda (condition)
+                 (declare (ignore condition))
+                 (when (eq (search-outcome-reason *last-search-outcome*) :running)
+                   (setf *last-search-outcome*
+                         (make-search-outcome
+                           :status :unknown :reason :interrupted))))))
           (if (> *threads* 0)
             (format t "~%working with ~D thread(s)...~2%" *threads*)
             (format t "~%working...~2%"))
-          (time (dfs))
-          (setf completed t))
+          (setf dfs-result (time (dfs))
+                completed t))
       (setf *solutions-valid*
-            (and completed (not (null *solution-paths*))))))
+            (and completed
+                 (member dfs-result '(:solution-limit-reached :exhausted))
+                 (not (null *solution-paths*))))
+      (when completed
+        (setf *last-search-outcome*
+              (cond
+                ((and *solutions-valid* (eq dfs-result :exhausted))
+                 (make-search-outcome
+                   :status :exhausted-with-solutions :reason :complete))
+                (*solutions-valid*
+                 (make-search-outcome :status :solution :reason dfs-result))
+                ((eq dfs-result :exhausted)
+                 (make-search-outcome
+                   :status :exhausted-no-solution :reason :complete))
+                (t
+                 (make-search-outcome :status :unknown :reason dfs-result)))))))
   (in-package :ww))
 
 

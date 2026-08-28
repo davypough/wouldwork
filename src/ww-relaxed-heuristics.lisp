@@ -28,6 +28,7 @@
   (operators nil :type list)
   (goals nil :type list)
   (validated-p nil)
+  (unreachability-complete-p nil)
   indexed-model)
 
 
@@ -928,7 +929,9 @@ never turn an unknown fact into proof that the concrete problem is impossible."
                      models)
              :test #'equal)
     :validated-p
-      (every #'relaxed-hmax-model.validated-p models)))
+      (every #'relaxed-hmax-model.validated-p models)
+    :unreachability-complete-p
+      (every #'relaxed-hmax-model.unreachability-complete-p models)))
 
 
 (defun registered-relaxed-model (state goal)
@@ -959,6 +962,31 @@ never turn an unknown fact into proof that the concrete problem is impossible."
           :ignore-unreachable t
           :validate (not (relaxed-hmax-model.validated-p model))))
       0)))
+
+
+(defun registered-relaxed-goal-reachability (state goal)
+  "Return :REACHABLE, :UNREACHABLE, or :UNKNOWN for registered relaxations.
+
+Only a model explicitly marked complete for unreachability may return
+:UNREACHABLE.  A relaxed path is not a concrete continuation, so reachability
+remains :UNKNOWN to candidate screening."
+  (let ((model (registered-relaxed-model state goal)))
+    (cond
+      ((or (null model)
+           (null (relaxed-hmax-model.goals model))
+           (not (relaxed-hmax-model.unreachability-complete-p model)))
+       :unknown)
+      ((if (relaxed-hmax-model.indexed-model model)
+         (relaxed-indexed-hmax-cost
+           (relaxed-hmax-model.facts model)
+           (relaxed-hmax-model.indexed-model model))
+         (relaxed-hmax-cost
+           (relaxed-hmax-model.facts model)
+           (relaxed-hmax-model.operators model)
+           (relaxed-hmax-model.goals model)
+           :validate (not (relaxed-hmax-model.validated-p model))))
+       :reachable)
+      (t :unreachable))))
 
 
 (defun registered-relaxed-lm-cut-bound (state goal)

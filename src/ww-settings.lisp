@@ -45,6 +45,58 @@ MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specif
       (fboundp 'min-steps-remaining?)))
 
 
+(defstruct candidate-screening-context
+  "Exact context supplied to sound checkpoint screeners."
+  final-goal
+  final-goal-function
+  remaining-depth-budget
+  continuation-key)
+
+
+(defstruct candidate-screening-result
+  "Tri-state checkpoint screening evidence.
+
+STATUS is one of :IMPOSSIBLE, :POSSIBLE, or :UNKNOWN.  Only :IMPOSSIBLE may
+exclude a checkpoint, and only when SOURCE and REASON identify a sound proof.
+:POSSIBLE is reserved for a concrete continuation witness."
+  status source reason evidence witness)
+
+
+(defstruct candidate-state-screener
+  "One problem-local sound proof source, ordered by PRIORITY."
+  name function (priority 0 :type integer))
+
+
+(sb-ext:defglobal *candidate-state-screeners* nil
+  "Problem-local sound checkpoint screeners.
+
+Each function accepts (STATE CONTEXT) and returns NIL for unknown or a
+CANDIDATE-SCREENING-RESULT.  Ordinary heuristic scores and incomplete probes
+must return unknown rather than :IMPOSSIBLE.")
+
+
+(defun register-candidate-state-screener
+    (name function-name &key (priority 0))
+  "Register a problem-local sound checkpoint screener."
+  (unless (symbolp name)
+    (error "Candidate-state screener name must be a symbol: ~S" name))
+  (unless (and (symbolp function-name) (fboundp function-name))
+    (error "Candidate-state screener requires a defined function: ~S"
+           function-name))
+  (check-type priority integer)
+  (when (find name *candidate-state-screeners*
+              :key #'candidate-state-screener-name :test #'eq)
+    (error "Candidate-state screener registered twice: ~S" name))
+  (setf *candidate-state-screeners*
+        (stable-sort
+          (append *candidate-state-screeners*
+                  (list (make-candidate-state-screener
+                          :name name :function function-name
+                          :priority priority)))
+          #'< :key #'candidate-state-screener-priority))
+  name)
+
+
 (unless (boundp '*probe*)
   (defvar *probe* nil
     "Inserts a probe to stop processing at a specific state."))
@@ -221,6 +273,25 @@ MIN-STEPS-REMAINING? query remains the final fallback, preserving problem-specif
 (sb-ext:defglobal *solutions-valid* nil
   "Whether *solution-paths* came from a search that completed normally.")
 
+
+(defstruct search-outcome
+  "Durable classification of the most recent planner run."
+  status
+  reason)
+
+
+(sb-ext:defglobal *last-search-outcome*
+  nil
+  "The most recent planner run's result, including failures without solutions.")
+
+
+(defvar *goal-chain-candidate-rejector* nil
+  "Dynamically bound predicate for rejecting one milestone endpoint contextually.")
+
+
+(sb-ext:defglobal *goal-chain-stage-generation* 0
+  "Monotonic staged-problem generation used in exact checkpoint identities.")
+
 (sb-ext:defglobal *solution-report-printers* nil
   "Problem-local functions called after Wouldwork prints a solution.")
 
@@ -393,28 +464,47 @@ All supplied functions must be read-only and safe to call concurrently."
 (defstruct goal-chaining-policy
   "Problem-local implementations behind the public goal-chaining commands."
   subgoal-solver
-  final-solver)
+  final-solver
+  search-runner
+  prefix-validator
+  commit-handler
+  state-context
+  settings-snapshotter
+  settings-runner)
 
 
 (sb-ext:defglobal *goal-chaining-policy* nil
   "Active problem-local goal-chaining policy, or NIL for generic goal chaining.")
 
 
-(defun register-goal-chaining-policy (subgoal-solver final-solver)
+(defun register-goal-chaining-policy
+    (subgoal-solver final-solver
+     &key search-runner prefix-validator commit-handler state-context
+          settings-snapshotter settings-runner)
   "Register specialized implementations for SOLVE-SUBGOAL and mid-chain SOLVE.
 
 SUBGOAL-SOLVER names a function of one goal-form argument.  FINAL-SOLVER names a
 function of no arguments.  Staging another problem clears the policy."
-  (dolist (solver (list subgoal-solver final-solver))
-    (unless (and (symbolp solver) (fboundp solver))
-      (error "Goal-chaining solver must name a defined function: ~S" solver)))
+  (dolist (function-name
+           (remove nil
+             (list subgoal-solver final-solver search-runner prefix-validator
+                   commit-handler state-context settings-snapshotter settings-runner)))
+    (unless (and (symbolp function-name) (fboundp function-name))
+      (error "Goal-chaining policy requires a defined function: ~S"
+             function-name)))
   (when *goal-chaining-policy*
     (error "A goal-chaining policy is already registered: ~S"
            *goal-chaining-policy*))
   (setf *goal-chaining-policy*
         (make-goal-chaining-policy
           :subgoal-solver subgoal-solver
-          :final-solver final-solver)))
+          :final-solver final-solver
+          :search-runner search-runner
+          :prefix-validator prefix-validator
+          :commit-handler commit-handler
+          :state-context state-context
+          :settings-snapshotter settings-snapshotter
+          :settings-runner settings-runner)))
 
 
 (defun register-goal-chaining-checkpoint-extension (name snapshotter restorer)

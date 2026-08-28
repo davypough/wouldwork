@@ -398,6 +398,8 @@ is staged again.
      (funcall
        (symbol-function
          (goal-chaining-policy-final-solver *goal-chaining-policy*))))
+    (*goal-chain-session*
+     (solve-generic-final))
     (t
       ;; Mid-chain: consume the last subgoal result and reinstate the original goal.
       (continue-from-solution *final-goal*)
