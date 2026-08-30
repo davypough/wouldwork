@@ -15,6 +15,8 @@
 ;;;   6. Jammer-only gate-target and gun derivation, including the deliberate
 ;;;      absence of intervening locations from those two occluder lists.
 ;;;   7. Finite-height edge clearance, while ordinary sight remains opaque.
+;;;   8. An initial connector pairing accepted before coordinate-derived LOS exists, with
+;;;      that exact connector-location-to-receiver sightline present after initialization.
 ;;;
 ;;; The goal is the characterization query itself.  No action or propagation is
 ;;; needed: DERIVE-LOS-FROM-SEGMENTS establishes the static LOS tables during
@@ -62,6 +64,7 @@
             boundary-left
             boundary-right)
   transmitter (clear-transmitter)
+  connector (initial-connector)
   receiver (clear-receiver
             wall-interior-receiver
             wall-corner-receiver
@@ -80,6 +83,7 @@
 ;;;; TECHNOLOGY INCLUDE ;;;;
 
 
+(include-tech beam-relay)
 (include-tech visibility)
 
 (defparameter *beam-occlusion-tolerance* 2/5)
@@ -96,6 +100,11 @@
 
 (define-init
   (has-location idle-agent idle)
+  ;; The jammer exists physically at a harmless off-lane site; its type enables the
+  ;; jammer-only gate/gun LOS derivation exercised below.
+  (has-location derivation-enabler idle)
+  (has-location initial-connector clear-site)
+  (paired initial-connector clear-receiver)
   (open open-gate)
 
   ;; All ordinary bands lie below y=72, inside the solid lower part of this
@@ -188,6 +197,13 @@
 
 (define-query beam-los-coordinates-scenarios-valid ()
   (and
+    ;; The initial PAIRED fact passes validation on the pending coordinate derivation, and
+    ;; the normal LOS init action subsequently supplies its exact structural sightline.
+    (has-location initial-connector clear-site)
+    (paired initial-connector clear-receiver)
+    (bind (los-via clear-site $paired-occluders clear-receiver))
+    (null $paired-occluders)
+
     ;; Direct derivation for each ordinary apparatus family.
     (bind (los-via clear-site $transmitter-occluders clear-transmitter))
     (null $transmitter-occluders)
@@ -291,7 +307,7 @@
 
     ;; The state itself is unchanged by this zero-action characterization.
     (has-location idle-agent idle)
-    (not (has-location derivation-enabler idle))))
+    (has-location derivation-enabler idle)))
 
 
 (define-goal

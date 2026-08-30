@@ -83,7 +83,11 @@
   ;; floor is elevation seven.
   (has-location lifecycle-jammer lifecycle-origin)
   (has-height lifecycle-jammer 1)
-  (has-elevation lifecycle-destination 7))
+  (has-elevation lifecycle-destination 7)
+
+  ;; These instances keep the optional support leaves populated for the substrate
+  ;; characterization.  The fan remains harmless because it is not a beam blocker.
+  (has-location unused-fan empty-site))
 
 
 ;;;; LIFECYCLE TRIGGER ;;;;

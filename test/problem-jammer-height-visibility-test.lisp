@@ -56,6 +56,17 @@
   (gate-segment> sight-gate 7 -1 7 3))
 
 
+(define-test-claim jammer-coordinate-topology-validation
+  ;; The raw segment activates the later coordinate-derived LOS pass, so validation
+  ;; does not require a generated LOS-VIA fact to exist before init actions run.
+  (null
+    (validate-init-literals
+      '((has-location height-jammer height-site)
+        (jamming height-jammer height-gun)
+        (wall-segment> height-wall 5 -1 5 3))
+      :checks '(jammer-init-check))))
+
+
 (define-query jammer-height-visibility-scenarios-valid ()
   (and
     (has-location height-agent height-site)

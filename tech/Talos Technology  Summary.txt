@@ -70,8 +70,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (crossing-active crossing)
 (depressed plate)
 (has-location mobile-object $location)
-(holding $agent $cargo :bijective)  ;reverse lookup, e.g. (bind (holding $holder ?tray))
-(jamming jammer $target)
+(holding $agent $cargo :bijective)  ;live cargo must be located, held, or mounted; a held tray retains its holder's location
+(jamming jammer $target)  ;an initial active jammer must be located and unheld; physical visibility also requires potential target topology
 (latched toggle-plate)
 (lethal threat)
 (mounted-on fan $gears)

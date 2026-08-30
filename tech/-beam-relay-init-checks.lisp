@@ -1,6 +1,8 @@
 ;;; Filename: -beam-relay-init-checks.lisp
 
 ;;; Initialization validation for connector pairing and relay sightlines.
+;;; Coordinate-authored visibility derives its LOS-VIA facts after DEFINE-INIT validation,
+;;; so raw segment geometry is also accepted here as a pending source of those sightlines.
 
 
 (in-package :ww)
@@ -90,25 +92,6 @@
                              Target:    ~S"
                             connector target))))
                edges))))
-
-
-(define-init-check-helper init-apparatus-has-potential-sightline-p (apparatus literals)
-  (some (lambda (literal)
-          (destructuring-bind (los-location occluders los-apparatus)
-              (rest (init-literal-proposition literal))
-            (declare (ignore los-location occluders))
-            (eql apparatus los-apparatus)))
-        (positive-init-literals-with-relation 'los-via literals)))
-
-
-(define-init-check-helper init-location-has-potential-sightline-p (location literals)
-  (some (lambda (literal)
-          (destructuring-bind (los-location1 occluders los-location2)
-              (rest (init-literal-proposition literal))
-            (declare (ignore occluders))
-            (or (eql location los-location1)
-                (eql location los-location2))))
-        (positive-init-literals-with-relation 'los-via literals)))
 
 
 (define-init-check-helper init-check-paired-apparatus-sightline

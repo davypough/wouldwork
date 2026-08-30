@@ -138,6 +138,84 @@
          (apply (action.pre-defun-name action) state args))))
 
 
+(define-test-helper jammer-live-cargo-literals ()
+  ;; Four distinct agents may each hold one unlocated jammer.  The remaining live
+  ;; jammer is grounded, so every cargo instance has exactly one location source.
+  '((has-location gate-agent gate-site)
+    (holding gate-agent gate-jammer)
+    (has-location wall-agent wall-vantage)
+    (holding wall-agent wall-jammer)
+    (has-location floor-agent floor-site)
+    (holding floor-agent floor-jammer)
+    (has-location disallowed-agent disallowed-site)
+    (holding disallowed-agent disallowed-jammer)
+    (has-location lifecycle-jammer lifecycle-gears-site)))
+
+
+(define-test-claim live-cargo-physical-state-validation
+  (null
+    (validate-init-literals
+      (jammer-live-cargo-literals)
+      :checks '(cargo-physical-state-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        (remove '(has-location lifecycle-jammer lifecycle-gears-site)
+                (jammer-live-cargo-literals)
+                :test #'equal)
+        :checks '(cargo-physical-state-init-check)))
+    'init-check-failure
+    :containing "live cargo no physical state"
+    :check 'cargo-physical-state-init-check))
+
+
+(define-test-claim jammer-positive-initialization-validation
+  ;; A placed jammer may actively suppress a drive at the same location.
+  (null
+    (validate-init-literals
+      '((has-location lifecycle-jammer lifecycle-gears-site)
+        (has-position lifecycle-target lifecycle-gears-site)
+        (jamming lifecycle-jammer lifecycle-target))
+      :checks '(jammer-init-check)))
+  ;; Point targets require authored physical topology when VISIBILITY is installed.
+  (null
+    (validate-init-literals
+      '((has-location gate-jammer gate-site)
+        (jamming gate-jammer gate-target)
+        (los-via wall-vantage () gate-target))
+      :checks '(jammer-init-check)))
+  ;; Held cargo is unlocated and cannot simultaneously be an active jammer.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((holding gate-agent gate-jammer)
+          (jamming gate-jammer gate-target)
+          (los-via wall-vantage () gate-target))
+        :checks '(jammer-init-check)))
+    'init-check-failure
+    :containing "JAMMING jammer is held and therefore unlocated"
+    :check 'jammer-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((jamming gate-jammer gate-target)
+          (los-via wall-vantage () gate-target))
+        :checks '(jammer-init-check)))
+    'init-check-failure
+    :containing "JAMMING jammer has no HAS-LOCATION"
+    :check 'jammer-init-check)
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-location gate-jammer gate-site)
+          (jamming gate-jammer gate-target)
+          (not (los-via wall-vantage () gate-target)))
+        :checks '(jammer-init-check)))
+    'init-check-failure
+    :containing "JAMMING target has no potential LOS-VIA"
+    :check 'jammer-init-check))
+
+
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
 
 

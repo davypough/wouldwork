@@ -22,7 +22,8 @@
 ;;;               -reachability (identity-default reachable, overridden by reachability);
 ;;;               -visibility (null-default elevation-visible-for-object interface); -pickup (pickup-clear,
 ;;;               shared with box and beam-relay); -recorder-fork-registry (jamming fact
-;;;               fork)  --  all shared via nested include-tech rather than local declaration
+;;;               fork); -jammer-init-checks (active placement and topology validation)
+;;;               -- all shared via nested include-tech rather than local declaration
 ;;;   extension : visibility overrides -visibility's null default with authored LOS
 ;;;   driver    : propagate-changes! (master), nested above rather than assumed from a peer;
 ;;;               (jamming ...) is consumed by gate's update-gate-status!
@@ -43,6 +44,7 @@
 (include-tech -placement)
 (include-tech -reachability)
 (include-tech -visibility)
+(include-tech -jammer-init-checks)
 (include-tech -pickup)
 (include-tech -recorder-fork-registry)
 

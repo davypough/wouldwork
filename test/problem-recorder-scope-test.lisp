@@ -41,6 +41,7 @@
   (recording-copy> live-fan ghost-fan)
   (has-location live-agent source-site)
   (has-location ghost-agent source-site)
+  (has-location live-fan source-site)
   (has-position recorder1 source-site)
   (has-position plate1 source-site)
   (has-position wall-gears1 source-site)

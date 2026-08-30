@@ -6,4 +6,6 @@ artifacts/
 .claude/
 .agents/
 .asdf-cache/
+.codex-fasl/
 _to_delete/
+tmp/

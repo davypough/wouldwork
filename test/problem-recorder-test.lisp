@@ -49,7 +49,9 @@
   (has-location ghost-agent recorder-site)
   (recording-copy> live-agent ghost-agent)
   (recording-copy> live-connector ghost-connector)
-  (recording-copy> live-fan ghost-fan))
+  (recording-copy> live-fan ghost-fan)
+  (has-location live-connector recorder-site)
+  (has-location live-fan recorder-site))
 
 
 ;;;; SCHEMA AND VALIDATION CHARACTERIZATION ;;;;
@@ -71,6 +73,27 @@
       'solve-recorder-subgoal-form)
   (eq (goal-chaining-policy-final-solver *goal-chaining-policy*)
       'solve-recorder-final))
+
+
+(define-test-claim recorder-cargo-physical-state-validation
+  ;; Live endpoints need physical state; their mapped ghosts deliberately begin absent.
+  (null
+    (validate-init-literals
+      '((recording-copy> live-connector ghost-connector)
+        (recording-copy> live-fan ghost-fan)
+        (has-location live-connector recorder-site)
+        (has-location live-fan recorder-site))
+      :checks '(cargo-physical-state-init-check)))
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((recording-copy> live-connector ghost-connector)
+          (recording-copy> live-fan ghost-fan)
+          (has-location live-fan recorder-site))
+        :checks '(cargo-physical-state-init-check)))
+    'init-check-failure
+    :containing "live cargo no physical state"
+    :check 'cargo-physical-state-init-check))
 
 
 (define-test-claim recorder-validation

@@ -17,6 +17,7 @@
 ;;;              object parameters remain valid when an optional type has no objects: the
 ;;;              query is still installed and its null body returns NIL; only iteration
 ;;;              over that empty type produces no calls.
+;;;   init      : helpers recognizing authored or pending coordinate-derived LOS topology
 
 (in-package :ww)
 
@@ -27,6 +28,35 @@
 
 (define-types
   repeater (either floor-repeater wall-repeater))
+
+
+(define-init-check-helper init-coordinate-derived-sightlines-p (literals)
+  "Whether the installed visibility technology will derive LOS-VIA from this geometry."
+  (and (find 'derive-los-from-segments *init-actions* :key #'action.name)
+       (or (positive-init-literals-with-relation 'wall-segment> literals)
+           (positive-init-literals-with-relation 'edge-segment> literals)
+           (positive-init-literals-with-relation 'boundary-wall literals))))
+
+
+(define-init-check-helper init-apparatus-has-potential-sightline-p (apparatus literals)
+  (or (init-coordinate-derived-sightlines-p literals)
+      (some (lambda (literal)
+              (destructuring-bind (los-location occluders los-apparatus)
+                  (rest (init-literal-proposition literal))
+                (declare (ignore los-location occluders))
+                (eql apparatus los-apparatus)))
+            (positive-init-literals-with-relation 'los-via literals))))
+
+
+(define-init-check-helper init-location-has-potential-sightline-p (location literals)
+  (or (init-coordinate-derived-sightlines-p literals)
+      (some (lambda (literal)
+              (destructuring-bind (los-location1 occluders los-location2)
+                  (rest (init-literal-proposition literal))
+                (declare (ignore occluders))
+                (or (eql location los-location1)
+                    (eql location los-location2))))
+            (positive-init-literals-with-relation 'los-via literals))))
 
 
 (define-query visible

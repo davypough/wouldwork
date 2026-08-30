@@ -1,6 +1,6 @@
 ;;; Filename: -physical-init-checks.lisp
 
-;;; Initialization validation for shared physical placement facts.
+;;; Initialization validation for shared physical placement facts and live-cargo presence.
 
 
 (in-package :ww)
@@ -8,6 +8,10 @@
 
 (define-init-check physical-state-init-check (literals)
   (check-init-object-placement-consistency literals))
+
+
+(define-init-check cargo-physical-state-init-check (literals)
+  (check-init-live-cargo-physical-state literals))
 
 
 (define-init-check-helper init-object-location (object locations positions)
@@ -45,6 +49,44 @@
     (dolist (literal (positive-init-literals-with-relation 'holding literals)
                      held-objects)
       (setf (gethash (third (init-literal-proposition literal)) held-objects) t))))
+
+
+(define-init-check-helper init-mounted-objects (literals)
+  (let ((mounted-objects (make-hash-table :test #'equal)))
+    (dolist (literal (positive-init-literals-with-relation 'mounted-on literals)
+                     mounted-objects)
+      (setf (gethash (second (init-literal-proposition literal)) mounted-objects) t))))
+
+
+(define-init-check-helper init-recording-ghost-objects (literals)
+  (let ((ghost-objects (make-hash-table :test #'equal)))
+    (dolist (literal (positive-init-literals-with-relation 'recording-copy> literals)
+                     ghost-objects)
+      (setf (gethash (third (init-literal-proposition literal)) ghost-objects) t))))
+
+
+(define-init-check-helper check-init-live-cargo-physical-state (literals)
+  "Require every live cargo object to have one physical-state source."
+  ;; The foundational -LOCATION and -HOLDING roles can be staged independently for
+  ;; relation characterization.  Completeness becomes meaningful only when both are
+  ;; installed.  A recorder ghost has no physical state until START-RECORDER forks it;
+  ;; MOUNTED-ON accounts for a wall-mounted fan, whose drive owns its position.
+  (when (and (init-relation-signature 'has-location)
+             (init-relation-signature 'holding))
+    (let ((locations (init-literal-map 'has-location literals 1 2))
+          (held-objects (init-held-objects literals))
+          (mounted-objects (init-mounted-objects literals))
+          (ghost-objects (init-recording-ghost-objects literals)))
+      (dolist (object (init-type-instances 'cargo))
+        (unless (or (gethash object locations)
+                    (gethash object held-objects)
+                    (gethash object mounted-objects)
+                    (gethash object ghost-objects))
+          (fail-init-check nil "~%DEFINE-INIT gives live cargo no physical state.~%~
+                  Object: ~S~%~
+                  Add HAS-LOCATION, HOLDING, or MOUNTED-ON.  Only the ghost endpoint ~
+                  of RECORDING-COPY> may begin absent."
+                 object))))))
 
 
 (define-init-check-helper init-check-tray-support-held

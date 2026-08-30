@@ -32,7 +32,8 @@
   tray (tray1 tray1*)
   transmitter (transmitter1 transmitter2)
   receiver (receiver1 receiver2)
-  ladder (ladder1 ladder2)
+  ladder (;ladder1
+          ladder2)
   hue (blue red)
 )
 
@@ -67,14 +68,15 @@
   (has-location connector1 location13)
   (has-location connector2 location10)
   (has-location box1 location7)
-  (has-location tray1 location13)
+  (has-location tray1 location3)
+  (paired connector1 receiver1)
 
   ;; Fixed-position objects and initial support occupancy
   (has-position plate1 location6)
   (has-position plate2 location9)
   (has-position plate3 location12)
   (has-position plate4 location15)
-  (has-position ladder1 location5)
+  ;(has-position ladder1 location5)
   (has-position ladder2 location14)
   (has-position recorder1 location3)
 
@@ -84,7 +86,7 @@
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
   (location-coords> location4 8 10 3/2)
-  (location-coords> location5 17 151/10)
+  (location-coords> location5 36 9)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
   (location-coords> location8 241/10 6)
@@ -166,15 +168,15 @@
 
   ;; Authorized elevation changes
   (traverse-via jumping location8 () location9)
-  (traverse-via jumping location2 () location4)
+  ;(traverse-via jumping location2 () location4)
   (traverse-via stairway location2 () location4)
   (traverse-via stairway location9 () location10)
-  (traverse-via> climbing location5 ((ladder1)) location13)
-  (traverse-via> climbing location14 ((ladder2)) location15)
+  ;(traverse-via> climbing location5 ((ladder1)) location13)
+  (traverse-via> climbing location14 ((ladder2)) location5)
 
   ;; Nearby manipulation across boundaries
   (reach-via location4 () location2)
-  (reach-via location15 () location14)  ;across the loc15 ledge; the vertical tests bound each direction
+  (reach-via location5 () location14)  ;across the loc15 ledge; the vertical tests bound each direction
 )
 
 
@@ -197,3 +199,19 @@
        (ghost-stops-recorder)
   )
 )
+
+
+;; Initial state
+;;  (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location7)
+
+;; First subgoal -- use recorder to open gate1, get box1 to loc8, return with tray1 to loc3
+;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location3) (has-location connector2 location10) (has-location box1 location8))
+
+;; Second subgoal -- setup for reopening gate1
+;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location8))
+
+;; Third subgoal -- use recorder to reopen gate1, relocate conn2 and box1, return tray1 to loc3
+;; (and (has-location agent1 location17) (has-location tray1 location3) (has-location connector1 location13) (has-location connector2 location17) (has-location box1 location17))
+
+;; Third subgoal -- setup for red path
+;; (and (has-location connector2 location17) (paired connector2 receiver1) (has-location box1 location2) (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13)

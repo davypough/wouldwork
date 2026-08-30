@@ -48,8 +48,11 @@
   (has-location ghost-agent recorder-site)
   (holding live-agent live-held-tray)
   (holding ghost-agent ghost-held-tray)
+  (has-location live-connector recorder-site)
+  (has-location unmapped-fan recorder-site)
   (has-location live-held-tray recorder-site)
   (has-location ghost-held-tray recorder-site)
+  (has-location live-ground-tray recorder-site)
   ;; OBJECT-MANIPULATION-ALLOWED and CONNECTOR-PAIRING-ALLOWED gate ghost action on this
   ;; flag; the characterization below expects both to be true for the ghost side.
   (recording-in-progress)
