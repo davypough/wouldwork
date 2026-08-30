@@ -204,8 +204,8 @@
 ;; Initial state
 ;;  (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location7)
 
-;; First subgoal -- use recorder to open gate1, get box1 to loc8, return with tray1 to loc3
-;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location3) (has-location connector2 location10) (has-location box1 location8))
+;; First subgoal -- 27 steps, use recorder to open gate1, get box1 to loc8, return with tray1 to loc3
+;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location3) (has-location box1 location8))
 
 ;; Second subgoal -- setup for reopening gate1
 ;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location8))

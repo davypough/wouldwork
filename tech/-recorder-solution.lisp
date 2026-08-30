@@ -753,19 +753,26 @@ directly, because its focused tests author the already-open recording state ther
   (recorder-cycle-ending-action-p (recorder-move-action-name newest-move)))
 
 
+(defun recorder-recording-prefix-trigger-p
+    (start-state newest-move current-state)
+  "Whether NEWEST-MOVE can change the isolated recording sequence."
+  (declare (ignore current-state))
+  (let ((action (recorder-move-action-name newest-move)))
+    (or (member action '(start-recorder stop-recorder cancel-playback))
+        (some (lambda (agent)
+                (funcall (symbol-function 'ghost-recording-object)
+                         start-state agent))
+              (recorder-move-agents newest-move)))))
+
+
 (defun recorder-recording-prefix-changed-p (start-state integrated-path)
   "Whether the newest move changes the isolated recording sequence.
 
 Ordinary live moves are absent from that sequence.  Their pre-recording effects are
 captured when START-RECORDER is eventually checked, while live moves after the start
 cannot alter a recording prefix already accepted at its preceding ghost move."
-  (let* ((move (car (last integrated-path)))
-         (action (recorder-move-action-name move)))
-    (or (member action '(start-recorder stop-recorder cancel-playback))
-        (some (lambda (agent)
-                (funcall (symbol-function 'ghost-recording-object)
-                         start-state agent))
-              (recorder-move-agents move)))))
+  (recorder-recording-prefix-trigger-p
+    start-state (car (last integrated-path)) start-state))
 
 
 (defun validate-recorder-path-cycle (start-state integrated-path cycle)

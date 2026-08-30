@@ -84,7 +84,8 @@
   'recorder-ending-prefix-trigger-p)
 (register-search-prefix-validator
   'validate-recorder-recording-prefix
-  'recorder-prefix-pruning-enabled-p)
+  'recorder-prefix-pruning-enabled-p
+  'recorder-recording-prefix-trigger-p)
 (register-search-successor-pruner
   'prune-recorder-interleaving-successor-p
   'recorder-interleaving-pruning-enabled-p)

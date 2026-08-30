@@ -110,6 +110,12 @@
     (3.0 (use-live-only-prefix ghost-agent))))
 
 
+(define-test-helper recorder-recording-prefix-validator-entry ()
+  (find 'validate-recorder-recording-prefix
+        *search-prefix-validators*
+        :key #'search-prefix-validator.validator))
+
+
 (define-test-claim recorder-prefix-pruning-contract
   *recorder-prefix-pruning*
   (not (assoc '*recorder-prefix-pruning* *problem-parameter-defaults*))
@@ -117,9 +123,16 @@
   (let ((display (with-output-to-string (*standard-output*)
                    (display-current-parameters))))
     (null (search "*RECORDER-PREFIX-PRUNING* =>" display)))
-  (find 'validate-recorder-recording-prefix
-        *search-prefix-validators*
-        :key #'search-prefix-validator.validator)
+  (let ((entry (recorder-recording-prefix-validator-entry)))
+    (and entry
+         (eql (search-prefix-validator.trigger-p entry)
+              'recorder-recording-prefix-trigger-p)))
+  (not (search-prefix-validation-required-p
+         '(2.0 (enable-live-only-prefix live-agent)) *start-state*))
+  (search-prefix-validation-required-p
+    '(1.0 (start-recorder live-agent)) *start-state*)
+  (search-prefix-validation-required-p
+    '(3.0 (use-live-only-prefix ghost-agent)) *start-state*)
   (validate-recorder-recording-prefix
     *start-state* (recorder-valid-prefix-path) *start-state*)
   (multiple-value-bind (valid-p diagnostic)
