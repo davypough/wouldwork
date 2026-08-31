@@ -850,20 +850,19 @@ here, so every search driver reports validations and prunes on the same basis."
           t)))))
 
 
-(defun print-search-prefix-validator-breakdown (include-idle-validators)
+(defun print-search-prefix-validator-breakdown ()
   "Print each prefix validator's own checks and rejections under the aggregate line.
 
 The aggregate counts successors, while a validator counts the candidate paths it
 examined, so the two agree only when one validator sees one path per successor.
-INCLUDE-IDLE-VALIDATORS also lists registered validators that never ran, which the final
-report wants and a repeating progress report does not."
+Registered validators that never ran are listed too, so the final report shows which
+validators were in force."
   (dolist (row (search-prefix-validator-statistics))
     (destructuring-bind (validator enabled-p checks rejections) row
       (cond
         ((> checks 0)
          (format t "~&  ~(~A~): ~:D check~:P, ~:D rejection~:P."
                  validator checks rejections))
-        ((not include-idle-validators))
         (enabled-p
          (format t "~&  ~(~A~): enabled, never triggered." validator))
         (t
@@ -1616,7 +1615,7 @@ different acceptable milestone state."
             *search-prefix-pruned*
             (* 100.0 (/ *search-prefix-pruned* *search-prefix-validations*))
             *search-prefix-validations*)
-    (print-search-prefix-validator-breakdown t))
+    (print-search-prefix-validator-breakdown))
   (when (> *successor-policy-pruned* 0)
     (format t "~2%Successor policies pruned ~:D state~:P, ~,1F% of total states."
             *successor-policy-pruned*
@@ -1948,8 +1947,7 @@ different acceptable milestone state."
       (format t "~%search-prefix validation pruned = ~:D (~,1F% of ~:D prefix validations)"
               *search-prefix-pruned*
               (* 100.0 (/ *search-prefix-pruned* *search-prefix-validations*))
-              *search-prefix-validations*)
-      (print-search-prefix-validator-breakdown nil))
+              *search-prefix-validations*))
     (when (> *num-backtracks* 0)
       (format t "~%average backtrack distance = ~,1F levels (~:D backtracks)"
               (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)
