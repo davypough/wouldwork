@@ -7,6 +7,12 @@
 ;;; lifecycle hooks, but checkpoint search, contextual nogoods, propagation, and undo
 ;;; remain generic planner facilities.
 
+;;; Exhaustion is a proof only when the search actually explored its whole space.  A search
+;;; the depth cutoff truncated -- one where a cut node still had successors -- reports
+;;; :DEPTH-CUTOFF-TRUNCATED, rejects no checkpoint, and stops the recovery.  A cutoff that
+;;; is merely too small therefore surfaces as a report to raise it, instead of an unbounded
+;;; walk through every alternative predecessor state.
+
 (in-package :ww)
 
 
@@ -711,6 +717,12 @@ request and every remaining phase has a positive local cutoff."
                   (format t "Trying another distinct state for milestone ~D.~%"
                           (1+ index)))))))
           (:exhausted-no-solution
+           (when (eq (search-outcome-reason outcome) :depth-cutoff-truncated)
+             (format t "~&Milestone ~D search was truncated by the depth cutoff; ~
+                        no checkpoint was rejected.~%"
+                     (1+ index))
+             (return-from try-goal-chain-from
+               (values :unknown nil :depth-cutoff-truncated)))
            (format t "~&Milestone ~D has no remaining states for this continuation.~%"
                    (1+ index))
            (return-from try-goal-chain-from (values :exhausted nil :complete)))

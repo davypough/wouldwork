@@ -450,6 +450,7 @@
     (setf *duplicate-accumulated-depths* 0)
     (setf *duplicate-num-paths* 0)
     (setf *depth-cutoff-hits* 0)
+    (setf *depth-cutoff-truncated* nil)
     (setf *repeated-states* 0)
     (setf *solution-paths* nil)
     (setf *hybrid-goals* nil)
@@ -746,6 +747,12 @@
       (return-from df-bnb1 nil))
     (when (and (> *depth-cutoff* 0) (= (node.depth current-node) *depth-cutoff*))
       (increment-global *depth-cutoff-hits* 1)
+      ;; The cutoff leaves the space unexplored only where a cut node still had
+      ;; successors.  One confirmed truncation settles the whole search, so the
+      ;; probe stops as soon as the flag is set and never runs again.
+      (unless *depth-cutoff-truncated*
+        (when (expand current-node)
+          (setf *depth-cutoff-truncated* t)))
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
     (when (and *solution-paths*
@@ -2077,7 +2084,10 @@ different acceptable milestone state."
                  (make-search-outcome :status :solution :reason dfs-result))
                 ((eq dfs-result :exhausted)
                  (make-search-outcome
-                   :status :exhausted-no-solution :reason :complete))
+                   :status :exhausted-no-solution
+                   :reason (if *depth-cutoff-truncated*
+                             :depth-cutoff-truncated
+                             :complete)))
                 (t
                  (make-search-outcome :status :unknown :reason dfs-result)))))))
   (in-package :ww))

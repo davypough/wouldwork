@@ -231,9 +231,12 @@
              (>= (length (goal-chain-session-nogoods *goal-chain-session*)) 3))))))
 
 
+;; A cutoff that truncates the search proves nothing, so exhaustive propagation is
+;; claimed at a cutoff of 4, which explores this problem's whole space.
 (define-test-claim goal-chain-all-alternatives-propagate
   (call-with-isolated-backtracking-chain
     (lambda ()
+      (let ((*depth-cutoff* 4))
       (solve-subgoal (bt-at bt-a))
       (let ((stable-key
               (goal-chain-phase-endpoint-key
@@ -245,14 +248,17 @@
                (goal-chain-phase-endpoint-key
                  (first (goal-chain-session-phases *goal-chain-session*))))
              (bt-current-choice-p 'bt-bad)
-             (= (length (goal-chain-session-nogoods *goal-chain-session*)) 2))))))
+             (= (length (goal-chain-session-nogoods *goal-chain-session*)) 2)))))))
 
 
+;; The first two requests run at a cutoff of 4 so their exhaustion is a real proof;
+;; the third then changes the cutoff, which is the contextual fact under test.
 (define-test-claim goal-chain-nogood-context-includes-goal-and-cutoff
   (call-with-isolated-backtracking-chain
     (lambda ()
-      (solve-subgoal (bt-at bt-a))
-      (solve-subgoal (bt-at bt-unreachable))
+      (let ((*depth-cutoff* 4))
+        (solve-subgoal (bt-at bt-a))
+        (solve-subgoal (bt-at bt-unreachable)))
       (let ((old-nogoods (length (goal-chain-session-nogoods *goal-chain-session*))))
         (let ((*depth-cutoff* 2))
           (solve-subgoal (and (bt-at bt-b) (bt-choice bt-good))))
@@ -267,7 +273,7 @@
                           (first
                             (goal-chain-session-phases
                               *goal-chain-session*)))))))
-                1)
+                4)
              (= (cdr
                   (assoc '*depth-cutoff*
                     (goal-chain-search-settings-bindings
@@ -281,6 +287,29 @@
              ;; them for global invalidity.
              (> (length (goal-chain-session-nogoods *goal-chain-session*))
                 old-nogoods))))))
+
+
+;; A milestone search that the depth cutoff truncated leaves part of the space
+;; unexplored, so it rejects no checkpoint and stops the recovery instead of
+;; grinding through every alternative predecessor state.
+(define-test-claim goal-chain-truncated-search-rejects-no-checkpoint
+  (call-with-isolated-backtracking-chain
+    (lambda ()
+      (let ((*depth-cutoff* 4))
+        (solve-subgoal (bt-at bt-a)))
+      (let ((before (length (goal-chain-session-nogoods *goal-chain-session*))))
+        (let ((*depth-cutoff* 1))
+          (solve-subgoal (bt-at bt-c)))
+        (and (zerop before)
+             ;; The dead first checkpoint was exhausted without truncation, so its
+             ;; rejection stands; the live alternative was only truncated.
+             (= (length (goal-chain-session-nogoods *goal-chain-session*)) 1)
+             (= (length (goal-chain-session-phases *goal-chain-session*)) 1)
+             (bt-current-choice-p 'bt-bad)
+             (null *solution-paths*)
+             (not *solutions-valid*)
+             (eq (search-outcome-reason *last-search-outcome*)
+                 :depth-cutoff-truncated))))))
 
 
 (define-test-helper bt-unknown-outcome-does-not-reject (reason)

@@ -47,6 +47,9 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (solve-subgoal <goal>)
   -- searches for and retains the next ordered milestone in single-threaded mode
+     A milestone search the depth cutoff truncated proves nothing: it rejects no
+     checkpoint and leaves the preceding chain untouched, so raise *depth-cutoff*
+     and reissue the same command
 
 (export-subgoal-progress <txt-file>)
   -- writes the active accepted milestone chain as readable, replayable text

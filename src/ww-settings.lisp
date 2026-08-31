@@ -262,6 +262,10 @@ must return unknown rather than :IMPOSSIBLE.")
   "Count of nodes whose expansion was blocked because they reached *depth-cutoff*.")
 (declaim (type fixnum *depth-cutoff-hits*))
 
+(sb-ext:defglobal *depth-cutoff-truncated* nil
+  "Whether the depth cutoff cut off a node that still had successors, leaving part
+   of the search space unexplored.  Only then is an exhausted search inconclusive.")
+
 (sb-ext:defglobal *num-init-successors* 0
   "The number of branches completed so far from the start state.")
 

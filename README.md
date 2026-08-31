@@ -54,6 +54,12 @@ settings, actions, and symbolic checkpoint facts for inspection. Import replays 
 and reruns the problem's ordinary and technology-specific validators before restoring the
 chain; it never trusts a serialized in-memory planning state.
 
+A milestone that cannot be reached rewinds to the preceding milestone and looks for another
+checkpoint, but only when its search actually explored the whole space. When the depth cutoff
+cut off part of that space instead, `solve-subgoal` reports the truncation, rejects no
+checkpoint, and returns with the accepted chain unchanged -- raise `*depth-cutoff*` and
+reissue the same `solve-subgoal`.
+
 This is deliberate: planning development is exploratory, and it avoids re-entering all the search control parameters every new session.
 
 There’s also a small but important design choice:
