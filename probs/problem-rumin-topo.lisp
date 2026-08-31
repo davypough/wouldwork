@@ -68,7 +68,7 @@
   (has-location connector1 location13)
   (has-location connector2 location10)
   (has-location box1 location7)
-  (has-location tray1 location3)
+  (has-location tray1 location2)
   (paired connector1 receiver1)
 
   ;; Fixed-position objects and initial support occupancy
@@ -202,16 +202,16 @@
 
 
 ;; Initial state
-;;  (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location7)
+;;  (and (has-location agent1 location3) (has-location tray1 location2) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location7)
 
-;; First subgoal -- 27 steps, use recorder to open gate1, get box1 to loc8, return with tray1 to loc3
-;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location3) (has-location box1 location8))
+;; First subgoal -- 25 steps, use recorder to open gate1, get box1 to loc8, return with tray1 to loc3
+;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location3) (has-location box1 location8) (ghost-stops-recorder))
 
-;; Second subgoal -- setup for reopening gate1
+;; Second subgoal -- setup for reopening gate1 (no recorder)
 ;; (and (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13) (paired connector1 receiver1) (has-location connector2 location10) (has-location box1 location8))
 
 ;; Third subgoal -- use recorder to reopen gate1, relocate conn2 and box1, return tray1 to loc3
-;; (and (has-location agent1 location17) (has-location tray1 location3) (has-location connector1 location13) (has-location connector2 location17) (has-location box1 location17))
+;; (and (has-location agent1 location17) (has-location tray1 location3) (has-location connector1 location13) (has-location connector2 location17) (has-location box1 location17) (ghost-stops-recorder))
 
 ;; Third subgoal -- setup for red path
 ;; (and (has-location connector2 location17) (paired connector2 receiver1) (has-location box1 location2) (has-location agent1 location3) (has-location tray1 location3) (has-location connector1 location13)

@@ -465,6 +465,8 @@
     (setf *min-steps-contributor-evaluations* 0)
     (setf *min-steps-contributor-prunes* 0)
     (initialize-min-steps-fallback-adaptation)
+    (setf *search-prefix-validations* 0)
+    (reset-search-prefix-validator-statistics)
     (setf *search-prefix-pruned* 0)
     (setf *successor-policy-pruned* 0)
     (setf *shutdown-requested* nil)
@@ -830,24 +832,57 @@
       (return-from df-bnb1 (process-successors succ-states current-node open))))))  ;returns live successor nodes
 
 
-(defun successor-search-prefix-valid-p (current-node succ-state)
-  "Whether some path to SUCC-STATE survives every enabled prefix validator.
+(defun search-prefix-pruned-p (state path-generator)
+  "Whether the enabled prefix validators reject every candidate path ending at STATE.
+
+PATH-GENERATOR receives the newest move and returns the candidate paths ending at STATE.
+It is called only when validation is actually required, so a successor no validator is
+interested in never pays for path reconstruction.  Both prefix statistics are counted
+here, so every search driver reports validations and prunes on the same basis."
+  (when (search-prefix-validation-enabled-p)
+    (let ((move (record-move state)))
+      (when (search-prefix-validation-required-p move state)
+        (increment-global *search-prefix-validations* 1)
+        (unless (some (lambda (path)
+                        (candidate-search-prefix-valid-p path state))
+                      (funcall path-generator move))
+          (increment-global *search-prefix-pruned* 1)
+          t)))))
+
+
+(defun print-search-prefix-validator-breakdown (include-idle-validators)
+  "Print each prefix validator's own checks and rejections under the aggregate line.
+
+The aggregate counts successors, while a validator counts the candidate paths it
+examined, so the two agree only when one validator sees one path per successor.
+INCLUDE-IDLE-VALIDATORS also lists registered validators that never ran, which the final
+report wants and a repeating progress report does not."
+  (dolist (row (search-prefix-validator-statistics))
+    (destructuring-bind (validator enabled-p checks rejections) row
+      (cond
+        ((> checks 0)
+         (format t "~&  ~(~A~): ~:D check~:P, ~:D rejection~:P."
+                 validator checks rejections))
+        ((not include-idle-validators))
+        (enabled-p
+         (format t "~&  ~(~A~): enabled, never triggered." validator))
+        (t
+         (format t "~&  ~(~A~): disabled." validator))))))
+
+
+(defun successor-search-prefix-pruned-p (current-node succ-state)
+  "Whether no path to SUCC-STATE survives the enabled prefix validators.
 
 Standard search has one parent path.  Hybrid ALL-PATHS search keeps the successor
 when at least one path through its parent DAG remains viable."
-  (unless (search-prefix-validation-enabled-p)
-    (return-from successor-search-prefix-valid-p t))
-  (let ((move (record-move succ-state)))
-    (unless (search-prefix-validation-required-p move succ-state)
-      (return-from successor-search-prefix-valid-p t))
-    (let ((parent-paths
-            (if *hybrid-mode*
-              (enumerate-paths-to-node current-node)
-              (list (record-solution-path current-node)))))
-      (some (lambda (parent-path)
-              (candidate-search-prefix-valid-p
-                (append parent-path (list move)) succ-state))
-            parent-paths))))
+  (search-prefix-pruned-p
+    succ-state
+    (lambda (move)
+      (mapcar (lambda (parent-path)
+                (append parent-path (list move)))
+              (if *hybrid-mode*
+                (enumerate-paths-to-node current-node)
+                (list (record-solution-path current-node)))))))
 
 
 (defun goal-chain-candidate-rejected-p (path state)
@@ -870,8 +905,7 @@ different acceptable milestone state."
           (next-iteration))
         (when *global-invariants*
           (validate-global-invariants current-node succ-state))
-        (unless (successor-search-prefix-valid-p current-node succ-state)
-          (increment-global *search-prefix-pruned* 1)
+        (when (successor-search-prefix-pruned-p current-node succ-state)
           (next-iteration))
         (when (search-successor-pruned-p current-node succ-state)
           (next-iteration))
@@ -1577,10 +1611,12 @@ different acceptable milestone state."
             *min-steps-fallback-skipped*
             *min-steps-fallback-unique-prunes*
             *min-steps-fallback-reactivations*))
-  (when (> *search-prefix-pruned* 0)
-    (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of total states."
+  (when (> *search-prefix-validations* 0)
+    (format t "~2%Search-prefix validation pruned ~:D state~:P, ~,1F% of ~:D prefix validation~:P."
             *search-prefix-pruned*
-            (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
+            (* 100.0 (/ *search-prefix-pruned* *search-prefix-validations*))
+            *search-prefix-validations*)
+    (print-search-prefix-validator-breakdown t))
   (when (> *successor-policy-pruned* 0)
     (format t "~2%Successor policies pruned ~:D state~:P, ~,1F% of total states."
             *successor-policy-pruned*
@@ -1908,10 +1944,12 @@ different acceptable milestone state."
               *min-steps-fallback-evaluations*
               *min-steps-fallback-skipped*
               *min-steps-fallback-unique-prunes*))
-    (when (> *search-prefix-pruned* 0)
-      (format t "~%search-prefix validation pruned = ~:D (~,1F% of total states)"
+    (when (> *search-prefix-validations* 0)
+      (format t "~%search-prefix validation pruned = ~:D (~,1F% of ~:D prefix validations)"
               *search-prefix-pruned*
-              (* 100.0 (/ *search-prefix-pruned* *total-states-processed*))))
+              (* 100.0 (/ *search-prefix-pruned* *search-prefix-validations*))
+              *search-prefix-validations*)
+      (print-search-prefix-validator-breakdown nil))
     (when (> *num-backtracks* 0)
       (format t "~%average backtrack distance = ~,1F levels (~:D backtracks)"
               (coerce (/ *accumulated-backtrack-distance* *num-backtracks*) 'single-float)

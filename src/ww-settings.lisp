@@ -120,7 +120,8 @@ must return unknown rather than :IMPOSSIBLE.")
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
              (gethash 'recorder *types*))
-    (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*))
+    (format t "~&  *MAX-RECORDER-CYCLES* => ~D" *max-recorder-cycles*)
+    (format t "~&  *RECORDER-PREFIX-PRUNING* => ~A" *recorder-prefix-pruning*))
   (when (and (member "beam-relay" *spliced-tech-names* :test #'string=)
              (gethash 'connector *types*))
     (format t "~&  *MAX-CONNECTOR-PAIRINGS* => ~D" *max-connector-pairings*))
@@ -301,10 +302,13 @@ must return unknown rather than :IMPOSSIBLE.")
 
 
 (defstruct (search-prefix-validator (:conc-name search-prefix-validator.))
-  "A path-prefix validator, its enabling predicate, and optional newest-move trigger."
+  "A path-prefix validator, its enabling predicate, optional newest-move trigger, and
+   its per-search check and rejection counts."
   validator
   enabled-p
-  trigger-p)
+  trigger-p
+  (checks 0 :type sb-ext:word)
+  (rejections 0 :type sb-ext:word))
 
 
 (sb-ext:defglobal *search-prefix-validators* nil
@@ -429,7 +433,11 @@ All supplied functions must be read-only and safe to call concurrently."
 
 (defun candidate-search-prefix-valid-p
     (path current-state &optional excluded-validators)
-  "Whether every enabled non-excluded validator accepts PATH ending at CURRENT-STATE."
+  "Whether every enabled non-excluded validator accepts PATH ending at CURRENT-STATE.
+
+Each validator counts the paths it examines and the paths it rejects, so the search
+report can attribute prefix pruning to the validator responsible.  Validation stops at
+the first rejection, so a rejected path is attributed to one validator only."
   (let ((newest-move (car (last path))))
     (dolist (entry *search-prefix-validators* t)
       (let ((validator (search-prefix-validator.validator entry)))
@@ -439,10 +447,31 @@ All supplied functions must be read-only and safe to call concurrently."
                        (search-prefix-validator.enabled-p entry)))
                    (search-prefix-validator-triggered-p
                      entry newest-move current-state))
+          (sb-ext:atomic-incf (search-prefix-validator.checks entry))
           (unless (funcall
                     (symbol-function validator)
                     *start-state* path current-state)
+            (sb-ext:atomic-incf (search-prefix-validator.rejections entry))
             (return nil)))))))
+
+
+(defun reset-search-prefix-validator-statistics ()
+  "Zero every registered validator's check and rejection counts before a new search."
+  (dolist (entry *search-prefix-validators*)
+    (setf (search-prefix-validator.checks entry) 0
+          (search-prefix-validator.rejections entry) 0))
+  nil)
+
+
+(defun search-prefix-validator-statistics ()
+  "Rows of (VALIDATOR ENABLED-P CHECKS REJECTIONS) for each registered prefix validator."
+  (mapcar (lambda (entry)
+            (list (search-prefix-validator.validator entry)
+                  (funcall
+                    (symbol-function (search-prefix-validator.enabled-p entry)))
+                  (search-prefix-validator.checks entry)
+                  (search-prefix-validator.rejections entry)))
+          *search-prefix-validators*))
 
 
 (sb-ext:defglobal *goal-chaining-checkpoint-extensions* nil
@@ -624,6 +653,10 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *max-recorder-cycles* 1
   "Maximum number of START-RECORDER actions permitted in one search path.")
 
+(defvar *recorder-prefix-pruning* nil
+  "Whether search pruning also rejects an open recording prefix that can no longer be
+   replayed, in addition to the always-on validation of every completed recorder cycle.")
+
 (defvar *max-connector-pairings* nil
   "Maximum PAIRED termini per connector, or NIL until beam-relay supplies its default.")
 
@@ -674,6 +707,7 @@ treat their arguments as read-only and be safe to call concurrently."
     (*goal*)
     (*threads* . 0)
     (*max-recorder-cycles* . 1)
+    (*recorder-prefix-pruning*)
     (*auto-wait*)
     (*max-connector-pairings*)
     (*split-depth-max* . 20)
@@ -692,7 +726,7 @@ treat their arguments as read-only and be safe to call concurrently."
   '(*problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
     *solution-type* *progress-reporting-interval* *randomize-search* *branch*
     *probe* *symmetry-pruning* *debug* *goal* *threads*
-    *max-recorder-cycles*)
+    *max-recorder-cycles* *recorder-prefix-pruning*)
   "Problem parameters saved in VALS.LISP, in positional file order.")
 
 
@@ -961,6 +995,12 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *min-steps-contributor-prunes* 0
   "Count of nodes pruned by registered lower-bound contributors.")
 (declaim (type fixnum *min-steps-contributor-prunes*))
+
+
+(sb-ext:defglobal *search-prefix-validations* 0
+  "Count of successor states whose path was reconstructed and checked by enabled
+   search-prefix validators.")
+(declaim (type fixnum *search-prefix-validations*))
 
 
 (sb-ext:defglobal *search-prefix-pruned* 0

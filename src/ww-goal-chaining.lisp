@@ -381,19 +381,25 @@ continuation, and :UNKNOWN otherwise."
       (remprop 'goal-fn :form))))
 
 
+(defun restore-undo-checkpoint (checkpoint)
+  "Restore the complete planning session captured in CHECKPOINT."
+  (setf *start-state* (undo-checkpoint-start-state checkpoint)
+        *final-goal* (copy-tree (undo-checkpoint-final-goal checkpoint))
+        *solution-paths* (undo-checkpoint-solution-paths checkpoint)
+        *solutions-valid* (undo-checkpoint-solutions-valid checkpoint)
+        *goal-chain-session* (undo-checkpoint-goal-chain-session checkpoint))
+  (restore-goal-chaining-extension-states
+    (undo-checkpoint-extension-states checkpoint))
+  (restore-checkpoint-goal checkpoint)
+  t)
+
+
 (defun ww-undo ()
   "Undo one user goal-chaining command, including any automatic recovery it caused."
   (if (null *undo-stack*)
     (format t "~&Nothing to undo.~%")
     (let ((checkpoint (pop *undo-stack*)))
-      (setf *start-state* (undo-checkpoint-start-state checkpoint)
-            *final-goal* (copy-tree (undo-checkpoint-final-goal checkpoint))
-            *solution-paths* (undo-checkpoint-solution-paths checkpoint)
-            *solutions-valid* (undo-checkpoint-solutions-valid checkpoint)
-            *goal-chain-session* (undo-checkpoint-goal-chain-session checkpoint))
-      (restore-goal-chaining-extension-states
-        (undo-checkpoint-extension-states checkpoint))
-      (restore-checkpoint-goal checkpoint)
+      (restore-undo-checkpoint checkpoint)
       (format t "~&Reverted the last goal-chaining command.~2%")
       (format t "Current State: ~%~A~%" *start-state*)
       (format t "Current Goal: ~%~A~2%" *goal*)

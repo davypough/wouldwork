@@ -75,8 +75,7 @@
                   (when (state-is-inconsistent succ-state)
                     (incf *inconsistent-states-dropped*)
                     (return-from process-succ))
-                  (unless (successor-search-prefix-valid-p node succ-state)
-                    (incf *search-prefix-pruned*)
+                  (when (successor-search-prefix-pruned-p node succ-state)
                     (return-from process-succ))
                   (when (search-successor-pruned-p node succ-state)
                     (return-from process-succ))
@@ -300,8 +299,7 @@
           (unless (validate-global-invariants current-node succ-state)
             (return-from process-one)))
 
-        (unless (successor-search-prefix-valid-p current-node succ-state)
-          (increment-global *search-prefix-pruned* 1)
+        (when (successor-search-prefix-pruned-p current-node succ-state)
           (return-from process-one))
 
         (when (search-successor-pruned-p current-node succ-state)

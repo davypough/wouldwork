@@ -125,6 +125,7 @@
                              (:file "ww-goal-chaining")
                              (:file "ww-advisor")
                              (:file "ww-solution-validation")
+                             (:file "ww-goal-chain-persistence")
                              (:file "ww-backward")
 		                     (:file "ww-planner")
                              (:file "ww-symmetry")

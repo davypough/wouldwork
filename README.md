@@ -46,6 +46,14 @@ That means when you restart SBCL and Wouldwork, it will restore:
 - the problem you were last working on
 - all your parameter choices for that problem (algorithm, search settings, debug level, ...).
 
+Accepted `solve-subgoal` checkpoints are deliberately not stored in `vals.lisp`. To carry
+an incomplete milestone chain across a restart, use
+`(export-subgoal-progress "name.txt")` before leaving. After restarting, freshly stage the
+same problem and use `(import-subgoal-progress "name.txt")`. The text file lists the goals,
+settings, actions, and symbolic checkpoint facts for inspection. Import replays every action
+and reruns the problem's ordinary and technology-specific validators before restoring the
+chain; it never trusts a serialized in-memory planning state.
+
 This is deliberate: planning development is exploratory, and it avoids re-entering all the search control parameters every new session.
 
 There’s also a small but important design choice:

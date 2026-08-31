@@ -106,6 +106,101 @@
                          proposition))))
 
 
+(define-test-helper bt-subgoal-progress-test-path (suffix)
+  (merge-pathnames
+    (format nil "wouldwork-bt-progress-~A-~A.txt" suffix (gensym "FILE"))
+    (uiop:temporary-directory)))
+
+
+(define-test-helper reset-bt-chain-to-origin (origin)
+  (setf *start-state* (copy-problem-state origin)
+        *goal-chain-session* nil
+        *final-goal* nil
+        *undo-stack* nil
+        *solution-paths* nil
+        *solutions-valid* nil)
+  (install-compiled-goal '(bt-at bt-c))
+  t)
+
+
+(define-test-claim goal-chain-progress-export-import-round-trip
+  (call-with-isolated-backtracking-chain
+    (lambda ()
+      (let ((origin (copy-problem-state *start-state*))
+            (path (bt-subgoal-progress-test-path "round-trip")))
+        (unwind-protect
+            (progn
+              (solve-subgoal (bt-at bt-a))
+              (export-subgoal-progress path)
+              (let ((text (read-file-string path)))
+                (reset-bt-chain-to-origin origin)
+                (import-subgoal-progress path)
+                (let ((imported
+                        (and
+                          (= (length
+                               (goal-chain-session-phases
+                                 *goal-chain-session*))
+                             1)
+                          (bt-current-choice-p 'bt-bad)
+                          (= (length *undo-stack*) 1)
+                          (search "Wouldwork subgoal progress" text)
+                          (search ":ACTIONS" text)
+                          (search "BT-CHOICE" text))))
+                  (solve-subgoal (and (bt-at bt-b) (bt-choice bt-good)))
+                  (let ((recovered
+                          (and imported
+                               (bt-current-choice-p 'bt-good)
+                               (= (length
+                                    (goal-chain-session-phases
+                                      *goal-chain-session*))
+                                  2))))
+                    (ww-undo)
+                    (let ((returned-to-import
+                            (and (bt-current-choice-p 'bt-bad)
+                                 (= (length
+                                      (goal-chain-session-phases
+                                        *goal-chain-session*))
+                                    1))))
+                      (ww-undo)
+                      (and recovered returned-to-import
+                           (null *goal-chain-session*)
+                           (null *undo-stack*)
+                           (bt-state-has-p *start-state* '(bt-at bt-start))))))))
+          (uiop:delete-file-if-exists path))))))
+
+
+(define-test-claim goal-chain-progress-import-is-transactional
+  (call-with-isolated-backtracking-chain
+    (lambda ()
+      (let ((origin (copy-problem-state *start-state*))
+            (path (bt-subgoal-progress-test-path "transaction")))
+        (unwind-protect
+            (progn
+              (solve-subgoal (bt-at bt-a))
+              (export-subgoal-progress path)
+              (let* ((record (read-subgoal-progress-file path))
+                     (checkpoint
+                       (first (getf (rest record) :checkpoints)))
+                     (endpoint (getf checkpoint :endpoint)))
+                (incf (getf endpoint :time))
+                (write-subgoal-progress-file record path))
+              (reset-bt-chain-to-origin origin)
+              (let ((signaled nil))
+                (handler-case
+                    (import-subgoal-progress path)
+                  (error ()
+                    (setf signaled t)))
+                (and signaled
+                     (null *goal-chain-session*)
+                     (null *undo-stack*)
+                     (null *final-goal*)
+                     (null *solution-paths*)
+                     (not *solutions-valid*)
+                     (equal *goal* '(bt-at bt-c))
+                     (bt-state-has-p *start-state* '(bt-at bt-start)))))
+          (uiop:delete-file-if-exists path))))))
+
+
 (define-test-claim goal-chain-automatic-second-a-state
   (call-with-isolated-backtracking-chain
     (lambda ()

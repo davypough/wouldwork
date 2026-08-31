@@ -6,8 +6,11 @@
 ;;; with a live action after START-RECORDER.  Integrated search can therefore perform the
 ;;; following ghost action, but the isolated recording cannot: the live action is absent.
 ;;;
-;;; Expected minimum path length: three.  Search-prefix validation should prune at least
-;;; one state while retaining the valid branch.
+;;; Expected minimum path length: four.  The valid branch deliberately takes two setup
+;;; actions, one more than the three-action invalid branch.  At equal lengths the
+;;; MIN-LENGTH bound retires the invalid branch as soon as the first solution is found and
+;;; search-prefix validation never sees it, so the shorter invalid branch is what makes
+;;; the search itself prune at least one state while retaining the valid branch.
 
 (in-package :ww)
 
@@ -16,9 +19,10 @@
 (ww-set *problem-type* planning)
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
-(ww-set *depth-cutoff* 3)
+(ww-set *depth-cutoff* 4)
+(ww-set *recorder-prefix-pruning* t)
 
-(setf *expected-min-length* 3)
+(setf *expected-min-length* 4)
 
 
 (define-types
@@ -30,10 +34,9 @@
 
 (include-tech recorder)
 
-(defparameter *recorder-prefix-pruning* t)
-
 
 (define-dynamic-relations
+  (snapshot-partial)
   (snapshot-ready)
   (live-only-ready)
   (prefix-result prefix-result))
@@ -59,8 +62,22 @@
   (?agent agent)
   (and (live-recording-object ?agent)
        (not (recording-in-progress))
+       (not (snapshot-partial)))
+  (">" ?agent "starts preparing a fact captured by the recorder snapshot")
+  (assert (snapshot-partial)))
+
+
+;; The second setup action exists only to make the valid branch one action longer than the
+;; invalid branch, so the MIN-LENGTH bound cannot retire the invalid branch before
+;; search-prefix validation reaches it.
+(define-action complete-snapshot-prefix
+  1
+  (?agent agent)
+  (and (live-recording-object ?agent)
+       (not (recording-in-progress))
+       (snapshot-partial)
        (not (snapshot-ready)))
-  (">" ?agent "prepares a fact captured by the recorder snapshot")
+  (">" ?agent "finishes preparing a fact captured by the recorder snapshot")
   (assert (snapshot-ready)))
 
 
@@ -100,8 +117,9 @@
 
 (define-test-helper recorder-valid-prefix-path ()
   '((1.0 (prepare-snapshot-prefix live-agent))
-    (2.0 (start-recorder live-agent))
-    (3.0 (use-snapshot-prefix ghost-agent))))
+    (2.0 (complete-snapshot-prefix live-agent))
+    (3.0 (start-recorder live-agent))
+    (4.0 (use-snapshot-prefix ghost-agent))))
 
 
 (define-test-helper recorder-invalid-prefix-path ()
@@ -118,11 +136,11 @@
 
 (define-test-claim recorder-prefix-pruning-contract
   *recorder-prefix-pruning*
-  (not (assoc '*recorder-prefix-pruning* *problem-parameter-defaults*))
-  (not (member '*recorder-prefix-pruning* *persisted-problem-parameters*))
+  (assoc '*recorder-prefix-pruning* *problem-parameter-defaults*)
+  (member '*recorder-prefix-pruning* *persisted-problem-parameters*)
   (let ((display (with-output-to-string (*standard-output*)
                    (display-current-parameters))))
-    (null (search "*RECORDER-PREFIX-PRUNING* =>" display)))
+    (search "*RECORDER-PREFIX-PRUNING* =>" display))
   (let ((entry (recorder-recording-prefix-validator-entry)))
     (and entry
          (eql (search-prefix-validator.trigger-p entry)

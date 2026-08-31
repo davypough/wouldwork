@@ -132,6 +132,78 @@
          (search "cumulative depth: 4" printed :test #'char-equal))))
 
 
+(define-test-helper recorder-orchestration-progress-test-path ()
+  (merge-pathnames
+    (format nil "wouldwork-recorder-progress-~A.txt" (gensym "FILE"))
+    (uiop:temporary-directory)))
+
+
+(define-test-claim recorder-open-checkpoint-export-import-round-trip
+  (let ((origin (copy-problem-state *start-state*))
+        (original-goal (copy-tree *goal*))
+        (path (recorder-orchestration-progress-test-path)))
+    (unwind-protect
+        (progn
+          (setf *goal-chain-session* nil
+                *recorder-subgoal-chain* nil
+                *final-goal* nil
+                *undo-stack* nil
+                *solution-paths* nil
+                *solutions-valid* nil)
+          (install-compiled-goal original-goal)
+          (solve-subgoal (cycle-at cycle-middle))
+          (export-subgoal-progress path)
+          (let ((text (read-file-string path)))
+            (setf *start-state* (copy-problem-state origin)
+                  *goal-chain-session* nil
+                  *recorder-subgoal-chain* nil
+                  *final-goal* nil
+                  *undo-stack* nil
+                  *solution-paths* nil
+                  *solutions-valid* nil)
+            (install-compiled-goal original-goal)
+            (import-subgoal-progress path)
+            (let ((imported-open
+                    (and (= (recorder-orchestration-chain-length) 1)
+                         (recorder-orchestration-state-at-p
+                           *start-state* 'cycle-middle)
+                         (recorder-state-recording-open-p *start-state*)
+                         (search "Recorder: cycle 1 open" text)
+                         (search "RECORDING-IN-PROGRESS" text))))
+              (solve-subgoal (cycle-at cycle-end))
+              (export-subgoal-progress path)
+              (let ((two-checkpoint-text (read-file-string path)))
+                (setf *start-state* (copy-problem-state origin)
+                      *goal-chain-session* nil
+                      *recorder-subgoal-chain* nil
+                      *final-goal* nil
+                      *undo-stack* nil
+                      *solution-paths* nil
+                      *solutions-valid* nil)
+                (install-compiled-goal original-goal)
+                (import-subgoal-progress path)
+                (let ((imported-two
+                        (and (= (recorder-orchestration-chain-length) 2)
+                             (recorder-orchestration-state-at-p
+                               *start-state* 'cycle-end)
+                             (recorder-state-recording-open-p *start-state*)
+                             (search "Accepted checkpoints: 2"
+                                     two-checkpoint-text))))
+                  (solve)
+                  (and imported-open imported-two
+                       *solutions-valid*
+                       (recorder-orchestration-cumulative-solution-p)))))))
+      (uiop:delete-file-if-exists path)
+      (setf *start-state* origin
+            *goal-chain-session* nil
+            *recorder-subgoal-chain* nil
+            *final-goal* nil
+            *undo-stack* nil
+            *solution-paths* nil
+            *solutions-valid* nil)
+      (install-compiled-goal original-goal))))
+
+
 (define-test-claim recorder-initial-solve-remains-ordinary
   (let ((ordinary-solve-p nil))
     (unwind-protect

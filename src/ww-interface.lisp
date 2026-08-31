@@ -45,6 +45,18 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 (solve)
   -- attempts to solve the currently staged problem
 
+(solve-subgoal <goal>)
+  -- searches for and retains the next ordered milestone in single-threaded mode
+
+(export-subgoal-progress <txt-file>)
+  -- writes the active accepted milestone chain as readable, replayable text
+
+(import-subgoal-progress <txt-file>)
+  -- replays and restores exported milestones into a freshly staged problem
+
+(ww-undo)
+  -- reverses the last goal-chaining command or imported checkpoint chain
+
 (get-probs-folder-path)
    -- the location where all problem specification files should appear
       (test problems live in the test folder, per (get-test-folder-path))
@@ -84,6 +96,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
        (ww-set *symmetry-pruning* <t (prune symmetric states) or
                                     nil (don't prune symmetric states>)
        (ww-set *max-recorder-cycles* <positive integer limiting recorder starts per path>)
+       (ww-set *recorder-prefix-pruning* <t (also prune unplayable open recording prefixes) or
+                                          nil (validate only completed recorder cycles)>)
        (ww-set *max-connector-pairings* <positive integer limiting pairings per connector>)
        (ww-set *probe* (<action name> <instantiations> <depth> &optional <count>))
            -- probe enables debugging when a state is reached during search
@@ -180,10 +194,11 @@ is staged again.
                *probe* ~A~%
                *symmetry-pruning* ~A~%
                *max-recorder-cycles* ~A~%
+               *recorder-prefix-pruning* ~A~%
                *debug* ~A~2%"
             *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
-            *probe* *symmetry-pruning* *max-recorder-cycles*
+            *probe* *symmetry-pruning* *max-recorder-cycles* *recorder-prefix-pruning*
             *debug*))
 
 
@@ -227,7 +242,9 @@ is staged again.
     ((and (>= (length params) 16)
           (member (nth 14 params) '(nil t))
           (typep (nth 15 params) '(integer 1 *)))
-      (append (subseq params 0 14) (nthcdr 15 params)))
+      (append (subseq params 0 14)
+              (list (nth 15 params))
+              (nthcdr 15 *default-parameters*)))
     ((and (= (length params) 15)
           (member (nth 14 params) '(nil t)))
       (append (subseq params 0 14)

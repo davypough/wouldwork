@@ -58,8 +58,9 @@
 (in-package :ww)
 
 
-(defparameter *recorder-prefix-pruning* nil
-  "Whether diagnostic search pruning rejects unplayable open recording prefixes.")
+;; *RECORDER-PREFIX-PRUNING* is a managed problem parameter defined in ww-settings.lisp,
+;; so a problem sets it with (ww-set *recorder-prefix-pruning* t) like any other setting,
+;; it appears in the current parameter display, and staging resets it to NIL.
 
 
 (include-tech -recorder-core)

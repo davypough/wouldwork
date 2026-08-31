@@ -265,11 +265,13 @@
     (equal
       (normalize-persisted-problem-parameters
         (append (subseq *default-parameters* 0 14) '(t 5 512 64)))
-      (append (subseq *default-parameters* 0 14) '(5)))
+      (append (subseq *default-parameters* 0 14) '(5)
+              (nthcdr 15 *default-parameters*)))
     (equal
       (normalize-persisted-problem-parameters
         (append (subseq *default-parameters* 0 14) '(nil 3)))
-      (append (subseq *default-parameters* 0 14) '(3)))
+      (append (subseq *default-parameters* 0 14) '(3)
+              (nthcdr 15 *default-parameters*)))
     (equal
       (normalize-persisted-problem-parameters
         (append (subseq *default-parameters* 0 14) '(t)))
