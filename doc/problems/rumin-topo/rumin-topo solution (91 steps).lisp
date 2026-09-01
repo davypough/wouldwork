@@ -1,15 +1,18 @@
-;;; RUMIN-TOPO -- complete solution.  90 actions, two recorder cycles, both closed.
-;;; Goal (and (has-location agent1 location16)) -- VALIDATION SUCCESSFUL / Goal satisfied.
+;;; RUMIN-TOPO -- complete solution.  91 actions, two recorder cycles, both closed.
+;;; Goal (and (has-location agent1 location16) (ghost-stops-recorder))
+;;; -- VALIDATION SUCCESSFUL / Goal satisfied.
 ;;; No object was added, removed or retyped.
 ;;;
-;;; Setup -- *max-recorder-cycles* 2 is already in the problem file:
-;;;   (progn (ql:quickload :wouldwork) (in-package :ww))
+;;; Setup -- *max-recorder-cycles* 5 is already in the problem file; this solution uses 2:
+;;;   (ql:quickload :wouldwork)
+;;;   (in-package :ww)
 ;;;   (stage rumin-topo)
 ;;;
 ;;; Depends on:
 ;;;   * location17 at (18 5), in front of window1
-;;;   * elevation 2 as the third coordinate of location15 and location16; edge5 height 2
-;;;   * (reach-via location15 () location14)
+;;;   * elevation 2 as the third coordinate of location5, location15 and location16,
+;;;     with edge5 height 2; location5 and location15 then share a derived walking zone
+;;;   * (reach-via location5 () location14)
 ;;;   * tech/reachability.lisp supplies symmetric REACH-VIA positional permission;
 ;;;     vertical reach independently limits manipulation from either side
 ;;;
@@ -20,9 +23,9 @@
 ;;;           transmitter1 and connector2 @loc17
 ;;;   55-56   return to the recorder and open cycle 2
 ;;;   57-76   cycle 2: hand blue to the ghosts, build the red chain, gate5 opens
-;;;   77-85   stage box1 at loc14 with tray1 on top, climb ladder2 to the loc15 ledge
-;;;   86-88   reach down for the tray, load plate4, walk through gate6 to loc16
-;;;   89-90   ghost returns to the recorder and stops, closing cycle 2
+;;;   77-85   stage box1 at loc14 with tray1 on top, climb ladder2 to location5
+;;;   86-89   reach down for the tray, walk to loc15, load plate4, cross gate6 to loc16
+;;;   90-91   ghost returns to the recorder and stops, closing cycle 2
 ;;;
 ;;; The last two actions matter for goal chaining.  SOLVE-RECORDER-FINAL strengthens the
 ;;; problem goal with (ghost-stops-recorder) exactly as SOLVE-SUBGOAL does, so a solution
@@ -38,12 +41,12 @@
 ;;;                -> receiver2
 ;;; plate3 is held down by tray1*, so gate5 stays open through the final leg.
 ;;;
-;;; The final leg turns on the elevation split.  On the loc15 ledge the agent is at
+;;; The final leg turns on the elevation split.  At location5 the agent is at
 ;;; elevation 2; tray1 resting on box1 at loc14 is at 1, a gap of exactly
-;;; *vertical-reach-limit*, so it can be lifted.  box1 itself is at 0, a gap of 2, and stays
-;;; out of reach -- verified directly:
-;;;     PICKUP-CLEAR tray1 from loc15 = T
-;;;     PICKUP-CLEAR box1  from loc15 = NIL
+;;; *vertical-reach-limit*, so it can be lifted before the derived walk to location15.
+;;; box1 itself is at 0, a gap of 2, and stays out of reach -- verified directly:
+;;;     PICKUP-CLEAR tray1 from location5 = T
+;;;     PICKUP-CLEAR box1  from location5 = NIL
 ;;; REACH-VIA supplies symmetric positional permission.  The separate
 ;;; WITHIN-AGENT-VERTICAL-REACH test determines what can actually be manipulated from
 ;;; either side.
@@ -56,12 +59,12 @@
   (MOVE AGENT1* ((WALK LOCATION3 NIL LOCATION2) (STAIRS LOCATION2 NIL LOCATION4) (WALK LOCATION4 NIL LOCATION13)))
   (PICKUP-CONNECTOR AGENT1* CONNECTOR1* LOCATION13)
   (CONNECT-CONNECTOR AGENT1* CONNECTOR1* LOCATION13 GROUND (RECEIVER1))
-  (PICKUP-TRAY AGENT1* TRAY1* LOCATION13 LOCATION13)
-  (MOVE AGENT1* ((WALK LOCATION13 NIL LOCATION4) (JUMP LOCATION4 NIL LOCATION2)))
+  (MOVE AGENT1* ((WALK LOCATION13 NIL LOCATION4) (STAIRS LOCATION4 NIL LOCATION2)))
+  (PICKUP-TRAY AGENT1* TRAY1* LOCATION2 LOCATION2)
   (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 TRAY1* (CONNECTOR1* TRANSMITTER1))
-  (MOVE AGENT1 ((WALK LOCATION4 NIL LOCATION13)))
-  (PICKUP-TRAY AGENT1 TRAY1 LOCATION13 LOCATION13)
-  (MOVE AGENT1 ((WALK LOCATION13 NIL LOCATION4) (JUMP LOCATION4 NIL LOCATION2) (WALK LOCATION2 (GATE1) LOCATION1)))
+  (MOVE AGENT1 ((STAIRS LOCATION4 NIL LOCATION2)))
+  (PICKUP-TRAY AGENT1 TRAY1 LOCATION2 LOCATION2)
+  (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION1)))
   (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3)))
   (MOVE AGENT1 ((WALK LOCATION1 (GATE2) LOCATION6)))
   (PUT-TRAY AGENT1 TRAY1 PLATE1 LOCATION6)
@@ -133,8 +136,9 @@
   (PICKUP-TRAY AGENT1 TRAY1 LOCATION12 LOCATION12)
   (MOVE AGENT1 ((WALK LOCATION12 (GATE5) LOCATION14)))
   (PUT-TRAY AGENT1 TRAY1 BOX1 LOCATION14)
-  (MOVE AGENT1 ((LADDER LOCATION14 (LADDER2) LOCATION15)))
-  (PICKUP-TRAY AGENT1 TRAY1 LOCATION14 LOCATION15)
+  (MOVE AGENT1 ((LADDER LOCATION14 (LADDER2) LOCATION5)))
+  (PICKUP-TRAY AGENT1 TRAY1 LOCATION14 LOCATION5)
+  (MOVE AGENT1 ((WALK LOCATION5 NIL LOCATION15)))
   (PUT-TRAY AGENT1 TRAY1 PLATE4 LOCATION15)
   (MOVE AGENT1 ((WALK LOCATION15 (GATE6) LOCATION16)))
   (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3)))

@@ -86,7 +86,7 @@
   (location-coords> location2 6 9)
   (location-coords> location3 6 5)
   (location-coords> location4 8 10 3/2)
-  (location-coords> location5 36 9)
+  (location-coords> location5 36 9 2)
   (location-coords> location6 22 16)
   (location-coords> location7 25 16)
   (location-coords> location8 241/10 6)
