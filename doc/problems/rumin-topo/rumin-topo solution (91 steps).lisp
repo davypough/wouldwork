@@ -27,11 +27,10 @@
 ;;;   86-89   reach down for the tray, walk to loc15, load plate4, cross gate6 to loc16
 ;;;   90-91   ghost returns to the recorder and stops, closing cycle 2
 ;;;
-;;; The last two actions matter for goal chaining.  SOLVE-RECORDER-FINAL strengthens the
-;;; problem goal with (ghost-stops-recorder) exactly as SOLVE-SUBGOAL does, so a solution
-;;; whose final cycle stays open cannot be produced by the chaining facility.  Closing here
-;;; is safe: gate5 shuts and the red chain dies when the ghosts are removed, but the agent
-;;; is already through gate6, and gate6 is held by the live tray1 on plate4.
+;;; The last two actions explicitly close the final cycle; SOLVE-SUBGOAL does not synthesize
+;;; recorder closure.  Closing here is safe: gate5 shuts and the red chain dies when the
+;;; ghosts are removed, but the agent is already through gate6, and gate6 is held by the
+;;; live tray1 on plate4.
 ;;;
 ;;; Red chain (no hop crosses gate1):
 ;;;   transmitter2 -> connector1*  @loc2  on box1*    anchor 2

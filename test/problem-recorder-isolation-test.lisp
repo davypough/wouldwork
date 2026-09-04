@@ -37,14 +37,16 @@
        live-landing-box ghost-landing-box)
   connector (live-place-connector ghost-place-connector
              live-pair-connector ghost-pair-connector
-             live-target-connector ghost-target-connector)
+             live-target-connector ghost-target-connector
+             live-lit-blocker-connector ghost-lit-blocker-connector)
   tray (live-held-tray ghost-held-tray
         live-ground-tray ghost-ground-tray)
   recorder (recorder1)
   pressure-plate (shared-plate)
   transmitter (shared-transmitter)
   location (pickup-site place-site pair-origin
-            live-target-site ghost-target-site landing-site))
+            live-target-site ghost-target-site landing-site
+            live-lit-site ghost-lit-site))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -75,6 +77,7 @@
   (recording-copy> live-place-connector ghost-place-connector)
   (recording-copy> live-pair-connector ghost-pair-connector)
   (recording-copy> live-target-connector ghost-target-connector)
+  (recording-copy> live-lit-blocker-connector ghost-lit-blocker-connector)
   (recording-copy> live-held-tray ghost-held-tray)
   (recording-copy> live-ground-tray ghost-ground-tray)
 
@@ -127,7 +130,11 @@
   (has-location ghost-target-connector ghost-target-site)
   (los-via pair-origin () live-target-site)
   (los-via pair-origin () ghost-target-site)
-  (los-via pair-origin () shared-transmitter))
+  (los-via pair-origin () shared-transmitter)
+
+  ;; Lit connector occupancy conflicts only within its own recorder layer.
+  (has-location live-lit-blocker-connector live-lit-site)
+  (has-location ghost-lit-blocker-connector ghost-lit-site))
 
 
 ;;;; CHARACTERIZATION HELPERS ;;;;
@@ -150,12 +157,32 @@
     (recording-copy> live-place-connector ghost-place-connector)
     (recording-copy> live-pair-connector ghost-pair-connector)
     (recording-copy> live-target-connector ghost-target-connector)
+    (recording-copy> live-lit-blocker-connector ghost-lit-blocker-connector)
     (recording-copy> live-held-tray ghost-held-tray)
     (recording-copy> live-ground-tray ghost-ground-tray)))
 
 
 (define-test-claim beam-relay-default-pairing-limit
   (= *max-connector-pairings* 3))
+
+
+(define-test-claim recorder-isolation-connector-location-layering
+  (let ((probe-state (copy-problem-state *start-state*)))
+    (add-proposition
+      '(color live-lit-blocker-connector blue)
+      (problem-state.idb probe-state))
+    (add-proposition
+      '(color ghost-lit-blocker-connector blue)
+      (problem-state.idb probe-state))
+    (and
+      (not (connectable-location
+             probe-state 'live-pair-connector 'live-lit-site))
+      (connectable-location
+        probe-state 'ghost-pair-connector 'live-lit-site)
+      (connectable-location
+        probe-state 'live-pair-connector 'ghost-lit-site)
+      (not (connectable-location
+             probe-state 'ghost-pair-connector 'ghost-lit-site)))))
 
 
 (define-test-claim recorder-isolation-validation

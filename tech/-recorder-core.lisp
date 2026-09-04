@@ -235,3 +235,10 @@
                          (recording-in-progress))))
            (and (ghost-recording-object ?actor)
                 (ghost-recording-object ?terminus)))))
+
+
+(define-query connector-location-conflict-p (?connector ?other)
+  ;; A lit connector blocks another connector only within the same recorder layer.  Live
+  ;; and ghost copies may occupy the same physical location because their mobile supports,
+  ;; manipulation, and pairings are independently isolated above.
+  (same-recording-side ?connector ?other))

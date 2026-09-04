@@ -427,6 +427,7 @@
 (define-query connectable-location (?connector connector ?location location)
   (not (exists (?other connector)
          (and (different ?other ?connector)
+              (connector-location-conflict-p ?connector ?other)
               (has-location ?other ?location)
               (bind (color ?other $hue))))))
 

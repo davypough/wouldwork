@@ -8,6 +8,7 @@
 ;;;   queries : object-manipulation-allowed  -- actor may pick up, carry, place, or mount object
 ;;;             support-use-allowed          -- occupant may rest or stand on support
 ;;;             connector-pairing-allowed    -- actor may pair connector to terminus
+;;;             connector-location-conflict-p -- another lit connector blocks this placement
 
 (in-package :ww)
 
@@ -22,3 +23,7 @@
 
 (define-query connector-pairing-allowed (?actor ?connector ?terminus)
   (do ?actor ?connector ?terminus t))
+
+
+(define-query connector-location-conflict-p (?connector ?other)
+  (do ?connector ?other t))
