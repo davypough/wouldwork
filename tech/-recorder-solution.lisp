@@ -890,23 +890,22 @@ replays the whole path once and applies the problem goal."
 
 
 (defun recorder-cycle-recording-sequence (state cycle)
-  "Build CYCLE's recording-side presentation from its accepted path segment.
+  "Build CYCLE's ghost-side presentation from its accepted path segment.
 
-Each contiguous live block becomes one PAUSE marker.  Real boundary actions remain in
-place.  A legacy implicit opening or final goal-terminated closing is synthesized only in
-the report; an open cycle also receives whatever ghost return moves STATE can supply."
-  (let* ((start (recorder-path-cycle.start cycle))
-         (ending (recorder-path-cycle.ending cycle))
-         (sequence (list (or start '(start-recorder))))
-         (previous-side nil))
-    (dolist (move (recorder-path-cycle.moves cycle))
-      (let ((side (recorder-report-move-side state move)))
-        (when (and (eql side :live)
-                   (not (eql previous-side :live)))
-          (setf sequence (nconc sequence (list '(pause)))))
-        (when (eql side :ghost)
-          (setf sequence (nconc sequence (list move))))
-        (setf previous-side side)))
+Only the recorded ghost acts here, headed by the live agent's START-RECORDER.  A
+contiguous live run becomes one PAUSE marker exactly when ghost action still follows it,
+so every PAUSE is matched one-to-one by a RESUME in the playback sequence.  A normal or
+synthesized STOP-RECORDER counts as that remaining ghost action, since rule 8 makes the
+stop the recorded final act.  Real boundary actions remain in place; a legacy implicit
+opening or final goal-terminated closing is synthesized only in the report, and an open
+cycle also receives whatever ghost return moves STATE can supply."
+  (let ((ending (recorder-path-cycle.ending cycle))
+        (sequence (list (or (recorder-path-cycle.start cycle) '(start-recorder)))))
+    (dolist (run (recorder-cycle-runs state cycle))
+      (if (eql (first run) :ghost)
+        (setf sequence (nconc sequence (third run)))
+        (when (second run)
+          (setf sequence (nconc sequence (list '(pause)))))))
     (nconc sequence
            (cond
              ((recorder-cycle-normal-stop-p ending) (list ending))
@@ -930,28 +929,43 @@ markers, not planner actions, and carry no step number for that reason."
 
 
 (defun recorder-cycle-playback-sequence (state cycle)
-  "Present CYCLE's in-window moves, pausing live blocks and resuming ghost blocks.
+  "Present CYCLE's live moves, resuming the ghost after each paused live run.
 
-Setup, START-RECORDER, and normal STOP-RECORDER are not playback actions.  A live
-CANCEL-PLAYBACK is the final playback action."
-  (let ((sequence nil)
-        (moves
-          (append
-            (recorder-path-cycle.moves cycle)
-            (when (recorder-cycle-cancellation-p
-                    (recorder-path-cycle.ending cycle))
-              (list (recorder-path-cycle.ending cycle)))))
-        (previous-side nil))
-    (dolist (move moves sequence)
-      (let ((side (recorder-report-move-side state move)))
-        (when (not (eql side previous-side))
-          (cond
-            ((eql side :live)
-             (setf sequence (nconc sequence (list '(pause)))))
-            ((eql previous-side :live)
-             (setf sequence (nconc sequence (list '(resume)))))))
-        (setf sequence (nconc sequence (list move)))
-        (setf previous-side side)))))
+Only the live agent acts during playback, so ghost moves never appear here, and neither do
+setup, START-RECORDER, or a normal STOP-RECORDER.  A RESUME follows a live run exactly
+when the recording sequence gave that run a PAUSE, which makes the two markers stand
+one-to-one.  A live CANCEL-PLAYBACK is the final playback action."
+  (let ((ending (recorder-path-cycle.ending cycle))
+        (sequence nil))
+    (dolist (run (recorder-cycle-runs state cycle))
+      (when (eql (first run) :live)
+        (setf sequence (nconc sequence (third run)))
+        (when (second run)
+          (setf sequence (nconc sequence (list '(resume)))))))
+    (nconc sequence
+           (when (recorder-cycle-cancellation-p ending)
+             (list ending)))))
+
+
+(defun recorder-cycle-runs (state cycle)
+  "Group CYCLE's window moves into contiguous same-side runs for both report sequences.
+
+Each run is the list (SIDE GHOST-FOLLOWS-P MOVES), where GHOST-FOLLOWS-P is true when
+ghost action still occurs after the run in the assembled recording sequence.  The closing
+supplies that action for a trailing live run unless the cycle was cancelled: a normal stop
+is the recorded final act under rule 8, and a synthesized closing appends ghost return
+moves before its stop.  MOVES is freshly consed, so callers may NCONC it in place."
+  (let ((runs nil)
+        (ghost-follows
+          (not (recorder-cycle-cancellation-p (recorder-path-cycle.ending cycle)))))
+    (dolist (move (reverse (recorder-path-cycle.moves cycle)) runs)
+      (let ((side (recorder-report-move-side state move))
+            (current (first runs)))
+        (if (and current (eql side (first current)))
+          (setf (third current) (cons move (third current)))
+          (push (list side ghost-follows (list move)) runs))
+        (when (eql side :ghost)
+          (setf ghost-follows t))))))
 
 
 (defun recorder-cycle-integrated-path (cycle)

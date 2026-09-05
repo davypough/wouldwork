@@ -1585,7 +1585,7 @@ different acceptable milestone state."
   (format t "~2%Program cycles = ~:D" *program-cycles*)
   (format t "~2%Total states processed = ~:D" *total-states-processed*)
   (when (eql *tree-or-graph* 'graph)
-    (format t "~2%Repeated states = ~:D, ie, ~,1F percent"
+    (format t "~2%Repeated states pruned = ~:D, ie, ~,1F percent"
               *repeated-states* (* (/ *repeated-states* *total-states-processed*) 100)))
   (when (> *dead-end-num-paths* 0)
     (format t "~2%Average dead-end depth = ~A"
@@ -1926,7 +1926,7 @@ different acceptable milestone state."
           (format t "~%ht count: ~:D    ht size: ~:D"
                   (loop for bucket being the hash-values of *closed* sum (length bucket))
                   (hash-table-size *closed*)))
-      (format t "~%repeated states = ~:D (~,1F% of total states)"
+      (format t "~%repeated states pruned = ~:D (~,1F% of total states)"
                 *repeated-states* (* 100.0 (/ *repeated-states* *total-states-processed*))))
     (when (and *symmetry-pruning* *symmetry-families*)
       (if (use-canonical-symmetry-p)

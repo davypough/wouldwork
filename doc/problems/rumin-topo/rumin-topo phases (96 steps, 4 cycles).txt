@@ -1,0 +1,194 @@
+RUMIN-TOPO -- 96-action solution, four recorder cycles.
+Source: rumin-topo solution (96 steps, 4 cycles).lisp
+
+Sectioning follows PARSE-RECORDER-PATH and PRINT-RECORDER-CYCLE-REPORT in
+tech/-recorder-solution.lisp; this transcribes that decomposition, with long MOVE
+routes wrapped and per-cycle metrics (elapsed time, value change) omitted -- they
+need a replay, not a reading of the path.  Live agent = AGENT1; ghost agent =
+AGENT1*.  Numbers are positions in the 96-action VALIDATE-SOLUTION list.
+
+Each phase has exactly one actor:
+
+Setup phase     -- actions accumulated before this cycle's START-RECORDER.
+Recording phase -- AGENT1* only, headed by AGENT1's START-RECORDER and closed by
+                   the ending.  A (PAUSE) marks a pause point AGENT1 creates
+                   while recording; it stands where a live block ran and nothing
+                   was captured.
+Playback phase  -- AGENT1 only.  A (RESUME) marks where AGENT1 releases the ghost
+                   to run the recorded steps following that pause point; the ;;
+                   annotation names them.  START-RECORDER and a normal
+                   STOP-RECORDER are not playback actions.
+
+(PAUSE) and (RESUME) stand one-to-one: every pause point created during recording
+is released exactly once during playback.  A normal STOP-RECORDER counts as
+remaining recorded action, so a live block that ends the window still earns a
+pause point.
+
+==============================================================================
+Recorder cycle 1  (steps 1-25; 23 in-window moves, 6 recorded)
+==============================================================================
+Setup phase:
+  ;; (empty)
+
+Recording phase:
+  (1 (START-RECORDER AGENT1))
+  (PAUSE)
+  (5 (MOVE AGENT1* ((WALK LOCATION3 NIL LOCATION2))))
+  (6 (PICKUP-TRAY AGENT1* TRAY1* LOCATION2 LOCATION2))
+  (PAUSE)
+  (11 (MOVE AGENT1* ((STAIRS LOCATION2 NIL LOCATION4))))
+  (PAUSE)
+  (21 (MOVE AGENT1* ((STAIRS LOCATION4 NIL LOCATION2))))
+  (PAUSE)
+  (23 (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3))))
+  (24 (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION3))
+  (25 (STOP-RECORDER AGENT1*))
+
+Playback phase:
+  (2 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION2) (STAIRS LOCATION2 NIL LOCATION4)
+     (WALK LOCATION4 NIL LOCATION13))))
+  (3 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION13))
+  (4 (MOVE AGENT1 ((WALK LOCATION13 NIL LOCATION4))))
+  (RESUME)   ;; AGENT1* runs recorded steps 5-6
+  (7 (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 TRAY1* (CONNECTOR1* TRANSMITTER1)))
+  (8 (MOVE AGENT1 ((STAIRS LOCATION4 NIL LOCATION2))))
+  (9 (PICKUP-TRAY AGENT1 TRAY1 LOCATION2 LOCATION2))
+  (10 (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION1))))
+  (RESUME)   ;; AGENT1* runs recorded step 11
+  (12 (MOVE AGENT1 ((WALK LOCATION1 (GATE2) LOCATION6))))
+  (13 (PUT-TRAY AGENT1 TRAY1 PLATE1 LOCATION6))
+  (14 (MOVE AGENT1 ((WALK LOCATION6 (GATE3) LOCATION7))))
+  (15 (PICKUP-BOX AGENT1 BOX1 LOCATION7 LOCATION7))
+  (16 (MOVE AGENT1 ((WALK LOCATION7 (GATE2 GATE3) LOCATION8))))
+  (17 (PUT-BOX AGENT1 BOX1 GROUND LOCATION8))
+  (18 (MOVE AGENT1 ((WALK LOCATION8 (GATE2) LOCATION6))))
+  (19 (PICKUP-TRAY AGENT1 TRAY1 LOCATION6 LOCATION6))
+  (20 (MOVE AGENT1 ((WALK LOCATION6 (GATE2) LOCATION1))))
+  (RESUME)   ;; AGENT1* runs recorded step 21
+  (22 (MOVE AGENT1 ((WALK LOCATION1 (GATE1) LOCATION3))))
+  (RESUME)   ;; AGENT1* runs recorded steps 23-24
+
+Closure: explicit.
+
+==============================================================================
+Recorder cycle 2  (steps 29-51; 21 in-window moves, 7 recorded)
+==============================================================================
+Setup phase:
+  (26 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION2))))
+  (27 (PUT-TRAY AGENT1 TRAY1 GROUND LOCATION2))
+  (28 (MOVE AGENT1 ((WALK LOCATION2 NIL LOCATION3))))
+
+Recording phase:
+  (29 (START-RECORDER AGENT1))
+  (30 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* LOCATION3))
+  (31 (MOVE AGENT1* ((WALK LOCATION3 NIL LOCATION2) (STAIRS LOCATION2 NIL LOCATION4)
+      (WALK LOCATION4 NIL LOCATION13))))
+  (32 (CONNECT-CONNECTOR AGENT1* CONNECTOR1* LOCATION13 GROUND (RECEIVER1)))
+  (33 (MOVE AGENT1* ((WALK LOCATION13 NIL LOCATION4) (STAIRS LOCATION4 NIL LOCATION2))))
+  (34 (PICKUP-TRAY AGENT1* TRAY1* LOCATION2 LOCATION2))
+  (PAUSE)
+  (49 (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION2))
+  (50 (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3))))
+  (51 (STOP-RECORDER AGENT1*))
+
+Playback phase:
+  (35 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION3))
+  (36 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION2) (STAIRS LOCATION2 NIL LOCATION4))))
+  (37 (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 TRAY1* (CONNECTOR1* TRANSMITTER1)))
+  (38 (MOVE AGENT1 ((STAIRS LOCATION4 NIL LOCATION2) (WALK LOCATION2 (GATE1) LOCATION8))))
+  (39 (MOVE AGENT1 ((JUMP (LOCATION8 GROUND) NIL (LOCATION8 BOX1)))))
+  (40 (MOVE AGENT1 ((JUMP (LOCATION8 BOX1) NIL (LOCATION9 GROUND)))))
+  (41 (MOVE AGENT1 ((STAIRS LOCATION9 NIL LOCATION10))))
+  (42 (PICKUP-CONNECTOR AGENT1 CONNECTOR2 LOCATION10))
+  (43 (MOVE AGENT1 ((STAIRS LOCATION10 NIL LOCATION9) (JUMP LOCATION9 NIL LOCATION8)
+      (WALK LOCATION8 (GATE1) LOCATION17))))
+  (44 (CONNECT-CONNECTOR AGENT1 CONNECTOR2 LOCATION17 GROUND (RECEIVER1)))
+  (45 (MOVE AGENT1 ((WALK LOCATION17 (GATE1) LOCATION8))))
+  (46 (PICKUP-BOX AGENT1 BOX1 LOCATION8 LOCATION8))
+  (47 (MOVE AGENT1 ((WALK LOCATION8 (GATE1) LOCATION2))))
+  (48 (PUT-BOX AGENT1 BOX1 GROUND LOCATION2))
+  (RESUME)   ;; AGENT1* runs recorded steps 49-50
+
+Closure: explicit.
+
+==============================================================================
+Recorder cycle 3  (steps 55-61; 5 in-window moves, 0 recorded)
+==============================================================================
+Setup phase:
+  (52 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION2))
+  (53 (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 BOX1 (CONNECTOR2 TRANSMITTER1)))
+  (54 (MOVE AGENT1 ((WALK LOCATION2 NIL LOCATION3))))
+
+Recording phase:
+  (55 (START-RECORDER AGENT1))
+  (PAUSE)
+  (61 (STOP-RECORDER AGENT1*))
+  ;; No ghost move is captured: this cycle records nothing.
+
+Playback phase:
+  (56 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION2))))
+  (57 (PICKUP-TRAY AGENT1 TRAY1 LOCATION2 LOCATION2))
+  (58 (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION12))))
+  (59 (PUT-TRAY AGENT1 TRAY1 PLATE3 LOCATION12))
+  (60 (MOVE AGENT1 ((WALK LOCATION12 (GATE1) LOCATION3))))
+  (RESUME)   ;; AGENT1* runs the recorded stop at step 61
+  ;; Every in-window move is live: the ghost's only recorded act is the stop.
+
+Closure: explicit.
+
+==============================================================================
+Recorder cycle 4  (steps 62-91; 28 in-window moves, 4 recorded)
+==============================================================================
+Setup phase:
+  ;; (empty)
+
+Recording phase:
+  (62 (START-RECORDER AGENT1))
+  (PAUSE)
+  (79 (MOVE AGENT1* ((WALK LOCATION3 NIL LOCATION2))))
+  (80 (PICKUP-CONNECTOR AGENT1* CONNECTOR1* LOCATION2))
+  (81 (CONNECT-CONNECTOR AGENT1* CONNECTOR1* LOCATION2 BOX1* (CONNECTOR2* TRANSMITTER2)))
+  (PAUSE)
+  (90 (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION3))))
+  (91 (STOP-RECORDER AGENT1*))
+
+Playback phase:
+  (63 (MOVE AGENT1 ((WALK LOCATION3 NIL LOCATION2))))
+  (64 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION2))
+  (65 (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION8))))
+  (66 (PUT-CONNECTOR AGENT1 CONNECTOR1 LOCATION8 GROUND))
+  (67 (MOVE AGENT1 ((WALK LOCATION8 (GATE1) LOCATION2))))
+  (68 (PICKUP-BOX AGENT1 BOX1 LOCATION2 LOCATION2))
+  (69 (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION8))))
+  (70 (PUT-BOX AGENT1 BOX1 GROUND LOCATION8))
+  (71 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION8))
+  (72 (MOVE AGENT1 ((JUMP (LOCATION8 GROUND) NIL (LOCATION8 BOX1)))))
+  (73 (MOVE AGENT1 ((JUMP (LOCATION8 BOX1) NIL (LOCATION9 GROUND)))))
+  (74 (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION9 PLATE2 (CONNECTOR2*)))
+  (75 (MOVE AGENT1 ((JUMP LOCATION9 NIL LOCATION8) (WALK LOCATION8 (GATE1) LOCATION17))))
+  (76 (PICKUP-CONNECTOR AGENT1 CONNECTOR2 LOCATION17))
+  (77 (MOVE AGENT1 ((WALK LOCATION17 (GATE1) LOCATION11))))
+  (78 (CONNECT-CONNECTOR AGENT1 CONNECTOR2 LOCATION11 GROUND (CONNECTOR1 RECEIVER2)))
+  (RESUME)   ;; AGENT1* runs recorded steps 79-81
+  (82 (MOVE AGENT1 ((WALK LOCATION11 NIL LOCATION8))))
+  (83 (PICKUP-BOX AGENT1 BOX1 LOCATION8 LOCATION8))
+  (84 (MOVE AGENT1 ((WALK LOCATION8 (GATE5) LOCATION14))))
+  (85 (PUT-BOX AGENT1 BOX1 GROUND LOCATION14))
+  (86 (MOVE AGENT1 ((WALK LOCATION14 (GATE5) LOCATION12))))
+  (87 (PICKUP-TRAY AGENT1 TRAY1 LOCATION12 LOCATION12))
+  (88 (MOVE AGENT1 ((WALK LOCATION12 (GATE5) LOCATION14))))
+  (89 (PUT-TRAY AGENT1 TRAY1 BOX1 LOCATION14))
+  (RESUME)   ;; AGENT1* runs recorded step 90
+
+Closure: explicit.
+
+==============================================================================
+Trailing setup  (steps 92-96)
+==============================================================================
+Trailing setup:
+  (92 (MOVE AGENT1 ((LADDER LOCATION14 (LADDER2) LOCATION5))))
+  (93 (PICKUP-TRAY AGENT1 TRAY1 LOCATION14 LOCATION5))
+  (94 (MOVE AGENT1 ((WALK LOCATION5 NIL LOCATION15))))
+  (95 (PUT-TRAY AGENT1 TRAY1 PLATE4 LOCATION15))
+  (96 (MOVE AGENT1 ((WALK LOCATION15 (GATE6) LOCATION16))))
+

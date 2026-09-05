@@ -227,6 +227,20 @@
   chain)
 
 
+(defun print-recorder-checkpoint-phases (segments stream)
+  "Print the cumulative recorder phase report for the chain accepted through SEGMENTS.
+
+The report covers the whole path from the staged origin, never the last segment alone: a
+recorder cycle can open in one checkpoint segment and close in a later one, so only the
+accumulated path parses into the cycles the search actually chose.  *START-STATE* is still
+the preceding checkpoint's baseline at this point, so the origin is bound for the replay
+and for the solution-total metrics computed against it."
+  (format stream "~&~%Recorder phases accumulated through this checkpoint:~%")
+  (let ((*start-state* (recorder-subgoal-chain-origin)))
+    (print-recorder-report
+      (make-recorder-subgoal-cumulative-solution segments) stream)))
+
+
 (defun install-recorder-subgoal-baseline (state)
   "Commit an independent copy of checkpoint STATE as the next search baseline."
   (let ((baseline (copy-problem-state state)))
@@ -382,6 +396,7 @@
         (print-recorder-report cumulative-solution)
         cumulative-solution)
       (progn
+        (print-recorder-checkpoint-phases segments *standard-output*)
         (install-compiled-goal
           (goal-chain-request-goal (goal-chain-phase-request (car (last phases)))))
         (install-recorder-subgoal-baseline (solution.goal last-solution))))))
