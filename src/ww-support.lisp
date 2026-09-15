@@ -282,7 +282,7 @@
   (loop with remaining = key
         do (multiple-value-bind (next code) (truncate remaining 1000)
              (when (nth-value 1
-                     (gethash (gethash code *integer-constants*)
+                     (gethash (gethash code (or *worker-name-read-view* *integer-constants*))   ; CHANGED
                               *object-to-symmetry-membership*))
                (return t))
              (when (zerop next)

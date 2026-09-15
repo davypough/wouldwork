@@ -14,8 +14,7 @@
   (assert (= (hash-table-size source) (hash-table-size copy)))
   (assert (eql (hash-table-rehash-size source) (hash-table-rehash-size copy)))
   (assert (eql (hash-table-rehash-threshold source) (hash-table-rehash-threshold copy)))
-  (assert (eql (sb-ext:hash-table-synchronized-p source)
-               (sb-ext:hash-table-synchronized-p copy))))
+  (assert (not (sb-ext:hash-table-synchronized-p copy))))                          ; CHANGED
 
 (defun snapshot-test-copy-policy ()
   (let* ((table (make-hash-table :test #'equal :synchronized t))
@@ -81,8 +80,10 @@
     (assert (= (length views) 2))
     (snapshot-test-table-settings *static-idb* (worker-read-view-static first))
     (snapshot-test-table-settings *constant-integers* (worker-read-view-codes first))
+    (snapshot-test-table-settings *integer-constants* (worker-read-view-names first))       ; CHANGED
     (assert (not (eq (worker-read-view-static first) (worker-read-view-static second))))
     (assert (not (eq (worker-read-view-codes first) (worker-read-view-codes second))))
+    (assert (not (eq (worker-read-view-names first) (worker-read-view-names second))))     ; CHANGED
     (loop for name in (worker-read-view-memo-symbols first)
           for a in (worker-read-view-memo-tables first)
           for b in (worker-read-view-memo-tables second)

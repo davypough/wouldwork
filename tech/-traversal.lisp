@@ -411,5 +411,6 @@
 
 (register-worker-read-memo '*traversal-canonical-families* :empty-table)
 (register-worker-read-memo '*traversal-dependency-key-cache* :empty-table)
+(register-worker-read-memo '*traversal-segment-cache* :empty-table)                           ; CHANGED
 (register-worker-read-configuration '*traversal-state-dependencies*
                                     '*traversal-cache-parameters* '*traversal-modes*)

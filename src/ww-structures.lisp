@@ -41,7 +41,7 @@
         (until (zerop int))
         (setf x int)
         (finally (return (mapcar (lambda (i)
-                                   (gethash i *integer-constants*))
+                                   (gethash i (or *worker-name-read-view* *integer-constants*)))   ; CHANGED
                                  int-list)))))
 
 

@@ -1,7 +1,7 @@
 ;;; Worker-owned reads and technology memos; no views survive a worker group.
 (in-package :ww)
 
-(defstruct worker-read-view static codes memo-symbols memo-tables)
+(defstruct worker-read-view static codes names memo-symbols memo-tables)            ; CHANGED
 (defstruct worker-read-context sources copies object-index generation views configuration)
 
 (defparameter *worker-read-memo-symbols* nil)
@@ -63,11 +63,13 @@
     (reject-worker-read-write 'static-fact-update)))
 
 (defun worker-read-empty-table (table)
+  "An unsynchronized table with TABLE's settings. Every copy is owned by one worker,
+   or read by the coordinator only after all workers have joined."            ; CHANGED
   (make-hash-table :test (hash-table-test table)
                    :size (hash-table-size table)
                    :rehash-size (hash-table-rehash-size table)
                    :rehash-threshold (hash-table-rehash-threshold table)
-                   :synchronized (sb-ext:hash-table-synchronized-p table)))
+                   :synchronized nil))                                          ; CHANGED
 
 (defun worker-read-copy-value (value &optional ancestors)
   "Own finite cons trees and strings. Atoms retain identity; other types fail.
@@ -112,6 +114,7 @@
     (make-worker-read-view
       :static (worker-read-copy-table *static-idb*)
       :codes (worker-read-copy-table *constant-integers*)
+      :names (worker-read-copy-table *integer-constants*)                        ; CHANGED
       :memo-symbols names
       :memo-tables (mapcar #'make-worker-read-memo names))))
 
@@ -119,7 +122,8 @@
   (if (null view)
       (funcall function)
       (let ((*worker-static-read-view* (worker-read-view-static view))
-            (*worker-code-read-view* (worker-read-view-codes view)))
+            (*worker-code-read-view* (worker-read-view-codes view))
+            (*worker-name-read-view* (worker-read-view-names view)))                ; CHANGED
         (progv (worker-read-view-memo-symbols view)
                (worker-read-view-memo-tables view)
           (funcall function)))))
@@ -160,7 +164,9 @@
     (assert (equalp (worker-read-view-static view)
                     (first (worker-read-context-copies context))))
     (assert (equalp (worker-read-view-codes view)
-                    (second (worker-read-context-copies context)))))
+                    (second (worker-read-context-copies context))))
+    (assert (equalp (worker-read-view-names view)                                   ; CHANGED
+                    (third (worker-read-context-copies context)))))                 ; CHANGED
   t)
 
 (defun end-worker-read-phase (context)

@@ -9,6 +9,7 @@
 Enabled by default on STAGE. Serial searches use canonical reads without copying.")
 (defvar *worker-static-read-view* nil)
 (defvar *worker-code-read-view* nil)
+(defvar *worker-name-read-view* nil)                                              ; CHANGED
 
 
 (declaim (special *recorder-prefix-pruning*
@@ -701,10 +702,10 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *bound-refresh-interval* 1000
   "Worker cycles between cached branch-and-bound refreshes.")
 
-(defvar *donation-check-interval* 10000
+(defvar *donation-check-interval* 100
   "Worker cycles between work-donation checks.")
 
-(defvar *donation-threshold* 256
+(defvar *donation-threshold* 16
   "Minimum local stack size before a worker may donate work.")
 
 (defvar *donation-fraction* 0.2
@@ -739,8 +740,8 @@ treat their arguments as read-only and be safe to call concurrently."
     (*min-tasks* . 256)
     (*num-closed-shards* . 64)
     (*bound-refresh-interval* . 1000)
-    (*donation-check-interval* . 10000)
-    (*donation-threshold* . 256)
+    (*donation-check-interval* . 100)
+    (*donation-threshold* . 16)
     (*donation-fraction* . 0.2)
     (*enable-work-donation* . t))
   "Authoritative defaults restored before staging a problem specification.")

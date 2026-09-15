@@ -197,21 +197,13 @@
 
 (defun extract-donation-nodes (local-stack num-to-donate)
   "Extract NUM-TO-DONATE nodes from LOCAL-STACK for donation.
-   Preferentially extracts shallower nodes (larger subtrees).
    Returns (values donated-nodes remaining-stack).
-   
-   Strategy: Sort by depth, donate the shallowest half."
-  (declare (type list local-stack) (type fixnum num-to-donate))
-  (when (or (<= num-to-donate 0) (null local-stack))
-    (return-from extract-donation-nodes (values nil local-stack)))
-  
-  ;; Sort by depth (ascending - shallowest first)
-  (let ((sorted (sort (copy-list local-stack) #'< 
-                      :key (lambda (n) (node.depth n)))))
-    ;; Split: first num-to-donate are donated, rest are kept
-    (let ((donated (subseq sorted 0 (min num-to-donate (length sorted))))
-          (remaining (nthcdr num-to-donate sorted)))
-      (values donated remaining))))
+   A DFS stack's depths never increase from top to bottom, so its last
+   NUM-TO-DONATE nodes are the shallowest (largest subtrees).  The kept
+   stack retains its original order, so the worker still pops deepest-first."
+  (declare (type list local-stack) (type fixnum num-to-donate))                          ; CHANGED
+  (values (last local-stack num-to-donate)                                                ; CHANGED
+          (butlast local-stack num-to-donate)))                                           ; CHANGED
 
 
 (defun compute-donation-count (stack-size)
@@ -871,7 +863,7 @@
   (format t "  *split-depth-max*       ; Max depth for initial task creation (default: 20)~%")
   (format t "                          ; Higher = more tasks, more parallelism~%")
   (format t "  *tasks-per-thread*      ; Target tasks per thread (default: 8)~%")
-  (format t "  *min-tasks*             ; Minimum tasks regardless of threads (default: 256)~%")
+  (format t "  *min-tasks*             ; Minimum tasks regardless of threads (default: 16)~%")
   (format t "~%CLOSED TABLE (Graph Search):~%")
   (format t "  *num-closed-shards*     ; Number of hash table shards (default: 64)~%")
   (format t "                          ; Should be power of 2, >= thread count~%")
@@ -880,8 +872,8 @@
   (format t "                          ; Lower = more responsive, higher = less overhead~%")
   (format t "~%WORK DONATION (Load Balancing):~%")
   (format t "  *enable-work-donation*  ; Enable/disable donation (default: T)~%")
-  (format t "  *donation-threshold*    ; Min stack size to donate (default: 256)~%")
-  (format t "  *donation-check-interval*; Cycles between donation checks (default: 10000)~%")
+  (format t "  *donation-threshold*    ; Min stack size to donate (default: 16)~%")
+  (format t "  *donation-check-interval*; Cycles between donation checks (default: 100)~%")
   (format t "  *donation-fraction*     ; Fraction to donate (default: 0.2)~%")
   (format t "~%TUNING TIPS:~%")
   (format t "  - For problems with uneven branching: lower *donation-threshold*~%")
@@ -1018,12 +1010,14 @@
    exceed this many seconds at 4 threads.")
 
 
-(defun test-threads ()
+(defun test-threads (&optional depth)                                                    ; CHANGED
   "Time the currently staged problem at several *THREADS* settings and report the
-   fastest. First calibrates a *DEPTH-CUTOFF* by deepening one level at a time at
-   4 threads until a run takes *TEST-THREADS-MIN-SECONDS*, the next depth is predicted
-   to exceed *TEST-THREADS-MAX-SECONDS*, or the search is no longer truncated by the
-   cutoff; the staged *DEPTH-CUTOFF* is ignored. All runs use *SOLUTION-TYPE*
+   fastest. Without DEPTH, first calibrates a *DEPTH-CUTOFF* by deepening one level at
+   a time at 4 threads until a run takes *TEST-THREADS-MIN-SECONDS*, the next depth is
+   predicted to exceed *TEST-THREADS-MAX-SECONDS*, or the search is no longer truncated
+   by the cutoff. With DEPTH, skips calibration and times every thread count at that
+   *DEPTH-CUTOFF*, so runs before and after a code change stay comparable. The staged
+   *DEPTH-CUTOFF* is ignored either way. All runs use *SOLUTION-TYPE*
    EVERY with *RANDOMIZE-SEARCH* off so each thread count performs the same exhaustive
    work. All SOLVE output is discarded; *THREADS*, *SOLUTION-TYPE*, *DEPTH-CUTOFF*, and
    *RANDOMIZE-SEARCH* are restored on exit. Requires *DEBUG* 0 and *PROBE* off, since
@@ -1046,17 +1040,23 @@
           (setf *threads* 4
                 *solution-type* 'every
                 *randomize-search* nil)
-          (format t "~2&Calibrating depth-cutoff for ~A at 4 threads (solution-type every)~%"
-                  *problem-name*)
-          (multiple-value-bind (depth seconds states report)
-              (calibrate-test-threads-cutoff)
-            (push (list 4 seconds states) results)
-            (format t "~&~%Timing ~A at depth-cutoff ~D~%" *problem-name* depth)
-            (format t "~&~A" report)
-            (format t "~&  threads  4   ~8,2F sec   ~12:D states/sec~%"
-                    seconds (round states seconds))
-            (finish-output))
-          (dolist (n '(8 12 16 20))
+          (if depth                                                                       ; CHANGED
+              (progn                                                                      ; CHANGED
+                (setf *depth-cutoff* depth)                                               ; CHANGED
+                (format t "~&~%Timing ~A at fixed depth-cutoff ~D~%" *problem-name* depth)   ; CHANGED
+                (finish-output))                                                          ; CHANGED
+              (progn                                                                      ; CHANGED
+                (format t "~2&Calibrating depth-cutoff for ~A at 4 threads (solution-type every)~%"
+                        *problem-name*)
+                (multiple-value-bind (calibrated-depth seconds states report)             ; CHANGED
+                    (calibrate-test-threads-cutoff)
+                  (push (list 4 seconds states) results)
+                  (format t "~&~%Timing ~A at depth-cutoff ~D~%" *problem-name* calibrated-depth)   ; CHANGED
+                  (format t "~&~A" report)
+                  (format t "~&  threads  4   ~8,2F sec   ~12:D states/sec~%"
+                          seconds (round states seconds))
+                  (finish-output))))                                                      ; CHANGED
+          (dolist (n (if depth '(4 8 12 16 20) '(8 12 16 20)))                            ; CHANGED
             (setf *threads* n)
             (multiple-value-bind (seconds states report) (timed-silent-solve)
               (push (list n seconds states) results)
@@ -1172,8 +1172,8 @@
            *num-closed-shards* 64
            *bound-refresh-interval* 1000
            *enable-work-donation* t
-           *donation-check-interval* 10000
-           *donation-threshold* 256
+           *donation-check-interval* 100
+           *donation-threshold* 16
            *donation-fraction* 0.2)
      (format t "~%Applied :default preset~%"))
     

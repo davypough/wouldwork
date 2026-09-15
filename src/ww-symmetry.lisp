@@ -777,12 +777,14 @@
                     collect (cons item tail)))))
 
 
-(defun symmetry-tree-contains-row-p (tree row)
-  "Whether TREE contains any object in ROW."
-  (cond ((consp tree)
-         (or (symmetry-tree-contains-row-p (car tree) row)
-             (symmetry-tree-contains-row-p (cdr tree) row)))
-        (t (member tree row :test #'eq))))
+(defun symmetry-tree-objects (tree)                                                    ; CHANGED
+  "Return the distinct symmetry-family objects occurring anywhere in TREE."             ; CHANGED
+  (cond ((consp tree)                                                                  ; CHANGED
+         (union (symmetry-tree-objects (car tree))                                     ; CHANGED
+                (symmetry-tree-objects (cdr tree))                                     ; CHANGED
+                :test #'eq))                                                           ; CHANGED
+        ((nth-value 1 (gethash tree *object-to-symmetry-membership*))                  ; CHANGED
+         (list tree))))                                                                ; CHANGED
 
 
 (defun normalize-row-signature-tree
@@ -811,11 +813,12 @@
 
 
 (defun compute-row-state-signature
-    (family row row-index state-form family-indices)
-  "Return an invariant complete-incidence signature for one FAMILY row."
+    (family row row-index annotated-form family-indices)                               ; CHANGED
+  "Return an invariant complete-incidence signature for one FAMILY row.
+   ANNOTATED-FORM holds (proposition . symmetry-objects) entries."                     ; CHANGED
   (sort
-    (loop for proposition in state-form
-          when (symmetry-tree-contains-row-p proposition row)
+    (loop for (proposition . objects) in annotated-form                                ; CHANGED
+          when (some (lambda (object) (member object row :test #'eq)) objects)         ; CHANGED
             collect (normalize-row-signature-tree
                       proposition family row-index family-indices))
     #'ww-object<))
@@ -858,15 +861,17 @@
     :test #'same-symmetry-row-p))
 
 
-(defun symmetry-cell-rows-interact-p (rows state-form)
-  "Whether a CELL row participates in a fact that couples distinct symmetry rows."
+(defun symmetry-cell-rows-interact-p (rows annotated-form)                              ; CHANGED
+  "Whether a CELL row participates in a fact that couples distinct symmetry rows.
+   ANNOTATED-FORM holds (proposition . symmetry-objects) entries."                     ; CHANGED
   (some
-    (lambda (proposition)
+    (lambda (entry)                                                                    ; CHANGED
       (and (some (lambda (row)
-                   (symmetry-tree-contains-row-p proposition row))
+                   (some (lambda (object) (member object row :test #'eq))              ; CHANGED
+                         (cdr entry)))                                                 ; CHANGED
                  rows)
-           (> (length (symmetry-tree-row-memberships proposition)) 1)))
-    state-form))
+           (> (length (symmetry-tree-row-memberships (car entry))) 1)))                ; CHANGED
+    annotated-form))                                                                   ; CHANGED
 
 
 (defun symmetry-cell-row-orderings (cell state-form)
@@ -934,14 +939,20 @@
 
 
 (defun map-symmetry-canonical-mappings (function state-form)
-  "Call FUNCTION for every unresolved exact family-row ordering in STATE-FORM."
+  "Call FUNCTION for every unresolved exact family-row ordering in STATE-FORM.
+   Below this point the form travels annotated as (proposition . symmetry-objects)
+   entries, so row-incidence tests scan each proposition's tree once per build."       ; CHANGED
   (let ((mapping (make-hash-table :test #'eq))
-        (family-indices (make-hash-table :test #'eq)))
+        (family-indices (make-hash-table :test #'eq))
+        (annotated-form (mapcar (lambda (proposition)                                  ; CHANGED
+                                  (cons proposition                                    ; CHANGED
+                                        (symmetry-tree-objects proposition)))          ; CHANGED
+                                state-form)))                                          ; CHANGED
     (loop for family in *symmetry-families*
           for family-index from 0
           do (setf (gethash family family-indices) family-index))
     (visit-symmetry-canonical-mappings
-      function *symmetry-families* 0 state-form family-indices mapping)))
+      function *symmetry-families* 0 annotated-form family-indices mapping)))           ; CHANGED
 
 
 (defun build-exact-canonical-idb-form (idb)

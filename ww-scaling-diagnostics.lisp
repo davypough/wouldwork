@@ -1,7 +1,8 @@
 ;;; REPL-only diagnostics for parallel scaling of SBCL on this machine.
 ;;; Load explicitly, then enter (run-scaling-diagnostics), which is independent of
 ;;; wouldwork search, or (profile-search-consing depth-cutoff) in serial mode, which
-;;; profiles per-function consing of the staged problem.
+;;; profiles per-function consing of the staged problem, or (profile-search-calls depth-cutoff)
+;;; in serial mode, which reports calls and exclusive time per function per state.
 (in-package :ww)
 
 
@@ -86,6 +87,49 @@
     (values)))
 
 
+(defun profile-search-calls (depth-cutoff)
+  "Count calls per function for one silent serial SOLVE of the staged problem at
+   DEPTH-CUTOFF, with *SOLUTION-TYPE* EVERY and *RANDOMIZE-SEARCH* off (as in
+   TEST-THREADS). Uses SB-PROFILE on every function in the WOULDWORK package. Prints
+   the 60 functions with the most exclusive run time (excluding nested profiled calls),
+   with calls per state and microseconds per state. Per-call profiling overhead inflates
+   tiny, frequently called functions, so compare functions of similar call counts.
+   Requires *THREADS* 0. Parameters are restored and all functions unprofiled on exit."
+  (assert (zerop *threads*) ()
+    "Enter (ww-set *threads* 0) before calling PROFILE-SEARCH-CALLS.")
+  (let ((entry-solution-type *solution-type*)
+        (entry-depth-cutoff *depth-cutoff*)
+        (entry-randomize-search *randomize-search*)
+        (seconds 0.0)
+        (states 0)
+        (entries nil))
+    (unwind-protect
+        (progn
+          (setf *solution-type* 'every
+                *depth-cutoff* depth-cutoff
+                *randomize-search* nil)
+          (sb-profile:unprofile)
+          (eval `(sb-profile:profile ,(package-name (find-package :ww))))
+          (sb-profile:reset)
+          (multiple-value-setq (seconds states) (timed-silent-solve))
+          (setf entries (sort (collect-profile-calls) #'> :key #'fourth)))
+      (sb-profile:unprofile)
+      (setf *solution-type* entry-solution-type
+            *depth-cutoff* entry-depth-cutoff
+            *randomize-search* entry-randomize-search))
+    (format t "~2&Call profile: ~A, serial, depth-cutoff ~D~%" *problem-name* depth-cutoff)
+    (format t "  ~,2F sec (profiled), ~:D states~2%" seconds states)
+    (format t "  ~13@A  ~11@A  ~9@A  ~9@A  ~A~%" "Calls" "Calls/state" "Seconds" "us/state" "Function")
+    (loop for (name nil calls ticks) in entries
+          repeat 60
+          do (format t "  ~13:D  ~11,2F  ~9,3F  ~9,2F  ~S~%"
+                     calls (/ calls (float states))
+                     (/ ticks (float internal-time-units-per-second))
+                     (/ (* 1000000.0 ticks) internal-time-units-per-second states)
+                     name))
+    (values)))
+
+
 (defun collect-profile-consing ()
   "Return a list of (name consing calls) for every profiled function that was called,
    sorted by decreasing consing. Reads SB-PROFILE's internal statistics table."
@@ -98,6 +142,20 @@
                    (push (list name consing calls) entries))))
              sb-profile::*profiled-fun-name->info*)
     (sort entries #'> :key #'second)))
+
+
+(defun collect-profile-calls ()
+  "Return a list of (name consing calls ticks) for every profiled function that was
+   called. Reads SB-PROFILE's internal statistics table; TICKS are exclusive internal
+   run-time units."
+  (let ((entries nil))
+    (maphash (lambda (name info)
+               (multiple-value-bind (calls ticks consing)
+                   (funcall (sb-profile::profile-info-read-stats-fun info))
+                 (when (plusp calls)
+                   (push (list name consing calls ticks) entries))))
+             sb-profile::*profiled-fun-name->info*)
+    entries))
 
 
 (defun report-diagnostic-system-info ()
