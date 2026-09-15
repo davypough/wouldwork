@@ -1,251 +1,70 @@
-CURRENT CHECKPOINT UPDATE -- 2026-09-12
--------------------------------------
-The retained Subgoal 3 is now 64 actions (94 cumulative). Agent1 is
-empty-handed at location14 and switch2 is on. Live tray1 is on plate4 at
-location13; live box1 is on plate5 at location12 with live connector1 on top,
-still paired with repeater1 and receiver1. Agent1* is empty-handed at
-location12 and tray1* is on recording plate5. Box1* remains on plate1 and
-connector1* remains unpaired on plate2. Ordinary gates1, 2, 3, 6, and 7 are
-open while ordinary gate5 is closed; recording gates1, 2, 3, and 5 are open
-while recording gates6 and 7 are closed. The fourth recorder cycle remains
-deliberately open for Subgoal 4. Integrated replay and all four recorder-cycle
-validations passed.
+Crelay-Topo Backward Analysis -- 2026-09-15
+==========================================
 
-The location9 recovery checkpoint and its 17-action continuation discussed
-below are superseded historical analysis. Later location9 beam arrangements
-are not the current retained endpoint. Use subgoal solutions.txt for the
-current retained action sequence; subgoal2-validation.txt remains the evidence
-for the preceding closed checkpoint.
+The proposed carrier strategy now has a complete forward validation: 94 actions,
+three recorder cycles, agent1 at location19. The final cycle remains open with
+the ghost on plate3. No minimum-length claim is made. See subgoal-solutions.txt
+for the retained sequence and subgoal3-complete-validation.txt for evidence.
 
-Filename: Working-Backwards-from-Goal.txt
+Backward dependencies and their validated realization
+-----------------------------------------------------
 
-;;; This is a backward analysis of the crelay-topo problem defined in
-;;; probs/problem-crelay-topo.lisp.  It is intended to expose prerequisites and useful
-;;; planning phases before we look for an exact forward solution.  It is not itself a
-;;; validated action sequence.
-;;;
-;;; "Required" below follows from the current controls, topology, and technology rules.
-;;; "Likely arrangement" identifies a promising implementation that still has to be
-;;; incorporated into, and validated as part of, a complete forward solution.
+1. Cross gate9 to location19.
+   Plates6, 7, and 8 must remain occupied while agent1 crosses. The solution
+   assigns tray1 to plate6, connector1 to plate7, and box1 to plate8. Agent1
+   remains available to walk to the goal; it is not a final plate occupant.
 
+2. Deliver all three live objects beyond gate8.
+   Agent1 carries tray1, with box1 on the tray and connector1 on box1, through
+   gate8 from location15 to location21. Only then is the stack unloaded and
+   the connector retrieved. The beam may disappear after this crossing.
 
-HARD BACKWARD CHAIN
+3. Activate receiver1 for the gate8 crossing.
+   Ghost connector1* at location9 links transmitter1/repeater1. The ghost
+   stands on plate3 to open gate4. Live connector1 remains paired to
+   repeater1/receiver1 while elevated on the carried box/tray stack. The
+   complete replay validates the approach to location15 and crossing to
+   location21 under the current beam and gate rules.
 
-1. Final goal: agent1 must reach location19.
+4. Open gate7 with switch2.
+   Switch2 is reached at location14 through gate6 and screen1. Live tray1
+   holds plate4; the ghost stands on plate5 holding the loaded ghost tray.
+   Agent1 crosses empty-handed, turns switch2 on, and returns before removing
+   tray1 from plate4. Ordinary gate5 closes, but recording gate5 remains open
+   for the ghost's later return toward location2 and beam setup.
 
-   Agent1 must approach from the location16/location17/location18 area and pass gate9.
-   Gate9 is open only while plate6, plate7, and plate8 are all depressed.
+5. Recover the carrier after the switch trip.
+   Agent1 retrieves tray1 and stands on plate5 alongside the ghost. A local
+   release of tray1* settles box1 onto the equal-height live tray. Connector1
+   stays on box1, with its pairings intact. Co-location alone is not transfer.
 
-   In this movement model an agent standing on a plate must first step down to the ground;
-   it cannot step off the plate and cross gate9 in the same MOVE.  Therefore agent1 cannot
-   be counted as one of the three final plate occupants.  Three other persistent occupants
-   must be on plate6, plate7, and plate8 when agent1 crosses gate9.  Live or ghost agents and
-   cargo can depress plates when their recorder-side use is legal.
+6. Prepare the elevated live stack.
+   Pause the ghost with tray1* at location5. Agent1 uses the blower to place
+   box1 on that tray, then makes a second blower trip to connect connector1
+   on box1. Live agent1 does not use ghost box1* as a jumping support.
+   Current connector pickup removes pairings, so the sequence explicitly
+   reconnects during the second loading trip. Retaining pairings at pickup
+   remains an unimplemented technology option, not an assumption of this path.
 
-2. Reach the three final plates through gate8.
+7. Preserve the early doors and provide the ghost beam resources.
+   Start cycle 3 from Subgoal 2: connector1 is on plate1, box1 on plate2, and
+   tray1 grounded at location7. Their ghost copies preserve plates1/2 while
+   the live cargo is removed. After the handoff, the ghost returns its tray
+   to plate1 and retrieves connector1*. The explicit ground-and-pickup swap
+   avoids holding both objects at once. Box1* stays on plate2 throughout.
 
-   Gate8 must be open while agent1 passes from the location15 side to the
-   location16/location17/location18 side.  Receiver1 controls gate8, so receiver1 must be
-   active at that time.  Any connector or support arrangement supplying the beam must stay
-   intact until the required agents and resources have crossed.
+8. Establish the starting checkpoint.
+   Cycle 1 puts connector1 on plate1. Cycle 2 uses the blower and ghost tray
+   to recover box1 from location6 and put it on plate2, leaving tray1 grounded
+   at location7. Both cycles close normally. These retained subgoals are unchanged.
 
-3. Reach location15 through gate7.
+Scope and alternatives
+----------------------
+These resource assignments describe the validated solution; they are not claims
+that every solution must use the same assignments or number of actions. The
+original objects, geometry, wiring, and locations were not changed for this replay.
+No extra box, connector, tray, or location was needed.
 
-   Switch2 must be on to open gate7.  Switch2 is reachable only from location14.
-
-4. Reach switch2 through gate6 and screen1.
-
-   Gate6 opens only while plate4 and plate5, at location13 and location12, are both
-   depressed.  Screen1 is co-located with gate6 and passes only an empty-handed agent.
-   Thus the two plate occupants must be put in place before an empty-handed agent crosses
-   to location14 and toggles switch2.
-
-   Switch2 is an important phase boundary:
-
-     switch2 off: gate5 open,  gate7 closed     (the initial state)
-     switch2 on:  gate5 closed, gate7 open
-
-   The agent can toggle switch2 on, return through gate6 and screen1 while plate4 and plate5
-   are still occupied, and then recover those occupants for later use.  Removing the first
-   occupant closes gate6, but by then the agent is back on the location12/location13 side
-   and can proceed through the newly opened gate7.
-
-5. Reach plate4 and plate5 through gate5.
-
-   Gate5 does not initially need to be opened: its inverted switch2 control makes it open
-   while switch2 is off.  All resources that must pass gate5 should be moved through before
-   switch2 is turned on, unless the plan deliberately returns to switch2 to reverse the
-   gates again.
-
-6. Reach the location8/location9/location10 area through gate3.
-
-   Plate2, at location7, controls gate3.  Tray1 starts on plate2, so plate2 is initially
-   depressed and gate3 is initially open.  The first two validated checkpoints preserve
-   live tray1 on plate2 while a later ghost copy is temporarily used elsewhere.  Before
-   live tray1 is eventually reclaimed, everything still needing gate3 must cross or another
-   occupant must replace it.  The earlier sketch's reference to gate7 here was a name error:
-   plate2 controls gate3; switch2 controls gate7.
-
-7. Leave the starting area through gate1.
-
-   Plate1, at location2, controls gate1.  No cargo starts on the location1/location2 side,
-   so the recorder supplies the initial cooperation.  A complete 10-action first cycle has
-   been checked and recorded:
-
-   * agent1 starts the recorder;
-   * agent1* moves to location2 and steps onto plate1;
-   * agent1 crosses gates1 and 3, retrieves connector1 from location9, and returns;
-   * agent1 puts connector1 on plate1;
-   * agent1* steps off plate1 and returns to location1; and
-   * agent1* stops the recorder.
-
-   The validated closed checkpoint has connector1 on plate1, gate1 open, tray1 still on
-   plate2, gate3 open, box1 still at location6, agent1 at location2, and one recorder cycle
-   used.  The layer-based support relation lets the live and ghost copies coexist on the
-   same fixed plate during a later recording cycle.  The second validated cycle confirms
-   that ending that cycle removes the ghost support facts without disturbing connector1 or
-   tray1.
-
-
-RECEIVER1 AND THE BEAM
-
-Required:
-
-* Transmitter1 and receiver1 have the same red chroma.
-* Gate4 lies in the useful transmitter-to-location9 beam corridor.  Plate3 at location10
-  must remain depressed to keep gate4 open.  This is part of the main dependency chain,
-  not an aside.
-* A connector placed directly on the ground at location9 is too low to reach receiver1
-  across the two one-unit walls.  Raising the connector is required.
-
-Previously checked direct arrangement:
-
-* Move box1 to location9.
-* Place connector1 on box1, giving the connector a beam height of 2.
-* Pair connector1 with transmitter1 and receiver1.
-* Keep plate3 depressed so gate4 remains open.
-
-That arrangement colors connector1 red, activates receiver1, and opens gate8 in the
-current model.  It remains a valid constructed-state alternative, but the current carrier
-handoff candidate instead splits the relay across recorder layers as described below.
-
-
-REPEATER1
-
-Subgoal 3 deliberately stops after switch2 is turned on but before the recording-side
-upstream relay is prepared. Connector1* is unpaired on plate2, and agent1* has not yet
-stepped on plate3. Subgoal 4 owns both actions: pair connector1* with transmitter1 and
-repeater1, then arrange for agent1* to occupy plate3 when gate4 must be open.
-
-An earlier continuation was replayed beyond that boundary and found that a particular
-split-relay placement did not activate receiver1.  That probe is useful historical
-evidence that pairings alone do not guarantee an operational, height-compatible beam,
-but it is not a Subgoal 3 obstruction and does not establish that every Subgoal 4 relay
-arrangement fails. The exact beam geometry must be rechecked in Subgoal 4 after the
-upstream pairing and plate3 occupancy are established. Switch2 is already on at that
-boundary, so agent1 must return through still-open gate6 before either switch-plate
-occupant is reclaimed.
-
-
-BOX1, SWITCH1, BLOWER1, AND GATE2
-
-Box1 starts at elevated location6.  The second subgoal has now validated the exact use of
-switch1, blower1, and the ghost tray needed to recover it while preserving the two early live
-gate commitments:
-
-* agent1* removes tray1* from recording plate2 and holds it at location5;
-* agent1 steps onto blower1 and turns switch1 on, closing ordinary gate2 and lifting agent1
-  to elevated location20;
-* agent1 jumps from location20 onto tray1* at location5;
-* agent1 turns switch1 off from the tray, reopening gate2 without falling;
-* agent1 jumps through gate2 to ground at location6 and picks up box1; and
-* agent1 returns through gate2 by location4, carries box1 through gate3, and grounds it at
-  location9.
-
-Agent1* then returns empty-handed to recorder1 and closes the cycle normally.  The complete
-27-action prefix—10 actions for the first cycle and 17 for this continuation—was accepted by
-VALIDATE-SOLUTION.  At its endpoint connector1 remains on plate1, tray1 remains on plate2,
-box1 is free at location9, switch1 and blower1 are off, gates1, 2, 3, and 5 are open, and all
-ghost-object state has been removed.  This continuation was inferred and replay-validated;
-no minimum-length search was run.
-
-The later blower-loading question is also resolved.  The approved
-`(reach-via location20 () location5)` relation is now authored.  From the validated
-preparatory checkpoint, agent1 can ride the blower with box1, put it on agent1*'s held
-tray1* at location5, retrieve connector1, ride again, and connect it on the box.  Full
-replay validates the first location13 transfer: agent1* carries tray1*, box1, and
-connector1 to location13, where releasing tray1* settles the live box and connector onto
-the live tray held by agent1. A second local transfer then leaves live tray1 on plate4
-and settles the intact live box/connector stack onto plate5. The empty-handed trip through
-screen1 and the switch2 toggle are validated as the end of Subgoal 3. Returning agent1,
-the upstream connector1* pairing, plate3 occupancy, and the gate8 beam are Subgoal 4 work.
-This removes the former Subgoal 3 manipulation-reach obstruction without claiming that
-the later relay phase is already solved.
-
-
-THE LADDERS
-
-The ladders are not merely unused props.  Together they form a one-way, empty-handed return
-route that bypasses the three early controlled gates:
-
-  ladder3: location11 -> location10, bypassing closed gate5
-  ladder2: location8  -> location5,  bypassing closed gate3
-  ladder1: location3  -> location1,  bypassing closed gate1 and returning to recorder1
-
-The staged mobility model was checked with gates 1, 3, and 5 closed and produced this route:
-
-  location11
-    --ladder3--> location10
-    --walk------> location8
-    --ladder2--> location5
-    --walk------> location3
-    --ladder1--> location1
-
-Because a screen or ladder passes only an empty-handed agent, cargo must be left in its
-intended phase before this return.  This route is likely important for bringing a ghost back
-to recorder1 to close a cycle after plate occupants have been reclaimed and the ordinary
-gate route has closed.  None of the three ladders should be pruned before a complete forward
-solution proves that an alternative recorder-closing route is sufficient.
-
-
-RESOURCE AND PHASE CHECKLIST FOR A FORWARD PLAN
-
-The following commitments do not all have to exist simultaneously.  A useful forward plan
-should explicitly show when each is established, when its gate has been crossed for the last
-time, and when its occupant can be reclaimed.
-
-* plate1 occupied while leaving the starting area through gate1;
-* tray1 on plate2 through the first two validated cycles, then another occupant committed
-  there if tray1 is reclaimed before every required resource has crossed gate3;
-* plate3 occupied while the transmitter beam must cross gate4;
-* an elevated connector arrangement maintained while receiver1 must hold gate8 open;
-* plate4 and plate5 occupied while reaching and returning from switch2 through gate6;
-* switch2 on before using gate7, with the resulting closure of gate5 accounted for;
-* three persistent occupants available for plate6, plate7, and plate8 while agent1 crosses
-  gate9;
-* any ghost that must stop the recorder empty-handed and able to use the ladder return chain
-  to location1.
-
-The recorder's live/ghost copies are likely needed not just to open gate1, but to satisfy
-the peak number of simultaneous plate, beam-support, and agent-position commitments.  A
-precise forward solution should be organized around releasing and reusing those resources
-at the phase boundaries above.
-
-
-LOCATION-PRUNING REVIEW
-
-There is no clearly disposable authored location at present:
-
-* locations1-3 anchor the start, plate1, recorder1, and ladder1;
-* locations4-6 anchor blower1, switch1 reach, the gate2 jumps, box1, and the elevated ledge;
-* location7 anchors plate2;
-* locations8-10 anchor ladder2, the elevated connector site, plate3, and ladder3's return;
-* locations11-14 anchor ladder3, plates4/5, the gate6/screen passage, and switch2;
-* location15 is the necessary standing region between gate7 and gate8;
-* locations16-18 anchor the three final plates;
-* location19 is the goal; and
-* location20 is blower1's elevated destination and part of the authored gate2 jump geometry.
-
-Locations are optional modelling choices in general, but each current location supplies a
-distinct apparatus, cargo, traversal, or phase role.  Removing one now would erase a
-plausibly necessary route rather than merely reduce duplicate search branching.
+The old four-cycle intermediate checkpoint and speculative alternatives are
+preserved in Historical-Analysis-before-2026-09-15.txt. No additional Subgoal 4
+is needed for the current retained complete solution.

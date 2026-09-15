@@ -1,0 +1,305 @@
+Crelay-Topo Subgoal Solutions
+=============================
+
+This is the cumulative record of validated subgoal solutions.  Append each new
+subgoal after it has been found and validated; do not replace earlier entries.
+
+------------------------------------------------
+Subgoal 1 -- Hold gate1 open with connector1
+------------------------------------------------
+
+Subgoal:
+
+  (and (on connector1 plate1)
+       (ghost-stops-recorder))
+
+Status: validated, 10 actions
+
+Purpose:
+
+  Complete one normal recorder cycle with connector1 left on plate1 so that
+  gate1 remains open.  Agent1 ends at location2.  Tray1 remains on plate2 at
+  location7, keeping gate3 open, and box1 remains at location6.
+
+Integrated WouldWork action sequence:
+
+   1. (START-RECORDER AGENT1)
+   2. (MOVE AGENT1* ((WALK LOCATION1 NIL LOCATION2)))
+   3. (MOVE AGENT1* ((STEP (LOCATION2 GROUND) NIL
+                                  (LOCATION2 PLATE1))))
+   4. (MOVE AGENT1 ((WALK LOCATION1 (GATE1 GATE3) LOCATION9)))
+   5. (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION9)
+   6. (MOVE AGENT1 ((WALK LOCATION9 (GATE1 GATE3) LOCATION2)))
+   7. (PUT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 PLATE1)
+   8. (MOVE AGENT1* ((STEP (LOCATION2 PLATE1) NIL
+                                  (LOCATION2 GROUND))))
+   9. (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION1)))
+  10. (STOP-RECORDER AGENT1*)
+
+Setup phase:
+
+  No preliminary actions are required.  Initially agent1 is at recorder1 at
+  location1, connector1 is at location9, tray1 is on plate2 at location7, and
+  box1 is at location6.  Gates2, gate3, and gate5 are open.
+
+Recording phase:
+
+  (START-RECORDER AGENT1)
+  (MOVE AGENT1* ((WALK LOCATION1 NIL LOCATION2)))
+  (MOVE AGENT1* ((STEP (LOCATION2 GROUND) NIL
+                              (LOCATION2 PLATE1))))
+  (PAUSE)
+  (MOVE AGENT1* ((STEP (LOCATION2 PLATE1) NIL
+                              (LOCATION2 GROUND))))
+  (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION1)))
+  (STOP-RECORDER AGENT1*)
+
+Playback phase during the pause:
+
+  (MOVE AGENT1 ((WALK LOCATION1 (GATE1 GATE3) LOCATION9)))
+  (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION9)
+  (MOVE AGENT1 ((WALK LOCATION9 (GATE1 GATE3) LOCATION2)))
+  (PUT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 PLATE1)
+  (RESUME)
+
+
+------------------------------------------------
+Subgoal 2 -- Put box1 on plate2; leave tray1 grounded at location7
+------------------------------------------------
+
+Subgoal:
+
+  (and (on connector1 plate1)
+       (on box1 plate2)
+       (has-location box1 location7)
+       (has-location tray1 location7)
+       (not (on tray1 plate2))
+       (not (holding agent1 tray1))
+       (= (base tray1) 0)
+       (ghost-stops-recorder))
+
+Status: validated, 20 actions (30 cumulative), replayed 2026-09-12.
+Integrated replay and both recorder cycles pass; no minimum-length search was run.
+
+Purpose:
+
+  Complete the second normal recorder cycle with box1 replacing tray1 on plate2.
+  First put the live tray on the ground at location7, freeing plate2 before
+  retrieving box1. The ghost-held tray still supports the blower-assisted trip
+  to elevated location6. Bring box1 back to location7 and put it on plate2.
+
+Integrated WouldWork action sequence from the Subgoal 1 endpoint:
+
+   1. (MOVE AGENT1 ((WALK LOCATION2 NIL LOCATION1)))
+   2. (START-RECORDER AGENT1)
+   3. (MOVE AGENT1* ((WALK LOCATION1 (GATE1) LOCATION7)))
+   4. (PICKUP-TRAY AGENT1* TRAY1* LOCATION7 LOCATION7)
+   5. (MOVE AGENT1* ((WALK LOCATION7 NIL LOCATION5)))
+   6. (MOVE AGENT1 ((WALK LOCATION1 (GATE1) LOCATION7)))
+   7. (PICKUP-TRAY AGENT1 TRAY1 LOCATION7 LOCATION7)
+   8. (PUT-TRAY AGENT1 TRAY1 GROUND LOCATION7)
+   9. (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
+  10. (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
+  11. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  12. (MOVE AGENT1 ((JUMP (LOCATION20 GROUND) NIL (LOCATION5 TRAY1*))))
+  13. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  14. (MOVE AGENT1 ((JUMP (LOCATION5 TRAY1*) (GATE2) (LOCATION6 GROUND))))
+  15. (PICKUP-BOX AGENT1 BOX1 LOCATION6 LOCATION6)
+  16. (MOVE AGENT1 ((JUMP LOCATION6 (GATE2) LOCATION4) (WALK LOCATION4 NIL LOCATION7)))
+  17. (PUT-BOX AGENT1 BOX1 PLATE2 LOCATION7)
+  18. (MOVE AGENT1* ((WALK LOCATION5 (GATE1) LOCATION1)))
+  19. (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION1)
+  20. (STOP-RECORDER AGENT1*)
+
+Setup phase:
+
+  Agent1 walks from location2 back to recorder1 at location1. Connector1
+  remains on plate1 and tray1 initially remains on plate2.
+
+Recording phase:
+
+  (START-RECORDER AGENT1)
+  (MOVE AGENT1* ((WALK LOCATION1 (GATE1) LOCATION7)))
+  (PICKUP-TRAY AGENT1* TRAY1* LOCATION7 LOCATION7)
+  (MOVE AGENT1* ((WALK LOCATION7 NIL LOCATION5)))
+  (PAUSE)
+  (MOVE AGENT1* ((WALK LOCATION5 (GATE1) LOCATION1)))
+  (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION1)
+  (STOP-RECORDER AGENT1*)
+
+Playback phase during the pause:
+
+  (MOVE AGENT1 ((WALK LOCATION1 (GATE1) LOCATION7)))
+  (PICKUP-TRAY AGENT1 TRAY1 LOCATION7 LOCATION7)
+  (PUT-TRAY AGENT1 TRAY1 GROUND LOCATION7)
+  (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
+  (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
+  (TOGGLE-SWITCH AGENT1 SWITCH1)
+  (MOVE AGENT1 ((JUMP (LOCATION20 GROUND) NIL (LOCATION5 TRAY1*))))
+  (TOGGLE-SWITCH AGENT1 SWITCH1)
+  (MOVE AGENT1 ((JUMP (LOCATION5 TRAY1*) (GATE2) (LOCATION6 GROUND))))
+  (PICKUP-BOX AGENT1 BOX1 LOCATION6 LOCATION6)
+  (MOVE AGENT1 ((JUMP LOCATION6 (GATE2) LOCATION4)
+                (WALK LOCATION4 NIL LOCATION7)))
+  (PUT-BOX AGENT1 BOX1 PLATE2 LOCATION7)
+  (RESUME)
+
+Validated endpoint:
+
+  Agent1 is empty-handed at location7. Box1 is on plate2 at location7;
+  tray1 is unheld and grounded beside it at the same location. Connector1
+  remains on plate1. Switch1 and blower1 are off; gates1, 2, 3, and 5 are open.
+  Gate3 temporarily closes while plate2 is empty, but no intervening action
+  needs it. The second cycle closes normally and all ghost-object state is gone.
+
+  See subgoal2-validation.txt for the retained replay and recorder-cycle evidence.
+
+
+------------------------------------------------
+Subgoal 3 -- Transfer the loaded tray, establish the beam, and reach the goal
+------------------------------------------------
+
+Subgoal:
+
+  (and (has-location agent1 location19)
+       (on tray1 plate6)
+       (on connector1 plate7)
+       (on box1 plate8)
+       (on agent1* plate3))
+
+Status: validated, 64 actions (94 cumulative), replayed 2026-09-15.
+VALIDATE-SOLUTION: all 94 actions executed successfully; original goal satisfied.
+VALIDATE-RECORDER-SOLUTION: T NIL. Two closed cycles and the final open cycle
+pass independent recording checks; complete playback reaches location19.
+No minimum-length search was run.
+
+Purpose:
+
+  Load box1 and connector1 onto the ghost-held tray with the blower. Stage
+  plates4/5, turn switch2 on, and transfer the stack to the live tray. The
+  ghost establishes the transmitter1/repeater1 beam and holds plate3. Agent1
+  carries all three live objects through gate8, distributes them on plates6-8,
+  and reaches location19 while the ghost remains on plate3.
+
+Integrated WouldWork action sequence from the Subgoal 2 endpoint:
+
+   1. (MOVE AGENT1 ((WALK LOCATION7 (GATE1) LOCATION1)))
+   2. (START-RECORDER AGENT1)
+   3. (MOVE AGENT1* ((WALK LOCATION1 (GATE1) LOCATION7)))
+   4. (PICKUP-TRAY AGENT1* TRAY1* LOCATION7 LOCATION7)
+   5. (MOVE AGENT1* ((WALK LOCATION7 NIL LOCATION5)))
+   6. (MOVE AGENT1 ((WALK LOCATION1 NIL LOCATION2)))
+   7. (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION2)
+   8. (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION7)))
+   9. (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION7 GROUND (REPEATER1 RECEIVER1))
+  10. (PICKUP-BOX AGENT1 BOX1 LOCATION7 LOCATION7)
+  11. (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
+  12. (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
+  13. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  14. (PUT-BOX AGENT1 BOX1 TRAY1* LOCATION5)
+  15. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  16. (MOVE AGENT1 ((WALK LOCATION4 NIL LOCATION7)))
+  17. (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION7)
+  18. (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
+  19. (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
+  20. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  21. (CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION5 BOX1 (REPEATER1 RECEIVER1))
+  22. (TOGGLE-SWITCH AGENT1 SWITCH1)
+  23. (MOVE AGENT1 ((WALK LOCATION4 NIL LOCATION7)))
+  24. (PICKUP-TRAY AGENT1 TRAY1 LOCATION7 LOCATION7)
+  25. (MOVE AGENT1 ((WALK LOCATION7 (GATE3 GATE5) LOCATION13)))
+  26. (PUT-TRAY AGENT1 TRAY1 PLATE4 LOCATION13)
+  27. (MOVE AGENT1* ((WALK LOCATION5 (GATE3 GATE5) LOCATION12)))
+  28. (MOVE AGENT1* ((STEP (LOCATION12 GROUND) NIL (LOCATION12 PLATE5))))
+  29. (MOVE AGENT1 ((WALK LOCATION13 (GATE6 SCREEN1) LOCATION14)))
+  30. (TOGGLE-SWITCH AGENT1 SWITCH2)
+  31. (MOVE AGENT1 ((WALK LOCATION14 (GATE6 SCREEN1) LOCATION13)))
+  32. (PICKUP-TRAY AGENT1 TRAY1 LOCATION13 LOCATION13)
+  33. (MOVE AGENT1 ((WALK LOCATION13 NIL LOCATION12)))
+  34. (MOVE AGENT1 ((STEP (LOCATION12 GROUND) NIL (LOCATION12 PLATE5))))
+  35. (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION12)
+  36. (PICKUP-TRAY AGENT1* TRAY1* LOCATION12 LOCATION12)
+  37. (MOVE AGENT1* ((STEP (LOCATION12 PLATE5) NIL (LOCATION12 GROUND))))
+  38. (MOVE AGENT1* ((WALK LOCATION12 (GATE1 GATE3 GATE5) LOCATION2)))
+  39. (PUT-TRAY AGENT1* TRAY1* GROUND LOCATION2)
+  40. (PICKUP-CONNECTOR AGENT1* CONNECTOR1* LOCATION2)
+  41. (PUT-CONNECTOR AGENT1* CONNECTOR1* LOCATION2 GROUND)
+  42. (PICKUP-TRAY AGENT1* TRAY1* LOCATION2 LOCATION2)
+  43. (PUT-TRAY AGENT1* TRAY1* PLATE1 LOCATION2)
+  44. (PICKUP-CONNECTOR AGENT1* CONNECTOR1* LOCATION2)
+  45. (MOVE AGENT1* ((WALK LOCATION2 (GATE1 GATE3) LOCATION9)))
+  46. (CONNECT-CONNECTOR AGENT1* CONNECTOR1* LOCATION9 GROUND (REPEATER1 TRANSMITTER1))
+  47. (MOVE AGENT1* ((WALK LOCATION9 NIL LOCATION10)))
+  48. (MOVE AGENT1* ((STEP (LOCATION10 GROUND) NIL (LOCATION10 PLATE3))))
+  49. (MOVE AGENT1 ((STEP (LOCATION12 PLATE5) NIL (LOCATION12 GROUND))))
+  50. (MOVE AGENT1 ((WALK LOCATION12 (GATE7) LOCATION15)))
+  51. (MOVE AGENT1 ((WALK LOCATION15 (GATE8) LOCATION21)))
+  52. (PUT-TRAY AGENT1 TRAY1 GROUND LOCATION21)
+  53. (PICKUP-TRAY AGENT1 TRAY1 LOCATION21 LOCATION21)
+  54. (MOVE AGENT1 ((WALK LOCATION21 NIL LOCATION16)))
+  55. (PUT-TRAY AGENT1 TRAY1 PLATE6 LOCATION16)
+  56. (MOVE AGENT1 ((WALK LOCATION16 NIL LOCATION21)))
+  57. (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION21)
+  58. (MOVE AGENT1 ((WALK LOCATION21 NIL LOCATION17)))
+  59. (PUT-CONNECTOR AGENT1 CONNECTOR1 LOCATION17 PLATE7)
+  60. (MOVE AGENT1 ((WALK LOCATION17 NIL LOCATION21)))
+  61. (PICKUP-BOX AGENT1 BOX1 LOCATION21 LOCATION21)
+  62. (MOVE AGENT1 ((WALK LOCATION21 NIL LOCATION18)))
+  63. (PUT-BOX AGENT1 BOX1 PLATE8 LOCATION18)
+  64. (MOVE AGENT1 ((WALK LOCATION18 (GATE9) LOCATION19)))
+
+Phase A -- loading, actions 1-22 (31-52 cumulative):
+
+  Return to recorder1 and start cycle 3. Box1* holds plate2 and connector1*
+  holds plate1. Pause the ghost holding tray1* at location5. Agent1 stages
+  connector1 at location7 and uses the blower to put box1 on tray1*. Repeat
+  the blower trip to connect connector1 on box1 to repeater1/receiver1.
+  Turn switch1 off after each loading trip.
+
+  Current PICKUP-CONNECTOR clears pairings. The second pickup is followed by
+  CONNECT-CONNECTOR on box1. The retain-pairings pickup option is missing from
+  tech/ and was not added for this validation.
+
+Phase B -- switch2 and handoff, actions 23-35 (53-65 cumulative):
+
+  Put live tray1 on plate4. The ghost carries the stack to location12 and
+  steps onto plate5. Agent1 crosses gate6/screen1 empty-handed, turns switch2
+  on, and returns before retrieving tray1. Agent1 then stands on plate5 while
+  holding tray1. The ghost releases tray1* locally to ground: box1 settles
+  onto the equal-height live tray, preserving connector1 and both pairings.
+
+Phase C -- ghost beam setup, actions 36-48 (66-78 cumulative):
+
+  The ghost retrieves tray1*, steps down, and returns to location2 through
+  still-open recording gate5. Ground the tray, pick up and ground connector1*,
+  place tray1* on plate1, then retrieve connector1*. Connect connector1* at
+  location9 to repeater1/transmitter1 and stand on plate3 at location10.
+  Gate4 opens and repeater1 becomes energized. The ghost waits through the goal.
+
+Phase D -- finish, actions 49-64 (79-94 cumulative):
+
+  Agent1 steps off plate5 and carries the stack through gate7 to location15,
+  then gate8 to location21. Release tray1, grounding box1 with connector1 on
+  top. Put tray1 on plate6, return for connector1 and put it on plate7, then
+  return for box1 and put it on plate8. Walk through gate9 to location19.
+  Final connector pickup clears its pairings; the beam is no longer needed
+  after all resources have crossed gate8.
+
+Validated endpoint:
+
+  Agent1 is at location19. Tray1 is on plate6 at location16; unpaired
+  connector1 is on plate7 at location17; box1 is on plate8 at location18.
+  Agent1* remains on plate3 at location10. Tray1* holds plate1 at location2,
+  box1* holds plate2 at location7, and connector1* at location9 is paired to
+  repeater1/transmitter1. Switch2 is on. Ordinary gates1, 2, 3, 4, 7, and 9
+  are open; gate8 has closed after the live beam was dismantled.
+
+  The third cycle remains open at the goal. No actual STOP-RECORDER at plate3
+  is needed or claimed. This replaces the former four-cycle intermediate
+  checkpoint; no Subgoal 4 is required for this retained solution.
+
+Evidence:
+
+  subgoal3-handoff-validation.txt -- 65-action handoff prefix.
+  subgoal3-complete-validation.txt -- exact 94-action replay and final evidence.
+  Historical-Analysis-before-2026-09-15.txt -- superseded Subgoal 3 and notes.

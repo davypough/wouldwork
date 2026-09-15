@@ -130,10 +130,10 @@
                   (filter-symmetric-instantiations action precondition-args state)))
           (let (pre-results updated-dbs)
             (setf pre-results  ;process this action, collecting all ? and $ vars
-              (remove-if #'null (mapcar (lambda (pinsts)  ;nil = failed precondition
-                                          (apply pre-defun-name  ;iprecondition
-                                                 state pinsts))
-                                        precondition-args)))
+              (iter (for pinsts in precondition-args)
+                    (for pre-result = (apply pre-defun-name state pinsts))  ;iprecondition
+                    (when pre-result  ;nil = failed precondition
+                      (collect pre-result))))
             #+:ww-debug (when (>= *debug* 5)
                                  (let ((*package* (find-package :ww)))
                                    (ut::prt precondition-variables precondition-args pre-results)))

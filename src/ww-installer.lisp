@@ -777,7 +777,7 @@
    a second, drifting copy."
   `(lambda (state &rest args)
      ,(format nil "~A precondition" name)
-     (declare (ignorable state))
+     (declare (ignorable state) (dynamic-extent args))
      (destructuring-bind ,pre-param-?vars args
        (let ,pre-$vars
          (declare (ignorable ,@pre-$vars))

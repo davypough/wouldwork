@@ -842,6 +842,7 @@
   (format t "    *threads*                    = ~D~%" *threads*)
   (format t "    *tree-or-graph*              = ~A~%" *tree-or-graph*)
   (format t "    *solution-type*              = ~A~%" *solution-type*)
+  (format t "    *worker-read-snapshots*      = ~A~%" *worker-read-snapshots*)
   (format t "~%  Task Generation:~%")
   (format t "    *split-depth-max*            = ~D~%" *split-depth-max*)
   (format t "    *tasks-per-thread*           = ~D~%" *tasks-per-thread*)
@@ -1008,40 +1009,114 @@
   (terpri))
 
 
+(defparameter *test-threads-min-seconds* 12.0
+  "TEST-THREADS stops deepening its calibration once a 4-thread run takes this long.")
+
+
+(defparameter *test-threads-max-seconds* 24.0
+  "TEST-THREADS stops deepening its calibration when the next depth is predicted to
+   exceed this many seconds at 4 threads.")
+
+
 (defun test-threads ()
-  "Time the currently staged problem at each of several *THREADS* settings and report
-   the fastest. Intended as a quick probe before a long run, so stage a reduced
-   *DEPTH-CUTOFF* first. All SOLVE output is discarded; *THREADS* is restored on exit.
-   Requires *THREADS* > 0 on entry: crossing the zero boundary is what reloads the
-   system with synchronized global hash tables, and only WW-SET does that."
-  (assert (> *threads* 0) ()
-    "Enter (ww-set *threads* 4) before calling TEST-THREADS.")
+  "Time the currently staged problem at several *THREADS* settings and report the
+   fastest. First calibrates a *DEPTH-CUTOFF* by deepening one level at a time at
+   4 threads until a run takes *TEST-THREADS-MIN-SECONDS*, the next depth is predicted
+   to exceed *TEST-THREADS-MAX-SECONDS*, or the search is no longer truncated by the
+   cutoff; the staged *DEPTH-CUTOFF* is ignored. All runs use *SOLUTION-TYPE*
+   EVERY with *RANDOMIZE-SEARCH* off so each thread count performs the same exhaustive
+   work. All SOLVE output is discarded; *THREADS*, *SOLUTION-TYPE*, *DEPTH-CUTOFF*, and
+   *RANDOMIZE-SEARCH* are restored on exit. Requires *DEBUG* 0 and *PROBE* off, since
+   their compiled-in instrumentation would distort the timings.
+   If *THREADS* is 0 on entry, switches to parallel mode with (ww-set *threads* 4)
+   first, since crossing the zero boundary reloads the system with synchronized global
+   hash tables; parallel mode (4 threads) is then retained on exit."
+  (assert (and (zerop *debug*) (null *probe*)) ()
+    "Enter (ww-set *debug* 0) and (ww-set *probe* nil) before calling TEST-THREADS.")
+  (when (zerop *threads*)
+    (format t "~&Switching to parallel mode with (ww-set *threads* 4)...~%")
+    (ww-set *threads* 4))
   (let ((entry-threads *threads*)
-        (saved-output (sb-ext:symbol-global-value '*standard-output*))
-        (sink (make-broadcast-stream))
+        (entry-solution-type *solution-type*)
+        (entry-depth-cutoff *depth-cutoff*)
+        (entry-randomize-search *randomize-search*)
         (results nil))
-    (format t "~2&Timing ~A, ~A, depth-cutoff ~D~%"
-            *problem-name* *solution-type* *depth-cutoff*)
-    (dolist (n '(4 8 12 16 20))
-      (setf *threads* n)
-      (let ((start (get-internal-real-time)))
-        (unwind-protect
-            (let ((*standard-output* sink))
-              (setf (sb-ext:symbol-global-value '*standard-output*) sink)
-              (solve))
-          (setf (sb-ext:symbol-global-value '*standard-output*) saved-output))
-        (push (cons n (/ (- (get-internal-real-time) start)
-                         (float internal-time-units-per-second)))
-              results)
-        (format t "~&  threads ~2D   ~8,2F sec   ~A~%"
-                n (cdr (first results))
-                (search-outcome-status *last-search-outcome*))
-        (finish-output)))
-    (setf *threads* entry-threads)
-    (let ((best (first (sort results #'< :key #'cdr))))
+    (unwind-protect
+        (progn
+          (setf *threads* 4
+                *solution-type* 'every
+                *randomize-search* nil)
+          (format t "~2&Calibrating depth-cutoff for ~A at 4 threads (solution-type every)~%"
+                  *problem-name*)
+          (multiple-value-bind (depth seconds states report)
+              (calibrate-test-threads-cutoff)
+            (push (list 4 seconds states) results)
+            (format t "~&~%Timing ~A at depth-cutoff ~D~%" *problem-name* depth)
+            (format t "~&~A" report)
+            (format t "~&  threads  4   ~8,2F sec   ~12:D states/sec~%"
+                    seconds (round states seconds))
+            (finish-output))
+          (dolist (n '(8 12 16 20))
+            (setf *threads* n)
+            (multiple-value-bind (seconds states report) (timed-silent-solve)
+              (push (list n seconds states) results)
+              (format t "~&~A" report)
+              (format t "~&  threads ~2D   ~8,2F sec   ~12:D states/sec~%"
+                      n seconds (round states seconds))
+              (finish-output))))
+      (setf *threads* entry-threads
+            *solution-type* entry-solution-type
+            *depth-cutoff* entry-depth-cutoff
+            *randomize-search* entry-randomize-search))
+    (let ((best (first (sort results #'< :key #'second))))
       (format t "~&~%Fastest: ~D threads, ~,2F sec.  Adopt with (ww-set *threads* ~D).~%"
-              (car best) (cdr best) (car best))
-      (car best))))
+              (first best) (second best) (first best))
+      (first best))))
+
+
+(defun calibrate-test-threads-cutoff ()
+  "Deepen *DEPTH-CUTOFF* from 1 with timed silent solves at the current *THREADS*.
+   Stops when the search reaches no cutoff node, when a run takes
+   *TEST-THREADS-MIN-SECONDS*, or when the next depth is
+   predicted (from the latest per-level growth ratio) to exceed
+   *TEST-THREADS-MAX-SECONDS*. The ratio is trusted only once the prior level took
+   at least 0.5 sec, since shorter runs are dominated by fixed startup costs.
+   Returns (values depth seconds states time-report) for the final run."
+  (let ((depth 0)
+        (seconds 0.0)
+        (prior-seconds 0.0)
+        (states 0)
+        (report ""))
+    (loop
+      (incf depth)
+      (setf *depth-cutoff* depth
+            prior-seconds seconds)
+      (multiple-value-setq (seconds states report) (timed-silent-solve))
+      (when (or (zerop *depth-cutoff-hits*)
+                (>= seconds *test-threads-min-seconds*)
+                (and (>= prior-seconds 0.5)
+                     (> (* seconds (/ seconds prior-seconds)) *test-threads-max-seconds*)))
+        (return (values depth seconds states report))))))
+
+
+(defun timed-silent-solve ()
+  "Run SOLVE with standard output (including worker-thread output) discarded and the
+   TIME report (written to *TRACE-OUTPUT*) captured as a string.
+   Returns (values wall-seconds states-processed time-report)."
+  (let ((saved-output (sb-ext:symbol-global-value '*standard-output*))
+        (sink (make-broadcast-stream))
+        (report (make-string-output-stream))
+        (start (get-internal-real-time)))
+    (unwind-protect
+        (let ((*standard-output* sink)
+              (*trace-output* report))
+          (setf (sb-ext:symbol-global-value '*standard-output*) sink)
+          (solve))
+      (setf (sb-ext:symbol-global-value '*standard-output*) saved-output))
+    (values (/ (- (get-internal-real-time) start)
+               (float internal-time-units-per-second))
+            *total-states-processed*
+            (get-output-stream-string report))))
 
 ;;; ============================================================
 ;;; CLOSED SHARD DIAGNOSTICS

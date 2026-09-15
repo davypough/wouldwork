@@ -449,7 +449,6 @@
 
 (defmacro increment-global (var-name &optional (delta-form 1))
   `(progn
-     (declaim (type fixnum ,var-name))
      ,(if (> *threads* 0)
         `(sb-ext:atomic-incf ,var-name ,delta-form)
         `(incf ,var-name ,delta-form))))
@@ -457,7 +456,6 @@
 
 (defmacro push-global (item var-name)
   `(progn
-     (declaim (type list ,var-name))
      ,(if (> *threads* 0)
         `(sb-ext:atomic-push ,item ,var-name)
         `(push ,item ,var-name))))
@@ -465,7 +463,6 @@
 
 (defmacro pop-global (var-name)
   `(progn
-     (declaim (type list ,var-name))
      ,(if (> *threads* 0)
         `(sb-ext:atomic-pop ,var-name)
         `(pop ,var-name))))

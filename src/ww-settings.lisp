@@ -142,7 +142,6 @@ must return unknown rather than :IMPOSSIBLE.")
   (format t "~&  MIN STEPS REMAINING? => ~A"
           (when (min-steps-remaining-available-p) 'YES))
   (when (> *threads* 0)
-    (format t "~&  *WORKER-READ-SNAPSHOTS* => ~S" *worker-read-snapshots*)
     (format t "~&~%  For parallel settings: (display-parallel-parameters)"))
   (terpri) (terpri))
 
