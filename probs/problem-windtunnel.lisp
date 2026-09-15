@@ -35,7 +35,6 @@
   relay           (either connector repeater)
   transmitter     (transmitter1)
   receiver        (receiver1)
-  beam            ()  ;initial beams
   plate           (plate1)
   blower          (blower1)
   hue             (blue)  ;the hue of a transmitter, receiver, repeater, or active connector
@@ -47,6 +46,10 @@
   source          (either transmitter connector repeater)  ;beam source
   occluder        (either cargo agent gate wall)  ;objects that can occlude a beam
   target          (either connector receiver repeater)  ;beam target
+  beam            (compute (loop for i from 1 to (loop for src in (gethash 'source *types*)
+                                                   sum (count-if (lambda (tgt) (not (eql tgt src)))
+                                                                 (gethash 'target *types*)))
+                                 collect (intern (format nil "BEAM~D" i) :ww)))  ;beam pool, one per distinct source-target pair
   focus           (either transmitter receiver repeater)  ;los object of interest
   fixture         (either transmitter receiver recorder repeater plate blower)
   zone            (either gate area)
@@ -885,13 +888,14 @@
 
 
 (define-update create-beam-segment-p! (?source ?target)
-  ; Create a beam segment from source, and return the new beam's name.
+  ; Create a beam segment from source using the first free pooled beam, and return its name.
   (do
-    ;; Generate new beam entity with next available index
+    ;; Select the first pooled beam not currently in use
     (bind (current-beams $current-beams))
-    (assign $next-index (1+ (length $current-beams)))
-    (assign $new-beam (intern (format nil "BEAM~D" $next-index)))
-    (register-dynamic-object $new-beam 'beam)
+    (doall (?b beam)
+      (if (and (not $new-beam)
+               (not (member ?b $current-beams)))
+        (assign $new-beam ?b)))
     ;; Calculate beam path and intersection
     (mv-assign ($source-x $source-y) (get-coordinates ?source))
     (mv-assign ($target-x $target-y) (get-coordinates ?target))
