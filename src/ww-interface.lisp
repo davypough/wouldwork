@@ -97,7 +97,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
        (ww-set *randomize-search* <t (random depth-first search) or
                                    nil (standard depth-first search)>)
        (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or
-                         -1 (search all branches)>)
+                         0 (search all branches)>)
        (ww-set *debug* <one of 0 (no debugging), 1-4 (increasing debugging info),
                                5 (step through search)>)
        (ww-set *symmetry-pruning* <t (prune symmetric states) or

@@ -553,7 +553,7 @@
         (when *randomize-search*
           (setf succ-nodes (alexandria:shuffle succ-nodes)))))
     (when (= *program-cycles* 0)  ;ie, expanding the start state
-      (when (>= *branch* 0)  ;choose an initial branch to explore, drop others
+      (when (>= *branch* 1)  ;choose an initial branch to explore, drop others
         (format t "~&Exploring only branch ~D of ~D~%" *branch* (length succ-nodes))
         (setf succ-nodes (subseq succ-nodes (1- *branch*) *branch*)))
       (setf *num-init-successors* (length succ-nodes))

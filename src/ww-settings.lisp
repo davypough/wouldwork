@@ -136,7 +136,7 @@ must return unknown rather than :IMPOSSIBLE.")
              (gethash 'connector *types*))
     (format t "~&  *MAX-CONNECTOR-PAIRINGS* => ~D" *max-connector-pairings*))
   (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
-  (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 0) 'ALL *branch*))
+  (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 1) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" *happening-names*)
   (format t "~&  BOUNDING FUNCTION? => ~A" (when (fboundp 'bounding-function?) 'YES))
@@ -657,8 +657,8 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *randomize-search* nil  ;
   "Set to t or nil.")
 
-(defvar *branch* -1  ;
-  "If n>0, explore only the nth branch from the *start-state*.")
+(defvar *branch* 0  ;
+  "If n>0, explore only the nth branch from the *start-state*; n<1 explores all branches.")
 
 (defvar *auto-wait* nil
   "When T, enables hybrid automatic wait mechanism for problems with happenings.
@@ -724,7 +724,7 @@ treat their arguments as read-only and be safe to call concurrently."
     (*solution-type* . first)
     (*progress-reporting-interval* . 100000)
     (*randomize-search*)
-    (*branch* . -1)
+    (*branch* . 0)
     (*probe*)
     (*symmetry-pruning*)
     (*debug* . 0)

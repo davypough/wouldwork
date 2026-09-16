@@ -42,7 +42,7 @@
   "Check version admission and source selection without starting a search."
   (assert (equal (truename expected-root)
                  (truename (asdf:system-source-directory :wouldwork))))
-  (assert (and (zerop *threads*) (= *branch* -1) (null *probe*)
+  (assert (and (zerop *threads*) (< *branch* 1) (null *probe*)
                (not *parallel-search-active*)))
   (assert (eql (not (null (find-symbol "*WORKER-READ-SNAPSHOTS*" :ww)))
                snapshot-code-p))

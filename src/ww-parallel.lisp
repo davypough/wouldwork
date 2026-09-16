@@ -159,7 +159,11 @@
                                     (problem-state.heuristic (node.state n)))))
                       (*randomize-search*
                        (alexandria:shuffle frontier))
-                      (t frontier))))))))
+                      (t frontier))))
+        ;; Keep only the chosen initial branch from the start state, as SEARCH-SERIAL does
+        (when (and (= current-depth 1) (>= *branch* 1))
+          (format t "~&Exploring only branch ~D of ~D~%" *branch* (length frontier))
+          (setf frontier (subseq frontier (1- *branch*) *branch*)))))))
 
 
 ;;; ============================================================
