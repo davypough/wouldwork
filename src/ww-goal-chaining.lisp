@@ -66,8 +66,16 @@
   "Generic settings whose values affect milestone feasibility or search order.")
 
 
-(defmacro solve-subgoal (goal-form)
-  `(solve-subgoal-form ',goal-form))
+(defmacro solve-subgoal (form1 &optional (form2 nil form2-p))
+  "(SOLVE-SUBGOAL GOAL) solves GOAL as the next milestone of the active chain.
+(SOLVE-SUBGOAL START GOAL) is a one-off search for GOAL from START, serial or parallel.
+START is either an unquoted list of dynamic facts, or a form evaluating to a
+problem-state or fact list."
+  (if form2-p
+    `(solve-subgoal-from-form
+       ,(if (and (consp form1) (consp (car form1))) `',form1 form1)
+       ',form2)
+    `(solve-subgoal-form ',form1)))
 
 
 (defun validate-candidate-screening-result (result)
@@ -857,3 +865,41 @@ request and every remaining phase has a positive local cutoff."
       (symbol-function
         (goal-chaining-policy-subgoal-solver *goal-chaining-policy*)) goal-form)
     (solve-generic-subgoal-form goal-form)))
+
+
+(defun solve-subgoal-from-form (start goal-form)
+  "Search once for GOAL-FORM from START, outside goal chaining and in any thread mode.
+Any active goal chain is discarded; a single WW-UNDO restores the prior session."
+  (let ((origin
+          (etypecase start
+            (problem-state (copy-problem-state start))
+            (list (make-start-state-from-facts start)))))
+    (when (state-is-inconsistent origin)
+      (error "Cannot search from an inconsistent state."))
+    (setf (problem-state.name origin) 'start
+          (problem-state.instantiations origin) nil)
+    (save-undo-checkpoint)
+    (loop for (nil nil restorer) in *goal-chaining-checkpoint-extensions*
+          do (funcall (symbol-function restorer) nil))
+    (setf *start-state* origin
+          *goal-chain-session* nil
+          *final-goal* nil
+          *solution-paths* nil
+          *solutions-valid* nil)
+    (install-compiled-goal goal-form)
+    (ww-solve)))
+
+
+(defun make-start-state-from-facts (facts)
+  "Return the staged origin state with its dynamic database replaced by FACTS."
+  (let ((state (copy-problem-state
+                 (if *goal-chain-session*
+                   (goal-chain-session-origin-state *goal-chain-session*)
+                   *start-state*))))
+    (clrhash (problem-state.idb state))
+    (dolist (fact facts)
+      (check-proposition fact)
+      (unless (gethash (car fact) *relations*)
+        (error "~S is not a dynamic fact; a start state lists only dynamic facts." fact))
+      (add-proposition fact (problem-state.idb state)))
+    (invalidate-problem-state-hash state)))

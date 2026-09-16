@@ -47,6 +47,10 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (solve-subgoal <goal>)
   -- searches for and retains the next ordered milestone in single-threaded mode
+
+(solve-subgoal <start-state> <goal>)
+  -- one-off search (serial or parallel) for <goal> from <start-state> (a problem-state
+     form, or an unquoted list of all dynamic facts); discards any active goal chain
      A milestone search the depth cutoff truncated proves nothing: it rejects no
      checkpoint and leaves the preceding chain untouched, so raise *depth-cutoff*
      and reissue the same command
