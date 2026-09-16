@@ -1101,8 +1101,10 @@
 
 (defun timed-silent-solve ()
   "Run SOLVE with standard output (including worker-thread output) discarded and the
-   TIME report (written to *TRACE-OUTPUT*) captured as a string.
+   TIME report (written to *TRACE-OUTPUT*) captured as a string. A full GC runs first,
+   outside the timed region, so each run starts from the same heap.
    Returns (values wall-seconds states-processed time-report)."
+  (sb-ext:gc :full t)                                                                   ; CHANGED
   (let ((saved-output (sb-ext:symbol-global-value '*standard-output*))
         (sink (make-broadcast-stream))
         (report (make-string-output-stream))

@@ -720,7 +720,7 @@
            (blocks3-file (problem-source-file "problem-blocks3.lisp"))
            (vals-problem-name (read-init-vals vals-file))
            (vals-problem-file (problem-source-file
-                                (concatenate 'string "problem-" vals-problem-name ".lisp")))
+                                (concatenate 'string "problem-" (string-downcase vals-problem-name) ".lisp")))   ; CHANGED
            (spliced nil))
       (cond ((not (probe-file problem-file))  ;no problem.lisp file?
               (copy-problem-with-tech-includes blocks3-file problem-file)  ;default problem.lisp
