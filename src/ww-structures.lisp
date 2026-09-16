@@ -80,9 +80,9 @@
 
 (defun print-problem-state (state &optional (stream t) depth)  ;potential bug here?
   (declare (type problem-state state) (ignore depth))
-  (format stream "<~A ~A ~A ~A ~A ~A~%  ~S~%  ~S>"
-          (problem-state.name state)
-          (problem-state.instantiations state)
+  (format stream "<~A ~A ~A ~A ~A~%  ~S~%  ~S>"
+          (format-action-for-display
+            (cons (problem-state.name state) (problem-state.instantiations state)))
           (problem-state.happenings state)
           (problem-state.time state)
           (problem-state.value state)

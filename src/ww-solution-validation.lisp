@@ -55,7 +55,8 @@ transitions for the interactive VALIDATE-SOLUTION interface."
           for next-action-form = (second tail)
           for index from 1
           do (when verbose
-               (format t "~%--- Action ~D: ~S ---~%" index action-form))
+               (format t "~%--- Action ~D: ~A ---~%" index
+                       (format-action-for-display action-form)))
              (multiple-value-bind (new-state success-p failure-reason)
                  (apply-action-to-state
                    action-form current-state next-action-form verbose)
@@ -267,7 +268,11 @@ to the search's candidate-validation diagnostics."
     
     ;; Strip any display connectives from a path pasted off annotated solution output,
     ;; so the count check and matching see the pure value list.
-    (setf provided-args (strip-display-connectives action provided-args))
+    (handler-case
+        (setf provided-args (strip-display-connectives action provided-args))
+      (invalid-action-phrase (condition)
+        (return-from %apply-action-to-state
+          (values nil nil (princ-to-string condition)))))
     (setf *replay-action* (cons action-name provided-args))
     
     ;; Check argument count matches effect variables
@@ -352,48 +357,6 @@ to the search's candidate-validation diagnostics."
           (values nil nil :precondition-failure)))))
 
 
-(defun strip-display-connectives (action provided-args)
-  "Returns PROVIDED-ARGS with any display connectives removed, yielding the pure value
-   list used for matching and diagnostics. Returns PROVIDED-ARGS unchanged when ACTION's
-   effect-format template carries no string connectives, or when PROVIDED-ARGS is already
-   the pure value list. Otherwise PROVIDED-ARGS was pasted from annotated solution output,
-   and the connective tokens are dropped."
-  (let ((template (action.effect-format action)))
-    (if (or (notany #'stringp template)
-            (= (length provided-args) (length (action.effect-variables action))))
-      provided-args
-      (extract-annotated-values template provided-args))))
-
-
-(defun extract-annotated-values (template provided-args)
-  "Walks TEMPLATE left to right against PROVIDED-ARGS, the token list read back from
-   annotated solution output. Annotated output is printed with escaping off, so a string
-   connective contributes one token per whitespace-delimited word rather than one token
-   overall; those tokens are discarded. Each variable slot consumes one token, which is
-   collected. Returns the pure value list."
-  (let ((tokens provided-args)
-        (values nil))
-    (dolist (slot template (nreverse values))
-      (if (stringp slot)
-        (loop repeat (count-connective-words slot)
-              do (pop tokens))
-        (push (pop tokens) values)))))
-
-
-(defun count-connective-words (string)
-  "Number of whitespace-delimited words in STRING, ie the number of tokens STRING
-   contributes when printed unescaped and read back."
-  (let ((count 0)
-        (in-word nil))
-    (loop for char across string
-          do (if (member char '(#\Space #\Tab #\Newline #\Return #\Page))
-               (setf in-word nil)
-               (unless in-word
-                 (setf in-word t)
-                 (incf count))))
-    count))
-
-
 (defun get-precondition-args (action state)
   "Get precondition argument combinations, handling dynamic vs static actions."
   (if (action.dynamic action)
@@ -451,6 +414,9 @@ to the search's candidate-validation diagnostics."
   "Check if action with given args can execute from state."
   (let ((action (find action-name *actions* :key #'action.name)))
     (when action
+      (handler-case
+          (setf args (strip-display-connectives action args))
+        (invalid-action-phrase () (return-from next-action-valid-p nil)))
       (let ((precondition-args (get-precondition-args action state)))
         (dolist (pre-args precondition-args)
           (let ((pre-result (apply (action.pre-defun-name action) state pre-args)))
@@ -576,7 +542,7 @@ to the search's candidate-validation diagnostics."
 (defun report-validation-failure (index action-form reason state)
   "Report a validation failure with diagnostics."
   (format t "~%VALIDATION FAILED at action ~D~%" index)
-  (format t "~%Action: ~S~%" action-form)
+  (format t "~%Action: ~A~%" (format-action-for-display action-form))
   (let ((action (find (first action-form) *actions* :key #'action.name)))
     (cond
       ;; True precondition failure

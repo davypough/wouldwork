@@ -1093,11 +1093,9 @@
                              (action.effect-variables action))))
               
               ;; Show the action with as many resolved variables as possible
-              (format t "ACTION: (~A~{ ~A~})~%~%" 
-                      (action.name action)
-                      (mapcar (lambda (x) 
-                                (if (symbolp x) x (format nil "~A" x)))
-                              effect-var-values)))
+              (format t "ACTION: ~A~%~%"
+                      (format-action-for-display
+                        (cons (action.name action) effect-var-values))))
             
             ;; Apply effect function
             (let* ((updated-dbs (if (eql result t)

@@ -868,7 +868,7 @@ Returns a list of plists:
         collect
         (multiple-value-bind (action previous target) (bw-trace-step->triple step)
           (when (and verbose action)
-            (format t "~&BW TRACE: ~S~%" action))
+            (format t "~&BW TRACE: ~A~%" (format-action-for-display action)))
           (let* ((validated (and action target
                                  (bw-regress+validate target action
                                                     :normalizer normalizer
@@ -1824,7 +1824,7 @@ Example:
               (format t "Actions:~%")
               (loop for action in solution-path
                     for i from 1
-                    do (format t "  ~2D. ~S~%" i action)))
+                    do (format t "  ~2D. ~A~%" i (format-action-for-display action))))
             (return (values t solution-path
                             (list :success t
                                   :path-length (length solution-path)
@@ -1885,7 +1885,7 @@ Example:
       ;; Now test a CONNECT candidate through bw-regress+validate
       (let ((connect-action '(connect-to-1-terminus agent1 connector3 receiver2 area4 ground)))
         (format t "~%=== Testing CONNECT via bw-regress+validate ===~%")
-        (format t "Action: ~S~%" connect-action)
+        (format t "Action: ~A~%" (format-action-for-display connect-action))
         
         ;; First just do regression
         (let ((regressed (bw-regress pred connect-action)))
@@ -1965,11 +1965,11 @@ Example:
             (find-if (lambda (p) (eql (car p) 'holds)) (bw--all-props gs)))
     (format t "Gate1 open: ~S~%"
             (find-if (lambda (p) (equal p '(open gate1))) (bw--all-props gs)))
-    (format t "Candidates: ~S~%" candidates)
+    (format t "Candidates:~%~{  ~A~%~}" (mapcar #'format-action-for-display candidates))
     
     ;; Get validated predecessors from first candidate
     (let ((action (first candidates)))
-      (format t "~%=== Regressing: ~S ===~%" action)
+      (format t "~%=== Regressing: ~A ===~%" (format-action-for-display action))
       (let ((preds (bw-regress+validate gs action :verbose nil)))
         (format t "Validated predecessors: ~D~%" (length preds))
         
@@ -2002,7 +2002,7 @@ Example:
                                                         :direction :backward)))
             (format t "Candidates from this predecessor: ~D~%" (length pred-candidates))
             (dolist (c pred-candidates)
-              (format t "  ~S~%" c))))))))
+              (format t "  ~A~%" (format-action-for-display c)))))))))
 
 
 (defun bw-diagnose-move-regression ()
@@ -2033,19 +2033,19 @@ Traces through the regression and forward validation step by step."
                                                             :direction :backward)))
       (if candidates
           (dolist (c candidates)
-            (format t "  ~S~%" c))
+            (format t "  ~A~%" (format-action-for-display c)))
           (format t "  NONE~%"))
       
       ;; Check for MOVE candidates specifically
       (let ((move-candidates (remove-if-not (lambda (c) (eql (car c) 'move)) candidates)))
         (format t "~%MOVE candidates: ~D~%" (length move-candidates))
         (dolist (m move-candidates)
-          (format t "  ~S~%" m)))
+          (format t "  ~A~%" (format-action-for-display m))))
       
       ;; Test each candidate
       (format t "~%=== Testing each candidate ===~%")
       (dolist (action candidates)
-        (format t "~%--- Action: ~S ---~%" action)
+        (format t "~%--- Action: ~A ---~%" (format-action-for-display action))
         (let ((validated (bw-regress+validate gs action :verbose t)))
           (format t "  => ~D validated predecessor~:P~%" (length validated)))))))
 
@@ -2084,12 +2084,12 @@ Shows:
                                                             :direction :backward)))
       (format t "~%Candidate actions (~D):~%" (length candidates))
       (dolist (a candidates)
-        (format t "  ~S~%" a))
+        (format t "  ~A~%" (format-action-for-display a)))
       
       ;; Test each candidate with verbose output
       (format t "~%Validation results:~%")
       (dolist (action candidates)
-        (format t "~%--- Action: ~S ---~%" action)
+        (format t "~%--- Action: ~A ---~%" (format-action-for-display action))
         (let ((validated (bw-regress+validate gs action :verbose t)))
           (format t "  => ~D validated predecessor~:P~%" (length validated)))))))
 
@@ -2114,12 +2114,12 @@ rather than the enumerated minimal goal state."
                                                             :direction :backward)))
       (format t "~%Candidate actions (~D):~%" (length candidates))
       (dolist (a candidates)
-        (format t "  ~S~%" a))
+        (format t "  ~A~%" (format-action-for-display a)))
       
       ;; Test each candidate with verbose output
       (format t "~%Validation results:~%")
       (dolist (action candidates)
-        (format t "~%--- Action: ~S ---~%" action)
+        (format t "~%--- Action: ~A ---~%" (format-action-for-display action))
         (let ((validated (bw-regress+validate s15 action :verbose t)))
           (format t "  => ~D validated predecessor~:P~%" (length validated)))))))
 

@@ -2,6 +2,12 @@ Crelay-Topo replacement Subgoal 3: plate5 handoff
 ================================================
 Validated 2026-09-15 against the current working tree.
 
+Argument-order and phrase-format validation: PUT-CONNECTOR and CONNECT-CONNECTOR
+forms below put the placement location last. The user ran the focused phrase
+tests and the complete 94-action comparison successfully. Plain and phrase-form
+replay both satisfy the goal and produce matching final databases and time.
+Independent recorder validation also passed. No solve/search was run.
+
 35 new actions from the saved Subgoal 2 endpoint; 65 cumulative.
 This is a validated replacement-plan prefix, not a complete final-goal solution.
 Subgoal 3 is now replaced in subgoal-solutions.txt by the full validated path.
@@ -42,7 +48,7 @@ Exact cumulative replay form, after staging crelay-topo:
   (MOVE AGENT1 ((WALK LOCATION1 (GATE1 GATE3) LOCATION9)))
   (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION9)
   (MOVE AGENT1 ((WALK LOCATION9 (GATE1 GATE3) LOCATION2)))
-  (PUT-CONNECTOR AGENT1 CONNECTOR1 LOCATION2 PLATE1)
+  (PUT-CONNECTOR AGENT1 CONNECTOR1 PLATE1 LOCATION2)
   (MOVE AGENT1* ((STEP (LOCATION2 PLATE1) NIL
                                   (LOCATION2 GROUND))))
   (MOVE AGENT1* ((WALK LOCATION2 NIL LOCATION1)))
@@ -78,7 +84,7 @@ Exact cumulative replay form, after staging crelay-topo:
 (MOVE AGENT1 ((WALK LOCATION1 NIL LOCATION2)))
 (PICKUP-CONNECTOR AGENT1 CONNECTOR1 LOCATION2)
 (MOVE AGENT1 ((WALK LOCATION2 (GATE1) LOCATION7)))
-(CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION7 GROUND (REPEATER1 RECEIVER1))
+(CONNECT-CONNECTOR AGENT1 CONNECTOR1 GROUND (REPEATER1 RECEIVER1) LOCATION7)
 (PICKUP-BOX AGENT1 BOX1 LOCATION7 LOCATION7)
 (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
 (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
@@ -90,7 +96,7 @@ Exact cumulative replay form, after staging crelay-topo:
 (MOVE AGENT1 ((WALK LOCATION7 NIL LOCATION4)))
 (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))
 (TOGGLE-SWITCH AGENT1 SWITCH1)
-(CONNECT-CONNECTOR AGENT1 CONNECTOR1 LOCATION5 BOX1 (REPEATER1 RECEIVER1))
+(CONNECT-CONNECTOR AGENT1 CONNECTOR1 BOX1 (REPEATER1 RECEIVER1) LOCATION5)
 (TOGGLE-SWITCH AGENT1 SWITCH1)
 (MOVE AGENT1 ((WALK LOCATION4 NIL LOCATION7)))
 (PICKUP-TRAY AGENT1 TRAY1 LOCATION7 LOCATION7)

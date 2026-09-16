@@ -284,7 +284,8 @@
     (unless (validate-global-invariants nil *backtrack-state*)
       (apply-update-inverse-bt (choice.inverse-update choice))
       (decf (problem-state.time *backtrack-state*) (action.duration action))
-      (error "Global invariant violation in successor state from action ~A" (choice.act choice))))
+      (error "Global invariant violation in successor state from action ~A"
+             (format-action-for-display (choice.act choice)))))
 
   ;; Step 4: Constraint
   (when (and (fboundp 'constraint-fn)
@@ -373,13 +374,15 @@
                 ;; Special handling for backtrack operations - simplified output
                 (if (and string (string= string "Backtracking to"))
                     (when choice
-                      (format t "~%Backtracking to: ~A~%" (choice.act choice)))
+                      (format t "~%Backtracking to: ~A~%"
+                              (format-action-for-display (choice.act choice))))
                     ;; Normal detailed output for non-backtrack operations
                     (progn
                       (when (and string (not (string= string "")))
                         (format t "~%~A:~%" string))
                       (when choice
-                        (format t "~%Action: ~A~%" (choice.act choice))
+                        (format t "~%Action: ~A~%"
+                                (format-action-for-display (choice.act choice)))
                         (format t "Depth: ~A~%" depth)
                         (format t "Forward Update: ~A~%" (choice.forward-update choice))
                         (format t "Inverse Update: ~A~%" (choice.inverse-update choice)))
@@ -399,7 +402,7 @@
                           for stack-choice in *choice-stack*
                           do (format t "  [~A] ~A~A~%" 
                                      i 
-                                     (choice.act stack-choice)
+                                     (format-action-for-display (choice.act stack-choice))
                                      ;; Highlight current choice being processed
                                      (if (and choice (eq stack-choice choice))
                                          " ← current"

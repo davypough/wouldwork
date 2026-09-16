@@ -125,7 +125,7 @@
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (assign $places (placement-options ?agent ?location ?connector)))
-  (">" ?agent "puts" ?connector "at" ?location "on" $place "without pairings")
+  (">" ?agent "puts" ?connector "on" $place "without pairings at" ?location)
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (place-held-object!
@@ -146,7 +146,7 @@
         (exists (?t terminus)
           (connectable-terminus
             ?agent $pairing-vantages ?location $connector ?t)))
-  (">" ?agent "connects" $connector "at" ?location "on" $place "to" $termini)
+  (">" ?agent "connects" $connector "on" $place "to" $termini "at" ?location)
   (do (assign $connectable nil)
       (doall (?terminus terminus)
         (if (connectable-terminus

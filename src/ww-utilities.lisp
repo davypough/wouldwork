@@ -428,7 +428,8 @@
             for i from 1
             do (format t "~&--- Solution ~D ---~%" i)
                (loop for (time action) in (ww::solution.path sol)
-                     do (format t "  ~A ~A~%" time action))
+                     do (format t "  ~A ~A~%" time
+                                (ww::format-action-for-display action)))
                (terpri))
       ;; Return count and switch value
       (values (length optimal) min-switches))))

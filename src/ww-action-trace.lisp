@@ -74,10 +74,9 @@
 
 (defun trace-action-instantiation (state action pre-result instantiation)
   "Traces a single action instantiation from current state through final delta."
-  (format t "~%INSTANTIATION #~D: (~A~{ ~A~})~%" 
+  (format t "~%INSTANTIATION #~D: ~A~%"
           *trace-count*
-          (action.name action)
-          instantiation)
+          (format-action-for-display (cons (action.name action) instantiation)))
   ;; Show current state
   (format t "~%PRIOR STATE:~%")
   (print-state-propositions state)

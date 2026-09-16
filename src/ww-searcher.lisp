@@ -1817,11 +1817,8 @@ different acceptable milestone state."
     (dolist (item path)
       (incf step)
       (let* ((action-form (second item))
-             (display-form (cons (car action-form)
-                                 (merge-effect-format (car action-form)
-                                                      (cdr action-form))))
-              (new-state (apply-action-to-state action-form current-state nil nil)))
-        (write (list (first item) display-form) :pretty t :escape nil)           ; connectives, unquoted
+             (new-state (apply-action-to-state action-form current-state nil nil)))
+        (write-string (format-action-entry-for-display item))
         (terpri)
         (cond (new-state
                (setf current-state new-state)
@@ -1833,23 +1830,6 @@ different acceptable milestone state."
     (terpri)))
 
 
-(defun merge-effect-format (action-name instantiations)
-  "Interleaves the string connectives from ACTION-NAME's effect-format template with the
-   pure INSTANTIATIONS values, producing a human-readable move for display. Each string in
-   the template is emitted verbatim; each non-string slot consumes the next instantiation
-   value, in order. Returns INSTANTIATIONS unchanged when the action is unknown (eg wait,
-   start-state) or its template carries no string connectives."
-  (let ((action (find action-name *actions* :key #'action.name)))
-    (if (and action (some #'stringp (action.effect-format action)))
-      (let ((values instantiations))
-        (mapcar (lambda (slot)
-                  (if (stringp slot)
-                    slot
-                    (pop values)))
-                (action.effect-format action)))
-      instantiations)))
-
-
 (defun report-replay-failure (step action-form last-good-state)
   "Print a diagnostic for replay failure in printout-solution-with-states.
    Replay failure is a system invariant violation: the recorded action
@@ -1857,7 +1837,7 @@ different acceptable milestone state."
    cause is a bug in the action's precondition or effect form."
   (format t "~%============================================================~%")
   (format t "REPLAY FAILURE at step ~D~%" step)
-  (format t "Action: ~S~%" action-form)
+  (format t "Action: ~A~%" (format-action-for-display action-form))
   (format t "Last consistent state (time ~A):~%" (problem-state.time last-good-state))
   (format t "  ~A~%" (list-database (problem-state.idb last-good-state)))
   (format t "The recorded action did not reproduce when re-applied to~%")

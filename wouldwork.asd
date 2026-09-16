@@ -93,6 +93,7 @@
 		                     (:file "ww-settings")
 		                     (:file "ww-problem-lifecycle")
 		                     (:file "ww-structures")
+                             (:file "ww-action-format")
                              (:file "ww-worker-read-snapshots")
 		                     (:file "ww-relaxed-heuristics")
 		                     (:file "ww-converter")

@@ -24,6 +24,7 @@ Read these when a problem loads but behaves as though a form didn't take effect,
 | `wouldwork-problem-template.md` | Writing a new spec. Opens with the Talos/`tech`-based vs. hand-authored fork, then the DSL reference and an interview template. |
 | `working-reference-builder.md` | A spec exists and needs analysis. Normalizes its scattered facts into one verified working reference. |
 | `inferring-missing-relations.md` | A spec is correct but unsolvable because one relation instance is missing. Assumes a working reference already exists. |
+| `action-phrases.md` | Reading action reports and pasting phrase or plain forms into replay validation. |
 
 These form a sequence: write → normalize → diagnose.
 

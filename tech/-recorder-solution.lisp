@@ -995,10 +995,11 @@ moves before its stop.  MOVES is freshly consed, so callers may NCONC it in plac
   "Replay PATH for reporting, surfacing an accepted-path inconsistency as an error."
   (let ((validation (validate-action-sequence start-state path)))
     (unless (action-sequence-validation-success-p validation)
-      (error "Recorder report cannot replay ~A at step ~D, action ~S: ~S"
+      (error "Recorder report cannot replay ~A at step ~D, action ~A: ~S"
              description
              (action-sequence-validation-failure-index validation)
-             (action-sequence-validation-failure-action validation)
+             (format-action-for-display
+               (action-sequence-validation-failure-action validation))
              (action-sequence-validation-failure-reason validation)))
     (action-sequence-validation-final-state validation)))
 
@@ -1111,7 +1112,7 @@ markers are not planner actions and do not contribute to any metric."
   "Print HEADING and every entry in one report SEQUENCE."
   (format stream "~&~%~A:~%" heading)
   (dolist (entry sequence)
-    (format stream "~S~%" entry)))
+    (format stream "~A~%" (format-action-entry-for-display entry))))
 
 
 (defun print-recorder-report-metrics (heading metrics stream)
