@@ -36,7 +36,7 @@ report on it. Unless the user's message says otherwise:
 **T10 — end-to-end closure on crelay-topo. APPROVED and IN PROGRESS.**
 Seven of nine milestones found: lk1/lk2/lk3/lk7/lk8 CLOSED; lk9/lk4 REALIZED;
 lk5/lk6 OPEN. Current checkpoint: agent1 at location15, cumulative depth 19,
-switch2 on, one recorder cycle open. Thirteen searches reported, including three
+switch2 on, one recorder cycle open. Sixteen searches reported, including three
 restoration replays. The earlier lk4 cost bound remains recorded for its own start.
 
 Read `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt` for boundaries,
@@ -59,8 +59,54 @@ and tested (55 engine assertions, 346 ledger assertions). The run is filed as
 BD2 with unknown coverage and its raw engine report preserved. Two bounds now
 exist; LK5 remains OPEN. No crelay-topo search was rerun. Proposed next step:
 reload the corrected engine and restore the archive, then a cutoff-10 LK5 probe
-at threads 16 if D approves that explicit increase. No deepening is yet authorized.
-No cutoff increase or further crelay-topo search was run in this implementation.
+at threads 16. D subsequently APPROVED this single increase and requested a
+repository consistency check; that review is complete, with no new search run.
+Use `constraint-evidence/lk5-cutoff10-recommendation-2026-09-21.txt` under
+crelay-topo. The alternative gate8-opening split remains unapproved and is not
+a prerequisite. Generic ledger reporter inconsistencies and an unsupported
+gate-opening inference are recorded in `evidence/t10-consistency-review-2026-09-21.txt`.
+The cutoff-10 approval covered that one run. D subsequently set 12 as the maximum
+reasonable cutoff for his searches; individual goal/experiment choices remain
+explicit. No automatic deepening is authorized. Final composed-path check due.
+
+LATEST RESULT: D restored seven checkpoints/19 actions and reported no solution
+for the approved cutoff-10 probe in 8.652 seconds, with 21,972,125,904 bytes consed.
+The checkpoint is unchanged; LK5 remains OPEN. D supplied metadata: cutoff 10,
+threads 16, DEPTH-CUTOFF-TRUNCATED, truncation T, 130,956 cutoff hits, GRAPH,
+symmetry NIL, minimum-steps pruning T. Filed as BD3, preserving BD2 unchanged;
+three bounds now exist. Data-only ingestion and readback checks passed. Evidence:
+`constraint-evidence/lk5-cutoff10-result-2026-09-21.txt` and
+`constraint-evidence/lk5-cutoff10-bound-ingestion-2026-09-21.log` under crelay-topo.
+Do not repeat ingestion or the search. D approved read-only beam/resource
+analysis; it is now complete with no staging, replay or search. Evidence:
+`constraint-evidence/lk5-beam-resource-analysis-2026-09-21.txt` under crelay-topo.
+The candidate location9 beam needs gate4/plate3, and ground-level onward beams
+are blocked by wall10. Two conditional networks differ in where a connector is
+raised; neither is validated or proved necessary. D APPROVED the next experiment:
+source-side `(color repeater1 red)` from the retained checkpoint, threads 16,
+cutoff 11, keeping the original checkpoint separately. Exact pre-run record:
+`constraint-evidence/repeater-source-probe-recommendation-2026-09-21.txt` under
+crelay-topo. Return the candidate into `*t10-source-checkpoint*`; do not overwrite
+`*t10-checkpoint*`. RESULT: source power found in 8 actions (7.164 s), cumulative
+depth 27. Endpoint reviewed: live connector1 at location9 powers repeater1,
+live agent holds plate3 at location10; switch2 off, gates6/7/8 closed. Ghost
+resources unchanged. Record this separate candidate REALIZED, validated NIL;
+do not count it as another main-spine link or as LK5. Evidence and endpoint:
+`constraint-evidence/repeater-source-result-2026-09-21.txt` under crelay-topo.
+Keep the original seed. Source candidate archive now exists; no replay performed.
+D APPROVED one keeper-replacement probe with goal repeater red and agent1 not
+on plate3, cutoff 11/threads 16. The new ceiling is 12, but this approved probe
+retains 11; no automatic retry. It does not require uninterrupted power during
+the phase. Preserve both existing checkpoints and capture its return separately
+as `*t10-keeper-checkpoint*`. Pre-run record:
+`constraint-evidence/keeper-replacement-probe-recommendation-2026-09-21.txt`.
+RESULT: 5 actions, 0.209 s, new experimental candidate at depth32 with 9 checkpoints.
+Tray1 now holds plate3, live agent empty-handed on ground at location10, source
+power restored after a temporary interruption. Plates4/5 empty; gates6/7/8 closed,
+switch2 off; ghosts unchanged. Candidate REALIZED, validated NIL; main-spine
+counts/statuses unchanged. Evidence: `constraint-evidence/keeper-replacement-result-2026-09-21.txt`.
+Save the keeper candidate separately. Recommend read-only switch2-return-access
+and resource analysis before another search; await D's direction. Ceiling12 remains.
 
 D's current instruction: skip routine replay validation of search-found phases.
 Keep those records REALIZED with validated NIL until replay evidence exists.
@@ -263,7 +309,7 @@ Two invariants constrain everything below:
 | T7 | S5 height and reach lattice | PROPOSED | not requested | — |
 | T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
 | T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
-| T10 | End-to-end closure on crelay-topo (7/9 found; LK5 cutoff-8 bound filed) | IN PROGRESS | searches 2026-09-20; checkpoint/reporting fixes 2026-09-21 | T2–T5 |
+| T10 | End-to-end closure on crelay-topo (7/9 spine links found; keeper candidate REALIZED, access audit proposed) | IN PROGRESS | keeper probe completed; reasonable cutoff ceiling 12, 2026-09-21 | T2–T5 |
 | T11 | Implement and score the G14 fix | APPROVED, DEFERRED | approved, four parts | — |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
@@ -942,3 +988,15 @@ Evidence: `doc/constraint-method/evidence/cutoff-reporting-fix-2026-09-21.txt`
 and `doc/problems/crelay-topo/constraint-evidence/lk5-bound-ingestion-2026-09-21.log`.
 The next cutoff increase is a proposal only; implementation approval did not
 authorize deepening. T10's final composed-path validation is still outstanding.
+
+**Subsequent cutoff-10 approval and consistency review, 2026-09-21.** D approved
+one LK5 crossing probe at cutoff 10, threads 16, and requested a repository check.
+Source wiring, checkpoint behavior, BD2 provenance, retained test evidence and
+archive/profile/register-prefix hashes were checked. No Lisp or search ran.
+The restart note's unapproved gate8-opening alternative is not a prerequisite;
+its claimed opening-cost inference is unsupported by BD2 and the endpoint facts.
+The generic ledger command/wording reporters still need a separate implementation
+step. Use the explicit dated cutoff-10 recommendation, starting with STAGE to
+reload the corrected engine, then threads 16 and archive import. Transcribe that
+pre-run record before next ingestion; preserve the last measured cutoff-8 record
+and BD2 in the meantime. Review: `evidence/t10-consistency-review-2026-09-21.txt`.

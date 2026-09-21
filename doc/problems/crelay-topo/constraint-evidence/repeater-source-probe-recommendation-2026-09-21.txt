@@ -1,0 +1,51 @@
+Approved repeater source-power probe -- 2026-09-21
+================================================
+D approved this particular intermediate goal after the read-only beam analysis.
+One search: (color repeater1 red), cutoff 11, threads 16, from the saved
+location15 checkpoint (7 phases, 19 actions). No restaging in the current REPL.
+This is a new goal, not another LK5 crossing attempt or a necessary milestone
+claim. No further probe/deepening or automatic adoption of its endpoint.
+
+Source archive: t10-location15-checkpoint.txt in this directory.
+SHA-256: 76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635
+The user's last two searches returned *T10-CHECKPOINT* unchanged. Preserve it.
+The new variable below captures the returned object without replacing the seed.
+An exhausted search returns that same seed object; success returns a new object.
+
+(assert (= *threads* 16))
+(ww-set *depth-cutoff* 11)
+(defparameter *t10-source-checkpoint*
+  (solve-subgoal *t10-checkpoint* (color repeater1 red)))
+
+Report the search transcript plus these read-only metadata:
+(list :outcome *last-search-outcome*
+      :cutoff *depth-cutoff* :threads *threads*
+      :cutoff-truncated *depth-cutoff-truncated*
+      :cutoff-hits *depth-cutoff-hits* :search-mode *tree-or-graph*
+      :symmetry-pruning *symmetry-pruning*
+      :min-steps-pruning *min-steps-pruning-enabled*
+      :new-checkpoint-p (not (eq *t10-source-checkpoint* *t10-checkpoint*)))
+
+SUCCESS interpretation committed before execution: a concrete realization of
+physical red power at repeater1 from this exact start under these settings.
+Inspect exact pairings, plate3 occupant, physical/recording gates, agent
+positions, elevations and remaining resources before choosing any continuation.
+The goal does not force a particular connector/source route, preserve plate1,
+cross gate8, or guarantee a useful continuation. No automatic upgrade of LK5;
+no routine phase replay. Keep any found phase REALIZED with validated NIL until
+separate replay evidence exists. The original checkpoint remains available.
+
+EXHAUSTION interpretation committed before execution: no realization of this
+source-power goal found within cutoff 11 under the actual reported settings.
+Record coverage and pruning as a grade-3 bound for THIS goal, not as a bound
+on crossing gate8 or a refutation of the alternative direct-connector network.
+No automatic retries, prior-phase search, or cutoff beyond 11. Time and memory
+are unmeasured for this goal; BD3 does not predict its resource cost.
+
+On success, persist the candidate separately before leaving the REPL:
+(export-search-checkpoint *t10-source-checkpoint*
+  (merge-pathnames
+    "doc/problems/crelay-topo/constraint-evidence/t10-repeater-source-checkpoint.txt"
+    (asdf:system-source-directory :wouldwork)))
+Do not overwrite the location15 seed or designate this as the main continuation
+before endpoint review. No new link/result was filed while preparing the probe.

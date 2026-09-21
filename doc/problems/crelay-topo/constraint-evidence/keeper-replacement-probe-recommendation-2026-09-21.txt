@@ -1,0 +1,55 @@
+Approved keeper-replacement probe -- 2026-09-21
+==============================================
+D approved the proposed single cutoff-11, threads-16 probe and also increased
+the maximum reasonable cutoff to 12. This run retains the specifically proposed
+11; the ceiling is not an automatic retry at 12. No problem defaults changed.
+
+Source: *T10-SOURCE-CHECKPOINT*, eight checkpoints, 27 actions, live agent on
+plate3 at location10; live connector at location9 pairs transmitter1/repeater1;
+both relays red; switch2 off; physical gates6/7/8 closed; recorder cycle open.
+Exact trace/endpoint: repeater-source-result-2026-09-21.txt in this directory.
+The source archive was absent when checked while preparing this recommendation.
+Save the existing source candidate first. No restaging or replay is required.
+
+(export-search-checkpoint *t10-source-checkpoint*
+  (merge-pathnames
+    "doc/problems/crelay-topo/constraint-evidence/t10-repeater-source-checkpoint.txt"
+    (asdf:system-source-directory :wouldwork)))
+
+(assert (= *threads* 16))
+(ww-set *depth-cutoff* 11)
+(defparameter *t10-keeper-checkpoint*
+  (solve-subgoal *t10-source-checkpoint*
+    (and (color repeater1 red)
+         (not (on agent1 plate3)))))
+
+Preserve both *T10-CHECKPOINT* (location15 seed) and *T10-SOURCE-CHECKPOINT*.
+The new variable returns a new candidate on success, the source on exhaustion.
+Report the transcript and actual metadata before any further search:
+(list :outcome *last-search-outcome*
+      :cutoff *depth-cutoff* :threads *threads*
+      :cutoff-truncated *depth-cutoff-truncated*
+      :cutoff-hits *depth-cutoff-hits* :search-mode *tree-or-graph*
+      :symmetry-pruning *symmetry-pruning*
+      :min-steps-pruning *min-steps-pruning-enabled*)
+
+SUCCESS interpretation committed before execution: repeater1 is physically red
+and agent1 no longer occupies plate3 at the returned endpoint. The goal does
+not require uninterrupted power during the phase, a particular replacement
+witness, preserved source pairings, empty hands, restored gate7 access, receiver
+activation, or gate8 crossing. Inspect the actual route, keeper, resource/view
+commitments and agent configuration before adopting a continuation. File the
+experimental phase REALIZED with validated NIL; no automatic LK5 upgrade.
+
+EXHAUSTION interpretation committed before execution: no realization of this
+goal found within 11 additional actions from this exact source under reported
+settings/pruning. Record a grade-3 bound with actual coverage. It refutes
+neither a different endpoint nor the original crossing or alternative network.
+No automatic deepening to 12, predecessor retry, or follow-up search.
+
+On success only, save the new candidate separately before leaving the REPL:
+(export-search-checkpoint *t10-keeper-checkpoint*
+  (merge-pathnames
+    "doc/problems/crelay-topo/constraint-evidence/t10-keeper-checkpoint.txt"
+    (asdf:system-source-directory :wouldwork)))
+No search or export ran in the assistant session. Await D's local results.

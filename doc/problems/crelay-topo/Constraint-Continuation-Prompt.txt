@@ -1,6 +1,6 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Regenerated 2026-09-21 after the approved coverage fix and LK5 bound ingestion.
+Regenerated 2026-09-21 after keeper-probe result and endpoint review.
 STATE FILES ARE AUTHORITATIVE. Dated updates below are historical; this current
 block and Constraint-Restart-Checkpoint.txt supersede their next-step commands.
 
@@ -10,9 +10,13 @@ T10 -- end-to-end closure, APPROVED and IN PROGRESS.
 Seven of nine milestones found. LK1/LK2/LK3/LK7/LK8 CLOSED;
 LK9/LK4 still REALIZED in the ledger; LK5/LK6 OPEN. Migration replay evidence
 is recorded separately and did not regrade these records.
-Sixteen premises, nine links, two filed cost bounds. Thirteen reported searches
+Sixteen premises, nine spine links, three filed cost bounds. Sixteen reported searches
 include three restoration replays. Latest checkpoint: agent1 at location15,
-cumulative depth 19, switch2 on, one recorder cycle still open.
+cumulative depth 19, switch2 on, one recorder cycle still open, retained as seed.
+Separate source-power candidate: eight checkpoints, depth 27, REALIZED with
+validated NIL. It is not an adopted spine link; LK5/LK6 remain OPEN.
+Separate keeper candidate: nine checkpoints, depth32, REALIZED with validated
+NIL. Tray1 holds plate3, freeing agent1; source powered, gate6/7/8 still closed.
 
 READ Constraint-Restart-Checkpoint.txt in this directory after this prompt.
 It contains the exact cold-image import commands, endpoint inventory, full
@@ -46,17 +50,65 @@ D APPROVED THE CORRECTION; it is implemented and tested (55 engine assertions,
 346 ledger assertions). LK5 is filed as BD2 with UNKNOWN coverage and raw
 COMPLETE/NIL preserved separately. Raw evidence is in
 constraint-evidence/lk5-cutoff8-result-2026-09-21.txt. No sightline route or
-sufficient action budget is established; no deepening has been authorized.
-NEXT PROPOSAL: reload the corrected engine, restore the existing archive, and
-run LK5 at cutoff 10 and threads 16 only if D approves that explicit increase.
+sufficient action budget is established. D subsequently APPROVED one cutoff-10
+LK5 crossing probe at threads 16 and requested a repository consistency check.
+That review is complete and D has now reported the cutoff-10 run: no solutions,
+8.652 seconds real time, 129.312500 seconds CPU, 21,972,125,904 bytes consed.
+Archive import succeeded and the seven-checkpoint/19-action object returned
+unchanged. LK5 remains OPEN. Metadata confirmed cutoff 10, threads 16,
+DEPTH-CUTOFF-TRUNCATED, truncation T, 130,956 cutoff hits, GRAPH, symmetry NIL,
+minimum-steps pruning T. Filed BD3; BD2 preserved unchanged. Data-only ingestion
+and readback checks passed. Do not repeat ingestion or the search. D approved
+read-only beam/resource analysis and set 11 as the maximum reasonable cutoff
+for his searches. Analysis is complete without staging, replay or search:
+constraint-evidence/lk5-beam-resource-analysis-2026-09-21.txt.
+The location9 source beam requires gate4/plate3; a ground-level onward beam
+meets wall10's top and is blocked. Conditional networks raise either source
+or destination connector; neither is validated or proved necessary. D APPROVED
+one source-side (color repeater1 red) probe, threads 16, cutoff 11, retaining
+the original checkpoint separately. Exact pre-run record and commands:
+constraint-evidence/repeater-source-probe-recommendation-2026-09-21.txt.
+Use the current REPL without restaging. Return the candidate into
+*t10-source-checkpoint*, preserving *t10-checkpoint*. RESULT NOW RECEIVED:
+8 actions, 7.164 seconds, 18,486,863,216 bytes consed; checkpoint depth 27.
+Live connector1 at location9 powers repeater1; live agent1 holds plate3 at
+location10. Switch2 off, gates6/7/8 closed; ghost resources unchanged. Neither
+receiver active; no elevated relay. Endpoint reviewed, not independently replayed.
+Evidence: constraint-evidence/repeater-source-result-2026-09-21.txt.
+Request export of candidate to t10-repeater-source-checkpoint.txt before leaving
+REPL; source archive now exists (hash in restart checkpoint). Keep seed untouched. D APPROVED keeper
+replacement: (and (color repeater1 red) (not (on agent1 plate3))), cutoff 11,
+threads 16, from the candidate. D also raised the reasonable cutoff ceiling to
+12; this specific probe retains 11, with no automatic retry. Pre-run record:
+constraint-evidence/keeper-replacement-probe-recommendation-2026-09-21.txt.
+Save the source first and capture the new return in *t10-keeper-checkpoint*,
+preserving both existing checkpoints. RESULT: 5 additional actions, 0.209 s,
+depth32; tray1 moved from plate4 to plate3. Agent1 at location10 empty-handed,
+source powered again; power was interrupted during the phase as allowed.
+Plates4/5 empty, gates6/7/8 closed, switch2 off; ghosts unchanged. Cutoff11,
+threads16, truncation NIL, hits0, GRAPH, symmetry NIL, minimum-steps pruning T.
+Evidence: constraint-evidence/keeper-replacement-result-2026-09-21.txt.
+Save keeper candidate separately to t10-keeper-checkpoint.txt (unconfirmed).
+Recommend read-only switch2 return-access/resource audit before another search;
+await D's direction. No next search approved. No new search ran in this update.
+Raw result: constraint-evidence/lk5-cutoff10-result-2026-09-21.txt.
+Historical pre-run commands and committed outcome interpretations:
+constraint-evidence/lk5-cutoff10-recommendation-2026-09-21.txt.
+The alternative gate8-opening split is unapproved, not a prerequisite. The
+restart note's unsupported gate-opening cost inference has been corrected.
+Generic ledger command/wording reporter findings remain pending a separate
+implementation step; use the explicit dated recommendation for this run.
+Review: doc/constraint-method/evidence/t10-consistency-review-2026-09-21.txt.
 No crelay-topo search was rerun for the fix. Do not repeat data ingestion.
 T10's existing search approval persists, but no silent deepening is permitted.
 The next search uses (setf *t10-checkpoint*
   (solve-subgoal *t10-checkpoint* <unquoted-goal>)); save a successful result
 with export-search-checkpoint. The object retains its exact endpoint and the
 whole action history. Exhaustion returns the original checkpoint unchanged;
-there is no automatic predecessor retry. The last measured cutoff remains 8;
-the proposed cutoff 10 awaits approval and has no sufficiency claim.
+there is no automatic predecessor retry. The cutoff-10 result is now reported;
+the ledger now carries its transcribed pre-run recommendation and BD3 with
+confirmed truncation. No further search has run; the ceiling is now 12, with
+individual experiments chosen explicitly.
 Old ledger recommendation command fields describe the former serial chain.
 The dated recommendation records the exact checkpoint start and threads 16; do not
 execute the old chained command or count archive import as another search.
@@ -1341,4 +1393,111 @@ in that directory; constraint-evidence/lk5-bound-ingestion-2026-09-21.log.
 No crelay-topo search or replay, extractor run, scoring, or sealed-content
 reading occurred. The archive and generated static profile were not modified.
 Temporary test bootstrap/cache removed; continuation updated last.
-T10 stays IN PROGRESS. Cutoff 10 is proposed, not yet approved.
+T10 stays IN PROGRESS. Cutoff 10 was proposed, not yet approved at that update.
+
+SUBSEQUENT APPROVAL AND CONSISTENCY REVIEW, 2026-09-21
+--------------------------------------------------
+D approved the single cutoff-10 crossing probe and asked for repository
+consistency checking first. The restart note had proposed an unapproved
+gate8-opening prerequisite and overclaimed an opening-cost bound from BD2;
+the note now distinguishes that alternative and removes the unsupported
+inference. BD2 remains UNKNOWN, and graph cuts retain their stated relaxation.
+The plan, board and restart instructions now record the same approved next run.
+
+Review also found that generic ledger commands omit checkpoint assignment and
+cutoff setup for this continuation, retain old chain/replay instructions, and
+use overstrong generic exhaustion wording. No reporter code was changed. Use
+the explicit cutoff-10 recommendation, committed before any new result; its
+outcome readings must be transcribed before next ingestion. The ledger still
+holds the last measured cutoff-8 recommendation and BD2. No counts or grades
+changed. No Lisp, tests, staging, replay, or search ran in this review.
+
+The location15 archive, generated profile, and all three register prefix hashes
+were reverified against the values above. Register bytes were hashed only; no
+sealed content was displayed/interpreted. The retained logs were inspected,
+not rerun. No sealed solution or prohibited analysis was read. No temporary
+files created. This continuation was updated last, after the review evidence,
+pre-run recommendation, plan and restart checkpoint.
+
+LK5 CUTOFF-10 RESULT REPORTED, 2026-09-21
+--------------------------------------
+No solutions in 8.652 seconds; the saved seven-checkpoint/19-action prefix is
+unchanged. Search fourteen; archive import is not counted as another search.
+Raw result retained; no bound yet ingested because coverage and actual pruning
+metadata are absent from the transcript. Request the read-only metadata from
+the current REPL before restaging or any further run. Do not infer truncation
+from timing or the no-solution message. No next search is authorized.
+No Lisp, staging, replay or search ran in this documentation update. No sealed
+material read. Result, plan and restart updated first; this prompt last.
+
+LK5 CUTOFF-10 METADATA AND BOUND FILED, 2026-09-21
+----------------------------------------------
+D supplied actual settings and coverage: cutoff 10, threads 16, exhausted with
+DEPTH-CUTOFF-TRUNCATED, T, 130,956 cutoff hits, GRAPH, symmetry NIL and
+minimum-steps pruning T. At least one cutoff node had successors; cutoff hits
+are not necessarily distinct states or individual positive witnesses.
+The pre-run recommendation was transcribed, not regenerated after the outcome.
+BD3 filed; BD2 unchanged; LK5 OPEN; checkpoint unchanged. Well-formedness and
+readback checks passed in standalone SBCL with system/user initialization
+disabled, loading only the ledger diagnostic. No Wouldwork problem load,
+staging, replay or search. Append ingest-lk5-cutoff10-bound-2026-09-21.lisp
+after ingest-lk5-bound-2026-09-21.lisp for ordered reconstruction only.
+Evidence: constraint-evidence/lk5-cutoff10-bound-ingestion-2026-09-21.log.
+State: sixteen premises, nine links, three bounds, fourteen searches. No sealed
+content read, no temporary files. This prompt updated last after result,
+ledger, plan and restart. Recommend read-only beam/resource analysis next;
+await D's direction, with no further search approved.
+
+READ-ONLY BEAM/RESOURCE ANALYSIS COMPLETED, 2026-09-21
+--------------------------------------------------
+D approved the analysis and raised the maximum reasonable cutoff to 11 during
+his searches. No source parameter was edited; STAGE still takes its defaults
+from the problem spec, so an approved probe must explicitly set its cutoff.
+Evidence: constraint-evidence/lk5-beam-resource-analysis-2026-09-21.txt.
+Authored coordinates and current tech semantics identify gate4's plate3 demand
+on the candidate transmitter-to-location9 beam, wall10's inclusive height block,
+and conditional elevated-source/elevated-destination relay alternatives.
+Live connector1 remains committed to plate5; ghost connector1* requires the
+ghost actor, currently on plate1. Boxes are still at location6. Ground trays
+are not connector supports; held trays require a holder and compatible layers.
+Screen1 does not pass held cargo. No available elevated relay is assumed.
+These are source-derived obligations for candidate networks, not measured
+action sequences, complete necessity proofs, S6 implementation, or new bounds.
+Propose a source-power experiment for (color repeater1 red) at cutoff 11 and
+threads 16, preserving the original checkpoint. It would test one component
+of the repeater candidate, not establish LK5 or rule out the direct alternative.
+Await D's choice; no probe command issued, link added, or recommendation filed.
+No Lisp, staging, replay, validation, or search ran. Counts and ledger unchanged;
+no sealed analysis/register/solution content read. No temporary files created.
+Report, plan and restart updated first; this continuation updated last.
+
+SOURCE-POWER PROBE APPROVED, 2026-09-21
+------------------------------------
+D approved the specific intermediate goal, not merely the ceiling. One local
+probe for (color repeater1 red), cutoff 11, threads 16, from the unchanged
+location15 checkpoint. Pre-run interpretations and separate candidate-save
+commands are in repeater-source-probe-recommendation-2026-09-21.txt under
+constraint-evidence/. Preserve *t10-checkpoint* and the location15 archive;
+use *t10-source-checkpoint* for the return value. Do not automatically commit
+this candidate as the main continuation or infer that LK5 has been realized.
+Success requires endpoint inspection; exhaustion describes this goal only.
+No search ran here; fourteen reported searches and three bounds remain.
+No Lisp executed or sealed content read. Recommendation, plan and restart
+updated first; this prompt last. Await the user's result.
+
+SOURCE-POWER FOUND AND REVIEWED, 2026-09-21
+----------------------------------------
+D supplied full trace and metadata. Eight-action phase from depth19 seed to
+depth27 candidate; EXHAUSTED-WITH-SOLUTIONS/COMPLETE, truncation T, 10,908 hits,
+GRAPH, symmetry NIL, minimum-steps pruning T. Preserve both reports: successful
+COMPLETE is not full-space exhaustion when a cutoff witness is also reported.
+Candidate uses live connector and live agent on plate3, not the earlier ghost
+keeper candidate. Moving that sole witness off plate3 without replacement
+would close gate4 and interrupt source power. Source setup is measured; freeing
+the live agent while preserving that setup remains unresolved.
+No main-ledger milestone was added or regraded; this is a separate experimental
+REALIZED phase, validated NIL. Nine spine links and three bounds unchanged.
+Recommend one keeper-replacement probe at cutoff11/threads16, subject to approval;
+save candidate separately first. No further search, Lisp execution or replay
+performed by the assistant. Trace copied from D's attachment into permitted
+evidence; no sealed content read. Plan/restart/result first, this prompt last.

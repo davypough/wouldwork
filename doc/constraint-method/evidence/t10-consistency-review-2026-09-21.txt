@@ -1,0 +1,54 @@
+T10 repository consistency review -- 2026-09-21
+=============================================
+Scope: current cutoff reporting, standalone checkpoints, ledger provenance,
+retained tests, and T10 handoff. No Lisp, staging, replay, tests, or search ran.
+The working tree was clean before this documentation update.
+
+FINDINGS
+1. The restart note added by e6e3e96 proposes an unapproved gate8-opening search
+   before cutoff 10, while the plan/continuation propose the crossing at cutoff
+   10. D has now explicitly approved the latter. The proposal does not override
+   that approval. Its arithmetic is also unsupported: BD2 coverage is UNKNOWN,
+   and an endpoint satisfying (open gate8) alone does not ensure the agent is
+   at location15 with the needed walking preconditions and gate view. A one-walk
+   arc does not supply that missing endpoint obligation. The relaxed graph-cut
+   result must not become an unqualified concrete no-bypass theorem. The cost
+   of a different goal under corrected instrumentation is not measured by BD2.
+2. tech/constraint-ledger.lisp, LEDGER-SEARCH-COMMANDS and related reporters:
+   LK5 has a checkpoint start but retains :SEARCH-PREAMBLE :CONTINUE. Generated
+   commands omit cutoff setup and assignment of the returned checkpoint; the
+   cautions describe a live chain and retrieval text requests routine replay.
+   These do not match the standalone API or D's current validation preference.
+   Use the explicit dated recommendation, as the handoff already directs.
+3. LEDGER-EXHAUSTION-READING still says no realization EXISTS within the cutoff,
+   without qualifying actual coverage/pruning. That is stronger than the new
+   unknown-coverage rules. The dedicated LK5 recommendation records no solution
+   FOUND under the stated settings. Preserve old commitments as history; any
+   generic-template correction is a separate, prospective implementation step.
+
+CONSISTENCY CHECKS
+ASDF loads checkpoint support after its structures/persistence helpers and
+parallel infrastructure before workers. Worker-local cutoff successor witnesses
+aggregate into the global flag; initialization resets flags/counters. BD2 is
+UNKNOWN, preserves raw COMPLETE/NIL separately, and leaves LK5 OPEN.
+Checkpoint exhaustion returns the original object; success returns a new one.
+STAGE forces an ASDF reload. Set threads before importing the saved archive.
+Prior logs show 55 cutoff assertions, 346 ledger assertions, 34 checkpoint
+assertions and three legacy persistence claims. These were not rerun here.
+Seven found links, five CLOSED/two REALIZED, and LK5/LK6 OPEN agree across files.
+The location15 archive and generated profile match their recorded SHA-256:
+76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635
+EFD35D3926255B4C715338CABA147CF6DAC53D223DFB287AF365853F2B8BD596
+Register prefixes of 140954, 143144 and 151434 bytes match all recorded hashes.
+Only bytes were hashed; no register content was displayed or interpreted.
+No t10-current-checkpoint.txt exists; the location15 seed remains the archive.
+
+DISPOSITION
+No new blocking mismatch was found in the explicit checkpoint execution path;
+this is not runtime verification of D's image or a full-engine correctness proof.
+Record one approved cutoff-10 crossing probe at threads 16 in the dated pre-run
+recommendation. No new result, bound, milestone, or approval to deepen beyond 10.
+Reporter code is unchanged. The ledger retains the last measured recommendation;
+transcribe the new dated pre-run record before ingesting the next outcome.
+No sealed solution or prohibited analysis/register content was opened.
+Only documentation was updated; continuation prompt updated last.

@@ -1,0 +1,4 @@
+      the cutoff truncated the space: nodes with successors were cut off, so this covers strictly less
+        than the reachable space from that start.
+      pruning in force: GRAPH repeated-state pruning; symmetry NIL; minimum-steps pruning enabled T (runtime flag); direct cutoff truncation confirmed.  An exhaustion under pruning excludes solutions in pruned branches.
+LK5 filed as BD3; OPEN; truncation T; BD2 unchanged. Checks/readback passed.

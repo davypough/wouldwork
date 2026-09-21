@@ -359,20 +359,24 @@
           (:date "2026-09-21" :event :amended :by "ledger" :note
            "Transcribed the prior standalone cutoff-8 recommendation from its dated evidence file; exact source is the location15 archive, threads 16.")
           (:date "2026-09-21" :event :amended :by "ledger" :note
-           "exhausted at cutoff 8; filed as bd2, a cost bound"))
+           "exhausted at cutoff 8; filed as bd2, a cost bound")
+          (:date "2026-09-21" :event :amended :by "ledger" :note
+           "Transcribed the approved cutoff-10 pre-run recommendation; same location15 archive, threads 16; deepens BD2 without replacing it.")
+          (:date "2026-09-21" :event :amended :by "ledger" :note
+           "exhausted at cutoff 10; filed as bd3, a cost bound"))
  :from "the agent somewhere in R5"
  :to "the agent somewhere in R6"
  :intent "cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier"
  :closed-by nil
  :evidence nil
  :validated nil
- :attempts (bd2)
+ :attempts (bd2 bd3)
  :refuted-by nil
  :segment-bridge nil
  :search-goal (or (has-location agent1 location16) (has-location agent1 location17)
                   (has-location agent1 location18) (has-location agent1 location21))
  :search-start "*t10-checkpoint*"
- :search-cutoff 8
+ :search-cutoff 10
  :search-threads 16
  :search-settings nil
  :search-preamble :continue
@@ -381,12 +385,12 @@
  :recommendation (:source-sha256
                   "76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635"
                   :source-archive "constraint-evidence/t10-location15-checkpoint.txt" :source
-                  "constraint-evidence/lk5-checkpoint-recommendation-2026-09-21.txt" :date
-                  "2026-09-21" :cutoff 8 :threads 16 :start "*t10-checkpoint*" :premises
-                  (pr4 pr3 pr10) :guesses nil :standing :established :deepens nil :success
-                  "Success establishes a concrete LK5 realization from this exact start; inspect the result and save the returned checkpoint. File REALIZED with validated NIL unless separate replay evidence exists. It establishes no universal resource allocation and does not establish LK6 or the original final goal."
+                  "constraint-evidence/lk5-cutoff10-recommendation-2026-09-21.txt" :date
+                  "2026-09-21" :cutoff 10 :threads 16 :start "*t10-checkpoint*" :premises
+                  (pr4 pr3 pr10) :guesses nil :standing :established :deepens bd2 :success
+                  "SUCCESS: a found sequence realizes LK5 from this exact start. File REALIZED with validated NIL unless replay evidence exists. It establishes neither LK6 nor the original goal or any universal resource allocation. No routine phase replay."
                   :exhaustion
-                  "Exhaustion is a grade-3 bound for this exact start/settings/pruning, not a refutation. Record cutoff truncation and pruning with the result. The checkpoint object and the retained prefix remain unchanged; no automatic deepening or predecessor retry is authorized. Report the result before another search.")
+                  "EXHAUSTION: no solution found from this checkpoint at cutoff 10 under the actual settings/pruning. File a grade-3 bound with measured coverage, never a refutation. Reliable NIL means no observed direct cutoff truncation, not unpruned exhaustive coverage. The checkpoint returns unchanged; no predecessor retry or deepening.")
  :measured nil)
 
 (:id lk6
@@ -903,5 +907,29 @@
  :measured (:nodes nil :seconds 1.839 :cpu-seconds 24.34375 :bytes-consed 4234773504
             :cutoff-hits 32356)
  :interpretation-committed "Exhaustion is a grade-3 bound for this exact start/settings/pruning, not a refutation. Record cutoff truncation and pruning with the result. The checkpoint object and the retained prefix remain unchanged; no automatic deepening or predecessor retry is authorized. Report the result before another search."
+ :segment-bridge nil)
+
+(:id bd3
+ :kind :bound
+ :statement "no realization of lk5 was found within 10 actions from the stated start state"
+ :provenance (:search-measured :outcome :exhausted :start-state "*t10-checkpoint*"
+              :search-expression "cutoff 10, threads 16, as recommended 2026-09-21" :cutoff 10
+              :threads 16 :cutoff-truncated t :pruning
+              "GRAPH repeated-state pruning; symmetry NIL; minimum-steps pruning enabled T (runtime flag); direct cutoff truncation confirmed"
+              :run "constraint-evidence/lk5-cutoff10-result-2026-09-21.txt"
+              :reported-cutoff-truncated t :reported-outcome :exhausted-no-solution
+              :reported-reason :depth-cutoff-truncated :source-archive
+              "constraint-evidence/t10-location15-checkpoint.txt" :source-sha256
+              "76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635")
+ :depends-on ((pr4) (pr3) (pr10))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :standing
+ :sources ("run evidence constraint-evidence/lk5-cutoff10-result-2026-09-21.txt")
+ :events ((:date "2026-09-21" :event :opened :by "ledger" :note ""))
+ :for-link lk5
+ :measured (:nodes nil :seconds 8.652 :cpu-seconds 129.3125 :bytes-consed 21972125904
+            :cutoff-hits 130956)
+ :interpretation-committed "EXHAUSTION: no solution found from this checkpoint at cutoff 10 under the actual settings/pruning. File a grade-3 bound with measured coverage, never a refutation. Reliable NIL means no observed direct cutoff truncation, not unpruned exhaustive coverage. The checkpoint returns unchanged; no predecessor retry or deepening."
  :segment-bridge nil)
 

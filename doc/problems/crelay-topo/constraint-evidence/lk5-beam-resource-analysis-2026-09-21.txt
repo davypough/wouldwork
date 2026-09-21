@@ -1,0 +1,113 @@
+LK5 beam-route and resource analysis -- 2026-09-21
+================================================
+Approved read-only analysis. D also set 11 as the maximum reasonable depth
+cutoff during his searches. This is a ceiling, not a sufficiency claim or an
+automatic sequence of searches. No problem specification setting was changed.
+No Lisp, staging, replay, diagnostic execution, or search ran in this analysis.
+
+PERMITTED SOURCES
+probs/problem-crelay-topo.lisp (authored coordinates, apparatus and wiring);
+Constraint-Static-Profile.txt (S3/S4), saved location15 archive's final endpoint;
+tech/beam-relay.lisp, beam-direct.lisp, -beam-substrate.lisp, visibility.lisp,
+-vertical.lisp, -apparatus-coordinates.lisp, -recorder-core.lisp,
+-recording-shadow-policy.lisp, -recorder-receiver-shadow.lisp,
+-recorder-controls-shadow.lisp, -recorder-plate-shadow.lisp, plate.lisp,
+tray.lisp, -placement.lisp, -pickup.lisp, -mobility.lisp, reachability.lisp,
+-reachability.lisp, -support-motion.lisp, -configuration-transition.lisp,
+-passability.lisp, and recorder/session source declarations.
+No sealed solutions, prior backward/forward analyses, prediction register
+content, or schema-gap content was read. This is not an S6 implementation/run.
+
+CONFIRMED SOURCE FACTS
+The exact saved endpoint has no PAIRED, COLOR, ACTIVE or RECORDING-ACTIVE facts.
+The spec authors no COUPLED facts. Fixed repeater1 is not an automatic wire:
+RELAY-LINKED requires a pairing or coupling, and relay arrivals require actual
+visibility. A repeater cannot directly power receiver1 without a fixed coupling;
+this instance has none. The receiver-side link therefore needs a paired connector.
+
+The source fixture is transmitter1 (29.9,11.5), red, top 1. Receiver1 is
+(19,27.9), red, top 1. Repeater1 is (19,18), top 1. Ground connectors have
+top 1; a connector resting on a ground-level box has top 2. A connector on a
+tray held by a standing agent has top 2.5. An ordinary directly held connector
+loses HAS-LOCATION and cannot relay. A ground tray cannot support a connector.
+
+GEOMETRY OF TWO CANDIDATE BEAM NETWORKS -- NOT REPLAYED PLANS
+A: transmitter1 -> connector at location9 -> repeater1 -> raised connector
+   at location15 -> receiver1.
+B: transmitter1 -> raised connector at location9 -> ground connector at
+   location15 -> receiver1 (no repeater required by this candidate).
+Both need two placed connectors concurrently. The existing live/ghost pair
+is a candidate supply, not two freely manipulable objects for one actor.
+
+Specific barrier calculations, derived directly from the authored coordinates:
+- Transmitter1 -> location9 (19,11.5) crosses gate4 at (28,11.5). For these
+  low beam heights a closed gate4 blocks. Gate4 is controlled by plate3 at
+  location10. S4 already reports this pressure demand but gate4 labels no
+  movement-spine arc: movement-only decomposition misses a beam obligation.
+- Location9 -> repeater1 follows x=19 and crosses wall9 at y=16. At height 1
+  it clears wall9's top 0.5. No conclusion about all movable occluders follows.
+- Repeater1 -> location15 (19,26) crosses wall10 at y=20. Both endpoints at
+  height 1 put the beam at wall10's top 1, which BLOCKS: visibility tests the
+  barrier interval inclusively. With the location15 connector at height 2,
+  the crossing height is 1 + (2/8)*(2-1) = 1.25 and clears that wall.
+- Location9 -> location15 directly crosses wall9 and wall10. With both
+  connectors at height 1 it fails at wall10. With the source connector at
+  height 2 and destination at 1, wall10 crossing height is
+  2 - (8.5/14.5) = 41/29 > 1; wall9 crossing height is 49/29 > 0.5.
+- Location15 -> receiver1 lies on x=19 from y=26 to 27.9, north of wall10,
+  and does not cross gate8 at x=17. Gate8 need not be open for THIS final hop.
+
+These checks cover the named segment barriers for these candidate paths. They
+do not establish legal pickup/placement/pairing actions, support transport,
+absence of moving occluders, or a concrete whole-route realization. Neither
+network is claimed necessary or exhaustive. No minimum action count is proved.
+
+RESOURCE AND VIEW OBLIGATIONS AT THE CHECKPOINT
+- Live connector1 rests on plate5 at location12; lifting it removes that
+  witness and closes physical gate6 unless another occupant replaces it.
+  Tray1 on plate4 at location13 is another gate6 commitment. Plate4/5 are
+  resources that can be reassigned only with the resulting access change stated.
+- Ghost connector1* is at location9. Only ghost agent1* may pick it up under
+  OBJECT-MANIPULATION-ALLOWED. Ghost agent1* is currently holding plate1 by
+  standing on it at location2. Relocating it releases that gate1 witness;
+  do not assume it can return through the same route afterward.
+- A ghost occupying plate3 would power physical gate4 as well as recording
+  gate4 during the open cycle. A live plate3 occupant alone would not supply
+  recording pressure. Physical lighting includes both live and ghost relays;
+  recording lighting excludes mapped live relays. A live connector may pair
+  with a ghost connector during this open cycle, but the reverse pairing
+  selection is forbidden. The physical receiver goal need not imply a
+  recording-active receiver.
+- Both boxes remain at location6, not near either proposed relay support.
+  Bringing a box to location9 or location15 is an unresolved transport task.
+- A held tray is an alternative elevation source, but its holder is another
+  simultaneous resource. One actor cannot hold the tray and lift the connector
+  at the same time. A live connector may use a ghost-held tray; ghost cargo
+  cannot rely on live mobile supports. This does not prove such an assembly
+  reachable. Simply placing a connector on the currently grounded tray is illegal.
+- Screen1 on the gate6 passage passes only an empty-handed agent. A route the
+  empty-handed agent used to reach switch2 is not thereby a cargo route.
+
+WHAT THE TWO EXHAUSTIONS DO AND DO NOT ADD
+BD2: cutoff 8, UNKNOWN coverage. BD3: cutoff 10, confirmed cutoff truncation,
+GRAPH pruning, symmetry NIL, minimum-steps pruning enabled. Neither names the
+failed resource obligation, proves one candidate route necessary, proves a
+gate-opening lower bound, or proves that the checkpoint is unsolvable.
+The corrected source analysis now supplies specific setup questions that an
+unchanged crossing goal did not distinguish. No sufficiency claim for 11.
+
+RECOMMENDED NEXT EXPERIMENT -- PROPOSAL ONLY
+Target the source side separately: (color repeater1 red), from the retained
+location15 checkpoint, threads 16, a single proposed cutoff 11. This tests a
+candidate component of network A, not a necessary milestone for all solutions.
+Record the pre-run interpretation before execution if D chooses this probe.
+Success: inspect the returned endpoint's exact connector pairings, plate3
+witness, physical/recording gate states, agent positions and remaining support
+resources. Retain the original location15 checkpoint separately; do not replace
+it or commit a new LK5 phase automatically. This goal alone neither crosses
+gate8 nor guarantees a useful continuation. Exhaustion: a bound for this new
+goal/start/settings only; it neither deepens BD3 on the same goal nor refutes
+network B. The cutoff-11 resource cost is unmeasured and not inferred from BD3.
+No new ledger link, search recommendation or search was committed by this
+analysis. D's ceiling permits budgeting up to 11; await choice of this particular
+goal/decomposition. No unrequested extractor or engine changes.

@@ -1,0 +1,49 @@
+User-reported LK5 cutoff-10 result -- 2026-09-21
+=============================================
+Run against the approved lk5-cutoff10-recommendation-2026-09-21.txt.
+Recommended cutoff 10, threads 16; actual runtime metadata still requested.
+D first reported successful archive import:
+  Restored 7 checkpoints, 19 actions by replay; no search.
+  *T10-CHECKPOINT*
+
+Search result supplied by D:
+  No solutions found.
+  8.652 seconds of real time
+  129.312500 seconds total run time (126.812500 user, 2.500000 system)
+  Real GC 0.401 seconds; real non-GC 8.251 seconds
+  Run GC 0.296 seconds; run non-GC 129.017 seconds
+  1494.59% CPU
+  27,576,009,358 processor cycles
+  21,972,125,904 bytes consed
+  No new checkpoint; saved endpoint and history retained.
+  #<SEARCH-CHECKPOINT CRELAY-TOPO: 7 checkpoints, 19 actions>
+
+This is reported search fourteen, including three historical restoration
+searches. The import above is replay and is not counted as a search.
+LK5 stays OPEN; location15 checkpoint and accepted prefix are unchanged.
+No solution found is not an impossibility proof or an opening-cost theorem.
+
+Pending: actual cutoff/thread values, search outcome/reason, cutoff truncation,
+cutoff hits, graph/tree mode, symmetry and minimum-steps pruning metadata.
+Do not infer T or NIL for truncation from this transcript. Formal bound
+ingestion awaits the read-only metadata; the ledger still has two bounds.
+Use the pre-run recommendation's interpretations when ingesting. Preserve BD2.
+No further search, deepening, staging or replay is requested or authorized.
+
+FOLLOW-UP METADATA REPORTED BY D
+(:OUTCOME #S(SEARCH-OUTCOME :STATUS :EXHAUSTED-NO-SOLUTION
+                          :REASON :DEPTH-CUTOFF-TRUNCATED)
+ :CUTOFF 10 :THREADS 16 :CUTOFF-TRUNCATED T :CUTOFF-HITS 130956
+ :SEARCH-MODE GRAPH :SYMMETRY-PRUNING NIL :MIN-STEPS-PRUNING T)
+
+This supersedes the pending-metadata paragraph above. At least one cutoff node
+had successors; 130,956 counts cutoff hits, not necessarily distinct states or
+130,956 successor witnesses. Record a truncated grade-3 bound, not impossibility.
+Ingestion script: ingest-lk5-cutoff10-bound-2026-09-21.lisp, after the cutoff-8
+ingestion. Preserve BD2 and the exact pre-run interpretation.
+
+FILED: BD3 with truncation T, actual settings and reported timing/allocation
+metrics. Data-only ingestion and readback checks passed; BD2 unchanged and
+LK5 OPEN. Log: lk5-cutoff10-bound-ingestion-2026-09-21.log. Three total bounds;
+fourteen searches unchanged. No problem was loaded, replayed or searched by
+the assistant; the standalone ingestion loaded only the ledger diagnostic.

@@ -1,0 +1,61 @@
+T10 LK5 cutoff-10 recommendation -- 2026-09-21
+===========================================
+D approved one cutoff-10 LK5 crossing probe at threads 16 and requested a
+repository consistency check first. Review:
+doc/constraint-method/evidence/t10-consistency-review-2026-09-21.txt.
+No search has run under this recommendation; no further deepening is approved.
+The separate gate8-opening split remains an unapproved alternative, not a
+prerequisite or a substitute for this approved experiment.
+
+Exact start: location15, seven checkpoints, 19 accepted actions, switch2 on,
+one recorder cycle open. Archive: t10-location15-checkpoint.txt in this directory.
+Rechecked SHA-256:
+76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635
+S4's gate8 controller row was reread: beam supply remains unresolved. The
+cutoff-8 recommendation records the prior permitted beam-source analysis and
+connector1's plate5 commitment. No route or sufficient budget is established.
+Ten allows two more actions; its time/memory cost is unmeasured.
+
+Explicit commands (do not use the generic ledger command reporter):
+STAGE forces the corrected engine reload. Stop on any load/import error.
+Expected import: 7 checkpoints, 19 actions, no search.
+
+(stage crelay-topo)
+(ww-set *threads* 16)
+(defparameter *t10-checkpoint*
+  (import-search-checkpoint
+    (merge-pathnames
+      "doc/problems/crelay-topo/constraint-evidence/t10-location15-checkpoint.txt"
+      (asdf:system-source-directory :wouldwork))))
+
+(ww-set *depth-cutoff* 10)
+(setf *t10-checkpoint*
+  (solve-subgoal *t10-checkpoint*
+    (or (has-location agent1 location16) (has-location agent1 location17)
+        (has-location agent1 location18) (has-location agent1 location21))))
+
+Report the result and these read-only metadata before any further search:
+(list :outcome *last-search-outcome*
+      :cutoff *depth-cutoff* :threads *threads*
+      :cutoff-truncated *depth-cutoff-truncated*
+      :cutoff-hits *depth-cutoff-hits* :search-mode *tree-or-graph*
+      :symmetry-pruning *symmetry-pruning*
+      :min-steps-pruning *min-steps-pruning-enabled*)
+
+SUCCESS: a found sequence realizes LK5 from this exact start. File REALIZED with
+validated NIL unless replay evidence exists. It establishes neither LK6 nor the
+original goal or any universal resource allocation. No routine phase replay.
+On success only, save the new endpoint while retaining the location15 seed:
+(export-search-checkpoint *t10-checkpoint*
+  (merge-pathnames
+    "doc/problems/crelay-topo/constraint-evidence/t10-current-checkpoint.txt"
+    (asdf:system-source-directory :wouldwork)))
+
+EXHAUSTION: no solution found from this checkpoint at cutoff 10 under the actual
+settings/pruning. File a grade-3 bound with measured coverage, never a refutation.
+Reliable NIL means no observed direct cutoff truncation, not unpruned exhaustive
+coverage. The checkpoint returns unchanged; no predecessor retry or deepening.
+
+The ledger retains its last measured cutoff-8 recommendation and BD2. Before
+ingesting the new outcome, transcribe THIS pre-run recommendation and its exact
+start; do not regenerate interpretations after the outcome. Preserve BD2.
