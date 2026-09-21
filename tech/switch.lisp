@@ -17,7 +17,9 @@
 (defun install-toggle-switch ()
   "Install TOGGLE-SWITCH after all technologies have been spliced, so recorder-aware
    problems can select their recording shadow without making ordinary switch problems
-   depend on recorder."
+   depend on recorder.  Live and ghost toggles intentionally update separate switch
+   layers: the ordinary state is the live playback baseline, while the recording state
+   is the ghost's shadow memory."
   (let ((recording-switch-state-p
           (nth-value 1 (gethash 'recording-switched-on *relations*))))
     (install-action
@@ -37,16 +39,13 @@
       '(">" ?agent "toggles" ?switch)
       (if recording-switch-state-p
         '(assert
-           ;; A ghost's toggle is physical, like its weight on a plate: it flips its own
-           ;; recording memory and the live switch both.  A live toggle stays live-side
-           ;; only, so a recorded ghost route keeps the gate states it was recorded under.
+           ;; Live toggles update ordinary state; ghost toggles update only the
+           ;; recording shadow.  Cycle-boundary normalization later reseeds the
+           ;; shadow from the committed live baseline.
            (if (recording-shadow-object ?agent)
-             (do (if (recording-switched-on ?switch)
-                   (not (recording-switched-on ?switch))
-                   (recording-switched-on ?switch))
-                 (if (switched-on ?switch)
-                   (not (switched-on ?switch))
-                   (switched-on ?switch)))
+             (if (recording-switched-on ?switch)
+               (not (recording-switched-on ?switch))
+               (recording-switched-on ?switch))
              (if (switched-on ?switch)
                (not (switched-on ?switch))
                (switched-on ?switch)))
