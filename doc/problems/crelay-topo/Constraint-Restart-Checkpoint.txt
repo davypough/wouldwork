@@ -60,7 +60,11 @@ Use that newer archive on subsequent restarts; keep the location15 seed intact.
 The current-checkpoint file does not exist until a later save creates it.
 
 Next unresolved work: lk5 across gate8, controlled by receiver1. S4 says the
-beam dependency is UNRESOLVED and needs sightline analysis. The existing
+beam dependency is UNRESOLVED and needs sightline analysis; S4's own gate8 row
+also records that receiver1 carries NO positive pressure alternative and NO
+mandatory keeper, so this arc spends beam supply and a clear corridor rather than
+any witness, and that BOTH directions across it are graph cuts, so no bypass
+exists to search around. The existing
 cutoff is 8, now with threads 16 and the saved checkpoint as the explicit start:
 (or (has-location agent1 location16) (has-location agent1 location17)
     (has-location agent1 location18) (has-location agent1 location21))
@@ -68,10 +72,34 @@ Permitted authored instance/beam semantics and connector availability have now
 been inspected; the dated LK5 recommendation below records the findings. Cutoff 8
 is an existing bounded experiment, NOT a proved adequate realization cost.
 Connector1 is currently committed to plate5; do not assume it is freely available.
-The next bounded command is in
-constraint-evidence/lk5-checkpoint-recommendation-2026-09-21.txt.
-The result and metadata have arrived and are filed as BD2. The next proposed
+The cutoff-8 command recorded in
+constraint-evidence/lk5-checkpoint-recommendation-2026-09-21.txt has already
+been run once at threads 16 and is filed as BD2; it is not a pending command and
+must not be re-run as though no result existed. The next proposed
 cutoff is 10; do not run it without D's approval. No next search is implicit.
+
+WHAT BD2 ALREADY CONSTRAINS, derived before naming any further cutoff. Every
+route into R6 passes gate8, and gate8's door is one walk wide
+((traverse-via walking location15 location16) names gate8 alone), so a solution
+reaching R6 in d actions has gate8 open after at most d-1. BD2 reports no
+solution within 8, so on its own report gate8 is not openable within 7 actions
+from this checkpoint. A cutoff-4 activated-device probe, proposed and withdrawn on
+2026-09-21, would have been exhausted by arithmetic rather than by search. Caveat:
+BD2's coverage is UNKNOWN, so this is evidence from the run's report and not a
+measured bound -- which is itself an argument for re-running the same space with
+the corrected instrumentation.
+
+PROPOSED, NOT AUTHORIZED, for D: split lk5 the way lk4 was split -- a new
+preceding link "gate8 is open" from the same checkpoint at cutoff 8, with the
+R5->R6 walk left as the residual link, goal (open gate8). Cutoff 8 is named
+because this space size is already measured as cheap here (1.839 s wall, 24.34 s
+CPU, 4.234 GB consed) and because, with the arc one walk wide, it reaches one more
+effective combined action than BD2 did while producing a reliably measured result.
+A cutoff-10 probe is a larger step; take it after this one's measured result, not
+instead of it. No ledger record exists for this proposal and it authorizes no run.
+If D approves, the ledger change is a new ingestion script appended to the
+reconstruction list below, because a hand edit to the ledger is lost when that
+list is replayed.
 Do not open sealed solution, backward, forward or initial-conditions files.
 After lk5, lk6 targets location19 through gate9's three pressure supports.
 The final search also uses the explicit checkpoint and the original goal.
