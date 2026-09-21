@@ -1,0 +1,18 @@
+User-reported lk8 find and phase-source validation, 2026-09-20.
+Search: chained (has-location agent1 location14), cutoff 6, threads 0.
+Start: validated lk7 endpoint, cumulative depth 11.
+Result: six additional actions, cumulative depth 17; no wall-clock duration supplied.
+(MOVE > AGENT1 moves via ((STEP (LOCATION12 PLATE5) NIL (LOCATION12 GROUND))))
+(MOVE > AGENT1 moves via ((WALK LOCATION12 (GATE5) LOCATION9)))
+(PICKUP-CONNECTOR-RETAINING-PAIRINGS > AGENT1 picks up CONNECTOR1 retaining pairings at LOCATION9)
+(MOVE > AGENT1 moves via ((WALK LOCATION9 (GATE5) LOCATION12)))
+(PUT-CONNECTOR > AGENT1 puts CONNECTOR1 on PLATE5 without pairings at LOCATION12)
+(MOVE > AGENT1 moves via ((WALK LOCATION12 (GATE6 SCREEN1) LOCATION14)))
+Validation: SUCCESS-P T, ACTION-COUNT 6, FAILURE-INDEX NIL,
+FAILURE-ACTION NIL, FAILURE-REASON NIL, GOAL-CHECKED-P T,
+GOAL-SATISFIED-P T.
+Endpoint: agent1 at location14, tray1 on plate4, connector1 on plate5.
+Gate6 open. Recorder cycle 1 remains open; ghost agent on plate1 and
+ ghost tray on plate2. The agent was replaced on plate5 before crossing.
+This validates the phase from its own source, not the whole chain from origin.
+Next existing recommendation: lk9, (switched-on switch2), cutoff 4, threads 0.

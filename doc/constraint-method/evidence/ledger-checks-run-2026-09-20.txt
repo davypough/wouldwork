@@ -1,0 +1,45 @@
+Interactive-phase acceptance evidence -- T2, T3, T4, T5.  2026-09-20.
+=====================================================================
+
+WHERE THIS RAN, disclosed because it is not lumpy.  An isolated cloud sandbox with a
+stock SBCL, from copies of tech/constraint-ledger.lisp, tech/constraint-profile.lisp
+and this directory's check file at the same relative paths.  Wouldwork was NOT loaded,
+no problem was staged, no extractor and NO SEARCH was run, no generated output was
+written, and no repository file was executed against.  Everything under test reads no
+staged data by design, so a clean image is the whole environment it needs.  D's runs on
+lumpy are authoritative: 90 of 90 after T2, 130 of 130 after T3, and 174 of 174 after
+T4, all on 2026-09-20.
+
+NOTE ON tech/constraint-profile.lisp.  Case 42 READS that file as text, to assert that
+every fragment of RO's narration the question templates stand for is still present.
+It is read, never loaded and never run; RO itself is not executed anywhere here.
+
+1  ACCEPTANCE CHECKS, 47 cases, run in a clean image before anything else.
+
+    sbcl --noinform --no-userinit --no-sysinit --script \
+         doc/constraint-method/evidence/ledger-checks-2026-09-20.lisp
+
+    Interactive-phase acceptance checks passed: 307.  All source forms read and evaluated.
+
+   Cases  1-24  T2, the ledger.
+   Cases 25-31  T3, the recommender.
+   Case     32  the thread split: 16 for a stated start, 0 for a chain link.
+   Cases 33-39  T4, the ingester.
+   Cases 40-47  T5, the question generator: coverage of every premise RO narrates,
+                suppression of a question the scenario already answers, the anti-drift
+                check against RO's own text, an answer that writes a user-asserted
+                premise and upgrades nothing, the three answer kinds, :unknown costing
+                nothing, the printed questionnaire, and one-line statements.
+
+2  COMPILE, which is what verifies the callees-first definition order.
+
+    compile-file: warnings-p NIL failure-p NIL; style 0 other 0
+
+3  SAMPLE REPORT.  ledger-sample-report-2026-09-20.lisp builds a ledger, prints it,
+   prints the recommender's report including a deliberate DEEPENING past an existing
+   bound, ingests an exhausted run carrying a surprise, prints the schema-gap
+   candidates, and prints the questionnaire.  Output:
+   ledger-sample-report-2026-09-20.txt beside this file.  Nothing in it is a claim
+   about crelay-topo: the statements are illustrative, NO SEARCH WAS RUN, the support
+   and occupant names are invented placeholders, and the ledger is not written to the
+   problem directory.

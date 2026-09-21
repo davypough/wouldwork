@@ -1,0 +1,22 @@
+User-reported validation after cold-image restoration of lk1, lk2 and lk3.
+The three restoration searches reached cumulative depths 4, 5 and 6.
+They restore existing milestones; their finds are not filed again.
+
+Command:
+(validate-action-sequence (goal-chain-phase-source-state *phase*) *path*
+                          :goal-test (symbol-function 'goal-fn))
+
+Reported result fields:
+:SUCCESS-P T
+:ACTION-COUNT 1
+:FAILURE-INDEX NIL
+:FAILURE-ACTION NIL
+:FAILURE-REASON NIL
+:GOAL-CHECKED-P T
+:GOAL-SATISFIED-P T
+
+Final action: (MOVE > AGENT1 moves via ((WALK LOCATION9 (GATE5) LOCATION13)))
+Final agent location: LOCATION13. Cumulative depth: 6.0.
+RECORDING-IN-PROGRESS remains present; RECORDER-CYCLES-USED is 1.
+This validates lk3 from its own phase source, not the whole chain from its origin.
+No wall-clock validation duration was supplied.

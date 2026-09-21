@@ -1,0 +1,417 @@
+Crelay-Topo -- Role Obligations and G12 Audit
+===========================================
+2026-09-20. HAND-MAINTAINED. Sections 1-4 are the specification as it
+stood BEFORE implementation and are left unrevised, so the pre-run record
+survives. Section 6, appended after the first run, records what was built,
+run and scored. This is an addition to the method, not an amendment to
+sealed register sections 3-6.
+
+1  AUDIT RESULTS AND THEIR EXACT LIMITS
+--------------------------------------
+RO1  Gate9's normal aggregate requires plate6, plate7 and plate8 all
+     depressed. ON is keyed by occupant, so three distinct witnesses
+     are necessary. This is a conditional state requirement, not a
+     proof that gate9 is required in every concrete solution.
+     Sources: problem-crelay-topo.lisp CONTROLS; gate.lisp;
+     -controls.lisp; plate.lisp; -support-occupancy.lisp.
+
+RO2  If ghosts are absent, gate9 is open, and agent1 occupies none of
+     those plates, the three remaining live occupants -- box1, tray1,
+     connector1 -- must occupy them, one each, with no forced pairing.
+     This follows by saturating the eligible witness pool of size three.
+     If ghosts are present, those named-live-object obligations do not
+     follow from the count alone. Nor does RO2 prove that this segment
+     occurs in every solution. Presence is not availability: a body held
+     or committed elsewhere may make the conditional assignment impossible.
+
+RO3  A pickup targeting cargo at location7 must be performed from
+     location7 under this instance's authored reach geometry. All 21
+     location coordinates were inspected. The nearest other location,
+     location8, has squared horizontal distance
+         (151/10 - 14)^2 + (3 - 65/10)^2 = 673/50 = 13.46.
+     This exceeds (5/2)^2 = 25/4 = 6.25. No other location is closer;
+     the next two squared distances are 50 and 72.50. The instance
+     authors no exceptional REACH-VIA/> edges or reach-limit override.
+     Increasing actor elevation cannot bypass the horizontal bound.
+     Sources: authored coordinates; -reachability-coordinates.lisp
+     REACHABILITY-COORDINATES-WITHIN-LIMIT-P and derivation;
+     reachability.lisp REACHABLE; -pickup.lisp PICKUP-CLEAR.
+     Evidence is source inspection and decimal arithmetic on terminating
+     rationals, not staging, action validation or an extractor run.
+
+RO4  Removing the last physical ON witness from plate2 makes it
+     undepressed and closes physical gate3 after propagation, under the
+     no-jammer premise. RO3 rules out pickup from another location.
+     This still does not rule out a replacement witness, a cargo route
+     after pickup, or a recorder transition. It does not prove permanent
+     stranding. Recording gate state must be analyzed in its own view.
+     Sources: tray.lisp PICKUP-TRAY; box.lisp PICKUP-BOX;
+     beam-relay.lisp pickup variants; plate.lisp; gate.lisp.
+
+RO5  START-RECORDER copies current mapped location, holding and support
+     assignments. Fixed plates retain their identity, so a fork can add
+     a ghost witness to the same plate. Ghosts can act during the open
+     cycle; they are NOT immobile copies. STOP/CANCEL remove ghost state
+     and normalize the recording shadow, with different ending guards.
+     Source: -recorder-session.lisp; -recorder-core.lisp;
+     -recorder-cycle-boundary.lisp; -recorder-plate-shadow.lisp.
+     A permitted fork effect is not a validated full recording/playback
+     trajectory. Cycle consistency remains a separate proof obligation.
+
+RO6  Agent reachability is not cargo transport. Ladder/screen passage
+     requires empty hands. Remote pickup/placement, held-tray riders,
+     support transitions and blower relocation can move cargo without
+     following the same traversal abstraction. Merely removing ladder
+     edges from a cargo graph does not account for all these effects.
+     Sources: -passability.lisp; -placement.lisp;
+     -configuration-transition.lisp; -support-motion.lisp;
+     -floor-blowing.lisp; box.lisp; tray.lisp; beam-relay.lisp.
+
+G12 remains OPEN. RO1-RO6 establish local premises and identify missing
+ones; none closes the complete last-keeper argument. The earlier S4
+sealed value paragraph was already read for scoring. These results are
+therefore disclosed post-S4 analysis, not fresh blind S4 predictions.
+No new sealed prediction paragraph or prior solution was consulted.
+
+2  PROPOSED COMPONENT: ROLE-OBLIGATION ANALYSIS
+----------------------------------------------
+Working name RO, deliberately not S5/S6/S7. Do not change those sealed
+specifications or silently enlarge S4. Start with conditional allocation
+logic; transport and permanent stranding are separate future components.
+
+Inputs:
+  - S1 control alternatives, polarity and device-state premises;
+  - S2 functional occupancy signature, witness types and view restrictions;
+  - explicit requested device/role conditions, with their provenance;
+  - an explicit segment description: physical/recording view, open/closed
+    cycle, occupant presence, and proved exclusions/commitments;
+  - support positions from the instance for role destinations.
+Do not equate a graph-required candidate with an unconditional input goal.
+Do not infer a segment merely because it would make the budget tight.
+
+Each output obligation carries:
+  condition; segment/view; support set; eligible witness set; minimum
+  simultaneous demand; exclusions and their reasons; derivation sources;
+  proof grade; unresolved premises; status CONDITIONAL or ESTABLISHED.
+ESTABLISHED is permitted only when every prerequisite is established in
+the stated scope. A conditional statement may be valid without its
+condition being shown reachable or necessary. Report these separately.
+
+Algorithm:
+  1 Preserve alternative control clauses and their polarity. Obtain
+    positive pressure roles only through justified occupancy semantics;
+    persistent switches and latches do not require continuous weight.
+  2 Build each alternative's distinct support set; repeated mentions of
+    one plate cost one witness. Do not sum mutually exclusive alternatives.
+  3 Determine per-support eligible witnesses in the specified view.
+    Unknown availability stays symbolic; a declared type extent alone
+    is not a current availability set. Do not silently choose a layer.
+  4 With fully known finite eligibility, check injective assignments from
+    required supports to witnesses. A shortage is lack of such a matching,
+    not simply a count when different supports have different eligibility.
+    With unresolved eligibility, retain the condition and report unknown.
+  5 A named body is necessary only if every admissible assignment across
+    every surviving control alternative uses it. Report a forced exact
+    plate only if every assignment pairs that body with that plate.
+    If no assignment survives, report shortage/inconsistent premises;
+    do not infer forced membership vacuously from an empty assignment set.
+    This is finite allocation reasoning, not action search or a plan witness.
+  6 Attach the role's position as a conditional occupancy destination.
+    A destination becomes a transport obligation only after its necessity,
+    initial position, object-presence history and segment are established.
+  7 Print missing prerequisites. Never emit permanent stranding merely
+    because allocation is tight or a relaxed graph has an approach-only side.
+
+Initial implementation boundary, when separately approved:
+  Plain Common Lisp diagnostic helpers and an independent reporter.
+  No problem object names in code. Do not modify the problem, search,
+  recorder semantics, S0-S4 outputs, or existing first scores. Prefer
+  an explicit scenario input over pretending to infer unproved segments.
+  Decide the file/API placement in the implementation proposal.
+
+3  VALIDATION CONTRACT BEFORE ANY IMPLEMENTATION RUN
+----------------------------------------------------
+These are proposed synthetic acceptance cases, not new scores:
+  - Three roles and exactly three eligible witnesses force membership
+    of all three witnesses but not a particular role pairing.
+  - Add a fourth universally eligible witness: no one witness is forced.
+  - Two roles both restricted to one witness produce a shortage even
+    if unrelated witnesses make the total pool larger than two.
+  - Two references to one support require one witness, not two.
+  - Alternatives requiring different supports remain alternatives;
+    a body forced in just one alternative is not globally forced.
+  - Unknown segment availability yields unresolved obligations.
+  - Persistent/inverted controls do not create positive pressure roles
+    without a separate derivation.
+  - Reaching an explicit agent goal does not invent named cargo goals.
+Before a first staged RO run, append exact observable predictions and
+the selected segment assumptions to register section 7. Audit results
+already known must be marked known regression expectations, not blind
+discoveries. Score the first completed run without revising commitments.
+
+4  LAST-KEEPER PROOF CHECKLIST (NOT YET DISCHARGED)
+--------------------------------------------------
+A proposed impossibility must identify the required cargo destination,
+the view and interval requiring pressure, all eligible replacements,
+pickup/placement reach on both sides, loaded movement and support routes,
+blower effects, fork/stop/cancel possibilities, and preservation by every
+relevant action. A cutoff or missing route in S3 proves none of these.
+
+5  AUTHORIZATION AND NEXT SESSION
+---------------------------------
+AS WRITTEN, BEFORE IMPLEMENTATION. D approved recording this audit,
+specifying the analysis, and updating the documentation for a fresh
+session. Implementation and execution of RO were not part of that
+approval; the next session was to prepare a bounded implementation
+proposal with predictions and obtain approval before coding. That is what
+happened. See section 6 for the outcome and for the current authorization
+state. Do not redo the audit or ask permission to reread its permitted
+sources. No solve or sealed-file access is authorized.
+
+6  IMPLEMENTATION AND FIRST RUN -- APPENDED AFTER THE FACT
+----------------------------------------------------------
+2026-09-20, later the same day. Sections 1-5 above are unrevised.
+
+D approved, in order: placement, implementation with the acceptance cases,
+and appending commitments before a single staged run and scoring it.
+
+PLACEMENT, resolving the question section 2 left open. RO is a contiguous
+callees-first block in tech/constraint-profile.lisp ending in its own
+reporter REPORT-ROLE-OBLIGATIONS, which takes the scenario as its one
+required argument. It is deliberately NOT called by
+REPORT-STATIC-CONSTRAINT-PROFILE, because a generated file must not carry
+a segment nobody stated; the whole-profile reporter instead prints two
+lines saying so. RO names CONTROLS, ON and HAS-POSITION and takes every
+problem-specific term from the caller's scenario, which is data, so C3
+holds.
+
+COMMITMENTS AND SCORE. Register 7.26 holds the scenario and predictions
+P1-P8, appended before execution. Register 7.27 holds the first score: all
+eight REGENERATED. That score is against RO's own commitments, NOT against
+a sealed value paragraph -- RO has none -- and it is therefore a weaker
+experiment than S0-S4's. It does not close G12 and does not touch S4's
+PARTIAL first score.
+
+ACCEPTANCE CASES. Section 3's ten cases are implemented as 42 assertions in
+constraint-evidence/ro-helper-checks-2026-09-20.lisp; all 42 passed.
+DISCLOSED DEVIATION: they were run AFTER the first staged run rather than
+before it. The run output was already written and retained, and no
+commitment was revised, but the intended order was not kept.
+
+NEW GAP. G14 records that RO printed S1's device-state premises unfiltered,
+so a physical-view obligation carried a recording-view axiom. No printed
+claim depends on it -- the matching read the physical pool alone -- and the
+fix is reporting and provenance only. It requires its own approval, its own
+commitments in register section 7, and a fresh score.
+
+STILL OPEN. G12. Section 4's last-keeper checklist is undischarged. RO
+emits no transport obligation and no stranding verdict by construction.
+
+
+7  G14 FIX -- APPROVED PRE-IMPLEMENTATION SPECIFICATION
+-------------------------------------------------------
+2026-09-20, later the same day.  Sections 1-6 above are unrevised.  This is
+the specification as it stands BEFORE any of the fix's code exists, written
+so the pre-implementation record survives exactly as section 2's did for RO.
+The commitments derived from it are register 7.28.  D approved implementation,
+the acceptance cases, appending 7.28, and one staged run with a score, and
+directed that the work be done in a fresh session.
+
+7.1  THE DEFECT IN MECHANISM
+
+REPORT-ROLE-DEVICE calls REPORT-KEEPER-AXIOMS, which selects axioms by
+RELATION-KEYS-A-DEVICE-P alone.  That test asks only whether the state
+relation admits the device, and both the playback and the recording gate-state
+relations do, so both print.  The scenario's :VIEW never reaches the selection.
+
+What :VIEW indexes and what the axioms are indexed by are two different axes.
+ROLE-VIEW-CLASSES maps :PHYSICAL to the live and unpaired layer classes of
+BODIES, computed from the bijective layer-pair relation S2 discovers by shape.
+The axioms are not indexed by body class at all: they are two distinct STATE
+RELATIONS, selected per reading object.  Both sit under one keyword, which is
+exactly G14's "indexed by different things".
+
+7.2  THE COMPUTABLE LINK
+
+The gate substrate supplies a VIEW-DISPATCH query: an IF whose test asks
+whether the reading object is a recording-shadow object, whose then-branch
+reads the recording-side gate state through the shadow query, and whose
+else-branch reads the ordinary one.  The shadow-object test resolves to the
+GHOST class, because the tracked variable sits at position 2 of the layer-pair
+relation, which is the same car/cdr rule CENSUS-LAYER-CLASS already uses.  The
+else-branch is therefore restricted to the complement, live and unpaired.
+
+This is G14's sentence read literally: the relation it keys is READ BY A
+CONSUMER RESTRICTED TO THAT VIEW.  The index is computed by walking UPWARD
+from the state relation to its readers, not downward toward the occupancy
+relation.  A downward walk was considered and rejected: it reaches the
+occupancy relation through consumers S2 classifies as layer-blind, so it
+returns UNINDEXED for both relations and separates nothing.
+
+7.3  DEFINITION, per state relation R and stated view V
+
+  IN-VIEW(V)    some read site of R is governed by a layer-class test whose
+                admitted classes are exactly V's classes.
+  OUT-OF-VIEW   R has at least one class-governed read site, and none of them
+                admits V's classes.
+  UNINDEXED     R has no resolvable class-governed read site, or its governing
+                tests resolve to no class at all.
+
+The rule is EXISTENTIAL, NOT EXCLUSIVE, and must say so at the claim site.
+The playback gate state is also read by ungoverned queries that restrict
+nothing.  IN-VIEW therefore means "a consumer restricted to this view reads
+it", never "only this view reads it".  Each axiom line carries the count of
+view-blind read sites found, which is what keeps the label from overclaiming.
+
+7.4  MACHINERY: WHAT IS REUSED AND WHAT IS NEW
+
+Reused unchanged from S2: LAYER-PAIR-RELATIONS, CENSUS-QUERY-READS-P,
+FORM-READS-RELATION-P, FORM-CALLS-QUERY-P, CENSUS-TERM-READS-LAYER-P, and the
+interprocedural parameter mapping through :RAW-ARGS behind
+CENSUS-CALL-PARAMETER.
+
+New, and the whole substance of the fix:
+
+  1  Resolving a layer-class test to WHICH class, by the position the tracked
+     variable occupies in the layer-pair relation -- position 1 live, position
+     2 ghost, both or neither unresolved.  S2 deliberately never names the
+     class, only counts it, so this capability does not exist yet.
+  2  Collecting a read site's GOVERNING conditions with polarity: IF tests
+     positive in the then-branch and negated in the else-branch, enclosing AND
+     conjuncts, NOT flipping.  S2 collects only AND/OR siblings that mention
+     the KEY variable.  The gate dispatch is an IF on a DIFFERENT variable
+     than the read's key, so S2's site walk as written reports NONE for both
+     relations and the fix would collapse to UNINDEXED/UNINDEXED.
+  3  Inheriting governing conditions across a call, so a read inside a callee
+     carries the governance of the call site that reached it.  This is what
+     indexes the recording-side relation, whose own query body holds no layer
+     test.
+
+Nothing here changes which witnesses RO allocates.
+
+7.5  PLACEMENT AND OUTPUT SHAPE
+
+REPORT-KEEPER-AXIOMS IS SHARED: REPORT-KEEPER-DEVICE calls it for every S4
+row, and S4's output is generated into Constraint-Static-Profile.txt, whose
+S0-S4 prefix is hash-locked.  It must not be touched, and S4 has no view to
+index against in any case.  The fix adds an RO-local reporter,
+REPORT-ROLE-AXIOMS, as a contiguous callees-first addition inside the existing
+RO block, and REPORT-ROLE-DEVICE calls it instead.  No signature churn:
+REPORT-ROLE-DEVICE already receives the scenario, so the view is read from
+there rather than threaded as a new parameter.
+
+The two existing data lines per axiom stay verbatim and everything new is
+appended beneath them, so the diff against ro-first-run-2026-09-20.txt is
+purely additive and mechanically checkable.  Each axiom gains an index line
+naming its verdict, the governing test, the query the test was found in, and
+the classes admitted; then a line giving its view-blind read-site count, with
+the existential caveat on an in-view row and the RETAINED marker on an
+out-of-view one.  The block ends with a summary line counting in-view,
+out-of-view and unindexed rows against the stated view, and two NOTEs: that
+the index is over CONSUMERS that read the relation and not over the bodies
+whose occupancy derives it, those being different axes; and that the walk
+descends IF, AND, OR, NOT and the queries those call, so UNINDEXED is weaker
+than "no restriction", in the same voice as S2's existing switch-walk NOTE.
+
+7.6  THREE DECISIONS INSIDE THAT SHAPE
+
+  D1  RETAIN, DO NOT FILTER.  G14 permits either.  RO's printed output IS the
+      score record, so dropping a row removes evidence; labelling it satisfies
+      "never printed plain beside an in-view conclusion" without deleting
+      anything.
+  D2  THE EMPTY-TYPE PREMISE IS LEFT EXACTLY AS IT IS.  It is a type-extent
+      fact, not a view-indexed one.  Inventing an index for it would be the
+      assumed index G14 objects to, in the other direction.
+  D3  AN OR DOES NOT GOVERN.  A read inside a disjunction collects nothing: a
+      disjunct is an alternative, not a restriction, and treating it as one
+      would manufacture an index.  This is a decision, not a limitation.
+
+The no-axiom case is unchanged: the existing UNRESOLVED line prints verbatim
+with no index line.
+
+7.7  WHAT MUST NOT CHANGE
+
+  - Constraint-Static-Profile.txt, 640 lines, 41,214 bytes, hash EFD35D39...,
+    and its S0-S4 prefix of 41,101 bytes, hash 9E4A9B0A...
+  - REPORT-KEEPER-AXIOMS and REPORT-KEEPER-DEVICE.
+  - The two trailing lines of REPORT-STATIC-CONSTRAINT-PROFILE.
+  - Every other RO line: the SCOPE block, the segment block, the requested
+    conditions header, the device header and its requested/provenance line,
+    the alternative header, the per-support eligibility lines, the UNRESOLVED
+    restriction caveat, the matching verdict, forced members, forced pairings,
+    destinations, the grade/status line, sources, unresolved premises, and the
+    closing no-transport line.
+  - Register 7.26, 7.27 and 7.28, and sections 1-6 of this document.
+
+C3 HOLDS.  The new code names no substrate relation.  The layer-pair relation
+is discovered by shape through LAYER-PAIR-RELATIONS and the dispatch query by
+walking the installed query names.  Every query and relation named in the
+output is data the walk found, never a symbol in the source.
+
+7.8  ACCEPTANCE CASES, TO RUN BEFORE THE FIRST STAGED RUN
+
+M9's order is a commitment, not an intention.  7.27 disclosed that RO's checks
+ran after its staged run; repeating that would be the same deviation twice.
+These run in a clean image first, with evidence retained in
+constraint-evidence/.
+
+  Class resolution by position
+   1  Tracked variable at layer-pair position 1 resolves live; at position 2,
+      ghost.
+   2  At both positions, or at neither, resolves to nothing.  No guess and no
+      default class.
+   3  Interprocedural: the term calls a query whose own body reads the pair
+      relation, the variable mapped through :RAW-ARGS.  Resolves correctly.
+      This is G7's lesson -- the class test lives in the callee, which is
+      exactly where the gate dispatch puts it.
+  Governing conditions and polarity
+   4  A read in an IF then-branch collects that test positive; in the else-
+      branch, negated; inside NOT, flipped again; nested IFs accumulate both.
+   5  A read as an AND conjunct collects its sibling conjuncts as governing.
+   6  A read inside an OR collects nothing (D3).
+  Class admission
+   7  One positive ghost test admits (ghost); one negated ghost test admits
+      the complement (live unpaired).
+   8  Two governing tests naming opposite classes admit nothing, giving
+      UNINDEXED-contradictory and never IN-VIEW.  This is the empty-set trap
+      ROLE-FORCED-WITNESSES already guards against in the allocator,
+      reappearing on the indexing side.
+   9  An unresolvable governing test neither narrows the admitted set nor
+      upgrades the verdict; it is counted and printed.
+  Index verdict
+  10  One class-governed site admitting exactly the view's classes gives
+      IN-VIEW; only the other view's classes gives OUT-OF-VIEW; no class-
+      governed site gives UNINDEXED with a nonzero ungoverned count; no reader
+      at all gives UNINDEXED with zero sites.
+  11  Both an in-view governed site and ungoverned sites gives IN-VIEW AND a
+      nonzero view-blind count, asserted together so neither can drift from
+      the other.
+  12  The relation's own asserting update is not a consumer.  Without this
+      every axiom is trivially read by its writer and every index is IN-VIEW
+      by accident.
+  13  A recursive query terminates the walk.
+  Non-interference
+  14  For 7.26's scenario the allocation helpers return the first run's values
+      unchanged: three supports, the same per-support eligibility, PERFECT,
+      three forced members, zero forced pairings, three destinations.  The fix
+      is reporting-only, and this is what makes that claim testable rather
+      than asserted.
+  15  REPORT-KEEPER-AXIOMS produces identical output for a constructed axiom
+      list.  The S4 path is untouched by construction; this checks the
+      construction.
+
+HYGIENE CONSTRAINT ON THE CHECKS THEMSELVES.  Cases 3, 10 and 13 need stub
+definitions carrying :RAW-BODY and :RAW-ARGS.  They must use freshly generated
+symbols and bind the query-name list with LET, never SETF.  A check that
+permanently installs a stub would contaminate the image the staged run then
+uses, and that contamination would be invisible in the run output.  The stubs
+are disclosed as stubs in the evidence file.
+
+7.9  AUTHORIZATION STATE
+
+D approved all four items: implementation, the acceptance cases run first,
+appending register 7.28, and one staged run with regeneration and a score.
+D directed that the documentation be made current and the work done in a fresh
+session, so no code was written in the session that produced this section.
+The next session implements against 7.28's commitments, which are not to be
+revised.  No solve, no action search, and no sealed-file access is authorized.

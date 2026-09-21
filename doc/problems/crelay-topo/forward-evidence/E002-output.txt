@@ -1,0 +1,165 @@
+E002 threads=16 cutoff=1 mode=FIRST
+E002-EXPECTED-START=(:FACTS
+                     ((BLOWING BLOWER1) (DEPRESSED PLATE1) (DEPRESSED PLATE2) (HAS-LOCATION AGENT1 LOCATION20)
+                      (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1 LOCATION6) (HAS-LOCATION BOX1* LOCATION6)
+                      (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1 LOCATION7)
+                      (HAS-LOCATION TRAY1* LOCATION7) (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (ON TRAY1 PLATE2) (ON TRAY1* PLATE2)
+                      (OPEN GATE1) (OPEN GATE3) (OPEN GATE5) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1)
+                      (RECORDING-DEPRESSED PLATE2) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE2)
+                      (RECORDING-OPEN GATE3) (RECORDING-OPEN GATE5) (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+                     :HAPPENING-FACTS NIL :HAPPENINGS NIL :TIME 14.0 :VALUE 0.0 :POLICY-CONTEXT (:CYCLE-COUNT 2 :RECORDING-OPEN-P T))
+Installing goal...
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=20)...
+Generating tasks: target=256, safety-cap-depth=20
+New path to goal found at depth = 1
+Solution found during task generation!
+Search completed during task generation
+
+Parallel Search Timing Breakdown:
+  Task generation: 2 ms
+  Worker search:   0 ms
+  Finalization:    0 ms
+  Total:           2 ms
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 25
+  Mean / shard  : 0.4
+  Max / shard   : 3
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #56(3) #21(2) #51(2) #2(1) #3(1)
+
+
+
+In problem CRELAY-TOPO, performed GRAPH search for FIRST solution.
+
+Search ended with first solution found.
+
+Depth cutoff = 1
+
+Maximum depth explored = 0
+
+Program cycles = 0
+
+Total states processed = 1
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Average branching factor = 0.0
+
+
+Candidate solution validation:
+  Nominal goal paths checked = 1
+  Accepted = 1
+  Rejected = 0
+
+Start state:
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION7) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1)
+ (ON TRAY1* PLATE2) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (RECORDING-OPEN GATE3) (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+Goal:
+(HOLDING AGENT1* TRAY1*)
+
+
+
+Total solution paths recorded = 1, of which 1 is/are unique solution paths
+Check *solution-paths* and *unique-solution-states* for solution records.
+
+Number of steps in first solution found: = 1
+
+Duration of first solution found = 15.0
+
+Solution path of first solution found from start state to goal state:
+(14.0 (START-STATE))
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION7) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1)
+ (ON TRAY1* PLATE2) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (RECORDING-OPEN GATE3) (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+(15.0 (PICKUP-TRAY > AGENT1* picks up TRAY1* at LOCATION7 from LOCATION7))
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION7) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2)
+ (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+
+
+Setup phase:
+
+Recording phase:
+(START-RECORDER)
+(15.0 (PICKUP-TRAY > AGENT1* picks up TRAY1* at LOCATION7 from LOCATION7))
+(MOVE > AGENT1* moves via ((WALK LOCATION7 (GATE1) LOCATION1)))
+(STOP-RECORDER)
+
+Playback phase:
+Closure: synthesized.
+Cycle metrics: depth 1, elapsed time 1.0, value change 0.0.
+Complete solution totals: depth 1, elapsed time 1.0, value change 0.0.
+E002-START-IDENTITY=PASS
+E002-OUTCOME=:SOLUTION REASON=:SOLUTION-LIMIT-REACHED
+E002-CUMULATIVE-RECORDER=T NIL
+E002-SEGMENT-ACTIONS=((15.0 (PICKUP-TRAY AGENT1* TRAY1* LOCATION7 LOCATION7)))
+E002-CUMULATIVE-ACTIONS=((1.0 (START-RECORDER AGENT1)) (2.0 (MOVE AGENT1* ((WALK LOCATION1 NIL LOCATION2))))
+                         (3.0 (MOVE AGENT1* ((STEP (LOCATION2 GROUND) NIL (LOCATION2 PLATE1)))))
+                         (4.0 (MOVE AGENT1 ((WALK LOCATION1 (GATE1 GATE3) LOCATION9))))
+                         (5.0 (PICKUP-CONNECTOR-RETAINING-PAIRINGS AGENT1 CONNECTOR1 LOCATION9))
+                         (6.0 (MOVE AGENT1 ((WALK LOCATION9 (GATE1 GATE3) LOCATION2))))
+                         (7.0 (PUT-CONNECTOR AGENT1 CONNECTOR1 PLATE1 LOCATION2)) (8.0 (MOVE AGENT1 ((WALK LOCATION2 NIL LOCATION1))))
+                         (9.0 (CANCEL-PLAYBACK AGENT1)) (10.0 (START-RECORDER AGENT1))
+                         (11.0 (MOVE AGENT1* ((WALK LOCATION1 (GATE1) LOCATION7))))
+                         (12.0 (MOVE AGENT1 ((WALK LOCATION1 (GATE1) LOCATION4))))
+                         (13.0 (MOVE AGENT1 ((STEP (LOCATION4 GROUND) NIL (LOCATION4 BLOWER1))))) (14.0 (TOGGLE-SWITCH AGENT1 SWITCH1))
+                         (15.0 (PICKUP-TRAY AGENT1* TRAY1* LOCATION7 LOCATION7)))
+E002-ENDPOINT=(:FACTS
+               ((BLOWING BLOWER1) (DEPRESSED PLATE1) (DEPRESSED PLATE2) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION AGENT1* LOCATION7)
+                (HAS-LOCATION BOX1 LOCATION6) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1 LOCATION2)
+                (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION TRAY1* LOCATION7)
+                (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (ON TRAY1 PLATE2)
+                (OPEN GATE1) (OPEN GATE3) (OPEN GATE5) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS)
+                (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE5) (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+               :HAPPENING-FACTS NIL :HAPPENINGS NIL :TIME 15.0 :VALUE 0.0 :POLICY-CONTEXT (:CYCLE-COUNT 2 :RECORDING-OPEN-P T))
+E002-ACCEPTED-PREFIX actions=15; not a final solution.

@@ -1,0 +1,204 @@
+Crelay-Topo Forward-Led Analysis -- Method
+=========================================
+Created 2026-09-18. Architecture approved in the originating conversation.
+Status: pilot procedure revised after E007; strategic four-point procedure in force.
+
+PURPOSE AND SCOPE
+Find any fully validated solution using reachable checkpoints and bounded
+Wouldwork searches. Develop this procedure on crelay-topo before extracting
+a reusable initialization template. Do not consult sealed solution files.
+No claim of completeness or global minimum length is made.
+
+AUTHORITY
+Forward-Resource-Hypotheses.txt: candidate completion allocations and open obligations.
+Forward-Checkpoints.txt: checkpoint tree, frontier, strategic obligations.
+Forward-Search-Log.txt: experiment proposals and outcomes.
+Forward-Rules-Facts.txt: sourced semantics, hypotheses, scoped exclusions.
+Forward-Interface-Audit.txt: interface findings and qualification requirements.
+forward-evidence/: durable actions, state evidence, logs and source identities.
+Forward-Continuation-Prompt.txt: derived handoff summary, regenerated last.
+If the handoff disagrees with a primary record, the primary record wins.
+Backward documents supply questions and evidence, not automatically accepted
+lemmas. Verify any imported finding and cite its original record.
+
+SEARCH CONTRACT
+Every forward Wouldwork search uses *threads* = 16 and the two-argument form:
+  (solve-subgoal reconstructed-checkpoint-state (and ...))
+The goal is unquoted. The start is a concrete problem-state reconstructed
+from the true staged origin, not a partial conjunction treated as a state.
+The raw dynamic-fact-list start interface is reserved for explicitly labeled
+hypothetical diagnostics, not reachable checkpoint construction.
+Do not use serial chaining or IMPORT-SUBGOAL-PROGRESS in this workflow.
+Existing serial-chain action archives may supply candidate prefixes for replay.
+The user runs Lisp commands, one reviewed experiment at a time. The assistant
+prepares commands, interprets evidence and maintains records. Approval of this
+architecture does not authorize unbounded or expensive solves.
+
+SETUP
+User's established sequence (each REPL expression entered separately):
+  PowerShell: sbcl --dynamic-space-size 24000
+  (progn (ql:quickload :wouldwork) (in-package :ww))
+  (stage crelay-topo)
+  (ww-set *threads* 16)
+  (ww-set *depth-cutoff* <n>)
+  (solve-subgoal <start> <end>)
+Here <n>, <start> and <end> are placeholders, not literal Lisp expressions.
+After source edits in an already loaded session, reload the changed definitions
+explicitly; QUICKLOAD alone need not reload an already loaded system.
+Finish loading, staging and thread configuration before reconstructing a parent.
+Use WW-SET, not a dynamic binding, for worker-count changes. Mode changes may
+reload/restage. After setup verify staged problem, *threads* = 16, search
+settings, and actual origin. Capture a copy of the true origin and original
+goal before the first one-off request changes *start-state* and GOAL-FN.
+Reconstruct durable checkpoints by replay after every restage or relevant code
+change. An in-memory state from a previous stage is not a durable archive.
+
+RECORD TYPES
+Milestone: target condition plus explanation of its usefulness.
+Checkpoint Cnnn: one exact reachable endpoint, parent, and cumulative witness.
+Experiment Ennn: one specified parent, target, settings, budget and outcome.
+Fact Fnnn: sourced semantics or observation. Hypothesis Hnnn: unproven claim.
+Exclusion Xnnn: justified impossibility with exact scope and dependencies.
+IDs are permanent. Retractions retain the original entry with a dated reason.
+
+THE FOUR-POINT STRONGER PROCEDURE
+This governs milestone selection; the attempt loop below is its execution protocol.
+
+1. FORMULATE A CONCRETE COMPLETION HYPOTHESIS.
+   Name a way the final goal could be reached. Allocate actual resources at the
+   decisive transitions, including gate keepers, beam links, risers, carrier hands,
+   recording copies, and temporary apparatus. Make a phase ledger: which roles
+   must coexist, which can be reused, and what releases each commitment.
+   Separate source facts, validated witnesses, imported claims and hypotheses.
+   Retain at least one plausible competing family. Do not call a fitted count a
+   reachable state, or treat a chosen tactic as a universal necessity.
+
+2. DEDUCE THE NEXT STRATEGICALLY USEFUL CAPABILITY BACKWARD.
+   Identify an unresolved dependency of that completion hypothesis. Ask whether
+   resolving it advances the plan or eliminates an alternative. Prefer an early
+   test of a potentially fatal assumption over polishing a convenient local tactic.
+   Define the milestone's useful endpoint and what must still be available after
+   it. Compare retained parent checkpoints; the latest is not automatically best.
+   Before search fill a milestone contract: hypothesis, obligation, exact target,
+   resources/access preserved, evidence sought, alternatives and next decisions.
+   Do not infer a necessary action sequence from one witness or a cutoff failure.
+
+3. SEARCH FOR THE CAPABILITY AS A WHOLE.
+   Let Wouldwork choose the intervening multi-action sequence. Single-action
+   milestones are reserved for uncertain rule/interface checks or diagnosing a
+   particular failed segment. Use an explicit modest cutoff selected from the
+   hypothesized mechanism, not a universal one-action rule or blind deepening.
+   If an integrated target proves expensive, split at meaningful dependencies.
+   All searches are 16-thread two-argument one-offs from reachable concrete states.
+   Prefer one user-run operation containing reconstruction, search, capture,
+   cumulative validation and durable save, rather than a round trip per phase.
+   Stop after the one planned experiment; do not launch further searches silently.
+
+4. EVALUATE THE ENDPOINT AGAINST THE INTENDED CONTINUATION.
+   Certify legality through segment/cumulative replay and technology validation;
+   separately assess access, scarce resources, support structure and recorder
+   history against the next obligation. Label a local mechanism witness as such
+   if its strategic usefulness is unresolved. Keep distinct useful endpoints and
+   revise the hypothesis or choose another parent when necessary.
+   A milestone predicate can be satisfied by an endpoint that cannot serve the
+   planned continuation. Local success alone does not settle that question.
+
+MILESTONE CONTRACT
+Record: hypothesis ID; backward dependency; useful capability; parent and why;
+exact conjunctive goal; simultaneous resource allocation; future obligations;
+endpoint requirements versus genuine path restrictions versus preferences;
+FIRST/MIN-LENGTH, cutoff and stopping budget; predicted mechanism and evidence;
+what success, bounded failure and interruption establish; acceptance checks;
+next decision for each result. Use Forward-Resource-Hypotheses.txt for the pilot.
+A goal conjunction constrains the endpoint, not invariants throughout the path.
+Keep exact state evidence separate from readable planning summaries.
+
+ATTEMPT LOOP
+1. Complete the strategic milestone contract using the four-point procedure.
+2. Specify exact goal, FIRST or MIN-LENGTH, cutoff, stopping conditions and scope.
+3. Provide REPL commands directly for straightforward tests (user-authorized).
+   Obtain specific approval for expensive searches or materially broader work.
+4. Reconstruct and verify the parent after all setup; verify 16 threads.
+5. Run one two-argument search. Do not rely on *start-state* remaining the origin.
+6. Capture actions, endpoint, outcome/reason, settings, elapsed time and counters
+   before another search, undo, staging or validation can replace their context.
+7. In the same user-run operation where practical, replay the segment and
+   cumulative prefix, compare endpoints and perform
+   applicable technology checks. For recorder use the actual fork history.
+8. Record the result, update frontier and dependencies, then regenerate handoff.
+
+VALIDATION
+VALIDATE-SOLUTION is the interactive check for proposed complete OR PARTIAL
+action sequences, including authored candidates. PARTIAL VALIDATION with all
+actions executed is positive prefix evidence, not failure to execute.
+It uses current *start-state* and current GOAL-FN. Bind/use the intended origin
+and goal context explicitly; an installed subgoal is not the original final goal.
+Its partial-success return defect was fixed after audit A02; E001 verified the
+return behavior. Use VALIDATE-ACTION-SEQUENCE and its success/final-state accessors
+for structured programmatic endpoint capture.
+Integrated action replay alone does not certify isolated recorder execution.
+Validate every cycle from its actual pre-START snapshot using the cumulative
+path; check the current milestone for prefix acceptance and original goal only
+for final completion. Keep open-cycle qualifications explicit (audit A03).
+
+OUTCOMES
+WITNESS: actions and endpoint obtained; not yet an accepted checkpoint.
+ACCEPTED-PREFIX: replay, endpoint agreement and applicable technology checks pass.
+BOUNDED-NEGATIVE: completed coverage proves no path within stated limits under
+the exact parent, target, settings and trusted pruning. It does not prove a dead end.
+UNKNOWN: interrupted, timed out, resource-limited, or coverage/validation uncertain.
+REJECTED-CANDIDATE: replay/technology validation failed; preserve first failure.
+PROVEN-IMPOSSIBLE: independent sound proof within explicitly recorded scope.
+FINISHED: cumulative plan validates and original goal holds.
+An unresolved search-time pruning issue limits negative conclusions even if the
+engine reports exhaustion. A witness establishes possibility, never necessity.
+
+FRONTIER AND RECOVERY
+Prefer goal-relevant capabilities, resource availability/recoverability, access,
+affordable next probes, and useful information. Prefix length is secondary.
+Use qualitative reasons, not a costly minimum-length heuristic ledger.
+Keep a small active frontier and retain deferred branches durably. Do not call a
+deferred branch impossible. On difficulty choose among raising budget, splitting
+a milestone, another endpoint, another parent, or revising milestone order.
+Repeated identical searches may return the same endpoint. Request alternatives
+with justified endpoint distinctions or a separately verified enumeration method.
+One-off calls do not provide serial-chain contextual rejection/backtracking.
+Merge checkpoints only with exact continuation-relevant state/history evidence;
+the same visible milestone is insufficient.
+
+SEARCH POLICY
+CURRENT USER INSTRUCTION after E012: keep depth-cutoff at10 from now on.
+This supersedes the earlier invitation to consider10-12 or higher. New planned
+searches use10; do not exceed it without a later explicit user revision. Continue
+one reviewed experiment at a time, with no automatic retry or follow-up. Cutoff10
+is a search-depth limit, not a guarantee of bounded memory or elapsed time.
+Historical guidance follows for provenance, not as permission to exceed10.
+User clarified after E011: consider cutoffs10-12 (possibly more) when they serve
+a productive capability milestone. E008's heap failure is one parent/goal/order
+result, not a universal depth ceiling. Do not default mechanically to tiny tests.
+Still justify parent, target and cutoff; do not treat depth alone as a runtime
+or memory guarantee. One reviewed experiment at a time; substantial proposals
+retain their specific-approval boundary. No blind retry of resource failures.
+FIRST for constructing any useful witness; MIN-LENGTH for a specifically useful
+measurement. Both use 16 threads. No segment optimum implies whole-plan optimum.
+Do not extrapolate depth limits linearly from the reported parallel speedup.
+Start with short targeted searches, record their costs and adjust deliberately.
+
+PILOT AND TEMPLATE EXTRACTION
+First qualify the interface and recorder context, then test one unresolved
+mechanism, an alternative branch, and restart reconstruction. Extract a generic
+initialization template only after those workflows are demonstrated. Template
+inputs: problem/spec, original goal, technologies, resource model, run policy,
+validation hooks, provenance and first bounded question. Keep crelay-specific
+gate/ghost facts out of the generic method. Pilot corrections update this file.
+
+PILOT LESSON AFTER E007
+Optimize total problem-solving effort, including user interaction and validation
+setup, not only search runtime. Single-action tests belong to interface/rule
+qualification or diagnosis of a specific failure. Once qualified, target useful
+multi-action capabilities. State the backward connection to a plausible complete
+plan, label tactic choices as hypotheses, and identify retained alternatives.
+Do not mistake proving a local tactic executable for proving it globally useful.
+Combine search, capture, cumulative checks and durable save in a single user-run
+operation when practical. A cutoff increase needs a reason and an explicit bound;
+use shorter milestones when an integrated probe is actually too costly.

@@ -41,6 +41,10 @@
    is kept unchanged.
    The heuristic is disabled for the duration of the strategy's phases
    and restored on completion or abort."
+  (when (and (consp goal-form) (eq (first goal-form) 'quote))
+    (error "SOLVE-VIA-STRATEGY requires an unquoted goal; received ~S.~%~
+            Drop the quote: ~S"
+           goal-form (second goal-form)))
   (if goal-form-supplied-p
     `(run-advisor ',goal-form t)
     `(run-advisor nil nil)))

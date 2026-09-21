@@ -1,0 +1,4 @@
+      cutoff coverage UNKNOWN: truncation was not reliably measured; do not infer
+        complete reachable-space exhaustion.
+      pruning in force: GRAPH repeated-state pruning; symmetry NIL; minimum-steps pruning enabled T (runtime flag only); parallel cutoff coverage instrumentation was incomplete.  An exhaustion under pruning excludes solutions in pruned branches.
+LK5 filed as BD2; OPEN; UNKNOWN coverage. Checks/readback passed.

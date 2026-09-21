@@ -1,0 +1,108 @@
+T10 restart checkpoint -- 2026-09-21
+==================================
+APPROVED, IN PROGRESS. Seven of nine milestones found. Five CLOSED:
+lk1, lk2, lk3, lk7, lk8. Two still REALIZED in the ledger: lk9, lk4.
+Migration replay evidence is separate; the ledger was not regraded.
+Two OPEN: lk5, lk6. Sixteen premises, two retained grade-3 bounds (BD1, BD2).
+Thirteen reported searches include three cold-restoration searches. LK5 cutoff 8
+found no solution in 1.839 seconds at threads 16; checkpoint unchanged. Its raw
+result is retained in constraint-evidence/lk5-cutoff8-result-2026-09-21.txt.
+Metadata arrived: COMPLETE, truncation NIL, 32,356 cutoff hits, GRAPH, symmetry
+NIL, minimum-steps pruning T. Parallel workers skip cutoff nodes without setting
+the truncation flag; COMPLETE is not evidence of full reachable-space exhaustion.
+Historical coverage is UNKNOWN. D approved the reporting/ledger fix; it passed
+55 engine and 346 ledger assertions. LK5 is now filed as BD2 with UNKNOWN coverage
+and its raw COMPLETE/NIL report preserved. No larger cutoff is authorized.
+Proposed next experiment: cutoff 10 from the same checkpoint at threads 16,
+after reloading the fix and restoring the archive. Await D's approval to deepen.
+
+D runs searches locally, one bounded command at a time. T10 probes remain
+approved; no other task or silent deepening is authorized. D clarified that
+routine validation can normally be skipped for Wouldwork search finds;
+use validation for logically developed action sequences. Keep :validated NIL
+for un-replayed finds, and retain T10's final composed-path acceptance check.
+
+Current checkpoint: cumulative depth 19, agent1 at location15, switch2 on.
+Tray1 holds plate4 at location13; connector1 holds plate5 at location12;
+box1 remains at location6. Ghost agent holds plate1 at location2; ghost tray
+holds plate2 at location7; ghost connector at location9, ghost box at location6.
+One recorder cycle used, still open. Physical gates1/2/3/6/7 open; physical
+gate5 closed. Recording gates1/2/3/5 open. This is not a final solution.
+
+APPROVED WORKFLOW CHANGE, 2026-09-21
+D approved saved standalone checkpoints and threads 16. The archive below is
+already generated from the permitted ledger's 19 accepted actions. Deterministic
+replay reproduced the documented endpoint; a second, freshly staged import
+matched the complete symbolic state. No crelay-topo search was run.
+
+Cold restart: this restores all seven milestones by replay, without searching.
+Set threads BEFORE import. A thread-mode rebuild invalidates in-memory states.
+(stage crelay-topo)
+(ww-set *threads* 16)
+(defparameter *t10-checkpoint*
+  (import-search-checkpoint
+    (merge-pathnames
+      "doc/problems/crelay-topo/constraint-evidence/t10-location15-checkpoint.txt"
+      (asdf:system-source-directory :wouldwork))))
+Expected: Restored 7 checkpoints, 19 actions by replay; no search.
+No milestones are re-filed. D confirmed this import locally on 2026-09-21.
+Wouldwork is already running; omit QUICKLOAD/IN-PACKAGE preambles in future.
+
+The checkpoint object holds the actual endpoint and all accepted action segments.
+The next search uses (setf *t10-checkpoint* (solve-subgoal *t10-checkpoint* <goal>)).
+On exhaustion the same checkpoint is returned. No predecessor search is attempted.
+After a successful next search, save its result before leaving the REPL:
+(export-search-checkpoint *t10-checkpoint*
+  (merge-pathnames
+    "doc/problems/crelay-topo/constraint-evidence/t10-current-checkpoint.txt"
+    (asdf:system-source-directory :wouldwork)))
+Use that newer archive on subsequent restarts; keep the location15 seed intact.
+The current-checkpoint file does not exist until a later save creates it.
+
+Next unresolved work: lk5 across gate8, controlled by receiver1. S4 says the
+beam dependency is UNRESOLVED and needs sightline analysis. The existing
+cutoff is 8, now with threads 16 and the saved checkpoint as the explicit start:
+(or (has-location agent1 location16) (has-location agent1 location17)
+    (has-location agent1 location18) (has-location agent1 location21))
+Permitted authored instance/beam semantics and connector availability have now
+been inspected; the dated LK5 recommendation below records the findings. Cutoff 8
+is an existing bounded experiment, NOT a proved adequate realization cost.
+Connector1 is currently committed to plate5; do not assume it is freely available.
+The next bounded command is in
+constraint-evidence/lk5-checkpoint-recommendation-2026-09-21.txt.
+The result and metadata have arrived and are filed as BD2. The next proposed
+cutoff is 10; do not run it without D's approval. No next search is implicit.
+Do not open sealed solution, backward, forward or initial-conditions files.
+After lk5, lk6 targets location19 through gate9's three pressure supports.
+The final search also uses the explicit checkpoint and the original goal.
+Do not finish this standalone workflow with ordinary (solve).
+Then (validate-search-checkpoint *t10-checkpoint*) calls VALIDATE-ACTION-SEQUENCE
+on the complete retained path from its origin. Require SUCCESS-P, GOAL-CHECKED-P,
+and GOAL-SATISFIED-P all T. It also checks exact endpoint equality. The latest
+*solution-paths* is only a standalone segment, not the cumulative witness.
+
+Migration evidence: constraint-evidence/checkpoint-replay-2026-09-21.log.
+Builder: constraint-evidence/build-search-checkpoint-2026-09-21.lisp, replay only.
+The archive stores the migration replay settings; the ledger retains the original
+measured search settings. No ledger grades were automatically upgraded.
+
+Ledger reconstruction, from repository root: load these under
+ doc/problems/crelay-topo/constraint-evidence/ in this exact order:
+1. build-realization-ledger-2026-09-20.lisp
+2. ingest-lk1-2026-09-20.lisp
+3. ingest-runs-2026-09-20.lisp
+4. ingest-lk4-bound-2026-09-20.lisp
+5. ingest-lk3-validation-2026-09-20.lisp
+6. ingest-lk7-validation-2026-09-20.lisp
+7. ingest-lk8-validation-2026-09-20.lisp
+8. ingest-lk9-found-2026-09-20.lisp
+9. ingest-lk4-found-2026-09-20.lisp
+10. ingest-lk5-bound-2026-09-21.lisp
+These ingest data, not search. Do not rerun an individual ingestion against an
+already-updated ledger; events append. The current ledger is already written.
+Evidence for this session is in the five correspondingly named .txt files.
+
+The lk4 old cutoff-8 bound describes the pre-excursion source; the new one-action
+find describes the post-switch source. Both survive; neither contradicts the other.
+The schema-gap candidate in lk4-bound-2026-09-20.txt still awaits D's hand filing.
+T11 remains deferred. No new extractor, scoring or schema-gap edits were made.

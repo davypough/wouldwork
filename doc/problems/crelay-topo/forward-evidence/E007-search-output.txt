@@ -1,0 +1,140 @@
+(solve-subgoal *crelay-box-start*
+  (and (has-location box1 location5)
+       (not (on box1 tray1*))
+       (holding agent1* tray1*)))
+Installing goal...
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=20)...
+Generating tasks: target=256, safety-cap-depth=20
+New path to goal found at depth = 1
+Solution found during task generation!
+Search completed during task generation
+
+Parallel Search Timing Breakdown:
+  Task generation: 1 ms
+  Worker search:   0 ms
+  Finalization:    0 ms
+  Total:           2 ms
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 20
+  Mean / shard  : 0.3
+  Max / shard   : 2
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #34(2) #1(1) #2(1) #6(1) #18(1)
+
+
+
+In problem CRELAY-TOPO, performed GRAPH search for FIRST solution.
+
+Search ended with first solution found.
+
+Depth cutoff = 1
+
+Maximum depth explored = 0
+
+Program cycles = 0
+
+Total states processed = 1
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Average branching factor = 0.0
+
+
+Candidate solution validation:
+  Nominal goal paths checked = 1
+  Accepted = 1
+  Rejected = 0
+
+Start state:
+((DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION4) (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2)
+ (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION5)
+ (HOLDING1 AGENT1* TRAY1*) (HOLDING1 AGENT1 BOX1) (HOLDING2 AGENT1* TRAY1*) (HOLDING2 AGENT1 BOX1) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1)
+ (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (OPEN GATE2) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1)
+ (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5))
+
+Goal:
+(AND (HAS-LOCATION BOX1 LOCATION5) (NOT (ON BOX1 TRAY1*)) (HOLDING AGENT1* TRAY1*))
+
+
+
+Total solution paths recorded = 1, of which 1 is/are unique solution paths
+Check *solution-paths* and *unique-solution-states* for solution records.
+
+Number of steps in first solution found: = 1
+
+Duration of first solution found = 22.0
+
+Solution path of first solution found from start state to goal state:
+(21.0 (START-STATE))
+((DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION4) (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2)
+ (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION5)
+ (HOLDING1 AGENT1* TRAY1*) (HOLDING1 AGENT1 BOX1) (HOLDING2 AGENT1* TRAY1*) (HOLDING2 AGENT1 BOX1) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1)
+ (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (OPEN GATE2) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1)
+ (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5))
+
+(22.0 (PUT-BOX > AGENT1 puts BOX1 on GROUND at LOCATION5))
+((DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION4) (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2)
+ (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION5)
+ (HAS-LOCATION BOX1 LOCATION5) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1)
+ (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (OPEN GATE2) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1)
+ (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5))
+
+
+
+Setup phase:
+
+Recording phase:
+(START-RECORDER)
+(PAUSE)
+(MOVE > AGENT1* moves via ((WALK LOCATION5 (GATE1) LOCATION1)))
+(STOP-RECORDER)
+
+Playback phase:
+(22.0 (PUT-BOX > AGENT1 puts BOX1 on GROUND at LOCATION5))
+(RESUME)
+Closure: synthesized.
+Cycle metrics: depth 1, elapsed time 1.0, value change 0.0.
+Complete solution totals: depth 1, elapsed time 1.0, value change 0.0.
+Evaluation took:
+  0.005 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  16,863,784 processor cycles
+  10,582,512 bytes consed

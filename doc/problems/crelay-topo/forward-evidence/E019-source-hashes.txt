@@ -1,0 +1,7 @@
+2026-09-19 preparation; no assistant-run Lisp.
+3eb5a982d8bcb29987be6d04b4c59c3d4b6390462d944f510e7a75285cb88c0b  probs/problem-crelay-topo.lisp
+35c705297263795643b43a19f452da3b8738be254de202b8b15560f402f14d5b  tech/jump.lisp
+b7d27f43b2288acc673a800971dba8ede8186572bcef47320fae7e62e1695837  tech/-recorder-core.lisp
+360f83725aad0a737df6ef902a2fd50aa17485ab23a1e274e621b7ad9e678d86  tech/-support-elevation.lisp
+502de581725755cbf6d54f732014903a4c53296b09f5102df7789da1ea7bdad4  tech/-vertical.lisp
+473a42220cab4bc59a89e419713d2b83f4224b8977b5da39041cbe74831fadad  tech/-support-motion.lisp

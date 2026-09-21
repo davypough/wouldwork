@@ -1,0 +1,29 @@
+User-reported lk7 find and phase-source validation, 2026-09-20.
+Search: chained two-plate goal, cutoff 8, threads 0, from restored lk3 endpoint.
+Goal: (and (depressed plate4) (depressed plate5)).
+Five additional actions; cumulative depth 11. No wall-clock duration supplied.
+
+(MOVE > AGENT1 moves via ((WALK LOCATION13 (GATE3 GATE5) LOCATION7)))
+(PICKUP-TRAY > AGENT1 picks up TRAY1 at LOCATION7 from LOCATION7)
+(MOVE > AGENT1 moves via ((WALK LOCATION7 (GATE3 GATE5) LOCATION12)))
+(PUT-TRAY > AGENT1 puts TRAY1 on PLATE4 at LOCATION13)
+(MOVE > AGENT1 moves via ((STEP (LOCATION12 GROUND) NIL (LOCATION12 PLATE5))))
+
+Validation from (goal-chain-phase-source-state *phase*) over the phase's path:
+:SUCCESS-P T
+:ACTION-COUNT 5
+:FAILURE-INDEX NIL
+:FAILURE-ACTION NIL
+:FAILURE-REASON NIL
+:GOAL-CHECKED-P T
+:GOAL-SATISFIED-P T
+
+Reported endpoint includes (ON TRAY1 PLATE4), (ON AGENT1 PLATE5),
+(HAS-LOCATION AGENT1 LOCATION12), (HAS-LOCATION TRAY1 LOCATION13),
+(ON TRAY1* PLATE2), (ON AGENT1* PLATE1), (OPEN GATE6),
+(RECORDER-CYCLES-USED 1), and (RECORDING-IN-PROGRESS).
+
+This closes the stated two-plate milestone only. Its goal did not require
+non-agent occupants, despite its stronger intent wording. Readiness to leave
+for location14 remains unestablished. The next existing recommendation is lk8
+at cutoff 6; exhaustion would bound this checkpoint, not refute the excursion.

@@ -595,7 +595,8 @@ to the search's candidate-validation diagnostics."
        (format t "~%All ~D action~:P executed successfully.~%" action-count)
        (format t "Goal NOT satisfied.~%")
        (format t "~%Intermediate state:~%")
-       (display-validation-state final-state)))))
+       (display-validation-state final-state)
+       final-state))))
 
 
 (defun display-validation-state (state)

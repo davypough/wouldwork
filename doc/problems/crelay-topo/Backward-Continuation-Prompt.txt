@@ -1,0 +1,346 @@
+Crelay-Topo Backward Analysis -- Continuation Prompt
+===================================================
+Regenerated 2026-09-18 at the end of session 5.  THE STATE FILES ARE
+AUTHORITATIVE: if anything here disagrees with Backward-Tree.txt,
+Backward-Justification.txt or Backward-Rules-Facts.txt, the files win and
+this prompt is stale (that happened once, when session 4's regeneration
+did not carry session 4's own results; session 5 opened by noticing it).
+
+Paste this into a new session to resume the incremental backward analysis
+of the crelay-topo problem.
+
+TASK
+----
+We are building a formal, incremental backward (regression) analysis of
+probs/problem-crelay-topo.lisp, one small step per turn, waiting for my
+approval between steps.  The aim is a backward method that does not lean
+on the known 94-action solution.  This method is being built for problems
+where NO solution is known, so nothing in it may depend on one: see H6.
+The known solution may be consulted once, after a branch has been carried
+to a checkpoint on its own, as a post-hoc check that the method found a
+solution at all -- never to choose, rank, prune or reassure.  Treat the
+subgoal-solution files as SEALED during expansion.
+Any solution is acceptable -- minimality is not required.
+
+READ FIRST (they carry the whole state of the work)
+---------------------------------------------------
+  doc/problems/crelay-topo/Backward-Tree.txt            the node tree
+  doc/problems/crelay-topo/Backward-Justification.txt   why each node holds
+  doc/problems/crelay-topo/Backward-Rules-Facts.txt     heuristic, rules
+                                                        R1-R17, facts,
+                                                        lemmas T1-T25,
+                                                        pruning analogues
+  probs/problem-crelay-topo.lisp                        the problem spec
+  doc/problems/crelay-topo/Initial-Conditions.txt       regenerated
+                                                        2026-09-17, 21
+                                                        locations, current
+  doc/problems/crelay-topo/test13-progress.txt          the 14-action
+                                                        chain to the L20
+                                                        hover state, for
+                                                        IMPORT-SUBGOAL-
+                                                        PROGRESS
+Older narrative drafts, superseded: Working-Backwards-from-Goal.txt and
+the subgoal-solution files -- the latter hold the validated solution and
+are SEALED during expansion (H6).
+
+METHOD IN FORCE
+---------------
+Node kinds S (state conditions), A (action), P (parameter grouping).
+Status A active, O open, X excluded at creation, R refuted, D done.
+Each non-X, non-R node carries f = depth + h, h from the landmark
+heuristic H1.  Expand the open node with the smallest f; ties go to fewer
+ghost conditions, then fewer gate conditions, then greater role
+consolidation (H2).  Nothing is pruned on f: every exclusion rests on
+logic -- T4 relevance, T7 and T13 dominance, the T15/T24 census,
+contradiction -- never on a bound.  S nodes keep complete condition sets
+(T4) and carry aliases N1, N2, ... in creation order.  A refuted node
+keeps its header with status R, its cites, and a one-line
+"REFUTED <date>: <reason>" beneath it.
+
+H1 is revisable, and revision is not optional: a correction that changes
+any f difference between OPEN nodes is applied and every affected f
+recomputed before the next expansion.  A correction that shifts the
+frontier uniformly is applied too but reorders nothing.
+
+H3, the audit, runs at EVERY expansion, BEFORE the children are ranked --
+A provenance, B delivery, C access, D session, E interference, F
+dominance, G over-specification, H solution-independence.  A to D give h
+increments; E, F and G change the node.  Each justification entry carries
+an Audit line naming the checks that fired and those that ran clean.
+Session 5's lesson for the audit: run check D (session) as a COUNT of
+ghost bodies against the recording-side gates the ghost must pass (R16,
+T23) -- that is what refuted thirty-two nodes at once.
+
+H4, measurement: (SOLVE-SUBGOAL *START-STATE* <goal>) with a modest
+cutoff gives an admissible lower bound by construction.  Never hand-build
+a start state.  Ceiling from the true start: about cutoff 14 (17 took
+395 s with 16 threads).  From a mid-problem state the ceiling is FAR
+lower: see the instrument notes below.
+
+H7, forward exact solving: H6 forbids BORROWED knowledge, not GENERATED
+knowledge.  A landmark solution gives a number, a witness, a reachable
+legal end state to chain from, and a shape.  CAVEAT on shape: one plan is
+one witness; it shows what is possible, never what is necessary.  A
+node may be refuted by a COUNT or a CODE READING, never by a witness.
+The method ENDS when the two frontiers meet: a backward node whose
+complete condition set is satisfied by a reachable state yields a whole
+plan and is marked D.
+
+H6, solution independence: no condition set, exclusion, landmark value,
+expansion order or tie-break may cite a known solution.  H3 check H asks
+at every node whether each reason could have been given on an unsolved
+problem.
+
+H5, session hygiene: when the dialogue outweighs the three state files, or
+findings are being restated rather than remembered, STOP EXPANDING, write
+the files current, regenerate this prompt so that it alone carries the
+position, and recommend a fresh session.  Regenerate it AFTER the last
+file edit of the session, and make it agree with the files.
+
+RUNNING WOULDWORK, AND HOW RUNS FEED THE ANALYSIS
+--------------------------------------------------
+Reload and stage.  After any file change:
+    (progn (ql:quickload :wouldwork) (in-package :ww))
+    (stage crelay-topo)
+STAGE reinitializes settings from the problem spec, so restage between
+runs.  The spec sets *problem-type* planning, *solution-type* MIN-LENGTH,
+*tree-or-graph* graph, *depth-cutoff* 15.  MIN-LENGTH is what makes a
+returned path a guaranteed minimum.
+
+The call.  (SOLVE-SUBGOAL <start> <goal>), goal UNQUOTED.  Two forms:
+    (solve-subgoal <goal>)                 next milestone of a chain;
+                                           needs (ww-set *threads* 0)
+    (solve-subgoal *start-state* <goal>)   one-off, serial or parallel
+Write goal relations as the state listings print them: (has-location
+agent1 location19), (open gate8), (and (not ...) ...).
+
+Reading a result.
+  a path        the minimum, guaranteed, given MIN-LENGTH.
+  no solution   for the one-off form from a concrete start, the space was
+                exhausted to the cutoff, so the goal costs cutoff+1 or
+                more.
+  a chain segment truncated by the cutoff proves nothing -- raise the
+                cutoff and reissue.
+
+INSTRUMENT NOTES, MEASURED IN SESSION 5 (test 13)
+--------------------------------------------------
+* (ww-set *threads* N) crossing the 0/parallel boundary calls
+  (asdf:load-system :wouldwork :force t), which RE-STAGES the problem and
+  resets *START-STATE*.  So the two-argument one-off with 16 threads from
+  a chained state does not exist: the chain is gone.  Set *threads*
+  first, then rebuild the state with VALIDATE-ACTION-SEQUENCE on the
+  exported action list (compact forms as EXPORT-SUBGOAL-PROGRESS writes
+  them work directly), then search from ACTION-SEQUENCE-VALIDATION-
+  FINAL-STATE.
+* A mid-problem state with two ghosts and the blower stream running has
+  a branching factor near 5.6; cutoff 10 from it processed 37 million
+  states in 40 minutes with 16 threads, at 5.2 GB, without finishing
+  branch 4 of 25.  Treat cutoff 8 as the ceiling from such states (the
+  serial cutoff-8 probe took 387 s), and ask SHORT chained milestones
+  instead: five of them, cutoffs 1-4, answered in 8 seconds total.
+* IMPORT-SUBGOAL-PROGRESS restores a chain into a freshly staged problem
+  (threads 0); test13-progress.txt in the repo folder is the 14-action
+  chain to the L20 hover state.  Keep exports in the repo folder, not the
+  scratchpad, which does not survive a session.
+* A one-off search that says "Start state: ((DEPRESSED PLATE2) (HAS-
+  LOCATION AGENT1 LOCATION1) ..." ran from the TRUE start whatever you
+  passed it; read that line before believing the number.
+* On this Windows machine (Git Bash): `python`, not `python3`; $TMPDIR is
+  unset; files in tech/ begin with `-`, so grep them with `-- *.lisp`.
+
+HOW A RUN FEEDS THE TREE
+------------------------
+1  Target a LANDMARK CLUSTER or a single conjunct, never a node.
+2  Choose the start by what kind of answer you need: a PLAN from any
+   legal start is a witness; an EXHAUSTION is sound only for that state;
+   a LOWER BOUND on h needs *START-STATE*.  Derive intermediate starts
+   by chain or replay, never by hand.
+3  PREDICT THE NUMBER AND THE MECHANISM FIRST, in writing.  Three of six
+   predictions have been wrong about mechanism (K15, the alcove, the
+   tray loading), never about price alone.
+4  Run at the smallest plausible cutoff; chain short milestones.
+5  Read the TRACE, then the LISTINGS, then the NUMBER.
+6  Feed back: a measured K replaces an argued one; record both values.
+7  Disjointness: measure A, B, then A and B together (not yet run).
+8  Exhaustion is a result: cost > cutoff for that state.
+9  When search cannot reach it, change instrument.
+10 A negative result on a short segment with an obvious route (test 13's
+   W3: two actions available, exhausted at 3) means a RULE you have not
+   read.  Go read the code before arguing.
+
+WHERE THE ANALYSIS STANDS
+-------------------------
+Base h 29 (K14's live +2 folded in on 2026-09-18).  Session 5 made NO
+EXPANSION.  It re-audited N13 under F20 and K17 and refuted it, with
+thirty-one other nodes, on a code-verified count (T23); then ran test 13.
+
+The decisive fact, R16 and T23: a ghost passes only RECORDING-OPEN gates,
+and a recording plate is depressed only by GHOST weight (while a live
+plate is depressed by either layer).  A ghost is born at L1, so leaving
+the strip strands a ghost object on plate1, crossing gate3 strands one on
+plate2, and entering L14 pins two on plates 4 and 5: four objects, three
+exist.  No ghost ever reaches L14, so none ever toggles switch2; the
+recording switch2 is set only by copying a live-on switch at a fork,
+which shuts recording gate5 in the same stroke.  NO GHOST EVER PASSES
+GATE7 -- not to L14, L15, L21 or the plate room, in any cycle.  Hence:
+  * agent1 throws switch2 itself, from L14, with live gate6 held by any
+    two bodies of either layer (K14 live, universal);
+  * every gate9 occupant is a live object or a copy inherited at a fork
+    with its live original already on the plate (F18, T18);
+  * a freed ghost keeps agent1* and ONE ghost object for the south and
+    the NE cluster; an unfreed ghost keeps all three where they forked;
+  * T24, the census with keepers, refuted N14, the L14 source of N5's
+    walk, and 1.1.4 (seven or eight slots against at most six bodies).
+What a ghost CAN still do: hold plate1 for agent1's exits (K2, free);
+stand on plate 3, 4 or 5; carry its one free object there or to L9; hold
+tray1* at L9 as the riser for live connector1 (rule 19); place
+connector1* as a chain link; ferry agent1 across recording-open gate5 on
+tray1* (T25, the only way north after T12's lock); and, without moving,
+hand every copy to the live view where its original stood at the fork
+(T18) -- a raised connector1* on box1* at L9, or a copy on a gate9 plate.
+
+Test 13 (loading agent1's held tray) then measured K10: from the ground
+NOBODY can set cargo on a ghost-held tray (R17: placement reach 1, held
+tray top 3/2), so T9's ghost-release loading needs agent1 standing on
+box1 at the loading spot; and the blower loading is >= 9 from a state
+that already has the stream running.  K10 +2 -> +4 as a floor; the tray
+subtree rose by 2.
+
+Frontier, by f:
+  30  1.1.1.1.1.1.1.3.1.1.4   [P] under N11: ?cargo riding tray1* held by
+                              agent1* in the cluster (R17 bites: how did
+                              it get there?  From a raised stand, or by
+                              settling from agent1's own released tray)
+      1.1.1.1.1.1.1.3.1.6     [A] under N11: a ghost action lights
+                              receiver1 -- connector1* placed at L9 or
+                              L8, or a ghost occluder cleared
+      1.1.1.1.1.1.2.3         [P] under N3's pickup: ?cargo on
+                              ?other-plate beside a ghost co-occupant,
+                              necessarily an inherited copy (T18, T23)
+  31  1.1, 1.1.1, N2 (active, not open); the L15 source
+      1.1.1.1.1.1.1.2 (active); N11 and its .7; 1.1.2; 1.1.3
+  32  N4, N5, N10, N12, N6, N7, the tray-release action and its P
+  33+ the rest
+Tie at 30 by H2: all three need one ghost condition.  1.1.1.1.1.1.2.3
+needs NO gate condition (agent1 already in the room); the two N11
+children need switch2 on and receiver1 active.  Recommendation: expand
+1.1.1.1.1.1.2.3 -- it is also the only ghost-occupant mechanism T23 left
+standing, and it forces the question of what is on which plate at the
+fork.  Ask before expanding it.
+
+FIRST TASKS OF THE NEXT SESSION, BEFORE ANY EXPANSION
+------------------------------------------------------
+1  K18, the alcove, is recorded as PENDING APPROVAL at the end of the
+   test 13 entry.  T23 makes all three gate9 occupants live objects or
+   their copies, so box1 reaches the room in every solution and must be
+   lifted at L6, which only an agent standing in L6 can do (F10: no reach
+   edge into L6).  Test 12 measured agent1 into L6 at 19 from the start;
+   K1, K2 and K15 account for 11; the other 8 are counted nowhere.
+   +8 uniformly, base 29 -> 37, reorders nothing.  Decide, apply if
+   approved (every f +8; a python pass over the headers, tested with
+   grep first -- the S-node header has ONE space before the alias,
+   "[S] N13", the A/P headers two spaces before the status).
+2  Re-rank (nothing should move), run H3 on the chosen 30-tier node, and
+   ask before expanding it.
+
+WHAT THE THIRTEEN MEASUREMENTS ESTABLISHED
+-------------------------------------------
+1-5   agent1 out of the west strip 4 (K1, K2 exact; F17, F18, T18, T19);
+      a ghost outside the strip 11 (K15 = +8, replace-don't-free, K16,
+      T20); (open gate8) exhausted at 14 and 17, so gate8 costs 18 or
+      more; test 4 inconclusive (hand-built state).
+6     chained (on tray1 plate3): 7; T20 live in the listing.
+7     BEAM-VISIBLE table (F20): transmitter1 only from L3 L7 L8 L9 and
+      only with gate4 open; receiver1 only from L15 (any height) and L9
+      (top >= 2); repeater1 only from L8 L9 (any) and L15 (top >= 2).
+8-11  alcove exhaustions at cutoffs 4-15 -- all below the true 19; the
+      old T22 (box1 dead) was drawn from them and RETRACTED by test 12.
+12    agent1 into L6: 19, by a freed ghost holding tray1* at L5 as a
+      landing pad for agent1 dropping off the L20 stream, then a live
+      toggle and a jump through gate2 (F22 corrected).
+13    tray loading from the L20 hover state: ghost holds tray1* 1; agent1
+      to connector1 at plate1 2 (one MOVE jumps L20 -> L5 and walks on
+      through gate1); connector1 ONTO THE GHOST TRAY EXHAUSTED at 3 with
+      a two-action route available -> R17; agent1 holds tray1 3; blower
+      loading with the ghost tray pinned exhausted at 8.
+
+THE OPEN QUESTION, AS IT NOW STANDS
+------------------------------------
+Who is standing where at agent1's LAST inbound crossing of gate8?  At
+that moment plate3 must be held, a connector raised at L9 (or the chain
+through L15), and its riser present -- and none of those bodies can be
+one of the three live objects unless it is in agent1's own hands as a
+loaded stack.  Session 5 tried to close a plan on paper from T23 and
+came out ONE GHOST BODY SHORT every way it turned: plate1 (exit), plate2
+(gate3 eastward), plate3, relay and riser want five ghost-side bodies
+and four exist (agent1* plus three copies, two of which are stranded if
+the ghost leaves the strip).  That argument is NOT recorded as a lemma:
+it is exactly the shape of reasoning that has been wrong three times
+(H7), and the sealed solution says a plan exists.  It is recorded here so
+the next session knows where the pressure is and what to measure:
+  (i)   fork-inheritance inside the room: chain agent1 carrying one live
+        object onto a gate9 plate, back to L1 (T25: free), CANCEL,
+        START; read the listing for the copy on the plate and for what
+        the fork does to plate3 / the relay.  This is the mechanism the
+        tree has never priced.
+  (ii)  the ghost ferry: from a state with the ghost north of gate5
+        holding tray1*, agent1 riding, live switch2 on -- does the MOVE
+        through recording-open gate5 carry agent1?  (T25 asserts it from
+        R1b and rule 19; unmeasured.)
+  (iii) the blower loading mechanism itself, from a state where box1 is
+        already fetched (it may be the stand the placement needs).
+  (iv)  whether a live tray release beside a ghost-held tray of equal
+        height settles the rider onto the ghost tray (R12 says yes;
+        unmeasured) -- the reverse hand-off, which would let the ghost
+        ferry cargo.
+If (i)-(iv) all come back as the code reads, the count stands and the
+problem as currently coded may have no solution -- in which case the
+sealed solution should be re-validated by ME (validate-solution under
+the current code; the 2026-09-17 switch.lisp change post-dates it), not
+read by the assistant.
+
+CODE CHANGES ALREADY MADE AND TESTED
+------------------------------------
+1. tech/beam-relay.lisp: PICKUP-CONNECTOR-RETAINING-PAIRINGS beside
+   PICKUP-CONNECTOR.  Tested; used by the search in tests 2 and 13.
+2. tech/switch.lisp: a ghost's TOGGLE-SWITCH flips both RECORDING-
+   SWITCHED-ON and the live SWITCHED-ON; a live toggle flips only the
+   live one.  Tested (test 12's ghost toggle launched agent1).
+3. src/ww-goal-chaining.lisp, src/ww-installer.lisp, src/ww-advisor.lisp:
+   a quoted goal errors instead of silently installing (QUOTE ...).
+None of these three is committed; git status shows them modified.
+
+OPEN ITEMS
+----------
+- The engine's own bound is 0 for this problem: TOPO-RESOURCE-LOCATION-
+  TASKS is skipped whenever the problem has a blower drive.  Consider
+  letting the agent-location task survive a blower.
+- The one-off SOLVE-SUBGOAL form should refuse, or warn, when *threads*
+  crossed the boundary since the state was made -- it silently searched
+  from the true start in test 13's first attempt.
+- L21 and L15 have no fixture role; L15 is a known occluder on the
+  L9 -> receiver1 line.
+- Staging in session 5 rewrote src/problem.lisp and vals.lisp with
+  crelay-topo, which was what was staged before; harmless.
+- Scratch scripts and logs of test 13 are in the session-5 scratchpad
+  (test13*.lisp, test13*.log); only test13-progress.txt was copied into
+  the repo folder.  Nothing depends on the rest.
+
+MY PREFERENCES
+--------------
+As you perform individual analyses, tests, and reviews, provide a concise
+explanation of why, what, and conclusion for each as you go.
+
+When you would like a response from me, present the questions/comments
+as numbered items for easy reference.
+
+Do NOT try to use the Filesystem extension -- diagnosed and ruled out
+2026-09-17 (client-side schema validation; no version of the package
+works here).  Use the shell with in-place edits, or the Write/Edit tools
+with anchors copied from a fresh read; every anchor typed from memory in
+session 5 missed.  Base every analysis on the current files, not on
+remembered code -- and never on a data table without the code that reads
+it (F19), nor on an action's existence without its preconditions (R17).
+Keep explanations short, present whole functions with changed lines
+marked, deal with one issue at a time, and give me a REPL expression
+after any edit.  Ask before proceeding to each next backward step.

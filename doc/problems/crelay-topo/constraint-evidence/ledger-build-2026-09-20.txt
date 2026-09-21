@@ -1,0 +1,348 @@
+Crelay-topo realization ledger -- build record.  2026-09-20, T10 first half.
+===========================================================================
+
+WHAT THIS IS.  The output of
+  doc/problems/crelay-topo/constraint-evidence/build-realization-ledger-2026-09-20.lisp,
+which writes Constraint-Realization-Ledger.txt and prints the ledger, the search
+recommendations and the questionnaire.  NOTHING WAS STAGED, NO PROBLEM WAS LOADED AND
+NO SEARCH WAS RUN.  The builder reads no file at run time: every fact in it was taken by
+hand from the permitted sources named in its header and written into the script.
+
+WHERE IT RAN, disclosed because it is not lumpy: an isolated cloud sandbox with a stock
+SBCL.  The builder is deterministic and its dates are fixed strings, so re-running it on
+lumpy must reproduce the ledger byte for byte.  SHA-256 of the ledger as written here:
+  BF4EE922D54919AD530224ED3927678215630EC667716E517D6F6AFDA2C7D794
+  bytes: 27819
+
+CONTAMINATION.  No C1-sealed file was opened to build this: not Backward-*, not
+Forward-*, not Initial-Conditions.txt, and not subgoal-solution-*, which is sealed
+always.  The goal and the agent's initial location were read from the INSTANCE,
+probs/problem-crelay-topo.lisp, which C1 names as a permitted source.  The spine, the
+regions, the control table and the occupancy pools came from
+Constraint-Static-Profile.txt, which is generated output.  AM5, AM6 and the
+approach-side correction came from Constraint-Abstract-Model.txt.
+
+WHAT IS CLAIMED AND WHAT IS NOT.  Six links, one per spine crossing between the agent's
+initial region and the goal region.  Each rests on the spine premise, which is grade 2
+UNDER THE QUOTIENT'S STATED RELAXATION -- S4 itself prints the missing movement-coverage
+premise, and that gap is carried on the spine premise rather than dropped.  No link is
+claimed to be realizable; every one is OPEN and none has been searched.
+
+----------------------------------------------------------------------------
+
+
+
+LEDGER  REALIZATION LEDGER  [interactive-phase state for crelay-topo]
+-------------------------------------------------------------
+  SCOPE: a record of what is claimed and what it rests on.  It derives nothing.
+  STANDING is computed from the dependency closure and never stored.  A record
+  printed CONDITIONAL rests on at least one live guess or one cost bound.
+  NOTE: RO prints "status CONDITIONAL" for what this reporter calls STANDING.
+  This file's :STATUS is the stored lifecycle, which RO has no analogue for.
+
+  OPEN LINKS (6)
+    lk1  cross R1 -> R8: the first spine crossing, and the only one whose start state is the staged one
+      from: the agent somewhere in R1
+      to:   the agent somewhere in R8
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether a witness can be put on the required support without spending the agent, which the budget says costs one of eight occupants
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk2  cross R8 -> R2: crosses the support S3 places at an endpoint of R8
+      from: the agent somewhere in R8
+      to:   the agent somewhere in R2
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether a witness can be put on the required support without spending the agent, which the budget says costs one of eight occupants
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk3  cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair
+      from: the agent somewhere in R2
+      to:   the agent somewhere in R3
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk4  cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5
+      from: the agent somewhere in R3
+      to:   the agent somewhere in R5
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk5  cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier
+      from: the agent somewhere in R5
+      to:   the agent somewhere in R6
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether a relay is required at all, and whether a relay role can share a support with a pressure role
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk6  cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone
+      from: the agent somewhere in R6
+      to:   the agent somewhere in R7
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether three witnesses can be present on the approach side simultaneously, which the budget makes tight and RO reports as conditional
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+
+  SETTLED LINKS (0)
+
+  PREMISES IN FORCE (10)
+    pr1  standing established; status in-force  the problem's goal places the agent at the sole endpoint of the last region of the spine
+    pr2  standing established; status in-force  the agent's initial location lies in the first region of the spine
+    pr3  standing established; status in-force  the region quotient relaxes all other doors, elevation and cargo conditions, so a route through it is a candidate and not a plan
+    pr4  standing established; status in-force  the adjacency spine joins the first region to the last only through five intermediate regions, crossing six controlled devices in one fixed order
+    pr5  standing established; status in-force  two of the six devices are controlled by opposite polarities of one switch and are therefore never open together
+    pr6  standing established; status in-force  ON is keyed by the occupant, so the map from an occupied support to its witness is injective
+    pr7  standing established; status in-force  support occupancy is layer-blind, so distinct required supports need distinct witnesses and a ghost counts as one
+    pr8  standing established; status in-force  two of the six devices each require one depressed support, at endpoints the quotient places in the region the crossing starts from
+    pr9  standing established; status in-force  the last device requires three distinct depressed supports, all at endpoints the quotient places on the APPROACH side of its crossing
+    pr10  standing established; status in-force  one of the six devices sits at control depth 2 behind a receiver, and the identity of the device supplying it is not decidable from the control algebra
+
+  PREMISES DISCHARGED (0)
+
+  COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)  (0)
+
+  OPEN QUESTIONS (9)
+    qn1  standing established; status open  Does the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state occur in every solution, or only in some?
+    qn2  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, do any ghost occupants exist?
+    qn3  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, does the agent occupy any of the required supports (plate1)?
+    qn4  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, can a witness removed from a required support be replaced by another before the aggregate is read?
+    qn5  standing established; status open  Can a recorder cycle boundary occur within the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state?
+    qn6  standing established; status open  For the required supports (plate1), can every available witness reach every one of them?
+    qn7  standing established; status open  For the required supports (plate1), does elevation admit every witness-to-support pairing?
+    qn8  standing established; status open  For the required supports (plate1), does occupancy history admit every witness-to-support pairing?
+    qn9  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, which of the present occupants (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*) are actually available as witnesses?
+
+  ANSWERED QUESTIONS (0)
+
+  RETRACTED OR REFUTED PREMISES (0)
+
+  INVALIDATED LINKS (0)
+
+  no obligation, no necessity and no plan witness is derived by this component.
+
+
+RECOMMENDED SEARCHES  [for crelay-topo]
+--------------------------------------------------------------
+  SCOPE: what to run and what each outcome would establish.  It runs nothing.
+  Every reading below was written BEFORE its run, which is what stops an
+  exhaustion from being reinterpreted once its outcome is known.
+
+  OPEN LINKS (6)
+    lk1  cross R1 -> R8: the first spine crossing, and the only one whose start state is the staged one
+      standing established; rests on pr2, pr4, pr3, pr8, pr7, pr6
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location20) (has-location agent1 location3) (has-location agent1 location4) (has-location agent1 location5) (has-location agent1 location7)))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk1 from the stated start within 8 actions.  It makes lk1 :REALIZED.  It CLOSES lk1 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk1 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk1 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+    lk2  cross R8 -> R2: crosses the support S3 places at an endpoint of R8
+      standing established; rests on pr4, pr3, pr8, pr7, pr6
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location10) (has-location agent1 location8) (has-location agent1 location9)))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk2 from the stated start within 8 actions.  It makes lk2 :REALIZED.  It CLOSES lk2 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk2 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk2 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+    lk3  cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair
+      standing established; rests on pr4, pr3, pr5
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location11) (has-location agent1 location12) (has-location agent1 location13)))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk3 from the stated start within 8 actions.  It makes lk3 :REALIZED.  It CLOSES lk3 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk3 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk3 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+    lk4  cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5
+      standing established; rests on pr4, pr3, pr5
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (has-location agent1 location15))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk4 from the stated start within 8 actions.  It makes lk4 :REALIZED.  It CLOSES lk4 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+    lk5  cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier
+      standing established; rests on pr4, pr3, pr10
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location16) (has-location agent1 location17) (has-location agent1 location18) (has-location agent1 location21)))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk5 from the stated start within 8 actions.  It makes lk5 :REALIZED.  It CLOSES lk5 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk5 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk5 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+    lk6  cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone
+      standing established; rests on pr1, pr4, pr3, pr9, pr7, pr6
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (has-location agent1 location19))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk6 from the stated start within 8 actions.  It makes lk6 :REALIZED.  It CLOSES lk6 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk6 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk6 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+
+  a recommendation is not an approval to run it.
+
+
+QUESTIONS  [for crelay-topo]
+--------------------------------------------------------------
+  Each of these is a premise the analysis could not settle.  Answer from
+  intuition; the default is :unknown and costs nothing.
+  AN ANSWER IS A PREMISE, NOT A FINDING.  It is filed as user-asserted, and
+  everything resting on it reads CONDITIONAL for as long as it stands.
+
+  OPEN (9)
+
+    qn1  [one-of]
+      blocks lk1
+      Does the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state occur in every solution, or only in some?
+        1. :occurs-in-every-solution
+        2. :occurs-in-some-solution-only
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: RO allocates inside a stated segment; it never establishes that the segment occurs. An answer here is a premise, not a finding.
+      answer with: (answer-ledger-question ledger 'qn1 <answer> "<the premise in your words>" "D")
+
+    qn2  [one-of]
+      blocks lk1
+      In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, do any ghost occupants exist?
+        1. :no-ghost-occupants-exist
+        2. :ghost-occupants-exist
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: S2 makes occupancy layer-blind, so a ghost depresses a support exactly as a live body does. This changes the size of the pool, not the matching rule.
+      answer with: (answer-ledger-question ledger 'qn2 <answer> "<the premise in your words>" "D")
+
+    qn3  [one-of]
+      blocks lk1
+      In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, does the agent occupy any of the required supports (plate1)?
+        1. :agent-occupies-none-of-them
+        2. :agent-occupies-one-of-them
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The agent is one of the occupants. Whether it is spent on a support decides whether the remaining pool can cover the rest.
+      answer with: (answer-ledger-question ledger 'qn3 <answer> "<the premise in your words>" "D")
+
+    qn4  [one-of]
+      blocks lk1
+      In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, can a witness removed from a required support be replaced by another before the aggregate is read?
+        1. :a-replacement-witness-exists
+        2. :no-replacement-witness-exists
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: Removing the last eligible witness closes the device in the same propagation. Whether a replacement exists is what separates a momentary loss from a lasting one, and RO does not decide it.
+      answer with: (answer-ledger-question ledger 'qn4 <answer> "<the premise in your words>" "D")
+
+    qn5  [one-of]
+      blocks lk1
+      Can a recorder cycle boundary occur within the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state?
+        1. :a-cycle-boundary-can-occur
+        2. :no-cycle-boundary-occurs-here
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: A boundary removes ghost state and normalizes the shadow, so it changes the available pool mid-segment. No extractor reads the cycle structure; that is G8, and this question is the hand reading it asks for.
+      answer with: (answer-ledger-question ledger 'qn5 <answer> "<the premise in your words>" "D")
+
+    qn6  [one-of]
+      blocks lk1
+      For the required supports (plate1), can every available witness reach every one of them?
+        1. :every-available-witness-can-reach-every-support
+        2. :some-witness-support-pair-is-out-of-reach
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: RO's eligibility restricts by availability alone and says so at the claim site. Reach is the first of the three restrictions it leaves open.
+      answer with: (answer-ledger-question ledger 'qn6 <answer> "<the premise in your words>" "D")
+
+    qn7  [one-of]
+      blocks lk1
+      For the required supports (plate1), does elevation admit every witness-to-support pairing?
+        1. :elevation-admits-every-pairing
+        2. :some-pairing-is-blocked-by-elevation
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The second restriction RO leaves open. S5 is not written, so this is a hand reading until it is.
+      answer with: (answer-ledger-question ledger 'qn7 <answer> "<the premise in your words>" "D")
+
+    qn8  [one-of]
+      blocks lk1
+      For the required supports (plate1), does occupancy history admit every witness-to-support pairing?
+        1. :occupancy-history-admits-every-pairing
+        2. :some-pairing-is-excluded-by-history
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The third restriction RO leaves open. A body that was never where it would have to start from is not eligible, however available it is.
+      answer with: (answer-ledger-question ledger 'qn8 <answer> "<the premise in your words>" "D")
+
+    qn9  [subset-of]
+      blocks lk1
+      In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, which of the present occupants (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*) are actually available as witnesses?
+        1. agent1
+        2. agent1*
+        3. box1
+        4. box1*
+        5. connector1
+        6. connector1*
+        7. tray1
+        8. tray1*
+        9. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: Presence is not availability. A declared type extent states who exists, not who is free; an absent answer leaves RO reporting demand only.
+      answer with: (answer-ledger-question ledger 'qn9 <answer> "<the premise in your words>" "D")
+
+  ANSWERED (0)
+
+  answering settles what rests on the answer, never that the answer is true.

@@ -1,0 +1,206 @@
+
+
+S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
+--------------------------------------------------------------
+  SCOPE: graph reachability relaxes all other doors, elevation and cargo conditions.
+  It omits non-traversal relocation, support transitions and recorder lifecycle.
+  Graph cuts and approach-only regions therefore do NOT prove concrete stranding.
+  Pressure counts require ON's functional key and the relevant view's occupancy semantics.
+  Device-state conclusions additionally require the printed S1 axiom premises.
+
+  controlled devices (10); spine rows (11); spine check :VERIFIED-AGAINST-QUOTIENT
+
+    blower1 == switch1
+      state recording-turning: state == aggregate; empty-type premises (jammer)
+      state turning: state == aggregate; empty-type premises (jammer)
+      controller switch1: SWITCH; position unresolved; region UNRESOLVED
+        manipulation reach candidates (location region required-open barriers): ((location20 "r8" nil) (location4 "r8" nil) (location5 "r8" nil) (location6 "r9" (gate2)))
+        persistent state; no continuous weight requirement inferred.
+      positive pressure alternatives (nil); individually mandatory nil
+      conditional shortage: available eligible ON witnesses < 0 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      no movement-spine occurrence; nonmovement function UNRESOLVED, not inert.
+
+    gate1 == plate1
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller plate1: PRESSURE; position location2; region R1
+      positive pressure alternatives ((plate1)); individually mandatory (plate1)
+      conditional shortage: available eligible ON witnesses < 1 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate1))
+        R1 -> R8, device absent: source reaches ("R1"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9")
+          graph cut in this direction: YES
+          mandatory pressure plate1 at R1: BOTH
+        R8 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9"); destination reaches ("R1")
+          graph cut in this direction: NO, bypass exists
+          mandatory pressure plate1 at R1: BOTH
+
+    gate2 == (not switch1)
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller switch1: SWITCH; position unresolved; region UNRESOLVED
+        manipulation reach candidates (location region required-open barriers): ((location20 "r8" nil) (location4 "r8" nil) (location5 "r8" nil) (location6 "r9" (gate2)))
+        persistent state; no continuous weight requirement inferred.
+      positive pressure alternatives nil; individually mandatory nil
+      inverted aggregate: no positive keeper demand inferred.
+      spine mode jumping, family ((gate2))
+        R8 -> R9, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R9")
+          graph cut in this direction: YES
+        R9 -> R8, device absent: source reaches ("R9"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8")
+          graph cut in this direction: YES
+
+    gate3 == plate2
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller plate2: PRESSURE; position location7; region R8
+      positive pressure alternatives ((plate2)); individually mandatory (plate2)
+      conditional shortage: available eligible ON witnesses < 1 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate3))
+        R2 -> R8, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9"); destination reaches ("R1" "R8" "R9")
+          graph cut in this direction: NO, bypass exists
+          mandatory pressure plate2 at R8: BOTH
+        R8 -> R2, device absent: source reaches ("R1" "R8" "R9"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9")
+          graph cut in this direction: YES
+          mandatory pressure plate2 at R8: BOTH
+
+    gate4 == plate3
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller plate3: PRESSURE; position location10; region R2
+      positive pressure alternatives ((plate3)); individually mandatory (plate3)
+      conditional shortage: available eligible ON witnesses < 1 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      no movement-spine occurrence; nonmovement function UNRESOLVED, not inert.
+
+    gate5 == (not switch2)
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller switch2: SWITCH; position unresolved; region UNRESOLVED
+        manipulation reach candidates (location region required-open barriers): ((location14 "r4" nil))
+        persistent state; no continuous weight requirement inferred.
+      positive pressure alternatives nil; individually mandatory nil
+      inverted aggregate: no positive keeper demand inferred.
+      spine mode walking, family ((gate5))
+        R2 -> R3, device absent: source reaches ("R1" "R2" "R8" "R9"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9")
+          graph cut in this direction: YES
+        R3 -> R2, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7" "R8" "R9"); destination reaches ("R1" "R2" "R8" "R9")
+          graph cut in this direction: NO, bypass exists
+
+    gate6 == (and plate4 plate5)
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller plate4: PRESSURE; position location13; region R3
+      controller plate5: PRESSURE; position location12; region R3
+      positive pressure alternatives ((plate4 plate5)); individually mandatory (plate4 plate5)
+      conditional shortage: available eligible ON witnesses < 2 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate6 screen1))
+        R3 -> R4, device absent: source reaches ("R1" "R2" "R3" "R5" "R6" "R7" "R8" "R9"); destination reaches ("R4")
+          graph cut in this direction: YES
+          mandatory pressure plate4 at R3: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+          mandatory pressure plate5 at R3: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+        R4 -> R3, device absent: source reaches ("R4"); destination reaches ("R1" "R2" "R3" "R5" "R6" "R7" "R8" "R9")
+          graph cut in this direction: YES
+          mandatory pressure plate4 at R3: DEPARTURE-ONLY
+          mandatory pressure plate5 at R3: DEPARTURE-ONLY
+
+    gate7 == switch2
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller switch2: SWITCH; position unresolved; region UNRESOLVED
+        manipulation reach candidates (location region required-open barriers): ((location14 "r4" nil))
+        persistent state; no continuous weight requirement inferred.
+      positive pressure alternatives (nil); individually mandatory nil
+      conditional shortage: available eligible ON witnesses < 0 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate7))
+        R3 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R8" "R9"); destination reaches ("R5" "R6" "R7")
+          graph cut in this direction: YES
+        R5 -> R3, device absent: source reaches ("R5" "R6" "R7"); destination reaches ("R1" "R2" "R3" "R4" "R8" "R9")
+          graph cut in this direction: YES
+
+    gate8 == receiver1
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller receiver1: RECEIVER; position unresolved; region UNRESOLVED
+        beam dependency unresolved; requires sightline analysis.
+      positive pressure alternatives (nil); individually mandatory nil
+      conditional shortage: available eligible ON witnesses < 0 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate8))
+        R5 -> R6, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R8" "R9"); destination reaches ("R6" "R7")
+          graph cut in this direction: YES
+        R6 -> R5, device absent: source reaches ("R6" "R7"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R8" "R9")
+          graph cut in this direction: YES
+
+    gate9 == (and plate6 plate7 plate8)
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      controller plate6: PRESSURE; position location16; region R6
+      controller plate7: PRESSURE; position location17; region R6
+      controller plate8: PRESSURE; position location18; region R6
+      positive pressure alternatives ((plate6 plate7 plate8)); individually mandatory (plate6 plate7 plate8)
+      conditional shortage: available eligible ON witnesses < 3 implies
+        this normal aggregate cannot activate (minimum simultaneous plate demand).
+      spine mode walking, family ((gate9))
+        R6 -> R7, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R8" "R9"); destination reaches ("R7")
+          graph cut in this direction: YES
+          mandatory pressure plate6 at R6: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+          mandatory pressure plate7 at R6: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+          mandatory pressure plate8 at R6: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+        R7 -> R6, device absent: source reaches ("R7"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R8" "R9")
+          graph cut in this direction: YES
+          mandatory pressure plate6 at R6: DEPARTURE-ONLY
+          mandatory pressure plate7 at R6: DEPARTURE-ONLY
+          mandatory pressure plate8 at R6: DEPARTURE-ONLY
+
+  explicit goal destinations (1); goal form (has-location agent1 location19)
+    agent1: location1 (R1) -> location19 (R7)
+      GRAPH-REQUIRED candidates (gate1 gate3 gate5 gate7 gate8 gate9); concrete necessity UNRESOLVED.
+    connector1: initially location9; no explicit destination, crossings UNRESOLVED.
+    box1: initially location6; no explicit destination, crossings UNRESOLVED.
+    tray1: initially location7; no explicit destination, crossings UNRESOLVED.
+
+  keeper supply from S2
+    on: support-occupant -> support
+      |occupied support| <= 8 - |unavailable support-occupant|
+      injective: the relation is keyed by its support-occupant argument, so two distinct occupied values need two distinct witnesses
+      BODIES by layer, not yet a claim about any predicate: live + unpaired 4, ghost + unpaired 4, total 8
+      consumers (6 relations): the bound each one actually reads
+        active [derived]  asserted by update-receiver-status!  via beam-reaches-receiver
+          site in base: NONE -- layer-blind, it reads every occupant
+          witnesses it reads: 8 -- the whole pool
+        depressed [derived]  asserted by update-plate-status!  via support-occupied
+          site in support-occupied: NONE -- layer-blind, it reads every occupant
+          witnesses it reads: 8 -- the whole pool
+        latched [not derived]  asserted by update-plate-status!  via support-occupied
+          site in support-occupied: NONE -- layer-blind, it reads every occupant
+          witnesses it reads: 8 -- the whole pool
+        recording-active [derived]  asserted by update-recording-receiver-status!  via recording-shadow-beam-reaches-receiver
+          site in base: NONE -- layer-blind, it reads every occupant
+          witnesses it reads: 8 -- the whole pool
+        recording-depressed [derived]  asserted by update-recording-plate-status!  via recording-plate-occupied
+          site in recording-plate-occupied: LAYER, STATE-SELECTED by (recorder-cycle-closed)
+          witnesses it reads: 4, either class -- the class is chosen at run time
+        recording-latched [derived]  asserted by update-recording-plate-status!  via recording-plate-occupied
+          site in recording-plate-occupied: LAYER, STATE-SELECTED by (recorder-cycle-closed)
+          witnesses it reads: 4, either class -- the class is chosen at run time
+      NOTE: assertion side only.  A query used in an action's precondition is not listed here.
+      NOTE: the switch walk descends AND, OR, NOT, IF and the queries those call.  A switch inside any other form is not found, so "no switch found" is weaker than "no switch".
+      *start-state* reading, NOT the bound: 1 of 8 keys assigned, 1 distinct value occupied
+    Available eligible witnesses are a parameter for each view and segment.
+    Total sequential crossers are NOT simultaneous body demand.
+
+  UNCONDITIONAL STRANDING: unresolved; no verdict emitted.

@@ -1,0 +1,234 @@
+
+
+LEDGER  REALIZATION LEDGER  [interactive-phase state for crelay-topo]
+-------------------------------------------------------------
+  SCOPE: a record of what is claimed and what it rests on.  It derives nothing.
+  STANDING is computed from the dependency closure and never stored.  A record
+  printed CONDITIONAL rests on at least one live guess or one cost bound.
+  NOTE: RO prints "status CONDITIONAL" for what this reporter calls STANDING.
+  This file's :STATUS is the stored lifecycle, which RO has no analogue for.
+
+  OPEN LINKS (2)
+    lk2  hold the aggregate open across the segment
+      from: the three supports unoccupied
+      to:   the three supports simultaneously occupied
+      standing conditional; status open
+      blocking premises (1):
+        pr3  [user-asserted, in-force]  no ghost occupants exist in the segment under analysis
+      premise gaps (3): necessity of this segment; replacement witnesses; recorder transitions
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk4  cross the gap the spine requires
+      from: the actor on the approach side
+      to:   the actor on the far side
+      standing established; status open
+      blocking premises (0):
+      attempt bd1: no realization of lk4 was found within depth 6 from the stated start state -- a cost bound, not a refutation
+      attempt bd2: no realization of lk4 was found within 8 actions from the stated start state -- a cost bound, not a refutation
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+
+  SETTLED LINKS (0)
+
+  PREMISES IN FORCE (2)
+    pr1  standing established; status in-force  the normal aggregate requires three distinct supports depressed, and occupancy is keyed by occupant, so three distinct witnesses are necessary
+    pr3  standing conditional; status in-force  no ghost occupants exist in the segment under analysis
+
+  PREMISES DISCHARGED (0)
+
+  COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)  (2)
+    bd1  attempted lk4; status standing
+      exhausted at cutoff 6, threads 0, from: the staged state after the aggregate opens
+      expression: (solve-subgoal ...) with *threads* 0
+      grade 3: a cost bound relative to that start state.  It licenses no
+        impossibility claim.
+      committed before the run: success would close lk4 with its action sequence, subject to validation; exhaustion would establish a depth-6 cost bound relative to this start state and nothing more
+      evidence: constraint-evidence/lk4-bound-2026-09-21.txt
+      the cutoff truncated nothing: the reachable space from that start was exhausted within
+        the cutoff.  Still a cost bound relative to that start, and still not an impossibility.
+    bd2  attempted lk4; status standing
+      exhausted at cutoff 8, threads 0, from: CHAIN
+      expression: cutoff 8, threads 0, as recommended 2026-09-21
+      grade 3: a cost bound relative to that start state.  It licenses no
+        impossibility claim.
+      committed before the run: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      evidence: constraint-evidence/lk4-bound-8-2026-09-21.txt
+      the cutoff truncated the space: nodes with successors were cut off, so this covers strictly less
+        than the reachable space from that start.
+      pruning in force: repeated-state pruning in graph mode.  An exhaustion under pruning excludes solutions in pruned branches.
+
+  OPEN QUESTIONS (10)
+    qn2  standing established; status open  does a support transition preserve occupancy across a cycle boundary?
+    qn3  standing established; status open  Does the segment described as physical view, no ghosts, the aggregate open, agent off those supports occur in every solution, or only in some?
+    qn4  standing established; status open  In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, do any ghost occupants exist?
+    qn5  standing established; status open  In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, does the agent occupy any of the required supports (ww::s6 ww::s7 ww::s8)?
+    qn6  standing established; status open  In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, can a witness removed from a required support be replaced by another before the aggregate is read?
+    qn7  standing established; status open  Can a recorder cycle boundary occur within the segment described as physical view, no ghosts, the aggregate open, agent off those supports?
+    qn8  standing established; status open  For the required supports (ww::s6 ww::s7 ww::s8), can every available witness reach every one of them?
+    qn9  standing established; status open  For the required supports (ww::s6 ww::s7 ww::s8), does elevation admit every witness-to-support pairing?
+    qn10  standing established; status open  For the required supports (ww::s6 ww::s7 ww::s8), does occupancy history admit every witness-to-support pairing?
+    qn11  standing established; status open  In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, which of the present occupants (ww::b1 ww::b2 ww::b3 ww::b4) are actually available as witnesses?
+
+  ANSWERED QUESTIONS (1)
+    qn1  standing established; status answered  are ghosts present in the segment under analysis?
+
+  RETRACTED OR REFUTED PREMISES (0)
+
+  INVALIDATED LINKS (0)
+
+  no obligation, no necessity and no plan witness is derived by this component.
+
+
+RECOMMENDED SEARCHES  [for crelay-topo]
+--------------------------------------------------------------
+  SCOPE: what to run and what each outcome would establish.  It runs nothing.
+  Every reading below was written BEFORE its run, which is what stops an
+  exhaustion from being reinterpreted once its outcome is known.
+
+  OPEN LINKS (2)
+    lk2  hold the aggregate open across the segment
+      standing conditional; rests on pr1, pr3
+      NO RECOMMENDATION COMMITTED.  Call RECOMMEND-LEDGER-SEARCH on lk2 first.
+    lk4  cross the gap the spine requires
+      standing established; rests on pr1
+      run, in order:
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (and (has-location agent1 location19)))
+      cautions:
+        staging resets settings and state, so set the parameters after (stage ...).
+        crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system.
+        the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true.
+        *depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-21, before the run:
+        success:    a found action sequence realizes lk4 from the stated start within 8 actions.  It makes lk4 :REALIZED.  It CLOSES lk4 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      DEEPENING: bd1 measured this link to cutoff 6; this run raises it to 8.
+        The earlier bound is not superseded until a new bound is filed against the same start state.
+
+  a recommendation is not an approval to run it.
+
+
+SCHEMA-GAP CANDIDATES  [for crelay-topo]  (1)
+--------------------------------------------------------------
+  M5: a surprising outcome is a question the schema failed to ask.  Append these
+  to the problem's Constraint-Schema-Gaps.txt BY HAND, stated domain-generally.
+  Nothing here writes to that file.
+
+    qn2  blocks lk4
+      question: does a support transition preserve occupancy across a cycle boundary?
+      candidate answers: :yes, :no, :depends-on-the-view
+      raised by: surprise while ingesting a run for lk4
+
+
+QUESTIONS  [for crelay-topo]
+--------------------------------------------------------------
+  Each of these is a premise the analysis could not settle.  Answer from
+  intuition; the default is :unknown and costs nothing.
+  AN ANSWER IS A PREMISE, NOT A FINDING.  It is filed as user-asserted, and
+  everything resting on it reads CONDITIONAL for as long as it stands.
+
+  OPEN (10)
+
+    qn2  [one-of]
+      blocks lk4
+      does a support transition preserve occupancy across a cycle boundary?
+        1. :yes
+        2. :no
+        3. :depends-on-the-view
+        4. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: surprise while ingesting a run for lk4
+      answer with: (answer-ledger-question ledger 'qn2 <answer> "<the premise in your words>" "D")
+
+    qn3  [one-of]
+      blocks lk2
+      Does the segment described as physical view, no ghosts, the aggregate open, agent off those supports occur in every solution, or only in some?
+        1. :occurs-in-every-solution
+        2. :occurs-in-some-solution-only
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: RO allocates inside a stated segment; it never establishes that the segment occurs. An answer here is a premise, not a finding.
+      answer with: (answer-ledger-question ledger 'qn3 <answer> "<the premise in your words>" "D")
+
+    qn4  [one-of]
+      blocks lk2
+      In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, do any ghost occupants exist?
+        1. :no-ghost-occupants-exist
+        2. :ghost-occupants-exist
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: S2 makes occupancy layer-blind, so a ghost depresses a support exactly as a live body does. This changes the size of the pool, not the matching rule.
+      answer with: (answer-ledger-question ledger 'qn4 <answer> "<the premise in your words>" "D")
+
+    qn5  [one-of]
+      blocks lk2
+      In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, does the agent occupy any of the required supports (ww::s6 ww::s7 ww::s8)?
+        1. :agent-occupies-none-of-them
+        2. :agent-occupies-one-of-them
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The agent is one of the occupants. Whether it is spent on a support decides whether the remaining pool can cover the rest.
+      answer with: (answer-ledger-question ledger 'qn5 <answer> "<the premise in your words>" "D")
+
+    qn6  [one-of]
+      blocks lk2
+      In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, can a witness removed from a required support be replaced by another before the aggregate is read?
+        1. :a-replacement-witness-exists
+        2. :no-replacement-witness-exists
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: Removing the last eligible witness closes the device in the same propagation. Whether a replacement exists is what separates a momentary loss from a lasting one, and RO does not decide it.
+      answer with: (answer-ledger-question ledger 'qn6 <answer> "<the premise in your words>" "D")
+
+    qn7  [one-of]
+      blocks lk2
+      Can a recorder cycle boundary occur within the segment described as physical view, no ghosts, the aggregate open, agent off those supports?
+        1. :a-cycle-boundary-can-occur
+        2. :no-cycle-boundary-occurs-here
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: A boundary removes ghost state and normalizes the shadow, so it changes the available pool mid-segment. No extractor reads the cycle structure; that is G8, and this question is the hand reading it asks for.
+      answer with: (answer-ledger-question ledger 'qn7 <answer> "<the premise in your words>" "D")
+
+    qn8  [one-of]
+      blocks lk2
+      For the required supports (ww::s6 ww::s7 ww::s8), can every available witness reach every one of them?
+        1. :every-available-witness-can-reach-every-support
+        2. :some-witness-support-pair-is-out-of-reach
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: RO's eligibility restricts by availability alone and says so at the claim site. Reach is the first of the three restrictions it leaves open.
+      answer with: (answer-ledger-question ledger 'qn8 <answer> "<the premise in your words>" "D")
+
+    qn9  [one-of]
+      blocks lk2
+      For the required supports (ww::s6 ww::s7 ww::s8), does elevation admit every witness-to-support pairing?
+        1. :elevation-admits-every-pairing
+        2. :some-pairing-is-blocked-by-elevation
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The second restriction RO leaves open. S5 is not written, so this is a hand reading until it is.
+      answer with: (answer-ledger-question ledger 'qn9 <answer> "<the premise in your words>" "D")
+
+    qn10  [one-of]
+      blocks lk2
+      For the required supports (ww::s6 ww::s7 ww::s8), does occupancy history admit every witness-to-support pairing?
+        1. :occupancy-history-admits-every-pairing
+        2. :some-pairing-is-excluded-by-history
+        3. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: The third restriction RO leaves open. A body that was never where it would have to start from is not eligible, however available it is.
+      answer with: (answer-ledger-question ledger 'qn10 <answer> "<the premise in your words>" "D")
+
+    qn11  [subset-of]
+      blocks lk2
+      In the segment described as physical view, no ghosts, the aggregate open, agent off those supports, which of the present occupants (ww::b1 ww::b2 ww::b3 ww::b4) are actually available as witnesses?
+        1. ww::b1
+        2. ww::b2
+        3. ww::b3
+        4. ww::b4
+        5. :unknown  -- the default; it writes no premise and leaves this open
+      why it matters: Presence is not availability. A declared type extent states who exists, not who is free; an absent answer leaves RO reporting demand only.
+      answer with: (answer-ledger-question ledger 'qn11 <answer> "<the premise in your words>" "D")
+
+  ANSWERED (1)
+    qn1  absent -> premise pr3; standing established
+
+  answering settles what rests on the answer, never that the answer is true.

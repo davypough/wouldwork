@@ -928,6 +928,12 @@
   (reject-worker-read-write 'install-goal)
   (format t "~&Installing goal...")
   (check-type form list)
+  ;; A quoted goal would install the constant (QUOTE ...), which the translator reads as
+  ;; trivially true, so the start state would silently satisfy it.
+  (when (eq (first form) 'quote)
+    (error "A goal must not be quoted; received ~S.~%~
+            Drop the quote: ~S"
+           form (second form)))
   (when (eql (char (format nil "~S" form) 0) #\`)  ;eval backquoted form once at install
     (setf form (eval form)))
   (when (and (null form)

@@ -1,0 +1,907 @@
+;;; Constraint-led method -- realization ledger for crelay-topo.
+;;; Written by WRITE-REALIZATION-LEDGER.  Schema:
+;;;   doc/constraint-method/Status-Algebra-and-Record-Schema.md
+;;; This file is deliberately user-amendable.  Unrecognised keys
+;;; are preserved on the next write.
+
+(:ledger-version 1 :problem "crelay-topo" :written "2026-09-21")
+
+(:id pr1
+ :kind :premise
+ :statement "the problem's goal places the agent at the sole endpoint of the last region of the spine"
+ :provenance (:derived :grade 1 :by "the instance's DEFINE-GOAL against S3's regions")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("probs/problem-crelay-topo.lisp DEFINE-GOAL"
+           "Constraint-Static-Profile.txt S3 regions")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr2
+ :kind :premise
+ :statement "the agent's initial location lies in the first region of the spine"
+ :provenance (:derived :grade 1 :by "the instance's DEFINE-INIT against S3's regions")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("probs/problem-crelay-topo.lisp DEFINE-INIT"
+           "Constraint-Static-Profile.txt S3 regions")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr3
+ :kind :premise
+ :statement "the region quotient relaxes all other doors, elevation and cargo conditions, so a route through it is a candidate and not a plan"
+ :provenance (:derived :grade 1 :by "S3's contraction NOTE and S4's stated scope")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S3 NOTE and S4 SCOPE"
+           "Constraint-Abstract-Model.txt AM5, AM6")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr4
+ :kind :premise
+ :statement "the adjacency spine joins the first region to the last only through five intermediate regions, crossing six controlled devices in one fixed order"
+ :provenance (:derived :grade 2 :by
+              "S3's adjacency spine, checked by S4 against full-quotient reachability")
+ :depends-on ((pr3))
+ :premise-gaps ("that all relevant concrete movement is covered by the route model -- S4 prints this premise as missing")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "Constraint-Abstract-Model.txt AM5")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr5
+ :kind :premise
+ :statement "two of the six devices are controlled by opposite polarities of one switch and are therefore never open together"
+ :provenance (:derived :grade 1 :by "S1's exclusion pairs")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S1 control pairs"
+           "Constraint-Abstract-Model.txt AM2.1, AM6")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr6
+ :kind :premise
+ :statement "ON is keyed by the occupant, so the map from an occupied support to its witness is injective"
+ :provenance (:derived :grade 1 :by "S2's functional-relation census")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S2 functional relations")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr7
+ :kind :premise
+ :statement "support occupancy is layer-blind, so distinct required supports need distinct witnesses and a ghost counts as one"
+ :provenance (:derived :grade 2 :by "S2's consumer classification over the eight-member pool")
+ :depends-on ((pr6))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S2 occupancy pools"
+           "Constraint-Abstract-Model.txt AM1, section 2.2")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr8
+ :kind :premise
+ :statement "two of the six devices each require one depressed support, at endpoints the quotient places in the region the crossing starts from"
+ :provenance (:derived :grade 1 :by
+              "S1's control table against the instance's authored support positions and S3's regions")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S1 control table"
+           "probs/problem-crelay-topo.lisp HAS-POSITION facts"
+           "Constraint-Static-Profile.txt S3 regions")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr9
+ :kind :premise
+ :statement "the last device requires three distinct depressed supports, all at endpoints the quotient places on the APPROACH side of its crossing"
+ :provenance (:derived :grade 1 :by
+              "S1's control table against the instance's positions and S3's regions")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S1 control table"
+           "probs/problem-crelay-topo.lisp HAS-POSITION facts"
+           "Constraint-Abstract-Model.txt section 6, approach-side correction")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr10
+ :kind :premise
+ :statement "one of the six devices sits at control depth 2 behind a receiver, and the identity of the device supplying it is not decidable from the control algebra"
+ :provenance (:derived :grade 1 :by "S1, which says so at the claim site")
+ :depends-on nil
+ :premise-gaps ("which device supplies the receiver; S5 and S6 are not written")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S1 control DAG"
+           "Constraint-Abstract-Model.txt AM2.3, AM8")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id lk1
+ :kind :link
+ :statement "the agent crosses from R1 to R8 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr2) (pr4) (pr8) (pr7))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :closed
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R1-R8 arc: gate1")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :realized :by "ledger" :note
+           "8 actions found at cutoff 8; NOT yet validated")
+          (:date "2026-09-20" :event :closed :by "ledger" :note
+           "4 actions found at cutoff 8, validated under VALIDATE-ACTION-SEQUENCE")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "both gaps discharged: a ghost held the support without spending a live occupant, and the raw path replaced the transcript and validated at four actions"))
+ :from "the agent somewhere in R1"
+ :to "the agent somewhere in R8"
+ :intent "cross R1 -> R8: the first spine crossing, and the only one whose start state is the staged one"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 8, threads 0, as recommended 2026-09-20" :cutoff 8 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk1-validation-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk1 from the stated start within 8 actions.  It makes lk1 :REALIZED.  It CLOSES lk1 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(START-RECORDER > AGENT1 starts the recorder)"
+            "(MOVE > AGENT1* moves via ((WALK LOCATION1 NIL LOCATION2)))"
+            "(MOVE > AGENT1* moves via ((STEP (LOCATION2 GROUND) NIL (LOCATION2 PLATE1))))"
+            "(MOVE > AGENT1 moves via ((WALK LOCATION1 (GATE1) LOCATION7)))")
+ :validated t
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (or (has-location agent1 location20) (has-location agent1 location3)
+                  (has-location agent1 location4) (has-location agent1 location5)
+                  (has-location agent1 location7))
+ :search-start :chain
+ :search-cutoff 8
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :stage
+ :search-final nil
+ :chain-order 1
+ :recommendation (:date "2026-09-20" :cutoff 8 :threads 0 :start :chain :premises
+                  (pr2 pr4 pr3 pr8 pr7 pr6) :guesses nil :standing :established :deepens nil
+                  :success
+                  "a found action sequence realizes lk1 from the stated start within 8 actions.  It makes lk1 :REALIZED.  It CLOSES lk1 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk1 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk1 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds 4))
+
+(:id lk2
+ :kind :link
+ :statement "the agent crosses from R8 to R2 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr4) (pr8) (pr7))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :closed
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R8-R2 arc: gate3")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :closed :by "ledger" :note
+           "1 action found at cutoff 8, validated under VALIDATE-ACTION-SEQUENCE")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "gap discharged: the device on this arc was already open on the initial state's own occupancy, so the crossing cost only the walk"))
+ :from "the agent somewhere in R8"
+ :to "the agent somewhere in R2"
+ :intent "cross R8 -> R2: crosses the support S3 places at an endpoint of R8"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 8, threads 0, as recommended 2026-09-20" :cutoff 8 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk2-validation-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk2 from the stated start within 8 actions.  It makes lk2 :REALIZED.  It CLOSES lk2 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(MOVE > AGENT1 moves via ((WALK LOCATION7 (GATE3) LOCATION9)))")
+ :validated t
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (or (has-location agent1 location10) (has-location agent1 location8)
+                  (has-location agent1 location9))
+ :search-start :chain
+ :search-cutoff 8
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 2
+ :recommendation (:date "2026-09-20" :cutoff 8 :threads 0 :start :chain :premises
+                  (pr4 pr3 pr8 pr7 pr6) :guesses nil :standing :established :deepens nil
+                  :success
+                  "a found action sequence realizes lk2 from the stated start within 8 actions.  It makes lk2 :REALIZED.  It CLOSES lk2 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk2 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk2 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds 1))
+
+(:id lk3
+ :kind :link
+ :statement "the agent crosses from R2 to R3 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr4) (pr5))
+ :premise-gaps ("the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :closed
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R2-R3 arc: gate5")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :realized :by "ledger" :note
+           "1 action found at cutoff 8; NOT yet validated")
+          (:date "2026-09-20" :event :closed :by "ledger" :note
+           "1 action found at cutoff 8, validated under VALIDATE-ACTION-SEQUENCE"))
+ :from "the agent somewhere in R2"
+ :to "the agent somewhere in R3"
+ :intent "cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 8, threads 0, as recommended 2026-09-20" :cutoff 8 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk3-validation-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk3 from the stated start within 8 actions.  It makes lk3 :REALIZED.  It CLOSES lk3 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(MOVE > AGENT1 moves via ((WALK LOCATION9 (GATE5) LOCATION13)))")
+ :validated t
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (or (has-location agent1 location11) (has-location agent1 location12)
+                  (has-location agent1 location13))
+ :search-start :chain
+ :search-cutoff 8
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 3
+ :recommendation (:date "2026-09-20" :cutoff 8 :threads 0 :start :chain :premises (pr4 pr3 pr5)
+                  :guesses nil :standing :established :deepens nil :success
+                  "a found action sequence realizes lk3 from the stated start within 8 actions.  It makes lk3 :REALIZED.  It CLOSES lk3 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk3 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk3 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds nil))
+
+(:id lk4
+ :kind :link
+ :statement "the agent crosses from R3 to R5 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr4) (pr5))
+ :premise-gaps ("this milestone bundled an excursion into a cul-de-sac and the return; it has been split into three milestones that precede it, and what remains here is the walk through the device once the switch is thrown")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :realized
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R3-R5 arc: gate7")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "exhausted at cutoff 8; filed as bd1, a cost bound")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "surprise filed as qn10, a schema-gap candidate")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "renumbered in the chain after the fourth crossing was split")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 4, threads 0")
+          (:date "2026-09-20" :event :realized :by "ledger" :note
+           "1 action found at cutoff 4; NOT yet validated"))
+ :from "the agent somewhere in R3"
+ :to "the agent somewhere in R5"
+ :intent "cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 4, threads 0, as recommended 2026-09-20" :cutoff 4 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk4-found-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk4 from the stated start within 4 actions.  It makes lk4 :REALIZED.  It CLOSES lk4 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(MOVE > AGENT1 moves via ((WALK LOCATION14 (GATE6 GATE7 SCREEN1) LOCATION15)))")
+ :validated nil
+ :attempts (bd1)
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (has-location agent1 location15)
+ :search-start :chain
+ :search-cutoff 4
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 7
+ :recommendation (:date "2026-09-20" :cutoff 4 :threads 0 :start :chain :premises (pr4 pr3 pr5)
+                  :guesses nil :standing :established :deepens nil :success
+                  "a found action sequence realizes lk4 from the stated start within 4 actions.  It makes lk4 :REALIZED.  It CLOSES lk4 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 4.  It establishes that no realization of lk4 exists within 4 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds nil))
+
+(:id lk5
+ :kind :link
+ :statement "the agent crosses from R5 to R6 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr4) (pr10))
+ :premise-gaps ("whether a relay is required at all, and whether a relay role can share a support with a pressure role")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R5-R6 arc: gate8")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "renumbered in the chain after the fourth crossing was split")
+          (:date "2026-09-21" :event :amended :by "ledger" :note
+           "Transcribed the prior standalone cutoff-8 recommendation from its dated evidence file; exact source is the location15 archive, threads 16.")
+          (:date "2026-09-21" :event :amended :by "ledger" :note
+           "exhausted at cutoff 8; filed as bd2, a cost bound"))
+ :from "the agent somewhere in R5"
+ :to "the agent somewhere in R6"
+ :intent "cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier"
+ :closed-by nil
+ :evidence nil
+ :validated nil
+ :attempts (bd2)
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (or (has-location agent1 location16) (has-location agent1 location17)
+                  (has-location agent1 location18) (has-location agent1 location21))
+ :search-start "*t10-checkpoint*"
+ :search-cutoff 8
+ :search-threads 16
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 8
+ :recommendation (:source-sha256
+                  "76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635"
+                  :source-archive "constraint-evidence/t10-location15-checkpoint.txt" :source
+                  "constraint-evidence/lk5-checkpoint-recommendation-2026-09-21.txt" :date
+                  "2026-09-21" :cutoff 8 :threads 16 :start "*t10-checkpoint*" :premises
+                  (pr4 pr3 pr10) :guesses nil :standing :established :deepens nil :success
+                  "Success establishes a concrete LK5 realization from this exact start; inspect the result and save the returned checkpoint. File REALIZED with validated NIL unless separate replay evidence exists. It establishes no universal resource allocation and does not establish LK6 or the original final goal."
+                  :exhaustion
+                  "Exhaustion is a grade-3 bound for this exact start/settings/pruning, not a refutation. Record cutoff truncation and pruning with the result. The checkpoint object and the retained prefix remain unchanged; no automatic deepening or predecessor retry is authorized. Report the result before another search.")
+ :measured nil)
+
+(:id lk6
+ :kind :link
+ :statement "the agent crosses from R6 to R7 through the device labelling that spine arc"
+ :provenance (:derived :grade 2 :by "the S3 adjacency spine under its stated relaxation")
+ :depends-on ((pr1) (pr4) (pr9) (pr7))
+ :premise-gaps ("whether three witnesses can be present on the approach side simultaneously, which the budget makes tight and RO reports as conditional")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("Constraint-Static-Profile.txt S3 adjacency spine"
+           "device labelling the R6-R7 arc: gate9")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "renumbered in the chain after the fourth crossing was split"))
+ :from "the agent somewhere in R6"
+ :to "the agent somewhere in R7"
+ :intent "cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone"
+ :closed-by nil
+ :evidence nil
+ :validated nil
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (has-location agent1 location19)
+ :search-start :chain
+ :search-cutoff 8
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final t
+ :chain-order 9
+ :recommendation (:date "2026-09-20" :cutoff 8 :threads 0 :start :chain :premises
+                  (pr1 pr4 pr3 pr9 pr7 pr6) :guesses nil :standing :established :deepens nil
+                  :success
+                  "a found action sequence realizes lk6 from the stated start within 8 actions.  It makes lk6 :REALIZED.  It CLOSES lk6 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk6 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk6 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured nil)
+
+(:id qn1
+ :kind :question
+ :statement "Does the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state occur in every solution, or only in some?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("RO allocates inside a stated segment; it never establishes that the segment occurs. An answer here is a premise, not a finding.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :segment-necessity"))
+ :candidates (:occurs-in-every-solution :occurs-in-some-solution-only)
+ :default :unknown
+ :answer-kind :one-of
+ :template :segment-necessity
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn2
+ :kind :question
+ :statement "In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, do any ghost occupants exist?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("S2 makes occupancy layer-blind, so a ghost depresses a support exactly as a live body does. This changes the size of the pool, not the matching rule.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :ghost-absence"))
+ :candidates (:no-ghost-occupants-exist :ghost-occupants-exist)
+ :default :unknown
+ :answer-kind :one-of
+ :template :ghost-absence
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn3
+ :kind :question
+ :statement "In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, does the agent occupy any of the required supports (plate1)?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("The agent is one of the occupants. Whether it is spent on a support decides whether the remaining pool can cover the rest.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :agent-occupancy"))
+ :candidates (:agent-occupies-none-of-them :agent-occupies-one-of-them)
+ :default :unknown
+ :answer-kind :one-of
+ :template :agent-occupancy
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn4
+ :kind :question
+ :statement "In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, can a witness removed from a required support be replaced by another before the aggregate is read?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("Removing the last eligible witness closes the device in the same propagation. Whether a replacement exists is what separates a momentary loss from a lasting one, and RO does not decide it.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :replacement-witnesses"))
+ :candidates (:a-replacement-witness-exists :no-replacement-witness-exists)
+ :default :unknown
+ :answer-kind :one-of
+ :template :replacement-witnesses
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn5
+ :kind :question
+ :statement "Can a recorder cycle boundary occur within the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("A boundary removes ghost state and normalizes the shadow, so it changes the available pool mid-segment. No extractor reads the cycle structure; that is G8, and this question is the hand reading it asks for.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :recorder-transitions"))
+ :candidates (:a-cycle-boundary-can-occur :no-cycle-boundary-occurs-here)
+ :default :unknown
+ :answer-kind :one-of
+ :template :recorder-transitions
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn6
+ :kind :question
+ :statement "For the required supports (plate1), can every available witness reach every one of them?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("RO's eligibility restricts by availability alone and says so at the claim site. Reach is the first of the three restrictions it leaves open.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :per-support-reach"))
+ :candidates (:every-available-witness-can-reach-every-support
+              :some-witness-support-pair-is-out-of-reach)
+ :default :unknown
+ :answer-kind :one-of
+ :template :per-support-reach
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn7
+ :kind :question
+ :statement "For the required supports (plate1), does elevation admit every witness-to-support pairing?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("The second restriction RO leaves open. S5 is not written, so this is a hand reading until it is.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :per-support-elevation"))
+ :candidates (:elevation-admits-every-pairing :some-pairing-is-blocked-by-elevation)
+ :default :unknown
+ :answer-kind :one-of
+ :template :per-support-elevation
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn8
+ :kind :question
+ :statement "For the required supports (plate1), does occupancy history admit every witness-to-support pairing?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("The third restriction RO leaves open. A body that was never where it would have to start from is not eligible, however available it is.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :per-support-history"))
+ :candidates (:occupancy-history-admits-every-pairing :some-pairing-is-excluded-by-history)
+ :default :unknown
+ :answer-kind :one-of
+ :template :per-support-history
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id qn9
+ :kind :question
+ :statement "In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, which of the present occupants (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*) are actually available as witnesses?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("Presence is not availability. A declared type extent states who exists, not who is free; an absent answer leaves RO reporting demand only.")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :opened :by "ledger" :note
+           "generated from template :availability"))
+ :candidates (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*)
+ :default :unknown
+ :answer-kind :subset-of
+ :template :availability
+ :blocks (lk1)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate nil)
+
+(:id pr11
+ :kind :premise
+ :statement "at the checkpoint this realization reaches, a recorder cycle is OPEN, all four ghost occupants have locations, and two further devices on the spine are already open without any action having been spent on them"
+ :provenance (:search-measured :outcome :found :start-state "the staged start state"
+              :search-expression "the recommended first probe for the first crossing" :cutoff 8
+              :threads 0 :run "constraint-evidence/lk1-first-run-2026-09-20.txt")
+ :depends-on ((lk1))
+ :premise-gaps ("this describes the end state of ONE realization, not a property of every realization of this crossing")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("the run's reported checkpoint state")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr12
+ :kind :premise
+ :statement "a support can be held by a GHOST of the agent produced by a recorder fork while the live agent crosses, so holding a support does not have to spend a live occupant"
+ :provenance (:search-measured :outcome :found :start-state "the staged start state"
+              :search-expression "the recommended first probe for the first crossing" :cutoff 8
+              :threads 0 :run "constraint-evidence/lk1-first-run-2026-09-20.txt")
+ :depends-on ((lk1))
+ :premise-gaps ("observed once, in one crossing. It is not established that the same mechanism is available at the other crossings, whose supports lie in different regions and whose cycle budget is shared with this one")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("the run's reported recording and playback phases")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr13
+ :kind :premise
+ :statement "the replayable path of a recorder-bearing realization is shorter than its printed transcript: the pause, the ghost's return walk, the recorder stop and the resume are display structure and are not replayed actions"
+ :provenance (:search-measured :outcome :found :start-state "the chain's origin state"
+              :search-expression "validation of the first crossing's raw phase path" :cutoff 8
+              :threads 0 :run "constraint-evidence/lk1-validation-2026-09-20.txt")
+ :depends-on ((lk1))
+ :premise-gaps ("observed on one realization carrying one recorder cycle; not established for every recorder-bearing path")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("the validator's per-action output, four actions against a seven-line transcript")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr14
+ :kind :premise
+ :statement "two of the six devices on the spine are already open in the initial state, one from an occupant the instance places on its support at the start and one from the initial setting of the switch pair, so those two crossings demand no witness of their own"
+ :provenance (:derived :grade 1 :by "the instance's DEFINE-INIT against S1's control table")
+ :depends-on nil
+ :premise-gaps ("this is GRADE 1 and was derivable from the profile before any search ran. The ledger did not carry it, and two measured runs are what made it visible. A cheap crossing is not evidence that the method found something; it is evidence that the decomposition was built without a fact it had in hand")
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources ("probs/problem-crelay-topo.lisp DEFINE-INIT"
+           "Constraint-Static-Profile.txt S1 control table")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id bd1
+ :kind :bound
+ :statement "no realization of lk4 was found within 8 actions from the stated start state"
+ :provenance (:search-measured :outcome :exhausted :start-state "CHAIN" :search-expression
+              "cutoff 8, threads 0, as recommended 2026-09-20" :cutoff 8 :threads 0
+              :cutoff-truncated t :pruning "graph mode with repeated-state pruning, as staged"
+              :run "constraint-evidence/lk4-bound-8-2026-09-20.txt")
+ :depends-on ((pr4) (pr3) (pr5))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :standing
+ :sources ("run evidence constraint-evidence/lk4-bound-8-2026-09-20.txt")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :for-link lk4
+ :measured (:nodes nil :seconds 23)
+ :interpretation-committed "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link."
+ :segment-bridge nil)
+
+(:id qn10
+ :kind :question
+ :statement "does opening the device that labels a spine arc require traversal OUTSIDE that arc, and if so into a region the spine does not visit?"
+ :provenance (:derived :grade 1 :by "underdetermination in the analysis")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :open
+ :sources ("surprise while ingesting a run for lk4")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :candidates (:never :sometimes :for-this-device-yes)
+ :default :unknown
+ :answer-kind :one-of
+ :template nil
+ :blocks (lk4)
+ :answer nil
+ :answer-premise nil
+ :gap-candidate t)
+
+(:id pr15
+ :kind :premise
+ :statement "the switch controlling the fourth crossing's device has exactly ONE manipulation reach candidate, at an endpoint in a region that is not on the spine; that region is entered by one arc, which S4 marks a graph cut, and it reaches nothing else"
+ :provenance (:derived :grade 1 :by
+              "S4's controller row for that device, and its directional closure")
+ :depends-on nil
+ :premise-gaps ("S4's switch walk descends AND, OR, NOT, IF and the queries those call, so a single reach candidate is what the walk FOUND, which is weaker than what exists")
+ :segment (:view :physical :cycle :unknown :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S4, controller row and spine directional rows")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr16
+ :kind :premise
+ :statement "the device guarding that region demands TWO distinct depressed supports, both at endpoints in the region the excursion starts from, both APPROACH-ONLY, and S4 marks both KEEPER-OBLIGATED while the aggregate is required -- so neither can be the agent, which has to be on the far side"
+ :provenance (:derived :grade 1 :by
+              "S4's controller rows and its approach/departure classification")
+ :depends-on nil
+ :premise-gaps ("S4 prints permanent stranding for these supports as UNRESOLVED, on movement and lifecycle coverage; nothing here closes it")
+ :segment (:view :physical :cycle :unknown :ghosts :unknown)
+ :status :in-force
+ :sources ("Constraint-Static-Profile.txt S4, the guarding device's controller rows"
+           "probs/problem-crelay-topo.lisp HAS-POSITION facts"
+           "Constraint-Abstract-Model.txt AM1, the tight budget")
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id lk7
+ :kind :link
+ :statement "the two supports the guarding device demands are simultaneously held"
+ :provenance (:derived :grade 2 :by
+              "S4's controller rows under the quotient's stated relaxation")
+ :depends-on ((pr16) (pr7) (pr4))
+ :premise-gaps ("this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established")
+ :segment (:view :physical :cycle :unknown :ghosts :unknown)
+ :status :closed
+ :sources nil
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 8, threads 0")
+          (:date "2026-09-20" :event :closed :by "ledger" :note
+           "5 actions found at cutoff 8, validated under VALIDATE-ACTION-SEQUENCE")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "Validated the stated goal only: tray1 holds plate4 and agent1 holds plate5. The stronger non-agent witness intent is not established; lk8 must realize the excursion from this endpoint."))
+ :from "the agent in the region the third crossing reached"
+ :to "the two supports the guarding device demands are simultaneously held"
+ :intent "two witnesses, neither of them the agent, onto two supports in the region the excursion starts from. This is where the budget bites; an exhaustion here is informative."
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 8, threads 0, as recommended 2026-09-20" :cutoff 8 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk7-validation-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk7 from the stated start within 8 actions.  It makes lk7 :REALIZED.  It CLOSES lk7 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(MOVE > AGENT1 moves via ((WALK LOCATION13 (GATE3 GATE5) LOCATION7)))"
+            "(PICKUP-TRAY > AGENT1 picks up TRAY1 at LOCATION7 from LOCATION7)"
+            "(MOVE > AGENT1 moves via ((WALK LOCATION7 (GATE3 GATE5) LOCATION12)))"
+            "(PUT-TRAY > AGENT1 puts TRAY1 on PLATE4 at LOCATION13)"
+            "(MOVE > AGENT1 moves via ((STEP (LOCATION12 GROUND) NIL (LOCATION12 PLATE5))))")
+ :validated t
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (and (depressed plate4) (depressed plate5))
+ :search-start :chain
+ :search-cutoff 8
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 4
+ :recommendation (:date "2026-09-20" :cutoff 8 :threads 0 :start :chain :premises
+                  (pr16 pr7 pr6 pr4 pr3) :guesses nil :standing :established :deepens nil
+                  :success
+                  "a found action sequence realizes lk7 from the stated start within 8 actions.  It makes lk7 :REALIZED.  It CLOSES lk7 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk7 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk7 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds nil))
+
+(:id lk8
+ :kind :link
+ :statement "the agent stands at the switch's only manipulation reach candidate"
+ :provenance (:derived :grade 2 :by
+              "S4's controller rows under the quotient's stated relaxation")
+ :depends-on ((pr15) (pr16) (pr4))
+ :premise-gaps ("this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established")
+ :segment (:view :physical :cycle :unknown :ghosts :unknown)
+ :status :closed
+ :sources nil
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 6, threads 0")
+          (:date "2026-09-20" :event :closed :by "ledger" :note
+           "6 actions found at cutoff 6, validated under VALIDATE-ACTION-SEQUENCE")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "Connector1 replaced agent1 on plate5; tray1 held plate4; agent1 reached location14. This endpoint establishes non-agent witnesses for this realization only."))
+ :from "the agent in the region the third crossing reached"
+ :to "the agent stands at the switch's only manipulation reach candidate"
+ :intent "the excursion into the cul-de-sac, which is a graph cut and possible only while the guarding device is held open"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 6, threads 0, as recommended 2026-09-20" :cutoff 6 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk8-validation-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk8 from the stated start within 6 actions.  It makes lk8 :REALIZED.  It CLOSES lk8 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(MOVE > AGENT1 moves via ((STEP (LOCATION12 PLATE5) NIL (LOCATION12 GROUND))))"
+            "(MOVE > AGENT1 moves via ((WALK LOCATION12 (GATE5) LOCATION9)))"
+            "(PICKUP-CONNECTOR-RETAINING-PAIRINGS > AGENT1 picks up CONNECTOR1 retaining pairings at LOCATION9)"
+            "(MOVE > AGENT1 moves via ((WALK LOCATION9 (GATE5) LOCATION12)))"
+            "(PUT-CONNECTOR > AGENT1 puts CONNECTOR1 on PLATE5 without pairings at LOCATION12)"
+            "(MOVE > AGENT1 moves via ((WALK LOCATION12 (GATE6 SCREEN1) LOCATION14)))")
+ :validated t
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (has-location agent1 location14)
+ :search-start :chain
+ :search-cutoff 6
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 5
+ :recommendation (:date "2026-09-20" :cutoff 6 :threads 0 :start :chain :premises
+                  (pr15 pr16 pr4 pr3) :guesses nil :standing :established :deepens nil :success
+                  "a found action sequence realizes lk8 from the stated start within 6 actions.  It makes lk8 :REALIZED.  It CLOSES lk8 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 6.  It establishes that no realization of lk8 exists within 6 actions from that state, and nothing further: not that none exists deeper, not that lk8 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds nil))
+
+(:id lk9
+ :kind :link
+ :statement "the switch is thrown, so the fourth crossing's device is open"
+ :provenance (:derived :grade 2 :by
+              "S4's controller rows under the quotient's stated relaxation")
+ :depends-on ((pr15) (pr5))
+ :premise-gaps ("this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established")
+ :segment (:view :physical :cycle :unknown :ghosts :unknown)
+ :status :realized
+ :sources nil
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-20" :event :amended :by "ledger" :note
+           "search recommended at cutoff 4, threads 0")
+          (:date "2026-09-20" :event :realized :by "ledger" :note
+           "1 action found at cutoff 4; NOT yet validated"))
+ :from "the agent in the region the third crossing reached"
+ :to "the switch is thrown, so the fourth crossing's device is open"
+ :intent "throwing it also CLOSES the device the third crossing used, which the agent is already past; that is the exclusion pair doing what S1 says it does"
+ :closed-by (:search-measured :outcome :found :start-state "CHAIN" :search-expression
+             "cutoff 4, threads 0, as recommended 2026-09-20" :cutoff 4 :threads 0
+             :cutoff-truncated nil :pruning nil :run
+             "constraint-evidence/lk9-found-2026-09-20.txt" :interpretation-committed
+             "a found action sequence realizes lk9 from the stated start within 4 actions.  It makes lk9 :REALIZED.  It CLOSES lk9 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.")
+ :evidence ("(TOGGLE-SWITCH > AGENT1 toggles SWITCH2)")
+ :validated nil
+ :attempts nil
+ :refuted-by nil
+ :segment-bridge nil
+ :search-goal (switched-on switch2)
+ :search-start :chain
+ :search-cutoff 4
+ :search-threads 0
+ :search-settings nil
+ :search-preamble :continue
+ :search-final nil
+ :chain-order 6
+ :recommendation (:date "2026-09-20" :cutoff 4 :threads 0 :start :chain :premises (pr15 pr5)
+                  :guesses nil :standing :established :deepens nil :success
+                  "a found action sequence realizes lk9 from the stated start within 4 actions.  It makes lk9 :REALIZED.  It CLOSES lk9 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link."
+                  :exhaustion
+                  "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 4.  It establishes that no realization of lk9 exists within 4 actions from that state, and nothing further: not that none exists deeper, not that lk9 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.")
+ :measured (:nodes nil :seconds nil))
+
+(:id bd2
+ :kind :bound
+ :statement "no realization of lk5 was found within 8 actions from the stated start state"
+ :provenance (:search-measured :outcome :exhausted :start-state "*t10-checkpoint*"
+              :search-expression "cutoff 8, threads 16, as recommended 2026-09-21" :cutoff 8
+              :threads 16 :cutoff-truncated :unknown :pruning
+              "GRAPH repeated-state pruning; symmetry NIL; minimum-steps pruning enabled T (runtime flag only); parallel cutoff coverage instrumentation was incomplete"
+              :run "constraint-evidence/lk5-cutoff8-result-2026-09-21.txt"
+              :reported-cutoff-truncated nil :reported-outcome :exhausted-no-solution
+              :reported-reason :complete :coverage-audit
+              "Parallel workers counted cutoff hits but did not measure truncation. Actual coverage unknown; raw COMPLETE/NIL is not a completeness certificate.")
+ :depends-on ((pr4) (pr3) (pr10))
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :standing
+ :sources ("run evidence constraint-evidence/lk5-cutoff8-result-2026-09-21.txt")
+ :events ((:date "2026-09-21" :event :opened :by "ledger" :note ""))
+ :for-link lk5
+ :measured (:nodes nil :seconds 1.839 :cpu-seconds 24.34375 :bytes-consed 4234773504
+            :cutoff-hits 32356)
+ :interpretation-committed "Exhaustion is a grade-3 bound for this exact start/settings/pruning, not a refutation. Record cutoff truncation and pruning with the result. The checkpoint object and the retained prefix remain unchanged; no automatic deepening or predecessor retry is authorized. Report the result before another search."
+ :segment-bridge nil)
+

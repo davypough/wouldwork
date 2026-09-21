@@ -50,7 +50,23 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (solve-subgoal <start-state> <goal>)
   -- one-off search (serial or parallel) for <goal> from <start-state> (a problem-state
-     form, or an unquoted list of all dynamic facts); discards any active goal chain
+     form, an unquoted list of all dynamic facts, or a saved search-checkpoint);
+     discards any active goal chain. With a search-checkpoint, returns the next
+     checkpoint on success or the unchanged checkpoint on exhaustion.
+
+(capture-search-checkpoint)
+  -- captures a live milestone chain or a freshly staged initial state
+
+(export-search-checkpoint <checkpoint> <txt-file>)
+  -- saves the exact endpoint signatures and accumulated action history
+
+(import-search-checkpoint <txt-file>)
+  -- returns a checkpoint by replay, with no search; stage and set threads first
+
+(validate-search-checkpoint <checkpoint>)
+  -- replays the accumulated path from its origin and checks the original goal
+
+(solve-subgoal <goal>) continuation caution:
      A milestone search the depth cutoff truncated proves nothing: it rejects no
      checkpoint and leaves the preceding chain untouched, so raise *depth-cutoff*
      and reissue the same command

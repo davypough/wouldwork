@@ -278,6 +278,7 @@
   (duplicate-accumulated-depths 0 :type fixnum)  ; Sum of duplicate-collision termination depths
   (duplicate-num-paths 0 :type fixnum)           ; Number of duplicate-collision terminations
   (depth-cutoff-hits 0 :type fixnum)             ; Nodes blocked by *depth-cutoff*
+  (depth-cutoff-truncated nil :type boolean)    ; A cut node had successors
   (accumulated-backtrack-distance 0 :type fixnum) ; Sum of backtrack-event depth drops
   (num-backtracks 0 :type fixnum)                 ; Count of backtrack events
   (solutions-found 0 :type fixnum)         ; Solutions found by this worker
@@ -316,6 +317,7 @@
         sum (ws-duplicate-accumulated-depths stats) into total-duplicate-depths
         sum (ws-duplicate-num-paths stats) into total-duplicate-paths
         sum (ws-depth-cutoff-hits stats) into total-cutoff-hits
+        count (ws-depth-cutoff-truncated stats) into truncating-workers
         sum (ws-accumulated-backtrack-distance stats) into total-backtrack-distance
         sum (ws-num-backtracks stats) into total-backtracks
         finally
@@ -328,6 +330,8 @@
         (setf *duplicate-accumulated-depths* (+ *duplicate-accumulated-depths* total-duplicate-depths))
         (setf *duplicate-num-paths* (+ *duplicate-num-paths* total-duplicate-paths))
         (setf *depth-cutoff-hits* (+ *depth-cutoff-hits* total-cutoff-hits))
+        (when (plusp truncating-workers)
+          (setf *depth-cutoff-truncated* t))
         (setf *accumulated-backtrack-distance* (+ *accumulated-backtrack-distance* total-backtrack-distance))
         (setf *num-backtracks* (+ *num-backtracks* total-backtracks))))
 

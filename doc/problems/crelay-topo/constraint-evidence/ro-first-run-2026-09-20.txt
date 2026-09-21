@@ -1,0 +1,40 @@
+
+
+RO  ROLE OBLIGATIONS  [conditional allocation for one stated segment]
+--------------------------------------------------------------
+  SCOPE: allocation only.  No action search, no plan witness, no transport claim.
+  A conditional obligation may hold without its condition being reachable or necessary.
+  Presence is not availability; sequential crossers are not simultaneous demand.
+
+  segment: view :physical; cycle :none; ghosts :absent
+    provenance: RO2 segment: physical view, no ghosts, gate9 open, agent off those plates
+    stated available witnesses (3): (box1 connector1 tray1)
+    removed agent1: excluded -- premised off those plates in this segment
+
+  requested active device conditions (1)
+
+    gate9 == (and plate6 plate7 plate8)
+      requested :active; provenance RO1 audit; conditional, not proved necessary
+      state open: state == aggregate; empty-type premises (jammer)
+      state recording-open: state == aggregate; empty-type premises (jammer)
+      alternative 1: supports (plate6 plate7 plate8); minimum simultaneous demand 3
+        eligible for plate6 (3): (box1 connector1 tray1)
+        eligible for plate7 (3): (box1 connector1 tray1)
+        eligible for plate8 (3): (box1 connector1 tray1)
+        per-support restriction beyond availability UNRESOLVED (reach, elevation, history).
+        matching: PERFECT; an injective simultaneous assignment exists
+          forced members (3): (box1 connector1 tray1)
+          forced pairings (0): nil
+        conditional occupancy destinations (3):
+          plate6 at location16
+          plate7 at location17
+          plate8 at location18
+          CONDITIONAL ONLY: a destination becomes a transport obligation after its
+          necessity, initial position, object-presence history and segment are established.
+        grade 1; status CONDITIONAL
+        sources: CONTROLS clauses and polarity; ON's functional keying; HAS-POSITION;
+          stated segment RO2 segment: physical view, no ghosts, gate9 open, agent off those plates
+        unresolved premises: necessity of this segment; ghost absence; agent occupancy;
+          replacement witnesses; recorder transitions
+
+  no transport obligation and no stranding verdict is emitted by this component.

@@ -1,0 +1,122 @@
+Crelay-Topo Forward-Led Analysis -- Interface Audit
+=================================================
+2026-09-18. Initial static audit followed by user-run E001 replay qualification.
+Baseline HEAD: 7d0e04437d39b4457774c4e5cf146bed94e3a2c9, dirty working tree.
+HEAD alone does not identify the current code; capture relevant file hashes and
+working changes with runtime evidence. Existing unrelated changes were preserved.
+
+A01 -- TWO-ARGUMENT SEARCH (source-confirmed)
+src/ww-goal-chaining.lisp: SOLVE-SUBGOAL, SOLVE-SUBGOAL-FROM-FORM,
+MAKE-START-STATE-FROM-FACTS.
+Two arguments select a one-off WW-SOLVE in any thread mode. A problem-state is
+copied. A fact-list start replaces IDB while other copied state fields survive;
+this is not existential search over states satisfying a partial start formula.
+The call saves undo, clears chaining extensions/session, installs its start and
+goal, then searches. Capture the original goal/origin independently.
+Decision: all construction calls use a replay-derived problem-state and 16 threads.
+
+A02 -- PARTIAL VALIDATION (defect found statically; fix verified by E001)
+src/ww-solution-validation.lisp: VALIDATE-SOLUTION, %VALIDATE-SOLUTION,
+CHECK-VALIDATION-RESULT, DISPLAY-VALIDATION-STATE.
+Partial action sequences are supported. Successful execution without satisfying
+GOAL-FN prints PARTIAL VALIDATION and the intermediate state.
+The partial branch ends with DISPLAY-VALIDATION-STATE, whose last expression is
+TERPRI (returns NIL). Thus it does not return the state promised by the macro's
+docstring. Full success explicitly returns FINAL-STATE; partial success does not.
+This does not invalidate the printed successful replay. It prevents using the
+return value to distinguish partial success from action failure.
+Existing alternative: VALIDATE-ACTION-SEQUENCE returns structured success and
+final-state fields. It copies its initial state and supports timestamped or plain
+actions. Use it for reconstruction; retain VALIDATE-SOLUTION for interactive QA.
+Possible focused fix: return FINAL-STATE after the partial-state display. Verify
+partial success, goal success and action failure after any implementation.
+Follow-up: the partial branch now explicitly returns FINAL-STATE. This is the
+only engine edit made for the qualification. E001 checks partial/full/failure
+returns; all three checks passed in the user's E001 REPL run.
+
+A03 -- MID-CYCLE ONE-OFF SEARCH (history mismatch confirmed; effect unqualified)
+tech/-recorder-solution.lisp: PARSE-RECORDER-PATH creates an implicit open cycle
+when its supplied start already has RECORDING-IN-PROGRESS. For a cycle without
+an explicit START, RECORDER-PATH-CYCLE-SNAPSHOT copies that supplied start.
+VALIDATE-RECORDER-PATH-CYCLE replays the isolated ghost path from that snapshot.
+Consequently a one-off suffix beginning mid-cycle is checked from the checkpoint,
+not automatically from the actual earlier fork. Ordinary checkpoint state alone
+does not establish equivalence of these checks.
+tech/-recorder-cycle-chaining.lisp: RECORDER-SEGMENTS-FROM-GOAL-CHAIN-PHASES and
+VALIDATE-RECORDER-SUBGOAL-CUMULATIVE-PATH explicitly retain cumulative history.
+One-off calls clear that chain; no claim that they inherit its validation contract.
+Required qualification: compare suffix-local and cumulative validation on an
+open-cycle checkpoint, including a case with live changes since the fork that
+matter to ghost replay. Inspect search-time prefix validators as well as returned
+solution validators. False rejections cannot be repaired by post-search replay.
+Do not disable validators or switch to serial search as a workaround.
+If needed, design a small origin/prefix-context facility for parallel one-off
+search and ensure its context reaches every worker and relevant validator.
+Until qualified, mid-cycle witnesses require cumulative validation and negative
+search results cannot justify excluding the corresponding legal continuations.
+
+A04 -- GOAL CONTEXT AND TECHNOLOGY VALIDATION (source-confirmed)
+%VALIDATE-SOLUTION calls ordinary action replay and GOAL-FN; it does not invoke
+the complete registered solution-validator pipeline.
+VALIDATE-RECORDER-SOLUTION separately validates cycles, then integrated playback
+against current GOAL-FN; its GOAL-STATE argument is ignored.
+Therefore pass the cumulative original-origin path and install the appropriate
+milestone goal for prefix checks. Restore/use the original goal for completion.
+Never call a milestone-success message a complete puzzle solution.
+
+A05 -- SETUP AND PERSISTENCE (source-confirmed)
+src/ww-set.lisp handles thread-mode rebuilding. Finish all setup before replay.
+src/ww-goal-chain-persistence.lisp: VALIDATE-CLEAN-SUBGOAL-PROGRESS-IMPORT-SESSION
+calls VALIDATE-CONTINUATION-PRECONDITIONS, which requires *threads* = 0.
+Do not use IMPORT-SUBGOAL-PROGRESS to implement this 16-thread protocol.
+Archive action data and reconstruct states through replay instead.
+
+QUALIFICATION GATES
+Q1: Partial-prefix endpoint capture and active goal/origin identification.
+Q2: 16-thread one-off uses exactly the reconstructed concrete start.
+Q3: Recorder suffix-local versus cumulative semantics, including search pruning.
+Q4: Fresh-session reconstruction produces matching endpoint and recorder evidence.
+Q5: Success, bounded failure and interruption are recorded with correct scope.
+Q1 passed E001. Q3: 106 comparisons agreed on the 14-action fixture; general
+equivalence remains unproven. Q2 passed E002 (task generation, not worker search).
+Q4 fresh-session recovery
+and Q5 search outcome handling are not yet qualified by this replay-only run.
+
+FOLLOW-UP INSPECTION AND E001
+The parallel task generator and worker successor code both call
+CANDIDATE-SOLUTION-VALID-P. CANDIDATE-SEARCH-PREFIX-VALID-P also passes current
+*START-STATE* and the searched path to registered prefix validators. Hence the
+implicit-cycle snapshot issue is relevant before final result acceptance too.
+Prepared forward-evidence/E001-interface-check.lisp: replay the archived 14-action
+prefix, verify origin and stored checkpoints, then compare local and cumulative
+recorder candidate checks at every open-cycle split. Compare recording-prefix
+checks at subsequent steps and cycle-boundary checks at STOP/CANCEL steps.
+The script keeps only boolean acceptance and diagnostic fields, not opaque
+snapshot structures, in comparison output. It restores the original goal.
+It does not solve, change worker count, disable validators, or import a chain.
+Its calls to recording-prefix validators test their semantics directly even if
+optional recording-prefix pruning is disabled. They do not measure actual worker
+scheduling. No disagreement would establish agreement only for this fixture.
+An origin/archive mismatch or invalid cumulative baseline stops the check; do not
+rewrite the fixture silently. Investigate the first mismatch.
+
+IMPLEMENTATION STATUS
+Stage A: static audit complete; operational qualification remains open.
+Stage B: initial crelay-topo documents created.
+CURRENT QUALIFICATION SUMMARY (supersedes older pending notes above)
+E001-E006: return fix, concrete-start use, saved-parent reconstruction, actual
+worker execution (E004) and cumulative recorder checks passed for tested fixtures.
+E004 retained two distinct recording-state endpoints. E007 cumulative validation
+pending. General mid-cycle equivalence, fresh-process recovery, and negative/
+interrupted search semantics are not fully qualified. They are limitations, not
+an instruction to perform unrelated benchmarks before goal-directed work.
+
+Stage C: partial-return fix verified by user E001. E002 one-off diagnostic passed.
+Stage D: E001 completed; 106 recorder comparisons agree, archive endpoints match.
+E002 used the exact C002 start, found one pickup and certified cumulative C003.
+Configured threads 16; task generation found the solution before worker execution.
+Stages E-F: no mechanism pilot search or full exploration started.
+E003 follow-up: reconstruction of saved C003 and depth-2 extension passed in the
+user REPL. C004 cumulatively validated; task generation 19 ms, worker search 0 ms.
+Fresh staging was prescribed; a fresh OS/Lisp process restart has not been
+independently demonstrated. Bounded-negative/interruption qualification remains open.

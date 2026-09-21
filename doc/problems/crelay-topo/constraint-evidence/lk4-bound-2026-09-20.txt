@@ -1,0 +1,228 @@
+Crelay-topo -- the first exhaustion, and the decomposition it exposed.  2026-09-20, T10.
+=======================================================================================
+
+REPRODUCTION, from nothing, from the repository root, in order:
+  build-realization-ledger-2026-09-20.lisp
+  ingest-lk1-2026-09-20.lisp
+  ingest-runs-2026-09-20.lisp
+  ingest-lk4-bound-2026-09-20.lisp
+None stages a problem, loads wouldwork, or runs a search.
+
+WHAT D RAN.  The fourth milestone, cutoff 8, serial.  NO SOLUTIONS.  23.1 seconds,
+9.25 GB consed.  The engine's own words: "Milestone 4 search was truncated by the depth
+cutoff", so *DEPTH-CUTOFF-TRUNCATED* was true.  The committed chain through the third
+crossing is unchanged and nothing became a nogood.
+
+FILED as a GRADE-3 COST BOUND, truncated, with the committed exhaustion reading attached.
+The link stays OPEN.  A bound closes nothing and refutes nothing: WF8 makes that
+structural, not a matter of discipline.
+
+WHAT THE PROFILE ALREADY SAID, AND THE LEDGER NEVER ASKED.  Going back to S4 after the
+exhaustion -- not before it, which is the point -- its controller row for the device on
+that arc says:
+  - the controller is a SWITCH whose ONLY manipulation reach candidate is an endpoint in a
+    region that is not on the spine;
+  - the arc into that region is marked GRAPH CUT IN THIS DIRECTION, and from inside, that
+    region reaches nothing but itself -- a cul-de-sac;
+  - the device guarding that arc demands TWO distinct depressed supports, both at endpoints
+    in the region the excursion starts from, both APPROACH-ONLY, both KEEPER-OBLIGATED
+    while the aggregate is required.  Neither can be the agent, which has to be inside.
+
+SO THE FOURTH MILESTONE WAS NEVER ONE CROSSING.  It bundled an excursion into a cul-de-sac,
+held open by two witnesses that cannot be the agent, and the return.  EIGHT ACTIONS WAS
+NEVER GOING TO COVER IT, AND NO SEARCH WAS NEEDED TO KNOW THAT.  This is the
+movement-coverage premise S4 prints and pr4 has carried since the ledger was built, now
+bitten.  Filed: pr15 and pr16, both GRADE 1, both derivable before any search ran.
+
+WHAT THIS COSTS THE CLAIM THAT THE METHOD IS WORKING.  A constraint-led method that has to
+burn 23 seconds and 9 GB to be told to go and read its own static profile is not yet
+leading with constraints.  The bound is real and correctly filed, but it is not the
+finding; the finding is that the decomposition was built from the spine alone when S4's
+controller rows were sitting in the same file.  THAT IS THE SECOND TIME -- pr14 was the
+first.  Both are recorded as criticisms in their own premise gaps.
+
+THE REFINEMENT.  The fourth crossing is split into three milestones that precede it:
+hold the two supports, reach the switch, throw the switch.  What remains of the original
+is the walk through the device, cutoff dropped from 8 to 4.  IDS ARE APPEND-ONLY, so the
+new links are appended to the file; :CHAIN-ORDER is what puts them where they belong in
+the chain, and REPORT-CHAIN-REPLAY follows chain order rather than file order.  Acceptance
+case 51 added for exactly that.  Suite: 51 cases, 333 assertions, COMPILE-FILE clean.
+
+M5.  The surprise is filed as a schema-gap candidate, printed for hand-appending to
+Constraint-Schema-Gaps.txt: does opening the device that labels a spine arc require
+traversal OUTSIDE that arc, and if so into a region the spine does not visit?  That is a
+question about problem structure the region quotient does not ask, and it is portable.
+
+WHERE THE INGEST RAN: an isolated cloud sandbox with a stock SBCL, reading and rewriting
+the ledger only.  Every search ran on lumpy.
+
+---------------------------------------------------------------------------------------
+
+
+
+LEDGER  REALIZATION LEDGER  [interactive-phase state for crelay-topo]
+-------------------------------------------------------------
+  SCOPE: a record of what is claimed and what it rests on.  It derives nothing.
+  STANDING is computed from the dependency closure and never stored.  A record
+  printed CONDITIONAL rests on at least one live guess or one cost bound.
+  NOTE: RO prints "status CONDITIONAL" for what this reporter calls STANDING.
+  This file's :STATUS is the stored lifecycle, which RO has no analogue for.
+
+  OPEN LINKS (7)
+    lk3  cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair
+      from: the agent somewhere in R2
+      to:   the agent somewhere in R3
+      standing conditional; status realized
+      blocking premises (0):
+      premise gaps (1): the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk4  cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5
+      from: the agent somewhere in R3
+      to:   the agent somewhere in R5
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): this milestone bundled an excursion into a cul-de-sac and the return; it has been split into three milestones that precede it, and what remains here is the walk through the device once the switch is thrown
+      attempt bd1: no realization of lk4 was found within 8 actions from the stated start state -- a cost bound, not a refutation
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk5  cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier
+      from: the agent somewhere in R5
+      to:   the agent somewhere in R6
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether a relay is required at all, and whether a relay role can share a support with a pressure role
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk6  cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone
+      from: the agent somewhere in R6
+      to:   the agent somewhere in R7
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether three witnesses can be present on the approach side simultaneously, which the budget makes tight and RO reports as conditional
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk7  two witnesses, neither of them the agent, onto two supports in the region the excursion starts from. This is where the budget bites; an exhaustion here is informative.
+      from: the agent in the region the third crossing reached
+      to:   the two supports the guarding device demands are simultaneously held
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk8  the excursion into the cul-de-sac, which is a graph cut and possible only while the guarding device is held open
+      from: the agent in the region the third crossing reached
+      to:   the agent stands at the switch's only manipulation reach candidate
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk9  throwing it also CLOSES the device the third crossing used, which the agent is already past; that is the exclusion pair doing what S1 says it does
+      from: the agent in the region the third crossing reached
+      to:   the switch is thrown, so the fourth crossing's device is open
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): this milestone exists because the one-link-per-arc decomposition was wrong, not because the spine says so; it is a refinement, and its necessity is not established
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+
+  SETTLED LINKS (2)
+    lk1  standing established; status closed  the agent crosses from R1 to R8 through the device labelling that spine arc
+    lk2  standing established; status closed  the agent crosses from R8 to R2 through the device labelling that spine arc
+
+  PREMISES IN FORCE (16)
+    pr1  standing established; status in-force  the problem's goal places the agent at the sole endpoint of the last region of the spine
+    pr2  standing established; status in-force  the agent's initial location lies in the first region of the spine
+    pr3  standing established; status in-force  the region quotient relaxes all other doors, elevation and cargo conditions, so a route through it is a candidate and not a plan
+    pr4  standing established; status in-force  the adjacency spine joins the first region to the last only through five intermediate regions, crossing six controlled devices in one fixed order
+    pr5  standing established; status in-force  two of the six devices are controlled by opposite polarities of one switch and are therefore never open together
+    pr6  standing established; status in-force  ON is keyed by the occupant, so the map from an occupied support to its witness is injective
+    pr7  standing established; status in-force  support occupancy is layer-blind, so distinct required supports need distinct witnesses and a ghost counts as one
+    pr8  standing established; status in-force  two of the six devices each require one depressed support, at endpoints the quotient places in the region the crossing starts from
+    pr9  standing established; status in-force  the last device requires three distinct depressed supports, all at endpoints the quotient places on the APPROACH side of its crossing
+    pr10  standing established; status in-force  one of the six devices sits at control depth 2 behind a receiver, and the identity of the device supplying it is not decidable from the control algebra
+    pr11  standing established; status in-force  at the checkpoint this realization reaches, a recorder cycle is OPEN, all four ghost occupants have locations, and two further devices on the spine are already open without any action having been spent on them
+    pr12  standing established; status in-force  a support can be held by a GHOST of the agent produced by a recorder fork while the live agent crosses, so holding a support does not have to spend a live occupant
+    pr13  standing established; status in-force  the replayable path of a recorder-bearing realization is shorter than its printed transcript: the pause, the ghost's return walk, the recorder stop and the resume are display structure and are not replayed actions
+    pr14  standing established; status in-force  two of the six devices on the spine are already open in the initial state, one from an occupant the instance places on its support at the start and one from the initial setting of the switch pair, so those two crossings demand no witness of their own
+    pr15  standing established; status in-force  the switch controlling the fourth crossing's device has exactly ONE manipulation reach candidate, at an endpoint in a region that is not on the spine; that region is entered by one arc, which S4 marks a graph cut, and it reaches nothing else
+    pr16  standing established; status in-force  the device guarding that region demands TWO distinct depressed supports, both at endpoints in the region the excursion starts from, both APPROACH-ONLY, and S4 marks both KEEPER-OBLIGATED while the aggregate is required -- so neither can be the agent, which has to be on the far side
+
+  PREMISES DISCHARGED (0)
+
+  COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)  (1)
+    bd1  attempted lk4; status standing
+      exhausted at cutoff 8, threads 0, from: CHAIN
+      expression: cutoff 8, threads 0, as recommended 2026-09-20
+      grade 3: a cost bound relative to that start state.  It licenses no
+        impossibility claim.
+      committed before the run: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      evidence: constraint-evidence/lk4-bound-8-2026-09-20.txt
+      the cutoff truncated the space: nodes with successors were cut off, so this covers strictly less
+        than the reachable space from that start.
+      pruning in force: graph mode with repeated-state pruning, as staged.  An exhaustion under pruning excludes solutions in pruned branches.
+
+  OPEN QUESTIONS (10)
+    qn1  standing established; status open  Does the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state occur in every solution, or only in some?
+    qn2  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, do any ghost occupants exist?
+    qn3  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, does the agent occupy any of the required supports (plate1)?
+    qn4  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, can a witness removed from a required support be replaced by another before the aggregate is read?
+    qn5  standing established; status open  Can a recorder cycle boundary occur within the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state?
+    qn6  standing established; status open  For the required supports (plate1), can every available witness reach every one of them?
+    qn7  standing established; status open  For the required supports (plate1), does elevation admit every witness-to-support pairing?
+    qn8  standing established; status open  For the required supports (plate1), does occupancy history admit every witness-to-support pairing?
+    qn9  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, which of the present occupants (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*) are actually available as witnesses?
+    qn10  standing established; status open  does opening the device that labels a spine arc require traversal OUTSIDE that arc, and if so into a region the spine does not visit?
+
+  ANSWERED QUESTIONS (0)
+
+  RETRACTED OR REFUTED PREMISES (0)
+
+  INVALIDATED LINKS (0)
+
+  no obligation, no necessity and no plan witness is derived by this component.
+
+
+CHAIN REPLAY  [for crelay-topo]
+--------------------------------------------------------------
+  A goal chain is SESSION STATE and does not survive a REPL restart.  To resume
+  from a cold image, enter these in order.  The settled milestones are re-run,
+  not re-derived: their outcomes are already filed and are not filed again.
+
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location20) (has-location agent1 location3) (has-location agent1 location4) (has-location agent1 location5) (has-location agent1 location7)))   ; closed
+        (solve-subgoal (or (has-location agent1 location10) (has-location agent1 location8) (has-location agent1 location9)))   ; closed
+        (solve-subgoal (or (has-location agent1 location11) (has-location agent1 location12) (has-location agent1 location13)))   ; realized
+        (solve-subgoal (and (depressed plate4) (depressed plate5)))
+        (solve-subgoal (has-location agent1 location14))
+        (solve-subgoal (switched-on switch2))
+        (solve-subgoal (has-location agent1 location15))
+        (solve-subgoal (or (has-location agent1 location16) (has-location agent1 location17) (has-location agent1 location18) (has-location agent1 location21)))
+        (solve-subgoal (has-location agent1 location19))
+
+  3 of 9 milestones are already settled; the rest are the work.
+  A milestone whose cutoff was raised must be re-run at the raised cutoff, which
+  its own recommendation states; this block prints the chain's opening cutoff.
+
+
+SCHEMA-GAP CANDIDATES  [for crelay-topo]  (1)
+--------------------------------------------------------------
+  M5: a surprising outcome is a question the schema failed to ask.  Append these
+  to the problem's Constraint-Schema-Gaps.txt BY HAND, stated domain-generally.
+  Nothing here writes to that file.
+
+    qn10  blocks lk4
+      question: does opening the device that labels a spine arc require traversal OUTSIDE that arc, and if so into a region the spine does not visit?
+      candidate answers: :never, :sometimes, :for-this-device-yes
+      raised by: surprise while ingesting a run for lk4

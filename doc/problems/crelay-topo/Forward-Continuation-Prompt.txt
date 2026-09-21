@@ -1,0 +1,403 @@
+Crelay-Topo Forward-Led Analysis -- Continuation Prompt
+======================================================
+Regenerated 2026-09-19 after E019 accepted C018.
+The primary documents are authoritative; this prompt is their handoff summary.
+
+TASK AND APPROVAL
+Find any fully validated solution using forward Wouldwork searches guided by
+backward resource reasoning. The user approved the architecture/stages and now
+explicitly approved formulating a resource-allocation hypothesis and implementing
+the stronger four-point procedure. The follow-up updated documents and prepared
+a query-only Lisp helper. The user ran D001 and all seven ray predictions matched.
+E008 consumed its one-run approval and exhausted heap without a result.
+E009-E011 passed and produced C009-C011; physical live-load assembly is witnessed.
+E012 exhausted heap; its one-run approval is consumed. User now explicitly says
+keep cutoff10 from now on and continue. This supersedes earlier10-12/higher
+guidance. E014 accepted C013: new keeper fork and powered ghost southern source,
+E015 subsequently accepted C014:51 actions, switch2 on/live connector recovered
+atL12. Cutoff10 remains in force. E016 accepted sibling C015: live box plate5, switch2 off; ordinary blower now
+off due to live switch1 toggle. E017 accepted C016:61 actions, live switch2 on with live box plate5 and recovered
+connector. E018 accepted C017:71 actions, ghost holds trayL7, ghost connector plate2.
+E019 accepted C018:81 actions, live on ghost trayL12; live switch1 ON,
+recording switch1 OFF, live connector unpaired. Next: ferry/tray-recovery design.
+Continue without old
+REPL variables. Keep known solution files SEALED; use generated forward evidence.
+Do not read subgoal-solution-3-subgoals.txt, subgoal-solution-4-subgoals.txt or
+legacy known-solution files to choose/rank/prune/reassure. test13-progress.txt is
+an allowed generated experiment prefix, not a sealed solution.
+
+READ FIRST (relative to D:/quicklisp/local-projects/wouldwork/)
+1. doc/problems/crelay-topo/Forward-Resource-Hypotheses.txt -- H002 allocation,
+   U1-U5 open obligations, phase ledger and alternatives.
+2. doc/problems/crelay-topo/Forward-Method.txt -- four-point procedure and protocol.
+3. doc/problems/crelay-topo/Forward-Checkpoints.txt -- branch map/restore references.
+4. doc/problems/crelay-topo/Forward-Rules-Facts.txt and Forward-Search-Log.txt.
+5. Forward-Interface-Audit.txt as needed for implementation/validation constraints.
+Read current problem and relevant technology source before relying on a rule.
+Backward-Rules-Facts.txt and Backward-Justification.txt contain prior deductions
+and measurements; import selectively with provenance, not as unexamined axioms.
+Do not expand or alter the backward tree as a side task.
+
+PROCEDURE NOW IN FORCE
+1. Formulate a concrete completion hypothesis with simultaneous and phased
+   resource allocations, evidence levels, uncertainties and retained alternatives.
+2. Deduce a strategically useful capability backward from an unresolved obligation.
+   Explain why success changes the prospects for completion; compare parent states.
+3. Search forward for that multi-action capability, letting Wouldwork choose the
+   actions. Avoid repeating one-action pickup/mount/place experiments unless they
+   diagnose an actual uncertain rule or failure. Choose a reasoned bounded cutoff.
+4. Validate the endpoint AND assess it against the intended continuation: access,
+   resources, support structure, cycle history, alternative branches and next step.
+Combine reconstruction/search/capture/cumulative validation/save into one user-run
+operation when practical. This combined generic helper is NOT implemented yet.
+Do not launch another search automatically after the planned experiment.
+
+USER'S REPL WORKFLOW
+PowerShell: sbcl --dynamic-space-size 24000
+Then enter separately:
+  (progn (ql:quickload :wouldwork) (in-package :ww))
+  (stage crelay-topo)
+  (ww-set *threads* 16)
+  (ww-set *depth-cutoff* <n>)
+  (ww-set *solution-type* first)    ; for a witness, unless measuring a minimum
+  (solve-subgoal <concrete-reconstructed-start> <unquoted-goal>)
+All searches use 16 threads. The user runs Lisp; assistant prepares commands,
+reviews output and updates documents. Standing authorization: provide commands
+directly for straightforward tests, without asking permission every time. Get
+specific approval for substantial searches or materially broader changes.
+Do not infer expensive-search approval from the architecture approval.
+Finish setup/thread-mode changes BEFORE capturing the true origin and restoring
+checkpoints. Thread-mode crossing may reload/restage. No serial-chain import.
+
+START/GOAL AND VALIDATION CONTRACT
+Two-argument SOLVE-SUBGOAL is one-off; it copies the concrete state, installs its
+start/goal and clears chain context. A raw fact-list start replaces IDB; it is not
+an existential conjunction over reachable states. Use replay-derived full states.
+Capture original staged origin and original goal independently. Current
+*START-STATE* after search is its source, NOT the returned endpoint.
+VALIDATE-SOLUTION supports partial prefixes; its former NIL partial-return bug
+was fixed in src/ww-solution-validation.lisp and verified by E001. Structured
+VALIDATE-ACTION-SEQUENCE supports reliable endpoint capture. Ordinary replay alone
+is not isolated recorder validation. Validate cumulative prefix from the true
+origin with VALIDATE-RECORDER-SOLUTION under the milestone goal; original final
+goal is (HAS-LOCATION AGENT1 LOCATION19), checked separately at completion.
+Synthesized STOP/return routes in reports are not actions in the saved witness.
+
+ACCEPTED CHECKPOINTS AND RESTORE SOURCES
+C000: true origin, signature in test13-progress.txt :ORIGIN.
+C001: 11 actions, first checkpoint of test13-progress.txt.
+C002: 14 actions, second checkpoint there; live agent hovering L20, blower on.
+C003: 15 actions, ghost holds tray at L7; forward-evidence/C003-checkpoint.sexp.
+C004: 17 actions, live holds connector at L2; C004-checkpoint.sexp. Separate branch.
+C005: 19 actions, live agent at L6; E004-candidates.sexp candidate 1, LIVE toggle.
+C006: 19 actions, same ordinary endpoint; E004 candidate 2, GHOST toggle.
+C007: 20 actions, live holds box at L6; E005-candidates.sexp candidate 1.
+C008: 21 actions, live holds box at L4; E006-candidates.sexp candidate 1.
+C009: 24 actions, live box on ghost-held tray at L5, live hovering L20;
+      E009-candidates.sexp candidate1; cumulative recorder T NIL.
+C010: 29 actions, live connector ON live box ON ghost-held tray at L5,
+      live hovering L20; E010-candidates.sexp candidate1; recorder T NIL.
+C011: 33 actions, live holds tray1 supporting box1 supporting connector1 at L5;
+      ghost tray on ground L5; E011-candidates.sexp candidate1; recorder T NIL.
+C012: 31 actions on alternate C008 branch, live box plate1/tray plate2/connector
+      L9 paired transmitter+repeater, live L1; E013 candidate1; recorder T NIL.
+Paths: C003->C004 OR C003->C005->C007->C008 OR C003->C006.
+C005/C006 differ: C005 keeps recording gate2 open, recording switch1 off; C006
+has recording gate2 closed and recording switch1/blower turning on. Both accepted.
+C008: ghost L5 holding tray1*, connector1 and copy on plate1, tray1 on plate2,
+box1* at L6, live/recording gate2 open, cycle 2 OPEN. Final goal not achieved.
+All mentioned .sexp evidence files are in doc/problems/crelay-topo/forward-evidence/.
+
+PENDING E007 (DO NOT PROMOTE WITHOUT VALIDATION)
+Search found one ground PUT-BOX from L4 to L5, leaving live agent empty-handed at
+L4 and ghost holding tray at L5. Candidate total 22 actions. Only search-time
+validation has passed. E007-search-output.txt preserves the output.
+E007-pending.sexp stores the printed display-form action and parent reference;
+restore C008 from E006-candidates.sexp, then replay/cumulatively validate this
+extension if choosing to use it. Do not rely on the old session's global variables.
+C009 now exists from E009, NOT from this E007 candidate. E007 remains unused.
+
+LEADING RESOURCE HYPOTHESIS H002 (NOT A SOLUTION)
+At the last inbound gate8 crossing:
+- box1* holds plate1; tray1* holds plate2;
+- connector1* at L9 links transmitter1 to repeater1;
+- agent1* holds plate3, enabling gate4/source beam;
+- live agent at L15 carries tray1 supporting box1 supporting connector1;
+- live connector links repeater1 to receiver1; switch2 live-on.
+Live carrier crosses gate8 with all three live objects. They then occupy plates
+6/7/8, permitting gate9 exit. Outside relay need not remain powered after entry
+IF moving through the gate with its relay is legal. This is the central hypothesis.
+Do not resurrect the simpler direct L9->room WALK: current route requires gate5
+and gate7 together, incompatible under a fixed switch2. The two-connector L15
+approach is chosen to avoid that specific shortcut failure.
+
+OPEN DEPENDENCIES, NOT TO BE ASSUMED AWAY
+U1: physical assembly now witnessed by C011; H002 pairing/reload integration still
+    open. Current box height 1 (old prose saying 2 is stale).
+    Carrier stack connector top is 7/2; old F20 sampled only up to 5/2.
+U2: obtain the ghost keeper/source allocation through legal fork/reposition steps;
+    current C008 copies do not already occupy those roles. Count fork/reload costs.
+U3: northern transport and switch2 operation: plates4/5 occupants, empty hands at
+    screen1, parked/recoverable load; gate5 closes when switch2 comes on. A ghost
+    ferry is a hypothesis with its own recording access/keeper schedule.
+U4: actually power receiver1 with the mixed beam chain at the real stack height,
+    and move it across gate8 without invalidating the traversal/safety rules.
+U5: unload and assign three distinct final plate occupants, then reach L19.
+The source offers motivation for nested transport and source-state route selection,
+but no combined runtime witness proves U1-U5. Do not invent states to certify them.
+
+ALTERNATIVES AND NEXT SESSION'S FIRST WORK
+H003 retains fork-inherited final-plate occupants so live originals can remain
+outside as relay infrastructure. Its exact allocation/bootstrap remains open.
+H004 retains other relay/load/location mechanisms; no spec change is proposed.
+The first source audit is now recorded in Forward-Resource-Hypotheses.txt and
+F015-F018. It conditionally supports H002's beam/crossing: the 7/2 ray clears
+wall10 at 13/8 > 1; ordinary mixed relay propagation is allowed; MOVE checks the
+source gate before nested load relocation/propagation. These are NOT witnesses.
+North/loading restrictions: live agent cannot manipulate cargo while holding its
+tray; ghost cannot manipulate live cargo; live agent cannot stand on ghost box.
+Consider loading live box+connector on ghost-held tray, then local release onto
+clear live-held tray, with carrier dismounted and unique eligible catch. This is
+only a conditional mechanism, not a reachable construction. Grounded placement
+is too low: box onto held tray needs live base >= 1/2; connector onto that box
+needs >= 3/2. Parking a tray unloads it. Keep plate4/5 occupied through return
+from screen1; ghost toggle changes both switch views, live toggle only ordinary.
+
+D001 is COMPLETED: saved D001-output.txt agrees with user transcript; all seven
+ray predictions matched on the verified original state, threads16. In particular,
+7/2 sees repeater1 and receiver1; initial gate4 blocks L9->transmitter as expected.
+No assembled state, action replay or gate8 crossing was tested. Do not rerun D001
+without a new reason. F019 records its scope.
+
+E008 / full M1 outcome: UNKNOWN, heap exhausted during GC. User's last progress
+sample: elapsed661s, states112,642,147, closed12,944,522, zero solutions. This is
+not completed depth12 exhaustion or evidence the predicted route is impossible.
+Exact crash time and heap configuration are unknown. E008-output.txt is 0 bytes;
+raw/candidate archives absent. E008-resource-exhaustion.txt preserves user report.
+C011 is now latest accepted. No automatic E008 rerun, larger cutoff or heap.
+
+E009 COMPLETED: one candidate accepted as C009, 24 cumulative actions, segment
+and cumulative endpoint/goal checks passed, recorder T NIL. Helper time0.071396s.
+Ghost toggled switch1, then live mounted blower and placed box onto ghost tray.
+This differs from predicted live toggle: recording switch1/blower drive on,
+recording gate2 closed. Retain these facts; no unobserved alternate assumed.
+Cycle2 open; synthesized closure is not in saved path. Both connectors still
+plate1, live tray plate2, ghost L5 holding tray+live box, live empty-handed L20.
+No final goal or complete live load established. Evidence E009-output.txt and
+E009-candidates.sexp, matching user attachment.
+
+E010 COMPLETED: accepted C010, five new actions, total29; all segment/cumulative
+endpoint and recorder checks passed. Helper0.602605s. Last action CONNECT-CONNECTOR
+placed live connector on box with pairings to connector1*, receiver1, transmitter1.
+No COLOR or ACTIVE receiver1 in endpoint, no repeater pairing. Live empty-handed
+L20, nested live cargo on ghost-held tray L5, live tray plate2, copy connector
+plate1, copy box L6; recording blower on, recording gate2 closed; cycle2 open.
+This witnesses nested cargo, NOT live carrier transfer or H002's powered chain.
+
+E011 COMPLETED: accepted C011, four new actions,total33; segment/cumulative goal
+and endpoint checks passed, recorder T NIL. Helper0.454977s. Live fetched tray
+from plate2 and returned L5; ghost locally released tray, transferring live box
+and connector onto live-held tray. Both agents L5, ghost empty-handed. Gate3
+closed in both views; ghost connector still plate1, ghost box L6. Existing live
+pairings unchanged (copy connector, receiver, transmitter), connector unlit.
+This proves physical U1 assembly for this history, not final relay/north access.
+
+E012 outcome UNKNOWN/resource-exhausted: last reported elapsed660s, fatal heap
+exhaustion624 bytes available/688 requested. No raw/candidate files. Setup output
+and request survived and confirm parent C008 recorder T NIL, cutoff12/threads16.
+Evidence E012-resource-exhaustion.txt. No completed negative or new checkpoint.
+
+E013 COMPLETED: accepted C012,10 new actions,total31; segment/cumulative goal
+and endpoint checks passed, recorder T NIL. Helper229.57506s. Actual route used
+ghost tray transport/local settling of box onto plate1, not predicted ground-box
+route. Live originals ready and live empty-handed at L1; old ghost L2/tray ground
+L2/connector plate1/box L6. Both switch1 drives on; cycle2 open. No new fork yet.
+
+E014 COMPLETED -- C013 is latest accepted checkpoint.
+Restore forward-evidence/E014-candidates.sexp candidate1 from true staged origin.
+Parent C012,10 new actions,total41; segment/cumulative/recorder checks all pass.
+Helper0.325372s,17,960 states; FIRST/16 threads/cutoff10/cycle cap3.
+Cycle2 cancelled at32, cycle3 fork at33, still open. Both boxes plate1 and both
+trays plate2. Live L9 holding unpaired connector; ghost on plate3 L10; ghost
+connector L9 paired transmitter/repeater and red; repeater red. Both gate4 views
+open, both switch2 views off. Southern source works without placed live connector.
+Actual ghost approach used L11 then ladder3; direct L1->L10 prediction unvalidated.
+Saved path includes live detours; no minimality claim. Synthesized STOP excluded.
+
+E015 RESULT -- C014 ACCEPTED (2026-09-19)
+Parent C013; ten new actions,51 cumulative/time51. E015-candidates.sexp candidate1
+is ACCEPTED-PREFIX; segment/cumulative goal and endpoint checks T, recorder T NIL.
+Saved archive/output agree with user paste. FIRST/16 threads/cutoff10/cycle cap3.
+Helper408.45215s (evaluation408.449s),57,497,004 states.927,954,184,784 bytes consed
+is cumulative allocation, not retained heap. No minimum-length claim.
+
+Actual segment:42 ghost steps off plate3;43 ghost walks L10->L13 via gate5;
+44 live detours L9->L1;45 ghost steps onto plate4;46 live walks L1->L12;
+47 live puts connector on plate5;48 live crosses gate6/screen1 toL14;
+49 live toggles switch2;50 live returns through gate6/screen1 toL12;
+51 live picks up connector retaining pairings (none were present).
+Cycle3 remains open; synthesized return/STOP is not saved history.
+
+Endpoint: live L12 holding unpaired connector; ghost ON plate4 atL13. Both boxes
+ON plate1 atL2; both trays ON plate2 atL7. Ghost connector L9 still paired to
+transmitter/repeater. Ordinary gates1/3/7 open; recording gates1/3/5 open.
+Ordinary switch2 on, recording switch2 off. Gate6 closes on connector recovery;
+gate4 is closed and southern relay/repeater unlit after ghost leaves plate3.
+Both switch1/blower drives remain on. Original final goal still unmet.
+
+U3 switch access and recovery now witnessed, but northern cargo transport is not.
+Live box/tray remain south of closed ordinary gate5. Ghost can cross gate5 under
+recording state, but moving ghost tray off plate2 closes recording gate3 even
+while live tray keeps ordinary gate3 open. Resolve ghost-side keeper exchange
+or a legal route avoiding that crossing before claiming a ferry schedule.
+C013 remains the earlier powered-source checkpoint; C011 remains separate cargo
+assembly evidence. Do not combine their simultaneous facts with C014. U1 desired
+pairings/reassembly, remaining U3 transport, northern U4 and U5 remain open.
+Next recommended work: audit both gate3 views and ghost-tray return access, then
+select a meaningful transport capability at cutoff10. No E016 prepared/run.
+
+E016 RESULT -- C015 ACCEPTED
+Parent C013 (alternate to C014);10 new actions,51 cumulative/time51. E016 accepted
+candidate1: segment/cumulative goal and exact endpoint checks T; recorder T NIL.
+Evidence E016-candidates.sexp/-output.txt and matching user paste. Helper28.65444s,
+evaluation28.651s;3,809,955 states. FIRST/16 threads/cutoff10/cycle cap3.
+63,961,083,376 bytes consed is cumulative allocation, not retained heap.
+
+Live box ON plate5 atL12; live agent there holding unpaired connector. Ghost box
+ON plate1; live/copy trays ON plate2. Ghost ON plate3 atL10; ghost connector L9
+paired transmitter/repeater, both ghost connector and repeater red. Both switch2
+views off. Ordinary gates1/2/3/4/5 open; recording gates1/3/4/5 open. Cycle3 open.
+IMPORTANT incidental change: action48 live TOGGLE-SWITCH SWITCH1 turned ordinary
+switch1/blower drive OFF and opened gate2; recording switch1/blower drive remain
+ON, recording gate2 closed. Do not reuse C013's ordinary blower-on assumption.
+
+Actual route:42 CONNECT live connector groundL9 to repeater/receiver/transmitter;
+43 MOVE L2;44 PICKUP box;45 MOVE L12;46 PUT box plate5;47 MOVE L4;
+48 TOGGLE switch1;49 MOVE L9;50 ordinary PICKUP connector (clears pairings);
+51 MOVE L12. All ten actions live; ghost stays on plate3. Temporary pairing at42
+is not endpoint pairing. Synthesized ghost return/STOP is not in saved actions.
+No minimum-length claim; incidental detour/toggle not established necessary.
+
+U3 now has a pre-switch northern live box witness, but no boarded ferry. Plate5
+weight is live-side only; recording gate6 does not gain it. C014 switch-access
+witness is a sibling, not merged with this state. Next recommended capability:
+switch2 live-on with this box retained north, recover/prepare connector, and
+account for subsequent ghost-tray boarding. Source boarding geometry remains
+only a hypothesis until tested. Ghost-tray/plate2 exchange and return, northern
+load/beam, gate8 crossing and final delivery remain open. C011 and C014 retained.
+No E017 prepared or run; future cutoff stays10. Original final goal unmet.
+
+E017 RESULT -- C016 ACCEPTED
+Parent C015;10 new actions,61 cumulative/time61. E017 candidate1 passes segment,
+cumulative goal/exact endpoint and recorder validation (T NIL). Saved archive
+and output agree with user paste. Helper0.905478s,evaluation0.902s;98,851 states.
+FIRST/16 threads/cutoff10/cycle cap3.1,667,204,736 bytes consed is allocation.
+
+Actual mechanism differs from prediction:52 live CONNECT connector on plate4
+atL13 fromL12, paired ghost connector/receiver/transmitter;53 live crosses
+screen/gate6 toL14 while live connector and box supply plates4/5.54 ghost leaves
+plate3;55 ghost detours toL1;56 live toggles switch2;57 live goes via gate6/7 and
+screen toL15;58 ghost walksL13;59 live returnsL12;60 ghost mounts plate4;
+61 live picks up connector fromL12 retaining pairings. Ghost replaces the live
+connector on plate4 before pickup; ordinary gate6 remains open at endpoint.
+No proof these detours are necessary. Synthesized ghost return/STOP excluded.
+
+Endpoint: live L12 holds connector paired to connector1*,receiver1,transmitter1
+(NO repeater pairing); live box ON plate5 atL12. Ghost ON plate4 atL13; ghost box
+ON plate1; both trays ON plate2; ghost connector L9 retains transmitter/repeater
+pairings. Ordinary gates1/2/3/6/7 open; recording gates1/3/5 open. Gate4 closed,
+source unlit. Live switch2 on, recording switch2 off. Ordinary switch1/blower
+drive off; recording switch1/blower drive on, as inherited from C015. Cycle3 open.
+
+U3 switch access with northern live box now witnessed, including live visit L15
+and connector recovery. No loaded relay or tray boarding shown. Live connector
+pairings are not H002's desired repeater/receiver pair; must clear/reconfigure
+before inaccessible loading. Ghost departure from plate4 will close ordinary
+gate6 unless another occupant replaces it; live is already outside screen.
+Next recommended experiment design: ghost tray/plate2 keeper exchange, followed
+by actual boarding from live box. Preserve ordinary/recording gate3 distinctions
+and plan reverse keeper exchange/source restoration. C011/C014 remain separate
+branches; no merging endpoints. No E018 prepared or run. Cutoff remains10.
+
+E018 RESULT -- C017 ACCEPTED
+Parent C016;10 new actions,71 cumulative/time71. E018 candidate1 accepted with
+segment/cumulative goal and exact endpoint checks T, recorder T NIL. Saved
+archive/output agree with user paste. Helper496.43933s,evaluation496.436s;
+70,666,260 states. FIRST/16 threads/cutoff10/cycle cap3.1,176,447,609,744 bytes
+consed is cumulative allocation, not retained heap. No minimum-length claim.
+
+All ten actions are ghost actions:62 step off plate4;63 moveL9;64 retaining
+pickup connector;65 moveL7;66 CONNECT connector on ground to repeater/transmitter;
+67 pickup tray;68 put tray ground;69 ordinary pickup connector;70 CONNECT
+connector plate2 to repeater/transmitter;71 pickup tray. Ghost holds tray atL7,
+ghost connector now keeps plate2 and recording gate3 open. Pairings were cleared
+at69 and re-established at70, not continuously retained throughout the segment.
+Ordinary pickup69 also removed the incoming live->ghost connector pairing.
+
+Endpoint live L12 holding connector paired receiver1/transmitter1 ONLY (no ghost
+connector or repeater pairing). Live box plate5 L12; live tray plate2 L7. Ghost
+box plate1 L2; ghost holds tray L7; ghost connector plate2 L7 paired repeater/
+transmitter. Ordinary gates1/2/3/7 open; recording gates1/3/5 open. Ordinary
+switch2 on/recording off; ordinary switch1 off/recording on. Gate4 and gate6
+closed, no source illumination. Cycle3 remains open. Synthesized return/STOP
+excluded from saved prefix. Original final goal unmet.
+
+U3 local keeper exchange now witnessed. Ghost tray is free to attempt departure
+through recording gates3/5; live tray's ordinary-only weight was not relied on
+for recording gate3. Northern tray delivery, live boarding from box, ferry and
+reverse keeper/source restoration are still unvalidated. Next recommended
+capability: deliver ghost tray north and board live agent using live box, while
+preserving switch2 and keeper access. Repair live relay pairings before final
+loading. No E019 prepared/run; cutoff10 remains. Prior branches retained.
+
+E019 RESULT -- C018 ACCEPTED
+Parent C017;10 new actions,81 cumulative/time81. E019 candidate1 passes segment/
+cumulative goal and exact endpoint checks, recorder T NIL. Archive/output agree
+with user paste. Helper88.79683s,evaluation88.793s;11,980,500 states. FIRST,
+16 threads,cutoff10,cycle cap3.195,808,946,432 bytes consed is total allocation.
+
+Actual segment:72 live CONNECT connector plate4 L13 to ghost/receiver/transmitter;
+73 live JUMP ground->box atL12;74 ghost PUT tray groundL7;75 ghost MOVE L4;
+76 live ordinary PICKUP connector fromL12 (all live connector pairings cleared);
+77 ghost TOGGLE switch1;78 ghost MOVE L7;79 ghost PICKUP tray;
+80 ghost MOVE L7->L12 through recording gates3/5;81 live JUMP box->ghost tray.
+This witnesses the intermediate-box boarding route, but not the predicted direct
+three-action sequence or its sufficiency. No minimum-length claim. Synthesized
+return/STOP excluded; cycle3 remains open.
+
+Endpoint live ON tray1* atL12 holding unpaired connector; ghost holds tray1* atL12.
+Live box remains ON plate5 L12; ghost box plate1 L2; live tray plate2 L7; ghost
+connector plate2 L7 with transmitter/repeater pairings. Gate4 closed/source unlit.
+Ordinary gates1/3/7 open; recording gates1/2/3/5 open. Ordinary switch2 on,
+recording switch2 off. IMPORTANT: ghost toggle77 flipped BOTH switch1 views:
+ordinary switch1 now ON/blower turning and blowing/gate2 closed; recording
+switch1 now OFF/blower drive off/gate2 open. Do not retain C017's opposite split.
+
+Northern ghost-tray delivery and live boarding are now validated. No ghost MOVE
+with live rider occurred after boarding, so ferry across ordinary-closed gate5
+is still an open capability, not inferred from successful empty-tray delivery.
+Next recommended capability: ferry live agent south and recover live tray, with
+safe dismount and connector placement/pairing access explicitly accounted for.
+Northern box remains behind; later return/loading and reverse keeper/source
+restoration need validation. C011 is separate load-assembly evidence, not current
+cargo. No E020 prepared/run; cutoff10 remains; all alternate branches retained.
+
+EVIDENCE/IMPLEMENTATION LIMITS
+E001: 106 recorder local/cumulative comparisons agree for a 14-action fixture.
+E002/E003/E005/E006: shallow searches completed in task generation, no speedup proof.
+E004: 625 tasks, 16 workers used, 172 ms task generation + 20 ms workers; two
+19-action candidates passed cumulative validation. This is real worker execution,
+not a universal correctness/equivalence or performance proof.
+General mid-cycle validation equivalence remains unproved; source-state implicit
+cycle checks differ from actual-fork history. Never turn an uncertain negative
+into a global exclusion. Fresh-process and interrupted-result qualification are
+not fully demonstrated. Do not let unrelated benchmarking displace goal work.
+Existing working tree includes unrelated and prior edits/deletions. Preserve them;
+do not restore removed legacy files. No commits or cleanup of durable evidence.
+
+HANDOFF HYGIENE
+Update primary documents after each meaningful result; regenerate this prompt LAST.
+Label witness vs accepted prefix vs hypothesis vs bounded negative. Save action
+records and exact endpoint evidence so no transcript or REPL global is essential.
+The pilot is crelay-specific; extract a reusable initialization template only after
+strategic milestone selection and restart/branch handling have been exercised.

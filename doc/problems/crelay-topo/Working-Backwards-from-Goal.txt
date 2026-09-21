@@ -68,3 +68,6 @@ No extra box, connector, tray, or location was needed.
 The old four-cycle intermediate checkpoint and speculative alternatives are
 preserved in Historical-Analysis-before-2026-09-15.txt. No additional Subgoal 4
 is needed for the current retained complete solution.
+
+Note 2026-09-17: a formal, incremental backward analysis is now kept in
+Backward-Tree.txt, Backward-Justification.txt, and Backward-Rules-Facts.txt.

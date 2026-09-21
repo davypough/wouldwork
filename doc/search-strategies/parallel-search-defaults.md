@@ -22,9 +22,10 @@ without copying worker views. Backtracking remains serial, as before.
 
 The retained serial selector optimization, worker-owned static facts/object-code
 maps, and cold worker-private traversal dependency caches are integrated.
-Traversal segment caches stay shared and synchronized. Speculative segment-cache
-privatization, extra shards and lock removal were not recommended by the evidence
-and are not part of this change.
+The current source also registers traversal segment caches as worker-private.
+Worker memo tables are created unsynchronized because each belongs to one worker.
+This supersedes the original integration's shared segment-cache policy; it does
+not establish the performance effect of that later change.
 
 For an explicit diagnostic comparison, WW-SET can disable WORKER-READ-SNAPSHOTS.
 REFRESH retains the current setting; STAGE restores the enabled default. The flag
@@ -47,14 +48,14 @@ leave references to caches from the previous technology set.
 | --- | --- | --- |
 | -vertical | type and location-elevation caches | Empty tables with original hash settings |
 | -mobility | canonical route keys | Empty table |
-| -traversal | canonical families and dependency classifications | Empty tables; dependency synchronization retained |
+| -traversal | canonical families, dependency classifications, and segments | Empty worker-private unsynchronized tables |
 | beam-crossing | lazily built crossing endpoint table | NIL; built inside each worker |
 | topo-lower-bound | 23 lazy model/context values, including their built flags | NIL; structures and tables rebuilt inside each worker |
 
 The traversal dependency cache holds integer keys and T/NIL classifications.
 Starting cold avoids transporting coordinator cache contents across worker
 lifetimes. Negative cached NIL entries preserve GETHASH's presence value.
-Shared segment results and the fact values referenced by their keys remain
+Segment results and the fact values referenced by their keys remain
 immutable; mobility copies segments when constructing routes.
 
 The lower-bound technology needs more than a private top-level table: its lazy

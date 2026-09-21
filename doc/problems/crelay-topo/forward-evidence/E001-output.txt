@@ -1,0 +1,69 @@
+E001 threads=16 cutoff=8 actions=14; replay only.
+Installing goal...
+Validating 0 actions...
+
+
+PARTIAL VALIDATION
+
+All 0 actions executed successfully.
+Goal NOT satisfied.
+
+Intermediate state:
+  Time: 0.0
+  Value: 0.0
+  Propositions:
+    (DEPRESSED PLATE2)
+    (HAS-LOCATION AGENT1 LOCATION1)
+    (HAS-LOCATION CONNECTOR1 LOCATION9)
+    (HAS-LOCATION BOX1 LOCATION6)
+    (HAS-LOCATION TRAY1 LOCATION7)
+    (ON TRAY1 PLATE2)
+    (OPEN GATE2)
+    (OPEN GATE3)
+    (OPEN GATE5)
+    (RECORDING-OPEN GATE2)
+    (RECORDING-OPEN GATE5)
+
+Installing goal...
+Validating 0 actions...
+
+
+VALIDATION SUCCESSFUL
+
+All 0 actions executed successfully.
+Goal satisfied.
+
+Final state:
+  Time: 0.0
+  Value: 0.0
+  Propositions:
+    (DEPRESSED PLATE2)
+    (HAS-LOCATION AGENT1 LOCATION1)
+    (HAS-LOCATION CONNECTOR1 LOCATION9)
+    (HAS-LOCATION BOX1 LOCATION6)
+    (HAS-LOCATION TRAY1 LOCATION7)
+    (ON TRAY1 PLATE2)
+    (OPEN GATE2)
+    (OPEN GATE3)
+    (OPEN GATE5)
+    (RECORDING-OPEN GATE2)
+    (RECORDING-OPEN GATE5)
+
+E001: the next unknown-action diagnostic is intentional.
+
+Validating 1 action...
+
+
+VALIDATION FAILED at action 1
+
+Action: (FORWARD-E001-NONEXISTENT-ACTION)
+
+Reason: Action FORWARD-E001-NONEXISTENT-ACTION not found in problem specification
+E001-PARTIAL/FULL/FAILURE-RETURNS=PASS
+Installing goal...
+Installing goal...
+E001-CUMULATIVE-RECORDER=T NIL
+E001-COMPARISONS=106 DISAGREEMENTS=0
+E001: agreement on this prefix is not a general equivalence proof.
+E001-COMPLETE; original goal restored on return.
+Installing goal...

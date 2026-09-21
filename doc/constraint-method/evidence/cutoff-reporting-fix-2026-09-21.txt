@@ -1,0 +1,43 @@
+Approved parallel cutoff reporting and unknown-coverage correction
+================================================================
+Worker DFS now mirrors serial DF-BNB1 at a depth-cutoff node: test whether it
+has successors, retain a worker-local positive flag, and skip later probes
+for that worker once the flag is true. The successors are neither enqueued
+nor checked for goals beyond the allowed depth. Aggregate flags after workers
+finish, preserving any already recorded positive global flag.
+
+This adds no shared write or lock on the cutoff path. Probe overhead is not
+benchmarked: a worker with no positive witness will examine each terminal
+cutoff node, while a worker finding a witness stops probing. This mirrors the
+serial semantics without pretending a cutoff hit alone proves truncation.
+
+Ledger provenance now accepts T, NIL, or :UNKNOWN. Omitted ingestion data
+defaults to :UNKNOWN; the reporter no longer treats any non-NIL value as T.
+Invalid supplied values signal. Reliable NIL is described only as no observed
+direct cutoff truncation, because pruning can also limit explored states.
+The raw historical COMPLETE/NIL result remains recorded separately from its
+corrected UNKNOWN coverage interpretation. LK5 is OPEN with bound BD2.
+
+Verification:
+- 55 assertions passed on a synthetic two-edge path, with serial and 16-thread
+  execution: nonterminal cutoff, terminal-at-cutoff, exhausted-before-cutoff,
+  reset/aggregation across runs, and a goal beyond/at the allowed depth.
+- Worker-local cutoff counts and flags were checked against global results.
+- 346 ledger assertions passed, including explicit/default unknown coverage,
+  invalid-value rejection, and no upgrade/refutation of the open link.
+- Data-only LK5 ingestion passed well-formedness and file readback, preserving
+  :UNKNOWN and recording the prior recommendation's exact archive provenance.
+- No crelay-topo search, action replay, or sealed-content reading was performed.
+
+Files:
+test/problem-cutoff-reporting-test.lisp
+test/cutoff-reporting-checks.lisp
+doc/constraint-method/evidence/cutoff-reporting-checks-2026-09-21.log
+doc/constraint-method/evidence/ledger-coverage-checks-2026-09-21.log
+doc/problems/crelay-topo/constraint-evidence/ingest-lk5-bound-2026-09-21.lisp
+doc/problems/crelay-topo/constraint-evidence/lk5-bound-ingestion-2026-09-21.log
+
+Tests used an isolated WOULDWORK_INSTANCE and a temporary repository-local
+compilation cache. Both bootstrap and cache are removed after testing.
+No stronger claim about minimum-steps pruning or unpruned full-space coverage
+is made by the :COMPLETE outcome. No cutoff increase is authorized by this fix.

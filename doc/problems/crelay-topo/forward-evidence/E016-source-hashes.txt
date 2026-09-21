@@ -1,0 +1,9 @@
+Preparation sources; no assistant-run Lisp.
+3eb5a982d8bcb29987be6d04b4c59c3d4b6390462d944f510e7a75285cb88c0b  probs/problem-crelay-topo.lisp
+b7d27f43b2288acc673a800971dba8ede8186572bcef47320fae7e62e1695837  tech/-recorder-core.lisp
+3c5999b50809f8a408cf67f14169ac8231776b06f4b2fc9177751b4d4c06d020  tech/tray.lisp
+d597def573cc4e0e08cffdaec868162212d5117fa83feda9279201b3cb7c0b9a  tech/box.lisp
+35c705297263795643b43a19f452da3b8738be254de202b8b15560f402f14d5b  tech/jump.lisp
+360f83725aad0a737df6ef902a2fd50aa17485ab23a1e274e621b7ad9e678d86  tech/-support-elevation.lisp
+502de581725755cbf6d54f732014903a4c53296b09f5102df7789da1ea7bdad4  tech/-vertical.lisp
+53d8c21c324bfdf13d5fe1e30f2c76a7dc12d9f0048f505206ccab692aee40bc  tech/-recorder-plate-shadow.lisp

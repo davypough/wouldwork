@@ -1,0 +1,18 @@
+E012 failure excerpt supplied by user after the approved cutoff12 run:
+
+  Elapsed time: 660 sec
+Heap exhausted during garbage collection: 624 bytes available, 688 requested.
+
+660 seconds is the last reported elapsed sample, not an exact crash timestamp.
+No state count or solution count was supplied in this excerpt.
+Actual heap configuration is not established by this excerpt.
+
+Filesystem follow-up: E012-output.txt retains 1240 bytes of setup/parent output;
+E012-request.sexp retains 3270 bytes. Parent C008 recorder validation reports
+T NIL; settings show FIRST, threads16, cutoff12. The stored request and parent
+signature survived. E012-raw.sexp and E012-candidates.sexp are absent.
+
+Outcome UNKNOWN / resource-exhausted. No completed cutoff negative, accepted
+candidate or new checkpoint. C011 remains the latest accepted branch endpoint.
+Preserve the failed experiment and its consumed one-run approval; no rerun.
+User subsequently instructed cutoff10 from now on and requested continuation.

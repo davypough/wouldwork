@@ -1,0 +1,60 @@
+T10 user restart confirmation and LK5 recommendation -- 2026-09-21
+================================================================
+D reported IMPORT-SEARCH-CHECKPOINT completed:
+  Restored 7 checkpoints, 19 actions by replay; no search.
+  *T10-CHECKPOINT*
+This confirms the local checkpoint object was restored. No new search is counted
+and no ledger milestone is re-ingested. D says Wouldwork is already running:
+omit QUICKLOAD/IN-PACKAGE preambles; restart sequences begin with STAGE.
+
+Pre-run analysis, from permitted current sources only:
+- Constraint-Static-Profile.txt S4 gate8 row (557-573): receiver1 controls gate8;
+  beam supply unresolved. The R5/R6 spine crossing requires this device under
+  the graph model's stated relaxation.
+- problem-crelay-topo.lisp supplies one red transmitter and a red receiver,
+  one live/ghost connector pair and a fixed repeater. It authors no COUPLED
+  beam links. The saved endpoint has no PAIRED or COLOR facts and gate8 is shut.
+- beam-relay.lisp RELAY-LINKED requires PAIRED or COUPLED links; receiver
+  activation requires matching hue, receiver pairing/coupling, and a clear
+  beam corridor. Merely standing near the receiver or declaring a repeater
+  does not supply power. Visibility uses actual endpoint tops and intervening
+  barrier/occluder checks (visibility.lisp and beam-direct.lisp).
+- PICKUP-CONNECTOR and its retaining-pairings variant remove ON and
+  HAS-LOCATION, and propagate changes. A directly held connector does not
+  relay. CONNECT-CONNECTOR places it and adds selected pairings; legal placement
+  alone is not proof that the complete route carries light.
+- The physical connector remains on plate5 at location12, with tray1 on plate4;
+  those two plates control gate6. Reallocating connector1 changes that support
+  commitment. The ghost connector at location9 is a distinct candidate, not a
+  proved reachable/usable resource for this crossing. Physical and recording
+  gate/receiver views must remain distinct (-recorder-receiver-shadow.lisp).
+
+No candidate sightline route or adequate realization cost is claimed. No staged
+diagnostic, replay, action search or new extractor was executed in this analysis.
+
+Committed bounded experiment:
+  source: *T10-CHECKPOINT*, restored location15 endpoint, 19-action prefix
+  archive: constraint-evidence/t10-location15-checkpoint.txt
+  SHA-256: 76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635
+  threads: 16; local depth cutoff: 8 (unchanged)
+  goal: (or (has-location agent1 location16) (has-location agent1 location17)
+            (has-location agent1 location18) (has-location agent1 location21))
+
+(ww-set *depth-cutoff* 8)
+(setf *t10-checkpoint*
+  (solve-subgoal *t10-checkpoint*
+    (or (has-location agent1 location16) (has-location agent1 location17)
+        (has-location agent1 location18) (has-location agent1 location21))))
+
+Success establishes a concrete LK5 realization from this exact start; inspect
+the result and save the returned checkpoint. File REALIZED with validated NIL
+unless separate replay evidence exists. It establishes no universal resource
+allocation and does not establish LK6 or the original final goal.
+Exhaustion is a grade-3 bound for this exact start/settings/pruning, not a
+refutation. Record cutoff truncation and pruning with the result. The checkpoint
+object and the retained prefix remain unchanged; no automatic deepening or
+predecessor retry is authorized. Report the result before another search.
+
+This recommendation supersedes LK5's old serial-chain command fields in the
+ledger; it preserves the cutoff and the original committed success/exhaustion
+distinction. No result has been ingested yet.

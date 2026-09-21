@@ -1,0 +1,12 @@
+User-reported lk9 search find, 2026-09-20.
+Chained goal (switched-on switch2), cutoff 4, threads 0.
+One additional action: (TOGGLE-SWITCH > AGENT1 toggles SWITCH2).
+Cumulative depth 18; agent1 remains at location14.
+Endpoint includes SWITCHED-ON SWITCH2 and OPEN GATE7; OPEN GATE5 absent.
+Tray1 remains on plate4, connector1 on plate5, gate6 open.
+Recording remains in progress; recording-open gate5 remains present.
+No independent replay validation requested or reported for this phase.
+User directed that routine validation can normally be skipped for search finds;
+validation is useful for action sequences developed by logical reasoning.
+Filed REALIZED with validated NIL; final composed-path check remains T10 acceptance.
+No wall-clock duration supplied.

@@ -1,0 +1,61 @@
+Standalone checkpoint implementation -- 2026-09-21
+================================================
+Approved by D after the proposal to replace repeated serial restart searches
+with persisted checkpoints and standalone parallel searches.
+
+API: capture-search-checkpoint, import-search-checkpoint,
+export-search-checkpoint, search-checkpoint-state, validate-search-checkpoint.
+The existing two-argument solve-subgoal now also accepts a checkpoint object.
+Success returns a new object and T; exhaustion returns the original and NIL.
+Search-found segments are not routinely replayed. Import replays each segment;
+final validation replays the cumulative path against the original goal and
+requires exact endpoint equality. The old chain persistence API remains available.
+
+Validation on this Windows host, SBCL, isolated WOULDWORK_INSTANCE values:
+- 34 new assertions passed, using only the synthetic goal-chain-backtracking
+  and recorder-cycle-orchestration problems. Parallel searches use threads 16.
+- Three existing persistence claims passed: generic round trip, transactional
+  failed import, and open-recorder chain round trip through final closure.
+- Failed-import tests tamper with an endpoint and check restored planner state.
+- A stale in-memory checkpoint is rejected after a thread-mode rebuild.
+- Search exhaustion preserves the exact input checkpoint; successful continuation
+  preserves previous checkpoints and accumulates the action history.
+- Recorder tests continue an open cycle after archive import and validate the
+  complete four-action path, including final closure, at the original goal.
+- Actual crelay-topo migration runs only deterministic replay: seven saved
+  milestones, 19 actions, no solve. Full documented location15 inventory checked,
+  including ghost placements, support occupancy, switch and gate states.
+- A fresh stage and threads-16 import exactly matched the complete endpoint
+  signature (both databases, event cursors, time, value and policy context).
+
+Logs:
+  search-checkpoint-checks-2026-09-21.log
+  ../../problems/crelay-topo/constraint-evidence/checkpoint-replay-2026-09-21.log
+Reproducible checks: test/search-checkpoint-checks.lisp after loading Wouldwork.
+Migration builder:
+  doc/problems/crelay-topo/constraint-evidence/build-search-checkpoint-2026-09-21.lisp
+Run the builder only after staging crelay-topo and setting threads to 16.
+Its settings describe replay, not a historical search configuration.
+
+Initial test setup hit the sandbox's external compilation-cache restriction;
+the successful runs used a temporary cache inside the repository. Another test
+exposed that old result buffers can survive staging; import checks the actual
+origin and goal, and does not infer an active session from stale result buffers.
+Technology redefinition warnings occur during repeated staging. No performance
+benchmark was run; no 8x speedup or increased-depth feasibility is claimed here.
+
+No crelay-topo search or new milestone was performed. The ledger's existing
+grades and twelve-search count remain unchanged. No sealed solution, backward,
+forward or initial-conditions contents were used; no prediction-register contents
+were displayed or interpreted. Prefix verification hashes bytes only. An initial
+repository-wide whitespace check was followed by checks scoped to changed code;
+it displayed no document contents. User changes were preserved.
+
+Verified unchanged generated profile SHA-256:
+EFD35D3926255B4C715338CABA147CF6DAC53D223DFB287AF365853F2B8BD596
+Verified unchanged register prefixes:
+140954: 9B6F5ABE805D53FBD3CD34348CBF705FDD0FBDF444AA0B32E8B12892D74C7D01
+143144: D1ED8AE553914D11257128D0072C8037B5FF5D02C512843CE0E59D9C9087631A
+151434: D2B2C31947C883AE69B456DCB9FA72C361F6DAF54EC66B83A4574700B5139CDF
+Generated location15 archive SHA-256:
+76B893835F609325098B4E6980179C0149DE9213EBCEF1C2FB3961BCF4259635

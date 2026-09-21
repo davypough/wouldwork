@@ -1,0 +1,1613 @@
+Crelay-Topo Backward Analysis -- Justification
+==============================================
+
+Companion to Backward-Tree.txt; labels match the tree.  Cites rules, facts,
+lemmas, nogoods, and symmetries from Backward-Rules-Facts.txt.
+
+Entry policy (for concision)
+----------------------------
+  - Entries exist only for nodes with status A, R, or D.  O nodes are
+    described by their tree line; X nodes by their tree citation.
+  - Each entry lists only what the node adds; inherited constraints are
+    implied by the path from the root.
+  - Any argument used at more than one node is promoted to a lemma (T) in
+    Backward-Rules-Facts.txt and cited thereafter.
+  - A refutation is recorded as a nogood (G) there, stated as the minimal
+    conflicting constraint set, so other branches can be checked against it.
+  - A full constraint snapshot appears only at declared checkpoints.
+
+Entry format
+------------
+  <label>  <one-line claim>
+    Uses:     R/F/T/G/Y labels
+    Adds:     new constraints, in wouldwork syntax
+    Cases:    child labels created (X children with citation)
+    Why:      at most a few lines, only where citations are not enough
+    Result:   status change; lemma or nogood recorded, if any
+
+Entries
+-------
+
+1  Goal state S0; enumerate every achiever of (has-location agent1 location19).
+    Uses:     R1 R2 R3 R5 R6 R7 R8 R9 F1 F2 F3 F4
+    Adds:     S0: (has-location agent1 location19)
+              S1: (not (has-location agent1 location19))                [R9]
+              Nothing else in S0 is constrained by the goal: recorder
+              cycle, ghost, other objects, and gates are all free.
+    Cases:    1.1 O (next), 1.2 O; 1.3 X, 1.4 X, 1.5 X, 1.6 X, 1.7 X
+    Why:      R1 lists every write of an agent's has-location, so the cases
+              are exhaustive: agent1's own MOVE (segment 1.1/1.3, transition
+              1.4) or relocation as a rider (holder MOVE 1.2/1.6, tray
+              placement 1.5, blower 1.7).
+              1.5: no reach edge touches location19 (F3), so the holder is
+              already at location19, and so is its rider -- contradicts S1.
+              1.6: only agent1 can hold a live tray (R6), and an agent cannot
+              ride a tray it holds (R5).
+    Result:   node 1 active; lemma T1 recorded; 1.1 expanded next.
+
+1.1  agent1 walks into location19; group sources by clause.
+    Uses:     R2 R4 F1 F6 T1 T2 T3
+    Adds:     S1: (has-location agent1 ?agent-loc), agent1 grounded (no
+    on-fact),
+              every clause gate open; SCREEN1 in clause => agent1 holds
+              nothing.  Destination safety is automatic (F6).
+    Cases:    1.1.1 A; 1.1.2, 1.1.3, 1.1.4 O; 1.1.5, 1.1.6, 1.1.7 X
+    Why:      One P node per distinct clause (F1).  Groups 1.1.5-1.1.7 need
+              gate5 and gate7 open together, impossible by T3.
+              Order: 1.1.1 first (fewest gates).  [CONTAMINATED as first
+              written -- it also cited the validated solution's group.  The
+              citation is struck under H6; fewest gates stands on its own
+              and the retroactive f pass later reconfirmed the order.]
+    Result:   1.1 active; lemmas T2, T3 recorded.
+
+1.1.1  Sources L16 L17 L18 L21, clause (GATE9).
+    Uses:     Y1 T2
+    Adds:     S1: agent1 grounded at ?agent-loc in {L16 L17 L18 L21};
+              plates 6, 7, 8 each directly occupied by distinct objects
+              other than agent1.
+    Cases:    1.1.1.1 O (next)
+    Why:      Y1 keeps the four sources as one case.  Since agent1 is
+              grounded, it cannot be one of the plate occupants (T2).
+    Result:   1.1.1 active.
+
+1.1.1.1  State S1; enumerate achievers of its last-achieved condition (A2).
+    Uses:     R1 R3 R5 R10 R11 R12 F4 F8 F9 F10 T4 T5
+    Adds:     A2 makes at least one S1 condition true that was false in S2
+              (T4).  Several may be achieved at once; cases cover, not
+              partition.
+    Cases:    1.1.1.1.1 A, .2 .3 .4 .5 O; .6 .7 .8 X
+    Why:      Achievers of "agent1 grounded at ?agent-loc": a MOVE into
+    ?agent-loc (.6), a
+              dismount at ?agent-loc (.4), or a tray release that
+              unloads agent1
+              (.5).  Riding a moving holder leaves agent1 on the tray, not
+              grounded; the blower cannot reach ?agent-loc (F4).
+              Achievers of a plate occupancy: a placement by either agent
+              (.1 .2) or an agent mounting the plate; agent1 is grounded in
+              S1, so only agent1* can mount (.3).
+              .6: from S2 one MOVE reaches location19 directly (T5).
+              .7: START and CANCEL need agent1 at the recorder (location1),
+              contradicting ?agent-loc; STOP only removes ghost
+              state and may not
+              strand a live rider (R10).  None achieves an S1 condition.
+              Order: .1 first.  [CONTAMINATED as first written -- it cited
+              the validated solution's final placement and nothing else.
+              Struck under H6; the retroactive f pass independently put .1
+              first, so the node stands, but the original reason does not.]
+    Result:   1.1.1.1 active; lemmas T4, T5 recorded.
+
+1.1.1.1.1  agent1's placement of live cargo on a plate is A2.
+    Uses:     R1 R11 R12 F9 F10 T4
+    Adds:     S2: agent1 grounded at ?agent-loc in {L16 L17 L18};
+              (holding agent1 ?cargo), ?cargo in {box1 connector1 tray1};
+              plate ?plate has no occupant of either layer;
+              the other two plates occupied as in S1, by objects other
+              than agent1 and ?cargo.
+    Cases:    1.1.1.1.1.1 A
+    Why:      Placement does not move or dismount agent1 (R1), so S1's
+              grounding at ?agent-loc already holds in S2.
+              ?agent-loc must reach L(?plate):
+              the plate room allows every pair, L21 none (F10).
+              ?plate is empty in S2, or A2 achieves nothing new (T4); this
+              also satisfies placement's clear-top test.  ?cargo is held, so it
+              rests on no plate in S2 (F9).  Riders of a released tray1
+              unload or settle at L(?plate) only (R12), so other plates are
+              unchanged.  ?cargo, ?plate, ?agent-loc stay
+              grouped: Y2 is not yet valid.
+    Result:   1.1.1.1.1 active.
+
+1.1.1.1.1.1  State S2; enumerate achievers of its last condition (A3).
+    Uses:     R3 R4 R5 R7 R9 R10 R11 R12 F1 F11 F12 T3 T4 T6 T7
+    Adds:     A3 makes one of these true: agent1 grounded at ?agent-loc; agent1
+              holding ?cargo; ?plate unoccupied; another plate occupied.
+    Cases:    .1 A, .2-.6 O; .7-.10 X
+    Why:      Grounded at ?agent-loc: a walk in (.1, .7), a dismount (.3), or a
+              tray release unloading agent1 (.4).  Walks from L14 need
+              empty hands (SCREEN1, R4); from L19, the goal would already
+              hold (R9); routes through gate5 fail by T3.
+              Holding ?cargo: agent1 picks it up (.2).  From ?plate is .9.
+              ?plate unoccupied: a live occupant other than agent1 would have
+              to be picked up by agent1, who then holds it, not ?cargo (F11).
+              A ghost occupant removed by agent1* or STOP-RECORDER, or
+              agent1* dismounting ?plate, leaves S3 already satisfying node
+              1.1.1.1 (.9).  agent1 dismounting ?plate alone is in .3.
+              Another plate occupied: agent1 placing or mounting violates
+              holding ?cargo or grounding (.8); agent1* can (.5, .6).
+              Order: .1 first.  [CONTAMINATED as first written -- it cited
+              the validated solution's walk.  Struck under H6; the
+              retroactive f pass then OVERTURNED this order, ranking the
+              pickup case .2 ahead of it, so the citation was not merely
+              unearned but wrong.]
+    Result:   node active; lemmas T6, T7 recorded; T4 caveat added.
+
+1.1.1.1.1.1.1  A3 is agent1's walk from ?from-loc into ?agent-loc, holding
+?cargo.
+    Uses:     R4 F12 T4
+    Adds:     S3: agent1 grounded at ?from-loc, still holding ?cargo
+    (walking keeps
+              held cargo); every gate on ?from-loc's clause open with agent1 at
+              ?from-loc; plate conditions as in N3 (walking changes no plate).
+              ?agent-loc is now free within {L16 L17 L18}.
+    Cases:    .1 A; .2 .3 O
+    Why:      One P node per distinct clause (F12).  Gate status is
+              evaluated with agent1 at ?from-loc, since agent1 can block beams.
+              Order: L21 first -- no gates, and gate8 or gate7 would each
+              require added apparatus conditions.
+    Result:   node active.
+
+1.1.1.1.1.1.1.1  ?from-loc = L21.
+    Uses:     F12 F13 T4 T8
+    Adds:     N4 as listed; no gate conditions.
+    Cases:    N4 O (next)
+    Why:      N4 is complete: the walk L21 -> ?agent-loc needs only agent1
+              grounded at L21 (F12).  By T8, N4 cannot be reached by a
+              walk into L21, so its last achiever must be something else:
+              a pickup of ?cargo at L21, a dismount or tray release at L21, or
+              a plate change.
+    Result:   node active; lemma T8 recorded.
+
+Retroactive f (2026-09-17)
+    Uses:     H1 K1-K9
+    Why:      f values were assigned to every non-X node (see tree).
+              Recomputing the order by f changed one choice: at N3, the
+              pickup case .2 (f=15) beats the walk-in case .1 (f=16),
+              because the pickup is itself a landmark event (K9) while the
+              walk L21 -> ?agent-loc is not.  .1 and its partial N4 stay open.
+              Ghost-dependent cases rank lower: each ghost placement,
+              mount, or tray use adds at least a ghost move into the
+              plate room.  The earlier expansion order otherwise stands.
+    Result:   next expansion switched from N4 to 1.1.1.1.1.1.2.
+
+1.1.1.1.1.1.2  A3 is agent1's pickup of ?cargo at ?cargo-loc, from ?agent-loc.
+    Uses:     R5 R7 F9 F10 F11 T7 K9
+    Adds:     S3: agent1 grounded at ?agent-loc and empty-handed; ?cargo at
+              ?cargo-loc in {L16 L17 L18}, liftable (nothing of its own
+              layer on
+              it); ?plate unoccupied; other plates as in N3.
+    Cases:    .2.1 A; .2.2 .2.3 .2.4 O
+    Why:      Pickup needs empty hands, reach, and vertical reach; reach
+              from ?agent-loc covers only L16-L18 (F10).
+              Sub-cases by what ?cargo
+              rests on.  From ?plate is excluded (T7).  From
+              another plate ?other-plate,
+              ?other-plate must stay occupied, so a ghost
+              co-occupant is required
+              (two live occupants cannot share, R5).
+              f: .2.1 15; .2.2 15 (tie, more conditions); .2.3 17 (ghost
+              occupant plus an extra placement of ?cargo on q); .2.4 18.
+    Result:   node active; N5 next.
+
+1.1.1.1.1.1.2.1  ?cargo rests on the ground at ?cargo-loc.
+    Uses:     R7 F10
+    Adds:     N5 as listed.
+    Cases:    N5 A
+    Result:   node active.
+
+1.1.1.1.1.1.2.1.1  State N5; enumerate achievers of its last condition.
+    Uses:     R3 R4 R9 R10 R11 R12 F10 F11 F12 T3 T6 T7 H2 K5 K8 K9
+    Adds:     A4 makes one of these true: agent1 grounded at ?agent-loc;
+              agent1 empty-handed; ?cargo on the ground at ?cargo-loc;
+              ?plate unoccupied; another plate occupied.
+    Cases:    .3 A; .1 .2 .4 .6 .7 O, .5 O; .8 .9 .10 X (see also the
+              R13 correction below)
+    Why:      Grounded: a walk in from outside {L16 L17 L18} (.1) or a
+              dismount (.5); within the room the walk is removable (T6),
+              since reach covers every plate and every pickup target.
+              With empty hands SCREEN1 no longer blocks, so L14 joins the
+              sources; L19 is excluded by R9 and gate5 routes by T3.
+              Empty-handed: agent1 puts something down -- on a plate
+              (.2, which also occupies a plate), on the ground or a
+              non-plate support (.4).
+              ?cargo on the ground: a tray release unloads it (.3 live,
+              .7 ghost).  agent1 simply putting ?cargo down is the N3
+              state again (.8, T7).
+              ?plate unoccupied: only agent1's own dismount (.5); a
+              pickup would leave agent1 holding something (F11), and a
+              ghost or STOP-RECORDER removal leaves N2 already satisfied
+              (.9, T7).
+              Another plate occupied: agent1 (.2) or agent1* (.6);
+              agent1 mounting it would break the grounding condition.
+              f: .1 15 for {L11 L12 L13} and L14, whose walk performs the
+              gate7 crossing counted in K8, else 16; .2 15 (K5 event);
+              .3 15 (K5 event if the tray lands on a plate); .4 16;
+              .5 17 (a mount must precede it); .6 .7 16 (ghost walk).
+              Tie at 15 broken by H2: .3 settles three conditions at once
+              -- ?cargo grounded, agent1 empty-handed, and a plate
+              occupied by tray1 -- so it is expanded first.
+    Result:   node active; H2, P1-P4, R13 recorded.
+
+1.1.1.1.1.1.2.1.1.3  A4 is agent1's release of tray1, unloading ?cargo.
+    Uses:     R11 R12 F8 F10 H2 K5
+    Adds:     S: (holding agent1 tray1), (on ?cargo tray1), so ?cargo is
+              box1 or connector1; the put location is ?cargo-loc, either
+              agent1's own location (local release) or a reachable one
+              (remote, F10).
+    Cases:    .3.1 A; .3.2 O
+    Why:      Whether the tray lands on a plate decides the f value, so
+              the two landings are separate P nodes.  A local release
+              settles riders on the highest clear support at or below
+              their level; the plate the tray now occupies is not clear
+              for a live rider, so ?cargo reaches the ground either way
+              (R12).  The tray may not land on ?plate, which N3 requires
+              empty.
+    Result:   node active.
+
+1.1.1.1.1.1.2.1.1.3.1  tray1 lands on ?other-plate.
+    Uses:     F8 F10 H2 K5 T2
+    Adds:     N6 as listed.  ?cargo-loc is ?other-plate's location, since
+              a released tray and its riders all go to the put location.
+    Cases:    N6 O (next)
+    Why:      One action settles three of N5's conditions: ?cargo
+              grounded, agent1 empty-handed, and ?other-plate occupied by
+              tray1 (H2).  f = 15: depth 4, and the suffix has realized
+              two plate occupancies (K5) and one pickup (K9), leaving 11.
+              N6 additionally needs nothing resting on ?cargo, so that
+              the later pickup is legal.
+    Result:   node active; N6 next.
+
+R13 amendment verified (2026-09-17): a one-action SOLVE-SUBGOAL from
+    agent1 and connector1 at L9, paired to transmitter1, returns
+    PICKUP-CONNECTOR-RETAINING-PAIRINGS with the pairing intact.  The
+    connector was unlit in that test anyway, since L9 -> transmitter1
+    needs gate4 open, so the dark-while-held half is still to be shown.
+
+R13 correction (2026-09-17)
+    Why:      The user reports that a connector may be picked up either
+              keeping or dropping its pairings.  The current
+              beam-relay.lisp has one PICKUP-CONNECTOR, which clears all
+              pairings in both directions, so only the dropping variant
+              exists in code today.  R13 now records both readings and
+              flags the discrepancy; H2's caution about moving a relay
+              connector onto a plate applies only under the current code.
+    Result:   R13 amended; no node status changed.
+
+Heuristic cross-check call (2026-09-17)
+    Why:      The diagnostic takes a state and a goal:
+              (report-topo-finite-resource-bound-analysis *start-state*
+              *goal*) after staging.  H1 records the corrected form.
+    Result:   H1 amended.
+
+1.1.1.1.1.1.2.1.1.3.1.1  State N6; enumerate achievers of its last
+    condition (A5).
+    Uses:     R3 R4 R5 R6 R8 R10 R11 R12 F4 F10 F11 F12 F15 T3 T4 T6 T9
+    Adds:     A5 makes one of these true: agent1 grounded at ?agent-loc;
+              (holding agent1 tray1) with ?cargo aboard; nothing on
+              ?cargo; ?plate or ?other-plate unoccupied; the third plate
+              occupied.
+    Cases:    .1 A; .2 .3 .4 .5 .6 O; .7 .8 .9 .10 .11 X
+    Why:      The structural result here is T9 with F15: a grounded tray
+              has no riders, and agent1 cannot load the tray it holds, so
+              a loaded held tray is loaded while held -- by a blower
+              landing or by settling from a ghost tray release.  That
+              kills .9 (PICKUP-TRAY cannot deliver a rider) and .8 (the
+              blower lands cargo only at location20, which would put
+              agent1 there rather than in the plate room), and leaves .2
+              as the only in-room loading.
+              Grounded at ?agent-loc: the walk in (.1) or a dismount
+              (.4); the in-room walk is deletable under the generalized
+              T6.
+              Plates: agent1 holds tray1, so it can neither pick up an
+              occupant nor place one (F11, .10); only agent1* can (.3,
+              .5), and only agent1* can clear ?cargo (.6).
+              f: .1 15 for {L11 L12 L13}, whose walk is the gate7
+              crossing counted in K8, else 16; L14 excluded (SCREEN1
+              needs empty hands, R4); .3 16; .2 .4 .5 .6 17.
+    Result:   node active; F15, T9 recorded, T6 generalized.
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1  ?from-loc in {L11 L12 L13}.
+    Uses:     F12 K8 T2 T9
+    Adds:     N7 as listed: gate7 and gate8 must both be open with agent1
+              at ?from-loc, so switch2 is on and receiver1 is active.
+    Cases:    N7 O (next)
+    Why:      This walk does the gate7 crossing K8 already counts, which
+              is why it outranks the L21 and L15 entries.  N7 keeps the
+              tray loaded, so by T9 the loading happened earlier, either
+              at location20 by blower or from a ghost tray -- the first
+              real constraint on the branch outside the plate room.
+    Result:   node active; N7 next.
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1  State N7; enumerate achievers (A6), and
+    correct H1.
+    Uses:     R3 R4 R5 R10 R11 R12 F8 F11 F12 F15 F16 T3 T4 T9 T10 T11
+              T12 K5 K8 K10
+    Adds:     A6 makes one of these true: agent1 grounded at ?from-loc;
+              the tray loaded; nothing on ?cargo; a plate's occupancy;
+              receiver1 active.  switch2-on is not achievable here (T11).
+    Cases:    .1 .2 .3 .4 .5 .6 O; .7-.12 X
+    Why:      Three findings, in order of weight.
+              T11: a ghost toggle writes only the recording view, so
+              gate7 owes its opening to agent1 standing at location14,
+              empty-handed through screen1.
+              T12: with switch2 on, gate5 is shut and ladder3 descends
+              only L11 -> L10, so southward travel is one-way.
+              Together they put the blower out of reach for loading, so
+              by T9 the tray was loaded north of gate5 by a ghost tray
+              release (.1) -- the only in-cluster loading.
+              K10 follows: any node requiring live cargo on a held tray
+              carries +3.  N6 and N7 become f=18, the tray-release action
+              f=18, and this node's children f=17-20.
+    Result:   H1 amended with K10; T9-T12 and F16 recorded; the tray
+              subtree demoted and marked open.
+
+Re-ranking after K10 (2026-09-17)
+    Why:      With the tray branch at 18, N5's best children are .1 (walk
+              in, f=15) and .2 (place another cargo on another plate,
+              f=15).  The tie goes to .2: both are live, and .2 needs no
+              gate open while .1 needs gate7 and gate8.
+    Result:   active path returns to N5; 1.1.1.1.1.1.2.1.1.2 is next.
+
+switch.lisp correction (2026-09-17)
+    Why:      The user reports a ghost can throw a switch.  The code gave
+              a ghost's toggle only RECORDING-SWITCHED-ON, while
+              plate.lisp makes ghost weight physical on the live plate --
+              an asymmetry, not a design.  A ghost toggle now flips both
+              views; a live toggle still flips only the live one, which is
+              what lets ordinary gate5 close while recording gate5 stays
+              open for the ghost's recorded return.
+    Result:   R15 recorded; T11 retracted; T12 weakened to hold only
+              while switch2 stays on; K10 revised from +3 to +2, since a
+              ghost can reopen gate5 and the blower stays usable.
+              f restored: the tray-release node, its P child and N6 to 17,
+              N7 to 17, N7's children 16-19.  N7 case .7 (a ghost toggles
+              switch2) is reopened at f=17.  N5's .1 and .2 remain best at
+              f=15, so the active path is unchanged.
+
+1.1.1.1.1.1.2.1.1.2  A4 is agent1's placement of ?cargo2 on ?other-plate.
+    Uses:     R11 F10 F11 H2 K5 K9 K10
+    Adds:     N8 as listed.  The placement moves neither agent1 nor its
+              support (R11), so the grounding and ?agent-loc carry over;
+              reach covers every plate from every room spot (F10).
+    Cases:    N8 O (next)
+    Why:      One action settles two of N5's conditions: agent1's hands
+              are freed and ?other-plate becomes occupied (H2).  ?cargo2
+              differs from ?cargo, which is already on the ground while
+              agent1 can hold only one object (F11).  ?other-plate must
+              be empty beforehand, or the placement adds no occupancy
+              (T4).  N8 therefore has only one of the three plates
+              occupied -- the remaining plate work is all still ahead.
+              A held tray1 with a rider would invoke K10 (+2), so the
+              no-rider reading is the cheap one and is stated explicitly.
+              f = 15: depth 4, with two plate occupancies (K5) and one
+              pickup (K9) realized below, leaving 11.
+    Result:   node active; N8 next.
+
+1.1.1.1.1.1.2.1.1.2.1  State N8; enumerate achievers (A5).
+    Uses:     R3 R4 R5 R7 R8 R9 R10 R11 R12 F4 F10 F11 F12 T3 T4 T6 K8 K9
+    Adds:     A5 makes one of these true: agent1 holding ?cargo2; agent1
+              grounded at ?agent-loc; ?cargo on the ground there; ?plate
+              or ?other-plate emptied; the third plate occupied.
+    Cases:    .1 A; .2 .3 .4 .5 .6 O; .7-.11 X
+    Why:      Holding ?cargo2: a pickup in the room (.1).  Off ?plate or
+              ?other-plate is impossible -- both are empty in N8 -- and
+              off the third plate only if a ghost keeps it occupied.
+              Grounded: the walk in (.2) or a dismount (.5); the in-room
+              walk is deletable (T6).
+              ?cargo on the floor: agent1 cannot put it there, since that
+              frees its hands and breaks N8's holding condition (.7,
+              F11); the blower reaches only location20 (.9); so only a
+              ghost tray release does it (.4).
+              Plates: with a hand full agent1 can neither lift an
+              occupant nor place one without emptying that hand (.8), so
+              only agent1* acts on plates here (.3, .6).
+              f: .1 15 (the pickup is a K9 event); .2 15 from
+              {L11 L12 L13}, whose walk is K8's gate7 crossing, else 16;
+              .3 16; .4 .5 .6 17.  Tie at 15 goes to .1: both are live,
+              and .1 needs no gate open while .2 needs gate7 and gate8.
+    Result:   node active; room-loading note added to H1.
+
+1.1.1.1.1.1.2.1.1.2.1.1  A5 is agent1's pickup of ?cargo2 in the room,
+    and K11 enters.
+    Uses:     R7 F10 K5 K9 K10 K11
+    Adds:     N9: agent1 empty-handed in the room, ?cargo and ?cargo2
+              both loose there, one plate occupied.
+    Cases:    N9 O
+    Why:      N9 is the first node fixing two live objects in the plate
+              room at once, which exposes what the earlier f values
+              missed.  Each live object crossed gate8 in an agent's hands,
+              one per walk unless carried as a stack, so a second live
+              object costs a return trip and a second crossing: K11, +2
+              per extra live object.
+              Applied, K11 leaves nodes fixing at most one live object in
+              the room untouched -- N2, N3 and N5 stay 15, since their
+              plate occupants may be ghosts -- and raises N8, N9 and the
+              placement above them to 17.  The tray branch pays K10's +2
+              instead of K11 and also sits at 17, which is the point of a
+              stack: it trades extra crossings for one loading.
+    Result:   K11 recorded; the N8 subtree re-ranked to 17-19; the active
+              path returns to N5's .1, agent1 walking into the room
+              empty-handed, still f=15.
+
+1.1.1.1.1.1.2.1.1.1  A4 is agent1's empty-handed walk into ?agent-loc;
+    group sources by clause.
+    Uses:     R4 R9 F11 F12 T3 T6 K8
+    Adds:     S: agent1 grounded at ?from-loc outside {L16 L17 L18} and
+              empty-handed (walking neither takes nor drops cargo); every
+              gate on ?from-loc's clause open with agent1 at ?from-loc;
+              N5's cargo and plate conditions unchanged, since a walk
+              writes no ON and no plate occupancy.
+    Cases:    .1 A; .2 .3 .4 O; .5 .6 .7 X
+    Why:      One P node per distinct clause (F12).  Empty hands remove
+              SCREEN1 as an obstacle, so L14 is admissible here although
+              it is not on the holding-?cargo sibling (1.1.1.1.1.1.1,
+              R4).  L19 would mean the goal already held (R9); the
+              southern groups need gate5 and gate7 together (T3); an
+              in-room source is deletable (T6).
+              f: .1 and .2 at 15, since either walk performs the gate7
+              crossing K8 already counts; .3 and .4 at 16.
+              Tie at 15 broken by H2: both are live, and .1 needs two
+              gate conditions (switch2 on, receiver1 active) against .2's
+              four (plates 4 and 5 occupied as well), so .1 is expanded
+              first.
+    Result:   node active; .1 next.
+
+1.1.1.1.1.1.2.1.1.1.1  ?from-loc in {L11 L12 L13}.
+    Uses:     F8 F12 K8 T2 T4
+    Adds:     N10 as listed: gate7 and gate8 open with agent1 at
+              ?from-loc, hence switch2 on and receiver1 active.  Gate
+              status is evaluated with agent1 at ?from-loc, since agent1
+              can occlude a beam.  ?agent-loc is free within
+              {L16 L17 L18}: N5 fixed it only as the walk's destination,
+              and the walk chooses it.
+    Cases:    N10 A
+    Why:      N10 is complete: the walk needs agent1 grounded at
+              ?from-loc, empty-handed, with the clause open (R4); nothing
+              else in N5 is touched by a walk.  By T10 the last achiever
+              of N10 is not a walk within {L11 L12 L13}.
+    Result:   node active; N10 is the frontier of this branch.
+
+K12 candidate (2026-09-17) -- raised at N10, not yet adopted
+    Uses:     R6 R11 R12 F4 K4 K5 K9 K10
+    Why:      N10 fixes a live ?cargo lying loose on the plate-room floor.
+              No cargo starts there: connector1 is at L9, box1 at L6,
+              tray1 at L7 (current problem file).  So ?cargo was carried
+              in, and two of the actions that put it on that floor are
+              counted by no landmark:
+                - the pickup that began the carry-in.  K9's three pickups
+                  each precede a distinct plate placement (one for K4,
+                  two for K5); this one precedes a floor put-down, and
+                  ?cargo's plate placement has its own later pickup in
+                  the suffix, so it is a fourth pickup event.
+                - the put-down itself: K4 and K5 count plate occupancies
+                  only.
+              Every route gives both: agent1 carries and sets down; or
+              agent1 loads a held tray1 (K10's +2) and releases it; or
+              agent1 places ?cargo on tray1* and agent1* releases it in
+              the room (R5 rule 19, R6), which still needs the pickup and
+              a release.  The blower reaches only location20 (F4).
+              Proposed: K12, +2 for any node requiring a live object at
+              rest loose in the plate room -- on the floor or on a
+              non-plate support.  It does not stack with K11, which
+              charges return crossings for extra live objects, nor with
+              K5, since an object on a plate is a counted occupancy.
+    Effect if adopted:  N5 and its parent P rise from 15 to 17, and with
+              them 1.1.1.1.1.1.2.2 (?cargo on box1) and N10 (to 17).  N2
+              and N3 stay at 15, their plate occupants being free to be
+              ghosts.  The best open node becomes N3's .1, agent1 walking
+              into the room holding ?cargo, at 16 -- so the active path
+              would leave the pickup branch and return to the walk-in
+              branch it displaced on 2026-09-17.
+    Result:   approved the same day; see the adoption entry below.
+
+K12 adopted, and f recomputed (2026-09-17)
+    Uses:     R5 R6 R11 R12 F4 K4 K5 K9 K10 K11 H1 H2
+    Why:      Raised at N10 and approved.  Nothing starts in the plate
+              region {L16 L17 L18 L21} -- connector1 L9, box1 L6, tray1
+              L7 in the current problem file -- so a live object at rest
+              there off a plate cost a carry-in pickup and a landing that
+              no landmark counted.  K12 charges +2 for each such object;
+              an object in agent1's hands or on a plate pays nothing.
+              The held-tray reading (+1) is recorded in H1 as open and is
+              not applied.
+    Changed:  N5 and its P parent 15 -> 17; 1.1.1.1.1.1.2.2 (?cargo on
+              box1) 15 -> 17; the empty-handed walk-in action and its P
+              children 15/16 -> 17/17/18/18, N10 15 -> 17; the
+              place-?cargo2 action, N8, N9 and that subtree 17-19 ->
+              19-21; N5's .4 16 -> 18, .5 17 -> 19, .6 16 -> 18.
+              Unmoved, and now the reason the ranking turns over: N2 and
+              N3 at 15, whose plate occupants may be ghosts and whose
+              ?cargo is held, not at rest; 1.1.1.1.1.1.2.3 (?cargo on
+              ?other-plate, a counted occupancy) at 17; N5's .7 (agent1*
+              releases tray1*, which performs the landing rather than
+              presupposing it) at 16; the tray branch, pending the
+              held-tray variant.
+    Result:   H1 amended; the pickup branch demoted and marked open.
+
+f consistency correction in the walk-in-holding-?cargo subtree
+    (2026-09-17)
+    Uses:     H1 K5 K8 F12
+    Why:      Checking the branch that K12 promotes exposed two f values
+              from the retroactive pass that the method, as applied since
+              at N5, does not support.  Depth is 3 throughout, and the
+              suffix is the walk in plus the placement on ?plate (one K5
+              event):
+                .3  {L11 L12 L13}: the walk crosses gate7, which is one
+                    of K8's two crossings, so h = 12 and f = 15, not 16 --
+                    the same reading that gave N5's {L11 L12 L13} entry
+                    15 against L21's 16.
+                .2  L15: the walk crosses gate8 only, which no landmark
+                    counts, so h = 13 and f = 16, not 17.
+                .1  L21: no gates, no landmark, h = 13, f = 16 -- stands.
+              The action node takes the least of its children, 15.
+    Result:   1.1.1.1.1.1.1 15, .1 16, .2 16, .3 15.
+
+New ranking and active path (2026-09-17)
+    Why:      Best open node is 1.1.1.1.1.1.1.3 at 15: agent1 walks into
+              the plate room from {L11 L12 L13} already holding ?cargo,
+              with gate7 and gate8 open.  Nothing else is below 16.
+              At 16: N4 and its P (the L21 source), the L15 source,
+              1.1.1.1.2 and 1.1.1.1.3 (ghost occupies a plate), 1.1.2,
+              1.1.3, 1.1.4 (other final-walk sources), 1.1.1.1.1.1.5 and
+              .6 (ghost plate work at N3), and N5's .7.
+              Reading: charging the carry-in turns the ranking away from
+              staging cargo on the plate-room floor and toward carrying
+              it straight in, or toward letting ghosts hold the plates
+              down -- the second and third of the three live families.
+    Result:   active path 1 -> 1.1 -> 1.1.1 -> N2 -> 1.1.1.1.1 -> N3 ->
+              1.1.1.1.1.1.1 -> 1.1.1.1.1.1.1.3; the pickup branch from
+              1.1.1.1.1.1.2 down, including N5 and N10, is now open.
+
+1.1.1.1.1.1.1.3  ?from-loc in {L11 L12 L13}, agent1 carrying ?cargo.
+    Uses:     F8 F11 F12 K8 K10 T2 T4 T9 T10 T12
+    Adds:     N11 as listed.  Gate7 and gate8 must be open with agent1
+              standing at ?from-loc, hence switch2 on and receiver1
+              active; gate status is read with agent1 there, since agent1
+              can occlude a beam.  ?agent-loc is free within
+              {L16 L17 L18}: N3 fixed it only as the walk's destination,
+              and the walk chooses it.  Plates 4 and 5 sit at L13 and
+              L12, but a grounded agent1 is not on them, so N11 asserts
+              nothing about gate6.  The tray reading is stated
+              explicitly, as at N8: a held tray1 carrying a rider invokes
+              K10, so the no-rider reading is the cheap one.
+    Cases:    N11 A
+    Why:      N11 is complete: the walk needs agent1 grounded at
+              ?from-loc, holding ?cargo, with the clause open (R4);
+              nothing else in N3 is touched by a walk, and no screen lies
+              on this route, so carrying is legal (contrast T14).  By T10
+              the last achiever is not a walk within {L11 L12 L13}.
+              This is the first node of the carry-straight-in family, and
+              it inherits N7's structural situation without N7's loading
+              problem: agent1 stands north of gate5 with switch2 on, so
+              by T12 the south is closed unless switch2 is thrown back,
+              and whatever agent1 carries was carried up before the
+              throw or produced north of it.  The difference is that
+              ?cargo is in agent1's hands rather than on a held tray, so
+              T9 and K10 do not bite.
+    Result:   node active; N11 is the frontier of this branch.
+
+K13 candidate (2026-09-17) -- raised at N11, not yet adopted
+    Uses:     K5 K11 R5 R6 F9 H1
+    Why:      N11, like N2, N3 and N5, fixes two plate occupants in the
+              room while agent1 is elsewhere, and h charges nothing for
+              putting them there.  K5 counts the occupancy events
+              themselves, but not the delivery:
+                - two live occupants cost K11's +2, one being beyond the
+                  first live object in the room;
+                - a ghost occupant costs at least the ghost walk into the
+                  room that H1's ghost increments already name, since
+                  agent1* is busy at plate1 for K2 and its trip to the
+                  plate room is a separate walk.
+              The cheapest mixed reading, one live and one ghost, still
+              pays the ghost walk, so the floor is +1 for two occupants
+              and more for three.
+              Proposed: K13, +1 per plate occupant in the room beyond the
+              first that the node fixes while agent1 is not delivering
+              it.  Nodes fixing one occupant, such as N8 and N9, pay
+              nothing.
+    Effect if adopted:  nearly uniform at the top of the frontier -- N11,
+              N4, the L15 P, 1.1.1.1.2, 1.1.1.1.3, N3, N2 and N5's .7 all
+              rise by 1 -- so the active path does not move.  The final-
+              walk sources 1.1.2, 1.1.3 and 1.1.4 fix all three occupants
+              and would rise by 2.  It is the third patch of one hole,
+              after K11 and K12: H1 counts what must be true in the plate
+              room and not what it costs to get it there.
+    Result:   approved the same day; see the adoption entry below.
+
+K13 adopted, with the count corrected, and f recomputed (2026-09-17)
+    Uses:     K2 K5 K10 K11 R5 R6 R10 F9 H1 H2
+    Why:      Approved under a policy now written into H1: a correction
+              that changes any f difference between open nodes is applied
+              at once, not deferred.  K13 is such a correction, because
+              the nodes it charges are not the nodes it spares.
+              Working the count out properly weakened it from the form
+              proposed at N11.  Ghost occupants do not cost one trip
+              each: agent1* may carry one object into the room, place it
+              on a plate, and mount another plate itself, so a single
+              ghost trip yields two occupancies.  The cheapest reading of
+              two or three occupants is one live object -- free as the
+              first live object in the room, K11 -- plus one ghost trip,
+              a flat +1.  So K13 is +1 for two or more undelivered
+              occupants and 0 for one or none, not +1 per occupant.
+              R10 blocks the shortcut of forking ghosts onto plates: the
+              fork places each ghost on its original's support, so it
+              never creates a new occupancy.
+    Changed:  +1 to every node fixing two or more undelivered occupants,
+              the root included, so base h becomes 15 and node 1 becomes
+              15.  N11 16, N3 16, N2 16, N4 and the L21 and L15 Ps 17,
+              N5 and its P 18, N10 and the walk-in Ps 18-19, the ghost-
+              plate cases 1.1.1.1.2 and 1.1.1.1.3 17, the final-walk
+              sources 1.1.2, 1.1.3, 1.1.4 17, 1.2 19.
+              Unmoved, which is the point: the N8/N9 chain and the whole
+              tray branch fix only the third plate, one occupant, so they
+              pay nothing.  N8, N9 and their subtree stay 19-21; N6, N7,
+              the tray-release action and its P stay 17; N6's .2, the
+              ghost tray1* release that loads agent1's held tray, stays
+              16.
+    Result:   H1 amended; the gap between the carry-straight-in branch
+              and the tray branch narrows by one.
+
+New ranking and active path after K13 (2026-09-17)
+    Why:      At 16: N11; N6's .2; and N3's ghost children 1.1.1.1.1.1.5
+              and .6.  H2 breaks the tie for N11, which is wholly live
+              while the other three are ghost actions.
+              At 17: N4 and the L21 and L15 Ps, 1.1.1.1.2, 1.1.1.1.3,
+              1.1.2, 1.1.3, 1.1.4, N5's .7, N6, N7, the tray-release
+              action and its P.  At 18 and above the rest.
+    Result:   active path unchanged: 1 -> 1.1 -> 1.1.1 -> N2 ->
+              1.1.1.1.1 -> N3 -> 1.1.1.1.1.1.1 -> 1.1.1.1.1.1.1.3 -> N11.
+              N11 is expanded next.
+
+K12 held-tray variant adopted (2026-09-17)
+    Uses:     K9 K10 K12 R5
+    Why:      Approved under the revision policy: it moves the tray
+              branch relative to the branch it competes with, so it may
+              not be left open.  An object riding a held tray has not
+              landed, so of K12's two uncounted actions only the carry-in
+              pickup applies: +1.
+    Changed:  +1 to N6, N7, the tray-release action and its two Ps, N6's
+              and N7's children, and 1.1.1.1.1.1.2.4.  N6, N7, the tray
+              release and its plate-landing P are now 18; N6's .2, the
+              ghost tray1* release that loads agent1's held tray, is 17.
+    Result:   the 16-tier is now N11 and N3's two ghost children alone.
+
+F10 corrected (2026-09-17)
+    Why:      F10 recorded only the plate room's reach edges.  The
+              regenerated initial conditions list every reach-via pair:
+              L16/L17/L18 mutually, L12 and L13 mutually, L14 to switch2,
+              and the switch1 cluster.  Two consequences are used at
+              once: switch2 can be thrown only from L14, and inside
+              {L11 L12 L13} only an agent at L12 or L13 can handle an
+              object on plate4 or plate5.  L11 reaches nothing but
+              itself.
+    Result:   F10 replaced by the complete list.
+
+1.1.1.1.1.1.1.3.1  State N11; enumerate achievers (A4), and record T13.
+    Uses:     R3 R4 R7 R8 R10 R11 R12 R13 R15 F4 F8 F10 F11 F12 T3 T4 T7
+              T10 T12 K3 K4 K5 K8 K9 K12 H2
+    Adds:     A4 makes one of these true: agent1 grounded at ?from-loc;
+              agent1 holding ?cargo; switch2 on; receiver1 active;
+              ?plate unoccupied; another plate occupied.  The last two
+              apparatus conditions are new to this branch, and they are
+              what make the node interesting.
+    Cases:    .1 A; .2 .3 .4 .5 .6 .7 O; .8-.16 X
+    Why:      Holding ?cargo: a pickup at ?from-loc or a reach-connected
+              spot (.1).  Reach is the binding constraint: only L12 and
+              L13 reach each other, so from L11 agent1 can lift nothing
+              but what lies at L11 (F10).
+              Grounded at ?from-loc: a walk in (.5, .9, .10), a dismount
+              (.4), or a ghost tray release unloading agent1 (.7).  With
+              switch2 on, gate5 is shut, so no southern source survives
+              (T3, T12); L14 needs empty hands (R4); the plate room and
+              L21 give states already satisfying N3 and N4 (.9, T7);
+              within the cluster the walk is deletable (T10).  L15 alone
+              survives, and its walk crosses gate7 a second time, which
+              K8 does not count, so .5 is 18.
+              switch2 on: only agent1* can throw it, since switch2 is
+              reachable only from L14 (F10) and agent1 stands at
+              ?from-loc (.3, .12).  R15 makes the ghost's toggle flip the
+              live switch too.
+              receiver1 active: agent1 cannot place or connect
+              connector1 without freeing its hand (.13, F11), so either
+              agent1* acts (.6) or agent1's own pickup or walk clears an
+              occluding object or body -- which is why .1 and .5 may
+              carry this condition as well (H2).
+              Plates: agent1 cannot reach them from the cluster (F10), so
+              only agent1* can occupy one (.2); and nothing may empty
+              ?plate, by the new lemma T13 (.8).
+              T13: with all three plates occupied, gate7 and gate8 open
+              and agent1 grounded at ?from-loc, the state satisfies
+              1.1.3 and the goal is one MOVE away, so every action after
+              it is deletable.  This kills the whole family of plate-
+              emptying achievers at one stroke and will recur wherever a
+              node holds agent1 outside the room with both gates open.
+              f: .1 16, the pickup being a K9 event; .2 16, the ghost
+              placement a K5 event but needing a ghost in the room; .3
+              17, K3's switch operation plus the ghost's uncounted walk
+              to L14; .4 17; .5 .6 18; .7 19.
+              Tie at 16 broken by H2: .1 is wholly live, .2 needs a
+              ghost.
+    Result:   node active; lemma T13 recorded; .1 next.
+
+1.1.1.1.1.1.1.3.1.1  A4 is agent1's pickup of ?cargo in the cluster.
+    Uses:     R7 F10 F11 K4 K9 K12 H2
+    Adds:     S: agent1 grounded at ?from-loc and empty-handed; ?cargo at
+              rest within reach, nothing on it; the rest of N11 unchanged,
+              a pickup moving nobody.
+    Cases:    .1 A; .2 .3 .4 O
+    Why:      Sub-cases by what ?cargo rests on, as at N5's pickup.
+              .1 is the consolidating case and the reason this branch is
+              cheap: nothing starts in the cluster either, so a ?cargo
+              lying loose there costs K12's +2 exactly as in the plate
+              room -- unless it rests on plate4 or plate5, where its
+              landing is a K4 event and the pickup that put it there
+              precedes that K4 placement.  One object then serves twice,
+              holding a gate6 plate down so an agent can reach switch2,
+              and afterwards riding to a gate9 plate (H2).
+              f: .1 16; .2 .3 18 (K12); .4 18 (the held-tray +1 and a
+              ghost walk).
+    Result:   node active; N12 next.
+
+1.1.1.1.1.1.1.3.1.1.1  ?cargo rests on plate4 or plate5.
+    Uses:     F8 F10 K4 T2 T4
+    Adds:     N12 as listed.  Reach forces ?from-loc to L12 or L13 (F10),
+              the first time this branch fixes agent1's spot more
+              narrowly than the cluster.  Note the ordering constraint
+              the branch now carries: gate6 follows plates 4 and 5 (F8),
+              so lifting ?cargo shuts gate6, and any crossing of gate6
+              still needed -- the ghost's trip to switch2 among them --
+              must happen before the lift.
+    Cases:    N12 A
+    Why:      N12 is complete: the pickup needs agent1 empty-handed at
+              ?from-loc, ?cargo within reach with nothing on it, and
+              changes nothing else.
+    Result:   node active; N12 is the frontier of this branch.
+
+K14 adopted, and f recomputed (2026-09-17)
+    Uses:     F10 F12 K3 K8 H1
+    Why:      Raised while ranking N12's children, where the three
+              cheapest differ only by travel that H1 counts nowhere, so
+              the revision policy forbids deferring it.  switch2 is
+              reachable only from L14 (F10), and L14 is entered only
+              across gate6 and screen1 (F12); K8's two crossings are
+              gate5 and gate7, so that walk is counted by nothing.  The
+              floor is +1, the ghost reading, since a ghost need not come
+              back; a live toggle is +2, agent1 having to leave L14
+              again.
+    Changed:  base h 15 -> 16, and every f in the tree +1, except the two
+              ghost-toggle nodes -- N11's .3 and N7's .7 -- which already
+              carried an ad-hoc ghost walk now absorbed into K14.  The
+              shift is uniform, so nothing is reordered above N12.
+    Result:   H1 amended; N12 17, N11 17, N3 17, N2 17, node 1 16.
+
+1.1.1.1.1.1.1.3.1.1.1.1  State N12; enumerate achievers (A5), and record
+    L14.
+    Uses:     R3 R4 R8 R10 R11 R12 R13 R15 F4 F8 F10 F11 F12 T3 T4 T7
+              T10 T12 T13 K3 K4 K5 K14 H2
+    Adds:     A5 makes one of these true: agent1 grounded at ?from-loc;
+              agent1 empty-handed; ?cargo resting on plate4 or plate5
+              with nothing on it; switch2 on; receiver1 active; ?plate
+              unoccupied; another gate9 plate occupied.
+    Cases:    .1 A; .2-.9 O; .10-.17 X
+    Why:      switch2 on: only agent1* can throw it while agent1 stands
+              at ?from-loc (F10, .13), and under R15 the ghost's toggle
+              flips the live switch too (.1).  With K14 this is the one
+              child that realizes a landmark the others leave standing,
+              and it costs only the ghost's walk in, not a return.
+              Grounded and empty-handed: the walk back from L14 (.2),
+              which is the live alternative and pays K14's +2; a dismount
+              (.3); the L15 and plate-room sources, each a second gate7
+              crossing (.5); southern sources shut by gate5 (.14, T3,
+              T12); the in-cluster walk deletable (.15, T10).
+              agent1 placing ?cargo on plate4 or plate5 would achieve
+              both the empty hand and the resting condition, but the
+              state before it is exactly N11 (.11, T7).
+              ?cargo resting there: otherwise only a ghost tray release
+              settling it on the plate as highest clear support (.6);
+              agent1* cannot handle live cargo (R6).
+              Plates: nothing may empty ?plate (T13, .10); agent1 cannot
+              reach the plate room from the cluster (F10), so only
+              agent1* can add an occupancy (.4).
+              T14: R13 says a held connector's beam dies, so if ?cargo is
+              connector1 and connector1 is the relay, the pickup at A4
+              shuts gate8 and agent1 can never walk in.  Recorded as a
+              standing constraint on this branch, not a refutation --
+              receiver1 may be lit by a chain that does not need
+              connector1.
+              f: .1 17; .2 .3 .4 18; .5 .6 .7 .8 19; .9 20.
+    Result:   node active; lemma T14 recorded; .1 next.
+
+1.1.1.1.1.1.1.3.1.1.1.1.1  A5 is agent1*'s toggle of switch2 at L14.
+    Uses:     R15 F8 F10 K3 K4 K14 T12 T13
+    Adds:     N13 as listed.  Before the toggle switch2 is off, so gate7
+              is shut and gate5 is open -- the south is still reachable,
+              which is where agent1's own K8 gate5 crossing belongs.
+              gate6 must be open on the ghost's recording side for the
+              ghost to be at L14 at all, so plates 4 and 5 are both
+              occupied then, ?cargo on one of them.  agent1* is
+              empty-handed, screen1 admitting nothing else.
+              (recording-in-progress) is now an explicit condition: the
+              branch has committed to a recorder session.
+    Cases:    N13 A
+    Why:      The toggle moves nobody and touches no plate, so every
+              other condition of N12 carries over unchanged.  agent1 at
+              ?from-loc with gate7 shut is consistent: it is already
+              north of gate5 and has no need of gate7 until the toggle.
+    Result:   node active; N13 is the frontier, and the first node of the
+              analysis to fix a ghost's position and the recorder
+              session together.
+
+H3 recorded: the heuristic audit (2026-09-17)
+    Why:      Five landmarks were added by noticing the same mistake five
+              times, each time after it had already misranked something.
+              H3 turns that into a checklist run at every expansion,
+              before the children are ranked: provenance, delivery,
+              access, session, interference, dominance, over-
+              specification.  Each entry from here on carries an Audit
+              line naming the checks that fired and those that came back
+              clean, so a gap found later can be traced to the node that
+              should have caught it.
+    Result:   H3 recorded; applied immediately to N13, where it found
+              three things at once.
+
+N13 audited, and K15 recorded (2026-09-17)
+    Uses:     R10 F8 F14 K1 K2 K8 K9 K13 H3 P1
+    Audit:    G fired -- N13 was over-specified.  It asserted plate4 and
+              plate5 both occupied, which is a precondition of the
+              ghost's walk into L14, not of this state.  Removed; it
+              belongs to whichever achiever puts agent1* at L14.
+              D fired, and this is the large one.  agent1* forks where
+              agent1 stands, and START-RECORDER needs agent1 at recorder1
+              in location1 (R10), so every ghost is born in the west
+              strip -- a second session cannot fork one elsewhere.  The
+              strip's only exit is gate1, which follows plate1, and K1
+              and K2 already record why only a ghost can hold plate1
+              before agent1 first leaves: box1, connector1 and tray1 all
+              start outside, and agent1 cannot fetch one without leaving.
+              So agent1* stands on plate1 -- and cannot leave, because
+              stepping off shuts the gate it would walk through.  Only
+              agent1 can free it, by carrying a live object back into the
+              strip and putting it on plate1.  K15 prices that at +4:
+              the pickup (K9's three all precede plate4/5 or plate6/7/8
+              placements), the plate1 placement (neither K4 nor K5), the
+              ghost's dismount, and one of agent1's two gate1 crossings,
+              the other being coverable by K8's gate5 crossing since one
+              MOVE spans a multi-gate route (R2).
+              B re-fired as a consequence: K13's cheap reading was one
+              live occupant plus one ghost, at +1.  A ghost occupant now
+              costs K15's +4, so the all-live reading -- K11's second
+              object at +2 -- is cheapest.  K13 revised from +1 to +2.
+              A, C, E, F run clean at N13: ?cargo and the gate9 occupants
+              all rest on plates and are counted; the switch2 travel is
+              K14, already charged; nothing here vacates a plate or
+              breaks a beam beyond T14's standing constraint; and the
+              state is not one move from the goal, gate7 being shut.
+    Changed:  base h 16 -> 17, every f +1; and +4 more on every node whose
+              conditions require a ghost outside the west strip, which is
+              35 nodes.  Nodes that merely permit a ghost reading are
+              untouched, their live reading being cheaper: N2, N3, the
+              dismount cases, the pickup off a co-occupied plate.
+    Result:   N13 22, and the ghost-toggle branch with it.  The live
+              alternative, agent1 walking to L14 and back, is 19.
+              Frontier: 1.1.1.1.1.1.1.3.1.1.1.2 (the live walk back from
+              L14) and 1.1.1.1.1.1.1.3.1.1.1.3 (the dismount) at 19,
+              N11's .2 and .4 at 19, N4 and the L21 and L15 Ps at 19.
+              The active path retreats from N13 to N12's .2.
+    Reading:  the analysis has turned decisively against ghosts.  A ghost
+              is nearly free while it stands on plate1 holding the front
+              door open, and expensive the moment a plan wants it
+              anywhere else.  Of the three families, the all-live one --
+              three objects ferried in across gate8, connector1 doing
+              double duty as relay and plate occupant (H2) -- is now the
+              cheapest, and the ghost-plate family the dearest.
+
+1.1.1.1.1.1.1.3.1.1.1.2 audited; T15, T16, and K13 restated (2026-09-17)
+    Uses:     F8 F9 F12 R4 K4 K8 K9 K11 K13 K14 K15 T2 H3
+    Audit:    A and B fired together, through a counting argument that
+              had not been made anywhere.  The state before this walk --
+              N14 -- needs gate6 open, so plate4 and plate5 both
+              occupied, with ?cargo on one; it inherits two of plates 6,
+              7 and 8 occupied; and agent1 stands at L14, on none of
+              them.  ON is functional (F9), so those are four distinct
+              occupants, and only three live objects exist.  T15 records
+              the census: three live occupants, or four when agent1 holds
+              one down itself.  N14 is therefore not live-feasible, and
+              K15's +4 applies.  The branch drops from 19 to 25.
+              The general form matters more than this node: on this
+              branch agent1 cannot be at L14 once two gate9 plates are
+              filled, so the switch2 trip must precede the second
+              delivery.
+              B fired again on the ferry count.  K13 had been charging
+              +2, the cost of the second object.  There are three gate9
+              plates and agent1 can occupy none of them (T2), so every
+              branch delivers three live objects: d inward walks and d-1
+              returns, of which K8 counts one, leaving 2d-2 = +4.  K13 is
+              restated as that ferry count, which merges it with K11 --
+              they were two statements of one landmark, and both earlier
+              values undercounted by forgetting the third object.
+              E fired on the sibling dismount cases: T16.  A mount on
+              plate4 or plate5 is a K4 event, which is why the +1 for
+              mounting-to-dismount was waived.  But the waiver holds only
+              while gate6 is still wanted, and once switch2 is on nothing
+              crosses gate6 again.  So the waiver lapses and the +1
+              stands on both dismount nodes.
+              C, D, F, G run clean here.
+    Changed:  base h 17 -> 19; +2 on all 57 non-ghost nodes, 0 on the 35
+              ghost nodes, whose ferry count is one object shorter and
+              cancels it; +4 on this walk and N14 for the census; +1 on
+              the two dismount nodes for T16.
+    Result:   N14 created at 25 and its branch demoted.  N11 and N12 stay
+              cheap at 20 but every unexpanded child of theirs is now 22
+              or worse, so the frontier minimum moves off this branch.
+              Best open node: N4 at 21 -- agent1 grounded at L21 holding
+              ?cargo, one gate9 plate empty, the other two occupied --
+              tied with the L15 source under N3's .1 and with 1.1.2,
+              1.1.3 and 1.1.4, and taking the tie on fewest gate
+              conditions: L21 needs none, the others need two to five.
+              Active path retargets to 1.1.1.1.1.1.1.1 -> N4.
+    Reading:  the census is the first hard resource bound in the
+              analysis, and it is tight: three objects for three gate9
+              plates, with plate4 or plate5 to be borrowed on the way and
+              given back.  Everything the branch does now has to respect
+              that the same three objects are wanted in two places, and
+              the order in which they are wanted is what the next few
+              expansions will fix.
+
+Admissibility reviewed, and the ferry count corrected (2026-09-17)
+    Uses:     R2 K10 K11 K13 H1 H2
+    Why:      Asked directly whether h is admissible.  It is built as a
+              lower bound and is not verified as one.  Two mechanisms can
+              break it: overlap, since one MOVE spans a multi-gate route
+              and the Ks count walks and pickups in several places while
+              only asserting they are distinct -- K15 already leans on
+              that overlap, and H2 exists because one action can fill
+              several landmark roles; and scope, since an increment
+              derived on one branch and then applied by a blanket pass
+              may overcharge a branch that escapes its premise.
+              The second was not hypothetical.  The ferry restatement
+              charged every non-ghost node +2 for delivering three
+              objects one at a time, but K11's original wording carried
+              the exception "unless they travelled as one stack", and the
+              tray family exists precisely to trade crossings for one
+              loading.  d is a count of carries, not of objects.  The
+              tray branch was overcharged by 2 and is corrected.
+    Changed:  K13 restated to count carries; -2 on the 23 tray-branch
+              nodes not already charged K15.  The tray-release action,
+              its P and N6 return to 20, N7 to 20.
+    Result:   the flaw cost ordering only.  Nothing is pruned on f in
+              this method, and every exclusion so far rests on logic --
+              T4 relevance, T7 and T13 dominance, the T15 census,
+              contradiction -- not on a bound.  Recorded in H1 so the
+              next reader knows what these numbers are and are not.
+
+1.1.1.1.1.1.1.1.1  State N4; enumerate achievers.
+    Uses:     R3 R7 R8 R10 R11 R12 F4 F10 F11 K5 K9 K12 K15 T8 T13 T16
+              H3
+    Audit:    E gave the branch its one advantage, and F and A took it
+              away again.
+              E: T14 does not bite here.  If ?cargo is connector1 and
+              connector1 is the relay, lifting it shuts gate8 -- but L21
+              lies inside gate8 and its walk into the plate room needs no
+              gate at all (F12, F13), so this is the one route on which
+              the relay may be the carried object.  It leaves an ordering
+              constraint rather than a contradiction: the other two
+              objects must have crossed gate8 before the relay is lifted.
+              F: T13 kills every plate-emptying achiever again, and more
+              cheaply than elsewhere -- L21's clause into location19 is
+              (GATE9) alone, so the state before such an action is one
+              walk from the goal.
+              A: no reach edge involves L21 (F10).  So agent1 at L21 can
+              lift only what lies at L21 itself and can touch no plate,
+              which leaves the pickup case paying K12's +2 for an object
+              at rest off a plate, and hands every plate achiever to
+              agent1* at K15's price.
+              T8 was already on record and disposes of every walk-in: a
+              walk ending at L21 followed by the walk from L21 into the
+              room is replaceable by one walk, whatever the source.
+              B, C, D, G run clean.
+    Cases:    .1 .2 .3 .4 .5 O; .6-.10 X
+    Why:      f: .1 23; .2 .3 25; .4 .5 27.  Nothing starts at L21,
+              nothing can be reached from it, and no fixture sits there,
+              so every way of arriving already holding ?cargo is dear.
+    Result:   N4 expanded and its whole branch demoted to 23 and above.
+              The open item that "no plan needs L21" now has a reason
+              behind it rather than an observation: T8 forbids walking
+              there as a step, and F10 leaves nothing to do once there.
+              Active path retargets to 1.1.1.1.1.1.1.2, the L15 source,
+              at 21 -- it takes the remaining 21-tie from 1.1.2, 1.1.3
+              and 1.1.4 on fewest gate conditions, needing gate8 alone
+              against their two, three and five.
+
+H4 recorded: measurement by SOLVE-SUBGOAL (2026-09-17)
+    Why:      The user observes that (SOLVE-SUBGOAL <start> <goal>)
+              returns a guaranteed minimum length when the cutoff is
+              modest, under about 10 -- the size of a landmark cluster,
+              not of a node.  Two uses follow, and the first answers the
+              admissibility weakness recorded in H1 directly: relaxing a
+              problem cannot lengthen its optimum, so the measured
+              minimum for any conjunct every solution must satisfy is an
+              admissible contribution to h, needing no argument.  The
+              second attacks the overlap hazard, which no argument here
+              has really closed: measure A, then B, then A and B
+              together, and a joint minimum below the sum exposes a
+              shared action and replaces the sum.
+              Nodes themselves cannot be measured -- they sit ninety-odd
+              actions from the start -- and their conditions are partial,
+              so variables must be ground and the minimum taken over
+              groundings.
+    Result:   H4 recorded with a queue ordered by doubt: K1 and K2, then
+              K15's +4, then switch2-on as a bundle, then the T15 census
+              as an exhaustion test.
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.2  L21 source of the tray branch; T17 recorded.
+    Uses:     R4 R12 F10 F11 F15 K10 K12 K15 T3 T8 T9 T15 H3
+    Audit:    D fired and refuted the branch's cheapness one step after
+              the tie-break sent the search here.
+              An agent holding a tray cannot pass screen1 (R4), and L14
+              is the only place switch2 can be thrown (F10).  So agent1
+              carrying a loaded tray1 can never throw the switch.  Nor
+              can it park the load and return: putting a tray down
+              settles its riders (R12), and a grounded tray carries none
+              (F15).  So if agent1 holds a loaded tray after the throw,
+              the throw was a ghost's.  Reversing the order does not
+              help: switch2 on shuts gate5 (T3), which puts blower1 out
+              of reach, and by T9 the only loading left is a ghost tray
+              release.  Either way the branch buys a ghost outside the
+              west strip.  T17 recorded; K15's +4 applies to the whole
+              tray subtree, which returns to 24-29.
+              A and B ran clean but tightened the node: by the census T15
+              the three live objects are exactly tray1, ?cargo and the
+              third plate's occupant, so that occupant is forced to be
+              the remaining one of box1 and connector1.  The carry count
+              is 2, the stack and that object, so the ferry charge is +2,
+              which is what the branch now carries.
+              F: T8 applies here as it did at N4 -- no walk into L21 can
+              be the achiever below N16.
+    Cases:    N16 O
+    Result:   N16 created at 25 and the branch demoted.  This is the
+              second time in two steps that an H3 audit has overturned a
+              tie-break within one expansion of taking it, which is an
+              argument for auditing a node before letting it win a tie,
+              not after.
+              Active path returns to 1.1.1.1.1.1.1.2, the L15 source
+              under N3's .1, at 21: it now takes the tie outright from
+              1.1.2, 1.1.3 and 1.1.4 on fewest gate conditions, gate8
+              alone against two, three and five.
+
+Test 1 run: agent1 out of the west strip (2026-09-17)
+    Command:  (solve-subgoal *start-state*
+                 (and (not (has-location agent1 location1))
+                      (not (has-location agent1 location2))))
+              with *threads* 0, *depth-cutoff* 10.
+    Measured: 4.  START-RECORDER; agent1* walks L1 -> L2; agent1* steps
+              onto plate1; agent1 walks L1 -> L7 through gate1.
+    Verdict:  K1 and K2 confirmed at 1 and 2, with agent1's exit walk the
+              fourth and uncounted action, exactly the prediction.  No h
+              value changes.  The first measured landmark in the
+              analysis.
+    But the trace carries three things the number does not:
+      F17  tray1 starts ON plate2, so gate3 is open before anything
+           happens, and tray1 is gate3's keeper as connector1 may be
+           gate8's (T14).  gate2 and gate5 are open at the start too.
+      F18  the fork copies support occupancy: TRAY1* was placed ON PLATE2
+           beside its original.  R10's "never newly occupies a plate"
+           means it creates no new occupancy, not that the copy floats
+           free.
+      T18  so a ghost stand-in is free where it forks, and K15 is scoped
+           to a ghost that must MOVE or ACT away from its birthplace.
+           No node charged K15 is affected: nothing starts on plates 4
+           through 8, so a ghost occupant there must still be walked in.
+      T19  and this is the payoff.  The map is a chain of regions and
+           gate3, which follows plate2, is the only link out of the
+           L3-L7 region.  box1 and tray1 both start west of it and both
+           must cross.  Without a stand-in neither pair of crossings
+           works: whichever is lifted last takes gate3 down and strands
+           its carrier.  tray1* on plate2 is that stand-in.
+    Result:   the opening is forced, and now for two reasons rather than
+              one: the recorder runs first both to free agent1 through
+              gate1 (K1, K2) and to leave a ghost holding plate2 before
+              tray1 is carried off.  The single-move walk L1 -> L7 also
+              confirms that one MOVE spans a whole multi-gate route,
+              which is the overlap hazard H1 records.
+
+Test 2 run: a ghost agent outside the west strip (2026-09-17)
+    Command:  (solve-subgoal *start-state*
+                 (and (recording-in-progress)
+                      (not (has-location agent1* location1))
+                      (not (has-location agent1* location2))))
+              with *threads* 0, *depth-cutoff* 12.
+    Measured: 11, against a prediction of 9 -- and by a route that shares
+              nothing with the predicted one after step 4.
+    What it does:  recorder; ghost to plate1; agent1 walks L1 -> L9 and
+              picks up connector1; carries it back to L2 and puts it on
+              plate1; walks to L1; CANCEL-PLAYBACK, which deletes every
+              ghost; START-RECORDER again, forking a fresh ghost at L1
+              with gate1 already held open by connector1; the new ghost
+              walks out through gate1 to L7.
+    Verdict:  K15 was wrong in mechanism, which is why it undercounted.
+              A ghost on plate1 is never freed: it cannot step off and
+              walk through the gate its own weight is holding.  It is
+              replaced.  The plan buys a live keeper for plate1, ends the
+              cycle, and starts another whose ghost is born already past
+              the obstacle.  K15 is now MEASURED at +8, since only K1 and
+              K2 are realized inside the 11.
+    Recorded: K16, recorder cycles -- CANCEL-PLAYBACK plus START-RECORDER
+              is two actions nothing counted, and both need agent1 at
+              location1, so gate1 must be open, so plate1 must be held by
+              something other than the ghost being replaced.
+              P2 weakened.  It said fewer cycles dominate; cycling is the
+              only way to move a ghost agent, and the measured optimum
+              spends a cycle to do it.  P2 now orders equals only.
+              T20, fork and free: to move an object that is holding a
+              plate down, start a cycle while it still rests there and
+              the copy inherits the plate.  Measured twice in this one
+              trace -- tray1* takes plate2 at the first fork, letting
+              tray1 travel; connector1* takes plate1 at the second,
+              letting connector1 be reclaimed later.  This is the answer
+              to the census pressure of L15: an object parked on a plate
+              is a loan, not a sacrifice, provided a fork catches it
+              there.
+    Changed:  +4 on all 53 ghost-requiring nodes, K15 going from +4 to
+              +8.  The ghost families are now decisively the dearest: the
+              ghost-plate cases, N13's ghost toggle, and the whole tray
+              subtree, which T17 showed cannot avoid a ghost.
+    Reading:  two measurements have now each overturned an argued result,
+              and in both cases the argument was not merely mispriced but
+              wrong about what happens.  The all-live family is the clear
+              front-runner, and a concrete sketch of it now exists: one
+              recorder cycle, the ghost parked on plate1 for good, tray1*
+              holding plate2 so tray1 can travel, agent1 throwing switch2
+              itself, and the three live objects ferried to the three
+              gate9 plates.
+    Open, and now the sharpest question in the analysis: what lights
+              receiver1?  gate8 is on every route into the plate region,
+              and by T14 a held connector is dark.  If connector1 is the
+              relay, it cannot be carried in -- it would shut the gate it
+              is being carried through.  If it is not the relay, then
+              transmitter1, repeater1 and the geometry must light
+              receiver1 without it.  One of the two must be true, and
+              which decides whether connector1 is free cargo or a fixture
+              that can never join the gate9 plates -- which the census
+              T15 cannot afford.
+
+Test 3 run: (open gate8) -- exhausted (2026-09-17)
+    Command:  (solve-subgoal *start-state* (open gate8))
+              with *depth-cutoff* 14.
+    Measured: no solution.  Opening gate8 costs 15 actions or more.
+    Verdict:  the first measurement that corroborates rather than
+              corrects.  Every solution must open gate8 -- agent1 starts
+              at location1 and gate8 is on every route into the plate
+              region (F12) -- so h at the root is at least 15, and the
+              composed base of 19 clears it.  Every node requiring gate8
+              open likewise has h at least 15, and none in the tree is
+              below that.  No f changes.
+    But the run did not answer the question it was asked, so the geometry
+    was read directly out of the regenerated initial conditions.
+    F19, the beam layout:  transmitter1 is the red source, receiver1 the
+              red sink, repeater1 a floor repeater that is both, and
+              connector1, connector1* and repeater1 are the relays.
+              LOS-VIA is authored only between apparatus and LOCATIONS --
+              no pair of apparatus appears -- so on the face of it every
+              beam runs through a relay standing at a location.  The
+              clear lines matter: transmitter1 sees L10, L12, L14, L15
+              with no barrier; receiver1 sees L10, L11, L14, L15, L20,
+              L4, L5.  A relay at L10, L14 or L15 therefore sees both
+              ends and lights receiver1 with no gate condition of its
+              own, which is why gate8 needs no other apparatus.
+    T21, and it reverses the reading of the last two steps.  None of
+              L10, L14, L15 is L16, L17 or L18, so a connector lighting
+              receiver1 is not on a gate9 plate.  Nor can it be installed
+              and later collected: lifting it makes it dark (R13, T14),
+              which shuts gate8, and gate8 is on every route into the
+              region.  To lift it agent1 must stand where it stands --
+              reach touches neither L15 nor L10 from inside (F10) -- so
+              agent1 ends outside holding a dark connector with no way
+              back.  From L10 it is worse, that being south of the gate5
+              that switch2 shuts for good.
+              So connector1 is committed to the beam, the three gate9
+              plates have two live bodies for three places, and every
+              solution needs a ghost outside the west strip: either a
+              ghost occupant on a plate or a ghost relay on the beam.
+              The all-live family does not exist.
+    Held, not applied:  if T21 stands, K15's +8 is paid by EVERY plan and
+              belongs in the base rather than on 53 marked nodes -- which
+              would raise every non-ghost node by 8 and flatten the
+              distinction the last two steps built.  That is a large
+              recompute resting on one inference from an absent table
+              entry, so it waits for test 4.
+
+Test 4: INCONCLUSIVE, and badly designed (2026-09-17)
+    Command:  (solve-subgoal ((has-location agent1 location15)
+                              (holding agent1 connector1) ...)
+                             (open gate8))   with cutoff 3.
+    Result:   no solution -- but the run does not bear on T21, because at
+              least two things could have produced it and they cannot be
+              told apart:
+      (a) the hand-built start state is not a legal state.  The test 2
+          trace prints HOLDING1 and HOLDING2, so HOLDING is not a
+          directly assertable dynamic fact, and a fact list the
+          translator cannot read leaves the search nothing to work from.
+      (b) a connector resting on the ground may be unable to pair with
+          apparatus anchored at level 1.  connector1 is VERTICAL-OBJECT
+          and MOBILE-OBJECT, so its level is whatever it rests on;
+          transmitter1, receiver1 and repeater1 have authored base level
+          1.  ELEVATED-OBJECT turns out to be the type of authored
+          fixtures, not a mark of being raised, so it says nothing either
+          way -- the height rule lives in the relay code.
+    Method note: a hand-built start state is the wrong instrument for a
+              question about reachability.  It tests my ability to write
+              a legal state as much as it tests the model, and a null
+              result cannot separate the two.  Prefer a goal from
+              *START-STATE*, where only the goal is mine to get wrong.
+    Also noted: connector1 is itself a BEAM-BLOCKER, so a connector can
+              occlude the beam it is not carrying -- relevant wherever
+              two relays are considered.
+    T21 stands provisional, and nothing has been recomputed.
+
+Test 5 run: (open gate8) at cutoff 17 -- exhausted (2026-09-17)
+    Measured: no solution in 395 seconds with *threads* 16.  Opening
+              gate8 costs 18 actions or more.
+    Two findings, and the second matters more than the first.
+    The ceiling.  Cutoff 14 returned quickly, 17 took most of seven
+              minutes and still exhausted, so the usable band for this
+              problem is about 14 and below.  The beam question cannot be
+              settled by search: it needs 18 or more.  H4 amended, with
+              the test 4 lesson beside it -- never hand-build a start
+              state to get around the ceiling, since a null result then
+              cannot be told from an illegal state.
+    The calibration.  One conjunct measures at 18 or more while the
+              composed base h for the entire problem is 19, and the
+              measured floor for one conjunct is 18 (h itself, solution-
+              free evidence).  h is admissible and
+              very weak: a single conjunct nearly saturates it and the
+              bulk of every plan is invisible to the landmark count.
+              Nothing is pruned on f, so this costs ordering only -- but
+              it means differences of one or two near the frontier are
+              close to noise, and explains why the H3 audit, which finds
+              structure, has been worth more than the arithmetic every
+              time the two have disagreed.
+    Available and not applied: every node here puts agent1 or a ghost
+              inside the plate region, which cannot happen before gate8
+              opens, so h >= 18 throughout and f >= depth + 18.  Nodes
+              whose suffix realized landmarks now carry h below 18 and
+              are understated.  Applying max(composed h, 18) is the first
+              task of the next session -- not this one, with the window
+              this full.
+    Recorded: H5, session hygiene.  When the window grows long, stop
+              expanding, write the files current, regenerate the
+              continuation prompt so it alone carries the position, and
+              say so without being asked.
+
+max(h) pass applied (2026-09-17, session 3)
+    Uses:     H1 H4 F12
+    Why:      h >= 18 for every node, gate8 having measured at 18 or
+              more (test 5), and h >= 19 for every node that puts agent1
+              inside the plate region, since the crossing walk is one
+              action more.  Applied as max(composed h, floor).
+    Changed:  1.1.1.1.1 and N3 20 -> 21; 1.1.1.1.1.1.1 and its L11-L13
+              P and N11 20 -> 21; the L21 P and N4 21 -> 22; N11's
+              pickup action, its P and N12 20 -> 22; N12's .3 and .5
+              22 -> 23; N3's pickup action 20 -> 22 (its children were
+              already 22); N9 and the pickup above it 23 -> 24.
+    Result:   no open node changed rank.  Frontier minimum still 21:
+              the L15 source 1.1.1.1.1.1.1.2 with 1.1.2, 1.1.3, 1.1.4.
+              The floor is now inert if the K15 fold is applied.
+
+The beam question settled, by reading and by measurement (2026-09-17)
+    Uses:     R13 F8 F10 F12 F19 F20 F21 F22 T14 T15 T21 T22 H4 H7
+    Read:     beam-relay.lisp and visibility.lisp.  Pairing
+              (CONNECTABLE-TERMINUS) uses POTENTIALLY-VISIBLE, which is
+              only "a LOS-VIA exists": no height rule.  Lighting
+              (RELAY-BEAM-REACHES-RECEIVER, COMPUTE-RELAY-LIGHTING) uses
+              BEAM-VISIBLE with the connector's TOP as near elevation
+              and the apparatus TOP (1) as far, and the :BEAM policy
+              tests every recorded wall/edge/boundary crossing at the
+              interpolated elevation against the barrier's span.  So a
+              ground connector and a level-1 terminus DO pair and DO
+              light -- but only if no crossing barrier spans elevation
+              1, and every wall (4) and wall10 (1, inclusive) does.
+              F19 had read LOS-VIA's NIL as "no barrier" and was wrong.
+    Test 6:   chained (on tray1 plate3) from the start, threads 0,
+              cutoff 8.  Predicted 7: recorder, ghost L1->L2, ghost onto
+              plate1, agent1 L1->L7, pickup tray1, L7->L10, put on
+              plate3.  Measured 7, exactly that.  The listing confirms
+              T20 directly: tray1* stays ON PLATE2, (DEPRESSED PLATE2)
+              persists after tray1 is lifted, gate3 stays open, gate4
+              opens.  Then (open gate8) as the next milestone, cutoff 9:
+              exhausted (102 s).  Prediction had been 8 more, via box1;
+              the gap is T22.
+    Test 7:   BEAM-VISIBLE on the replayed 7-action state (gate3 and
+              gate4 open), 12 stations x 3 heights x 3 apparatus: the
+              F20 table.  transmitter1 only from L3 L7 L8 L9; receiver1
+              only from L15 (any height) and L9 (top >= 2); repeater1
+              from L8 L9 (any) and L15 (top >= 2).  The same table on
+              *START-STATE* (gate4 shut) shows transmitter1 from nowhere.
+    Test 8:   (has-location agent1 location6) cutoff 8 and (holding
+              agent1 box1) cutoff 10, one-off from the start, 16
+              threads: both exhausted in 10 s.
+    Test 9:   (has-location agent1* location6) cutoff 15, 16 threads:
+              exhausted in 90 s.  Predicted 15 by "live toggle launches
+              the ghost through recording-open gate2".  Wrong.
+    Test 10:  chained: test 2's freed-ghost milestone (11, reproduced
+              exactly), then (has-location agent1* location6) cutoff 7:
+              exhausted (107 s).  Then replayed that prefix plus ghost
+              L7->L4, agent1 L1->L4, ghost STEP onto blower1, live
+              toggle: (BLOWING BLOWER1) but the ghost stays at L4.  A
+              live stream launches only live occupants.
+    Test 11:  same prefix with agent1 on blower1 instead: agent1 lands
+              at L20, gate2 shut.  From that state (or (has-location
+              agent1 location6) (has-location agent1* location6))
+              cutoff 4: exhausted.
+    Findings: F19 corrected; F20, F21, F22 recorded; T22 (box1 is dead);
+              T21 revised on measured grounds -- every solution needs a
+              ghost outside the west strip, so the K15 fold is now
+              justified and is recorded in H1 as pending approval; K17
+              (gate4 / plate3) recorded as a candidate.  The L15 source
+              node annotated: agent1 at L15 occludes the L9 relay.
+    Audit:    H run on all of it -- every reason above is a code reading
+              or a measurement from *START-STATE* or a replayed legal
+              state; nothing cites a known solution.
+    Open, and sharper than before:
+              (1) Who holds the relay up?  box1 is dead, so the raise is
+                  a held tray, whose holder is pinned at L9 or L15 while
+                  the beam runs.  A live holder cannot then cross gate8.
+              (2) Can a ghost ever cross gate8?  RECORDING-SHADOW-OBJECT-
+                  PRESENT (-recorder-core) excludes every mapped live
+                  object from the recording view, so recording-open
+                  gate8 needs a GHOST relay, raised on a ghost tray held
+                  by the ghost -- which pins the only ghost at the
+                  station.  Unless recording-open gate8 is inherited at
+                  a fork, or two cycles overlap, no ghost enters the
+                  plate region.  Then the gate9 occupants are live, and
+                  T22 leaves only connector1 and tray1 for three plates
+                  with agent1 grounded.  Something in this chain of
+                  readings must give; it is the next thing to measure,
+                  by chain, not to argue.
+              (3) K10's loading mechanism: the blower loads a held tray
+                  only if the holder hovers at L20 ON the stream and the
+                  cargo is launched separately; test 11's listing is
+                  the state to chain from.
+    Result:   no expansion.  H5 invoked: the window is full, the files
+              are current, the continuation prompt is regenerated.
+
+Lemma labels renamed L -> T (2026-09-18)
+    Why:      L was doing double duty for lemmas and locations (L15 the
+              census, L15 the cell in front of receiver1).  Lemmas are
+              now T1-T22; every location keeps its L.  Numbering is
+              unchanged, so old citations map one-to-one.
+
+Test 12 run: the live agent into the alcove -- T22 RETRACTED (2026-09-18)
+    Command:  chained: test 2's freed-ghost milestone (11, reproduced),
+              then (has-location agent1 location6), threads 0, cutoff 9.
+    Predicted: 8 more, by the ghost carrying tray1* to L4, agent1
+              mounting it, the ghost riding blower1 and toggling, and a
+              live toggle from L20 opening gate2 for a jump.
+    Measured: 8 more, 19 in all -- but by a different route.  The ghost
+              picks up tray1* at L7 and walks to L5; agent1 walks L1 ->
+              L4 and steps onto blower1; the ghost toggles switch1 (both
+              views on), launching agent1 to L20; agent1 jumps DOWN from
+              L20 onto the ghost's held tray at L5; agent1 toggles
+              switch1 (live off: live gate2 opens, and agent1, now
+              supported, does not fall); agent1 jumps from the tray
+              through gate2 into L6.
+    Verdict:  T22 was wrong and is retracted.  Its argument assumed
+              nothing could support a live agent once the stream
+              stopped; a ghost-held tray can, and the landing on it is
+              a downward jump that F21's limit does not refuse.  Every
+              exhaustion behind T22 (cutoffs 4-15) was below 19.  This
+              is the third argued impossibility a longer search has
+              overturned (after K15's mechanism and the beam question),
+              and the lesson is recorded on T22 itself: an exhaustion
+              proves cost > cutoff, never impossibility.
+    Changed:  F22 corrected; T22 retracted; T21 amended to rest on the
+              three-way raise case rather than on a dead box; the live
+              census is three bodies again.  No node domain changes:
+              the T22 sweep that was planned is cancelled.
+    Audit:    H clean -- the run started from *START-STATE* through a
+              measured milestone.
+
+K15 fold and K17 applied; frontier re-ranked (2026-09-18)
+    Uses:     H1 F20 F22 T17 T18 T21 K15 K17
+    Why:      Approved.  T21 (amended) makes the freed ghost universal:
+              the relay must be raised, and each of the three raises --
+              box1, a ghost-held tray, agent1's own loaded tray -- buys
+              a ghost outside the west strip (box1 by test 12, the
+              others by rule 19 and T17).  So K15's +8 belongs to every
+              node, and K17's +1 for the plate3 occupant likewise.
+    Changed:  +9 on 53 live-reading nodes, +1 on the 46 already charged
+              (the ghost-action nodes, the N13 and N14 branches, the
+              tray subtree).  Base h 28; node 1 f=28.
+    Result:   frontier by f: 27 -- N13 with its A parent (agent1* at
+              L14 toggles switch2, agent1 empty-handed at L12/L13 with
+              ?cargo on plate4/5), N11's .2 (agent1* places ghost cargo
+              on a gate9 plate) and .3 (the same toggle one step
+              shallower), N3's .5 and .6 (agent1* occupies a gate9
+              plate); 28 -- N7's .7, N6's .2, 1.1.1.1.2, 1.1.1.1.3;
+              29 -- 1.1, 1.1.1, N2 (not open), N11's .1.4 and .6, the
+              tray-release action and N6, N7 and its .1; 30 -- the
+              former 21-tier (the L15 source, 1.1.2-1.1.4, N3, N11) and
+              most of the rest.
+              Tie at 27, by H2: all five need one ghost action.  N3's
+              .5/.6 and N11's .2 put the ghost INSIDE the plate room,
+              which needs recording-open gate7 and gate8 -- two gate
+              conditions on the ghost's route, and recording-open gate8
+              needs a ghost relay (-recorder-receiver-shadow: the
+              recording view lights only ghost relays).  N11's .3 and
+              N13's parent put the ghost at L14, needing recording-open
+              gate6 and screen1 -- one gate condition.  Between those
+              two, N13 is the S node already created and audited, one
+              step deeper on the same path, with ?cargo already parked
+              on a gate6 plate (role consolidation, H2).  So N13 is
+              next, subject to approval; its H3 audit has run once (the
+              K15 entry) and is to be rerun under F20 and K17 before
+              its children are ranked.
+
+N13 re-audited under F20 and K17: T23 refutes it, and thirty-one
+nodes with it (2026-09-18)
+    Uses:     R4 R5 R6 R10 R15 R16 F8 F10 F12 F14 F16 F18 F20 F21 K14
+              K16 K17 T15 T18 T20 H3 H6
+    Read:     plate.lisp, -recorder-plate-shadow, -recorder-switch-
+              shadow, -recorder-controls-shadow, -recorder-gate-shadow,
+              -gate, -passability, -recorder-session, beam-relay.lisp
+              (COMPUTE-RELAY-LIGHTING-FOR-OBJECT).  Recorded as R16: a
+              live gate opens under weight of either layer; a recording
+              gate opens only under GHOST weight, or under a recording
+              switch that was copied from the live one at the fork and
+              since then flipped only by a ghost; a ghost passes only
+              recording-open gates.  The live view lights every relay,
+              ghost connectors included; the recording view lights ghost
+              relays only.
+    Audit:    D fired, on the question the earlier audit had left open:
+              how does agent1* reach L14?  Its walk crosses gate1, gate3
+              and gate6, each recording-open only under ghost weight
+              (R16).  The plate1 keeper is stranded in the strip, the
+              plate2 keeper west of gate3, and gate6 wants ghost bodies
+              on plates 4 AND 5 that stay pinned -- four ghost objects,
+              three exist.  So no ghost reaches L14 and none toggles
+              switch2; recording gate7 then opens only by inheriting a
+              live-on switch2 at the fork, which shuts recording gate5
+              in the same stroke.  No ghost ever passes gate7 (T23).
+              B fired next, as a count (T24): at N14 seven slots must be
+              held at once -- plates 4, 5 and 3, two gate9 plates, the
+              relay and its riser -- against six bodies with the ghost
+              in the strip or five with it freed (two keepers stranded).
+              N14's premise was the live L14 trip; its census fails on
+              K17's plate3 and F20's riser, neither counted when T15 was
+              written.
+              G ran clean; E noted the ordering consequence T25 records:
+              ladders make every empty-handed return to L1 gate-free, so
+              keepers matter at eastward and northward crossings only,
+              and K16's "gate1 must be open" was wrong.
+              H: every reason is a code reading (R16) or a recorded
+              measurement (F20, F22); nothing cites a solution.
+              A and C, F ran clean on N13 itself; moot once refuted.
+    Changed:  R16, T23, T24, T25 recorded.  Thirty-two nodes R (listed
+              under T23): every node putting agent1* at L14, L15, L21
+              or in the plate room, every ghost tray release inside the
+              room, both ghost toggles of switch2, and the three L14
+              states by census.  N2's occupant domain loses agent1*;
+              the tray1* case is struck from the two dismount actions in
+              the room; N3's P .2.3 annotated (a ghost co-occupant is an
+              inherited copy).  K14's live +2 in the base, h 28 -> 29,
+              every surviving f +1.  K13's ghost reading and K16's gate1
+              premise corrected.
+              A correction to what was said in conversation: N12's
+              .6-.9 and N11's .4/.7 keep the ghost in {L11 L12 L13},
+              which T23 permits (the ghost crosses gate5 while switch2
+              is off, and recording gate5 stays open for it after
+              agent1's live toggle, R15); they are NOT refuted.
+    Result:   the tree's ghost families are gone in their old form.
+              What a ghost can still do: hold plate1 for agent1's exits
+              (K2, free); leave the strip at the price of two keepers
+              (K15), and then stand on plate 3, 4 or 5, carry its one
+              free object there or to L9, hold tray1* at L9 as the riser
+              for live connector1 (rule 19), load agent1's held tray by
+              releasing tray1* beside it (T9), place connector1* as a
+              chain link, and ferry agent1 across recording-open gate5
+              on tray1* (T25) -- the one way north after T12's lock;
+              and, without moving at all, hand every ghost copy to the
+              live view where its original stood at the fork (T18),
+              including a raised connector1* on box1* at L9 or a copy
+              on a gate9 plate.
+              Frontier by f: 30 -- N6, N7, the tray-release action
+              1.1.1.1.1.1.2.1.1.3 and its P .3.1, N7's .1 (ghost tray
+              release loading agent1's tray in the cluster), N11's .1.4
+              (?cargo riding tray1* in the cluster) and .6 (a ghost
+              action lights receiver1), N3's P .2.3; 31 -- 1.1, 1.1.1,
+              N2 (not open), the L15 source 1.1.1.1.1.1.1.2, N11 and its
+              .7, N16 and the L21/L15 Ps above it, N7's .2/.4, 1.1.2,
+              1.1.3; 32 -- N4, N5, N10, N12 and most of the rest.
+              Every 30-tier node is in the tray family or gives the
+              ghost a southern role; the choice among them is the next
+              step, after the approved measurement (K10's blower
+              loading), which bears directly on N6/N7's price.
+
+Test 13 run: loading agent1's held tray -- K10 measured, T9 amended,
+R17 recorded (2026-09-18)
+    Setup:    chained, threads 0: test 2's freed-ghost milestone
+              (11, reproduced exactly), then (and (has-location agent1
+              location20) (blowing blower1)) cutoff 6: 3 -- agent1 walks
+              L1 -> L4, steps onto blower1, toggles switch1.  State: the
+              ghost at L7, connector1 and connector1* on plate1, tray1
+              and tray1* on plate2, agent1 hovering at L20, live gate2
+              shut, recording gate2 open.  Exported to the scratchpad as
+              test13-progress.txt (14 actions).
+    Instrument lesson:  the two-argument one-off with *threads* 16 from
+              a chained state does not exist as written -- WW-SET
+              crossing the 0/parallel boundary reloads the system, which
+              re-stages and resets *START-STATE* (the first attempt
+              searched from the true start and said so in its listing).
+              Rebuilt in parallel mode through VALIDATE-ACTION-SEQUENCE
+              (all 14 legal, endpoint identical), the cutoff-10 search
+              from this two-ghost, stream-running state processed 37
+              million states in 40 minutes without finishing branch 4 of
+              25, at 5.2 GB; stopped (H4 rule 9).  Chained milestones
+              with cutoffs 1-4 answered everything below in 8 seconds.
+    Prediction:  9, by the ghost releasing tray1* beside agent1's held
+              tray1: ghost picks up tray1* (1), agent1 down from L20 and
+              to plate1 (2), pickup connector1 (1), to L7 (1), connector1
+              onto the ghost's tray (1), pickup tray1 (1), release (1) --
+              8 or 9.  No blower loading within 10.
+    Measured: W1 (holding agent1* tray1*): 1.  W2 (holding agent1
+              connector1): 2 -- one MOVE ((JUMP LOCATION20 NIL LOCATION5)
+              (WALK LOCATION5 (GATE1) LOCATION2)), then the pickup.
+              W3 (on connector1 tray1*): EXHAUSTED at cutoff 3, with
+              agent1 at L2 holding connector1 and the ghost holding
+              tray1* at L7 -- a walk and a placement, geometrically.
+              W4 (holding agent1 tray1) from the W2 state: 3.
+              Blower probe, cutoff 8 from the hover state with (on tray1*
+              plate2) added to forbid lifting the ghost tray: EXHAUSTED
+              (387 s, 6 million states).
+    Read:     -support-elevation WITHIN-AGENT-PLACEMENT-REACH, used by
+              PLACEMENT-OPTIONS: cargo may be set at most
+              *vertical-reach-limit* = 1 above the agent's base.  A held
+              tray's top is its holder's top, 3/2.  So from the ground
+              nobody sets anything on a ghost-held tray; agent1 must
+              stand on box1 (base 2).  Recorded as R17.
+    Verdict:  the prediction was wrong about mechanism, the third such
+              case.  T9's ghost-release loading exists only with a raised
+              stand, i.e. box1 fetched and standing at the loading spot
+              (F22: 19 from the start for the alcove alone), and the
+              blower loading is >= 9 from a state that already has the
+              stream running.  K10 raised from +2 to +4 as a floor (five
+              ghost-route actions beyond the tray pickup, or >= 9 by
+              blower); T9 amended; R2 notes the mixed jump-and-walk MOVE.
+    Changed:  K10 +2 -> +4; the fifteen live nodes of the tray subtree
+              under 1.1.1.1.1.1.2.1.1.3 rose by 2 (N6, N7 at 32; N16 at
+              33).  N7's .1 annotated: ?cargo = connector1 only, box1 in
+              the cluster as the step.
+    Audit:    H clean -- every number is from a chained legal state and
+              every reading is code.  A on N7's .1 fired in retrospect:
+              the loading state needs box1 present, a provenance the
+              node never charged.
+    Result:   frontier by f: 30 -- N11's .1.4 (?cargo riding tray1* held
+              by agent1* in the cluster), N11's .6 (a ghost action lights
+              receiver1: connector1* placed, or an occluder cleared), and
+              N3's P .2.3 (?cargo on ?other-plate beside an inherited
+              ghost co-occupant); 31 -- 1.1, 1.1.1, N2 (active, not
+              open), the L15 source 1.1.1.1.1.1.1.2, N11 and its .7,
+              1.1.2, 1.1.3; 32 -- N4, N5, N10, N12, N6, N7 and the tray-
+              release action; the rest above.
+              N11's .1.4 now inherits R17's problem directly: ?cargo
+              rides tray1* only if it was set there from a raised stand
+              or settled from agent1's own released tray (R12), so its
+              expansion must say which.
+              Candidate landmark, PENDING APPROVAL: K18, the alcove.
+              T23 makes all three gate9 occupants live objects or their
+              inherited copies, so box1 reaches the room in every
+              solution and must first be lifted at L6, which only an
+              agent standing in L6 can do (F10: no reach edge into L6).
+              Test 12 measured agent1 into L6 at 19 from the start, of
+              which K1, K2 and K15 account for 11; the remaining 8 (the
+              ghost's tray pickup and walk to L5, agent1's walk and
+              step onto blower1, the ghost's toggle, the landing jump,
+              the live toggle, the jump into L6) are counted nowhere.
+              +8 uniformly; base h 29 -> 37; reorders nothing.

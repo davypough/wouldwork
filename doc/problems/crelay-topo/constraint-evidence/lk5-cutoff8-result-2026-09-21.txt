@@ -1,0 +1,65 @@
+User-reported LK5 standalone search result -- 2026-09-21
+======================================================
+Start: restored *T10-CHECKPOINT*, location15, seven checkpoints, depth 19.
+Recommendation: lk5-checkpoint-recommendation-2026-09-21.txt.
+Threads 16, local cutoff 8. Goal: agent1 at any of locations16/17/18/21.
+
+No solutions found.
+Real time: 1.839 seconds.
+Total run time: 24.343750 seconds (23.812500 user, 0.531250 system).
+Real GC time: 0.062 seconds; real non-GC time: 1.777 seconds.
+Run GC time: 0.046 seconds; run non-GC time: 24.298 seconds.
+CPU: 1323.76%.
+Processor cycles: 5,862,681,162.
+Bytes consed: 4,234,773,504.
+No new checkpoint; saved endpoint and history retained.
+#<SEARCH-CHECKPOINT CRELAY-TOPO: 7 checkpoints, 19 actions>
+
+Thirteenth reported crelay-topo search, including three earlier restoration
+searches. Archive import/replay is not included in that count.
+LK5 remains OPEN. No deeper search has been recommended or authorized here.
+
+This is an exhaustion report at the stated cutoff, not impossibility evidence.
+Cutoff-truncation and actual runtime pruning settings were not supplied in this
+transcript. Await read-only REPL metadata before formal ledger ingestion; the
+ingester's NIL default for truncation must not be mistaken for a measured NIL.
+The ledger still carries twelve searches' previously filed evidence and one
+bound until this pending outcome is filed with its actual metadata.
+
+FOLLOW-UP METADATA REPORTED BY D
+(:OUTCOME #S(SEARCH-OUTCOME :STATUS :EXHAUSTED-NO-SOLUTION :REASON :COMPLETE)
+ :CUTOFF-TRUNCATED NIL :CUTOFF-HITS 32356 :SEARCH-MODE GRAPH
+ :SYMMETRY-PRUNING NIL :MIN-STEPS-PRUNING T)
+
+SOURCE AUDIT, 2026-09-21
+src/ww-parallel.lisp worker depth check increments its cutoff-hit counter and
+skips the node without testing successors or setting *DEPTH-CUTOFF-TRUNCATED*.
+src/ww-parallel-infrastructure.lisp aggregates worker cutoff counts but has no
+corresponding truncation flag. In contrast, src/ww-searcher.lisp DF-BNB1 tests
+successors at a cutoff node before setting the flag. WW-SOLVE labels a finished
+no-solution run :COMPLETE whenever that global flag remains NIL.
+
+Therefore :COMPLETE/:CUTOFF-TRUNCATED NIL is not reliable evidence of complete
+reachable-space exhaustion for this parallel run. 32,356 cutoff nodes were
+skipped; whether any had successors was not measured by that worker path.
+Actual truncation remains UNKNOWN, not proved T and not proved NIL.
+The safe outcome is still no solution found under cutoff 8 and the reported
+settings, with the checkpoint retained. No impossibility claim follows.
+
+Formal ingestion remains pending: REPORT-LEDGER-BOUND-STRENGTH currently
+interprets NIL as proved non-truncation and any non-NIL value as proved
+truncation, so neither NIL nor :UNKNOWN can honestly represent this run there.
+Proposed next work: repair parallel truncation reporting and make the ledger
+represent unknown coverage explicitly, with focused synthetic regression tests.
+Await approval before changing engine or ledger code. No deeper run requested.
+
+APPROVED CORRECTION COMPLETED, 2026-09-21
+D approved the reporting/ledger correction. Parallel workers now test cutoff
+successors and aggregate observed truncation. The ledger represents T/NIL/UNKNOWN
+explicitly, defaulting omitted measurements to UNKNOWN. Reliable NIL reports
+only no observed direct cutoff truncation, not unpruned exhaustive coverage.
+This historical run is now filed as BD2, :cutoff-truncated :unknown, with the raw
+reported NIL/:COMPLETE retained separately in its provenance. LK5 remains OPEN.
+Thirteen searches total; no crelay-topo search was rerun for this correction.
+Reproduction: append ingest-lk5-bound-2026-09-21.lisp after the lk4-found ingestion.
+Readback and well-formedness passed; see lk5-bound-ingestion-2026-09-21.log.

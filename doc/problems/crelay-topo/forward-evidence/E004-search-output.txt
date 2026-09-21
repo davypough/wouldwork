@@ -1,0 +1,180 @@
+(solve-subgoal *crelay-box-start*
+  (has-location agent1 location6))
+Installing goal...
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=20)...
+Generating tasks: target=256, safety-cap-depth=20
+Generated 625 tasks at depths 0-3
+Loading 625 tasks into queue...
+
+Starting 16 workers...
+[Worker 10] Solution found at depth 4
+[Worker 12] Solution found at depth 4
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 172 ms
+  Worker search:   20 ms
+  Finalization:    0 ms
+  Total:           193 ms
+
+  Search efficiency: 10.4%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0        200         13          4          0         0
+       1        201         12          4          0         0
+       2        188         10          4          0         0
+       3        219         13          4          0         0
+       4        218         12          4          0         0
+       5        225         12          4          0         0
+       6        193         10          4          0         0
+       7        198         11          4          0         0
+       8        194         10          4          0         0
+       9        198         11          4          0         0
+      10        186         10          4          1         0
+      11        198         11          4          0         0
+      12        190         10          4          1         0
+      13        220         13          4          0         0
+      14        199         11          4          0         0
+      15        202         10          4          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 1,473
+  Mean / shard  : 23.0
+  Max / shard   : 38
+  Min / shard   : 14
+  Skew (max/min): 2.71x
+  Top-5 shards  : #23(38) #16(34) #4(33) #32(33) #39(33)
+
+
+
+In problem CRELAY-TOPO, performed GRAPH search for FIRST solution.
+
+Search ended with first solution found.
+
+Depth cutoff = 4
+
+Maximum depth explored = 4
+
+Program cycles = 179
+
+Total states processed = 6,625
+
+Repeated states pruned = 5,142, ie, 77.6 percent
+
+Average duplicate depth = 4
+
+Depth-cutoff hits = 621, ie, 9.4 percent
+
+Search-prefix validation pruned 0 states, 0.0% of 27 prefix validations.
+  validate-recorder-cycle-boundary-prefix: 27 checks, 0 rejections.
+  validate-recorder-recording-prefix: disabled.
+
+Average branching factor = 0.0
+
+
+Candidate solution validation:
+  Nominal goal paths checked = 2
+  Accepted = 2
+  Rejected = 0
+
+Start state:
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION7) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2)
+ (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+Goal:
+(HAS-LOCATION AGENT1 LOCATION6)
+
+
+
+Total solution paths recorded = 2, of which 2 is/are unique solution paths
+Check *solution-paths* and *unique-solution-states* for solution records.
+
+Number of steps in first solution found: = 4
+
+Duration of first solution found = 19.0
+
+Solution path of first solution found from start state to goal state:
+(15.0 (START-STATE))
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION7) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION7) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2)
+ (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+(16.0 (MOVE > AGENT1* moves via ((WALK LOCATION7 NIL LOCATION5))))
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION20) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION5) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2)
+ (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+(17.0 (MOVE > AGENT1 moves via ((JUMP (LOCATION20 GROUND) NIL (LOCATION5 TRAY1*)))))
+((BLOWING BLOWER1) (DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION5) (HAS-LOCATION BOX1 LOCATION6)
+ (HAS-LOCATION TRAY1 LOCATION7) (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6)
+ (HAS-LOCATION CONNECTOR1* LOCATION2) (HAS-LOCATION TRAY1* LOCATION5) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2)
+ (ON CONNECTOR1 PLATE1) (ON CONNECTOR1* PLATE1) (ON AGENT1 TRAY1*) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5)
+ (SWITCHED-ON SWITCH1) (TURNING BLOWER1))
+
+(18.0 (TOGGLE-SWITCH > AGENT1 toggles SWITCH1))
+((DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION5) (HAS-LOCATION BOX1 LOCATION6) (HAS-LOCATION TRAY1 LOCATION7)
+ (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1* LOCATION2)
+ (HAS-LOCATION TRAY1* LOCATION5) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1)
+ (ON CONNECTOR1* PLATE1) (ON AGENT1 TRAY1*) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (OPEN GATE2) (RECORDER-CYCLES-USED 2)
+ (RECORDING-DEPRESSED PLATE1) (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5))
+
+(19.0 (MOVE > AGENT1 moves via ((JUMP (LOCATION5 TRAY1*) (GATE2) (LOCATION6 GROUND)))))
+((DEPRESSED PLATE2) (DEPRESSED PLATE1) (HAS-LOCATION AGENT1 LOCATION6) (HAS-LOCATION BOX1 LOCATION6) (HAS-LOCATION TRAY1 LOCATION7)
+ (HAS-LOCATION CONNECTOR1 LOCATION2) (HAS-LOCATION AGENT1* LOCATION5) (HAS-LOCATION BOX1* LOCATION6) (HAS-LOCATION CONNECTOR1* LOCATION2)
+ (HAS-LOCATION TRAY1* LOCATION5) (HOLDING1 AGENT1* TRAY1*) (HOLDING2 AGENT1* TRAY1*) (ON TRAY1 PLATE2) (ON CONNECTOR1 PLATE1)
+ (ON CONNECTOR1* PLATE1) (OPEN GATE3) (OPEN GATE5) (OPEN GATE1) (OPEN GATE2) (RECORDER-CYCLES-USED 2) (RECORDING-DEPRESSED PLATE1)
+ (RECORDING-IN-PROGRESS) (RECORDING-OPEN GATE2) (RECORDING-OPEN GATE1) (RECORDING-OPEN GATE5))
+
+
+
+Setup phase:
+
+Recording phase:
+(START-RECORDER)
+(16.0 (MOVE > AGENT1* moves via ((WALK LOCATION7 NIL LOCATION5))))
+(PAUSE)
+(MOVE > AGENT1* moves via ((WALK LOCATION5 (GATE1) LOCATION1)))
+(STOP-RECORDER)
+
+Playback phase:
+(17.0 (MOVE > AGENT1 moves via ((JUMP (LOCATION20 GROUND) NIL (LOCATION5 TRAY1*)))))
+(18.0 (TOGGLE-SWITCH > AGENT1 toggles SWITCH1))
+(19.0 (MOVE > AGENT1 moves via ((JUMP (LOCATION5 TRAY1*) (GATE2) (LOCATION6 GROUND)))))
+(RESUME)
+Closure: synthesized.
+Cycle metrics: depth 4, elapsed time 4.0, value change 0.0.
+Complete solution totals: depth 4, elapsed time 4.0, value change 0.0.
+Evaluation took:
+  0.197 seconds of real time
+  0.421875 seconds of total run time (0.328125 user, 0.093750 system)
+  214.21% CPU
+  628,914,874 processor cycles
+  101,891,568 bytes consed

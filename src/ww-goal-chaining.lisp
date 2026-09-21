@@ -41,6 +41,11 @@
   screening-rejections)
 
 
+(defstruct (search-checkpoint (:constructor %make-search-checkpoint))
+  "An exact standalone search endpoint and its retained path from the origin."
+  session stage-generation problem policy)
+
+
 (defstruct undo-checkpoint
   "Complete planning-session snapshot for one goal-chaining operation."
   start-state goal goal-function-bound-p final-goal solution-paths solutions-valid
@@ -69,13 +74,22 @@
 (defmacro solve-subgoal (form1 &optional (form2 nil form2-p))
   "(SOLVE-SUBGOAL GOAL) solves GOAL as the next milestone of the active chain.
 (SOLVE-SUBGOAL START GOAL) is a one-off search for GOAL from START, serial or parallel.
-START is either an unquoted list of dynamic facts, or a form evaluating to a
-problem-state or fact list."
-  (if form2-p
-    `(solve-subgoal-from-form
-       ,(if (and (consp form1) (consp (car form1))) `',form1 form1)
-       ',form2)
-    `(solve-subgoal-form ',form1)))
+START is an unquoted list of dynamic facts, or a form evaluating to a
+problem-state, fact list, or SEARCH-CHECKPOINT.  A checkpoint search returns a
+new checkpoint on success, or the unchanged checkpoint on exhaustion.
+The goal itself is never quoted: a quoted goal would
+install the constant (QUOTE ...), which the translator reads as trivially true, so
+the start state would silently satisfy it."
+  (let ((goal-form (if form2-p form2 form1)))
+    (when (and (consp goal-form) (eq (first goal-form) 'quote))
+      (error "SOLVE-SUBGOAL requires an unquoted goal; received ~S.~%~
+              Drop the quote: ~S"
+             goal-form (second goal-form)))
+    (if form2-p
+      `(solve-subgoal-from-form
+         ,(if (and (consp form1) (consp (car form1))) `',form1 form1)
+         ',form2)
+      `(solve-subgoal-form ',form1))))
 
 
 (defun validate-candidate-screening-result (result)
@@ -867,9 +881,12 @@ request and every remaining phase has a positive local cutoff."
     (solve-generic-subgoal-form goal-form)))
 
 
-(defun solve-subgoal-from-form (start goal-form)
+(defun solve-subgoal-from-form (start goal-form &optional (runner #'ww-solve))
   "Search once for GOAL-FORM from START, outside goal chaining and in any thread mode.
 Any active goal chain is discarded; a single WW-UNDO restores the prior session."
+  (when (search-checkpoint-p start)
+    (return-from solve-subgoal-from-form
+      (solve-search-checkpoint start goal-form)))
   (let ((origin
           (etypecase start
             (problem-state (copy-problem-state start))
@@ -887,7 +904,7 @@ Any active goal chain is discarded; a single WW-UNDO restores the prior session.
           *solution-paths* nil
           *solutions-valid* nil)
     (install-compiled-goal goal-form)
-    (ww-solve)))
+    (funcall runner)))
 
 
 (defun make-start-state-from-facts (facts)

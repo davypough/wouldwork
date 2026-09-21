@@ -35,7 +35,8 @@
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
 ;;;                connectable-location, connectable-terminus
 ;;;   updates    : update-relay-status!
-;;;   actions    : pickup-connector, put-connector, connect-connector
+;;;   actions    : pickup-connector, pickup-connector-retaining-pairings,
+;;;                put-connector, connect-connector
 
 (include-tech -propagation)
 (include-tech -beam-substrate)
@@ -113,6 +114,26 @@
               (doall (?c connector)
                 (if (paired ?c ?connector)
                   (not (paired ?c ?connector)))))
+          (if (bind (on ?connector $support))
+            (not (on ?connector $support)))
+          (finally (propagate-changes!))))
+
+
+(define-action pickup-connector-retaining-pairings
+  ;; The same lift as PICKUP-CONNECTOR, except that every PAIRED fact survives.  A held
+  ;; connector has no HAS-LOCATION, so RELAY-ANCHOR returns nothing for it and
+  ;; COMPUTE-RELAY-LIGHTING skips it: the pairings outlast the carry while the beam does
+  ;; not, and setting the connector down revives whatever those retained pairings can still
+  ;; light.  A connector riding a held tray, or a box on one, keeps its beam instead, since
+  ;; relocation keeps that connector's HAS-LOCATION.
+  1
+  (?agent agent ?connector connector)
+  (and (bind (has-location ?agent $a-location))
+       (bind (has-location ?connector $connector-location))
+       (pickup-clear ?agent $a-location ?connector $connector-location))
+  (">" ?agent "picks up" ?connector "retaining pairings at" $a-location)
+  (assert (holding ?agent ?connector)
+          (not (has-location ?connector $connector-location))
           (if (bind (on ?connector $support))
             (not (on ?connector $support)))
           (finally (propagate-changes!))))

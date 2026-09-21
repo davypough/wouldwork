@@ -120,6 +120,14 @@
             (goal-chain-phase-solution (car (last phases))))
           phases))
       (error "The current search baseline does not match the last accepted checkpoint."))
+    (goal-chain-session-progress-record *goal-chain-session*)))
+
+
+(defun goal-chain-session-progress-record (session)
+  "Build the shared archive data for SESSION, without searching or replaying."
+  (let ((phases (goal-chain-session-phases session)))
+    (unless phases
+      (error "No accepted checkpoints are available to export."))
     (let ((prefix nil)
           (checkpoints nil))
       (loop for phase in phases
@@ -137,10 +145,10 @@
         :policy (goal-chaining-policy-signature)
         :original-goal
           (copy-tree
-            (goal-chain-session-original-goal *goal-chain-session*))
+            (goal-chain-session-original-goal session))
         :origin
           (make-subgoal-progress-state-signature
-            (goal-chain-session-origin-state *goal-chain-session*) nil)
+            (goal-chain-session-origin-state session) nil)
         :checkpoints checkpoints))))
 
 
@@ -202,7 +210,8 @@
         (when cycle-count
           (format stream ";;; Recorder: cycle ~D ~:[closed~;open~]~%"
                   cycle-count recording-open-p))))
-    (format stream ";;; Restore after staging this problem with IMPORT-SUBGOAL-PROGRESS.~%")
+    (format stream ";;; Restore with IMPORT-SUBGOAL-PROGRESS (serial chain), or~%")
+    (format stream ";;; IMPORT-SEARCH-CHECKPOINT (standalone, after staging and setting threads).~%")
     (format stream ";;; This file is readable data. Import replays and validates every action.~2%")
     (with-standard-io-syntax
       (let ((*package* (find-package :ww))

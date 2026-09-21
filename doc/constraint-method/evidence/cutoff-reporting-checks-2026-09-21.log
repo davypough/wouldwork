@@ -1,0 +1,880 @@
+This is SBCL 2.6.8, an implementation of ANSI Common Lisp.
+More information about SBCL is available at <http://www.sbcl.org/>.
+
+SBCL is free software, provided as is, with absolutely no warranty.
+It is mostly in the public domain; some portions are provided under
+BSD-style licenses.  See the CREDITS and COPYING files in the
+distribution for more information.
+To load "bordeaux-threads":
+  Load 1 ASDF system:
+    bordeaux-threads
+; Loading "bordeaux-threads"
+
+To load "usocket":
+  Load 1 ASDF system:
+    usocket
+; Loading "usocket"
+
+To load "cl-json":
+  Load 1 ASDF system:
+    cl-json
+; Loading "cl-json"
+
+To load "flexi-streams":
+  Load 1 ASDF system:
+    flexi-streams
+; Loading "flexi-streams"
+
+To load "wouldwork":
+  Load 1 ASDF system:
+    wouldwork
+; Loading "wouldwork"
+.
+Installing object types...
+Installing dynamic relations...
+Installing CLEARTOP? query-fn...
+Installing PUT action...
+Creating initial propositional database...
+Installing goal....................................................
+...........
+Initializing...
+Optimizing lambda expressions and compiling...
+  PUT...
+  CLEARTOP?...
+  enum relation requires predicates...
+  GOAL-FN...
+
+
+Current parameter settings:
+  *PROBLEM-NAME* => BLOCKS3
+  *PROBLEM-TYPE* => PLANNING
+  *ALGORITHM* => DEPTH-FIRST
+  *TREE-OR-GRAPH* => TREE
+  *SOLUTION-TYPE* => EVERY
+  *DEPTH-CUTOFF* => 3
+  *THREADS* => 0
+  *RANDOMIZE-SEARCH* => NIL
+  *DEBUG* => 0
+  *PROBE* => NIL
+  *GOAL* => (OR (AND (ON C T) (ON B C) (ON A B)) (AND (ON A T) (ON B A) (ON C B)))
+  *SYMMETRY-PRUNING* => NIL
+  *PROGRESS-REPORTING-INTERVAL* => 100,000
+  *BRANCH* TO EXPLORE => ALL
+  HEURISTIC? => NIL
+  EXOGENOUS HAPPENINGS => NIL
+  BOUNDING FUNCTION? => NIL
+  MIN STEPS REMAINING? => NIL
+
+
+Installing object types...
+Installing dynamic relations...
+Creating initial propositional database...
+Installing CUTOFF-FIRST-STEP action...
+Installing CUTOFF-LAST-STEP action...
+Installing goal...
+Initializing...
+Optimizing lambda expressions and compiling...
+  CUTOFF-FIRST-STEP...
+  CUTOFF-LAST-STEP...
+  enum relation requires predicates...
+  GOAL-FN...
+
+
+Current parameter settings:
+  *PROBLEM-NAME* => CUTOFF-REPORTING-TEST
+  *PROBLEM-TYPE* => PLANNING
+  *ALGORITHM* => DEPTH-FIRST
+  *TREE-OR-GRAPH* => GRAPH
+  *SOLUTION-TYPE* => FIRST
+  *DEPTH-CUTOFF* => 1
+  *THREADS* => 0
+  *RANDOMIZE-SEARCH* => NIL
+  *DEBUG* => 0
+  *PROBE* => NIL
+  *GOAL* => (CUTOFF-AT CUTOFF-UNREACHABLE)
+  *SYMMETRY-PRUNING* => NIL
+  *PROGRESS-REPORTING-INTERVAL* => 100,000
+  *BRANCH* TO EXPLORE => ALL
+  HEURISTIC? => NIL
+  EXOGENOUS HAPPENINGS => NIL
+  BOUNDING FUNCTION? => NIL
+  MIN STEPS REMAINING? => NIL
+
+
+
+Current parameter settings:
+  *PROBLEM-NAME* => CUTOFF-REPORTING-TEST
+  *PROBLEM-TYPE* => PLANNING
+  *ALGORITHM* => DEPTH-FIRST
+  *TREE-OR-GRAPH* => GRAPH
+  *SOLUTION-TYPE* => FIRST
+  *DEPTH-CUTOFF* => 1
+  *THREADS* => 0
+  *RANDOMIZE-SEARCH* => NIL
+  *DEBUG* => 0
+  *PROBE* => NIL
+  *GOAL* => (CUTOFF-AT CUTOFF-UNREACHABLE)
+  *SYMMETRY-PRUNING* => NIL
+  *PROGRESS-REPORTING-INTERVAL* => 100,000
+  *BRANCH* TO EXPLORE => ALL
+  HEURISTIC? => NIL
+  EXOGENOUS HAPPENINGS => NIL
+  BOUNDING FUNCTION? => NIL
+  MIN STEPS REMAINING? => NIL
+
+
+working...
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 1
+
+Maximum depth explored = 1
+
+Program cycles = 2
+
+Total states processed = 2
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 50.0 percent
+
+Average branching factor = 0.5
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.000 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  100.00% CPU
+  1,525,913 processor cycles
+  5,048,720 bytes consed
+  
+
+working...
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 2
+
+Maximum depth explored = 2
+
+Program cycles = 3
+
+Total states processed = 3
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 33.3 percent
+
+Average branching factor = 0.7
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.000 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  100.00% CPU
+  1,451,429 processor cycles
+  5,048,720 bytes consed
+  
+
+working...
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 3
+
+Maximum depth explored = 2
+
+Program cycles = 3
+
+Total states processed = 3
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Average dead-end depth = 2
+
+Average branching factor = 0.7
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.000 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  100.00% CPU
+  1,337,015 processor cycles
+  5,048,720 bytes consed
+  
+Installing object types...
+Installing dynamic relations...
+Creating initial propositional database...
+Installing CUTOFF-FIRST-STEP action...
+Installing CUTOFF-LAST-STEP action...
+Installing goal...
+Initializing...
+Optimizing lambda expressions and compiling...
+  CUTOFF-FIRST-STEP...
+  CUTOFF-LAST-STEP...
+  enum relation requires predicates...
+  GOAL-FN...
+
+
+Current parameter settings:
+  *PROBLEM-NAME* => CUTOFF-REPORTING-TEST
+  *PROBLEM-TYPE* => PLANNING
+  *ALGORITHM* => DEPTH-FIRST
+  *TREE-OR-GRAPH* => GRAPH
+  *SOLUTION-TYPE* => FIRST
+  *DEPTH-CUTOFF* => 3
+  *THREADS* => 16
+  *RANDOMIZE-SEARCH* => NIL
+  *DEBUG* => 0
+  *PROBE* => NIL
+  *GOAL* => (CUTOFF-AT CUTOFF-UNREACHABLE)
+  *SYMMETRY-PRUNING* => NIL
+  *PROGRESS-REPORTING-INTERVAL* => 100,000
+  *BRANCH* TO EXPLORE => ALL
+  HEURISTIC? => NIL
+  EXOGENOUS HAPPENINGS => NIL
+  BOUNDING FUNCTION? => NIL
+  MIN STEPS REMAINING? => NIL
+
+  For parallel settings: (display-parallel-parameters)
+
+
+
+Current parameter settings:
+  *PROBLEM-NAME* => CUTOFF-REPORTING-TEST
+  *PROBLEM-TYPE* => PLANNING
+  *ALGORITHM* => DEPTH-FIRST
+  *TREE-OR-GRAPH* => GRAPH
+  *SOLUTION-TYPE* => FIRST
+  *DEPTH-CUTOFF* => 3
+  *THREADS* => 16
+  *RANDOMIZE-SEARCH* => NIL
+  *DEBUG* => 0
+  *PROBE* => NIL
+  *GOAL* => (CUTOFF-AT CUTOFF-UNREACHABLE)
+  *SYMMETRY-PRUNING* => NIL
+  *PROGRESS-REPORTING-INTERVAL* => 100,000
+  *BRANCH* TO EXPLORE => ALL
+  HEURISTIC? => NIL
+  EXOGENOUS HAPPENINGS => NIL
+  BOUNDING FUNCTION? => NIL
+  MIN STEPS REMAINING? => NIL
+
+  For parallel settings: (display-parallel-parameters)
+
+
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 2
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #30(1) #37(1) #0(0) #1(0) #2(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 1
+
+Maximum depth explored = 0
+
+Program cycles = 0
+
+Total states processed = 2
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 50.0 percent
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.002 seconds of real time
+  0.015625 seconds of total run time (0.000000 user, 0.015625 system)
+  800.00% CPU
+  7,266,577 processor cycles
+  12,282,272 bytes consed
+  
+
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          1          1          2          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 3
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #22(1) #30(1) #37(1) #0(0) #1(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 2
+
+Maximum depth explored = 2
+
+Program cycles = 1
+
+Total states processed = 3
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 33.3 percent
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.002 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  6,378,729 processor cycles
+  12,016,064 bytes consed
+  
+
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          1          2          2          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 3
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #22(1) #30(1) #37(1) #0(0) #1(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 3
+
+Maximum depth explored = 2
+
+Program cycles = 2
+
+Total states processed = 3
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Average dead-end depth = 2
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.002 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  6,607,222 processor cycles
+  12,307,472 bytes consed
+  
+
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 2
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #30(1) #37(1) #0(0) #1(0) #2(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 1
+
+Maximum depth explored = 0
+
+Program cycles = 0
+
+Total states processed = 2
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 50.0 percent
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-UNREACHABLE)
+
+No solutions found.
+Evaluation took:
+  0.002 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  6,489,797 processor cycles
+  12,023,824 bytes consed
+  
+Installing goal...
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          0          0          0          0         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 2
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #30(1) #37(1) #0(0) #1(0) #2(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+DEPTH-FIRST search process completed normally.
+
+Depth cutoff = 1
+
+Maximum depth explored = 0
+
+Program cycles = 0
+
+Total states processed = 2
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Depth-cutoff hits = 1, ie, 50.0 percent
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-END)
+
+No solutions found.
+Evaluation took:
+  0.002 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  6,676,943 processor cycles
+  12,273,424 bytes consed
+  
+Installing goal...
+working with 16 thread(s)...
+
+
+
+========================================
+Partitioned Parallel Search
+========================================
+  Threads: 16
+  Mode: GRAPH / FIRST
+  Work donation: ENABLED
+  Closed shards: 64
+----------------------------------------
+
+Generating tasks (split-depth-max=1)...
+Generating tasks: target=256, safety-cap-depth=1
+Generated 1 tasks at depths 0-1
+Loading 1 tasks into queue...
+
+Starting 16 workers...
+[Worker 1] Solution found at depth 2
+All 16 workers completed.
+
+Parallel Search Timing Breakdown:
+  Task generation: 0 ms
+  Worker search:   1 ms
+  Finalization:    0 ms
+  Total:           1 ms
+
+  Search efficiency: 100.0%
+
+Per-Worker Statistics:
+
+  Worker  States     Cycles    Max-Depth  Solutions  Donated
+  ------  ---------  ---------  ---------  ---------  --------
+       0          0          0          0          0         0
+       1          1          1          2          1         0
+       2          0          0          0          0         0
+       3          0          0          0          0         0
+       4          0          0          0          0         0
+       5          0          0          0          0         0
+       6          0          0          0          0         0
+       7          0          0          0          0         0
+       8          0          0          0          0         0
+       9          0          0          0          0         0
+      10          0          0          0          0         0
+      11          0          0          0          0         0
+      12          0          0          0          0         0
+      13          0          0          0          0         0
+      14          0          0          0          0         0
+      15          0          0          0          0         0
+
+
+Closed Shard Distribution (64 shards):
+  Total entries : 2
+  Mean / shard  : 0.0
+  Max / shard   : 1
+  Min / shard   : 0
+  Skew (max/min): INFINITE
+  Top-5 shards  : #30(1) #37(1) #0(0) #1(0) #2(0)
+
+
+
+In problem CUTOFF-REPORTING-TEST, performed GRAPH search for FIRST solution.
+
+Search ended with first solution found.
+
+Depth cutoff = 2
+
+Maximum depth explored = 2
+
+Program cycles = 1
+
+Total states processed = 3
+
+Repeated states pruned = 0, ie, 0.0 percent
+
+Average branching factor = 0.0
+
+Start state:
+((CUTOFF-AT CUTOFF-START))
+
+Goal:
+(CUTOFF-AT CUTOFF-END)
+
+
+
+Total solution paths recorded = 1, of which 1 is/are unique solution paths
+Check *solution-paths* and *unique-solution-states* for solution records.
+
+Number of steps in first solution found: = 2
+
+Duration of first solution found = 2.0
+
+Solution path of first solution found from start state to goal state:
+(0.0 (START-STATE))
+((CUTOFF-AT CUTOFF-START))
+
+(1.0 (CUTOFF-FIRST-STEP))
+((CUTOFF-AT CUTOFF-MIDDLE))
+
+(2.0 (CUTOFF-LAST-STEP))
+((CUTOFF-AT CUTOFF-END))
+
+
+Evaluation took:
+  0.002 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  0.00% CPU
+  7,105,439 processor cycles
+  12,340,816 bytes consed
+  
+CUTOFF-REPORTING-CHECKS PASSED: 55 assertions.
+Cleaning up resources and shutting down threads...
+Cleanup completed.

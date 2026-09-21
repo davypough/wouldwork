@@ -1,0 +1,8 @@
+2026-09-19 preparation; no assistant-run Lisp.
+3eb5a982d8bcb29987be6d04b4c59c3d4b6390462d944f510e7a75285cb88c0b  probs/problem-crelay-topo.lisp
+7c912022e1d58b8724e9e27d6db10398278dfa656e8175da86290ac2067b9ff4  tech/switch.lisp
+69bd3783c623c9f0b5557114ea004812378981a6e1e849ad02e7e3a30ed6e798  tech/-passability.lisp
+53d8c21c324bfdf13d5fe1e30f2c76a7dc12d9f0048f505206ccab692aee40bc  tech/-recorder-plate-shadow.lisp
+bbbb3d4ef9b6184e9b95ea8a8a31cd327a592983b7e10f984d74d0a868d8746f  tech/beam-relay.lisp
+091d29d1821c63f30e55b307835ccc12356520418e1cb109f9eb975a4474a73f  tech/-placement.lisp
+6f0f9cedab9c053570c527201b04e042991cfb8258da0ccd695527f943d7e803  tech/-pickup.lisp

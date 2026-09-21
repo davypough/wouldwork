@@ -1,0 +1,12 @@
+User-reported lk4 find after switch milestone, 2026-09-20.
+Goal (has-location agent1 location15), cutoff 4, threads 0.
+One additional action:
+(MOVE > AGENT1 moves via ((WALK LOCATION14 (GATE6 GATE7 SCREEN1) LOCATION15)))
+Cumulative depth 19. Agent1 at location15, switch2 on, gates6/7 open,
+physical gate5 closed, recording gate5 open. Tray1 at location13 on plate4;
+connector1 at location12 on plate5; box1 at location6. Ghost agent at
+location2 on plate1, ghost tray at location7 on plate2, ghost connector
+at location9, ghost box at location6. One recorder cycle used and still open.
+No independent validation requested, following D's instruction for search finds.
+No wall-clock duration supplied. Prior lk4 cutoff-8 exhaustion remains valid
+for its earlier start state; this find starts after the inserted milestones.

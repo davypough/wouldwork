@@ -1,0 +1,291 @@
+Crelay-Topo Constraint Method -- Abstract Model
+===============================================
+Opened 2026-09-19, after S0, S1 and S2 were written and scored and
+BEFORE S3 exists.  HAND-MAINTAINED, per the artifact list in
+Constraint-Continuation-Prompt.txt.
+
+CURRENT STATUS, 2026-09-20. S0-S4 now exist. This model remains partial:
+its inventory and conditional budgets do not establish a mandatory role
+assignment or a concrete plan. The initial inventory predates S3; section
+5A records later graph findings, qualified below after the G12 audit.
+Constraint-Role-Obligations.txt now holds RO1-RO6 and the proposed next
+analysis. No RO component has been implemented or run.
+
+WHERE THIS FITS
+---------------
+Per-problem analysis.  Method-level task state and the session-start reading
+order live in doc/constraint-method/Constraint-Implementation-Plan.md; this
+problem's reading boundaries, approvals and hashes stay in
+Constraint-Continuation-Prompt.txt.
+
+WHAT THE MODEL IS
+-----------------
+  objects     the support occupants
+  roles       the slots that must be held
+  segments    time cut by recorder cycles
+  operators   the abstract transitions between assignments
+  constraints S1-S7, plus what falls out of their join
+
+A candidate abstract plan is an assignment of bodies to roles per
+segment.  This file has the objects, the role INVENTORY, the segment
+supply function, and one constraint joining them.  It does not have
+the mandatory role set, and it does not have the operators.
+
+
+1  OBJECTS                                             [COMPLETE]
+------------------------------------------------------------------
+Eight support occupants, four live and four ghost, no unpaired member.
+S2, from ON's keying alone (7.11, 7.17):
+
+    agent1      box1      connector1      tray1        live
+    agent1*     box1*     connector1*     tray1*       ghost
+
+Thirteen supports, of which four -- box1, box1*, tray1, tray1* -- are
+themselves occupants, which is what makes a stack.
+
+Grade 2 for the bound that rides on this, grade 1 for the census.
+
+
+2  ROLES, BY BODY COST                                 [COMPLETE --
+                                                        ROLE NECESSITY
+                                                        STILL CONDITIONAL]
+------------------------------------------------------------------
+From S1's control table, which is a claim about DEVICE STATE and not
+merely about the control aggregate, on the stated premise that jammer
+is empty (7.7).  The ten control entries split three ways by what they
+cost in bodies, and that split needs no geometry.
+
+2.1  ZERO-COST DEVICES (4).  A switch holds its own state; no body is
+     consumed to keep the device in its state.
+
+       gate2     == (not switch1)
+       gate5     == (not switch2)
+       gate7     == switch2
+       blower1   == switch1
+
+     S1 supplies two exclusion pairs; these are not their only
+     operational constraints:
+
+       {gate5, gate7}    on ((switch2))
+       {blower1, gate2}  on ((switch1))
+
+     Both are grade 1.  The second was carried only narratively before
+     S1 computed it (7.1).
+
+2.2  BODY-COST DEVICES (5 gates, 8 plates, disjoint).
+
+       gate1  <- plate1                     cost 1
+       gate3  <- plate2                     cost 1
+       gate4  <- plate3                     cost 1
+       gate6  <- plate4 AND plate5          cost 2
+       gate9  <- plate6 AND plate7 AND plate8   cost 3
+                                            ---------
+                                            total 8
+
+     THE COST IS CONTINUOUS, NOT ONE-SHOT.  plate.lisp's
+     UPDATE-PLATE-STATUS! asserts (depressed ?p) under
+     (support-occupied ?p) and denies it otherwise, on every
+     propagation. Removing the last eligible witness from any required
+     plate closes its listed gate in the same transition. Grade 1:
+     it is the axiom defining the derived
+     relation, not an induction.
+
+     DISTINCT PLATES NEED DISTINCT WITNESSES; A PLATE MAY HOLD BOTH LAYERS.
+     SUPPORT-OCCUPIED is an existential over occupants with
+     (on ?occupant ?support), and ON is keyed by the occupant, so the
+     map from an occupied support to a witness occupant is injective
+     (S2, W7).  Grade 2.
+
+     LAYER-BLIND.  SUPPORT-OCCUPIED applies no layer test, and S2
+     attributes DEPRESSED eight witnesses on that ground (7.13).  A
+     ghost depresses a plate exactly as a live body does.  This is the
+     correction G6 was opened for and it is load-bearing here: the
+     budget in section 5 is eight and not four.
+
+2.3  BEAM DEVICE (1 gate).
+
+       gate8  <- receiver1                  cost NOT YET A NUMBER
+
+     gate8 is the only device S1 places at depth 2, and S1 says plainly
+     that the identity of the supplying device is not decidable from
+     the control algebra.  receiver1 is energized by ACTIVE, which
+     UPDATE-RECEIVER-STATUS! asserts through the beam queries; those
+     read ON and HAS-LOCATION, both layer-blind through BASE (7.15).
+
+     If a connector relay is needed and cannot simultaneously serve a
+     required plate role, it draws from the same occupant pool. Neither
+     relay necessity nor role incompatibility follows from the count.
+     Beam geometry and any riser requirement remain for S5/S6.
+     RECORDED AS A CONDITIONAL COST, not as a number, because naming
+     one now would be an invention.  See section 7.
+
+
+3  SEGMENTS                                            [SUPPLY
+                                                        FUNCTION
+                                                        COMPLETE;
+                                                        NO EXTRACTOR
+                                                        OWNS IT -- G8]
+------------------------------------------------------------------
+Body supply is a step function of the segment, not a constant.
+-recorder-cycle-boundary.lisp's REMOVE-RECORDER-GHOST-STATE! removes
+every dynamic proposition referring to a mapped ghost at a cycle
+boundary, and RECORDER-CLOSED-GHOST-FREE is asserted over the result.
+At start, S2's reading of *START-STATE* shows HAS-LOCATION assigning
+four of eight keys; the four unassigned are the ghosts, which do not
+exist until a fork makes them (W13).
+
+    outside an open recorder cycle        4 bodies  (live only)
+    inside an open recorder cycle         8 bodies  (4 live + 4 ghost)
+
+The fork initializes ghost assignments; ghosts can subsequently act during
+an open cycle. They are not frozen bodies. Presence counts above are
+upper pools, not counts of available keepers. Availability must account
+for holdings, support roles, view restrictions and lifecycle conditions.
+NO EXTRACTOR IN SECTION 3 EMITS THIS.  S1-S7 contain nothing that reads
+the recorder's cycle structure, so the segment axis of this model rests
+on a hand reading of two tech files.  Filed as G8 in
+Constraint-Schema-Gaps.txt with the question that should have been
+asked.  The numbers above are therefore HAND-DERIVED and carry the
+staleness risk M2 exists to prevent.
+
+
+4  OPERATORS                                           [NOT WRITTEN --
+                                                        BLOCKED, AND
+                                                        THE BLOCK IS A
+                                                        DECISION, NOT
+                                                        A GAP]
+------------------------------------------------------------------
+The continuation prompt specifies the abstract operators as the
+backward analysis's T-lemmas -- fork-and-free, keeper loan, ferry,
+raise.  Those are stated in Backward-Rules-Facts.txt, which C1 seals
+against a session writing an extractor.
+
+Two consequences follow, and neither is this file's to accept:
+
+  1  a session that opens that file to write this section is spent for
+     extractor work thereafter, and
+  2  the model's operator vocabulary would then be imported from the
+     derivation the model is meant to check independently.  The
+     interface rule expects a CONTRADICTED score to be reported back to
+     the backward analysis as a suspected bad lemma; a model whose
+     operators ARE the lemmas cannot perform that check.
+
+Left empty deliberately.  D's call, recorded in the prompt when taken.
+
+
+5  THE BUDGET, AND THE FIRST CONSTRAINT                [COMPLETE,
+                                                        REGION-FREE]
+------------------------------------------------------------------
+AM1  THE BUDGET IS EXACTLY TIGHT.  The five body-cost gates consume
+     1 + 1 + 1 + 2 + 3 = 8 plate keepers over disjoint plate sets, and
+     the occupant pool is 8.  Opening all five simultaneously requires
+     every body in the problem to be standing on a plate.
+     Grade 2 (S2's injectivity) joined with grade 1 (S1's table).
+
+AM2  THE AGENT SPENDS ITSELF.  agent1 is one of the eight.  The goal is
+     (has-location agent1 location19).  PHYSICAL-SUPPORTS-AT
+     (-support-motion.lisp) admits a plate as a support at a location
+     only through (has-position ?plate ?location), and no plate is
+     positioned at location19 -- the eight plates sit at locations 2,
+     7, 10, 13, 12, 16, 17 and 18.  So in the goal state agent1 rests
+     on ground, or on a box or tray, but not on a plate.
+
+AM3  THEREFORE, IN THE GOAL STATE:
+
+       reached inside an open cycle   budget 7  ->  at least ONE of
+                                                    {gate1, gate3,
+                                                     gate4, gate6,
+                                                     gate9} is closed
+       reached outside a cycle        budget 3  ->  at least TWO of
+                                                    those five are
+                                                    closed
+
+     The second reading is the sharper one and is arithmetic on the
+     cost vector (1,1,1,2,3): three bodies buy at most {gate1, gate3,
+     gate4} or {gate9}, never more than three of the five.
+
+AM4  CONDITIONAL COMPETITION WITH THE BEAM. If a required relay must
+     use a connector off every simultaneously required plate, the plate
+     budget drops by one. An additional incompatible riser role may
+     consume another. Gate8 being open alone does not establish either
+     premise. CONDITIONAL, pending S5/S6 and role compatibility analysis.
+WHAT AM1-AM4 DO NOT SAY.  Nothing here claims any of the five gates
+must be open at the goal.  The constraint is of the form "not all of
+them", which refutes assignments; it forces nothing.  That is the
+logical asymmetry the method is built on, working exactly as stated:
+constraints prove impossibility, and this one proves the impossibility
+of the fully-open assignment without searching a single action.
+
+
+5A  GRAPH CANDIDATES, NOT A COMPLETE MANDATORY SET
+--------------------------------------------------
+S3's scored spine, checked by S4 against full-quotient reachability:
+    R1 -{gate1}- R8 -{gate3}- R2 -{gate5}- R3 -{gate7}- R5
+       -{gate8}- R6 -{gate9}- R7
+    R3 -{gate6, screen1}- R4
+    R8 -{gate2}- R9                     (jumping)
+    R3 --{ladder3}--> R2 --{ladder2}--> R8 --{ladder1}--> R1
+                                        (climbing, directed westward)
+
+AM5  The six graph-required device candidates are gate1, gate3, gate5,
+     gate7, gate8 and gate9. Their positive pressure requirements include
+     plate1, plate2 and plate6/7/8. These are conditional requirements
+     during the respective activations, not a simultaneous five-body
+     assignment or an unconditional concrete-plan obligation. S4 prints
+     the missing movement-coverage premise explicitly.
+
+AM6  S1 excludes simultaneous opening of gate5 and gate7. Consequently
+     the reported graph route cannot be traversed under one fixed setting
+     of switch2. A concrete-plan ordering additionally requires proof
+     that all relevant concrete movement is covered by that route model.
+     Do not promote the graph implication to an unqualified grade-4 theorem.
+
+AM7  Ladder arcs allow empty-handed return in the relaxed graph. Their
+     mode predicates and other action conditions still apply: the return
+     is not cost-free, and these arcs do not carry held cargo. This says
+     nothing by itself about cargo moved through placement or support effects.
+
+AM8  Gate4 labels no traversal arc. Its pressure requirement exists,
+     but necessity for a particular beam and therefore for the goal is
+     unresolved until sightline semantics establish it. G9 is TAG ONLY;
+     do not open it to obtain this information.
+
+AM9  Role inventory cannot be summed into a simultaneous demand without
+     a segment and overlap proof. Beam and switch-access roles remain
+     conditional, and named bodies require an eligibility/assignment proof.
+
+
+6  NEXT ANALYSIS AND REMAINING PROOF OBLIGATIONS
+------------------------------------------------
+S4 is implemented and first-scored PARTIAL (register 7.24), not pending.
+It reports directional candidates and conditional supply, not stranding.
+For crossing R6 -> R7, the gate9 plates lie on the approach side R6;
+the previous text calling this the far side was incorrect.
+
+The approved G12 audit is complete and G12 remains OPEN. See
+Constraint-Role-Obligations.txt, RO1-RO6 and its implementation contract:
+  - three pressure witnesses do not automatically force named live cargo;
+  - under explicit no-ghost/agent-off-plates premises, gate9 does force
+    all three live cargo witnesses, without fixing their plate permutation;
+  - location7 has no remote pickup location within horizontal reach;
+  - last physical pressure loss closes gate3, but replacement and later
+    transport/lifecycle alternatives remain to be excluded.
+These are hand-derived premises, not a new extractor score.
+
+S5: elevation and possible riser requirements.
+S6: sightline necessities, including whether a beam role can share a plate.
+S7: ordering under its stated relaxation; it cannot silently supply every
+    simultaneous role requirement or segment premise.
+RO: proposed conditional allocation analysis, specified but not implemented.
+Operators: still unresolved as described in section 4; no backward lemmas
+have been imported to resolve that decision.
+
+
+7  WHAT IS DELIBERATELY NOT CLAIMED
+------------------------------------
+No complete mandatory role set, permanent-stranding proof, operator list,
+forced skeleton or action plan. No claim that the full eight-body pool is
+simultaneously available for keeping plates. No reachability claim follows
+from a feasible allocation. First-run S4 scores and all sealed predictions
+remain unchanged. Next-session authorization is recorded in the continuation
+prompt and Constraint-Role-Obligations.txt section 5.

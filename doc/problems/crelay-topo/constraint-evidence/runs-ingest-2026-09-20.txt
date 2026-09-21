@@ -1,0 +1,257 @@
+Crelay-topo -- measured runs through the third crossing.  2026-09-20, T10.
+==========================================================================
+
+REPRODUCTION, from nothing, in this order, from the repository root:
+  build-realization-ledger-2026-09-20.lisp
+  ingest-lk1-2026-09-20.lisp
+  ingest-runs-2026-09-20.lisp
+None of the three stages a problem, loads wouldwork, or runs a search.
+
+WHAT D RAN ON LUMPY, in order, and what came back:
+  1  first crossing, chained milestone, depth 8, serial: FOUND at depth 4, by recorder
+     fork -- a ghost holds the required support while the live agent crosses.
+  2  validation of its raw phase path from the chain origin: SUCCESS-P T, 4 actions,
+     goal checked and satisfied.  CLOSED.
+  3  second crossing: FOUND, one action.
+  4  validation from ITS OWN phase source state: SUCCESS-P T, 1 action.  CLOSED.
+  5  third crossing: FOUND, one action.  REALIZED, not yet validated.
+
+LEDGER STATE: two links CLOSED, one REALIZED, three OPEN, fourteen premises.
+
+THREE THINGS THE RUNS SHOWED THAT THE LEDGER DID NOT ALREADY SAY.
+
+  A  THE REPLAYABLE PATH IS SHORTER THAN THE TRANSCRIPT.  Four actions against a
+     seven-line display.  The pause, the ghost's return walk, the recorder stop and the
+     resume are display structure; the closure is synthesized.  A session reading the
+     transcript as the action sequence would build a wrong composition.  Filed as pr13.
+
+  B  TWO OF THE SIX DEVICES WERE ALREADY OPEN IN THE INITIAL STATE, one from an occupant
+     the instance places on its support at the start and one from the initial setting of
+     the switch pair.  That is why crossings two and three cost one walk each.  THIS IS
+     GRADE 1 AND WAS DERIVABLE FROM THE PROFILE BEFORE ANY SEARCH RAN.  The ledger did
+     not carry it; two measured runs are what made it visible.  Filed as pr14 with the
+     omission stated in its premise gap rather than glossed.  A cheap crossing is not
+     evidence that the method found something -- it is evidence that the decomposition
+     was built without a fact the analysis already had in hand.
+
+  C  A GOAL CHAIN IS SESSION STATE AND DOES NOT SURVIVE A REPL RESTART.  D's image
+     restarted after the third crossing, taking the chain with it.  The per-link
+     recommendation prints only the next line, which is right inside a live session and
+     useless after a restart.  REPORT-CHAIN-REPLAY now prints the whole ordered sequence
+     from a cold image, marking what is already settled.  Re-running a settled milestone
+     re-establishes the chain; it does not re-file the outcome, which is already on
+     record.  Acceptance case 50 added; suite now 50 cases, 330 assertions.
+
+WHERE THE INGEST RAN: an isolated cloud sandbox with a stock SBCL, reading and rewriting
+the ledger only.  COMPILE-FILE clean.  Every search ran on lumpy, the only place a search
+for this method has ever run.
+
+--------------------------------------------------------------------------
+
+
+
+LEDGER  REALIZATION LEDGER  [interactive-phase state for crelay-topo]
+-------------------------------------------------------------
+  SCOPE: a record of what is claimed and what it rests on.  It derives nothing.
+  STANDING is computed from the dependency closure and never stored.  A record
+  printed CONDITIONAL rests on at least one live guess or one cost bound.
+  NOTE: RO prints "status CONDITIONAL" for what this reporter calls STANDING.
+  This file's :STATUS is the stored lifecycle, which RO has no analogue for.
+
+  OPEN LINKS (4)
+    lk3  cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair
+      from: the agent somewhere in R2
+      to:   the agent somewhere in R3
+      standing conditional; status realized
+      blocking premises (0):
+      premise gaps (1): the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk4  cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5
+      from: the agent somewhere in R3
+      to:   the agent somewhere in R5
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): the order in which the switch is thrown, since the two crossings need opposite polarities and no extractor supplies an ordering
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk5  cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier
+      from: the agent somewhere in R5
+      to:   the agent somewhere in R6
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether a relay is required at all, and whether a relay role can share a support with a pressure role
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+    lk6  cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone
+      from: the agent somewhere in R6
+      to:   the agent somewhere in R7
+      standing established; status open
+      blocking premises (0):
+      premise gaps (1): whether three witnesses can be present on the approach side simultaneously, which the budget makes tight and RO reports as conditional
+      would close: an action sequence found and validated under
+        VALIDATE-ACTION-SEQUENCE, or a grade-1 or grade-2 derivation named
+        in :CLOSED-BY.  No cost bound can close or refute it.
+
+  SETTLED LINKS (2)
+    lk1  standing established; status closed  the agent crosses from R1 to R8 through the device labelling that spine arc
+    lk2  standing established; status closed  the agent crosses from R8 to R2 through the device labelling that spine arc
+
+  PREMISES IN FORCE (14)
+    pr1  standing established; status in-force  the problem's goal places the agent at the sole endpoint of the last region of the spine
+    pr2  standing established; status in-force  the agent's initial location lies in the first region of the spine
+    pr3  standing established; status in-force  the region quotient relaxes all other doors, elevation and cargo conditions, so a route through it is a candidate and not a plan
+    pr4  standing established; status in-force  the adjacency spine joins the first region to the last only through five intermediate regions, crossing six controlled devices in one fixed order
+    pr5  standing established; status in-force  two of the six devices are controlled by opposite polarities of one switch and are therefore never open together
+    pr6  standing established; status in-force  ON is keyed by the occupant, so the map from an occupied support to its witness is injective
+    pr7  standing established; status in-force  support occupancy is layer-blind, so distinct required supports need distinct witnesses and a ghost counts as one
+    pr8  standing established; status in-force  two of the six devices each require one depressed support, at endpoints the quotient places in the region the crossing starts from
+    pr9  standing established; status in-force  the last device requires three distinct depressed supports, all at endpoints the quotient places on the APPROACH side of its crossing
+    pr10  standing established; status in-force  one of the six devices sits at control depth 2 behind a receiver, and the identity of the device supplying it is not decidable from the control algebra
+    pr11  standing established; status in-force  at the checkpoint this realization reaches, a recorder cycle is OPEN, all four ghost occupants have locations, and two further devices on the spine are already open without any action having been spent on them
+    pr12  standing established; status in-force  a support can be held by a GHOST of the agent produced by a recorder fork while the live agent crosses, so holding a support does not have to spend a live occupant
+    pr13  standing established; status in-force  the replayable path of a recorder-bearing realization is shorter than its printed transcript: the pause, the ghost's return walk, the recorder stop and the resume are display structure and are not replayed actions
+    pr14  standing established; status in-force  two of the six devices on the spine are already open in the initial state, one from an occupant the instance places on its support at the start and one from the initial setting of the switch pair, so those two crossings demand no witness of their own
+
+  PREMISES DISCHARGED (0)
+
+  COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)  (0)
+
+  OPEN QUESTIONS (9)
+    qn1  standing established; status open  Does the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state occur in every solution, or only in some?
+    qn2  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, do any ghost occupants exist?
+    qn3  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, does the agent occupy any of the required supports (plate1)?
+    qn4  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, can a witness removed from a required support be replaced by another before the aggregate is read?
+    qn5  standing established; status open  Can a recorder cycle boundary occur within the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state?
+    qn6  standing established; status open  For the required supports (plate1), can every available witness reach every one of them?
+    qn7  standing established; status open  For the required supports (plate1), does elevation admit every witness-to-support pairing?
+    qn8  standing established; status open  For the required supports (plate1), does occupancy history admit every witness-to-support pairing?
+    qn9  standing established; status open  In the segment described as the physical view, outside any recorder cycle, crossing the first spine arc from the staged start state, which of the present occupants (agent1 agent1* box1 box1* connector1 connector1* tray1 tray1*) are actually available as witnesses?
+
+  ANSWERED QUESTIONS (0)
+
+  RETRACTED OR REFUTED PREMISES (0)
+
+  INVALIDATED LINKS (0)
+
+  no obligation, no necessity and no plan witness is derived by this component.
+
+
+RECOMMENDED SEARCHES  [for crelay-topo]
+--------------------------------------------------------------
+  SCOPE: what to run and what each outcome would establish.  It runs nothing.
+  Every reading below was written BEFORE its run, which is what stops an
+  exhaustion from being reinterpreted once its outcome is known.
+
+  OPEN LINKS (4)
+    lk3  cross R2 -> R3: zero body cost; gate5 is one polarity of the switch pair
+      standing conditional; rests on pr4, pr3, pr5
+      run, in order:
+        (solve-subgoal (or (has-location agent1 location11) (has-location agent1 location12) (has-location agent1 location13)))
+      cautions:
+        this milestone CONTINUES an open goal chain; enter it in the session that opened it.
+        do NOT re-stage: staging discards the chain, and every earlier milestone would have to be re-run.
+        crossing the serial/parallel boundary with (ww-set *threads* ...) discards it too.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk3 from the stated start within 8 actions.  It makes lk3 :REALIZED.  It CLOSES lk3 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk3 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk3 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      on a find, the action sequence is here:
+        this is a MID-CHAIN milestone, so *solution-paths* is NIL by design.
+          (defparameter *phase* (car (last (goal-chain-session-phases *goal-chain-session*))))
+          (defparameter *path* (solution.path (goal-chain-phase-solution *phase*)))
+          (validate-action-sequence (goal-chain-phase-source-state *phase*) *path*
+                                    :goal-test (symbol-function 'goal-fn) :verbose t)
+        validate from the PHASE'S OWN source state, not from the chain's origin: only the
+        first phase starts at the origin, and every later one starts where its predecessor
+        ended.  Validating does not modify the state it is given, so the chain survives it.
+          (format t "~S~%" *path*)   prints the raw action forms, for the record.
+    lk4  cross R3 -> R5: zero body cost; gate7 is the OTHER polarity of the same switch pair as gate5
+      standing established; rests on pr4, pr3, pr5
+      run, in order:
+        (solve-subgoal (has-location agent1 location15))
+      cautions:
+        this milestone CONTINUES an open goal chain; enter it in the session that opened it.
+        do NOT re-stage: staging discards the chain, and every earlier milestone would have to be re-run.
+        crossing the serial/parallel boundary with (ww-set *threads* ...) discards it too.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk4 from the stated start within 8 actions.  It makes lk4 :REALIZED.  It CLOSES lk4 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk4 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk4 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      on a find, the action sequence is here:
+        this is a MID-CHAIN milestone, so *solution-paths* is NIL by design.
+          (defparameter *phase* (car (last (goal-chain-session-phases *goal-chain-session*))))
+          (defparameter *path* (solution.path (goal-chain-phase-solution *phase*)))
+          (validate-action-sequence (goal-chain-phase-source-state *phase*) *path*
+                                    :goal-test (symbol-function 'goal-fn) :verbose t)
+        validate from the PHASE'S OWN source state, not from the chain's origin: only the
+        first phase starts at the origin, and every later one starts where its predecessor
+        ended.  Validating does not modify the state it is given, so the chain survives it.
+          (format t "~S~%" *path*)   prints the raw action forms, for the record.
+    lk5  cross R5 -> R6: the beam crossing; S1 places gate8 at depth 2 and does not decide its supplier
+      standing established; rests on pr4, pr3, pr10
+      run, in order:
+        (solve-subgoal (or (has-location agent1 location16) (has-location agent1 location17) (has-location agent1 location18) (has-location agent1 location21)))
+      cautions:
+        this milestone CONTINUES an open goal chain; enter it in the session that opened it.
+        do NOT re-stage: staging discards the chain, and every earlier milestone would have to be re-run.
+        crossing the serial/parallel boundary with (ww-set *threads* ...) discards it too.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk5 from the stated start within 8 actions.  It makes lk5 :REALIZED.  It CLOSES lk5 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk5 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk5 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      on a find, the action sequence is here:
+        this is a MID-CHAIN milestone, so *solution-paths* is NIL by design.
+          (defparameter *phase* (car (last (goal-chain-session-phases *goal-chain-session*))))
+          (defparameter *path* (solution.path (goal-chain-phase-solution *phase*)))
+          (validate-action-sequence (goal-chain-phase-source-state *phase*) *path*
+                                    :goal-test (symbol-function 'goal-fn) :verbose t)
+        validate from the PHASE'S OWN source state, not from the chain's origin: only the
+        first phase starts at the origin, and every later one starts where its predecessor
+        ended.  Validating does not modify the state it is given, so the chain survives it.
+          (format t "~S~%" *path*)   prints the raw action forms, for the record.
+    lk6  cross R6 -> R7: the last crossing, and its goal is the problem's own goal, so (solve) may finish the chain in place of this milestone
+      standing established; rests on pr1, pr4, pr3, pr9, pr7, pr6
+      run, in order:
+        (solve-subgoal (has-location agent1 location19))
+      cautions:
+        this milestone CONTINUES an open goal chain; enter it in the session that opened it.
+        do NOT re-stage: staging discards the chain, and every earlier milestone would have to be re-run.
+        crossing the serial/parallel boundary with (ww-set *threads* ...) discards it too.
+        the one-argument form is goal chaining, which the engine runs at *threads* 0 only.
+      committed 2026-09-20, before the run:
+        success:    a found action sequence realizes lk6 from the stated start within 8 actions.  It makes lk6 :REALIZED.  It CLOSES lk6 only once VALIDATE-ACTION-SEQUENCE accepts the composition, and the closure then still stands on 0 live premise(s).  It establishes nothing about any other link.
+        exhaustion: an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at cutoff 8.  It establishes that no realization of lk6 exists within 8 actions from that state, and nothing further: not that none exists deeper, not that lk6 is impossible, and not a refutation of any premise.  It is filed as a :BOUND record, which cannot close or refute a link.
+      on a find, the action sequence is here:
+        this is the FINAL milestone: finish with (solve), which composes the chain.
+        the engine then puts ONE cumulative path in *solution-paths* and restores
+        *start-state* to the chain's origin, so the composition check is one call:
+          (validate-action-sequence *start-state* (solution.path (first *solution-paths*))
+                                    :goal-test (symbol-function 'goal-fn) :verbose t)
+
+  a recommendation is not an approval to run it.
+
+
+CHAIN REPLAY  [for crelay-topo]
+--------------------------------------------------------------
+  A goal chain is SESSION STATE and does not survive a REPL restart.  To resume
+  from a cold image, enter these in order.  The settled milestones are re-run,
+  not re-derived: their outcomes are already filed and are not filed again.
+
+        (progn (ql:quickload :wouldwork) (in-package :ww))
+        (stage crelay-topo)
+        (ww-set *threads* 0)
+        (ww-set *depth-cutoff* 8)
+        (solve-subgoal (or (has-location agent1 location20) (has-location agent1 location3) (has-location agent1 location4) (has-location agent1 location5) (has-location agent1 location7)))   ; closed
+        (solve-subgoal (or (has-location agent1 location10) (has-location agent1 location8) (has-location agent1 location9)))   ; closed
+        (solve-subgoal (or (has-location agent1 location11) (has-location agent1 location12) (has-location agent1 location13)))   ; realized
+        (solve-subgoal (has-location agent1 location15))
+        (solve-subgoal (or (has-location agent1 location16) (has-location agent1 location17) (has-location agent1 location18) (has-location agent1 location21)))
+        (solve-subgoal (has-location agent1 location19))
+
+  3 of 6 milestones are already settled; the rest are the work.
+  A milestone whose cutoff was raised must be re-run at the raised cutoff, which
+  its own recommendation states; this block prints the chain's opening cutoff.

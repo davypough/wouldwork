@@ -37,10 +37,16 @@
       '(">" ?agent "toggles" ?switch)
       (if recording-switch-state-p
         '(assert
+           ;; A ghost's toggle is physical, like its weight on a plate: it flips its own
+           ;; recording memory and the live switch both.  A live toggle stays live-side
+           ;; only, so a recorded ghost route keeps the gate states it was recorded under.
            (if (recording-shadow-object ?agent)
-             (if (recording-switched-on ?switch)
-               (not (recording-switched-on ?switch))
-               (recording-switched-on ?switch))
+             (do (if (recording-switched-on ?switch)
+                   (not (recording-switched-on ?switch))
+                   (recording-switched-on ?switch))
+                 (if (switched-on ?switch)
+                   (not (switched-on ?switch))
+                   (switched-on ?switch)))
              (if (switched-on ?switch)
                (not (switched-on ?switch))
                (switched-on ?switch)))

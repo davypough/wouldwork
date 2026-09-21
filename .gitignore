@@ -9,3 +9,4 @@ artifacts/
 .codex-fasl/
 _to_delete/
 tmp/
+.aider*

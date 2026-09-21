@@ -231,6 +231,12 @@
           (when (and (> *depth-cutoff* 0)
                      (>= current-depth *depth-cutoff*))
             (ws-inc-depth-cutoff-hits stats)
+            ;; Match serial DF-BNB1: hitting a terminal node at the cutoff is
+            ;; not truncation. Probe until this worker has one positive witness;
+            ;; never enqueue these beyond-budget successors or register goals.
+            (unless (ws-depth-cutoff-truncated stats)
+              (when (expand current-node)
+                (setf (ws-depth-cutoff-truncated stats) t)))
             (return-from :next-iteration nil))
 
           ;; Bounding function check (user-defined)

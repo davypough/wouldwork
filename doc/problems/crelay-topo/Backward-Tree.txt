@@ -1,0 +1,815 @@
+Crelay-Topo Backward Analysis -- Tree
+=====================================
+
+Started 2026-09-17.  Companion files: Backward-Justification.txt (why each
+node holds), Backward-Rules-Facts.txt (heuristic, rules, facts, lemmas,
+nogoods, symmetries cited by label).  Supersedes the narrative draft in
+Working-Backwards-from-Goal.txt.
+
+Node format
+-----------
+  <label>  [<kind>] <alias>  <status>  f=<n>  <cites>
+      <content, one condition or clause per line>
+
+Kinds
+  S   state node: open conditions still to be achieved (unordered set)
+  A   action node: the action (schema) that achieves a chosen condition
+  P   parameter node: binding or grouping of an action's arguments
+
+Status
+  A   active: on the path currently being expanded
+  O   open: not yet expanded
+  X   excluded at creation by a cheap local test (cite R/F/T/G/Y)
+  R   refuted after expansion (cite the refuting child or nogood)
+  D   done: conditions hold in the initial state or a validated checkpoint
+
+Variables
+  ?agent-loc    agent1's location, in the plate room {L16 L17 L18} unless said
+  ?from-loc     the location a walk starts from
+  ?cargo        a holdable object (wouldwork type CARGO)
+  ?cargo-loc    that object's location
+  ?plate        the plate whose occupancy is being achieved
+  ?other-plate  one of the remaining plates
+  ?occ6 ?occ7 ?occ8   the occupants of plate6, plate7, plate8
+
+Conventions
+  - Labels are permanent; new siblings take the next free number.
+  - Each S node also gets a short alias Nn, numbered in creation order.
+  - Each non-X node carries f = depth + h (heuristic H1 in
+    Backward-Rules-Facts.txt).  The next node expanded is the open node
+    with the smallest f; ties go to fewer ghost-dependent conditions, then
+    fewer gate conditions, then greater role consolidation (H2).  The
+    validated solution is used only as a sanity check, never to choose.
+    Nothing is pruned on f, since any solution is acceptable, and a
+    landmark shown wrong by later analysis is corrected in H1.
+    Since the max(h) pass of 2026-09-17 (H4), h >= 18 for every node
+    (gate8 measured at 18 or more) and h >= 19 for every node placing
+    agent1 inside the plate region (the crossing walk is one more).
+    Since 2026-09-18 K15's +8 is in the base (every solution needs a
+    ghost outside the west strip, T21) and K17's +1 (plate3 occupied
+    for gate4) is charged everywhere, and a node's f no longer says
+    whether it needs a ghost -- every node does.
+    Since 2026-09-18 (later) K14's live +2 is in the base as well: no
+    ghost ever reaches L14 (T23), so agent1 throws switch2 and walks
+    back.  Base h is 29.  The same lemma refuted every node that put
+    agent1* at L14, L15, L21 or in the plate room, and T24 (the census
+    with ghost keepers counted) refuted the L14 states; those nodes
+    carry R with a REFUTED line.  Test 13 (2026-09-18) then raised K10
+    to +4: the tray subtree under 1.1.1.1.1.1.2.1.1.3 rose by 2.
+    Ghost occupants of gate9 plates are
+    still possible, but only as copies inherited at a fork (F18, T18):
+    the live original must be on the plate when START-RECORDER runs.
+  - A node whose children are all X or R becomes R.
+  - Open conditions within an S node are unordered; a child fixes an order
+    only when ordering matters (resource release, gate closure).
+  - An S node's open conditions are kept complete: jointly sufficient for
+    the remaining actions below it to succeed (required by lemma T4).
+  - Equivalent cases are grouped into one P node until a later constraint
+    distinguishes them (see symmetries in Backward-Rules-Facts.txt).
+    When an action's parameters need no split, their domains ride on the
+    A node and its S child follows directly, without a P node.
+  - Every new child is tested immediately against the node's constraints,
+    lemmas (T), nogoods (G), and the ghost-playability check (P1);
+    failures are marked X on creation.
+
+Tree
+----
+
+1  [S] N1  A  f=29
+      (has-location agent1 location19)
+
+1.1  [A]  A  f=30  R1 R2 T1
+      (MOVE AGENT1 ((WALK ?agent-loc ?clause LOCATION19)))
+
+1.1.1  [P]  A  f=30  F1 Y1
+      ?agent-loc in {L16 L17 L18 L21}, ?clause (GATE9)
+
+1.1.1.1  [S] N2  A  f=30  T2
+      agent1 grounded at ?agent-loc
+      (on ?occ6 plate6), (on ?occ7 plate7), (on ?occ8 plate8)
+      ?occ6 ?occ7 ?occ8 distinct, from
+        {box1 box1* connector1 connector1* tray1 tray1*}
+      agent1* struck 2026-09-18 (T23); a ghost object here is a copy
+        inherited at a fork with its live original on the plate (T18)
+
+1.1.1.1.1  [A]  A  f=31  R11 F10
+      agent1 places live ?cargo on ?plate: PUT-BOX, PUT-CONNECTOR,
+      PUT-TRAY, or CONNECT-CONNECTOR
+      ?cargo in {box1 connector1 tray1}, ?plate in {plate6 plate7 plate8},
+      ?agent-loc in {L16 L17 L18}
+
+1.1.1.1.1.1  [S] N3  A  f=31  T2 T4
+      agent1 grounded at ?agent-loc
+      (holding agent1 ?cargo)
+      ?plate unoccupied
+      the other two plates occupied by distinct objects not in
+        {agent1 ?cargo}
+
+1.1.1.1.1.1.1  [A]  A  f=31  F12 T3 R4 R9
+      agent1 walks into ?agent-loc holding ?cargo from ?from-loc outside
+      the plate room
+
+1.1.1.1.1.1.1.1  [P]  O  f=32  F12
+      ?from-loc = L21, no gates
+
+1.1.1.1.1.1.1.1.1  [S] N4  O  f=32  T4
+      agent1 grounded at L21
+      (holding agent1 ?cargo)
+      ?plate unoccupied
+      the other two plates occupied as in N3
+
+1.1.1.1.1.1.1.1.1.1  [A]  O  f=33  R7 F10 F11 K9 K12
+      agent1 picks up ?cargo at L21 itself: no reach edge involves L21
+      (F10), so ?cargo lies at L21, and lying there off a plate it pays
+      K12's +2
+
+1.1.1.1.1.1.1.1.1.2  [A]  O  f=35  R3 K12 T16
+      agent1 dismounts to the ground at L21 from box1, the only live
+      support that can stand there; box1 at rest off a plate pays K12,
+      and the mount serves nothing (T16)
+
+1.1.1.1.1.1.1.1.1.3  [A]  R  T23  R11 R3 K5 K15
+      REFUTED 2026-09-18: agent1* at L21: no ghost ever passes gate7
+      agent1* places ghost cargo on one of the other two plates, or
+      mounts one; agent1 cannot, no reach edge joining L21 to the plates
+
+1.1.1.1.1.1.1.1.1.4  [A]  R  T23  R3 R5 K15 K12
+      REFUTED 2026-09-18: tray1* held by agent1* at L21: no ghost ever passes gate7
+      agent1 dismounts at L21 from tray1* held by agent1*
+
+1.1.1.1.1.1.1.1.1.5  [A]  R  T23  R12 R5 K15
+      REFUTED 2026-09-18: agent1* at L21: no ghost ever passes gate7
+      agent1* releases tray1*, unloading agent1 (holding ?cargo) to the
+      ground at L21
+
+1.1.1.1.1.1.1.1.1.6  [A]  X  T8
+      agent1 walks into L21 from anywhere: a walk ending at L21 followed
+      by the walk from L21 into the plate room is replaceable by one
+      walk, whatever the source
+
+1.1.1.1.1.1.1.1.1.7  [A]  X  T13
+      any action emptying ?plate: the state before has all three plates
+      occupied with agent1 grounded at L21, whose clause into location19
+      is (GATE9) alone -- one walk from the goal
+
+1.1.1.1.1.1.1.1.1.8  [A]  X  F11
+      agent1 places or picks up any other object: either breaks
+      (holding agent1 ?cargo)
+
+1.1.1.1.1.1.1.1.1.9  [A]  X  F4 R8
+      a blower landing grounds agent1 at L21
+
+1.1.1.1.1.1.1.1.1.10  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, CANCEL-PLAYBACK
+
+1.1.1.1.1.1.1.2  [P]  A  f=31  F12 F20
+      ?from-loc = L15, clause (GATE8)
+      needs receiver1 active with agent1 at L15
+      constrained by F20 (2026-09-17): agent1 standing at L15 occludes the
+      single-relay beam L9 -> receiver1, so here receiver1 is lit only by
+      the two-connector chain through repeater1 with the second connector
+      raised at L15 itself, or by a relay riding a tray agent1 holds
+
+1.1.1.1.1.1.1.3  [P]  O  f=31  F12 K8
+      ?from-loc in {L11 L12 L13}, clause (GATE7 GATE8); this walk is the
+      gate7 crossing every plan needs (K8)
+      needs switch2 on and receiver1 active with agent1 at ?from-loc
+
+1.1.1.1.1.1.1.3.1  [S] N11  O  f=31  T2 T4 T9 T10 T12 F8 F11 F12 K8 K10
+      agent1 grounded at ?from-loc in {L11 L12 L13}
+      (holding agent1 ?cargo), ?cargo in {box1 connector1 tray1}
+      switch2 on and receiver1 active, both evaluated with agent1 at
+        ?from-loc
+      ?plate unoccupied
+      the other two plates occupied by distinct objects not in
+        {agent1 ?cargo}
+      ?agent-loc is free within {L16 L17 L18}
+      if ?cargo = tray1 it carries no rider, else K10 applies
+
+1.1.1.1.1.1.1.3.1.1  [A]  O  f=32  R7 F10 F11 K9 H2
+      agent1 at ?from-loc picks up ?cargo, at ?from-loc itself or at a
+      reach-connected location; reach joins only L12 and L13, so L11
+      reaches nothing but itself (F10 corrected)
+
+1.1.1.1.1.1.1.3.1.1.1  [P]  O  f=32  H2 K4 K9 F10
+      ?cargo rests on plate4 (L13) or plate5 (L12), so ?from-loc is L12
+      or L13; the object that held a gate6 plate down is now carried to
+      a gate9 plate, and every event is already counted
+
+1.1.1.1.1.1.1.3.1.1.1.1  [S] N12  O  f=32  T2 T4 T10 T12 F8 F10 F11 K4
+      agent1 grounded at ?from-loc in {L12 L13} and empty-handed
+      ?cargo resting on plate4 or plate5, nothing on it
+      switch2 on and receiver1 active, both evaluated with agent1 at
+        ?from-loc
+      ?plate unoccupied
+      the other two plates of {plate6 plate7 plate8} occupied by distinct
+        objects not in {agent1 ?cargo}
+      gate6 is open here and shuts when ?cargo is lifted, so any crossing
+        of gate6 still required must precede that lift
+      if ?cargo = connector1 it must not be the relay lighting receiver1:
+        a held connector has no location and its beam dies (R13), so the
+        lift would shut gate8 before agent1 could walk in (T14)
+
+1.1.1.1.1.1.1.3.1.1.1.1.1  [A]  R  T23  R15 K3 K14 F10
+      REFUTED 2026-09-18: agent1* at L14: no ghost ever reaches L14
+      agent1* at L14 toggles switch2 on, which under R15 flips the live
+      switch too; the only achiever of switch2-on with agent1 standing at
+      ?from-loc (F10), and the ghost need not come back (K14)
+
+1.1.1.1.1.1.1.3.1.1.1.1.1.1  [S] N13  R  T23  T2 T4 T12 T13 T14 F8 F10
+      REFUTED 2026-09-18: agent1* at L14: no ghost ever reaches L14
+                                                  K4 K15 P1
+      agent1 grounded at ?from-loc in {L12 L13} and empty-handed
+      agent1* grounded at L14, empty-handed (screen1 admits no cargo),
+        switch2 within reach (F10)
+      switch2 off, so gate7 is shut and gate5 is open
+      ?cargo resting on plate4 or plate5, nothing on it
+      receiver1 active with agent1 at ?from-loc
+      ?plate unoccupied
+      the other two plates of {plate6 plate7 plate8} occupied by distinct
+        objects not in {agent1 ?cargo}
+      (recording-in-progress)
+      if ?cargo = connector1 it must not be the relay lighting receiver1
+        (T14)
+      corrected on audit: an earlier draft also asserted plate4 and
+        plate5 both occupied.  That is a precondition of the ghost's walk
+        into L14, not of this state, and belongs to whatever achiever
+        puts agent1* there
+
+1.1.1.1.1.1.1.3.1.1.1.2  [A]  R  T24 T23  F12 R4 K14 K15 T15 H2
+      REFUTED 2026-09-18: census: seven occupied slots, at most six bodies (five if the ghost is freed)
+      agent1 walks into ?from-loc empty-handed from L14, clause
+      (GATE6 SCREEN1); the return leg of a live trip to switch2, so this
+      branch pays K14's live +2 and realizes one of it.  Demoted on
+      audit: gate6 open needs plate4 and plate5 both occupied, and with
+      agent1 at L14 the census T15 then wants four distinct occupants
+      against three live objects, so a ghost is forced and K15 applies
+
+1.1.1.1.1.1.1.3.1.1.1.2.1  [S] N14  R  T24 T23  T2 T4 T14 T15 F8 F10 K4 K15
+      REFUTED 2026-09-18: census: seven occupied slots, at most six bodies (five if the ghost is freed)
+      agent1 grounded at L14, empty-handed (screen1), switch2 within
+        reach and already on
+      plate4 and plate5 both occupied, ?cargo on one of them with
+        nothing on it
+      receiver1 active with agent1 at L14
+      ?plate unoccupied
+      the other two plates of {plate6 plate7 plate8} occupied by distinct
+        objects not in {agent1 ?cargo}
+      four distinct supports are occupied here and agent1 stands on none
+        of them, so by T15 at least one occupant is a ghost
+
+1.1.1.1.1.1.1.3.1.1.1.3  [A]  O  f=33  R3 K4
+      agent1 dismounts to the ground at ?from-loc, from plate4, plate5,
+      box1, or tray1*; a mount on plate4 or plate5 is a K4 event, but it
+      then serves gate6 for someone else's crossing
+
+1.1.1.1.1.1.1.3.1.1.1.4  [A]  R  T23  R11 R3 K5
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on one of the other two gate9 plates, or
+      mounts one
+
+1.1.1.1.1.1.1.3.1.1.1.5  [A]  O  f=33  F12 R4 T12
+      agent1 walks into ?from-loc empty-handed from L15 (GATE7), or from
+      the plate room or L21 (GATE7 GATE8): each is a second gate7
+      crossing, which K8 does not count
+
+1.1.1.1.1.1.1.3.1.1.1.6  [A]  O  f=38  R12 R5 K12
+      agent1* releases tray1* at ?from-loc, settling ?cargo onto plate4
+      or plate5 as the highest clear support
+
+1.1.1.1.1.1.1.3.1.1.1.7  [A]  O  f=38  R11 R13
+      an agent1* action activates receiver1
+
+1.1.1.1.1.1.1.3.1.1.1.8  [A]  O  f=38  R11 R5
+      agent1* lifts a ghost object off ?cargo, making its top clear
+
+1.1.1.1.1.1.1.3.1.1.1.9  [A]  O  f=39  R12 R5
+      agent1* releases tray1*, unloading agent1 to the ground at
+      ?from-loc
+
+1.1.1.1.1.1.1.3.1.1.1.10  [A]  X  T13
+      any action emptying ?plate: the state before it has all three
+      plates occupied with both gates open and agent1 grounded outside
+      the room, one walk from the goal
+
+1.1.1.1.1.1.1.3.1.1.1.11  [A]  X  T7
+      agent1 places ?cargo on plate4 or plate5: the state before is
+      exactly N11
+
+1.1.1.1.1.1.1.3.1.1.1.12  [A]  X  F11
+      agent1 picks up anything: that breaks empty-handed
+
+1.1.1.1.1.1.1.3.1.1.1.13  [A]  X  F10
+      agent1 toggles switch2: reachable only from L14, contradicting
+      agent1 at ?from-loc
+
+1.1.1.1.1.1.1.3.1.1.1.14  [A]  X  T3 T12
+      agent1 walks into ?from-loc from {L8 L9 L10} or further south:
+      every such clause needs gate5, shut while switch2 is on
+
+1.1.1.1.1.1.1.3.1.1.1.15  [A]  X  T10
+      agent1 walks within {L11 L12 L13}
+
+1.1.1.1.1.1.1.3.1.1.1.16  [A]  X  F4 R8
+      a blower landing grounds agent1 at ?from-loc
+
+1.1.1.1.1.1.1.3.1.1.1.17  [A]  X  R10 T4
+      START-RECORDER or CANCEL-PLAYBACK: both need agent1 at location1
+
+1.1.1.1.1.1.1.3.1.1.2  [P]  O  f=32  K12
+      ?cargo on the ground at ?from-loc or at a reach-connected location:
+      loose off a plate, so K12's +2 applies outside the plate region for
+      the same reason
+
+1.1.1.1.1.1.1.3.1.1.3  [P]  O  f=32  K12
+      ?cargo on box1 in the cluster
+
+1.1.1.1.1.1.1.3.1.1.4  [P]  O  f=30  R5 K12
+      ?cargo on tray1* held by agent1* at a reachable spot: the held-tray
+      +1, plus a ghost walk into the cluster
+
+1.1.1.1.1.1.1.3.1.2  [A]  R  T23  R11 R3 K5
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on one of the other two plates, or
+      mounts one
+
+1.1.1.1.1.1.1.3.1.3  [A]  R  T23  R15 K3 F10
+      REFUTED 2026-09-18: agent1* at L14: no ghost ever reaches L14
+      agent1* at L14 toggles switch2 on, which under R15 flips the live
+      switch too; switch2 is reachable only from L14 (F10)
+
+1.1.1.1.1.1.1.3.1.4  [A]  O  f=32  R3 K4
+      agent1 dismounts to the ground at ?from-loc holding ?cargo, from
+      plate4 at L13, plate5 at L12, box1, or tray1*; a mount on plate4 or
+      plate5 is a K4 event and so adds nothing
+
+1.1.1.1.1.1.1.3.1.5  [A]  O  f=32  F12 T3 R4 T12
+      agent1 walks into ?from-loc holding ?cargo, from L15 only
+      (clause (GATE7)); this is a second gate7 crossing, which K8 does
+      not count
+
+1.1.1.1.1.1.1.3.1.6  [A]  O  f=30  R11 R13
+      an agent1* action activates receiver1: placing connector1*, or
+      clearing a ghost occluder from the beam path
+
+1.1.1.1.1.1.1.3.1.7  [A]  O  f=31  R12 R5
+      agent1* releases tray1*, unloading agent1 (holding ?cargo) to the
+      ground at ?from-loc
+
+1.1.1.1.1.1.1.3.1.8  [A]  X  T13 T7
+      any action emptying ?plate -- agent1* lifts a ghost occupant or
+      dismounts, or STOP-RECORDER clears ghost state.  The state before
+      it has all three plates occupied with gate7 and gate8 open and
+      agent1 grounded at ?from-loc, which satisfies 1.1.3: the goal is
+      one walk away, so everything after is deletable
+
+1.1.1.1.1.1.1.3.1.9  [A]  X  T7
+      agent1 walks into ?from-loc holding ?cargo from the plate room or
+      L21: the state before satisfies N3 or N4
+
+1.1.1.1.1.1.1.3.1.10  [A]  X  T3 T12 R4
+      agent1 walks into ?from-loc from {L8 L9 L10}, which needs gate5,
+      shut while switch2 is on; or from L14, whose screen1 needs empty
+      hands
+
+1.1.1.1.1.1.1.3.1.11  [A]  X  F11
+      agent1 picks up or places any other object: either breaks
+      (holding agent1 ?cargo)
+
+1.1.1.1.1.1.1.3.1.12  [A]  X  F10
+      agent1 toggles switch2: switch2 is reachable only from L14, which
+      contradicts agent1 at ?from-loc
+
+1.1.1.1.1.1.1.3.1.13  [A]  X  R11 F11
+      agent1 places or connects connector1 to activate receiver1: that
+      frees its hand, contradicting (holding agent1 ?cargo)
+
+1.1.1.1.1.1.1.3.1.14  [A]  X  F4 R8
+      a blower landing grounds agent1 at ?from-loc: blower1 moves stacks
+      only between location4 and location20
+
+1.1.1.1.1.1.1.3.1.15  [A]  X  T10
+      agent1 walks within {L11 L12 L13}
+
+1.1.1.1.1.1.1.3.1.16  [A]  X  R10 T4
+      START-RECORDER or CANCEL-PLAYBACK: both need agent1 at location1
+
+1.1.1.1.1.1.2  [A]  O  f=32  R7 F10
+      agent1 at ?agent-loc picks up ?cargo at ?cargo-loc, not from ?plate
+      ?cargo-loc in {L16 L17 L18}
+
+1.1.1.1.1.1.2.1  [P]  O  f=32  F10
+      ?cargo on the ground at ?cargo-loc
+
+1.1.1.1.1.1.2.1.1  [S] N5  O  f=32  F11 T4
+      agent1 grounded at ?agent-loc and empty-handed
+      ?cargo on the ground at ?cargo-loc
+      ?plate unoccupied
+      the other two plates occupied by distinct objects not in
+        {agent1 ?cargo}
+
+1.1.1.1.1.1.2.1.1.1  [A]  O  f=32  F12 R4 R9
+      agent1 walks into ?agent-loc empty-handed from ?from-loc outside
+      {L16 L17 L18}; empty hands now also admit SCREEN1 routes
+
+1.1.1.1.1.1.2.1.1.1.1  [P]  O  f=32  F12 K8
+      ?from-loc in {L11 L12 L13}, clause (GATE7 GATE8); this walk is the
+      gate7 crossing every plan needs (K8)
+
+1.1.1.1.1.1.2.1.1.1.1.1  [S] N10  O  f=32  T2 T4 F11 F12
+      agent1 grounded at ?from-loc in {L11 L12 L13} and empty-handed
+      switch2 on and receiver1 active, both evaluated with agent1 at
+        ?from-loc
+      ?cargo on the ground at ?cargo-loc in {L16 L17 L18}
+      ?plate unoccupied
+      the other two plates occupied by distinct objects not in
+        {agent1 ?cargo}
+      ?agent-loc is free within {L16 L17 L18} (the walk fixes it only at
+        its own step)
+
+1.1.1.1.1.1.2.1.1.1.2  [P]  R  T24 T23  F12 R4 F8
+      REFUTED 2026-09-18: agent1 at L14 with two gate9 plates filled: same census as N14
+      ?from-loc = L14, clause (GATE6 GATE7 GATE8 SCREEN1)
+      needs plates 4 and 5 occupied as well as switch2 on and receiver1
+      active; empty hands satisfy SCREEN1 here (R4)
+
+1.1.1.1.1.1.2.1.1.1.3  [P]  O  f=33  F12
+      ?from-loc = L21, no gates
+
+1.1.1.1.1.1.2.1.1.1.4  [P]  O  f=33  F12
+      ?from-loc = L15, clause (GATE8)
+      needs receiver1 active with agent1 at L15
+
+1.1.1.1.1.1.2.1.1.1.5  [P]  X  R9
+      ?from-loc = L19, clause (GATE9): the goal already holds there
+
+1.1.1.1.1.1.2.1.1.1.6  [P]  X  T3
+      ?from-loc in {L8 L9 L10}, {L3 L4 L5 L7 L20}, or {L1 L2}: every
+      such clause pairs GATE5 with GATE7
+
+1.1.1.1.1.1.2.1.1.1.7  [P]  X  T6
+      ?from-loc in {L16 L17 L18}: an in-room walk is deletable
+
+1.1.1.1.1.1.2.1.1.2  [A]  O  f=33  R11 H2 F10
+      agent1 places ?cargo2 on ?other-plate and so becomes empty-handed
+      (PUT-BOX, PUT-CONNECTOR, PUT-TRAY, CONNECT-CONNECTOR)
+      ?cargo2 in {box1 connector1 tray1} minus {?cargo}; ?other-plate is
+      one of the two plates other than ?plate
+
+1.1.1.1.1.1.2.1.1.2.1  [S] N8  O  f=33  T2 T4 F11
+      (holding agent1 ?cargo2)
+      agent1 grounded at ?agent-loc in {L16 L17 L18}
+      ?cargo on the ground at ?cargo-loc in {L16 L17 L18}
+      ?plate and ?other-plate both unoccupied
+      the third plate occupied by an object not in
+        {agent1 ?cargo ?cargo2}
+      if ?cargo2 = tray1 it carries no rider, else K10 applies
+
+1.1.1.1.1.1.2.1.1.2.1.1  [A]  O  f=34  R7 F10 K9 K11
+      agent1 at ?agent-loc picks up ?cargo2 at ?loc2 in {L16 L17 L18}:
+      from the ground, from box1, or off the third plate when a ghost
+      co-occupies it
+
+1.1.1.1.1.1.2.1.1.2.1.1.1  [S] N9  O  f=34  T2 T4 K11
+      agent1 grounded at ?agent-loc in {L16 L17 L18} and empty-handed
+      ?cargo2 resting at ?loc2 in {L16 L17 L18}, nothing on it
+      ?cargo on the ground at ?cargo-loc in {L16 L17 L18}
+      ?plate and ?other-plate both unoccupied
+      the third plate occupied by an object not in
+        {agent1 ?cargo ?cargo2}
+      two live objects are now fixed in the room, so K11 applies
+
+1.1.1.1.1.1.2.1.1.2.1.2  [A]  O  f=33  F12 T3 R4 R9 K8
+      agent1 walks into ?agent-loc holding ?cargo2 from ?from-loc:
+        {L11 L12 L13} (GATE7 GATE8)                       f=15
+        L21 (no gates)                                    f=16
+        L15 (GATE8)                                       f=16
+        L14 excluded (SCREEN1 with cargo, R4); L19 by R9
+
+1.1.1.1.1.1.2.1.1.2.1.3  [A]  R  T23  R11 R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on the third plate, or mounts it
+
+1.1.1.1.1.1.2.1.1.2.1.4  [A]  R  T23  R12 R5
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* releases tray1*, unloading live ?cargo to the ground at
+      ?cargo-loc -- the only way ?cargo reaches that floor other than by
+      agent1, who cannot free a hand here
+
+1.1.1.1.1.1.2.1.1.2.1.5  [A]  O  f=35  R3 R5
+      agent1 dismounts to the ground at ?agent-loc holding ?cargo2
+
+1.1.1.1.1.1.2.1.1.2.1.6  [A]  R  T23  R11 R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* lifts a ghost occupant off ?plate or ?other-plate, or
+      dismounts one
+
+1.1.1.1.1.1.2.1.1.2.1.7  [A]  X  F11
+      agent1 puts ?cargo down: that leaves agent1 empty-handed, not
+      holding ?cargo2
+
+1.1.1.1.1.1.2.1.1.2.1.8  [A]  X  F11
+      agent1 places ?cargo2 on the third plate, or mounts a plate
+
+1.1.1.1.1.1.2.1.1.2.1.9  [A]  X  F4 R8
+      a blower landing grounds ?cargo in the plate room
+
+1.1.1.1.1.1.2.1.1.2.1.10  [A]  X  T6
+      agent1 walks into ?agent-loc from within the plate room
+
+1.1.1.1.1.1.2.1.1.2.1.11  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, CANCEL-PLAYBACK, any other action
+
+1.1.1.1.1.1.2.1.1.3  [A]  O  f=32  R12 H2
+      (PUT-TRAY AGENT1 TRAY1 ?cargo-loc) with rider ?cargo on tray1,
+      unloading ?cargo to the ground at ?cargo-loc
+      ?cargo in {box1 connector1}; release is local when
+      ?cargo-loc = ?agent-loc, otherwise remote (reach by F10)
+
+1.1.1.1.1.1.2.1.1.3.1  [P]  O  f=32  H2 F8 F10
+      tray1 comes to rest on ?other-plate, so ?cargo-loc is that
+      plate's location; consolidates three conditions in one action
+
+1.1.1.1.1.1.2.1.1.3.1.1  [S] N6  O  f=32  T2 T4 R12
+      (holding agent1 tray1) and (on ?cargo tray1), nothing on ?cargo
+      agent1 grounded at ?agent-loc in {L16 L17 L18}
+      ?cargo-loc = the location of ?other-plate
+      ?plate and ?other-plate both unoccupied
+      the third plate occupied by an object not in
+        {agent1 ?cargo tray1}
+
+1.1.1.1.1.1.2.1.1.3.1.1.1  [A]  O  f=33  F12 T3 T6 R4 R9
+      agent1 walks into ?agent-loc from ?from-loc outside {L16 L17 L18},
+      holding tray1 with ?cargo aboard
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1  [P]  O  f=33  F12 K8
+      ?from-loc in {L11 L12 L13}, clause (GATE7 GATE8); this walk is the
+      gate7 crossing every plan needs (K8)
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1  [S] N7  O  f=32  T2 T4 T9
+      agent1 grounded at ?from-loc in {L11 L12 L13}
+      (holding agent1 tray1), (on ?cargo tray1), nothing on ?cargo
+      switch2 on and receiver1 active, both with agent1 at ?from-loc
+      ?plate and ?other-plate unoccupied
+      the third plate occupied by an object not in
+        {agent1 ?cargo tray1}
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.1  [A]  O  f=32  R12 T9 K10
+      agent1* releases tray1* at ?from-loc, settling ?cargo onto agent1's
+      held tray1 of equal top height -- the only loading available north
+      of gate5 once switch2 is on (T9, T12).  Since 2026-09-18 (R17,
+      test 13): ?cargo reached tray1* from a raised stand, so ?cargo =
+      connector1 and box1 stands in the cluster as the step; K10 +4
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.2  [A]  O  f=33  F12 T3 R4 R9
+      agent1 walks into ?from-loc holding the loaded tray1: only from L15
+      (GATE7) or the plate room and L21 (GATE7 GATE8); every southern
+      source needs gate5, which switch2-on closes (T3); L14 needs empty
+      hands; L19 by R9
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.3  [A]  R  T23  R11 R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on the third plate, or mounts it
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.4  [A]  O  f=33  R11
+      an agent1* action activates receiver1: placing a ghost connector,
+      or clearing an occluder from the beam path
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.5  [A]  O  f=34  R3 R5
+      agent1 dismounts at ?from-loc holding tray1 (plate4 at L13, plate5
+      at L12, box1, or tray1*)
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.6  [A]  R  T23 R5  R11
+      REFUTED 2026-09-18: the plates are in the room (T23); a ghost object cannot rest on live ?cargo (R5)
+      agent1* lifts a ghost occupant off ?plate or ?other-plate, or a
+      ghost object off ?cargo
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.7  [A]  R  T23  R15 K3
+      REFUTED 2026-09-18: agent1* at L14: no ghost ever reaches L14
+      agent1* at L14 toggles switch2 on, which under R15 flips the live
+      switch too; no contradiction with agent1 at ?from-loc.  Reopened
+      when T11 was retracted
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.8  [A]  X  T3 T9
+      a blower landing loads tray1: that puts the holder at location20,
+      not at ?from-loc, and the walk back north needs gate5, shut while
+      switch2 is on
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.9  [A]  X  F15
+      (PICKUP-TRAY AGENT1 TRAY1): a grounded tray carries no riders
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.10  [A]  X  F11
+      agent1 picks up or places any cargo while holding tray1
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.11  [A]  X  T10
+      agent1 walks within {L11 L12 L13}
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.1.1.12  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, CANCEL-PLAYBACK, any other action
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.2  [P]  O  f=33  F12 T17
+      ?from-loc = L21, no gates
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.2.1  [S] N16  O  f=33  T2 T4 T8 T9 T15 T17
+                                                  F11 F15 K10 K12 K15
+      agent1 grounded at L21
+      (holding agent1 tray1), (on ?cargo tray1), nothing on ?cargo,
+        ?cargo in {box1 connector1}
+      ?plate and ?other-plate both unoccupied
+      the third plate occupied by the remaining live object, which by the
+        census T15 is forced: tray1, ?cargo and that object are all three
+      ?agent-loc is free within {L16 L17 L18}; the walk itself needs no
+        gate
+      by T8 the achiever below this node is not a walk into L21
+      by T17 this branch needs a ghost outside the west strip, so K15
+        applies: agent1 holding a loaded tray can never throw switch2
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.3  [P]  O  f=33  F12
+      ?from-loc = L15, clause (GATE8)
+
+1.1.1.1.1.1.2.1.1.3.1.1.1.4  [P]  X  R4
+      ?from-loc = L14: SCREEN1 needs empty hands
+
+1.1.1.1.1.1.2.1.1.3.1.1.2  [A]  R  T23  R12 T9
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* releases tray1* at ?agent-loc, settling ?cargo onto
+      agent1's held tray1 of equal top height
+
+1.1.1.1.1.1.2.1.1.3.1.1.3  [A]  R  T23  R11 R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on the third plate, or mounts it
+
+1.1.1.1.1.1.2.1.1.3.1.1.4  [A]  O  f=34  R3 R5
+      agent1 dismounts to the ground at ?agent-loc while holding tray1
+
+1.1.1.1.1.1.2.1.1.3.1.1.5  [A]  R  T23  R11
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* lifts a ghost occupant off ?plate or ?other-plate
+
+1.1.1.1.1.1.2.1.1.3.1.1.6  [A]  R  T23 R5  R11
+      REFUTED 2026-09-18: agent1* in the room (T23); a ghost object cannot rest on live ?cargo (R5)
+      agent1* lifts a ghost object off ?cargo
+
+1.1.1.1.1.1.2.1.1.3.1.1.7  [A]  X  T6
+      agent1 walks into ?agent-loc from within the plate room
+
+1.1.1.1.1.1.2.1.1.3.1.1.8  [A]  X  F4 R8 T9
+      a blower landing puts ?cargo on tray1: only at blower1's aimed-at
+      location20, which would leave agent1 there, not in the plate room
+
+1.1.1.1.1.1.2.1.1.3.1.1.9  [A]  X  F15
+      (PICKUP-TRAY AGENT1 TRAY1): a grounded tray carries no riders, so
+      this cannot produce (on ?cargo tray1)
+
+1.1.1.1.1.1.2.1.1.3.1.1.10  [A]  X  F11
+      agent1 picks up or places any cargo while holding tray1
+
+1.1.1.1.1.1.2.1.1.3.1.1.11  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, CANCEL-PLAYBACK, any other action
+
+1.1.1.1.1.1.2.1.1.3.2  [P]  O  f=34
+      tray1 comes to rest on the ground or a non-plate support, so both
+      other plates are already occupied by objects not in
+      {agent1 ?cargo tray1}
+
+1.1.1.1.1.1.2.1.1.4  [A]  O  f=33  R11
+      agent1 places another cargo on the ground or a non-plate support
+
+1.1.1.1.1.1.2.1.1.5  [A]  O  f=34  R3
+      agent1 dismounts ?plate to the ground at ?agent-loc
+
+1.1.1.1.1.1.2.1.1.6  [A]  R  T23  R11 R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on another plate, or mounts one
+
+1.1.1.1.1.1.2.1.1.7  [A]  R  T23  R12 R5
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* releases tray1*, unloading rider ?cargo to the ground
+
+1.1.1.1.1.1.2.1.1.8  [A]  X  T7
+      agent1 puts ?cargo on the ground (its prior state is N3)
+
+1.1.1.1.1.1.2.1.1.9  [A]  X  T7 F11
+      agent1* or STOP-RECORDER empties ?plate; agent1 picks up an
+      occupant; agent1 mounts a plate
+
+1.1.1.1.1.1.2.1.1.10  [A]  X  R10 T4
+      START-RECORDER, CANCEL-PLAYBACK, any other action
+
+1.1.1.1.1.1.2.2  [P]  O  f=32
+      ?cargo on box1 at ?cargo-loc (box1 grounded, or on a plate other
+      than ?plate)
+
+1.1.1.1.1.1.2.3  [P]  O  f=30  R5 F9 T23
+      ?cargo on ?other-plate, which keeps a ghost co-occupant -- since
+      2026-09-18 necessarily a copy forked while live ?cargo itself (or
+      another live object since lifted) rested there (T18, T23)
+
+1.1.1.1.1.1.2.4  [P]  R  T23  R5
+      REFUTED 2026-09-18: tray1* held by agent1* in the plate room: no ghost ever passes gate7
+      ?cargo on tray1* held by agent1* at ?cargo-loc
+
+1.1.1.1.1.1.3  [A]  O  f=32  R3 R5
+      agent1 dismounts to the ground at ?agent-loc holding ?cargo: from
+      ?plate alone, from a plate shared with a ghost occupant, or from
+      box1; the tray1* case struck 2026-09-18 (T23: its holder cannot be
+      in the room)
+
+1.1.1.1.1.1.4  [A]  R  T23  R12
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* releases tray1*, unloading agent1 (holding ?cargo) to the
+      ground at ?agent-loc
+
+1.1.1.1.1.1.5  [A]  R  T23  R11
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on another plate
+
+1.1.1.1.1.1.6  [A]  R  T23  R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* mounts another plate
+
+1.1.1.1.1.1.7  [A]  X  T6
+      agent1 walks into ?agent-loc from within the plate room
+
+1.1.1.1.1.1.8  [A]  X  F11
+      agent1 picks up other cargo, places cargo, or mounts a plate
+
+1.1.1.1.1.1.9  [A]  X  T7
+      prior state already satisfies N2: agent1 picks up ?cargo from
+      ?plate; agent1*, or STOP-RECORDER, empties ?plate of a ghost
+
+1.1.1.1.1.1.10  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, or CANCEL-PLAYBACK
+
+1.1.1.1.2  [A]  R  T23  R11
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* places ghost cargo on a plate
+
+1.1.1.1.3  [A]  R  T23  R3
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* steps or jumps onto a plate
+
+1.1.1.1.4  [A]  O  f=32  R3 R5
+      agent1 steps or jumps from a support at ?agent-loc to the ground
+      (a plate shared with a ghost occupant, or box1; the tray1* case
+      struck 2026-09-18, T23)
+
+1.1.1.1.5  [A]  R  T23  R12
+      REFUTED 2026-09-18: agent1* in the plate room: no ghost ever passes gate7
+      agent1* puts tray1* down, unloading rider agent1 to the ground at
+      ?agent-loc
+
+1.1.1.1.6  [A]  X  T5
+      agent1 walks into ?agent-loc
+
+1.1.1.1.7  [A]  X  R10 T4
+      START-RECORDER, STOP-RECORDER, or CANCEL-PLAYBACK
+
+1.1.1.1.8  [A]  X  T4
+      any other action
+
+1.1.2  [P]  O  f=31  F1 T2
+      ?agent-loc = L15, ?clause (GATE8 GATE9)
+      needs receiver1 active with agent1 at L15, plus T2
+
+1.1.3  [P]  O  f=31  F1 T2
+      ?agent-loc in {L11 L12 L13}, ?clause (GATE7 GATE8 GATE9)
+      needs switch2 on, receiver1 active, plus T2
+
+1.1.4  [P]  R  T24 T23  F1 T2
+      REFUTED 2026-09-18: census: eight occupied slots (plates 3-8, relay, riser) against six objects
+      ?agent-loc = L14, ?clause (GATE6 GATE7 GATE8 GATE9 SCREEN1)
+      needs plates 4 and 5 occupied, switch2 on, receiver1 active,
+      agent1 empty-handed, plus T2
+
+1.1.5  [P]  X  T3
+      ?agent-loc in {L8 L9 L10}, ?clause (GATE5 GATE7 GATE8 GATE9)
+
+1.1.6  [P]  X  T3
+      ?agent-loc in {L3 L4 L5 L7 L20},
+      ?clause (GATE3 GATE5 GATE7 GATE8 GATE9)
+
+1.1.7  [P]  X  T3
+      ?agent-loc in {L1 L2}, ?clause (GATE1 GATE3 GATE5 GATE7 GATE8 GATE9)
+
+1.2  [A]  R  T23  R1 R5 T1
+      REFUTED 2026-09-18: recording-open gate9 needs ghost bodies on plates 6-8; no ghost ever passes gate7
+      (MOVE AGENT1* ((WALK ?from-loc ?clause LOCATION19))) with agent1
+      riding tray1* held by agent1*; needs (recording-in-progress) and
+      (recording-open gate9) in the prior state
+
+1.3  [A]  X  R2 F2
+      agent1 jumps, climbs, or uses stairs into location19
+
+1.4  [A]  X  R3 R9 F2
+      agent1 configuration transition ending at location19
+
+1.5  [A]  X  R7 R9 F3
+      PUT-TRAY at location19 of a tray agent1 rides
+
+1.6  [A]  X  R5 R6
+      holder of a live tray moves while agent1 rides it
+
+1.7  [A]  X  R8 F4
+      floor blower relocates a stack containing agent1
+

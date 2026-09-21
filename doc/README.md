@@ -28,6 +28,17 @@ Read these when a problem loads but behaves as though a form didn't take effect,
 
 These form a sequence: write → normalize → diagnose.
 
+### `constraint-method/` — the constraint-led analysis method
+
+Method-level material for the constraint-led approach: the extractors' purpose,
+the staged build plan, and the templates a new problem's analysis starts from.
+`Constraint-Implementation-Plan.md` is authoritative for task state and is where
+a session starts; the per-problem session handoffs point at it.
+
+Per-problem results of the method — prediction registers, generated profiles,
+schema gaps, evidence — stay under `problems/<name>/` with that problem's other
+working notes.
+
 ### `search-strategies/` — making a hard problem tractable
 
 `heuristics.md` and `relaxation.md` cover two strategies that are easily confused, with

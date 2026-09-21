@@ -1,0 +1,30 @@
+E008 evidence transcribed from user's message, after the approved cutoff-12 run.
+The progress elapsed value is the last reported sample, not an exact crash time.
+No successful post-search capture or cumulative validation was reported.
+
+[Progress from worker 9]
+  Total states processed: 112,642,147
+  Recent processing speed: 168,078 states/sec
+  Program cycles: 5,752,163
+  Net average branching factor: 19.6 (recent: 20.0)
+  Effective branching factor (b*): 4.59
+  Max depth explored: 12
+  Solutions found so far: 0
+  Closed entries: 12,944,522
+  Repeated states: 99,675,020 (88.5%)
+  Closed-shard load: max=202,901  min=201,523  skew=1.01x
+  Average dead-end depth: 10
+  Average duplicate depth: 12
+  Depth-cutoff hits: 12,659,898 (11.2%)
+  Average backtrack distance: 1.2 levels (3,595,090 backtracks)
+  Idle threads: 0 of 16
+  Elapsed time: 661 sec
+Heap exhausted during garbage collection: 96 bytes available, 640 requested.
+
+Follow-up filesystem inspection: E008-output.txt is 0 bytes;
+E008-raw.sexp and E008-candidates.sexp are absent.
+Classification: UNKNOWN / resource-exhausted incomplete attempt.
+Not a completed cutoff negative, not a proof that the predicted mechanism fails,
+and not a new accepted checkpoint. Actual heap configuration was not supplied
+in this excerpt. Do not infer it from the recommended startup command.
+Existing E008-output.txt and preparation helper/hashes are preserved unchanged.
