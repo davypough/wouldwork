@@ -33,11 +33,16 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T10 — approved read-only switch2 return-access and resource analysis.**
-Start this analysis in the next fresh session; do not ask for its approval again.
+**T10 — gate6/source resource probe exhausted; no automatic next search.**
+The approved audit's single cutoff-12 return-access probe completed from the
+depth-32 keeper candidate.  It found no solution and directly observed cutoff
+truncation, so it is a bound for only that exact combined source/gate6/location14
+goal—not a stranding proof or a refutation of another resource assignment.  The
+approved narrower source/gate6 conjunction also exhausted at the same ceiling
+with direct truncation.  Neither result authorizes an automatic next search.
 The two Talos test failures were fixed first at D's request. D now reports that
-`(test-talos)` runs successfully. Focused assistant checks also passed both repaired
-fixtures and all 55 cutoff assertions. No engine behavior changed. Evidence:
+`(test-talos)` runs successfully. Focused assistant checks also passed both
+repaired fixtures and all 55 cutoff assertions. No engine behavior changed. Evidence:
 `evidence/talos-two-test-fixes-2026-09-21.txt` and its two retained logs.
 
 Read `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt` for boundaries,
@@ -54,31 +59,39 @@ are empty, gate6 is closed, switch2 is off and gate7 is closed. Gate8 is still
 closed. Ghost agent/tray hold plate1/plate2; ghost connector is at location9,
 both boxes at location6. One recorder cycle remains open.
 
-**Question to resolve:** what concrete return access to switch2 is available,
-and which resources can restore that access without assuming that the tray and
-connector committed to source power are also free keepers or elevated relays?
-Read permitted current instance/tech semantics, static profile and the accepted
-candidate traces/archives. Distinguish route candidates from established facts.
-Account for screen1's empty-hand restriction, both gate6 supports, switch2's
-opposite gate5/gate7 polarities, and physical versus recording views. Do not
-assume the branch impossible, irreversibly stranded, or already fit for crossing.
-Deliver a sourced analysis and a concrete bounded next-step recommendation.
+**Audit/probe conclusion:** switch2 access requires physical gate6 to have both
+plate4/plate5 witnesses while the agent is empty-handed; source-power tray1 and
+connector1 cannot also be assumed to fill those supports.  The two approved
+cutoff-12 experiments found neither the full source/gate6/location14 state nor
+the narrower source/gate6 state.  They do not identify a missing resource or
+prove the branch impossible, irreversibly stranded, or fit for crossing.
 **No new search, validation/replay, extractor, code change or ledger restructuring
-is authorized by this read-only task.** Substantial searches remain D's to run.
+is authorized.** Substantial searches remain D's to run.
 
 **State and evidence:**
 - Main spine: seven of nine found; LK1/LK2/LK3/LK7/LK8 CLOSED,
   LK9/LK4 REALIZED, LK5/LK6 OPEN. Sixteen premises and three bounds in the ledger.
-- Sixteen reported searches include three historical restoration searches.
+- Eighteen reported searches include three historical restoration searches. The
+  two newest are separate cutoff-12 experiments, not ledger links or bounds.
 - BD2: crossing cutoff8, coverage UNKNOWN. BD3: crossing cutoff10, truncation T,
   130,956 hits, threads16, GRAPH, symmetry NIL, minimum-steps pruning T.
 - Separate source-power phase: 8 actions, 7.164 s, depth27, REALIZED/validated NIL.
 - Separate keeper phase: 5 actions, 0.209 s, depth32, REALIZED/validated NIL.
   Power was temporarily interrupted then restored, as its endpoint goal allowed.
+- Separate return-access experiment: cutoff12, threads16, no solution for
+  `(and (color repeater1 red) (open gate6) (has-location agent1 location14))`;
+  truncation T, 779,648 hits, GRAPH, symmetry NIL, minimum-steps pruning T.
+- Separate gate6/source experiment: cutoff12, threads16, no solution for
+  `(and (color repeater1 red) (open gate6))`; truncation T, 779,445 hits,
+  GRAPH, symmetry NIL, minimum-steps pruning T.
 - Both experimental phases are preserved separately, not adopted as mandatory
-  spine links; neither closes LK5. Their results are in the corresponding
+  spine links or main-ledger bounds; neither closes LK5. Their results are in
+  the corresponding
   `repeater-source-result-2026-09-21.txt` and
-  `keeper-replacement-result-2026-09-21.txt` under `constraint-evidence/`.
+  `keeper-replacement-result-2026-09-21.txt`, plus
+  `switch2-return-access-result-2026-09-21.txt` and
+  `gate6-source-resource-result-2026-09-21.txt`, under
+  `constraint-evidence/`.
 
 **All three archives now exist and were hashed/read as files, not replayed:**
 `t10-location15-checkpoint.txt` (7 checkpoints/19 actions),
@@ -294,7 +307,7 @@ Two invariants constrain everything below:
 | T7 | S5 height and reach lattice | PROPOSED | not requested | — |
 | T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
 | T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
-| T10 | End-to-end closure on crelay-topo (7/9 spine links found; next: read-only access/resource audit from depth32) | IN PROGRESS | access audit approved; tests fixed and full suite passed per D; cutoff ceiling12 | T2–T5 |
+| T10 | End-to-end closure on crelay-topo (7/9 spine links found; return-access probe exhausted at cutoff12) | IN PROGRESS | access audit/probe completed; no further search approved; tests fixed and full suite passed per D; cutoff ceiling12 | T2–T5 |
 | T11 | Implement and score the G14 fix | APPROVED, DEFERRED | approved, four parts | — |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
@@ -994,3 +1007,47 @@ next task is read-only switch2 return-access/resource analysis from that candida
 in a fresh session using only permitted evidence. No search is pending or newly
 authorized; the reasonable cutoff ceiling is 12. Current Task above and the
 refreshed continuation/restart documents supersede historical next-step commands.
+
+**Switch2 return-access audit, 2026-09-21.** The approved read-only audit is
+complete.  From the keeper endpoint, agent1 can only manipulate switch2 from
+location14; the R3-to-R4 passage requires physical gate6 (both plate4 and plate5)
+and screen1 admits only an empty-handed agent.  Switch2 off keeps physical gate5
+open and gate7 closed; turning it on reverses those states, while the recording
+view remains separate.  Tray1 on plate3 and connector1 at location9 are measured
+source commitments, not free gate6 keepers.  Ghost cargo is a route candidate,
+not an established replacement supply.  This neither proves stranding nor
+restores access.  The single proposed next experiment, requiring new approval,
+is a threads-16 cutoff-12 standalone search from `*t10-keeper-checkpoint*` for
+`(and (color repeater1 red) (open gate6) (has-location agent1 location14))`.
+It preserves the candidate and tests the direct access condition; success still
+requires endpoint resource/view inspection.  Evidence:
+`constraint-evidence/switch2-return-access-audit-2026-09-21.txt`.
+
+**Switch2 return-access probe, 2026-09-21.** D approved the proposed standalone
+threads-16 cutoff-12 probe.  From the nine-checkpoint keeper archive it found
+no solution for simultaneous red repeater power, physical gate6 open, and agent1
+at location14.  The engine reported direct cutoff truncation with 779,648 cutoff
+hits, GRAPH pruning, symmetry NIL, and minimum-steps pruning T; the unchanged
+checkpoint was returned.  This is a grade-3 bound for that exact experimental
+goal, not an LK5 bound, stranding proof, or resource-assignment refutation.
+It is retained separately, so the main ledger remains at three bounds and the
+seven-of-nine main-link count is unchanged.  No further search is authorized.
+Evidence: `constraint-evidence/switch2-return-access-result-2026-09-21.txt`.
+
+**Gate6/source resource proposal, 2026-09-21.** To separate the exhausted
+location14 component from the resource question, the next candidate experiment
+is one threads-16 cutoff-12 standalone search from the keeper checkpoint for
+`(and (color repeater1 red) (open gate6))`.  It would test coexistence of
+source power and gate6 support only; it is neither a necessary condition claim
+nor a crossing/final-plan claim.  Evidence:
+`constraint-evidence/gate6-source-resource-proposal-2026-09-21.txt`.
+
+**Gate6/source resource probe, 2026-09-21.** D approved that exact probe.  It
+found no solution at threads 16 and cutoff 12 from the unchanged keeper archive;
+direct cutoff truncation was observed with 779,445 cutoff hits, GRAPH pruning,
+symmetry NIL, and minimum-steps pruning T.  It is a grade-3 bound for the
+exact source/gate6 conjunction, not a claim about deeper states, universal
+necessity, stranding, or a particular failed resource.  It remains separate
+from LK5, leaving the main ledger at three bounds and seven found main links.
+No further search is authorized.  Evidence:
+`constraint-evidence/gate6-source-resource-result-2026-09-21.txt`.

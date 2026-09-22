@@ -1,10 +1,11 @@
 T10 restart checkpoint -- refreshed 2026-09-21
 ============================================
-CURRENT NEXT TASK: APPROVED read-only switch2 return-access/resource analysis
-from the keeper candidate at depth32. No re-approval needed. D asked to repair
-Talos tests first; fixes are complete, and D reports (test-talos) successful.
-No new search, replay/validation, extractor, code change or ledger restructuring
-is authorized by this analysis. Search ceiling12; all prior probes completed.
+CURRENT STATUS: the approved standalone switch2 return-access and gate6/source
+resource probes both exhausted at cutoff12. No further search is currently
+authorized. D asked to repair Talos tests first; fixes are complete, and D
+reports (test-talos) successful. No new replay/validation, extractor, code
+change or ledger restructuring is authorized. Search ceiling12; all prior probes
+completed.
 
 READING BOUNDARY
 Read Constraint-Continuation-Prompt.txt first. Use current permitted instance,
@@ -17,11 +18,13 @@ The new task should derive its analysis from permitted evidence only.
 STATE COUNTS
 Sixteen premises, nine main-spine links, three cost bounds. Five CLOSED links:
 lk1/lk2/lk3/lk7/lk8; lk9/lk4 REALIZED; lk5/lk6 OPEN. Seven of nine found.
-Sixteen reported searches include three old restoration searches. Archive import
+Eighteen reported searches include three old restoration searches. Archive import
 is replay, not another search. Source and keeper experimental phases remain
-REALIZED/validated NIL separately; they were not adopted as mandatory links.
-BD2: cutoff8 crossing, UNKNOWN historical coverage. BD3: cutoff10 crossing,
-confirmed truncation,130956 hits, GRAPH, symmetry NIL, min-steps pruning T.
+REALIZED/validated NIL separately; the two newest return-access/resource
+exhaustions are separate grade-3 experimental bounds, not main-ledger records.
+None were adopted as mandatory links. BD2: cutoff8 crossing, UNKNOWN historical
+coverage. BD3: cutoff10 crossing, confirmed truncation,130956 hits, GRAPH,
+symmetry NIL, min-steps pruning T.
 
 THREE DISTINCT CHECKPOINTS -- ALL SAVED
 1. Seed: *t10-checkpoint*, t10-location15-checkpoint.txt, 7 phases/19 actions.
@@ -48,17 +51,50 @@ One recorder cycle still open. Recording gates1/2/3/5 open. Recording gate4 is
 closed at both experimental endpoints despite physical gate4 being open.
 No complete solution or final original-goal validation is claimed.
 
-NEXT ANALYSIS QUESTION
-How can the live agent regain switch2 access or otherwise restore the relevant
-return route with source commitments accounted for? Inspect gate6's two supports,
-screen1's empty-hand restriction, gate5/gate7 opposite polarities, manipulation
-reach, cargo/support transport and live/recording differences. Do not silently
-spend tray1 or connector1 twice. Do not infer permanent stranding or declare a
-route necessary merely from the graph. Deliver sourced conclusions and a
-concrete bounded next-step proposal; no action execution in this read-only task.
+RETURN-ACCESS AUDIT RESULT
+The audit establishes that switch2 is reachable for manipulation only from
+location14. From the keeper endpoint, physical gate5 is open, but the route into
+location14 needs physical gate6 with both plate4 and plate5 depressed; screen1
+also requires the crossing agent to be empty-handed. Tray1 on plate3 and
+connector1 at location9 are existing source commitments, not free gate6
+keepers. Ghost cargo is a possible replacement supply, not an established one.
+Physical and recording gate states remain distinct. The branch is neither
+proved stranded nor shown to restore access. See
+switch2-return-access-audit-2026-09-21.txt for sources and qualifications.
+
+RETURN-ACCESS PROBE RESULT
+The approved threads-16, cutoff-12 standalone probe from
+*t10-keeper-checkpoint* found no solution for:
+  (and (color repeater1 red) (open gate6) (has-location agent1 location14))
+The returned checkpoint is unchanged.  Direct cutoff truncation was observed:
+779,648 cutoff hits, GRAPH mode, symmetry NIL, and minimum-steps pruning T.
+This is a grade-3 bound for this exact experimental goal/start/settings only;
+it does not prove the branch stranded or refute a different resource assignment.
+It is not an LK5 attempt, so the main ledger remains at three bounds.  See
+switch2-return-access-result-2026-09-21.txt.  No automatic retry, deepening,
+or new probe is authorized.
+
+GATE6/SOURCE RESOURCE PROBE RESULT
+The approved threads-16, cutoff-12 standalone probe from
+*t10-keeper-checkpoint* found no solution for:
+  (and (color repeater1 red) (open gate6))
+The returned checkpoint is unchanged. Direct cutoff truncation was observed:
+779,445 cutoff hits, GRAPH mode, symmetry NIL, and minimum-steps pruning T.
+This is a grade-3 bound for its exact experimental conjunction/start/settings;
+it does not prove a deeper impossibility, stranding, necessity, or a particular
+failed resource. It is not an LK5 attempt, so the main ledger remains at three
+bounds. No automatic retry, deepening, or new probe is authorized. See
+gate6-source-resource-result-2026-09-21.txt.
+
 Permitted evidence: lk5-beam-resource-analysis-2026-09-21.txt,
 repeater-source-result-2026-09-21.txt, keeper-replacement-result-2026-09-21.txt,
-their corresponding pre-run recommendation files, and the saved archives.
+switch2-return-access-audit-2026-09-21.txt,
+switch2-return-access-probe-recommendation-2026-09-21.txt,
+switch2-return-access-result-2026-09-21.txt,
+gate6-source-resource-proposal-2026-09-21.txt,
+gate6-source-resource-probe-recommendation-2026-09-21.txt,
+gate6-source-resource-result-2026-09-21.txt, their corresponding pre-run
+recommendation files, and the saved archives.
 
 RESTART REFERENCE -- NOT A REQUEST TO REPLAY DURING READ-ONLY ANALYSIS
 D already has Wouldwork running; omit QUICKLOAD/IN-PACKAGE. Do not restage a

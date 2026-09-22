@@ -5,16 +5,20 @@ STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
-CURRENT TASK -- ALREADY APPROVED
---------------------------------
-T10 remains IN PROGRESS. Perform the read-only switch2 return-access/resource
-audit from the keeper candidate: nine checkpoints, 32 actions. D approved this
-audit before prioritizing two Talos test failures. Repairs are complete; D now
-reports (test-talos) successful. Do not ask for the audit approval again.
-No new puzzle search, staging, replay, validation, extractor, code change or
-ledger restructuring is authorized by this read-only analysis. No probe is
-awaiting a result. The reasonable depth-cutoff ceiling is 12; individual future
-experiments still require explicit choice, with no automatic deepening.
+CURRENT TASK -- AWAITING A NEW APPROVAL
+----------------------------------------
+T10 remains IN PROGRESS. The approved read-only switch2 return-access/resource
+audit and its two approved standalone probes are complete. Both exhausted at
+cutoff12 with direct cutoff truncation: one for the combined
+source/gate6/location14 goal and one for the source/gate6 conjunction. They are
+bounded experimental results, not route, necessity, or stranding verdicts. D
+approved the audit before prioritizing two Talos test failures. Repairs are
+complete; D now reports (test-talos) successful.
+
+No puzzle search, staging, replay, validation, extractor, code change or ledger
+restructuring is currently authorized. The reasonable depth-cutoff ceiling is
+12; it does not authorize automatic deepening. The keeper candidate and main
+ledger are unchanged: these were separate experiments, not LK5 attempts.
 
 Read Constraint-Restart-Checkpoint.txt next for exact inventories, archive hashes,
 restoration reference, ordered ledger reconstruction and remaining boundaries.
@@ -35,18 +39,32 @@ power was briefly interrupted during the keeper phase, as permitted by its goal.
 Source and keeper phases are REALIZED with validated NIL, not adopted mandatory
 spine links. No final solution or original-goal validation is claimed.
 
-Audit how the live agent can regain switch2 access or otherwise restore the
-relevant return route while accounting for source commitments. Inspect current
-permitted instance and tech semantics, gate6 supports, screen1's empty-hand
-restriction, opposite gate5/gate7 polarities, manipulation reach, cargo/support
-transport and live/recording differences. Do not spend tray1 or connector1 twice
-or infer permanent stranding/necessity from a graph alone. Produce sourced
-conclusions and a bounded next-step proposal; execute no actions.
+AUDIT RESULT
+Switch2's only S4 manipulation-reach candidate is location14. From the keeper
+endpoint, physical gate5 is open because switch2 is off; physical return access
+to location14 additionally needs gate6 open via both plates4/5, and screen1
+passes only an empty-handed agent. Switch2 changes gate5/gate7 with opposite
+physical polarities, while recording gate state remains separate. Tray1 on
+plate3 and connector1 at location9 are source commitments, not free gate6
+keepers. Ghost cargo is a candidate replacement supply, not an established
+route. This does not prove stranding. Full source list, route qualifications,
+and the bounded proposal are in
+constraint-evidence/switch2-return-access-audit-2026-09-21.txt.
+The approved probe subsequently found no solution at cutoff12 and observed
+truncation; its evidence and bounded interpretation are in
+constraint-evidence/switch2-return-access-result-2026-09-21.txt.
+The approved resource conjunction likewise exhausted at cutoff12; its evidence
+and scoped reading are in
+constraint-evidence/gate6-source-resource-result-2026-09-21.txt.
 
 Permitted current evidence under constraint-evidence/:
 - lk5-beam-resource-analysis-2026-09-21.txt (conditional routes, not validated).
 - repeater-source-result-2026-09-21.txt and its pre-run recommendation.
 - keeper-replacement-result-2026-09-21.txt and its pre-run recommendation.
+- switch2-return-access-audit-2026-09-21.txt.
+- switch2-return-access-probe-recommendation-2026-09-21.txt and its result.
+- gate6-source-resource-proposal-2026-09-21.txt,
+  gate6-source-resource-probe-recommendation-2026-09-21.txt, and its result.
 - The three saved archives above.
 Use only permitted evidence and source. A memory lookup in the previous session
 accidentally surfaced older puzzle-checkpoint details outside this reading
@@ -56,11 +74,13 @@ Do not consult old memory/conversations or sealed solution material for answers.
 MAIN LEDGER AND TEST STATUS
 --------------------------
 Sixteen premises, nine spine links, three cost bounds. CLOSED: lk1/lk2/lk3/lk7/lk8.
-REALIZED: lk9/lk4. OPEN: lk5/lk6. Seven of nine main links found. Sixteen reported
-puzzle searches include three historical restoration searches; imports add none.
-BD2 retains UNKNOWN cutoff8 coverage and original raw COMPLETE/NIL. BD3 records
-cutoff10 crossing exhaustion with confirmed truncation and 130956 cutoff hits.
-Do not repeat ingestion or completed probes. Source/keeper phases remain separate.
+REALIZED: lk9/lk4. OPEN: lk5/lk6. Seven of nine main links found. Eighteen
+reported puzzle searches include three historical restoration searches; imports
+add none. BD2 retains UNKNOWN cutoff8 coverage and original raw COMPLETE/NIL.
+BD3 records cutoff10 crossing exhaustion with confirmed truncation and 130956
+cutoff hits. The two newer cutoff-12 return-access/resource results are
+separate experimental grade-3 bounds, not LK5 attempts or ledger records. Do
+not repeat ingestion or completed probes. Source/keeper phases remain separate.
 
 Both original test failures were reproduced, both repaired fixtures passed the
 ordinary runner, and all 55 dedicated cutoff assertions passed. Repairs changed
@@ -84,9 +104,13 @@ schema-gap candidate awaits D's hand filing. T11 is approved but DEFERRED.
 HANDOFF VERIFICATION
 --------------------
 All three archive hashes, the generated profile hash and the recorded sealed
-register prefix hashes were checked without reading sealed content. Generated
-reports and the register were not changed. This handoff update ran no Lisp,
-puzzle staging, replay or search. This continuation prompt was updated last.
+register prefix hashes were checked without reading sealed content before the
+two new experiments. Generated reports and the register were not changed. The
+two completed probes imported the keeper archive, then ran at threads16/cutoff12
+with a 16,000 MiB SBCL dynamic heap; neither created a new checkpoint. No replay,
+validation, extractor, or additional search ran. This continuation prompt was
+updated last after the plan, restart checkpoint, pre-run records, and result
+evidence were current.
 
 READ FIRST -- BOUNDED EXTRACTION ONLY
 ------------------------------------

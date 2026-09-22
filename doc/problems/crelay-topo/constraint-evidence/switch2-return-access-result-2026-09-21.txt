@@ -1,0 +1,45 @@
+Switch2 return-access probe result -- 2026-09-21
+=================================================
+The approved standalone probe from *t10-keeper-checkpoint* completed.  The
+first invocation exhausted SBCL's default 1 GiB dynamic heap while worker
+search was starting and produced no outcome.  The identical recorded probe was
+rerun with a 16,000 MiB dynamic heap; that runtime allocation changes neither
+the goal nor any search setting.
+
+START
+*t10-keeper-checkpoint*: nine checkpoints, 32 actions, SHA-256
+21953443D71570B85CD2E5A76D124E8D2720C03EB6648F8693AF8CA9F82D578D.
+The imported state retained red connector1/repeater1, tray1 on plate3,
+connector1 paired to transmitter1/repeater1 at location9, agent1 empty-handed
+at location10, physical gate5 open, and gates6/7/8/9 closed.
+
+GOAL
+(and (color repeater1 red) (open gate6) (has-location agent1 location14))
+
+SETTINGS AND OUTCOME
+Threads 16; cutoff 12; GRAPH; symmetry pruning NIL; minimum-steps pruning T.
+No solution was found.  The checkpoint returned unchanged and no new checkpoint
+was created.
+
+(:outcome #s(search-outcome :status :exhausted-no-solution
+                            :reason :depth-cutoff-truncated)
+ :cutoff 12 :threads 16 :cutoff-truncated t :cutoff-hits 779648
+ :search-mode graph :symmetry-pruning nil :min-steps-pruning t
+ :new-checkpoint-p nil)
+
+The engine processed 16,504,270 states, with 15,618,065 repeated states pruned
+(94.6%), 18,753 recorder-cycle-boundary prefix rejections, and 27,897
+successor-policy prunes.  It took 101.804 seconds real time, 1517.734375
+seconds CPU time, and 256,023,964,464 bytes consed.
+
+READING
+This is the committed grade-3 bound for this exact goal, source checkpoint,
+cutoff, and pruning configuration.  Direct cutoff truncation was observed, so
+the run covers strictly less than the reachable search space.  It does not
+prove the keeper branch stranded, identify a failed resource obligation, refute
+a different ghost/resource assignment, or rule out a different intermediate
+goal.  It is a separate experimental result, not an LK5 attempt; the main
+ledger remains at three cost bounds and no main-spine status changes.
+
+No replay, validation, extractor, or additional search was run.  The keeper
+archive remains unchanged.
