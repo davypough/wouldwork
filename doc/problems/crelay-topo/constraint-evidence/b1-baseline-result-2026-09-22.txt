@@ -1,0 +1,74 @@
+B1 two-cycle baseline result -- 2026-09-22
+============================================
+
+RUN
+The approved B1 standalone checkpoint search ran from freshly staged
+crelay-topo's *start-state* with threads16, cutoff12, GRAPH, minimum-steps
+pruning enabled, and staged symmetry behavior. Its goal was:
+
+  (and (recorder-cycle-ended)
+       (on tray1 plate1)
+       (has-location agent1 location1))
+
+RESULT
+The planner completed normally and found the B1 boundary at minimum path depth
+9. Three candidate goal paths were validated and accepted, representing two
+unique endpoint paths. The printed minimum path has:
+
+  1  START-RECORDER
+  2  agent1* walks from location1 to location2
+  3  agent1* steps onto plate1
+  4  agent1 walks through gate1 to tray1
+  5  agent1 picks up tray1
+  6  agent1 carries tray1 through gate1 to location2
+  7  agent1 puts tray1 on plate1
+  8  agent1 returns to recorder1 at location1
+  9  agent1 CANCEL-PLAYBACK
+
+The endpoint has tray1 on plate1, agent1 at location1, RECORDER-CYCLE-CLOSED,
+and no ghost facts. Physical gate1 and recording gate1 are open from tray1.
+The search's reported outcome is :EXHAUSTED-WITH-SOLUTIONS / :COMPLETE. It
+reached depth12 and recorded 12,635 cutoff hits, but did not report direct
+cutoff truncation. This is a successful B1 realization, not an exhaustion
+bound, an independent replay, B2 authorization, or a final solution.
+
+MEASURED RUN DATA
+  real time:              0.490 seconds
+  CPU time:               5.40625 seconds
+  bytes consed:           929,106,448
+  total states:           62,934
+  repeated states pruned: 31,866 (50.6%)
+  prefix rejections:      21
+  successor-policy prunes: 98
+  maximum depth:          12
+  candidate paths:        3 accepted / 2 unique
+
+CHECKPOINT RECOVERY AND EXPORT
+SOLVE-SEARCH-CHECKPOINT returned a new depth-9 checkpoint in the original SBCL
+process, but the immediately following export form did not run: PowerShell
+passed its Lisp pathname with an invalid reader escape, and SBCL terminated with
+READER-EOF-ERROR after the search had completed.
+
+D separately approved reconstruction by action-sequence replay. The recovery
+script replayed the exact nine canonical B1 actions with
+VALIDATE-ACTION-SEQUENCE, checked the derived RECORDER-CYCLE-ENDED query and
+the two stored endpoint facts, then exported the resulting one-phase checkpoint.
+It never invokes a solver. Earlier failed recovery logs are retained because the
+first serialization omitted required action phrases and two later assertions
+misclassified derived versus stored propositions; none started a planner search.
+
+The recovered archive is t10-b1-checkpoint.txt:
+
+  - one checkpoint / nine actions / depth 9;
+  - goal: (and (recorder-cycle-ended) (on tray1 plate1)
+               (has-location agent1 location1));
+  - SHA-256:
+    D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+
+The final successful replay/export log is
+b1-checkpoint-replay-export-2026-09-22.log. The archive is a separate B1
+experimental checkpoint, not a main-spine link or authorization to begin B2.
+
+The raw search log is b1-cutoff12-result-2026-09-22.txt, 84,685 bytes,
+SHA-256 DC1425DA193AF214D4A93B338BFEA7D68FB206D1898EE4163CADD22A7CF84370.
+B2 requires separate approval.

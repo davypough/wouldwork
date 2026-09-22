@@ -1,20 +1,104 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Refreshed 2026-09-22 after resource analysis and final handoff verification.
+Refreshed 2026-09-22 after the approved B2 source audit and handoff verification.
 STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
 CURRENT TASK -- AWAITING A NEW APPROVAL
 ----------------------------------------
-NEXT SESSION: read this prompt, Constraint-Restart-Checkpoint.txt and
-constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt.
-The pending question is: does D approve developing the alternative recorder
-baseline through read-only analysis? Handoff preparation did not approve that
-strategic next step. No new run, archive import, or deferred T11 work is pending.
-Use permitted evidence only. If earlier puzzle memories are automatically
-supplied, disclose that exposure; a new session alone does not ensure a clean
-prediction context. The 2026-09-22 analysis already carries that qualification.
+CURRENT HANDOFF -- authoritative over all historical instructions below
+D approved the read-only B2 audit and requested a new-session handoff. Both
+are complete. Read next, in this order:
+  Constraint-Restart-Checkpoint.txt
+  constraint-evidence/b2-construction-audit-2026-09-22.txt
+  constraint-evidence/b2-baseline-result-2026-09-22.txt
+  constraint-evidence/b2-baseline-proposal-2026-09-22.txt
+The named logs/runner and the four earlier baseline analyses remain permitted
+evidence when needed. The audit is the current correction to their estimates.
+
+The simple B2 route omitted an elevation requirement: the target is at3/2,
+ground approaches at0 and the jump-rise limit1. Blower lift is coupled to
+gate closure; opening the gate drops an unsupported hovering actor before
+the next move. This rejects the proposed six-action construction. It does
+not prove B2 impossible or explain every branch of the cutoff12 exhaustion.
+The six-action B2 and combined29-action estimates are withdrawn as execution
+guidance. B3/B4 remain conditional on an unrealized cargo-fork endpoint.
+
+No new search, staging, import, replay, validation, extractor or tests ran
+during the audit. B1 remains saved, one phase/nine actions; no B2 archive
+exists. All four checkpoint hashes, full profile hash and three register
+prefix hashes were checked again and match their recorded values. Register
+bytes were hashed only, never displayed/interpreted. Temporary .b2-cache is
+absent. Deliberate retained runner/logs are evidence, not cleanup leftovers.
+The main ledger remains sixteen premises/nine links/three bounds, seven of
+nine links found. The historical18 searches plus separate B1/B2 gives20
+reported searches; imports and failed setup launches are not searches.
+
+G15 is OPEN, appended at lines863-885 of Constraint-Schema-Gaps.txt; that
+exact range is permitted. It asks whether a quotient traversal's launch
+configuration exists and survives controller propagation until crossing.
+No earlier gap/register range changed and no new extractor is authorized.
+
+NEXT DECISION: recommend read-only derivation of revised box retrieval from
+preserved B1, supplying elevation, same-view gate access, cargo return and
+any recorder boundaries. This revised-construction task requires new
+approval. Do not rerun B1/B2, deepen, change the goal/instance, begin B3/B4,
+import a checkpoint, or resume deferred T11 automatically. The current audit
+approval is fulfilled, not a standing approval for subsequent planning.
+
+This remains an explicitly authorized exposed session. A fresh session must
+disclose any automatically supplied older puzzle memory before continuing;
+being new does not itself make it clean. Read only permitted current evidence.
+Plan, audit, correction notices, schema gap and restart note were updated
+before this continuation prompt, which was regenerated last for the handoff.
+
+HISTORICAL UPDATES -- superseded wherever they conflict with CURRENT HANDOFF
+
+LATEST RESULT -- supersedes pending-B2 instructions below:
+D approved the proposed B2 experiment. One search from restored B1 at
+threads16/cutoff12 found no solution with direct cutoff truncation T and
+381717 cutoff hits (18.166 seconds real). No B2 archive was created. B1
+remains one phase/nine actions and its hash was rechecked unchanged.
+Read the permitted b2-baseline-proposal-2026-09-22.txt and
+b2-baseline-result-2026-09-22.txt under constraint-evidence/; the latter names
+the retained runner and logs, including four setup failures before search.
+Temporary compilation cache was removed. No engine change or test run; no
+independent B2 replay or final validation. Main ledger and predecessor
+archives remain unchanged. No further runtime operation is approved.
+Recommend read-only source audit of the nominal B2 construction's movement
+and recorder assumptions, subject to approval. Failure at cutoff12 neither
+identifies the cause nor refutes the baseline. This remains the authorized
+exposed session; no further memory or sealed material was consulted.
+Result, plan and restart note were updated first, this prompt last.
+
+LATEST PREPARATION: D approved B2 preparation after the current session
+disclosed automatically supplied older puzzle details and a related memory
+registry lookup. This is a further exposure event, distinct from the earlier
+events below; the current preparation is authorized but is not a clean
+prediction experiment. No further memory lookup or sealed-content read was
+used. The exact proposal is now in
+constraint-evidence/b2-baseline-proposal-2026-09-22.txt (permitted evidence).
+It proposes one threads16/cutoff12 search from recovered B1, including its
+necessary restoration and a separate B2 export on success. Read that proposal
+before seeking execution approval. No import, staging, search, replay,
+validation or tests ran. The B1 archive hash was rechecked and matched; other
+historical hashes below were not rechecked. Main ledger and all checkpoints
+are unchanged. Plan, proposal and restart note were updated first; this prompt
+was updated last. B2 execution, B3/B4 and deferred T11 remain unapproved or
+deferred as previously recorded.
+
+NEXT SESSION: read this prompt, Constraint-Restart-Checkpoint.txt,
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt, and
+constraint-evidence/recorder-baseline-analysis-2026-09-22.txt, and
+constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt.
+constraint-evidence/recorder-baseline-staged-construction-2026-09-22.txt. The
+pending question is: does D approve B2 from the recovered B1 checkpoint? Do not
+rerun B1. The completed analyses/results did not approve B2, staging a new
+baseline, another search, validation, or deferred T11 work. Use permitted
+evidence only. If earlier puzzle memories are automatically supplied, disclose
+that exposure; a new session alone does not ensure a clean prediction context.
+All four 2026-09-22 analyses carry that qualification.
 
 LATEST UPDATE, 2026-09-22: D said "Continue the analysis" after the assistant
 disclosed earlier Crelay-Topo information in its supplied memory summary. The
@@ -29,18 +113,62 @@ With the current source roles fixed and ghost supply unavailable, only box1
 remains as a non-agent live keeper for gate6's two plates. This conditional
 shortage applies to switch access, not to the narrower gate6 goal that allows
 the live actor on a plate; it does not explain the searches or prove stranding.
-Recommended strategic direction: develop a changed recorder baseline with
-cargo holding recording gate1. Plate2 access, legal closure/recorder return,
-ghost mobility and source restoration must be accounted for first. This is
-a proposal, not a selected baseline or an authorized search/replay. No cutoff
-or command is pending. Keep all three saved candidates.
+D then approved developing the recommended alternative recorder baseline through
+read-only analysis. The result is a fresh two-cycle candidate, not a
+transformation of the keeper checkpoint: in cycle one, agent1* holds plate1
+while agent1 transfers tray1 from plate2 to plate1 and returns empty-handed to
+cancel. Agent1 then moves box1 through initially open gate2 to plate2. The
+second START-RECORDER forks tray1* onto plate1 and box1* onto plate2, keeping
+recording gates1 and3 open while the new ghost leaves R1 and reaches R2.
+This resolves the demonstrated local gate1 release obstruction and preserves
+gate3 access, but it does not establish source restoration, gate6 resources,
+switch2 access, gate8 power, or a solution. No runtime operation or new
+checkpoint occurred, and all three saved candidates remain distinct.
+
+D then approved read-only source-restoration and resource analysis from the
+baseline. The new ghost can reach R2 and hold plate3, supplying physical gate4
+for the low transmitter1-to-location9 source beam while agent1 pairs connector1
+at location9. The second fork leaves tray1* and box1* at plates1/2, so the live
+tray and box may move independently to plates4/5 while their ghost copies keep
+recording and physical gates1/3 open. With agent1 empty-handed, this is a
+source-derived candidate for red repeater power, physical gate6, and location14.
+It is not a measured path; the truncated cutoff-12 bounds began from the
+different keeper checkpoint and do not refute this arrangement.
+
+D then approved staged-construction analysis. The candidate is split into B1
+first-cycle tray transfer and cancellation, B2 box transfer and second fork, B3
+ghost plate3 source restoration, and B4 live gate6 witnesses plus location14
+crossing. Their nominal action counts are 9, 6, 5, and 9; the combined 29-action
+skeleton cannot fit the standing cutoff ceiling as a single fresh-start probe.
+Each future stage is proposed at cutoff12, but none is approved to run. B1 is
+the only candidate next operation; its exact postcondition and interpretations
+are recorded in recorder-baseline-staged-construction-2026-09-22.txt.
+
+D then approved B1. From a fresh initial state at threads16/cutoff12, the
+planner found the exact B1 boundary at minimum depth9: tray1 on plate1, agent1
+at recorder1/location1, and a closed, ghost-free recorder cycle. Three
+candidate paths were accepted. The post-search archive export form failed to
+parse because of a PowerShell pathname escape, after the search was complete.
+D then separately approved action-sequence recovery. The exact nine canonical
+actions were replayed with VALIDATE-ACTION-SEQUENCE and exported without calling
+a solver. The recovered separate B1 archive is
+constraint-evidence/t10-b1-checkpoint.txt: one checkpoint, nine actions,
+depth9, SHA-256 D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+The raw result and recovery record are retained in
+b1-baseline-result-2026-09-22.txt. B2 is not approved.
 New permitted evidence:
   constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt
+  constraint-evidence/recorder-baseline-analysis-2026-09-22.txt
+  constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt
+  constraint-evidence/recorder-baseline-staged-construction-2026-09-22.txt
+  constraint-evidence/b1-baseline-recommendation-2026-09-22.txt
+  constraint-evidence/b1-baseline-result-2026-09-22.txt
 This update supersedes earlier fresh-session instructions where they conflict.
-Ledger counts/grades and checkpoints are unchanged. No Lisp or tests ran.
+Ledger counts/grades are unchanged. The separately approved B1 replay/export
+ran without a planner search; no test suite ran.
 The later handoff check reverified archive/profile/register-prefix hashes as
-recorded under HANDOFF VERIFICATION below. Documentation was updated under the
-plan's handoff rule; this continuation prompt was updated last.
+recorded under HANDOFF VERIFICATION below. Plan, restart note and evidence were
+updated first; this continuation prompt was regenerated last.
 
 T10 remains IN PROGRESS. The approved read-only switch2 return-access/resource
 audit and its two approved standalone probes are complete. Both exhausted at
@@ -50,18 +178,21 @@ bounded experimental results, not route, necessity, or stranding verdicts. D
 approved the audit before prioritizing two Talos test failures. Repairs are
 complete; D now reports (test-talos) successful.
 
-No puzzle search, staging, replay, validation, extractor, code change or ledger
-restructuring is currently authorized. The reasonable depth-cutoff ceiling is
-12; it does not authorize automatic deepening. The keeper candidate and main
-ledger are unchanged: these were separate experiments, not LK5 attempts.
+No further puzzle search, staging, replay, validation, extractor, code change
+or ledger restructuring is currently authorized. The reasonable depth-cutoff
+ceiling is 12; it does not authorize automatic deepening. The keeper candidate
+and main ledger are unchanged: these were separate experiments, not LK5 attempts.
 
 Read Constraint-Restart-Checkpoint.txt next for exact inventories, archive hashes,
 restoration reference, ordered ledger reconstruction and remaining boundaries.
-All three archives under constraint-evidence/ are verified on disk:
+The three main archives and the separate B1 archive under constraint-evidence/
+are verified on disk:
 - t10-location15-checkpoint.txt: *t10-checkpoint*, seed, 7 checkpoints/19 actions.
 - t10-repeater-source-checkpoint.txt: *t10-source-checkpoint*, 8/27.
 - t10-keeper-checkpoint.txt: *t10-keeper-checkpoint*, current candidate, 9/32.
-Keep all three distinct. Archive inspection/import is not another puzzle search.
+- t10-b1-checkpoint.txt: separate B1 baseline experiment, 1/9, SHA-256
+  D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+Keep all four distinct. Archive inspection/import is not another puzzle search.
 Cold-import commands in the restart file are reference only, not instructions
 to execute during this read-only audit. Do not restage a live continuation.
 
@@ -190,8 +321,8 @@ completed extractor, then stop before the next extractor.  Never print the
 whole section 4.  Sections 4 and 5 are not required to score the G14 fix or
 RO: neither has a sealed value paragraph.
 
-Constraint-Schema-Gaps.txt, 860 lines (a WHERE THIS FITS pointer was
-appended after 853; every range below is unchanged):
+Constraint-Schema-Gaps.txt, 885 lines (WHERE THIS FITS was appended after853;
+G15 was appended at863-885; every earlier range below is unchanged):
   1-437         G1-G7 and introduction, permitted
   696-725       G12, destination and transition proof gap, permitted
   726-748       G13, relative writer target, permitted
@@ -199,6 +330,7 @@ appended after 853; every range below is unchanged):
   781-853       G14, unfiltered inherited premise, with its 2026-09-20
                 update recording the approved fix, permitted
   G9            TAG ONLY.  Its content quotes a sealed S4 prediction.
+  863-885       G15, launch configuration/propagation audit question, permitted
 Other gaps' status is summarized below; do not widen an extraction through G9.
 
 Then read:
@@ -356,7 +488,7 @@ CURRENT ARTIFACTS AND STATUS
 ----------------------------
 Constraint-Prediction-Register.txt       HAND, sealed 3-6; history through 7.28
 Constraint-Static-Profile.txt            GENERATED, 640 lines, S0-S4
-Constraint-Schema-Gaps.txt               HAND, through G14 and its fix update
+Constraint-Schema-Gaps.txt               HAND, through G15; G14 fix deferred
 Constraint-Abstract-Model.txt            HAND, partial; stale claims corrected
 Constraint-Role-Obligations.txt          HAND, 417 lines: RO1-RO6 and the
                                         pre-run RO specification (1-5),

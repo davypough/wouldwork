@@ -1,0 +1,126 @@
+Recorder-baseline source and resource analysis -- 2026-09-22
+==============================================================
+
+CURRENT QUALIFICATION, later 2026-09-22
+The assumed B2 starting arrangement has not been realized: its cutoff12
+search exhausted, and the source audit found an omitted box-retrieval
+elevation prerequisite. All source/resource conclusions below remain
+conditional on obtaining that arrangement. Read
+b2-construction-audit-2026-09-22.txt; no B3/B4 run is approved.
+
+AUTHORIZATION AND SCOPE
+D approved further read-only source-restoration and resource analysis from the
+two-cycle recorder baseline. This analysis uses that baseline record, the
+permitted checkpoint/evidence files, the authored instance and generated
+profile, and the beam, recorder, plate, mobility, placement, and cargo source
+files. No Lisp was executed. No recorder was started, and no problem was
+staged, imported, replayed, searched, or validated. No extractor, engine, or
+ledger code was changed, and no sealed material was read.
+
+SOURCE RESTORATION CANDIDATE
+The two-cycle baseline leaves tray1 on plate1 and box1 on plate2 before its
+second recorder start. Its new ghost tray1* and box1* therefore keep recording
+gates1 and3 open. The new ghost agent can:
+
+1. leave R1 through recording gate1;
+2. enter R2 through recording gate3; and
+3. make the explicit local STEP onto plate3 at location10.
+
+Physical plate pressure is layer-blind. Thus agent1* on plate3 opens physical
+gate4 as well as recording gate4. This substitutes for the live agent's
+plate3 role in the saved source phase. The live agent remains free to reach
+connector1 at location9 and establish the already measured pairing shape:
+
+  transmitter1 -> connector1 at location9 -> repeater1.
+
+The earlier beam analysis established that the low transmitter1-to-location9
+segment crosses gate4 and needs physical gate4 open. With agent1* on plate3,
+that condition is supplied without moving tray1 off plate1 or box1 off plate2.
+The resulting candidate endpoint is:
+
+  - tray1 on plate1, box1 on plate2, and agent1* on plate3;
+  - connector1 at location9, paired to transmitter1 and repeater1;
+  - repeater1 red in the physical view;
+  - agent1 free and empty-handed after the connection;
+  - physical and recording gates1, 3, and 4 open.
+
+This is a source-derived candidate endpoint, not a measured action sequence.
+The prior source phase demonstrates the connector pairing and red result with
+the live agent on plate3; it does not validate this ghost-keeper substitution.
+
+CORRECTION: LIVE CARGO IS FREE AFTER THE SECOND FORK
+The initial resource reading incorrectly treated tray1 and box1 as permanently
+committed once their ghost copies witness recording gates1 and3. That would be
+true before the second START-RECORDER, but not during its open cycle. The fork
+creates tray1* and box1* on the two plates. Live and ghost occupants may share
+a support, and physical plate pressure is layer-blind. The live actor may move
+the live cargo on its own recording side while the ghost copies remain on
+plates1/2. Those ghosts continue to hold both recording and physical gates1/3
+open.
+
+CORRECTED SOURCE/GATE6 CANDIDATE
+After the new ghost occupies plate3 and agent1 establishes the live connector1
+source at location9, agent1 can move live tray1 from plate1 to plate4 and live
+box1 from plate2 to plate5. The required routes use the still-open physical
+gates1 and3 and physical gate5, which remains open while switch2 is off. The
+two placements leave agent1 empty-handed. The resulting source-derived
+candidate endpoint is:
+
+  tray1*       plate1: recording and physical gate1 witness
+  box1*        plate2: recording and physical gate3 witness
+  agent1*      plate3: physical gate4 witness for the low source beam
+  connector1   location9, paired to transmitter1 and repeater1
+  tray1        plate4: physical gate6 witness
+  box1         plate5: physical gate6 witness
+  agent1       empty-handed and able to pass screen1 into location14
+
+The support policy permits each live/ghost pair to share its initial baseline
+plate, and moving the live member leaves the ghost witness in place. Gate6
+reads the physical, layer-blind pressure relation, so live tray1 and box1
+supply its two distinct plates. Agent1 can put down both cargo items before
+the screen crossing, satisfying the screen's empty-hand condition.
+
+This candidate therefore supplies the exact conjunction that the earlier
+cutoff-12 return-access probe sought:
+
+  (and (color repeater1 red) (open gate6)
+       (has-location agent1 location14))
+
+It is not a measured path or a claim that the conjunction is reachable. The
+prior probe began from the different depth-32 keeper checkpoint, so its
+truncated bound neither tests nor refutes this fresh baseline candidate.
+Connector1* remains unassigned. Nothing here establishes gate7, gate8, a
+receiver route, or the final goal.
+
+NEXT DECISION BOUNDARY
+The candidate needs construction from the initial state or a separately saved
+baseline checkpoint. No direct experiment is recommended yet: the existing
+cutoff ceiling is 12, while this candidate combines two recorder cycles,
+cargo transport, source wiring, and a gate6 crossing. Before any operation,
+derive a staged bounded construction and state the exact checkpoint endpoint
+and interpretation, then obtain approval for the specific replay or search.
+
+SOURCES
+Constraint-Implementation-Plan.md; Constraint-Continuation-Prompt.txt;
+Constraint-Restart-Checkpoint.txt;
+constraint-evidence/recorder-baseline-analysis-2026-09-22.txt;
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt;
+repeater-source-result-2026-09-21.txt;
+keeper-replacement-result-2026-09-21.txt;
+lk5-beam-resource-analysis-2026-09-21.txt;
+switch2-return-access-audit-2026-09-21.txt;
+gate6-source-resource-result-2026-09-21.txt;
+switch2-return-access-result-2026-09-21.txt;
+Constraint-Static-Profile.txt S3/S4;
+probs/problem-crelay-topo.lisp;
+tech/beam-relay.lisp, beam-direct.lisp, -beam-substrate.lisp,
+-recorder-receiver-shadow.lisp, -recorder-core.lisp,
+-recorder-session.lisp, -recorder-cycle-boundary.lisp,
+-recorder-plate-shadow.lisp, -recorder-controls-shadow.lisp,
+-recorder-gate-shadow.lisp, -recorder-solution.lisp,
+-recording-shadow-policy.lisp, -gate.lisp, plate.lisp, tray.lisp, box.lisp,
+-pickup.lisp, -placement.lisp, -holding.lisp, -location.lisp,
+-support-occupancy.lisp, -support-motion.lisp, -mobility.lisp,
+-mobility-action.lisp, -configuration-transition.lisp, step.lisp, jump.lisp,
+walkability.lisp, -passability.lisp, reachability.lisp, -vertical.lisp, and
+-support-elevation.lisp.

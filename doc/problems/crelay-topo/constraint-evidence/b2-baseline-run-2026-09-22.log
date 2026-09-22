@@ -1,0 +1,162 @@
+To load "bordeaux-threads":
+  Load 1 ASDF system:
+    bordeaux-threads
+; Loading "bordeaux-threads"
+
+To load "usocket":
+  Load 1 ASDF system:
+    usocket
+; Loading "usocket"
+
+To load "cl-json":
+  Load 1 ASDF system:
+    cl-json
+; Loading "cl-json"
+
+To load "flexi-streams":
+  Load 1 ASDF system:
+    flexi-streams
+; Loading "flexi-streams"
+
+To load "wouldwork":
+  Load 1 ASDF system:
+    wouldwork
+; Loading "wouldwork"
+  included technology: -propagation
+  included technology: -plate-types
+  included technology: -beam-substrate-init-checks
+  included technology: -beam-substrate
+  included technology: -apparatus-coordinates
+  included technology: -switch
+  included technology: -controls-init-checks
+  included technology: -controls
+  included technology: -recording-shadow-policy
+  included technology: -gate
+  included technology: gate
+  included technology: -interaction-policy
+  included technology: -physical-init-checks
+  included technology: -support-occupancy
+  included technology: plate
+  included technology: -height
+  included technology: -location-coordinates
+  included technology: -elevation
+  included technology: elevation
+  included technology: -segment-geometry
+  included technology: -location
+  included technology: -position
+  included technology: -holding
+  included technology: -vertical
+  included technology: -support-motion
+  included technology: -configuration-transition
+  included technology: -support-settling
+  included technology: -support-elevation
+  included technology: -placement
+  included technology: -reachability
+  included technology: -pickup
+  included technology: tray
+  included technology: box
+  included technology: -reachability-coordinates
+  included technology: reachability
+  included technology: switch
+  included technology: -recorder-fork-registry
+  included technology: -gears-fan
+  included technology: -floor-blowing
+  included technology: floor-blower
+  included technology: -passability
+  included technology: -threat
+  included technology: -mobility
+  included technology: -traversal
+  included technology: -mobility-action
+  included technology: ladder
+  included technology: step
+  included technology: jump
+  included technology: -visibility
+  included technology: -beam-relay-init-checks
+  included technology: beam-relay
+  included technology: -walkability-coordinates
+  included technology: -terrain-consistency
+  included technology: walkability
+  included technology: -beam-los-coordinates
+  included technology: -beam-interpolation
+  included technology: -beam-occlusion
+  included technology: visibility
+  included technology: topo-lower-bound
+  included technology: -recorder-core
+  included technology: -recorder-plate-shadow
+  included technology: -recorder-receiver-shadow
+  included technology: -recorder-switch-shadow
+  included technology: -recorder-controls-shadow
+  included technology: -recorder-jamming-shadow
+  included technology: -recorder-gate-shadow
+  included technology: -recorder-blower-shadow
+  included technology: -recorder-solution
+  included technology: -recorder-cycle-boundary
+  included technology: -recorder-session
+  included technology: -recorder-cycle-chaining
+  included technology: -recorder-init-checks
+  included technology: recorder
+While evaluating the form starting at line 2, column 0
+  of #P"D:/quicklisp/local-projects/wouldwork/doc/problems/crelay-topo/constraint-evidence/run-b2-baseline-2026-09-22.lisp":
+Unhandled SB-INT:SIMPLE-FILE-ERROR in thread #<SB-THREAD:THREAD tid=4012 "main thread" RUNNING {1100D18003}>:
+  Error opening #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl":
+
+    Access is denied.
+
+Backtrace for: #<SB-THREAD:THREAD tid=4012 "main thread" RUNNING {1100D18003}>
+0: (SB-DEBUG::DEBUGGER-DISABLED-HOOK #<SB-INT:SIMPLE-FILE-ERROR "Error opening ~S" {110E26A573}> #<unused argument> :QUIT T)
+1: (SB-DEBUG::RUN-HOOK *INVOKE-DEBUGGER-HOOK* #<SB-INT:SIMPLE-FILE-ERROR "Error opening ~S" {110E26A573}>)
+2: (INVOKE-DEBUGGER #<SB-INT:SIMPLE-FILE-ERROR "Error opening ~S" {110E26A573}>)
+3: (ERROR SB-INT:SIMPLE-FILE-ERROR :PATHNAME #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl" :MESSAGE "Access is denied." :FORMAT-CONTROL "Error opening ~S" :FORMAT-ARGUMENTS (#P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl"))
+4: (SB-IMPL::FILE-PERROR #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl" 5 "Error opening ~S" #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl")
+5: (SB-IMPL::%OPEN-ERROR #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl" 5 NIL :CREATE)
+6: (OPEN #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem-tmpGHU3ALSV.fasl" :DIRECTION :IO :ELEMENT-TYPE :DEFAULT :IF-EXISTS NIL :IF-DOES-NOT-EXIST :CREATE :EXTERNAL-FORMAT :UTF-8 :CLASS SB-SYS:FD-STREAM :AUTO-CLOSE NIL :OVERLAPPED T)
+7: (UIOP/STREAM:CALL-WITH-TEMPORARY-FILE #<FUNCTION (FLET "BEFORE182" :IN UIOP/STREAM::GET-TEMPORARY-FILE) {1000BFD64B}> :WANT-STREAM-P NIL :WANT-PATHNAME-P T :DIRECTION :IO :KEEP T :AFTER NIL :DIRECTORY #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/" :TYPE "fasl" :PREFIX "problem-tmp" :SUFFIX NIL :ELEMENT-TYPE NIL :EXTERNAL-FORMAT NIL)
+8: (UIOP/LISP-BUILD:COMPILE-FILE* #P"D:/quicklisp/local-projects/wouldwork/src/problem.lisp" :OUTPUT-FILE #P"C:/Users/user/AppData/Local/cache/common-lisp/sbcl-2.6.8-win-x64/D/quicklisp/local-projects/wouldwork/src/problem.fasl" :EXTERNAL-FORMAT :UTF-8 :WARNINGS-FILE NIL)
+9: (ASDF/LISP-ACTION:PERFORM-LISP-COMPILATION #<ASDF/LISP-ACTION:COMPILE-OP > #<ASDF/USER::ALWAYS-COMPILE-FILE "wouldwork" "src" "problem">)
+10: ((SB-PCL::EMF ASDF/ACTION:PERFORM) #<unused argument> #<unused argument> #<ASDF/LISP-ACTION:COMPILE-OP > #<ASDF/USER::ALWAYS-COMPILE-FILE "wouldwork" "src" "problem">)
+11: ((LAMBDA NIL :IN ASDF/ACTION:CALL-WHILE-VISITING-ACTION))
+12: ((:METHOD ASDF/ACTION:PERFORM-WITH-RESTARTS :AROUND (T T)) #<ASDF/LISP-ACTION:COMPILE-OP > #<ASDF/USER::ALWAYS-COMPILE-FILE "wouldwork" "src" "problem">) [fast-method]
+13: ((:METHOD ASDF/PLAN:PERFORM-PLAN (T)) #<ASDF/PLAN:SEQUENTIAL-PLAN {110B0B51D3}>) [fast-method]
+14: ((FLET SB-C::WITH-IT :IN SB-C::%WITH-COMPILATION-UNIT))
+15: ((:METHOD ASDF/PLAN:PERFORM-PLAN :AROUND (T)) #<ASDF/PLAN:SEQUENTIAL-PLAN {110B0B51D3}>) [fast-method]
+16: ((:METHOD ASDF/OPERATE:OPERATE (ASDF/OPERATION:OPERATION ASDF/COMPONENT:COMPONENT)) #<ASDF/LISP-ACTION:LOAD-OP > #<ASDF/SYSTEM:SYSTEM "wouldwork"> :PLAN-CLASS NIL :PLAN-OPTIONS NIL) [fast-method]
+17: ((SB-PCL::EMF ASDF/OPERATE:OPERATE) #<unused argument> #<unused argument> #<ASDF/LISP-ACTION:LOAD-OP > #<ASDF/SYSTEM:SYSTEM "wouldwork"> :VERBOSE NIL)
+18: ((LAMBDA NIL :IN ASDF/OPERATE:OPERATE))
+19: ((:METHOD ASDF/OPERATE:OPERATE :AROUND (T T)) #<ASDF/LISP-ACTION:LOAD-OP > #<ASDF/SYSTEM:SYSTEM "wouldwork"> :VERBOSE NIL) [fast-method]
+20: ((SB-PCL::EMF ASDF/OPERATE:OPERATE) #<unused argument> #<unused argument> ASDF/LISP-ACTION:LOAD-OP "wouldwork" :VERBOSE NIL)
+21: ((LAMBDA NIL :IN ASDF/OPERATE:OPERATE))
+22: ((:METHOD ASDF/OPERATE:OPERATE :AROUND (T T)) ASDF/LISP-ACTION:LOAD-OP "wouldwork" :VERBOSE NIL) [fast-method]
+23: (ASDF/SESSION:CALL-WITH-ASDF-SESSION #<FUNCTION (LAMBDA NIL :IN ASDF/OPERATE:OPERATE) {110B0E53FB}> :OVERRIDE T :KEY NIL :OVERRIDE-CACHE T :OVERRIDE-FORCING NIL)
+24: ((LAMBDA NIL :IN ASDF/OPERATE:OPERATE))
+25: (ASDF/SESSION:CALL-WITH-ASDF-SESSION #<FUNCTION (LAMBDA NIL :IN ASDF/OPERATE:OPERATE) {110B0E001B}> :OVERRIDE NIL :KEY NIL :OVERRIDE-CACHE NIL :OVERRIDE-FORCING NIL)
+26: ((:METHOD ASDF/OPERATE:OPERATE :AROUND (T T)) ASDF/LISP-ACTION:LOAD-OP "wouldwork" :VERBOSE NIL) [fast-method]
+27: (ASDF/OPERATE:LOAD-SYSTEM "wouldwork" :VERBOSE NIL)
+28: (QUICKLISP-CLIENT::CALL-WITH-MACROEXPAND-PROGRESS #<FUNCTION (LAMBDA NIL :IN QUICKLISP-CLIENT::APPLY-LOAD-STRATEGY) {110B0D124B}>)
+29: (QUICKLISP-CLIENT::AUTOLOAD-SYSTEM-AND-DEPENDENCIES "wouldwork" :PROMPT NIL)
+30: ((:METHOD QL-IMPL-UTIL::%CALL-WITH-QUIET-COMPILATION (T T)) #<unused argument> #<FUNCTION (FLET QUICKLISP-CLIENT::QL :IN QUICKLISP-CLIENT:QUICKLOAD) {110AE8941B}>) [fast-method]
+31: ((:METHOD QL-IMPL-UTIL::%CALL-WITH-QUIET-COMPILATION :AROUND (QL-IMPL:SBCL T)) #<QL-IMPL:SBCL {1107476023}> #<FUNCTION (FLET QUICKLISP-CLIENT::QL :IN QUICKLISP-CLIENT:QUICKLOAD) {110AE8941B}>) [fast-method]
+32: ((:METHOD QUICKLISP-CLIENT:QUICKLOAD (T)) :WOULDWORK :PROMPT NIL :SILENT NIL :VERBOSE NIL) [fast-method]
+33: (QL-DIST::CALL-WITH-CONSISTENT-DISTS #<FUNCTION (LAMBDA NIL :IN QUICKLISP-CLIENT:QUICKLOAD) {110AE85C9B}>)
+34: (SB-INT:SIMPLE-EVAL-IN-LEXENV (QUICKLISP-CLIENT:QUICKLOAD :WOULDWORK) #<NULL-LEXENV>)
+35: (EVAL-TLF (QUICKLISP-CLIENT:QUICKLOAD :WOULDWORK) 0 NIL)
+36: ((LABELS SB-FASL::EVAL-FORM :IN SB-INT:LOAD-AS-SOURCE) (QUICKLISP-CLIENT:QUICKLOAD :WOULDWORK) 0)
+37: ((LAMBDA (SB-KERNEL:FORM &KEY :CURRENT-INDEX &ALLOW-OTHER-KEYS) :IN SB-INT:LOAD-AS-SOURCE) (QUICKLISP-CLIENT:QUICKLOAD :WOULDWORK) :CURRENT-INDEX 0)
+38: (SB-C::%DO-FORMS-FROM-INFO #<FUNCTION (LAMBDA (SB-KERNEL:FORM &KEY :CURRENT-INDEX &ALLOW-OTHER-KEYS) :IN SB-INT:LOAD-AS-SOURCE) {5FF0DB}> #<SB-C::SOURCE-INFO {110AE7A5E3}> SB-C::INPUT-ERROR-IN-LOAD)
+39: (SB-INT:LOAD-AS-SOURCE #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\doc\\problems\\crelay-topo\\constraint-evidence\\run-b2-baseline-2026-09-22.lisp" {110AE84083}> :VERBOSE NIL :PRINT NIL :CONTEXT "loading")
+40: ((LABELS SB-FASL::LOAD-STREAM-1 :IN LOAD) #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\doc\\problems\\crelay-topo\\constraint-evidence\\run-b2-baseline-2026-09-22.lisp" {110AE84083}> NIL)
+41: (SB-FASL::CALL-WITH-LOAD-BINDINGS #<FUNCTION (LABELS SB-FASL::LOAD-STREAM-1 :IN LOAD) {5FF49B}> #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\doc\\problems\\crelay-topo\\constraint-evidence\\run-b2-baseline-2026-09-22.lisp" {110AE84083}> NIL #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\doc\\problems\\crelay-topo\\constraint-evidence\\run-b2-baseline-2026-09-22.lisp" {110AE84083}>)
+42: (LOAD #P"doc/problems/crelay-topo/constraint-evidence/run-b2-baseline-2026-09-22.lisp" :VERBOSE NIL :PRINT NIL :IF-DOES-NOT-EXIST :ERROR :EXTERNAL-FORMAT :DEFAULT)
+43: (SB-IMPL::PROCESS-EVAL/LOAD-OPTIONS ((:LOAD . "doc/problems/crelay-topo/constraint-evidence/run-b2-baseline-2026-09-22.lisp") (:QUIT)))
+44: (SB-IMPL::TOPLEVEL-INIT)
+45: ((FLET SB-UNIX::BODY :IN SB-IMPL::START-LISP))
+46: ((FLET "WITHOUT-INTERRUPTS-BODY-3" :IN SB-IMPL::START-LISP))
+47: (SB-IMPL::%START-LISP)
+48: ("foreign function: #x140048879")
+49: ("foreign function: #x14000B260")
+
+unhandled condition in --disable-debugger mode, quitting
+; 
+; compilation unit aborted
+;   caught 1 fatal ERROR condition
+Cleaning up resources and shutting down threads...
+Cleanup completed.

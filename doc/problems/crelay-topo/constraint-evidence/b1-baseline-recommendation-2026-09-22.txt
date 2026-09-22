@@ -1,0 +1,44 @@
+B1 two-cycle baseline recommendation -- 2026-09-22
+==================================================
+
+AUTHORIZATION
+D approved this one bounded B1 experiment after the staged construction was
+specified. This authorization covers only the experiment below. It does not
+authorize B2-B4, another cutoff, a replay, final validation, a ledger change,
+or a replacement of any existing checkpoint.
+
+START
+Freshly stage crelay-topo, set threads to 16 and depth cutoff to 12, then
+capture a fresh search checkpoint from *start-state*. Do not import any saved
+T10 checkpoint. Preserve the existing location15, source, and keeper archives.
+If B1 succeeds, retain its returned checkpoint in a new variable and archive;
+do not adopt it as a main-spine phase.
+
+GOAL
+  (and (recorder-cycle-ended)
+       (on tray1 plate1)
+       (has-location agent1 location1))
+
+This asks only for the closed first-cycle boundary: tray1 has been transferred
+to plate1, all ghosts are removed by a legal cycle ending, and the live agent
+has returned empty-handed to recorder1 at location1.
+
+SETTINGS
+  threads 16
+  depth cutoff 12
+  graph search
+  symmetry as staged
+  minimum-steps pruning as staged
+
+SUCCESS READING
+Success establishes one concrete B1 boundary under the returned checkpoint's
+actual endpoint facts. Inspect and record the action count, final tray/agent
+facts, recorder lifecycle facts, cutoff metadata, and pruning settings. Save
+the checkpoint separately. It does not establish B2's box transfer, the second
+fork, source restoration, gate6, location14, or a final solution.
+
+EXHAUSTION READING
+An exhaustion is a grade-3 bound only for this start, exact B1 goal, cutoff,
+and actual pruning configuration. Confirm whether direct cutoff truncation was
+observed. It does not refute another first-cycle route, a deeper B1 boundary,
+the two-cycle baseline, B2-B4, or the final problem.

@@ -1,0 +1,86 @@
+B2 cargo-fork proposal -- 2026-09-22
+==================================
+
+EXECUTION APPROVAL, subsequent to preparation
+D said "approved" in response to the concrete B2 experiment proposal. This
+authorizes the stated B1 restoration, one B2 search and separate success save.
+The original pre-approval record below is retained; it is now historical.
+
+AUTHORIZATION
+D approved preparation after this session disclosed supplied older puzzle
+memory and an initial registry lookup that returned related entries. This is
+an exposed session, not an independent clean prediction. No further memory
+lookup was used. B2 execution is NOT approved; this records the proposed run
+and its interpretation before that decision. No Lisp, staging, checkpoint
+import, search, replay, validation, or tests ran during preparation.
+
+EXACT START
+The recovered B1 archive t10-b1-checkpoint.txt, one phase/nine actions/depth9.
+Its SHA-256 was rechecked in this session and matches:
+D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+Its stored endpoint has tray1 on plate1/location2, agent1 at location1,
+box1 at location6, connector1 at location9, cycle1 closed and no ghosts.
+Physical gates1/2/5 are open. This is file inspection, not a fresh replay.
+
+PROPOSED OPERATION
+One standalone checkpoint search, threads16, cutoff12 additional actions,
+GRAPH, symmetry NIL, minimum-steps pruning T. If restoration is needed,
+stage and set threads before importing B1; then explicitly set run settings.
+Import is a replay needed to restore B1, not a rerun of its search. Approval
+for this proposal would cover that restoration, this one B2 search, endpoint
+inspection and separate export on success. No automatic retry or B3 follows.
+Use *t10-b1-checkpoint* for the restored predecessor and *t10-b2-checkpoint*
+for the result; save success as t10-b2-checkpoint.txt in this evidence folder.
+Preserve all four existing archives. No executable command is issued yet.
+
+GOAL (unchanged from the staged-construction proposal)
+  (and (recording-in-progress)
+       (on tray1 plate1)
+       (on box1 plate2)
+       (on tray1* plate1)
+       (on box1* plate2)
+       (has-location agent1 location1)
+       (has-location agent1* location1))
+
+RATIONALE
+S4 controller rows were read before retaining cutoff12: gate1 requires
+plate1, supplied by the saved tray; gate2 uses inverted switch1, and the
+saved endpoint has gate2 open; gate3 requires plate2. The prior construction
+proposes retrieving box1 through gate2, placing it on plate2, returning to
+recorder1 and starting again. START-RECORDER requires a closed ghost-free
+boundary and an empty-handed live agent at the recorder; it copies current
+locations and support occupancy, including both cargo-to-plate assignments.
+The instance has no recorder-cycle limit. Six actions is the prior nominal
+skeleton estimate, not a measured length or a new proof of route composition.
+The retained cap is the previously proposed ceiling12; no depth is inferred
+from B1's timing or from the old keeper-checkpoint exhaustions.
+
+SUCCESS AND ACCEPTANCE
+Record phase/cumulative depth and actions, all goal facts, both actor holding
+states, actual cycle count, physical and recording gate1/gate3 states, and
+remaining connector/box/tray inventory. The goal does not explicitly restrict
+cycle count, so inspect rather than assume that the found endpoint is cycle2.
+Save a new checkpoint separately and retain REALIZED/validated NIL for the
+search-found phase; no routine independent replay is requested. Success proves
+this cargo-fork endpoint from B1 only, not B3, source power, gate6, location14,
+or the final goal. Any unexpected endpoint is reviewed before continuation.
+
+EXHAUSTION
+Retain B1 unchanged. Record actual search/pruning settings, termination,
+direct cutoff-truncation value and cutoff hits. No-solution is a grade3 bound
+only for this exact start, goal, cap and pruning configuration; missing
+coverage remains UNKNOWN. It does not refute a deeper B2, another baseline,
+or the problem. No retry, deepening, or alternative probe is authorized.
+
+SOURCES
+Constraint-Implementation-Plan.md current task and T10;
+Constraint-Continuation-Prompt.txt; Constraint-Restart-Checkpoint.txt;
+the four permitted 2026-09-22 baseline/resource/staging analyses;
+b1-baseline-recommendation-2026-09-22.txt;
+b1-baseline-result-2026-09-22.txt; t10-b1-checkpoint.txt;
+Constraint-Static-Profile.txt gate1/gate2/gate3 controller rows;
+probs/problem-crelay-topo.lisp; tech/-recorder-session.lisp.
+
+No sealed register or solution content was read. Main ledger and measured
+results are unchanged. Other archive/profile/register hashes were not
+rechecked in this preparation; their earlier verification remains historical.

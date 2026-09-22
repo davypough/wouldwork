@@ -33,24 +33,87 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T10 — resource continuation analysis complete; strategic choice pending.**
-On 2026-09-22 D authorized continued read-only analysis after disclosure of
-supplied memory exposure; this is not a clean prediction session. The local
-ghost-release obstruction is now source-derived: stepping off plate1 closes
-recording gate1, and a live replacement does not restore ghost passage. Keeping
-the current source roles while excluding ghost supply also leaves only one
-non-agent live candidate for gate6's two plates. This conditional shortage does
-not explain the narrower probe's failure or prove the branch impossible.
-Recommended direction: develop a changed recorder baseline with a cargo witness
-for recording gate1, accounting for plate2 access and source restoration.
-No baseline, new search, replay, or implementation is approved. Evidence:
-`doc/problems/crelay-topo/constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt`.
+**T10 — B2 audit complete; revised box-retrieval construction awaits approval.**
 
-**Next-session entry:** read the continuation prompt, restart checkpoint and
-that analysis. The pending question is whether D approves developing the
-alternative recorder baseline through read-only analysis. The request to prepare
-this handoff did not approve that strategic next step. Do not rerun completed
-probes, import archives, or resume deferred T11 automatically.
+Handoff, 2026-09-22: D approved the read-only audit and documentation update.
+The proposed B2 route omitted a launch-elevation prerequisite: location6 is
+at3/2, the nearby ground launches at0, and the jump-rise limit is1. The
+blower fallback also needs a support/transition that survives opening gate2:
+switching off its lift drops an unsupported actor before the next move.
+This rejects the nominal six-action construction, not B2's reachability.
+The six-action B2 and combined29-action estimates are withdrawn as execution
+guidance; the second-fork and later B3/B4 endpoints remain conditional.
+Read `doc/problems/crelay-topo/constraint-evidence/b2-construction-audit-2026-09-22.txt`.
+Portable question G15 was appended without reading sealed gap content.
+No Lisp/search/replay/tests ran during the audit. Four archive hashes, the
+profile hash and three register-prefix hashes match; register content was
+not displayed. The main ledger remains unchanged. Historical18 searches plus
+the separate B1/B2 runs gives20; setup failures/imports add none.
+
+NEXT SESSION: read the continuation prompt, restart note and B2 audit/result/
+proposal. Recommend read-only derivation of a revised box-retrieval mechanism
+from preserved B1, subject to a new approval. No further runtime operation,
+baseline change, B3/B4, extractor or deferred T11 work is authorized. Do not
+rerun B1 or B2. All older next-step text below is historical where it conflicts.
+
+Latest result, 2026-09-22: D approved B2. One threads16/cutoff12 search from
+restored B1 found no solution; direct truncation T, 381717 cutoff hits,
+18.166 seconds. No B2 checkpoint was created; B1's hash remains unchanged.
+This separate experimental bound does not explain the failure or refute the
+baseline. Evidence: `doc/problems/crelay-topo/constraint-evidence/b2-baseline-result-2026-09-22.txt`.
+Recommend read-only audit of the nominal construction's movement and recorder
+assumptions, subject to new approval. No further runtime operation is approved.
+Earlier pending-B2 text below is historical and superseded by this result.
+
+Latest preparation, 2026-09-22: D approved B2 preparation after this session
+disclosed supplied older puzzle memory and a related registry lookup. This
+remains an exposed session. The B1 archive hash and stored endpoint were
+checked without import. The concrete one-run proposal, restoration scope,
+endpoint acceptance and bounded outcome readings are in
+`doc/problems/crelay-topo/constraint-evidence/b2-baseline-proposal-2026-09-22.txt`.
+No B2 operation is approved. No Lisp or tests ran; no sealed material was read.
+On 2026-09-22 D approved read-only development of the alternative baseline after
+the disclosed supplied-memory exposure; this remains an exposed, not clean,
+prediction session. The analysis produced a fresh two-cycle baseline candidate:
+the first cycle moves tray1 to plate1 while agent1* holds gate1, then cancels
+cleanly; box1 is moved to plate2; the second start forks cargo witnesses onto
+both plates. The new ghost can therefore leave R1 through recording gate1 and
+reach R2 through recording gate3 without depending on agent1* as a gate1
+witness. The baseline is not a checkpoint replacement, replayable sequence, or
+source/gate6 solution.
+
+D then approved read-only source-restoration analysis from that baseline. A
+new ghost can hold plate3, opening physical gate4 for the low source beam while
+the live agent pairs connector1 at location9. The baseline fork leaves tray1*
+and box1* on plates1/2, so their live counterparts can move independently to
+plates4/5 while the ghosts preserve gates1/3. With agent1 empty-handed, this
+is a source-derived candidate for red repeater power, physical gate6, and
+location14. It is neither a measured path nor a refutation of the earlier
+cutoff-12 bounds, which began from the different keeper checkpoint. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-analysis-2026-09-22.txt`.
+`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt`.
+
+D then approved read-only staged-construction analysis. The candidate separates
+into B1 first-cycle tray transfer/cancellation (nominal 9 actions), B2 box
+transfer and second fork (6), B3 ghost plate3 plus source pairing (5), and B4
+live gate6 witnesses plus location14 crossing (9). Each is proposed at the
+standing cutoff ceiling 12; the 29-action combined skeleton cannot be tested as
+one fresh-start probe.
+
+D approved B1. Its fresh-start threads16/cutoff12 search found the exact closed
+tray1-on-plate1 boundary at minimum depth9. The post-search export form then
+failed to parse because of a PowerShell pathname escape. D separately approved
+action-sequence recovery; the canonical nine actions were replayed and exported
+without invoking a solver. The recovered one-phase B1 archive has depth9,
+nine actions, and SHA-256
+`D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7`.
+Evidence: `doc/problems/crelay-topo/constraint-evidence/b1-baseline-result-2026-09-22.txt`.
+
+**Next-session entry:** read the continuation prompt, restart checkpoint, and
+the four 2026-09-22 analyses plus the B1 recommendation/result. The pending
+choice is whether to approve B2 from the recovered B1 checkpoint. Do not rerun
+B1, import archives, start B2, begin a new baseline, or resume deferred T11
+automatically without that approval.
 Handoff verification on 2026-09-22 rechecked all three archive hashes, the full
 generated-profile hash and all three recorded register-prefix hashes: all match.
 Register bytes were hashed only; no sealed content was displayed or interpreted.
@@ -330,7 +393,7 @@ Two invariants constrain everything below:
 | T7 | S5 height and reach lattice | PROPOSED | not requested | — |
 | T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
 | T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
-| T10 | End-to-end closure on crelay-topo (7/9 spine links found; resource continuation analyzed) | IN PROGRESS | read-only continuation approved/completed 2026-09-22; strategic choice pending; no further search approved; cutoff ceiling12 | T2–T5 |
+| T10 | End-to-end closure on crelay-topo (7/9 spine links found; B1 baseline boundary archived) | IN PROGRESS | B2 audit complete; G15 open; revised box-retrieval construction awaits approval; no run pending | T2–T5 |
 | T11 | Implement and score the G14 fix | APPROVED, DEFERRED | approved, four parts | — |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
@@ -780,7 +843,93 @@ ALWAYS. Searches require their own approval.
 **Status.** IN PROGRESS, 2026-09-20. **Approval.** Granted in session by D, including
 the searches, after being told plainly that T10 needs them.
 
+**Baseline update, 2026-09-22.** With D's explicit read-only approval, the
+alternative recorder baseline was developed from permitted source and evidence.
+It is a fresh two-cycle arrangement, not a transformation of the keeper
+checkpoint: first move tray1 to plate1 under agent1*'s open-cycle gate1
+witness, return agent1 empty-handed and cancel; then move box1 to plate2; then
+start a second cycle. The second fork puts tray1* on plate1 and box1* on
+plate2, keeping recording gates1 and3 open while the new ghost exits R1 and
+reaches R2. It removes the local ghost-release obstruction but leaves source
+restoration, gate6 resources, and every later traversal unresolved. No runtime
+operation, checkpoint import, replay, search, validation, extractor, code
+change, or ledger restructuring occurred. Evidence:
+`constraint-evidence/recorder-baseline-analysis-2026-09-22.txt`. The next
+strategic choice is only whether to authorize further read-only analysis of
+source restoration and resource commitments from that baseline.
+
+**Baseline source/resource update, 2026-09-22.** D approved that further
+read-only analysis. With tray1/box1 held at plates1/2, the new ghost can reach
+R2 and hold plate3; because physical pressure is layer-blind, that opens gate4
+for the low transmitter1-to-connector1 source beam while agent1 pairs the live
+connector at location9. The second fork leaves tray1* and box1* at plates1/2;
+the live tray and box can then move independently to plates4/5, retaining the
+ghost gate witnesses and opening physical gate6 for an empty-handed agent1.
+This gives a source-derived candidate for red repeater, gate6, and location14.
+It is not a measured path, and the truncated cutoff-12 bounds from the different
+keeper checkpoint neither explain nor refute it. No runtime operation,
+checkpoint import, replay, search, validation, extractor, code change, or
+ledger restructuring occurred. Evidence:
+`constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt`.
+The next choice is whether to derive a staged bounded construction for this
+candidate before any specific replay or search is proposed.
+
+**Baseline staged-construction update, 2026-09-22.** D approved that read-only
+derivation. B1 transfers tray1 to plate1 during a first recorder cycle and
+cancels at a closed boundary; B2 moves box1 to plate2 and starts the second
+cycle; B3 uses agent1* at plate3 and connector1 at location9 to restore the
+source; B4 uses the live tray and box at plates4/5 for gate6, then crosses
+screen1 empty-handed to location14. The nominal skeleton counts are 9, 6, 5,
+and 9 actions. Each future bounded stage is proposed at cutoff12; the 29-action
+combined skeleton is not a legitimate single fresh-start probe under that
+ceiling. No runtime operation, checkpoint import, replay, search, validation,
+extractor, code change, or ledger restructuring occurred. Evidence:
+`constraint-evidence/recorder-baseline-staged-construction-2026-09-22.txt`.
+The next choice is whether to approve B1 as an explicitly recorded bounded
+experiment.
+
+**B1 result update, 2026-09-22.** D approved the B1 fresh-start experiment.
+At threads16/cutoff12 it found the requested closed boundary at minimum depth9:
+agent1* opens gate1, agent1 transfers tray1 from plate2 to plate1, returns to
+recorder1, and cancels. The result has tray1 on plate1, agent1 at location1,
+and no ghosts; physical and recording gate1 are open. Three candidate paths
+were accepted. The returned checkpoint could not be exported because the
+post-search PowerShell pathname form caused a READER-EOF-ERROR after the search
+was complete.
+
+**B1 recovery update, 2026-09-22.** D separately approved action-sequence
+reconstruction. The canonical nine actions were validated from a fresh staged
+origin and exported as `constraint-evidence/t10-b1-checkpoint.txt`; no planner
+operation ran. The archive contains one checkpoint at depth9 with nine actions
+and SHA-256
+`D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7`.
+It is a separate B1 experimental checkpoint, not a main-spine link, validation,
+or B2 authorization. The next choice is whether to approve B2 from this
+recovered checkpoint. See `constraint-evidence/b1-baseline-result-2026-09-22.txt`.
+
 **What exists after the first half.**
+Current audit completion (2026-09-22): D approved read-only review and handoff.
+The B2 six-action route omitted jump-rise and propagated lift-loss conditions;
+that estimate is withdrawn, with G15 filed as a portable obligation. B1 and
+the three older archives are hash-verified and unchanged. Next strategic
+decision: approve read-only revised box retrieval from B1; no execution is
+authorized. Evidence: `constraint-evidence/b2-construction-audit-2026-09-22.txt`.
+Technical decision: preserve original pre-run text under explicit correction
+notices, so the measured failure remains tied to the proposal actually tested.
+
+Latest B2 result (2026-09-22): the approved single search exhausted with direct
+truncation at cutoff12. B1 remains unchanged; no B2 archive. See
+`constraint-evidence/b2-baseline-result-2026-09-22.txt`. Read-only construction
+audit is proposed, not yet approved; no further search or deepening authorized.
+
+Latest B2 preparation (2026-09-22): the separately filed proposal retains the
+staged-construction goal and threads16/cutoff12. Technical decision: preserve
+the goal rather than add an unmeasured cycle-count restriction; inspect the
+actual cycle count and holding states at any successful endpoint. D authorized
+preparation in this exposed session, not execution. See
+`constraint-evidence/b2-baseline-proposal-2026-09-22.txt`.
+
+Historical first-half state follows:
 `doc/problems/crelay-topo/Constraint-Realization-Ledger.txt`, built by
 `constraint-evidence/build-realization-ledger-2026-09-20.lisp`: ten derived premises,
 six links and nine open questions. Every link is OPEN. Nothing has been searched.

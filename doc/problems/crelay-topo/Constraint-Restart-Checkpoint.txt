@@ -1,5 +1,42 @@
 T10 restart checkpoint -- refreshed 2026-09-22
 ============================================
+CURRENT HANDOFF -- B2 AUDIT COMPLETE, 2026-09-22
+D approved the read-only audit and handoff update; both are complete.
+Read constraint-evidence/b2-construction-audit-2026-09-22.txt first after the
+continuation prompt. B2's simple route omitted a3/2 rise with jump limit1;
+the blower alternative also drops an unsupported actor when opening gate2.
+The nominal six-action B2 / combined29-action estimates are withdrawn.
+This rejects the proposed construction, not all B2 arrangements or deeper
+paths. B1 is unchanged and there is no B2 checkpoint. Proposed next work is
+read-only revised box retrieval from B1, requiring approval; no runtime
+operation, alternative baseline, B3/B4 or T11 work is currently authorized.
+All four archive hashes below, generated-profile hash and three recorded
+register-prefix hashes were rechecked and match. Register bytes were hashed
+without displaying content. No Lisp, search, import, replay or tests ran in
+the audit. Main ledger counts unchanged;20 total reported searches including
+the separate B1/B2 runs supersedes the historical18 below. G15 is OPEN.
+Older pending-B2 and pending-audit instructions below are historical.
+
+LATEST B2 RESULT -- supersedes pending-B2 instructions below
+D approved B2. The single threads16/cutoff12 search from restored B1 found
+no solution, direct truncation T, 381717 cutoff hits, 18.166 seconds.
+B1 remains one phase/nine actions; its archive hash was rechecked unchanged.
+No B2 checkpoint exists. Read constraint-evidence/b2-baseline-result-2026-09-22.txt
+and its pre-run proposal. This is a bound for that exact start/goal/settings,
+not a refutation or diagnosis. No further runtime operation is approved.
+Proposed next step: read-only source audit of the nominal B2 construction;
+await approval. Main ledger and four predecessor archives remain unchanged.
+
+LATEST B2 PREPARATION (supersedes pending preparation text below)
+D approved preparing B2 after the current session's supplied-memory and
+registry-lookup exposure was disclosed. Execution remains unapproved.
+Read constraint-evidence/b2-baseline-proposal-2026-09-22.txt for the exact
+goal, one threads16/cutoff12 search, necessary B1 restoration, separate save,
+endpoint review and outcome limits proposed for approval. The B1 file hash
+was rechecked and matches; no archive was imported and no Lisp or tests ran.
+All existing checkpoints and the main ledger are unchanged. Other historical
+hash checks below were not repeated. This is not a clean prediction session.
+
 LATEST ANALYSIS (2026-09-22)
 D authorized read-only continuation after supplied-memory exposure was disclosed.
 The ghost cannot simply leave plate1 to replace tray1: its separate dismount
@@ -7,17 +44,59 @@ closes recording gate1, and a live replacement supplies only physical pressure.
 With source roles fixed and ghost supply unavailable, only one non-agent live
 body remains for gate6's two supports. This is conditional allocation analysis,
 not an explanation of the narrower exhaustion or a stranding proof.
-Recommended direction is a changed recorder baseline with cargo holding
-recording gate1; plate2 access, closure/return and source restoration still need
-explicit preparation. No baseline or next run selected/approved. See
-constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt.
-All inventories, measured counts and archive references below are unchanged.
+
+D then approved development of the proposed alternative baseline through
+read-only analysis. It is a fresh two-cycle candidate, not a change to the
+keeper checkpoint: cycle one moves tray1 to plate1 under agent1*'s gate1
+witness and cancels; box1 is then moved to plate2; cycle two forks cargo
+witnesses at both plates. Tray1* keeps recording gate1 open and box1* keeps
+recording gate3 open, so the new ghost can reach R2 without agent1* holding
+plate1. Source restoration, gate6 resources, and all later crossings remain
+unresolved; no baseline was staged, replayed, searched, or saved. See
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt and
+constraint-evidence/recorder-baseline-analysis-2026-09-22.txt. All inventories,
+measured counts and archive references below are unchanged.
+
+D then approved read-only source-restoration and resource analysis from that
+baseline. The new ghost can reach R2 and occupy plate3, supplying physical
+gate4 for the low source beam while the live agent pairs connector1 at
+location9. The second fork leaves tray1* and box1* on plates1/2; the live tray
+and box can move independently to plates4/5 while those ghosts preserve gates1
+and3. This yields a source-derived candidate for red repeater power, physical
+gate6, and an empty-handed agent1 at location14. It is not a measured path, and
+the cutoff-12 bounds begin from the different keeper checkpoint, so they neither
+explain nor refute it. See
+constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt.
+
+D then approved read-only staged-construction analysis. The candidate separates
+into four independently bounded stages: B1 first-cycle tray1-to-plate1 and
+cancellation (nominal 9 actions); B2 box1-to-plate2 and second fork (6); B3
+ghost plate3 source witness and live connector pairing (5); B4 live tray/box
+to plates4/5 and an empty-handed location14 crossing (9). Each future stage is
+proposed at cutoff12; the 29-action combined skeleton cannot fit one
+fresh-start probe under that ceiling. No stage is approved to run. See
+constraint-evidence/recorder-baseline-staged-construction-2026-09-22.txt.
+
+D approved B1. From a fresh initial state at threads16/cutoff12, the planner
+found its exact closed boundary at minimum depth9: tray1 on plate1, agent1 at
+recorder1/location1, and no ghosts after CANCEL-PLAYBACK. Physical and
+recording gate1 are open. The returned checkpoint was not exported because the
+post-search PowerShell pathname form failed to parse; the search itself had
+already completed. D then separately approved replay/export recovery. The exact
+canonical nine-action B1 sequence was validated from a fresh staged origin and
+exported without calling a solver. The recovered archive contains one
+checkpoint at depth9 with nine actions:
+constraint-evidence/t10-b1-checkpoint.txt
+SHA256 D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+It is a separate B1 experimental checkpoint, not a main-spine link or B2
+authorization. Raw search and recovery evidence:
+constraint-evidence/b1-baseline-result-2026-09-22.txt.
 The subsequent handoff check on 2026-09-22 reverified all three archive hashes,
 the full generated-profile hash and the three recorded register-prefix hashes;
 all matched. Register bytes were hashed without displaying/interpreting content.
-Next session: read the continuation prompt and the analysis above, then resolve
-the pending approval for developing the alternative baseline through read-only
-analysis. Handoff preparation itself did not approve that next step.
+Next session: read the continuation prompt, all four analyses, and the B1
+recommendation/result, then resolve whether to approve B2 from the recovered
+B1 checkpoint. Do not rerun B1. No B2 operation is approved.
 
 CURRENT STATUS: the approved standalone switch2 return-access and gate6/source
 resource probes both exhausted at cutoff12. No further search is currently
@@ -48,7 +127,7 @@ None were adopted as mandatory links. BD2: cutoff8 crossing, UNKNOWN historical
 coverage. BD3: cutoff10 crossing, confirmed truncation,130956 hits, GRAPH,
 symmetry NIL, min-steps pruning T.
 
-THREE DISTINCT CHECKPOINTS -- ALL SAVED
+FOUR DISTINCT CHECKPOINT ARCHIVES -- ALL SAVED
 1. Seed: *t10-checkpoint*, t10-location15-checkpoint.txt, 7 phases/19 actions.
    Agent1 location15, switch2 on, connector1 on plate5/location12, tray1 on
    plate4/location13. Source unpowered. Physical gates1/2/3/6/7 open.
@@ -63,9 +142,15 @@ THREE DISTINCT CHECKPOINTS -- ALL SAVED
    connector1/repeater1 red. Plates4/5 empty. Switch2 off. Physical gates1/2/3/4/5
    open; gates6/7/8/9 closed. Receiver not active; no raised connector.
    SHA256 21953443D71570B85CD2E5A76D124E8D2720C03EB6648F8693AF8CA9F82D578D
+4. B1 baseline: t10-b1-checkpoint.txt, a separate fresh-origin experimental
+   archive, 1 phase/9 actions. Tray1 is on plate1; agent1 is at location1; the
+   recorder's first cycle is closed. SHA256
+   D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
 Archive paths above are under doc/problems/crelay-topo/constraint-evidence/.
-All three hashes were checked during handoff; keeper final facts match D's trace.
-This is file inspection, not an independent replay or an upgraded validation grade.
+The original three hashes were checked during handoff; the B1 archive was
+created by the separately approved replay/export recovery. Keeper final facts
+match D's trace. This is file inspection, not an independent replay or an
+upgraded validation grade.
 
 Shared across all three: ghost agent1* on plate1/location2, ghost tray1* on
 plate2/location7, ghost connector1* location9, both live/ghost boxes location6.

@@ -1,0 +1,153 @@
+B2 construction audit and handoff -- 2026-09-22
+============================================
+
+AUTHORIZATION AND SCOPE
+D approved the read-only B2 audit and requested documentation ready for a new
+session. Current source, permitted generated profile, B1 archive and retained
+B2 result/log were read as text. No Lisp, staging, import, search, replay,
+validation, extractor or test ran. No engine or instance was edited. This is
+the already disclosed exposed session, not a clean prediction experiment.
+No further memory lookup or sealed-content read occurred.
+
+CONCLUSION
+The nominal six-action B2 skeleton omitted a concrete elevation prerequisite
+on its first box-retrieval leg. An open gate2 does not make a ground-level
+jump into location6 legal. The simple blower fallback also omits a support
+requirement between switching off and crossing. These source-derived local
+counterexamples reject that construction as written; they do not prove B2
+unreachable, diagnose every branch of the measured search, or establish an
+alternative sequence. Withdraw the six-action B2 estimate and the combined
+29-action skeleton as execution guidance. B3/B4 remain conditional proposals
+whose B2 starting arrangement has not been realized.
+
+1. FIRST UNSUPPLIED PRECONDITION: GAINING ELEVATION
+Authored coordinates: locations4/5 are at level0; location6 and location20
+are at level3/2. Box1 remains at location6 in the saved B1 endpoint.
+The authored jumping edges into location6 come from locations4/5/20.
+JUMP-ELEVATION-REACHABLE requires target minus launch elevation <= the
+vertical reach limit, which is 1. JUMP-SEGMENT-FOR-CLAUSE checks this even
+when all barrier gates are open. Thus the two ordinary ground launches have
+3/2 > 1 and fail. Walking requires equal endpoint levels and cannot replace
+that jump. The level location20 launch would satisfy the landing-height test,
+but reaching and retaining that elevated launch position was not supplied.
+
+S3 explicitly warns that region membership does not establish concrete
+mobility: its quotient does not evaluate the modes' height predicates.
+R8 includes location20 with the lower approach locations. Treating that
+region as freely traversable was the proposal's error. Reading gate2's S4
+controller row alone did not discharge the movement obligation.
+
+Sources: probs/problem-crelay-topo.lisp 95-113, 136-137, 168, 179-182;
+tech/jump.lisp JUMP-ELEVATION-REACHABLE and JUMP-SEGMENT-FOR-CLAUSE;
+tech/-support-elevation.lisp default and reach queries;
+tech/walkability.lisp WALKING-SEGMENT-FOR-CLAUSE;
+Constraint-Static-Profile.txt S3 contraction warning.
+
+2. REMOTE PICKUP IS NOT A SUBSTITUTE FROM THESE APPROACH LOCATIONS
+PICKUP-BOX calls PICKUP-CLEAR, requiring manipulation reach and vertical
+reach. The horizontal reach limit is 5/2. Location6 is 29/10 horizontally
+from locations4 and20; from location5 the squared separation is 941/100,
+also greater than (5/2)^2 = 625/100. Therefore no derived reach edge from
+those three approach locations lets the actor simply lift box1 across the
+gap. Raising the actor at the same named location does not change that
+location-based horizontal test. This is a local statement about those
+locations, not an exhaustive transport impossibility claim.
+
+Sources: tech/box.lisp PICKUP-BOX; tech/-pickup.lisp PICKUP-CLEAR;
+tech/-reachability-coordinates.lisp REACHABILITY-COORDINATES-WITHIN-LIMIT-P;
+tech/reachability.lisp REACHABLE; authored coordinates above.
+
+3. BLOWER FALLBACK HAS A PROPAGATED STATE BOUNDARY
+Blower1 is at location4 and aims at location20. STEP onto it is an explicit
+configuration-changing MOVE; when active, propagation launches the actor to
+location20. Walking there and mounting it cannot be silently counted as one
+transparent route. Ordinary grounded WALK/JUMP segments may compose in one
+MOVE if every segment is legal in that state; the issue is not that every
+segment necessarily costs an action.
+
+Switch1 controls blower1 normally and gate2 inversely. In the same actor's
+environmental view, an active blower and open gate2 are incompatible under
+this wiring. The gate's base is 3/2 and its default height is 4: a closed
+gate2 has top11/2. From location20 at3/2 it requires clearance4 > limit1,
+so merely vaulting the closed gate from that hover position fails too.
+
+Switch1 can be manipulated from location20: the profile lists the reach
+candidate and its default fixture base1 differs from actor base3/2 by1/2.
+But TOGGLE-SWITCH propagates immediately. When its actor's blower view stops,
+DROP-OCCUPANTS! returns an unsupported occupant at location20 to location4.
+There is no retained hover state in which to take the next gate2 jump.
+An independent support or other specifically established transition is
+needed to bridge this boundary; none is supplied by the audited skeleton.
+
+Ghosts do not automatically evade this conjunction: both gate openness and
+blower activity select the recording view for ghost objects. Live-only
+switch changes cannot be borrowed as recording gate state. Ghost switches
+also affect the physical switch, so any proposed split-view mechanism needs
+its own explicit sequence and view-by-view checks.
+
+Sources: tech/step.lisp; tech/-mobility-action.lisp; tech/-mobility.lisp;
+tech/-floor-blowing.lisp BLOW-OCCUPANTS-AWAY! and DROP-OCCUPANTS!;
+tech/-gears-fan.lisp BLOWER-TURNING-FOR-OBJECT;
+tech/-recorder-blower-shadow.lisp; tech/-gate.lisp GATE-OPEN-FOR-OBJECT;
+tech/switch.lisp; tech/-vertical.lisp type defaults; authored wiring/geometry.
+
+4. RECORDER BOUNDARY CHECK
+B1 is genuinely closed and ghost-free, with cycle count1 and agent1 at
+recorder1/location1. START-RECORDER permits a new cycle at that boundary
+with an empty-handed live actor; there is no configured cycle maximum.
+It copies current live locations and ON assignments. Thus IF live tray1
+and box1 are first established on plates1/2, the proposed fork mechanism
+has source support. That conditional does not supply the missing box route.
+
+The B2 goal did not require cycle count2, so the measured exhaustion should
+not be described as testing only paths with exactly two total cycles.
+Temporary extra cycles were not excluded by that goal. Any candidate that
+uses them must pay for START, legal closure, exact snapshot placement and
+mandatory ended-cycle validation. Cancellation at the recorder removes ghost
+references; it does not preserve a ghost witness into the next fork.
+
+The log reports zero nominal goal candidates; it does not report a completed
+B2 candidate rejected by final validation. Boundary-prefix checks rejected
+1388 states, but those aggregate counts do not identify the cause of failure.
+The no-progress check is attached to completed cycle endings, not a blanket
+ban on START after B1. No source evidence was found for the proposed claim
+that B1's cancellation itself forbids a second start.
+
+Sources: tech/-recorder-session.lisp; tech/-recorder-cycle-boundary.lisp;
+tech/-recorder-solution.lisp RECORDER-ENDING-PREFIX-TRIGGER-P and
+VALIDATE-RECORDER-CYCLE-BOUNDARY-PREFIX; B1 archive; retained B2 raw log.
+
+5. SCOPE OF THE MEASURED BOUND
+B2's one approved search: cutoff12 additional actions, threads16, GRAPH,
+symmetry NIL, minimum-steps pruning T, no solution, direct truncation T,
+381717 cutoff hits, 18.166 seconds. B1 was returned unchanged; no B2 archive.
+That is a grade3 bound for the exact goal/start/settings. The local source
+counterexamples above are separate evidence about the nominal construction;
+they neither explain all 3,328,187 processed states nor prove stranding.
+No main-spine link or bound is added or regraded. The historical count18
+predates the separate B1/B2 searches; including those gives20 reported
+searches. Imports and setup failures are not additional searches.
+
+6. NEXT-SESSION DECISION -- NO OPERATION AUTHORIZED
+Recommend read-only derivation of a revised box-retrieval subconstruction
+from B1. It must first specify how the actor gains and retains sufficient
+elevation while its own gate2 view permits crossing, then box pickup/return,
+live box placement and any recorder-cycle boundaries. Use only given objects
+and geometry. Additional locations may be proposed under the project rules,
+but none was proposed or added here. Do not automatically repeat B2, deepen,
+change the goal or instance, import, validate, resume T11, or start B3/B4.
+Obtain approval for the revised-construction work before beginning it.
+
+The portable missing question is filed as G15 in Constraint-Schema-Gaps.txt:
+whether a proposed quotient traversal has its required launch configuration
+and whether controller propagation preserves it until the next action.
+This is an OPEN gap, not a new extractor specification or implementation.
+
+HANDOFF VERIFICATION
+All four archive hashes, the full generated-profile hash, and all three
+recorded register-prefix hashes were rechecked in this audit and match the
+continuation/restart records. Register bytes were hashed only, never displayed
+or interpreted. No B2 archive or temporary .b2-cache directory exists.
+Earlier failed launch logs and the runner are retained evidence, not temporary
+files. Documentation corrections preserve the historical pre-run proposal and
+result. Plan, restart, audit and gap update precede continuation regeneration.

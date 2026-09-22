@@ -858,3 +858,28 @@ Gaps are the portable artifact and travel to the next problem.  Build work they
 cause is tracked separately as tasks in
 doc/constraint-method/Constraint-Implementation-Plan.md; file the question here
 first and cite the gap id there.
+
+
+G15 -- Launch configuration and propagation across a quotient traversal
+----------------------------------------------------------------------
+Status: OPEN. Filed 2026-09-22 after an approved read-only construction audit.
+
+Missing question: before assigning a concrete realization or action budget to
+a region-graph traversal, what launch elevation/support does its movement
+predicate require, and do the controller-changing actions needed to clear
+the barrier preserve that configuration through propagation until crossing?
+
+An open barrier does not establish a legal landing-height change. A region
+containing both low ground and a raised point does not establish a way to
+reach the raised point. A controller toggle may simultaneously clear a gate
+and remove the actor's lift, so a proposed next action must begin from the
+propagated successor, not from a mixture of states. Remote cargo pickup must
+separately discharge horizontal and vertical reach. Recorder actors require
+each prerequisite in their own environmental view.
+
+The current quotient already warns that mode predicates are unevaluated;
+this gap concerns failure to carry that obligation into construction and its
+budget, not evidence that the quotient's declared contract is incorrect.
+No general impossibility, mandatory resource count, complete alternative,
+new extractor, or implementation approval follows from this question.
+Permitted evidence: constraint-evidence/b2-construction-audit-2026-09-22.txt.

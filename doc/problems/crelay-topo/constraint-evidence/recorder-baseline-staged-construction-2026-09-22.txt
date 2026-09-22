@@ -1,0 +1,151 @@
+Recorder-baseline staged construction analysis -- 2026-09-22
+============================================================
+
+AUDIT CORRECTION, later 2026-09-22
+B2's nominal six-action route fails to supply the elevation needed to reach
+box1. The six-action estimate and combined29-action skeleton below are
+withdrawn as execution guidance. B1 remains measured; B2 exhausted at12;
+B3/B4 depend on an unrealized B2 endpoint. Read
+b2-construction-audit-2026-09-22.txt for the source-derived obstruction and
+scope limits. Original analysis below is retained as pre-run provenance.
+
+AUTHORIZATION AND SCOPE
+D approved read-only derivation of a staged bounded construction for the
+two-cycle source/gate6/location14 candidate. This analysis uses the three
+preceding 2026-09-22 analyses, permitted instance/profile/evidence, and the
+recorder, mobility, cargo, support, gate, screen, and beam source files. No
+Lisp was executed. No recorder was started, and no problem was staged,
+imported, replayed, searched, or validated. No extractor, engine, or ledger
+code was changed, and no sealed material was read.
+
+WHY THE CANDIDATE MUST BE STAGED
+The source-derived action skeleton contains four independent commitments:
+
+  B1  first-cycle transfer of tray1 to plate1 and clean cancellation;
+  B2  box1 transfer to plate2 and the second recorder fork;
+  B3  ghost plate3 source keeper plus live connector1 source pairing;
+  B4  live tray1/box1 transfer to plates4/5 and the empty-handed gate6 crossing.
+
+The skeleton contains 29 nominal actions when every transparent multi-segment
+route is one MOVE action: B1 9, B2 6, B3 5, B4 9. This is not a measured
+length or a claim that each route is the chosen engine route. It shows why a
+single fresh-start experiment cannot fit the standing cutoff ceiling of 12.
+Each milestone, however, has a candidate skeleton no longer than 9 actions.
+
+STAGE B1 -- FIRST-CYCLE GATE1 TRANSFER
+Start from the initial state. The candidate action shape is:
+
+  START-RECORDER;
+  agent1* moves within R1 and steps onto plate1;
+  agent1 crosses physical gate1, picks up tray1 from plate2,
+  returns through gate1, and puts tray1 on plate1;
+  agent1 returns empty-handed to recorder1 and CANCEL-PLAYBACK.
+
+Candidate postcondition:
+
+  (and (recorder-cycle-ended)
+       (on tray1 plate1)
+       (has-location agent1 location1))
+
+The nominal count is 9. The suggested future cap is 12, the existing maximum.
+Success establishes only this closed baseline boundary. An exhaustion would be
+a bound for the initial state and this exact postcondition; it would not refute
+another gate1 baseline.
+
+STAGE B2 -- SECOND-CYCLE CARGO FORK
+Start from B1's closed boundary. Gate1 remains physically open under tray1.
+Agent1 reaches box1 through initially open gate2, carries it back to R8, puts
+it on plate2, returns empty-handed to recorder1, and starts the second cycle.
+
+Candidate postcondition:
+
+  (and (recording-in-progress)
+       (on tray1 plate1)
+       (on box1 plate2)
+       (on tray1* plate1)
+       (on box1* plate2)
+       (has-location agent1 location1)
+       (has-location agent1* location1))
+
+The nominal count is 6. The suggested future cap is 12, not a claim that 6 is
+the search depth. Success establishes the open two-cycle cargo baseline; it
+must be saved separately rather than replacing any current checkpoint.
+
+STAGE B3 -- SOURCE RESTORATION
+Start from B2. Agent1* traverses recording gates1/3 to location10 and steps on
+plate3. Agent1 traverses physical gates1/3 to location9, picks up connector1,
+and connects it at location9 to transmitter1 and repeater1.
+
+Candidate postcondition:
+
+  (and (recording-in-progress)
+       (on tray1* plate1)
+       (on box1* plate2)
+       (on agent1* plate3)
+       (has-location connector1 location9)
+       (paired connector1 transmitter1)
+       (paired connector1 repeater1)
+       (color repeater1 red))
+
+The nominal count is 5. The suggested future cap is 12. Success establishes
+the source/witness arrangement only; it does not open gate6 or establish a
+receiver path.
+
+STAGE B4 -- GATE6 ACCESS
+Start from B3. The live agent collects live tray1 from plate1, carries it
+through physical gates1/3/5 to plate4, then collects live box1 from plate2 and
+carries it through physical gates3/5 to plate5. Ghost tray1* and box1* remain
+on plates1/2 throughout. Agent1 is then empty-handed and crosses gate6 and
+screen1 to location14.
+
+Candidate postcondition:
+
+  (and (on tray1* plate1)
+       (on box1* plate2)
+       (on agent1* plate3)
+       (has-location connector1 location9)
+       (paired connector1 transmitter1)
+       (paired connector1 repeater1)
+       (color repeater1 red)
+       (on tray1 plate4)
+       (on box1 plate5)
+       (open gate6)
+       (has-location agent1 location14))
+
+The nominal count is 9. The suggested future cap is 12. This is the same
+source/gate6/location14 conjunction as the earlier cutoff-12 probe, but with
+additional witness facts and a different staged start; the keeper-checkpoint
+bound does not apply to it.
+
+EXECUTION BOUNDARY
+No command is emitted and no stage is approved to run. Before any future run,
+record the exact checkpoint variable/file for each successful stage, choose
+the approved run form and thread setting, preserve every predecessor
+checkpoint, and file the success/exhaustion reading before execution. The
+stages are proposed construction boundaries, not main-spine links or new
+ledger records. A final source/gate6/location14 success would still not
+establish gate7, gate8, the final goal, or T10 acceptance.
+
+SOURCES
+Constraint-Implementation-Plan.md; Constraint-Continuation-Prompt.txt;
+Constraint-Restart-Checkpoint.txt;
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt;
+constraint-evidence/recorder-baseline-analysis-2026-09-22.txt;
+constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt;
+repeater-source-result-2026-09-21.txt;
+keeper-replacement-result-2026-09-21.txt;
+lk5-beam-resource-analysis-2026-09-21.txt;
+switch2-return-access-audit-2026-09-21.txt;
+Constraint-Static-Profile.txt S3/S4;
+probs/problem-crelay-topo.lisp;
+tech/-recorder-core.lisp, -recorder-session.lisp,
+-recorder-cycle-boundary.lisp, -recorder-plate-shadow.lisp,
+-recorder-controls-shadow.lisp, -recorder-gate-shadow.lisp,
+-recorder-solution.lisp, -recording-shadow-policy.lisp, -gate.lisp,
+plate.lisp, tray.lisp, box.lisp, -pickup.lisp, -placement.lisp,
+-holding.lisp, -location.lisp, -support-occupancy.lisp,
+-support-motion.lisp, -mobility.lisp, -mobility-action.lisp,
+-configuration-transition.lisp, step.lisp, jump.lisp,
+walkability.lisp, -passability.lisp, reachability.lisp, beam-relay.lisp,
+beam-direct.lisp, -beam-substrate.lisp, -vertical.lisp, and
+-support-elevation.lisp.

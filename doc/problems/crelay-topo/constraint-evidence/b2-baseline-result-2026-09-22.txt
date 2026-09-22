@@ -1,0 +1,46 @@
+B2 cargo-fork result -- 2026-09-22
+================================
+D approved the exact experiment in b2-baseline-proposal-2026-09-22.txt.
+One planner search ran locally from restored B1, threads16/cutoff12,
+GRAPH, symmetry NIL, minimum-steps pruning T. The pre-run goal and outcome
+readings are retained unchanged in that proposal.
+
+RESULT
+No solution; EXHAUSTED-NO-SOLUTION / DEPTH-CUTOFF-TRUNCATED.
+Direct cutoff truncation T; 381717 cutoff hits; maximum depth12.
+3,328,187 states processed; 2,901,044 repeated states pruned.
+No nominal goal candidate reached validation.
+18.166 seconds real; 266.937500 seconds total run time;
+44,535,493,840 bytes consed.
+The returned checkpoint remains B1: one phase/nine actions, cycle1 closed,
+tray1 on plate1, agent1 location1, box1 location6, connector1 location9.
+No B2 archive was created. B1 SHA-256 rechecked after the run, unchanged:
+D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7.
+
+INTERPRETATION
+This is a separate grade3 bound for the exact B1 start, B2 conjunction,
+cutoff12 and actual pruning configuration. It is not a main-spine bound,
+proof of impossibility, or identification of a failed resource or mechanism.
+The nominal six-action construction was not realized. Its assumptions need
+read-only source review before proposing any further runtime operation.
+No automatic deepening, retry, B3 or B4 is authorized. Recommend a separately
+approved audit of cargo movement/action granularity and recorder-boundary
+semantics. Do not claim those caused the result before inspecting them.
+
+EXECUTION EVIDENCE AND SETUP FAILURES
+Successful process/raw search log: b2-baseline-approved-run-2026-09-22.log.
+Retained runner: run-b2-baseline-2026-09-22.lisp.
+Four preceding launches stopped before invoking the planner:
+- b2-baseline-run-2026-09-22.log: ordinary compilation cache denied.
+- b2-baseline-workspace-run-2026-09-22.log: initial cache mapping ineffective.
+- b2-baseline-final-run-2026-09-22.log: unsupported WW-SET setting rejected
+  after B1 restoration; replaced with direct setting of the existing variable.
+- b2-baseline-search-2026-09-22.log: broad flattened cache had a package-load
+  failure; replaced by a repository-only recursive cache mapping.
+The corrected process restored B1 and ran exactly one B2 search. Successful
+B1 restoration in the earlier setup attempt was also replay, not search.
+Temporary workspace cache removed after process completion. Logs and runner
+remain as deliberate evidence. No engine changes or tests were made/run.
+No independent B2 replay or final-goal validation occurred. Main ledger and
+all four predecessor archives are preserved. This remains the explicitly
+authorized exposed session; no further memory or sealed material was read.

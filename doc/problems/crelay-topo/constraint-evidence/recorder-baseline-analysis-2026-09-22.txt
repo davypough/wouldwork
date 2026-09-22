@@ -1,0 +1,127 @@
+Alternative recorder baseline analysis -- 2026-09-22
+======================================================
+
+AUDIT CORRECTION, later 2026-09-22
+Construction step5 below omitted the elevation prerequisite at gate2:
+opening the gate does not make the ground-to-location6 jump legal. The
+second-fork arrangement remains conditional; its proposed retrieval route
+is not established. Read b2-construction-audit-2026-09-22.txt. The subsequent
+source/resource analysis also corrected the earlier claim that live cargo
+remains committed after its ghost copies are forked. Original text is retained
+as historical provenance, not current execution guidance.
+
+AUTHORIZATION AND SCOPE
+After the prior keeper-resource continuation analysis, D approved developing
+the alternative recorder baseline through read-only analysis. This analysis
+uses only the continuation prompt, restart checkpoint, permitted generated
+profile and evidence, the authored instance, and the recorder, mobility,
+placement, and cargo source files. No Lisp was executed. No checkpoint was
+imported, staged, replayed, searched, or validated. No extractor, engine, or
+ledger code was changed, and no sealed material was read.
+
+RESULT: A FRESH TWO-CYCLE BASELINE CANDIDATE
+The current depth-32 keeper checkpoint cannot be converted in place: its one
+open recorder cycle fixes the ghost arrangement that creates the gate1
+obstruction. The alternative is therefore a fresh baseline, not a replacement
+for or mutation of any of the three saved checkpoints.
+
+The candidate persistent arrangement before its second recorder start is:
+
+  - tray1 on plate1 at location2;
+  - box1 on plate2 at location7;
+  - agent1 empty-handed at recorder1's location1;
+  - the first recorder cycle explicitly cancelled and therefore ghost-free.
+
+At the second START-RECORDER, tray1* and box1* are forked onto those same
+fixed plates. During that open cycle they, rather than agent1*, supply
+recording pressure for gate1 and gate3. The physical view is also held open
+by their live counterparts. This gives the new ghost agent a route from R1
+through gate1 to R8 and through gate3 to R2, where connector1* is located.
+
+SOURCE-DERIVED CONSTRUCTION
+1. In the initial state, agent1 starts the first recorder cycle at location1.
+   START-RECORDER forks agent1* at location1 and tray1* on plate2.
+2. Agent1* can make its explicit local STEP onto plate1 at location2. That
+   makes recording gate1 and physical gate1 open. The later dismount remains
+   prohibited as the original gate1 obstruction states; this candidate does
+   not require it.
+3. While agent1* remains on plate1, agent1 can use physical gate1 to reach
+   tray1 at plate2, pick it up, carry it back through physical gate1, and put
+   it on plate1. Live and ghost occupants may share a support during an open
+   recorder cycle, so the live tray placement does not conflict with agent1*.
+4. Agent1 returns to recorder1 empty-handed and uses CANCEL-PLAYBACK. This
+   is a legal cycle ending independent of the ghost's return. It removes the
+   ghosts and seeds the closed recording shadow from the surviving live state.
+   Thus tray1 now supplies both physical and closed-recording pressure on
+   plate1.
+5. With tray1 retaining physical gate1, agent1 can reach R8, traverse the
+   initially open inverted gate2 to location6, retrieve box1, return through
+   gate2, and put box1 on plate2 at location7. The jump and cargo rules place
+   no general empty-handed restriction on gate2; its gate must merely be
+   open. The authored initial switch1 setting leaves gate2 open.
+6. Agent1 returns to recorder1 empty-handed and starts the second cycle.
+   START-RECORDER's snapshot fork preserves tray1* on plate1 and box1* on
+   plate2. Recording gate1 and gate3 are therefore open for the new ghost
+   agent without making it a plate witness.
+
+WHY THIS ADDRESSES THE NEWLY FOUND OBSTRUCTION
+The prior candidate relied on agent1* itself for recording gate1. Its required
+STEP down removed the sole ghost pressure before its next ground MOVE, closing
+the very gate it needed to cross. Here tray1* remains on plate1 when the new
+ghost leaves location2, so that dismount does not close recording gate1.
+Unlike a live replacement during the prior open cycle, the cargo witness is
+present in the recording view because it was forked there at the second start.
+
+PLATE2 AND CLOSURE ACCOUNTING
+The first cycle begins with tray1* on plate2, but it is not relied upon as the
+second cycle's gate3 witness. CANCELLING that first cycle removes the ghost
+tray. Moving box1 to plate2 before the second start makes box1* the independent
+recording witness at its fork. This avoids trading the gate1 obstruction for a
+closed recording gate3 that would leave connector1* inaccessible in R2.
+
+CANCEL-PLAYBACK requires a live, empty-handed agent at a recorder and then
+atomically removes all ghost references. It does not require the ghost to
+return. The first cycle has persistent live progress -- tray1 has moved from
+plate2 to plate1 -- so this is not the recorder's no-progress case. The second
+START-RECORDER requires precisely the resulting closed, ghost-free boundary
+and is allowed because this problem has no maximum recorder-cycle limit.
+
+UNRESOLVED OBLIGATIONS
+This is a baseline arrangement, not a concrete solution, a replayable
+sequence, or a search recommendation.
+
+  - Source restoration remains separate. The new ghost can reach plate3 in R2
+    and could be a physical gate4 witness while the live connector is paired
+    at location9, but no action sequence or simultaneous endpoint has been
+    measured.
+  - Tray1 and box1 are committed to plate1 and plate2. They cannot also be
+    assumed to support gate6 or an elevated relay. The two cutoff-12 bounds do
+    not determine whether another assignment resolves that later shortage.
+  - The candidate preserves the existing gate1/gate3 route for the new ghost;
+    it does not establish legal transport of ghost connector1*, a gate6
+    crossing, switch2 access, gate8 power, source restoration, or the final
+    goal.
+  - Any next operation must state a concrete endpoint, preserved witnesses,
+    and a bounded purpose, then receive separate approval. No cutoff or command
+    is recommended from this analysis.
+
+SOURCES
+Constraint-Implementation-Plan.md; Constraint-Continuation-Prompt.txt;
+Constraint-Restart-Checkpoint.txt;
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt;
+keeper-replacement-result-2026-09-21.txt;
+repeater-source-result-2026-09-21.txt;
+lk5-beam-resource-analysis-2026-09-21.txt;
+switch2-return-access-audit-2026-09-21.txt;
+Constraint-Static-Profile.txt S3/S4;
+probs/problem-crelay-topo.lisp;
+tech/-recorder-core.lisp, -recorder-session.lisp,
+-recorder-cycle-boundary.lisp, -recorder-plate-shadow.lisp,
+-recorder-controls-shadow.lisp, -recorder-gate-shadow.lisp,
+-recorder-solution.lisp, -recording-shadow-policy.lisp, -gate.lisp,
+plate.lisp, tray.lisp, box.lisp, -pickup.lisp, -placement.lisp,
+-holding.lisp, -location.lisp, -support-occupancy.lisp,
+-support-motion.lisp, -mobility.lisp, -mobility-action.lisp,
+-configuration-transition.lisp, step.lisp, jump.lisp,
+walkability.lisp, -passability.lisp, reachability.lisp,
+-vertical.lisp, and -support-elevation.lisp.
