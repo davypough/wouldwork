@@ -1,0 +1,36 @@
+Talos two-test repair -- 2026-09-21
+=================================
+D requested these fixes before the approved return-access analysis.
+Reproduced both original failures using HEAD's two fixture files copied into
+temporary files, staged in an isolated WOULDWORK_INSTANCE=talos-fixes:
+- cutoff-reporting-test: completed without a solution.
+- recorder-switch-test: RECORDER-SWITCH-STATE-ISOLATION claim failed.
+
+Corrections:
+- The ordinary cutoff fixture now solves its two-edge path at depth2, expected
+  minimum length2. The dedicated cutoff-reporting driver explicitly requests
+  the unreachable goal for its exhaustion checks. The general Talos harness
+  still requires every ordinary fixture to solve; no suite checks were removed.
+- The recorder-switch claim now expects ghost toggles to change both ordinary
+  and recording state, while live toggles change ordinary state only. It checks
+  both gate views after the live toggle and retains pre-start rejection and
+  cycle-close reseeding checks. The shadow component header now agrees.
+- No engine behavior changed. In particular tech/switch.lisp and the Talos
+  harness were not changed; the reverted implementation was not reapplied.
+
+Validation:
+Both corrected fixtures passed TALOS-PROBLEM-FAILED-P's ordinary claim/search
+path. Dedicated serial/parallel cutoff checks passed all55 assertions. Logs:
+talos-two-failures-reproduced-2026-09-21.log
+talos-two-fixes-checks-2026-09-21.log
+SBCL used no system/user initialization, the local Quicklisp installation and
+an isolated compilation cache. No crelay-topo staging, replay or search ran.
+The complete117-problem/26-mutation suite was not rerun. Temporary fixtures,
+bootstrap scripts and cache were removed after retaining evidence.
+
+Reading disclosure: a routine memory keyword search inadvertently surfaced
+older puzzle-checkpoint details outside the constraint handoff's permitted
+reading context. This was disclosed before edits. Those notes did not inform
+the test fixes. Independent puzzle derivation should resume in a fresh session
+or only after D explicitly decides how to proceed with the disclosed exposure.
+The return-access analysis was approved but not performed during this repair.

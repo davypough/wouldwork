@@ -1,7 +1,7 @@
 ;;; Filename: -recorder-switch-shadow.lisp
 
-;;; Persistent recording-side switch state.  Ghost switch actions modify this shadow;
-;;; live actions modify ordinary SWITCHED-ON state.
+;;; Persistent recording-side switch state. Ghost switch actions modify this shadow
+;;; and ordinary SWITCHED-ON state; live actions modify only ordinary state.
 
 (include-tech -switch)
 (include-tech -recorder-core)

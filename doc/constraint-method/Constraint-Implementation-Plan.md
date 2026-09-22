@@ -33,6 +33,15 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
+**Priority interruption completed, 2026-09-21:** D approved the return-access
+analysis but asked to fix two Talos failures first. Both original failures were
+reproduced; corrected fixtures pass the ordinary Talos runner, and all 55 dedicated
+cutoff assertions pass. No engine semantics changed. Evidence:
+`evidence/talos-two-test-fixes-2026-09-21.txt`. Full suite not rerun. Return-access
+analysis remains approved but unperformed. A memory lookup exposed older puzzle
+checkpoint notes outside the permitted context (disclosed before edits); resume
+independent puzzle analysis in a fresh session, or await D's explicit direction.
+
 **T10 — end-to-end closure on crelay-topo. APPROVED and IN PROGRESS.**
 Seven of nine milestones found: lk1/lk2/lk3/lk7/lk8 CLOSED; lk9/lk4 REALIZED;
 lk5/lk6 OPEN. Current checkpoint: agent1 at location15, cumulative depth 19,

@@ -8,7 +8,7 @@
 
 (defun check-cutoff-reporting-run (cutoff truncated hits)
   (setf *depth-cutoff* cutoff)
-  (solve)
+  (solve-subgoal ((cutoff-at cutoff-start)) (cutoff-at cutoff-unreachable))
   (cutoff-reporting-check (eq :exhausted-no-solution (search-outcome-status *last-search-outcome*)))
   (cutoff-reporting-check (eq (if truncated :depth-cutoff-truncated :complete)
                               (search-outcome-reason *last-search-outcome*)))

@@ -6,6 +6,17 @@ block and Constraint-Restart-Checkpoint.txt supersede their next-step commands.
 
 CURRENT TASK
 ------------
+Priority update, 2026-09-21: D approved return-access analysis, then requested
+the cutoff-reporting-test and recorder-switch-test failures fixed first. Repair
+complete: both originals reproduced, both corrected fixtures pass the ordinary
+Talos runner, all55 dedicated cutoff assertions pass. No engine semantics changed;
+full suite not rerun. Evidence: doc/constraint-method/evidence/talos-two-test-fixes-2026-09-21.txt.
+No puzzle staging/replay/search. Return-access analysis remains approved and
+unperformed. A routine memory search surfaced older puzzle-checkpoint details
+outside the permitted reading context; disclosed before code edits, not used
+for these fixes. Resume independent puzzle derivation in a fresh session unless
+D explicitly decides otherwise. This prompt updated last after repair evidence.
+
 T10 -- end-to-end closure, APPROVED and IN PROGRESS.
 Seven of nine milestones found. LK1/LK2/LK3/LK7/LK8 CLOSED;
 LK9/LK4 still REALIZED in the ledger; LK5/LK6 OPEN. Migration replay evidence

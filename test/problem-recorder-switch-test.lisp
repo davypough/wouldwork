@@ -1,6 +1,7 @@
 ;;; Recorder switch-state separation.  The test applies the real recorder and switch
-;;; actions directly: ghost toggles affect only the recording shadow, live toggles affect
-;;; only ordinary state, and closing a cycle reseeds the shadow from the live baseline.
+;;; actions directly: ghost toggles affect both ordinary and recording switch state;
+;;; live toggles affect only ordinary state. Closing reseeds the recording shadow
+;;; from the live baseline. This matches SWITCH's playback-effect contract.
 ;;; Expected harness path length: zero.
 
 (in-package :ww)
@@ -72,10 +73,10 @@
            (recorder-switch-apply *start-state* '(start-recorder live-agent)))
          (ghost-on
            (recorder-switch-apply opened '(toggle-switch ghost-agent switch1)))
-         (both-on
+         (live-off
            (recorder-switch-apply ghost-on '(toggle-switch live-agent switch1)))
          (recording-off
-           (recorder-switch-apply both-on '(toggle-switch ghost-agent switch1)))
+           (recorder-switch-apply live-off '(toggle-switch ghost-agent switch1)))
          (closed
            (recorder-switch-apply recording-off '(stop-recorder ghost-agent))))
     (and
@@ -83,13 +84,15 @@
       (not (recorder-switch-fact-p opened '(switched-on switch1)))
       (not (recorder-switch-fact-p opened '(recording-switched-on switch1)))
 
-      (not (recorder-switch-fact-p ghost-on '(switched-on switch1)))
+      (recorder-switch-fact-p ghost-on '(switched-on switch1))
       (recorder-switch-fact-p ghost-on '(recording-switched-on switch1))
-      (not (recorder-switch-fact-p ghost-on '(open gate1)))
+      (recorder-switch-fact-p ghost-on '(open gate1))
       (recorder-switch-fact-p ghost-on '(recording-open gate1))
 
-      (recorder-switch-fact-p both-on '(switched-on switch1))
-      (recorder-switch-fact-p both-on '(recording-switched-on switch1))
+      (not (recorder-switch-fact-p live-off '(switched-on switch1)))
+      (recorder-switch-fact-p live-off '(recording-switched-on switch1))
+      (not (recorder-switch-fact-p live-off '(open gate1)))
+      (recorder-switch-fact-p live-off '(recording-open gate1))
 
       (recorder-switch-fact-p recording-off '(switched-on switch1))
       (not (recorder-switch-fact-p
