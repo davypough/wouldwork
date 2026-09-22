@@ -1,0 +1,65 @@
+This is SBCL 2.6.8, an implementation of ANSI Common Lisp.
+More information about SBCL is available at <http://www.sbcl.org/>.
+
+SBCL is free software, provided as is, with absolutely no warranty.
+It is mostly in the public domain; some portions are provided under
+BSD-style licenses.  See the CREDITS and COPYING files in the
+distribution for more information.
+To load "bordeaux-threads":
+  Load 1 ASDF system:
+    bordeaux-threads
+; Loading "bordeaux-threads"
+
+To load "usocket":
+  Load 1 ASDF system:
+    usocket
+; Loading "usocket"
+
+To load "cl-json":
+  Load 1 ASDF system:
+    cl-json
+; Loading "cl-json"
+
+To load "flexi-streams":
+  Load 1 ASDF system:
+    flexi-streams
+; Loading "flexi-streams"
+
+While evaluating the form starting at line 6, column 0
+  of #P"D:/quicklisp/local-projects/wouldwork/src/problem.lisp":
+Unhandled PACKAGE-DOES-NOT-EXIST in thread #<SB-THREAD:THREAD tid=12096 "main thread" RUNNING
+                                              {1100D18003}>:
+  The name "WW" does not designate any package.
+
+Backtrace for: #<SB-THREAD:THREAD tid=12096 "main thread" RUNNING {1100D18003}>
+0: (SB-DEBUG::DEBUGGER-DISABLED-HOOK #<PACKAGE-DOES-NOT-EXIST "The name ~S does not designate any package." {110AEB0C63}> #<unused argument> :QUIT T)
+1: (SB-DEBUG::RUN-HOOK *INVOKE-DEBUGGER-HOOK* #<PACKAGE-DOES-NOT-EXIST "The name ~S does not designate any package." {110AEB0C63}>)
+2: (INVOKE-DEBUGGER #<PACKAGE-DOES-NOT-EXIST "The name ~S does not designate any package." {110AEB0C63}>)
+3: (ERROR #<PACKAGE-DOES-NOT-EXIST "The name ~S does not designate any package." {110AEB0C63}>)
+4: (SB-KERNEL:WITH-SIMPLE-CONDITION-RESTARTS ERROR NIL PACKAGE-DOES-NOT-EXIST :PACKAGE "WW" :FORMAT-CONTROL "The name ~S does not designate any package." :FORMAT-ARGUMENTS ("WW"))
+5: (SB-INT:%FIND-PACKAGE-OR-LOSE "WW")
+6: (SB-INT:FIND-UNDELETED-PACKAGE-OR-LOSE "WW")
+7: ("top level form") [toplevel]
+8: ((FLET "G" :IN SB-C::%COMPILE-IN-LEXENV))
+9: (SB-C::%COMPILE-IN-LEXENV (SETQ *PACKAGE* (SB-INT:FIND-UNDELETED-PACKAGE-OR-LOSE "WW")) #<NULL-LEXENV> NIL #<SB-C::SOURCE-INFO {110AE7A4B3}> 0 NIL T T)
+10: (SB-C:EVAL-WITH-COMPILE-IN-LEXENV (SETQ *PACKAGE* (SB-INT:FIND-UNDELETED-PACKAGE-OR-LOSE "WW")) #<NULL-LEXENV> #<SB-C::SOURCE-INFO {110AE7A4B3}> 0 NIL)
+11: (SB-IMPL::%SIMPLE-EVAL (SETQ *PACKAGE* (SB-INT:FIND-UNDELETED-PACKAGE-OR-LOSE "WW")) #<NULL-LEXENV>)
+12: (SB-INT:SIMPLE-EVAL-IN-LEXENV (SETQ *PACKAGE* (SB-INT:FIND-UNDELETED-PACKAGE-OR-LOSE "WW")) #<NULL-LEXENV>)
+13: (SB-INT:SIMPLE-EVAL-IN-LEXENV (IN-PACKAGE :WW) #<NULL-LEXENV>)
+14: (EVAL-TLF (IN-PACKAGE :WW) 0 NIL)
+15: ((LABELS SB-FASL::EVAL-FORM :IN SB-INT:LOAD-AS-SOURCE) (IN-PACKAGE :WW) 0)
+16: ((LAMBDA (SB-KERNEL:FORM &KEY :CURRENT-INDEX &ALLOW-OTHER-KEYS) :IN SB-INT:LOAD-AS-SOURCE) (IN-PACKAGE :WW) :CURRENT-INDEX 0)
+17: (SB-C::%DO-FORMS-FROM-INFO #<FUNCTION (LAMBDA (SB-KERNEL:FORM &KEY :CURRENT-INDEX &ALLOW-OTHER-KEYS) :IN SB-INT:LOAD-AS-SOURCE) {5FF0DB}> #<SB-C::SOURCE-INFO {110AE7A4B3}> SB-C::INPUT-ERROR-IN-LOAD)
+18: (SB-INT:LOAD-AS-SOURCE #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\src\\problem.lisp" {110AE82D33}> :VERBOSE NIL :PRINT NIL :CONTEXT "loading")
+19: ((LABELS SB-FASL::LOAD-STREAM-1 :IN LOAD) #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\src\\problem.lisp" {110AE82D33}> NIL)
+20: (SB-FASL::CALL-WITH-LOAD-BINDINGS #<FUNCTION (LABELS SB-FASL::LOAD-STREAM-1 :IN LOAD) {5FF49B}> #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\src\\problem.lisp" {110AE82D33}> NIL #<SB-INT:FORM-TRACKING-STREAM for "file D:\\quicklisp\\local-projects\\wouldwork\\src\\problem.lisp" {110AE82D33}>)
+21: (LOAD #P"src/problem.lisp" :VERBOSE NIL :PRINT NIL :IF-DOES-NOT-EXIST :ERROR :EXTERNAL-FORMAT :DEFAULT)
+22: (SB-IMPL::PROCESS-EVAL/LOAD-OPTIONS ((:LOAD . "src/problem.lisp") (:EVAL . "(progn (in-package :ww) (stage blocks3) (load (merge-pathnames \"tech/constraint-profile.lisp\" (asdf:system-source-directory :wouldwork))) (report-static-constraint-profile))") (:QUIT)))
+23: (SB-IMPL::TOPLEVEL-INIT)
+24: ((FLET SB-UNIX::BODY :IN SB-IMPL::START-LISP))
+25: ((FLET "WITHOUT-INTERRUPTS-BODY-3" :IN SB-IMPL::START-LISP))
+26: (SB-IMPL::%START-LISP)
+27: ("foreign function: #x140048879")
+28: ("foreign function: #x14000B260")
+
+unhandled condition in --disable-debugger mode, quitting

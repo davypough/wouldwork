@@ -2754,3 +2754,50 @@ finds it must change an allocation to make the index work, it has EXCEEDED ITS
 SCOPE and stops for re-approval rather than proceeding.  G12 remains open.  No
 transport obligation and no stranding verdict is added.  S4 and its PARTIAL
 first score are untouched.  No new gap is filed in advance of the run.
+
+
+7.29  G14 FIX -- FIRST SCORE, OBSERVED.  2026-09-22.
+
+Section 7.28 stands unrevised.  Its commitments were written before the fix's
+code.  This score is against those commitments only: G14 has no sealed value
+paragraph, so this is a weaker experiment than S0-S4 under M9.
+
+The 26 clean-image helper assertions ran before the staged report.  Their load
+interval between `G14 LOAD BEGIN` and `G14 LOAD END` emitted no warning.  The
+checks cover class position, interprocedural class resolution, IF polarity,
+AND/OR governance, contradictory admissions, unresolvable conditions, index
+verdicts, recursive termination, allocation non-interference, and the unchanged
+shared S4 reporter.
+
+The one staged RO run used section 7.26's scenario unchanged.  It retained
+exactly the two existing axiom data lines.  `OPEN` reported IN-VIEW for
+:PHYSICAL, admitted (LIVE UNPAIRED), and four view-blind read sites.
+`RECORDING-OPEN` reported OUT-OF-VIEW, admitted (GHOST), retained its line for
+provenance, and reported zero view-blind sites.  The summary was 1 in-view, 1
+out-of-view, 0 unindexed.  Allocation was unchanged: PERFECT matching, three
+forced members, zero forced pairings, three conditional destinations, grade 1,
+CONDITIONAL, with no transport obligation or stranding verdict.
+
+  item                    observed                                verdict
+  ----------------------  --------------------------------------  ----------
+  P1 additive axiom rows  two preserved data rows; added index     REGENERATED
+                          lines only
+  P2 OPEN                 IN-VIEW :PHYSICAL; LIVE/UNPAIRED         REGENERATED
+  P3 RECORDING-OPEN       OUT-OF-VIEW; GHOST; retained             REGENERATED
+  P4 blind read sites     OPEN 4; RECORDING-OPEN 0                 REGENERATED
+  P5 summary              1 in-view, 1 out-of-view, 0 unindexed   REGENERATED
+  P6 allocation           first-run allocation unchanged           REGENERATED
+  P7 generated profile    full and S0-S4 prefix hashes match       REGENERATED
+  P8 order and load       checks first; no load warning            REGENERATED
+
+P7 measurement: the regenerated profile is 41,214 bytes with SHA-256
+EFD35D3926255B4C715338CABA147CF6DAC53D223DFB287AF365853F2B8BD596. Its first
+41,101 bytes hash to
+9E4A9B0ADB114554CC32475E99D75812B276DE0B59B5936EFC6079AFC2770AE8.
+
+Evidence retained:
+  constraint-evidence/g14-helper-checks-2026-09-22.lisp
+  constraint-evidence/g14-helper-checks-2026-09-22.log
+    SHA-256 D92CA5931CD6EB7855EFAF6539094A9BD3C6EA0BFF7A70D07CF84A45B4A3EE27
+  constraint-evidence/g14-first-run-2026-09-22.txt
+    SHA-256 64AC98DBF25A8E4AF4DDFC2100191C7073304F4F1C64B2711AB62BB96F18A869

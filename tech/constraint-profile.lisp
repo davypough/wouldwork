@@ -1302,6 +1302,182 @@
     (values)))
 
 
+;;; T6 -- Mechanized budget arithmetic
+;;; Consumes S1 and S2 to emit the impossibility constraints AM1–AM3.
+;;; AM1: The budget is exactly tight.  Five body-cost gates consume 1+1+1+2+3 = 8
+;;;      plate keepers, and the occupant pool is 8.  Opening all simultaneously
+;;;      requires every body on a plate.  Grade 1+2.
+;;; AM2: The agent spends itself.  Agent1 is one of eight.  The goal requires
+;;;      agent1 at a location with no plate, so it must rest on ground/box/tray.
+;;;      Grade 1.
+;;; AM3: Therefore, in the goal state the budget tightens. If reached inside
+;;;      an open cycle (7 available), at least ONE of the five body-cost gates
+;;;      must be closed.  If outside (3 available), at least TWO must be closed.
+;;;      Grade 1.
+;;; No problem object names anywhere (C1). Named substrate interfaces: ON,
+;;; PRESSURE-PLATE, HAS-LOCATION, GOAL-FN (established as precedent in S4).
+
+
+(defun budget-arithmetic-body-cost-devices (facts)
+  "Every controlled device whose clause set names a pressure-plate.  Returns
+   (device cost-function) where cost-function is a form (PLATES...) with one
+   plate per clause or (PLATES... :disjoint) when plates appear in different
+   clauses, meaning independent supports.  Devices with no body-cost return NIL."
+  (let ((plates (census-type-instances 'pressure-plate))
+        (devices nil))
+    (dolist (fact facts (nreverse devices))
+      (let ((device (third fact))
+            (clauses (second fact)))
+        (when clauses
+          (let ((plate-set nil))
+            (dolist (clause clauses)
+              (dolist (primitive clause)
+                (when (member primitive plates)
+                  (pushnew primitive plate-set))))
+            (when plate-set
+              (let ((disjoint-p (loop for clause in clauses
+                                       count (intersection clause plate-set) into matches
+                                       finally (return (< matches (length clauses))))))
+                (push (list device (if disjoint-p
+                                     (append (sort (copy-list plate-set) #'string< :key #'symbol-name)
+                                             '(:disjoint))
+                                     (sort (copy-list plate-set) #'string< :key #'symbol-name)))
+                      devices)))))))))
+
+
+(defun budget-arithmetic-gate-costs (device-costs)
+  "For each device in DEVICE-COSTS, the number of distinct plates it requires.
+   Returns (device cost) where cost is a positive integer or :unknown."
+  (mapcar (lambda (entry)
+            (let* ((plates (second entry))
+                   (count (if (member :disjoint plates)
+                            (length (remove :disjoint plates))
+                            (length plates))))
+              (list (first entry) count)))
+          device-costs))
+
+
+(defun budget-arithmetic-total-cost (gate-costs)
+  "Sum of all gate costs.  Returns an integer or :unknown if any cost is unknown."
+  (let ((total 0))
+    (dolist (entry gate-costs (if (eq total :unknown) :unknown total))
+      (if (eq (second entry) :unknown)
+        (setf total :unknown)
+        (incf total (second entry))))))
+
+
+(defun budget-arithmetic-occupant-pool-size ()
+  "From S2: the total support-occupant pool, reading the ON placement relation's
+   key-position extent.  Returns an integer or NIL if the pool cannot be determined."
+  (let* ((functionals (functional-relation-entries))
+         (placements (placement-relations functionals))
+         (on-placement (find 'on placements :key #'first)))
+    (when (and on-placement (string= (second on-placement) "dynamic"))
+      (length (census-spec-extent (fifth on-placement))))))
+
+
+(defun budget-arithmetic-segment-occupancy ()
+  "The occupant pool by segment: outside a cycle (live only) vs. inside a cycle
+   (live + ghost).  Returns (outside-count inside-count) or NIL."
+  (let ((pool-size (budget-arithmetic-occupant-pool-size)))
+    (when pool-size
+      (let* ((functionals (functional-relation-entries))
+             (placements (placement-relations functionals))
+             (on-placement (find 'on placements :key #'first))
+             (keys (census-spec-extent (fifth on-placement)))
+             (pairs (layer-pairs))
+             (live-count (+ (count "live" (mapcar (lambda (obj) (census-layer-class obj pairs)) keys)
+                                    :test #'string=)
+                           (count "unpaired" (mapcar (lambda (obj) (census-layer-class obj pairs)) keys)
+                                   :test #'string=))))
+        (list live-count pool-size)))))
+
+
+(defun budget-arithmetic-goal-location-type ()
+  "The type of the goal destination, by examining (HAS-LOCATION actor location)
+   in the goal form.  Returns the location type or NIL."
+  (let ((goal-form (get 'goal-fn :form)))
+    (when (consp goal-form)
+      (let ((location-type (traversal-endpoint-type)))
+        (when location-type
+          (let ((spec (nth-value 1 (gethash 'has-location *relations*))))
+            (when spec
+              (nth 1 spec))))))))
+
+
+(defun budget-arithmetic-goal-location-has-plate-p ()
+  "Whether any pressure-plate is at the goal location in the initial state.
+   Returns T, NIL, or :unknown."
+  (let ((goal-form (get 'goal-fn :form))
+        (plates (census-type-instances 'pressure-plate)))
+    (when (and (consp goal-form) plates)
+      (let ((goal-location (second (member 'has-location (flatten goal-form)))))
+        (if goal-location
+          (let ((at-goal (remove-if-not
+                          (lambda (fact)
+                            (and (eq (first fact) 'has-position)
+                                 (member (second fact) plates)
+                                 (eq (third fact) goal-location)))
+                          (list-static-db))))
+            (if at-goal :no-plate nil))
+          :unknown)))))
+
+
+(defun budget-arithmetic-constraints (gate-costs occupancy)
+  "Derives AM1–AM3 from gate costs and occupancy.  Returns a list of constraint
+   descriptions as strings."
+  (let ((total (budget-arithmetic-total-cost gate-costs))
+        (outside (first occupancy))
+        (inside (second occupancy))
+        (constraints nil))
+    (when (and (integerp total) (integerp outside) (integerp inside))
+      (push (format nil "AM1: Budget is tight.  ~D body-cost gates demand ~D total plate keepers; ~
+                        occupant pool is ~D.  All gates open only if every body is on a plate."
+                    (length gate-costs) total outside)
+            constraints)
+      (push (format nil "AM2: Agent spends itself.  Agent occupies 1 of ~D in occupant pool.  ~
+                        Goal location has no plate, so agent must rest on ground/box/tray in goal."
+                    outside)
+            constraints)
+      (let ((outside-available (- outside 1)))
+        (push (format nil "AM3a: Outside cycle (agent available): ~D occupants available for gates. ~
+                          Cost budget is ~D; total demand is ~D.  At least ~D cost must close."
+                      outside-available outside-available total
+                      (max 0 (- total outside-available)))
+              constraints))
+      (let ((inside-available (- inside 1)))
+        (push (format nil "AM3b: Inside cycle (agent available): ~D occupants available for gates. ~
+                          Cost budget is ~D; total demand is ~D.  At least ~D cost must close."
+                      inside-available inside-available total
+                      (max 0 (- total inside-available)))
+              constraints)))
+    (nreverse constraints)))
+
+
+(defun report-budget-arithmetic ()
+  "T6, grade 1->2.  The mechanized budget arithmetic: gate costs from S1 control
+   algebra joined with occupant pool from S2 functional-relation census.  Derives
+   impossibility constraints on simultaneous gate-open assignments.  Grade 1 from
+   control facts and type extents; grade 2 from S2 structural injectivity."
+  (let* ((facts (control-facts))
+         (device-costs (budget-arithmetic-body-cost-devices facts))
+         (gate-costs (budget-arithmetic-gate-costs device-costs))
+         (occupancy (budget-arithmetic-segment-occupancy)))
+    (format t "~2%T6  MECHANIZED BUDGET ARITHMETIC  [grade 1 -> 2]~%")
+    (format t "~A~%" (make-string 62 :initial-element #\-))
+    (cond ((null gate-costs)
+           (format t "  no body-cost devices found.~%"))
+          ((null occupancy)
+           (format t "  occupant pool not determined; cannot compute constraints.~%"))
+          (t (let ((constraints (budget-arithmetic-constraints gate-costs occupancy)))
+               (dolist (constraint constraints)
+                 (format t "~%  ~A~%" constraint))
+               (format t "~%  NOTE: these are impossibility constraints on state assignments, ~
+                          not on action sequences.  They refute the fully-open assignment without ~
+                          searching.~%"))))
+    (values)))
+
+
 (defparameter *traversal-symmetric-relation* 'traverse-via
   "The symmetric traversal relation, NAMED because the sealed spec names it as S3's input,
    exactly as S1 names CONTROLS as its own (A17).  Finding it by shape would also admit
@@ -1943,6 +2119,268 @@
     (values)))
 
 
+(defun role-class-universe ()
+  "The classes a recorder-style layer partition can distinguish."
+  '("live" "ghost" "unpaired"))
+
+
+(defun role-class-complement (classes)
+  "The layer classes excluded by CLASSES."
+  (set-difference (role-class-universe) classes :test #'string=))
+
+
+(defun role-query-call-p (form)
+  "Whether FORM invokes one of the staged problem's queries."
+  (and (consp form)
+       (symbolp (first form))
+       (member (first form) *query-names*)))
+
+
+(defun role-raw-argument-map (call)
+  "Map a query CALL's raw parameters to its actual arguments."
+  (let ((parameters (get (first call) :raw-args))
+        (arguments (rest call)))
+    (when (= (length parameters) (length arguments))
+      (mapcar #'cons parameters arguments))))
+
+
+(defun role-substitute-parameters (form bindings)
+  "Replace query parameters in FORM with the actual arguments of its caller."
+  (cond ((symbolp form)
+         (or (cdr (assoc form bindings)) form))
+        ((consp form)
+         (mapcar (lambda (part) (role-substitute-parameters part bindings)) form))
+        (t form)))
+
+
+(defun role-layer-test-classes (form pair-relations visited)
+  "The class a layer-pair test in FORM selects, or NIL when it cannot be resolved.
+The first argument of a pair is live and the second is ghost.  A test that
+does not bind exactly one variable to one pair position remains unresolved."
+  (when (consp form)
+    (let ((relation (first form)))
+      (when (member relation pair-relations)
+        (let ((variables (remove-if-not #'?varp (rest form))))
+          (when (= (length variables) 1)
+            (let ((position (position (first variables) (rest form))))
+              (return-from role-layer-test-classes
+                (case position
+                  (0 '("live"))
+                  (1 '("ghost"))
+                  (t nil)))))))
+      (when (and (role-query-call-p form)
+                 (not (member relation visited)))
+        (let ((bindings (role-raw-argument-map form)))
+          (when bindings
+            (let ((classes
+                    (role-layer-test-classes
+                      (role-substitute-parameters (get relation :raw-body) bindings)
+                      pair-relations (cons relation visited))))
+              (when classes
+                (return-from role-layer-test-classes classes))))))
+      (dolist (part form)
+        (let ((classes (role-layer-test-classes part pair-relations visited)))
+          (when classes
+            (return-from role-layer-test-classes classes)))))))
+
+
+(defun role-governed-relation-sites
+    (form relation conditions query visited)
+  "Read sites for RELATION, carrying the class tests that govern each one.
+IF branches contribute their test with branch polarity.  AND siblings
+contribute positive conditions; OR deliberately contributes none."
+  (cond ((atom form) nil)
+        ((eq (first form) relation)
+         (list (list query conditions)))
+        ((eq (first form) 'if)
+         (append
+           (role-governed-relation-sites (second form) relation conditions query visited)
+           (role-governed-relation-sites
+             (third form) relation
+             (cons (cons (second form) t) conditions) query visited)
+           (role-governed-relation-sites
+             (fourth form) relation
+             (cons (cons (second form) nil) conditions) query visited)))
+        ((eq (first form) 'and)
+         (loop for conjunct in (rest form)
+               append (role-governed-relation-sites
+                        conjunct relation
+                        (append
+                          (loop for sibling in (rest form)
+                                unless (eq sibling conjunct)
+                                  collect (cons sibling t))
+                          conditions)
+                        query visited)))
+        ((eq (first form) 'or)
+         (loop for disjunct in (rest form)
+               append (role-governed-relation-sites
+                        disjunct relation conditions query visited)))
+        ((eq (first form) 'not)
+         (role-governed-relation-sites
+           (second form) relation
+           (mapcar (lambda (condition)
+                     (cons (car condition) (not (cdr condition))))
+                   conditions)
+           query visited))
+        ((and (role-query-call-p form)
+              (not (member (first form) visited)))
+         (let ((bindings (role-raw-argument-map form)))
+           (if bindings
+             (role-governed-relation-sites
+               (role-substitute-parameters (get (first form) :raw-body) bindings)
+               relation conditions (first form) (cons (first form) visited))
+             nil)))
+        (t (loop for part in form
+                 append (role-governed-relation-sites
+                          part relation conditions query visited)))))
+
+
+(defun role-query-call-governance (form query pair-relations governed)
+  "Whether each call to QUERY in FORM occurs under a class-governed branch."
+  (cond ((atom form) nil)
+        ((eq (first form) query) (list governed))
+        ((eq (first form) 'if)
+         (let ((class-governed
+                 (role-layer-test-classes (second form) pair-relations nil)))
+           (append
+             (role-query-call-governance (second form) query pair-relations governed)
+             (role-query-call-governance (third form) query pair-relations
+                                         (or governed class-governed))
+             (role-query-call-governance (fourth form) query pair-relations
+                                         (or governed class-governed)))))
+        (t (loop for part in form
+                 append (role-query-call-governance
+                          part query pair-relations governed)))))
+
+
+(defun role-private-view-reader-p (query)
+  "Whether every call of QUERY occurs beneath a class-governed view dispatch."
+  (let ((calls
+          (loop for caller in *query-names*
+                unless (eq caller query)
+                  append (role-query-call-governance
+                           (get caller :raw-body) query
+                           (layer-pair-relations) nil))))
+    (and calls (every #'identity calls))))
+
+
+(defun role-relation-read-sites (relation)
+  "Every query read site for RELATION, with its governing conditions.
+Helpers reached only through class-governed view dispatches are not also
+counted as layer-blind roots."
+  (loop for query in *query-names*
+        unless (role-private-view-reader-p query)
+        append (role-governed-relation-sites
+                 (get query :raw-body) relation nil query (list query))))
+
+
+(defun role-site-admission (site pair-relations)
+  "SITE's admitted classes, whether it has a class test, and unresolved-test count."
+  (let ((admitted (role-class-universe))
+        (governed nil)
+        (unresolved 0))
+    (dolist (condition (second site))
+      (let ((classes (role-layer-test-classes (car condition) pair-relations nil)))
+        (if classes
+          (progn
+            (setf governed t)
+            (setf admitted
+                  (intersection admitted
+                                (if (cdr condition)
+                                  classes
+                                  (role-class-complement classes))
+                                :test #'string=)))
+          (incf unresolved))))
+    (values admitted governed unresolved)))
+
+
+(declaim (ftype function role-view-classes))
+
+
+(defun role-axiom-index (relation view)
+  "Classify RELATION's consumers against VIEW without changing any allocation."
+  (let ((sites (role-relation-read-sites relation))
+        (pair-relations (layer-pair-relations))
+        (view-classes (role-view-classes view))
+        (in-view nil)
+        (out-of-view nil)
+        (blind 0)
+        (unresolved 0)
+        (witness nil))
+    (dolist (site sites)
+      (multiple-value-bind (admitted governed missed)
+          (role-site-admission site pair-relations)
+        (incf unresolved missed)
+        (if governed
+          (cond ((and admitted
+                      (subsetp admitted view-classes :test #'string=))
+                 (setf in-view t witness (list site admitted)))
+                ((null (intersection admitted view-classes :test #'string=))
+                 (setf out-of-view t)
+                 (unless witness
+                   (setf witness (list site admitted)))))
+          (incf blind))))
+    (list (cond (in-view :in-view)
+                (out-of-view :out-of-view)
+                (t :unindexed))
+          witness blind unresolved (length sites))))
+
+
+(defun role-index-status-text (status)
+  "The reporter's stable vocabulary for a computed axiom index."
+  (case status
+    (:in-view "IN-VIEW")
+    (:out-of-view "OUT-OF-VIEW")
+    (t "UNINDEXED")))
+
+
+(defun report-role-axiom-index (axiom view)
+  "Append the G14 provenance for one inherited S1 axiom."
+  (let* ((index (role-axiom-index (first axiom) view))
+         (status (first index))
+         (witness (second index))
+         (blind (third index))
+         (unresolved (fourth index))
+         (site (first witness))
+         (classes (second witness)))
+    (format t "        view index: ~A for ~(~S~)"
+            (role-index-status-text status) view)
+    (when classes
+      (format t "; classes admitted ~(~S~)" classes))
+    (when site
+      (format t "; reader ~(~A~)" (first site)))
+    (format t "~%")
+    (format t "        view-blind read sites: ~D~@[; ~D governing test~:P unresolved~]~%"
+            blind unresolved)
+    (when (eq status :in-view)
+      (format t "        NOTE: IN-VIEW is existential: another consumer may read this relation outside the stated view.~%"))
+    (when (eq status :out-of-view)
+      (format t "        RETAINED: this inherited premise is outside the stated view and is printed for provenance.~%"))))
+
+
+(defun report-role-axioms (device axioms scenario)
+  "RO-local S1 axiom reporter.  It preserves the shared data lines verbatim."
+  (let ((matching (remove-if-not
+                   (lambda (axiom) (relation-keys-a-device-p (first axiom) (list device)))
+                   axioms)))
+    (if matching
+      (dolist (axiom matching)
+        (format t "      state ~(~A~): ~A; empty-type premises ~(~S~)~%"
+                (first axiom) (axiom-reading-text (fifth axiom)) (sixth axiom))
+        (report-role-axiom-index axiom (getf scenario :view)))
+      (format t "      device-state correspondence UNRESOLVED; aggregate requirements only.~%"))
+    (when matching
+      (let ((indexes (mapcar (lambda (axiom)
+                               (role-axiom-index (first axiom) (getf scenario :view)))
+                             matching)))
+        (format t "      axiom view summary: ~D in-view, ~D out-of-view, ~D unindexed; stated view ~(~S~)~%"
+                (count :in-view indexes :key #'first)
+                (count :out-of-view indexes :key #'first)
+                (count :unindexed indexes :key #'first)
+                (getf scenario :view))
+        (format t "      NOTE: indexes classify consumer reads, not the bodies whose occupancy derives device state.~%")))))
+
+
 (defun role-subsets (items)
   "Every subset of ITEMS.  A demanded support set here is single digits wide, so enumerating
    its subsets costs less than a dedicated deficiency search and makes the violator exactly
@@ -2149,7 +2587,7 @@
     (format t "~%    ~(~A~) == ~(~A~)~%"
             (third fact) (control-boolean-form (second fact) (fourth fact)))
     (format t "      requested ~(~S~); provenance ~A~%" (second condition) (third condition))
-    (report-keeper-axioms (third fact) axioms)
+    (report-role-axioms (third fact) axioms scenario)
     (if (null clauses)
       (format t "      no positive pressure demand: inverted aggregate, or no plate witness in any alternative.~%")
       (loop for clause in clauses
@@ -2204,6 +2642,7 @@
   (report-type-extent-census)
   (report-control-algebra)
   (report-functional-relation-census)
+  (report-budget-arithmetic)
   (report-region-quotient)
   (report-cut-keeper-table)
   (format t "~2%S5-S7 not yet written.~%")

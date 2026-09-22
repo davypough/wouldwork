@@ -1,0 +1,165 @@
+B2 revised box-retrieval analysis -- 2026-09-22
+===============================================
+
+AUTHORIZATION AND SCOPE
+D approved read-only derivation after the B2 construction audit. This analysis
+uses the preserved B1 endpoint, the authored crelay-topo geometry, and the
+permitted movement, support, switch, blower, cargo, gate, and recorder
+semantics. No Lisp, staging, import, search, replay, validation, extractor,
+test, engine edit, or instance edit ran. No sealed material was read. This is
+the exposed session already disclosed in the preceding handoff, not a clean
+prediction experiment.
+
+CONCLUSION
+The revised construction cannot be completed from the current authored
+locations and objects. A valid B2 must first supply an independent elevated
+standing/support configuration at the gate2 approach; the existing blower
+does not supply one that survives opening gate2. Once that missing resource is
+provided, the remaining box retrieval and second fork can be stated
+conditionally. This is a construction boundary, not an impossibility proof
+and not a runtime recommendation.
+
+1. REQUIRED B2 POSTCONDITION
+Starting at the preserved B1 endpoint:
+
+  - tray1 is on plate1, keeping physical and recording gate1 open;
+  - agent1 is at location1, empty-handed;
+  - box1 is at location6;
+  - the first recorder cycle is closed and ghost-free.
+
+The intended second-cycle boundary remains:
+
+  (and (recording-in-progress)
+       (on tray1 plate1)
+       (on box1 plate2)
+       (on tray1* plate1)
+       (on box1* plate2)
+       (has-location agent1 location1)
+       (has-location agent1* location1))
+
+The goal deliberately does not impose a cycle-count equality. A successful
+construction must inspect the actual cycle count and both live/ghost holding
+states before treating this boundary as established.
+
+2. NON-NEGOTIABLE ELEVATION SUBGOAL
+The authored jump edges into location6 start at locations4, 5, and 20.
+Locations4 and 5 are level0; location6 is level3/2; the jump-rise limit is1.
+Therefore neither ground approach can land at location6. The only authored
+approach whose launch elevation meets the landing test is location20 at
+level3/2. Equal-level walking does not create another route into the alcove.
+
+The revised B2 therefore needs, before pickup:
+
+  (and (has-location agent1 location20)
+       (= (location-elevation location20) 3/2)
+       (switch1 state that leaves gate2 open)
+       (an independent support or transition that retains agent1 at that
+        elevation after the lift is no longer active))
+
+The last clause is the missing premise. It is not supplied by the current
+problem.
+
+3. WHY THE EXISTING BLOWER CANNOT DISCHARGE THAT SUBGOAL
+Switch1 controls blower1 normally and gate2 inversely. Turning switch1 on can
+make the blower launch an occupant from location4 to location20, but it also
+closes gate2. At location20, turning switch1 off opens gate2 but immediately
+stops the blower; DROP-OCCUPANTS! then returns an unsupported actor to
+location4. The actor cannot take the next gate2 jump while retaining the
+level3/2 launch position.
+
+A ghost toggle does not repair this boundary: ghost switching changes the
+physical switch as well as its recording-side switch. A recording-only gate
+view cannot substitute for the live actor's physical gate2 crossing. A box or
+tray placed at the blower destination is likewise not an established
+solution, because it requires reaching that destination first and is itself
+subject to the same drop propagation when unsupported.
+
+4. CONDITIONAL CARGO LEG
+If an independent elevated standing/support configuration is established at
+location20 while switch1 is off and gate2 is open, the remaining cargo leg is:
+
+  a. move agent1 from that elevated approach through the open gate2 to
+     location6;
+  b. PICKUP-BOX box1 at location6;
+  c. return through the same legal elevated route while carrying box1;
+  d. PUT-BOX box1 on plate2;
+  e. return empty-handed to recorder1;
+  f. START-RECORDER.
+
+The pickup step still requires horizontal reach, a clear box top, and no
+existing holding. The return route must be checked with the carried-box
+state; the route cannot be inferred merely from the outbound jump. The
+placement must be a legal reachable placement on plate2. The final START-
+RECORDER requires the live agent to be at recorder1, empty-handed, and the
+prior cycle to be closed and ghost-free. At that moment it copies tray1 and
+box1 onto plate1 and plate2, respectively.
+
+These are conditional action classes, not an action count. No six-action or
+other length estimate is retained.
+
+5. WHAT WOULD COUNT AS A REALIZED REPLACEMENT
+A future candidate may close B2 only if it demonstrates, from B1, all of:
+
+  - a legal transition to an elevated gate2 approach;
+  - retention of that elevation while gate2 is open in the actor's own view;
+  - legal entry to location6 and pickup of box1;
+  - a legal carried-box return and placement on plate2;
+  - empty-handed return to recorder1;
+  - a legal second START-RECORDER fork with tray1* on plate1 and box1* on
+    plate2, with the observed cycle count and holding states recorded.
+
+An additional location is not by itself sufficient. It would need a measured
+or authored legal transition into the required level and a propagation-safe
+support boundary. No such location or transition is proposed here.
+
+6. STATUS AND LIMITS
+The current B2 search remains a grade-3 bound for its exact B1 start, goal,
+cutoff12, threads16, GRAPH, symmetry NIL, and minimum-steps pruning settings.
+This derivation neither explains all cutoff hits nor proves B2 unreachable.
+It rejects only the prior six-action construction as a complete mechanism.
+B3 and B4 remain conditional on a realized cargo-fork endpoint. No new search,
+replay, validation, checkpoint, ledger link, or grade is created by this
+analysis.
+
+7. ELEVATION-RESOURCE AUDIT
+The permitted authored elevation changes do not provide an independent B2
+resource. The three named jump edges into location6 all require the same
+level-3/2 landing test; only location20 can satisfy it. The other authored
+elevation technologies are ladders at locations3, 8, and 11, whose endpoints
+do not enter the gate2 alcove or location20. Step transitions on plates and
+blowers change support configuration but do not create a retained elevated
+landing; the blower's retained height is explicitly conditional on its active
+view.
+
+The movable supports cannot bootstrap this missing state from B1. Box1 is the
+unreachable cargo at location6. Tray1 is on plate1 and a grounded tray is
+inert; carrying it does not create a self-mountable support for its holder.
+Recorder ghosts are unavailable at B1's closed boundary, and a later ghost
+fork copies existing support state rather than creating an independent
+elevation transition. Consequently the current object inventory contains no
+source-derived elevation resource that can be established before the box
+pickup.
+
+This audit leaves only two honest future branches: supply a separately
+justified authored/instance location and transition that reaches and retains
+the required level, or close the B2 construction branch. Adding a location
+coordinate alone would not meet the obligation unless the derived movement
+graph also supplies a legal launch and propagation-safe support. No such
+addition is proposed here.
+
+8. BRANCH CLOSURE
+D closed the B2 construction branch after this audit. The six-action route
+remains withdrawn, the exact cutoff-12 result remains a grade-3 bound, and no
+runtime operation follows from this file. B3/B4 and deferred T11 remain
+unapproved. A later task would need a separately justified new elevation
+resource before reopening this branch.
+
+SOURCES
+Constraint-Implementation-Plan.md; Constraint-Continuation-Prompt.txt;
+Constraint-Restart-Checkpoint.txt; b2-construction-audit-2026-09-22.txt;
+b2-baseline-proposal-2026-09-22.txt; b2-baseline-result-2026-09-22.txt;
+recorder-baseline-staged-construction-2026-09-22.txt;
+probs/problem-crelay-topo.lisp lines 95-113, 136-137, 168, 179-182;
+tech/jump.lisp; tech/-mobility-action.lisp; tech/step.lisp; tech/switch.lisp;
+tech/-floor-blowing.lisp; tech/box.lisp; tech/-pickup.lisp;
+tech/-recorder-session.lisp.

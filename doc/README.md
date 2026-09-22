@@ -34,6 +34,9 @@ Method-level material for the constraint-led approach: the extractors' purpose,
 the staged build plan, and the templates a new problem's analysis starts from.
 `Constraint-Implementation-Plan.md` is authoritative for task state and is where
 a session starts; the per-problem session handoffs point at it.
+`Status-Algebra-and-Record-Schema.md` specifies the interactive ledger, and
+`Launch-Configuration-Checklist.md` is the portable G15 check required before a
+quotient traversal receives a concrete realization or budget.
 
 Per-problem results of the method — prediction registers, generated profiles,
 schema gaps, evidence — stay under `problems/<name>/` with that problem's other

@@ -1,20 +1,45 @@
 T10 restart checkpoint -- refreshed 2026-09-22
 ============================================
-CURRENT HANDOFF -- B2 AUDIT COMPLETE, 2026-09-22
-D approved the read-only audit and handoff update; both are complete.
-Read constraint-evidence/b2-construction-audit-2026-09-22.txt first after the
-continuation prompt. B2's simple route omitted a3/2 rise with jump limit1;
-the blower alternative also drops an unsupported actor when opening gate2.
-The nominal six-action B2 / combined29-action estimates are withdrawn.
-This rejects the proposed construction, not all B2 arrangements or deeper
-paths. B1 is unchanged and there is no B2 checkpoint. Proposed next work is
-read-only revised box retrieval from B1, requiring approval; no runtime
-operation, alternative baseline, B3/B4 or T11 work is currently authorized.
-All four archive hashes below, generated-profile hash and three recorded
-register-prefix hashes were rechecked and match. Register bytes were hashed
-without displaying content. No Lisp, search, import, replay or tests ran in
-the audit. Main ledger counts unchanged;20 total reported searches including
-the separate B1/B2 runs supersedes the historical18 below. G15 is OPEN.
+CURRENT HANDOFF -- T13 G15 APPLICATION SELECTION PENDING, 2026-09-22
+T12 completed G15's portable launch-configuration checklist:
+doc/constraint-method/Launch-Configuration-Checklist.md. It requires concrete
+actor/view, launch/landing, movement/support, propagated controller successor,
+and reach/cargo checks before a quotient traversal receives a realization or
+budget. It rejects a stated construction only; it does not establish
+reachability or impossibility.
+
+T13 is the next proposed task. Before reading new source material, the next
+session must ask D to choose and approve exactly one scope: a read-only check
+of a newly proposed B2 elevation resource, a general extractor-design task, or
+a traversal from another problem. B2 remains closed unless D separately names
+a new elevation resource and approves that first scope. No source audit,
+staging, replay, validation, search, instance change, or extractor work is
+authorized by this handoff.
+
+D approved the read-only recorder elevation-resource follow-up; it is
+complete. Read
+constraint-evidence/b2-recorder-elevation-resource-followup-2026-09-22.txt
+first after this checkpoint, then the revised-construction analysis. A
+ghost-held tray at location20 would conditionally retain a live rider while a
+live switch-off opens physical gate2: the ghost's recording blower remains on.
+That support cannot be established from B1. The ghost must lift tray1* off
+plate1 to carry it, which closes recording gate1 before the ghost can use the
+required passage toward blower1. The live tray cannot restore the recording
+view or be manipulated by the ghost. No other authored support reaches the
+elevated approach.
+
+The six-action B2 / combined29-action estimates remain withdrawn. The revised
+cargo return and second fork remain conditional on an independently established
+elevation/support transition that survives with gate2 open. No such resource
+was realized or proposed. B1 is unchanged and there is no B2 checkpoint. No
+runtime operation, alternative baseline or B3/B4 work is authorized. T11 is
+complete; see register 7.29 and the retained G14 evidence.
+No Lisp, search, import, replay or tests ran in the follow-up. Main ledger
+counts remain unchanged; 20 total reported searches includes the separate
+B1/B2 runs. G15 remains OPEN with its specification complete. The B2
+construction branch remains closed. Reopening it requires a separately
+justified new elevation resource and approval; no runtime operation follows
+this handoff.
 Older pending-B2 and pending-audit instructions below are historical.
 
 LATEST B2 RESULT -- supersedes pending-B2 instructions below
@@ -251,6 +276,8 @@ Generic ledger command/reporter inconsistencies are recorded in method evidence
 (t10-consistency-review-2026-09-21.txt) and await a separate implementation step.
 Use explicit recommendations when a future search is approved. The old gate8
 opening-cost inference was withdrawn; its split proposal is not an instruction.
-The lk4 schema-gap candidate awaits D's hand filing. T11 is approved but deferred.
+The lk4 schema-gap candidate awaits D's hand filing. T11 is complete: G14's
+reporting/provenance fix passed its clean checks and first staged score without
+changing RO allocation. See register 7.29.
 The Talos repairs changed tests and one header, not engine behavior; retained
 focused evidence plus D's full-suite success are in the method test-fix record.

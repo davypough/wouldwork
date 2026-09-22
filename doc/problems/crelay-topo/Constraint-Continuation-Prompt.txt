@@ -1,29 +1,94 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Refreshed 2026-09-22 after the approved B2 source audit and handoff verification.
+Refreshed 2026-09-22 for the T13 G15-application handoff.
 STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
-CURRENT TASK -- AWAITING A NEW APPROVAL
-----------------------------------------
+CURRENT TASK -- T13 SELECT AND APPROVE A CONCRETE G15 APPLICATION
+---------------------------------------------------------------
 CURRENT HANDOFF -- authoritative over all historical instructions below
-D approved the read-only B2 audit and requested a new-session handoff. Both
-are complete. Read next, in this order:
+T12 is complete. G15 is specified by the portable, documentation-only
+launch-configuration check:
+  doc/constraint-method/Launch-Configuration-Checklist.md
+It requires a concrete actor/view, launch and landing, movement and support
+conditions, the propagated successor of every controller action, and separate
+reach/cargo checks before a quotient traversal receives a realization or
+budget. Its labels reject only a stated construction and preserve missing
+conditions as conditional or open. It adds no extractor and authorizes no
+runtime work.
+
+T13 is PROPOSED and needs D's explicit choice before source work begins.
+Present these scopes:
+1. a read-only check of a newly proposed B2 elevation resource, which D must
+   identify and approve first;
+2. a general extractor-design task; or
+3. a different problem's proposed quotient traversal.
+
+Do not choose a scope, inspect new source material, or begin analysis before
+D approves one. T10 remains in progress, but its B2 construction branch stays
+closed after the recorder split-lift follow-up. Do not resume B2, B3/B4, a new
+baseline, staging, replay, validation, search, an instance change, or
+extractor work without the resulting task's separate approval.
+
+D approved the read-only recorder elevation-resource follow-up. It is
+complete. Read next, in this order:
   Constraint-Restart-Checkpoint.txt
+  constraint-evidence/b2-recorder-elevation-resource-followup-2026-09-22.txt
+  constraint-evidence/b2-revised-construction-analysis-2026-09-22.txt
+  constraint-evidence/b2-construction-audit-2026-09-22.txt
+  constraint-evidence/b2-baseline-result-2026-09-22.txt
+  constraint-evidence/b2-baseline-proposal-2026-09-22.txt
+The named logs/runner and the four earlier baseline analyses remain permitted
+evidence when needed. The follow-up is the current check of the only newly
+identified conditional support mechanism.
+
+The recorder split is conditionally valid but unavailable from B1. A ghost
+holding tray1* at location20 could sustain a live rider while a live
+switch-off opens physical gate2: ghost activation remains in the recording
+view. Reaching that support is the failure. Tray1* begins on plate1; when the
+ghost lifts it to carry it, recording gate1 closes before the ghost can use
+its required passage toward blower1. The live tray does not open the recording
+gate and cannot be manipulated by the ghost. No other authored support reaches
+the elevated approach.
+
+The B2 construction branch remains closed. The six-action B2 and combined
+29-action estimates remain withdrawn. No resource, B2 endpoint, archive,
+ledger record, runtime operation, or instance change resulted from this
+follow-up. Do not rerun B1/B2, deepen, change the goal/instance, begin B3/B4,
+import a checkpoint, or start a new extractor automatically. Reopening B2
+requires a separately justified new elevation resource.
+
+No Lisp, staging, import, search, replay, validation, extractor, test, engine
+edit, or instance edit ran. The main ledger remains sixteen premises/nine
+links/three bounds, seven of nine links found; total reported searches remain
+20. G15 remains an OPEN gap; its portable T12 specification is complete, and
+T13 is awaiting scope approval. This remains the already disclosed exposed
+session; no new memory source or sealed material was consulted. Plan, evidence,
+restart note, checklist, and documentation map were updated before this
+continuation prompt, which was regenerated last.
+
+HISTORICAL HANDOFF -- superseded wherever it conflicts with the current handoff
+
+D approved the read-only revised-construction derivation. It is complete.
+Read next, in this order:
+  Constraint-Restart-Checkpoint.txt
+  constraint-evidence/b2-revised-construction-analysis-2026-09-22.txt
   constraint-evidence/b2-construction-audit-2026-09-22.txt
   constraint-evidence/b2-baseline-result-2026-09-22.txt
   constraint-evidence/b2-baseline-proposal-2026-09-22.txt
 The named logs/runner and the four earlier baseline analyses remain permitted
 evidence when needed. The audit is the current correction to their estimates.
 
-The simple B2 route omitted an elevation requirement: the target is at3/2,
-ground approaches at0 and the jump-rise limit1. Blower lift is coupled to
-gate closure; opening the gate drops an unsupported hovering actor before
-the next move. This rejects the proposed six-action construction. It does
-not prove B2 impossible or explain every branch of the cutoff12 exhaustion.
-The six-action B2 and combined29-action estimates are withdrawn as execution
-guidance. B3/B4 remain conditional on an unrealized cargo-fork endpoint.
+The derivation found no complete route in the current authored geometry.
+Locations4/5 cannot jump to level3/2 location6. Location20 is the only
+elevated authored approach, but its blower lift is coupled to switch1:
+stopping the lift opens gate2 and immediately drops an unsupported actor.
+A future B2 therefore needs an independently retained elevated approach with
+gate2 open, followed conditionally by box pickup/return, plate2 placement,
+empty-handed recorder return, and a second START-RECORDER fork. No such
+location or transition was proposed. The old six-action B2 and combined29-
+action estimates remain withdrawn.
 
 No new search, staging, import, replay, validation, extractor or tests ran
 during the audit. B1 remains saved, one phase/nine actions; no B2 archive
@@ -35,17 +100,14 @@ The main ledger remains sixteen premises/nine links/three bounds, seven of
 nine links found. The historical18 searches plus separate B1/B2 gives20
 reported searches; imports and failed setup launches are not searches.
 
-G15 is OPEN, appended at lines863-885 of Constraint-Schema-Gaps.txt; that
-exact range is permitted. It asks whether a quotient traversal's launch
-configuration exists and survives controller propagation until crossing.
+G15 is OPEN. The read-only elevation-resource audit found no current object or
+authored transition that supplies the required retained level-3/2 approach.
 No earlier gap/register range changed and no new extractor is authorized.
-
-NEXT DECISION: recommend read-only derivation of revised box retrieval from
-preserved B1, supplying elevation, same-view gate access, cargo return and
-any recorder boundaries. This revised-construction task requires new
-approval. Do not rerun B1/B2, deepen, change the goal/instance, begin B3/B4,
-import a checkpoint, or resume deferred T11 automatically. The current audit
-approval is fulfilled, not a standing approval for subsequent planning.
+The B2 construction branch is closed. Reopening it would require a separately
+justified new elevation resource. Do not rerun B1/B2, deepen, change the
+goal/instance, begin B3/B4, import a checkpoint, or resume deferred T11
+automatically. The revised-construction approval is fulfilled and is not
+standing approval for runtime work or a new strategic construction.
 
 This remains an explicitly authorized exposed session. A fresh session must
 disclose any automatically supplied older puzzle memory before continuing;
@@ -298,7 +360,7 @@ Do not search the whole prediction register for headings or print matching
 lines.  Do not inspect old conversation/memory records for problem answers.
 If a range becomes stale, stop at the stated boundary; do not broaden it.
 
-Constraint-Prediction-Register.txt, 2756 lines, current line ranges:
+Constraint-Prediction-Register.txt, 2803 lines, current line ranges:
   101-223       section 3, sealed ALGORITHMS, permitted for implementation
   398-447       sections 7.1-7.2, permitted scoring history
   448-512       DO NOT READ: section 7.3 quotes sealed content
@@ -308,9 +370,10 @@ Constraint-Prediction-Register.txt, 2756 lines, current line ranges:
   2466-2501     section 7.25, completed audit/design and authorization
   2504-2572     section 7.26, RO commitments, written before its first run
   2575-2644     section 7.27, RO first score
-  2647-2756     section 7.28, G14 FIX COMMITMENTS -- deferred T11 only
+  2647-2756     section 7.28, G14 FIX COMMITMENTS
+  2759-2803     section 7.29, completed G14 fix score
 
-For deferred T11 only, read Constraint-Role-Obligations.txt in full --
+For completed T11 history, read Constraint-Role-Obligations.txt in full --
 sections 1-5 are RO's pre-implementation specification, section 6 is what
 actually happened, and SECTION 7 IS THE APPROVED G14 FIX SPECIFICATION --
 then G14, then register 7.28.  Sections 3 and 7.23-7.24 hold the S4 extractor
@@ -321,8 +384,9 @@ completed extractor, then stop before the next extractor.  Never print the
 whole section 4.  Sections 4 and 5 are not required to score the G14 fix or
 RO: neither has a sealed value paragraph.
 
-Constraint-Schema-Gaps.txt, 885 lines (WHERE THIS FITS was appended after853;
-G15 was appended at863-885; every earlier range below is unchanged):
+Constraint-Schema-Gaps.txt, 907 lines (WHERE THIS FITS was appended after853;
+G15 is at863-897, including its T12 specification update and T13 handoff;
+G14's completion update is at900-907):
   1-437         G1-G7 and introduction, permitted
   696-725       G12, destination and transition proof gap, permitted
   726-748       G13, relative writer target, permitted
@@ -330,7 +394,9 @@ G15 was appended at863-885; every earlier range below is unchanged):
   781-853       G14, unfiltered inherited premise, with its 2026-09-20
                 update recording the approved fix, permitted
   G9            TAG ONLY.  Its content quotes a sealed S4 prediction.
-  863-885       G15, launch configuration/propagation audit question, permitted
+  863-897       G15, launch configuration/propagation audit question, T12
+                specification update, and T13 handoff, permitted
+  900-907       G14 completion update, permitted
 Other gaps' status is summarized below; do not widen an extraction through G9.
 
 Then read:
@@ -486,9 +552,9 @@ spend turns retrying it.
 
 CURRENT ARTIFACTS AND STATUS
 ----------------------------
-Constraint-Prediction-Register.txt       HAND, sealed 3-6; history through 7.28
+Constraint-Prediction-Register.txt       HAND, sealed 3-6; history through 7.29
 Constraint-Static-Profile.txt            GENERATED, 640 lines, S0-S4
-Constraint-Schema-Gaps.txt               HAND, through G15; G14 fix deferred
+Constraint-Schema-Gaps.txt               HAND, through G15; G14 closed, T12 specified
 Constraint-Abstract-Model.txt            HAND, partial; stale claims corrected
 Constraint-Role-Obligations.txt          HAND, 417 lines: RO1-RO6 and the
                                         pre-run RO specification (1-5),

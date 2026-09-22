@@ -883,3 +883,25 @@ budget, not evidence that the quotient's declared contract is incorrect.
 No general impossibility, mandatory resource count, complete alternative,
 new extractor, or implementation approval follows from this question.
 Permitted evidence: constraint-evidence/b2-construction-audit-2026-09-22.txt.
+
+STATUS UPDATE
+    SPECIFIED 2026-09-22 by T12,
+    doc/constraint-method/Launch-Configuration-Checklist.md. The portable
+    procedure records the concrete actor/view, launch and landing, movement
+    predicate requirements, controller transition, propagated successor, and
+    separate reach/cargo conditions before assigning a budget. Its result
+    labels reject only an invalid construction and retain unestablished
+    prerequisites as conditional or open. This is not an extractor, does not
+    revise the quotient, and does not reopen B2 or authorize runtime work.
+    T13 is the next proposed task: D must select and approve a concrete
+    application before the checklist is used for new analysis.
+
+
+G14 STATUS UPDATE -- FIX SCORED 2026-09-22
+-------------------------------------------
+Status: CLOSED. The approved reporting/provenance fix is implemented and
+first-scored in register 7.29. It indexes inherited device-state premises by
+consumer view without changing RO's allocation. The staged physical-view run
+reported OPEN as IN-VIEW and RECORDING-OPEN as retained OUT-OF-VIEW; the
+allocation remained unchanged. The score is against committed predictions,
+not a sealed value paragraph.

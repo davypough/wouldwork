@@ -1,0 +1,77 @@
+B2 recorder elevation-resource follow-up -- 2026-09-22
+=======================================================
+
+AUTHORIZATION AND SCOPE
+D approved a read-only investigation of a new elevation resource for the
+closed B2 construction branch. This follow-up reads the preserved B1 archive,
+the authored crelay-topo geometry, and the permitted recorder, tray, support,
+switch, blower, pickup, and movement semantics. No Lisp, staging, import,
+search, replay, validation, extractor, test, engine edit, or instance edit
+ran. No sealed material was read. This remains the previously disclosed
+exposed session; no new memory source was consulted.
+
+QUESTION
+Could a second recorder cycle retain a live actor at location20 while its
+physical gate2 view is open, by using a ghost-held tray as the support?
+
+CANDIDATE MECHANISM
+The recorder semantics admit the relevant split only conditionally:
+
+1. A ghost may toggle switch1 on. That changes both its recording switch
+   memory and the ordinary physical switch, so both the recording and physical
+   blower views become active.
+2. If both agents are already on blower1, propagation raises them to
+   location20. A ghost holding tray1* there would make that tray a support at
+   the ghost holder's level.
+3. The live agent may mount a ghost-held tray during recording. This is the
+   one directional cross-layer support exception.
+4. A live toggle of switch1 off changes only the ordinary physical switch.
+   Gate2 would then be open in the live view while the ghost's recording
+   blower remained active. The ghost and the live rider would not satisfy
+   DROP-OCCUPANTS!'s unsupported-occupant condition.
+
+Thus the controller split itself is not the missing resource. A ghost-held
+tray already at location20 would retain a live actor there through the
+physical switch-off boundary.
+
+WHY IT DOES NOT REALIZE A B2 RESOURCE
+At the B1 endpoint, starting the second cycle copies tray1 onto plate1 as
+tray1*, at location2. The ghost agent begins at location1. To carry tray1*,
+the ghost must first pick it up. That removes its recording-side pressure
+from plate1, immediately closing recording gate1.
+
+The archived B1 witness establishes the relevant recorded crossing:
+location1 reaches location7 through gate1, and location7 returns to
+location2 through gate1. The current B2 baseline analysis likewise depends
+on tray1* keeping recording gate1 open for the ghost to leave this region.
+Once the ghost holds tray1*, its required recorded passage toward blower1 is
+not supplied. A live tray cannot repair the recording view, and the ghost
+cannot manipulate the live tray; recorder manipulation is same-side only.
+
+No other current support can replace tray1*:
+
+* box1 is the still-unreached cargo in location6;
+* a grounded tray is inert;
+* a tray held by the live actor cannot support its own holder and cannot be
+  carried by the ghost;
+* the authored ladders end at ground configurations and do not reach
+  location20 or the gate2 alcove; and
+* the blower remains the only authored elevation transition to location20.
+
+The split-lift sequence therefore identifies a conditional mechanism but not
+an available elevation resource from B1. It does not reopen B2, replace the
+existing cutoff-12 bound, establish a B2 endpoint, or authorize runtime
+work. A future reopening still requires a separately justified way to bring
+an independent, propagation-safe support to the elevated approach without
+relying on the tray1*/gate1 dependency.
+
+SOURCES
+Constraint-Implementation-Plan.md; Constraint-Continuation-Prompt.txt;
+Constraint-Restart-Checkpoint.txt;
+constraint-evidence/t10-b1-checkpoint.txt;
+constraint-evidence/b2-revised-construction-analysis-2026-09-22.txt;
+tech/-recorder-session.lisp; tech/-recorder-core.lisp;
+tech/-recorder-switch-shadow.lisp; tech/switch.lisp; tech/tray.lisp;
+tech/jump.lisp; tech/step.lisp; tech/-floor-blowing.lisp;
+tech/-support-elevation.lisp; tech/ladder.lisp; and
+probs/problem-crelay-topo.lisp.

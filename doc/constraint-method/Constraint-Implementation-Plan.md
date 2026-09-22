@@ -33,9 +33,38 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T10 — B2 audit complete; revised box-retrieval construction awaits approval.**
+**T13 — Select and approve a concrete application of G15.**
 
-Handoff, 2026-09-22: D approved the read-only audit and documentation update.
+T12 completed G15's portable launch-configuration specification. The next
+application is a strategic choice and has not been selected. The next session
+must present the following scopes and obtain explicit approval before opening
+new source material:
+
+1. a read-only check of a newly proposed B2 elevation resource, which requires
+   D to identify that resource first and does not reopen B2 by itself;
+2. a general extractor-design task, which is separate implementation work; or
+3. a different problem's proposed quotient traversal.
+
+Until D chooses one, no construction analysis, source audit, staging, replay,
+validation, search, instance change, or extractor work is authorized. T10's
+B2 branch remains closed: the nominal six-action B2 construction is rejected,
+and the recorder split-lift resource is unavailable from B1. T11 and T12 are
+complete.
+
+Follow-up, 2026-09-22: D approved a read-only investigation of a possible
+recorder-based elevation resource. The mechanism is conditionally sound only
+if a ghost already holds tray1* at location20: a ghost switch-on can sustain
+the ghost tray there, then a live switch-off opens physical gate2 while a live
+rider remains supported. It is unavailable from B1. Carrying tray1* away from
+plate1 closes recording gate1 before the ghost can use its required passage
+toward blower1; live tray1 cannot restore the recording view and cannot be
+manipulated by the ghost. No other authored support reaches the elevated
+approach. The B2 branch remains closed. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/b2-recorder-elevation-resource-followup-2026-09-22.txt`.
+No runtime operation, new baseline, B3/B4, or extractor is authorized. T11 is
+complete; T12's read-only G15 specification is complete.
+
+Handoff, 2026-09-22: D approved the read-only revised-construction derivation.
 The proposed B2 route omitted a launch-elevation prerequisite: location6 is
 at3/2, the nearby ground launches at0, and the jump-rise limit is1. The
 blower fallback also needs a support/transition that survives opening gate2:
@@ -50,11 +79,18 @@ profile hash and three register-prefix hashes match; register content was
 not displayed. The main ledger remains unchanged. Historical18 searches plus
 the separate B1/B2 runs gives20; setup failures/imports add none.
 
-NEXT SESSION: read the continuation prompt, restart note and B2 audit/result/
-proposal. Recommend read-only derivation of a revised box-retrieval mechanism
-from preserved B1, subject to a new approval. No further runtime operation,
-baseline change, B3/B4, extractor or deferred T11 work is authorized. Do not
-rerun B1 or B2. All older next-step text below is historical where it conflicts.
+The revised derivation and follow-up elevation-resource audit found no
+complete route or current elevation resource in the authored geometry. Any
+valid B2 needs an independently retained level-3/2 approach while switch1 is
+off and gate2 is open; the existing blower cannot provide that because
+stopping it drops the actor. The cargo return and second fork are therefore
+conditional only. No location or transition was proposed.
+
+NEXT SESSION: read the continuation prompt and restart checkpoint, then
+present T13's three scopes for D's choice. Do not read new source material or
+begin analysis until that choice is approved. The B2 construction branch stays
+closed unless D identifies a new elevation resource and approves the first
+scope. All older next-step text below is historical where it conflicts.
 
 Latest result, 2026-09-22: D approved B2. One threads16/cutoff12 search from
 restored B1 found no solution; direct truncation T, 381717 cutoff hits,
@@ -393,8 +429,10 @@ Two invariants constrain everything below:
 | T7 | S5 height and reach lattice | PROPOSED | not requested | — |
 | T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
 | T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
-| T10 | End-to-end closure on crelay-topo (7/9 spine links found; B1 baseline boundary archived) | IN PROGRESS | B2 audit complete; G15 open; revised box-retrieval construction awaits approval; no run pending | T2–T5 |
-| T11 | Implement and score the G14 fix | APPROVED, DEFERRED | approved, four parts | — |
+| T10 | End-to-end closure on crelay-topo (7/9 spine links found; B1 baseline boundary archived) | IN PROGRESS | B2 construction branch remains closed after elevation audit and recorder split-lift follow-up; no run pending | T2–T5 |
+| T11 | Implement and score the G14 fix | COMPLETE | approved, four parts | — |
+| T12 | Specify the G15 launch-configuration check | COMPLETE | approved in session, 2026-09-22 | — |
+| T13 | Select and approve a concrete application of G15 | PROPOSED | not requested | T12 |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
 deferred it on 2026-09-20 so the architecture tasks settle first. It is
@@ -425,6 +463,51 @@ otherwise unchanged, and it is regenerated last per M3.
 
 **Status.** COMPLETE, 2026-09-20. **Evidence.** This file, and the CURRENT TASK
 block at the top of `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt`.
+
+## T13 — Select and approve a concrete application of G15
+
+**Goal.** Choose the next bounded application of G15 without silently turning
+its portable specification into a B2 reopening, a construction audit, or an
+extractor project.
+
+**Acceptance.** D chooses one named traversal or resource proposal, the
+applicable G15 report form is copied into the approved task's scope, and the
+task records whether it is documentation-only, source analysis, or
+implementation. No source inspection or runtime operation occurs before that
+approval.
+
+**Scope.** The selection is strategic. Present the three choices named in
+CURRENT TASK; do not infer a preferred resource or construction from the
+closed B2 evidence.
+
+**Contamination scope.** None for the selection. The chosen task defines its
+own reading boundary and contamination scope.
+
+**Status.** PROPOSED. **Approval.** Not requested.
+
+## T12 — Specify the G15 launch-configuration check
+
+**Goal.** Turn G15's portable missing question into a read-only procedure that
+must be applied before a quotient traversal receives a concrete realization or
+action budget.
+
+**Acceptance.** A method-level specification requires a concrete actor/view,
+launch and landing points, all movement-predicate configuration requirements,
+the complete propagated successor of every intervening controller transition,
+and separate reach/cargo checks. It distinguishes concrete, conditional,
+rejected-construction, and open-question outcomes without claiming
+impossibility. It supplies a reusable report form.
+
+**Scope.** Documentation only. It does not add an extractor, revise a quotient,
+authorize a construction analysis, reopen B2, or permit staging, replay,
+validation, search, testing, or an instance change.
+
+**Contamination scope.** G15 and its permitted construction audit only. No
+sealed-file access is needed.
+
+**Status.** COMPLETE, 2026-09-22. **Approval.** Granted in session when D
+selected the portable read-only G15 specification. **Evidence.**
+`doc/constraint-method/Launch-Configuration-Checklist.md`.
 
 ## T11 — Implement and score the G14 fix
 
@@ -457,9 +540,11 @@ the index work, it has exceeded its scope: stop and ask.
 **Contamination scope.** C1 applies. No sealed-file reading, no solve and no
 action search is authorized by the existing approval.
 
-**Status.** APPROVED, DEFERRED 2026-09-20 by D until the architecture tasks are
-settled. **Approval.** Granted, all four parts, in one turn; the deferral does
-not withdraw it and it must not be re-asked when this resumes.
+**Status.** COMPLETE, 2026-09-22. The approved clean-image checks ran before
+the one staged RO report. All P1-P8 commitments regenerated; no allocation
+changed. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/g14-helper-checks-2026-09-22.log`,
+`g14-first-run-2026-09-22.txt`, and register 7.29.
 
 ## T1 — Status algebra and record schema
 
@@ -916,6 +1001,20 @@ decision: approve read-only revised box retrieval from B1; no execution is
 authorized. Evidence: `constraint-evidence/b2-construction-audit-2026-09-22.txt`.
 Technical decision: preserve original pre-run text under explicit correction
 notices, so the measured failure remains tied to the proposal actually tested.
+
+**Revised B2 construction update, 2026-09-22.** D approved read-only
+derivation of a replacement for the withdrawn six-action route. The source
+trace shows that current authored geometry has no complete replacement:
+locations4/5 cannot jump to level-3/2 location6, and location20 is reachable
+only through a blower whose switch simultaneously closes gate2 and drops an
+unsupported actor when turned off. A valid future B2 would first need an
+independent elevation/support transition that survives with gate2 open, then
+perform a carried-box return, plate2 placement, empty-handed recorder return
+and second fork. This is conditional analysis, not an impossibility claim or
+runtime guidance. No location or transition was proposed. Evidence:
+`constraint-evidence/b2-revised-construction-analysis-2026-09-22.txt`.
+The next strategic choice is whether to investigate such a separately
+justified elevation resource or close the branch.
 
 Latest B2 result (2026-09-22): the approved single search exhausted with direct
 truncation at cutoff12. B1 remains unchanged; no B2 archive. See
