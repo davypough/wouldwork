@@ -34,3 +34,11 @@ reading context. This was disclosed before edits. Those notes did not inform
 the test fixes. Independent puzzle derivation should resume in a fresh session
 or only after D explicitly decides how to proceed with the disclosed exposure.
 The return-access analysis was approved but not performed during this repair.
+
+FULL SUITE FOLLOW-UP
+D subsequently reported: "(test-talos) now runs successfully." Record this as
+user-confirmed full-suite success after the fixes, not an assistant rerun.
+The earlier supplied failing summary counted117 problems and26 mutation cases;
+no new detailed counts/transcript were supplied with the successful report.
+D requested a documentation handoff and will start a fresh session for the
+already approved read-only return-access/resource analysis. No new search.

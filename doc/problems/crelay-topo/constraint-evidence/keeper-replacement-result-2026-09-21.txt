@@ -99,3 +99,11 @@ Recommended next step: read-only return-access/resource audit, particularly
 switch2 behind gate6 versus the new source commitments, before another search.
 The reasonable cutoff ceiling remains12; no next search or automatic adoption.
 No Lisp, staging, replay or search performed by assistant while recording this.
+
+HANDOFF UPDATE, 2026-09-21 (supersedes pending export/approval above)
+The keeper archive t10-keeper-checkpoint.txt is now verified on disk: 9 checkpoints,
+32 actions. SHA256: 21953443D71570B85CD2E5A76D124E8D2720C03EB6648F8693AF8CA9F82D578D
+Its final facts match the reported endpoint; no independent replay was performed.
+D approved the read-only switch2 return-access/resource audit, then prioritized
+Talos test repairs. Those repairs are complete and D reports (test-talos) succeeds.
+The approved audit is the next task in a fresh session. No further search approved.

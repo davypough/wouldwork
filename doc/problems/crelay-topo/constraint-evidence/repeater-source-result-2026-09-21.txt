@@ -130,3 +130,10 @@ live agent can release plate3 while source power remains. It would not itself
 establish receiver power, restore gate7 access, or cross gate8. Retain both
 existing checkpoints; exact bounded experiment still requires D's choice.
 No further search, replay, staging or engine change performed by the assistant.
+
+HANDOFF UPDATE, 2026-09-21 (supersedes pending export/approval above)
+The source archive t10-repeater-source-checkpoint.txt is now verified on disk.
+SHA256: 659F0EDDA108AD81764AA7C227430057D0C6FE51C7374C2058438636CF2C25DB
+The keeper probe was subsequently approved and completed; see
+keeper-replacement-result-2026-09-21.txt. Both phases remain REALIZED/validated NIL.
+File inspection does not constitute independent replay validation.
