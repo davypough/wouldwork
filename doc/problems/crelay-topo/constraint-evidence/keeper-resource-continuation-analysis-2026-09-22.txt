@@ -1,0 +1,118 @@
+Keeper resource continuation analysis -- 2026-09-22
+=================================================
+AUTHORIZATION AND SCOPE
+D said "Continue the analysis" after disclosure that this session's supplied
+memory summary contained earlier Crelay-Topo information. The additional memory
+registry search returned no matches. Continuation is authorized with that
+exposure disclosed; this is not an independent clean prediction experiment.
+The derivation below uses current permitted files. No further memory lookup,
+sealed material, Lisp execution, staging, search, replay, validation, extractor,
+engine edit, or ledger restructuring occurred. Documentation alone was updated
+under the implementation plan's handoff requirement.
+
+START AND EVIDENCE
+The depth32/nine-checkpoint keeper candidate remains the analysis start. Its
+inventory is taken from Constraint-Restart-Checkpoint.txt and the final state
+in keeper-replacement-result-2026-09-21.txt. Archive hashes are recorded prior
+verification, not reverified in this analysis. Both cutoff12 result files were
+read. Neither experiment found its conjunction; both directly saw truncation.
+Their almost identical work counts do not identify a causal bottleneck.
+
+NEW LOCAL OBSTRUCTION: RELEASING THE GHOST AGENT
+1. Agent1* is ON plate1 at location2, the only current recording witness there.
+2. -mobility-action.lisp MOVEMENT-RESULTS-IN-STATE offers only explicit
+   configuration transitions while an agent is supported. STEP dismounts to
+   ground at the same location. MOVE then propagates changes. A dismount and
+   subsequent ground walk are not one transparent action.
+3. -recorder-plate-shadow.lisp RECORDING-PLATE-OCCUPIED counts only ghost
+   occupants during the open cycle. Removing agent1* without a ghost replacement
+   removes recording pressure on plate1. The authored controls and
+   -recorder-controls-shadow.lisp/-recorder-gate-shadow.lisp close recording gate1.
+4. -gate.lisp GATE-OPEN-FOR-OBJECT selects recording openness for agent1*.
+   A live agent or live cargo substituted on plate1 therefore does NOT repair
+   this ghost walking precondition, even if physical gate1 stays open.
+5. S3's R1 -> R8 walking arc requires gate1. Its ladder1 arc is directed
+   R8 -> R1, not an outward ladder bypass. The other ghost cargo starts outside
+   R1 (tray at location7, connector at location9, box at location6); none is
+   already a replacement on plate1. -recorder-core.lisp also prevents the live
+   actor from directly manipulating ghost cargo.
+
+This refutes the simple proposed handoff "walk the ghost to plate3 and free the
+live tray" from this inventory without further preparation. It is a local
+precondition argument, not an exhaustive impossibility or permanent-stranding
+proof. No complete audit of all support transport or recorder lifecycle paths
+has been performed. In particular, do not promote the S3 graph alone into one.
+
+CONDITIONAL BUDGET AT SWITCH2 ACCESS
+With the current source assignment fixed, tray1 is on plate3 and connector1 is
+the source relay at location9. The live actor must leave plates4/5 to enter
+location14 and must be empty-handed at screen1. If ghost bodies cannot yet be
+supplied, only box1 remains as a candidate non-agent live keeper for the two
+distinct gate6 plates. One such body cannot occupy both (ON is keyed by body).
+Even the box's transport is not established. Thus this PARTICULAR fixed-role,
+no-ghost-supply allocation is insufficient for that crossing.
+
+Do not apply this argument to the narrower (color repeater1 red)/(open gate6)
+goal: that goal permits the live actor to witness one plate. Do not infer that
+it explains either exhaustion. The probes allowed source reassignment and
+lifecycle changes; their goals did not freeze tray1 or connector1's roles.
+No universal source arrangement or missing-object claim is made here.
+
+RECORDER BOUNDARY CONSEQUENCES
+-recorder-session.lisp permits live cancellation only at a recorder while
+empty-handed; normal STOP requires the ghost at a recorder, empty-handed, with
+boundary-safe dependencies (-recorder-cycle-boundary.lisp). These are distinct
+ending mechanisms; neither was executed.
+CLOSE-RECORDER-CYCLE-STATE! removes ghost references and propagates. With the
+unchanged keeper cargo assignment this removes both plate1 and plate2 witnesses,
+closing their physical gates. Source tray1 and connector1 are live, so their
+mere existence does not depend on those ghosts.
+START-RECORDER copies CURRENT live placement, supports and pairings. It does
+not preserve an old ghost tray on plate2 while also cloning tray1 on plate3.
+A proposal for another cycle must explicitly pay for its new gate1/gate3 access
+arrangement and recorder return, rather than treating a restart as free supply.
+
+STRATEGIC OPTIONS -- NO NEXT RUN APPROVED
+A. Continue the present branch with a different source allocation or a proved
+   replacement/transport mechanism. Must name the actual replacement and its
+   relevant view before selecting another conjunction; no such route established.
+B. Develop a changed recorder baseline in which cargo, rather than the ghost
+   actor, supplies recording gate1 pressure. This directly addresses the local
+   obstruction and is the recommended planning direction. It may require moving
+   the source tray or obtaining the box; source power need not remain a milestone
+   during preparation. Also account for plate2 access, legal cycle closure,
+   live recorder return, post-fork ghost mobility and later source restoration.
+   A baseline is a proposed resource arrangement, not yet a replayable plan or
+   a reason to abandon any of the three saved checkpoints.
+
+No cutoff or search command is recommended yet: the preparation mechanism has
+not been derived far enough to justify one. Ceiling12 remains a ceiling only.
+Before any run, select the branch/baseline, state the exact endpoint and
+preserved obligations, derive its permitted transitions, then obtain approval
+for that specific bounded experiment or replay. Main ledger counts and grades
+are unchanged. The source/keeper candidates remain REALIZED/validated NIL.
+
+HANDOFF CHECK, LATER ON 2026-09-22
+D requested documentation readiness before starting another session. The plan,
+restart note and continuation prompt now distinguish the two exposure events,
+the completed analysis and the still-pending alternative-baseline approval.
+The three saved archive hashes, generated-profile hash and three recorded
+register-prefix hashes were reverified and matched. Register bytes were hashed
+only; no sealed content was displayed/interpreted. This supersedes the earlier
+statement that hashes had not been reverified during the analysis. No runtime
+operation or new puzzle derivation was performed for this handoff check.
+
+SOURCES (permitted, read as text)
+Constraint-Implementation-Plan.md T10/current instructions;
+Constraint-Continuation-Prompt.txt; Constraint-Restart-Checkpoint.txt;
+Constraint-Static-Profile.txt S3/S4;
+probs/problem-crelay-topo.lisp;
+prior lk5 beam/resource and switch2 access audit evidence;
+keeper-replacement-result and both cutoff12 result records;
+tech/switch.lisp, plate.lisp, walkability.lisp, step.lisp, reachability.lisp,
+-pickup.lisp, -interaction-policy.lisp, -recording-shadow-policy.lisp,
+-passability.lisp, -gate.lisp, -support-occupancy.lisp, -mobility.lisp,
+-mobility-action.lisp, -configuration-transition.lisp, -recorder-core.lisp,
+-recorder-plate-shadow.lisp, -recorder-controls-shadow.lisp,
+-recorder-gate-shadow.lisp, recorder.lisp, -recorder-session.lisp,
+-recorder-cycle-boundary.lisp.

@@ -1,5 +1,24 @@
-T10 restart checkpoint -- refreshed 2026-09-21
+T10 restart checkpoint -- refreshed 2026-09-22
 ============================================
+LATEST ANALYSIS (2026-09-22)
+D authorized read-only continuation after supplied-memory exposure was disclosed.
+The ghost cannot simply leave plate1 to replace tray1: its separate dismount
+closes recording gate1, and a live replacement supplies only physical pressure.
+With source roles fixed and ghost supply unavailable, only one non-agent live
+body remains for gate6's two supports. This is conditional allocation analysis,
+not an explanation of the narrower exhaustion or a stranding proof.
+Recommended direction is a changed recorder baseline with cargo holding
+recording gate1; plate2 access, closure/return and source restoration still need
+explicit preparation. No baseline or next run selected/approved. See
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt.
+All inventories, measured counts and archive references below are unchanged.
+The subsequent handoff check on 2026-09-22 reverified all three archive hashes,
+the full generated-profile hash and the three recorded register-prefix hashes;
+all matched. Register bytes were hashed without displaying/interpreting content.
+Next session: read the continuation prompt and the analysis above, then resolve
+the pending approval for developing the alternative baseline through read-only
+analysis. Handoff preparation itself did not approve that next step.
+
 CURRENT STATUS: the approved standalone switch2 return-access and gate6/source
 resource probes both exhausted at cutoff12. No further search is currently
 authorized. D asked to repair Talos tests first; fixes are complete, and D
@@ -11,9 +30,12 @@ READING BOUNDARY
 Read Constraint-Continuation-Prompt.txt first. Use current permitted instance,
 tech semantics, generated profile and the candidate evidence below. Do not read
 sealed solutions, backward/forward analyses, Initial-Conditions, sealed register
-sections, or old memory/conversations for puzzle answers. Previous session
-exposed memory details accidentally and disclosed it; D chose a fresh session.
-The new task should derive its analysis from permitted evidence only.
+sections, or old memory/conversations for puzzle answers. The 2026-09-21 exposure
+led to a fresh session; the separately disclosed 2026-09-22 supplied-memory
+exposure was followed by D's authorization to continue analysis. Do not confuse
+those events or describe the resulting analysis as a clean prediction run.
+The new task should derive its analysis from permitted evidence only. If memory
+is automatically supplied again, disclose it rather than claim a clean context.
 
 STATE COUNTS
 Sixteen premises, nine main-spine links, three cost bounds. Five CLOSED links:

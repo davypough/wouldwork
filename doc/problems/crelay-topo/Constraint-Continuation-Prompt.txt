@@ -1,12 +1,47 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Refreshed 2026-09-21 for a fresh session after successful Talos tests.
+Refreshed 2026-09-22 after resource analysis and final handoff verification.
 STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
 CURRENT TASK -- AWAITING A NEW APPROVAL
 ----------------------------------------
+NEXT SESSION: read this prompt, Constraint-Restart-Checkpoint.txt and
+constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt.
+The pending question is: does D approve developing the alternative recorder
+baseline through read-only analysis? Handoff preparation did not approve that
+strategic next step. No new run, archive import, or deferred T11 work is pending.
+Use permitted evidence only. If earlier puzzle memories are automatically
+supplied, disclose that exposure; a new session alone does not ensure a clean
+prediction context. The 2026-09-22 analysis already carries that qualification.
+
+LATEST UPDATE, 2026-09-22: D said "Continue the analysis" after the assistant
+disclosed earlier Crelay-Topo information in its supplied memory summary. The
+additional registry search had returned no matches. Continued analysis was
+therefore authorized with exposure disclosed, not as a clean prediction run.
+No additional memory or sealed material was consulted.
+
+The ghost-agent handoff has a specific local obstruction: dismounting plate1
+is a separate propagated action and closes recording gate1. A live substitute
+does not supply recording pressure, so it does not restore ghost passage.
+With the current source roles fixed and ghost supply unavailable, only box1
+remains as a non-agent live keeper for gate6's two plates. This conditional
+shortage applies to switch access, not to the narrower gate6 goal that allows
+the live actor on a plate; it does not explain the searches or prove stranding.
+Recommended strategic direction: develop a changed recorder baseline with
+cargo holding recording gate1. Plate2 access, legal closure/recorder return,
+ghost mobility and source restoration must be accounted for first. This is
+a proposal, not a selected baseline or an authorized search/replay. No cutoff
+or command is pending. Keep all three saved candidates.
+New permitted evidence:
+  constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt
+This update supersedes earlier fresh-session instructions where they conflict.
+Ledger counts/grades and checkpoints are unchanged. No Lisp or tests ran.
+The later handoff check reverified archive/profile/register-prefix hashes as
+recorded under HANDOFF VERIFICATION below. Documentation was updated under the
+plan's handoff rule; this continuation prompt was updated last.
+
 T10 remains IN PROGRESS. The approved read-only switch2 return-access/resource
 audit and its two approved standalone probes are complete. Both exhausted at
 cutoff12 with direct cutoff truncation: one for the combined
@@ -66,9 +101,11 @@ Permitted current evidence under constraint-evidence/:
 - gate6-source-resource-proposal-2026-09-21.txt,
   gate6-source-resource-probe-recommendation-2026-09-21.txt, and its result.
 - The three saved archives above.
-Use only permitted evidence and source. A memory lookup in the previous session
+ - keeper-resource-continuation-analysis-2026-09-22.txt.
+Use only permitted evidence and source. A memory lookup in the 2026-09-21 session
 accidentally surfaced older puzzle-checkpoint details outside this reading
 boundary; this was disclosed before the test edits. D chose a fresh session.
+The distinct 2026-09-22 supplied-memory exposure and approval are recorded above.
 Do not consult old memory/conversations or sealed solution material for answers.
 
 MAIN LEDGER AND TEST STATUS
@@ -103,6 +140,17 @@ schema-gap candidate awaits D's hand filing. T11 is approved but DEFERRED.
 
 HANDOFF VERIFICATION
 --------------------
+Final handoff check, 2026-09-22: all three saved checkpoint SHA-256 hashes
+matched the restart note; the full generated-profile hash and all three register
+prefix hashes matched the values in VERIFICATION AND CONTAMINATION HANDOFF.
+Register bytes were hashed only; no sealed content was displayed/interpreted.
+Plan/current task, board, restart note and new analysis agree on unchanged
+counts, current candidate, conditional conclusions and pending approval.
+No search, staging, replay, validation, extractor or test execution occurred.
+The continuation prompt was updated last. Historical next-step commands below
+remain history and do not authorize work.
+
+Prior verification, 2026-09-21:
 All three archive hashes, the generated profile hash and the recorded sealed
 register prefix hashes were checked without reading sealed content before the
 two new experiments. Generated reports and the register were not changed. The
@@ -129,7 +177,7 @@ Constraint-Prediction-Register.txt, 2756 lines, current line ranges:
   2466-2501     section 7.25, completed audit/design and authorization
   2504-2572     section 7.26, RO commitments, written before its first run
   2575-2644     section 7.27, RO first score
-  2647-2756     section 7.28, G14 FIX COMMITMENTS -- the current work
+  2647-2756     section 7.28, G14 FIX COMMITMENTS -- deferred T11 only
 
 For deferred T11 only, read Constraint-Role-Obligations.txt in full --
 sections 1-5 are RO's pre-implementation specification, section 6 is what

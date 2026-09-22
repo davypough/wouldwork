@@ -33,7 +33,28 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T10 — gate6/source resource probe exhausted; no automatic next search.**
+**T10 — resource continuation analysis complete; strategic choice pending.**
+On 2026-09-22 D authorized continued read-only analysis after disclosure of
+supplied memory exposure; this is not a clean prediction session. The local
+ghost-release obstruction is now source-derived: stepping off plate1 closes
+recording gate1, and a live replacement does not restore ghost passage. Keeping
+the current source roles while excluding ghost supply also leaves only one
+non-agent live candidate for gate6's two plates. This conditional shortage does
+not explain the narrower probe's failure or prove the branch impossible.
+Recommended direction: develop a changed recorder baseline with a cargo witness
+for recording gate1, accounting for plate2 access and source restoration.
+No baseline, new search, replay, or implementation is approved. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/keeper-resource-continuation-analysis-2026-09-22.txt`.
+
+**Next-session entry:** read the continuation prompt, restart checkpoint and
+that analysis. The pending question is whether D approves developing the
+alternative recorder baseline through read-only analysis. The request to prepare
+this handoff did not approve that strategic next step. Do not rerun completed
+probes, import archives, or resume deferred T11 automatically.
+Handoff verification on 2026-09-22 rechecked all three archive hashes, the full
+generated-profile hash and all three recorded register-prefix hashes: all match.
+Register bytes were hashed only; no sealed content was displayed or interpreted.
+
 The approved audit's single cutoff-12 return-access probe completed from the
 depth-32 keeper candidate.  It found no solution and directly observed cutoff
 truncation, so it is a bound for only that exact combined source/gate6/location14
@@ -48,8 +69,10 @@ repaired fixtures and all 55 cutoff assertions. No engine behavior changed. Evid
 Read `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt` for boundaries,
 then `Constraint-Restart-Checkpoint.txt` for exact inventories, archive hashes,
 restart commands and ledger reconstruction. Do not use memory or old conversations
-for puzzle answers. This session's accidental memory exposure was disclosed;
-D chose a new session. No further puzzle derivation occurred after that exposure.
+for puzzle answers. On 2026-09-21 an exposed session was stopped for a fresh
+session. On 2026-09-22 supplied-memory exposure was disclosed again and D
+explicitly authorized continued analysis. Keep these two events distinct;
+the latter analysis is not an independent clean prediction experiment.
 
 **Starting point for the analysis:** the saved keeper candidate at cumulative
 **depth 32, nine checkpoints**, not the old depth-19 seed. Agent1 is empty-handed
@@ -307,7 +330,7 @@ Two invariants constrain everything below:
 | T7 | S5 height and reach lattice | PROPOSED | not requested | — |
 | T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
 | T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
-| T10 | End-to-end closure on crelay-topo (7/9 spine links found; return-access probe exhausted at cutoff12) | IN PROGRESS | access audit/probe completed; no further search approved; tests fixed and full suite passed per D; cutoff ceiling12 | T2–T5 |
+| T10 | End-to-end closure on crelay-topo (7/9 spine links found; resource continuation analyzed) | IN PROGRESS | read-only continuation approved/completed 2026-09-22; strategic choice pending; no further search approved; cutoff ceiling12 | T2–T5 |
 | T11 | Implement and score the G14 fix | APPROVED, DEFERRED | approved, four parts | — |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
