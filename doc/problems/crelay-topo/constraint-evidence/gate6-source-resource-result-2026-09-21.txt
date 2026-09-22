@@ -1,0 +1,39 @@
+Gate6/source resource probe result -- 2026-09-21
+=================================================
+The approved standalone probe from *t10-keeper-checkpoint* completed using a
+16,000 MiB SBCL dynamic heap.  The heap allocation changes no goal or search
+setting.  The source archive is the nine-checkpoint, 32-action keeper candidate,
+SHA-256 21953443D71570B85CD2E5A76D124E8D2720C03EB6648F8693AF8CA9F82D578D.
+
+GOAL
+(and (color repeater1 red) (open gate6))
+
+SETTINGS AND OUTCOME
+Threads 16; cutoff 12; GRAPH; symmetry pruning NIL; minimum-steps pruning T.
+No solution was found.  The checkpoint returned unchanged and no new checkpoint
+was created.
+
+(:outcome #s(search-outcome :status :exhausted-no-solution
+                            :reason :depth-cutoff-truncated)
+ :cutoff 12 :threads 16 :cutoff-truncated t :cutoff-hits 779445
+ :search-mode graph :symmetry-pruning nil :min-steps-pruning t
+ :new-checkpoint-p nil)
+
+The engine processed 16,504,269 states, with 15,618,032 repeated states pruned
+(94.6%), 18,765 recorder-cycle-boundary prefix rejections, and 27,903
+successor-policy prunes.  It took 101.594 seconds real time, 1513.125 seconds
+CPU time, and 256,014,801,040 bytes consed.
+
+READING
+This is the committed grade-3 bound for this exact source checkpoint, resource
+conjunction, cutoff, and pruning configuration.  Direct cutoff truncation was
+observed, so it covers strictly less than the reachable search space.  Within
+12 actions it found no state combining red repeater source power and physical
+gate6 open.  It does not prove that no such state exists deeper, that the branch
+is stranded, that every solution needs this simultaneous configuration, or which
+resource obligation prevented it.  It is a separate experimental result, not an
+LK5 attempt; the main ledger remains at three cost bounds and no main-spine
+status changes.
+
+No replay, validation, extractor, or additional search was run.  The keeper
+archive remains unchanged.

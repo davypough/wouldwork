@@ -1,0 +1,51 @@
+Approved switch2 return-access probe -- 2026-09-21
+====================================================
+User approval: “continue,” following the documented bounded proposal.
+
+One standalone probe from the retained nine-checkpoint, 32-action keeper
+candidate.  This is not an LK5 realization, a final-goal search, or an
+automatic continuation adoption.  Preserve *T10-KEEPER-CHECKPOINT* and save a
+successful result in a distinct variable.
+
+Source archive:
+doc/problems/crelay-topo/constraint-evidence/t10-keeper-checkpoint.txt
+SHA-256: 21953443D71570B85CD2E5A76D124E8D2720C03EB6648F8693AF8CA9F82D578D
+
+(stage crelay-topo)
+(ww-set *threads* 16)
+(defparameter *t10-keeper-checkpoint*
+  (import-search-checkpoint
+    (merge-pathnames
+      "doc/problems/crelay-topo/constraint-evidence/t10-keeper-checkpoint.txt"
+      (asdf:system-source-directory :wouldwork))))
+(ww-set *depth-cutoff* 12)
+(defparameter *t10-return-access-checkpoint*
+  (solve-subgoal *t10-keeper-checkpoint*
+    (and (color repeater1 red)
+         (open gate6)
+         (has-location agent1 location14))))
+
+Capture the transcript and:
+(list :outcome *last-search-outcome*
+      :cutoff *depth-cutoff* :threads *threads*
+      :cutoff-truncated *depth-cutoff-truncated*
+      :cutoff-hits *depth-cutoff-hits* :search-mode *tree-or-graph*
+      :symmetry-pruning *symmetry-pruning*
+      :min-steps-pruning *min-steps-pruning-enabled*
+      :new-checkpoint-p
+      (not (eq *t10-return-access-checkpoint* *t10-keeper-checkpoint*)))
+
+SUCCESS interpretation committed before execution: the returned endpoint has
+physical repeater source power, physical gate6 open, and the live agent at
+location14 under the actual settings.  Before taking any further action,
+inspect the exact plate4/plate5 witnesses, connector pairings and placements,
+relay colors, holdings, and physical versus recording gate states.  This does
+not establish a switch toggle, gate7, gate8, a receiver route, LK5, or the
+final goal.  Do not promote the phase to the main spine automatically.
+
+EXHAUSTION interpretation committed before execution: no realization of this
+exact endpoint goal was found from this exact keeper checkpoint within cutoff
+12 under the reported coverage and pruning.  It is a grade-3 bound only; it
+does not prove the branch stranded, refute another resource assignment, or
+rule out a route requiring a differently factored intermediate goal.  Do not
+retry or deepen automatically.

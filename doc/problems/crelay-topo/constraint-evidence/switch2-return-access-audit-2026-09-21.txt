@@ -1,0 +1,87 @@
+Switch2 return-access and resource audit -- 2026-09-21
+========================================================
+Approved read-only analysis from the saved keeper checkpoint: nine checkpoints,
+32 actions.  No Lisp, staging, replay, validation, extractor, search, ledger
+change, or sealed material was used.
+
+SOURCES
+Constraint-Restart-Checkpoint.txt; probs/problem-crelay-topo.lisp;
+Constraint-Static-Profile.txt (S1, S3, and S4); t10-keeper-checkpoint.txt;
+lk5-beam-resource-analysis-2026-09-21.txt;
+repeater-source-result-2026-09-21.txt and
+keeper-replacement-result-2026-09-21.txt; their pre-run recommendations; and
+tech/-passability.lisp, switch.lisp, reachability.lisp,
+-interaction-policy.lisp, and beam-relay.lisp.  The three checkpoint archive
+hashes were relied on as recorded; no archive was imported or replayed.
+
+CURRENT FACTS
+The keeper endpoint has agent1 empty-handed at location10, tray1 on plate3,
+and connector1 at location9 paired to transmitter1 and repeater1.  Both live
+relays are red, gate4 is physically open, switch2 is off, gate5 is physically
+open, and gates6 and7 are physically closed.  The recorder cycle is open:
+recording gate5 is open while recording gate4 is closed.  Neither receiver
+view is active.  Agent1* remains on plate1, tray1* remains on plate2, and
+connector1* remains at location9; both boxes remain at location6.
+
+ESTABLISHED ACCESS CONDITIONS
+1. Switch2 is manipulable from location14.  S4 gives location14 as its sole
+   manipulation-reach candidate, with no reach barrier.  TOGGLE-SWITCH still
+   requires the actor to have a location, be reachable to the switch, and be
+   within vertical reach.
+2. From the current R2-side location10, gate5 is physically open because
+   switch2 is off, so it is a route candidate into R3.  Reaching location14
+   thereafter requires the R3-to-R4 passage, whose traversal clause contains
+   both gate6 and screen1.
+3. Gate6 is physically open exactly when both plate4 and plate5 are
+   depressed.  S4 marks each as a distinct, approach-only keeper candidate for
+   R3 -> R4.  The agent cannot remain on either plate while traversing.  The
+   co-located screen additionally permits only an empty-handed agent.
+4. Turning switch2 on has opposite physical effects: gate5 closes and gate7
+   opens.  Physical and recording views must remain separate: a live toggle
+   does not rewrite the recording switch state, so the existing recording
+   gate5 remains open.  That recording fact is not physical return access.
+
+RESOURCE ACCOUNTING
+The known earlier switch2 crossing used tray1 on plate4 and connector1 on
+plate5.  At the keeper endpoint those same movable live resources are no
+longer free: tray1 keeps plate3 depressed, holding gate4 open, and connector1
+at location9 retains the transmitter/repeater pairings that supplied the
+measured red source.  Moving either resource may be a legal action, but it
+cannot be counted both as a source commitment and as a gate6 keeper without
+an observed replacement.  In particular, lifting a paired connector retains
+its pairings but removes its location and beam anchor, so its beam does not
+persist while held.
+
+The ghost connector and ghost tray are a candidate additional supply, not
+established free keepers.  The ghost actor is currently committed to plate1;
+only that actor may manipulate its ghost cargo.  Releasing plate1 changes the
+physical gate1 state, and transport to plates4/5 has not been demonstrated.
+The boxes at location6 are likewise not established gate6 or elevation
+resources.  A ground tray cannot support a connector; a held tray can elevate
+one only with a separate holder.  No assumed candidate bypasses the screen's
+empty-hand requirement.
+
+CONCLUSION
+The keeper branch is neither proved stranded nor shown to restore switch2
+access.  The concrete missing condition is simultaneous physical source power,
+an open physical gate6, and the empty-handed live agent at location14.  The
+source and keeper experiments establish only their separate endpoint goals;
+they do not establish that their committed tray and connector can also hold
+gate6, or that a ghost replacement can be transported into place.
+
+BOUNDED NEXT-STEP PROPOSAL -- REQUIRES APPROVAL
+Run one standalone probe from *t10-keeper-checkpoint* at threads 16 and cutoff
+12, preserving that checkpoint and saving any success separately:
+
+  (and (color repeater1 red)
+       (open gate6)
+       (has-location agent1 location14))
+
+This is a direct test of return access while retaining the measured source
+condition.  A success establishes only this endpoint under its actual reported
+settings; inspect the plate4/plate5 witnesses, pairings, relay colors, live and
+recording gate states, and all holdings before deciding whether to toggle
+switch2 or adopt the branch.  It does not establish gate7, gate8, a receiver
+route, or a final solution.  An exhaustion is a bound for this exact goal,
+checkpoint, cutoff, and pruning configuration only; it does not refute a
+different resource assignment or prove the branch stranded.
