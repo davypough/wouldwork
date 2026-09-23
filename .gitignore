@@ -10,3 +10,4 @@ artifacts/
 _to_delete/
 tmp/
 .aider*
+*.log

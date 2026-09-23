@@ -2801,3 +2801,129 @@ Evidence retained:
     SHA-256 D92CA5931CD6EB7855EFAF6539094A9BD3C6EA0BFF7A70D07CF84A45B4A3EE27
   constraint-evidence/g14-first-run-2026-09-22.txt
     SHA-256 64AC98DBF25A8E4AF4DDFC2100191C7073304F4F1C64B2711AB62BB96F18A869
+
+7.30  S5 HEIGHT AND REACH LATTICE COMMITMENTS.  Written 2026-09-22 before
+the first S5 implementation run, under T7 approval.  The implementation reads
+only the authored instance and elevation/placement substrate; no backward,
+forward, initial-condition, or solution material was opened.
+
+P1  The height table has 21 rows, one for each entry in
+    *vertical-type-constants*.  The instance supplies three HAS-HEIGHT
+    overrides.
+
+P2  The location-level table has two locations at 3/2 and all other locations
+    at 0.  The distinct initial support/top elevations reported by S5 include
+    0, 1, 3/2, and 5/2.
+
+P3  The achievable-top enumeration is generated from declared support and
+    cargo types plus the placement predicates; it names no problem object in
+    diagnostic code.  It reports ground, mobile-support, and held-support
+    cases separately instead of treating a carried tray as grounded support.
+
+P4  The placement matrix has one row for every observed agent base and support
+    top, and applies WITHIN-AGENT-PLACEMENT-REACH rather than reproducing its
+    arithmetic.  At least one support top above ground by more than the
+    reach limit is listed as unreachable from ground.
+
+P5  The first staged S5 report will regenerate the profile without a profile
+    load warning.  The score reads only S5's own section-4 value paragraph,
+    then stops before S6.
+
+7.31  S5 FIRST SCORE.  Completed 2026-09-22.  The S5 value paragraph was read
+under D's one-time authorization to scan the sealed section after the first
+run had completed; the scan stopped before S6's paragraph.  This is a disclosed
+exception to M8's bounded-read rule.  No other sealed or prohibited source was
+opened.
+
+The first run is MISSED.  It correctly reported 21 type rows, three authored
+height overrides, two 3/2 locations, and no profile-load warning.  But it
+reported the staged current support tops rather than the sealed specification's
+achievable connector tops, so it did not emit exactly 1, 2, and 5/2 or the
+held-tray 5/2 placement row.  The implementation therefore did not regenerate
+F21 or R17.  The retained unedited first-run log is
+`constraint-evidence/s5-first-run-2026-09-22.log`, SHA-256
+`C4DC093FB4C247AC1884BDCAA5202FEFBF0D7E84F0DCE956F40581B6E9F0A58D`.
+
+The correction is a second scored run, not a replacement: enumerate potential
+resting configurations from the support and cargo type composition, then add
+each carried object's vertical extent to its candidate support top.  Its score
+will be appended separately.
+
+7.32  S5 SECOND SCORE.  Completed 2026-09-22 after the correction recorded in
+7.31.  The second staged run REGENERATED S5's sealed values: each connector
+reports exactly 1, 2, and 5/2 as its achievable tops, and the matrix reports a
+held tray at 3/2 as unreachable from an agent based at 0 with reach limit 1.
+This regenerates F21 and R17.  It also retained the expected 21 type rows and
+three authored height overrides.  The S5 paragraph alone was used for this
+score; no S6 material was read.
+
+The first miss remains the C2 score.  This separate result is a correction
+score, not a replacement.  The five clean staged acceptance assertions passed
+before the second score.  Evidence:
+`../constraint-method/evidence/s5-height-reach-checks-2026-09-22.lisp`;
+`constraint-evidence/s5-height-reach-checks-2026-09-22.log`, SHA-256
+`7E36EE40AA029678C1267B49BC487C3DD6495A5121332F5BDF42782676FA1CAB`; and
+`constraint-evidence/s5-second-run-2026-09-22.log`, SHA-256
+`DCB20A78FB25D11577B841C9FD846E90F92E7BA8A5FDA958D3ADDBA84DA73379`.
+
+7.33  S6 SIGHTLINE TABLE COMMITMENT AND DISCLOSURE.  Written 2026-09-22
+before S6 code.  During D's one-time authorized scan for S5, the returned
+range also displayed S6's sealed paragraph.  The earlier statement that the
+scan stopped before S6 was incorrect.  T8 therefore cannot claim an
+independent sealed prediction experiment; its first run is a disclosed
+regeneration check.
+
+The extractor will evaluate BEAM-VISIBLE on a copy of the staged start state
+for every location, every S5 connector top, and every fixed beam endpoint,
+under every direct subset of gate OPEN facts.  It will neither propagate nor
+search.  Each row collapses to ALWAYS, NEVER, or CONDITIONAL with the visible
+gate subsets, and a separate pass reports every LOS-VIA location occluder that
+blocks at the relevant interpolated elevation.  The implementation will use
+the translated query and the copied state rather than duplicating barrier,
+gate, or occlusion geometry.
+
+7.34  S6 FIRST SCORE.  Completed 2026-09-22 as a disclosed regeneration check,
+not a clean sealed prediction, because 7.33 records the earlier S6 exposure.
+The completed report evaluates all 512 direct gate subsets with no propagation
+or search. It regenerates the disclosed rows: transmitter visibility from
+locations3/7/8/9; receiver visibility from location15 at every tested height;
+the location9 receiver threshold (never at 1, always at 2 and 5/2); repeater
+visibility from locations8/9 at every tested height; and repeater visibility
+from location15 only at 2 and 5/2. The derived location-occluder kill list is
+empty, so it does not establish the previously disclosed location15 kill claim.
+That disagreement is measured output, not a post-run adjustment.
+
+The six clean staged assertions passed before this score. Evidence:
+`../constraint-method/evidence/s6-sightline-checks-2026-09-22.lisp`;
+`constraint-evidence/s6-first-run-2026-09-22.log`, SHA-256
+`ACF09447E3D4E3A0052C720B4FE47D573511C1970BC22D5FA44AD82A7CB00F97`; and
+`constraint-evidence/s6-sightline-checks-2026-09-22.log`, SHA-256
+`D7683F64B69A9E1F302D9A06BAA558D87DDD7B0B818360B1C107A7E25E15458F`.
+
+7.35  S7 LANDMARK GRAPH COMMITMENT AND DISCLOSURE.  Written 2026-09-22
+before S7 code. The earlier authorized scan also displayed S7's sealed value
+paragraph, so T9 is a disclosed regeneration check, not an independent sealed
+prediction experiment. The extractor uses the delete relaxation: once a
+landmark is achieved it persists, so it makes no simultaneous-role,
+keeper-return, crossing-order, or segment claim. It normalizes the explicit
+goal and expands only device-state conjuncts that S1 maps to CONTROLS. Plate
+primitives become existential occupancy landmarks and switches become
+reachable-toggle landmarks. An explicit location goal with no device-state
+conjunct remains an unexpanded movement landmark; the extractor must report
+that limit rather than inventing a route.
+
+7.36  S7 FIRST SCORE.  Completed 2026-09-22 as a disclosed regeneration check,
+not a clean sealed prediction, because 7.35 records the prior S7 exposure. The
+report states the delete relaxation and correctly leaves the explicit
+HAS-LOCATION goal as an unexpanded movement/query landmark: it has no
+controlled-device conjunct for S1 to expand. It therefore emits no K1-K9
+outline and is a MISS against the exposed sealed value. This is the correct
+scope boundary, not a missing controller fact: route extraction needs a stated
+movement relaxation and S3/S4 premises that S7's contract does not supply.
+
+The four clean staged acceptance assertions passed before this score. Evidence:
+`../constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`;
+`constraint-evidence/s7-first-run-2026-09-22.log`, SHA-256
+`B94279FF72E215C7ED2FBC9545925F15AC1E291DF1F641E24C6296BB201E64DD`; and
+`constraint-evidence/s7-landmark-checks-2026-09-22.log`, SHA-256
+`54DD4757BE8B22DCA6B755F39A9E8F92F4158EB0109B9B0BA444E86CEEDA6E6A`.

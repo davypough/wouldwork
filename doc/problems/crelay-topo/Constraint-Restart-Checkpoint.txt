@@ -1,6 +1,15 @@
 T10 restart checkpoint -- refreshed 2026-09-22
 ============================================
-CURRENT HANDOFF -- T13 G15 APPLICATION SELECTION PENDING, 2026-09-22
+CURRENT HANDOFF -- T10 END-TO-END CLOSURE REMAINS IN PROGRESS, 2026-09-22
+T13/T6 through T9 are complete. T9's disclosed S7 run is a MISS: its
+delete-relaxed extractor correctly cannot expand the location-only goal through
+S1 and does not invent a route or K1-K9 chain. The clean check at
+doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp passed four
+assertions. T10 remains in progress, but no run is pending and B2 remains
+closed. No staging, replay, validation, search, or construction work follows
+from this handoff without separate approval. All older task instructions below
+are historical where they conflict with this handoff.
+
 T12 completed G15's portable launch-configuration checklist:
 doc/constraint-method/Launch-Configuration-Checklist.md. It requires concrete
 actor/view, launch/landing, movement/support, propagated controller successor,

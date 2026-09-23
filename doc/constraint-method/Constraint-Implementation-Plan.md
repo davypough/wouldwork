@@ -33,23 +33,22 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T13 — Select and approve a concrete application of G15.**
+**T10 — End-to-end closure on crelay-topo.**
 
-T12 completed G15's portable launch-configuration specification. The next
-application is a strategic choice and has not been selected. The next session
-must present the following scopes and obtain explicit approval before opening
-new source material:
+T9 completed on 2026-09-22 as a disclosed regeneration check. Its delete-
+relaxed S7 report correctly leaves the explicit location-only goal unexpanded:
+there is no S1 device-state conjunct to backward-chain. It therefore does not
+regenerate the exposed K1–K9 outline and is recorded as a MISS, rather than
+inventing an unsound route or simultaneous role requirement. The four-assertion
+check passed without profile-load warnings. Evidence:
+`doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`.
 
-1. a read-only check of a newly proposed B2 elevation resource, which requires
-   D to identify that resource first and does not reopen B2 by itself;
-2. a general extractor-design task, which is separate implementation work; or
-3. a different problem's proposed quotient traversal.
-
-Until D chooses one, no construction analysis, source audit, staging, replay,
-validation, search, instance change, or extractor work is authorized. T10's
-B2 branch remains closed: the nominal six-action B2 construction is rejected,
-and the recorder split-lift resource is unavailable from B1. T11 and T12 are
-complete.
+T10 remains in progress, but no run is pending. The B2 branch stays closed:
+the nominal six-action construction is rejected and the recorder split-lift
+resource is unavailable from B1. No construction analysis, source audit,
+staging, replay, validation, search, instance change, or further extractor
+work is authorized by T9’s completion. T11 and T12 are complete. All older
+current-task text below is historical where it conflicts with this header.
 
 Follow-up, 2026-09-22: D approved a read-only investigation of a possible
 recorder-based elevation resource. The mechanism is conditionally sound only
@@ -425,14 +424,14 @@ Two invariants constrain everything below:
 | T3 | Search recommender | COMPLETE | approved in session, 2026-09-20 | T2 |
 | T4 | Result ingester | COMPLETE | approved in session, 2026-09-20 | T2, T3 |
 | T5 | Question generator | COMPLETE | approved in session, 2026-09-20 | T1, T2 |
-| T6 | Mechanized budget arithmetic | PROPOSED | not requested | — |
-| T7 | S5 height and reach lattice | PROPOSED | not requested | — |
-| T8 | S6 beam sightline table | PROPOSED | not requested | T7 |
-| T9 | S7 landmark graph and orderings | PROPOSED | not requested | — |
+| T6 | Mechanized budget arithmetic | COMPLETE | approved 2026-09-22; eight acceptance assertions passed | — |
+| T7 | S5 height and reach lattice | COMPLETE | approved 2026-09-22; first miss and correction score recorded | — |
+| T8 | S6 beam sightline table | COMPLETE | approved 2026-09-22; disclosed regeneration score recorded | T7 |
+| T9 | S7 landmark graph and orderings | COMPLETE | approved 2026-09-22; disclosed miss recorded | — |
 | T10 | End-to-end closure on crelay-topo (7/9 spine links found; B1 baseline boundary archived) | IN PROGRESS | B2 construction branch remains closed after elevation audit and recorder split-lift follow-up; no run pending | T2–T5 |
 | T11 | Implement and score the G14 fix | COMPLETE | approved, four parts | — |
 | T12 | Specify the G15 launch-configuration check | COMPLETE | approved in session, 2026-09-22 | — |
-| T13 | Select and approve a concrete application of G15 | PROPOSED | not requested | T12 |
+| T13 | Select and approve a concrete application of G15 | COMPLETE | selected and approved T6 implementation, 2026-09-22 | T12 |
 
 **T11 is listed last because it runs last, not because it is unapproved.** D
 deferred it on 2026-09-20 so the architecture tasks settle first. It is
@@ -483,7 +482,9 @@ closed B2 evidence.
 **Contamination scope.** None for the selection. The chosen task defines its
 own reading boundary and contamination scope.
 
-**Status.** PROPOSED. **Approval.** Not requested.
+**Status.** COMPLETE, 2026-09-22. **Approval.** D selected and approved full
+T6 implementation. This is an implementation selection, so G15's traversal
+report form does not apply. No source material was opened before the selection.
 
 ## T12 — Specify the G15 launch-configuration check
 
@@ -867,7 +868,14 @@ its premises. No problem object names, per C3.
 only. No `Backward-*`, `Forward-*`, `Initial-Conditions.txt`, or
 `subgoal-solution-*` access.
 
-**Status.** PROPOSED. **Approval.** Not requested.
+**Status.** COMPLETE, 2026-09-22. **Approval.** Granted when D selected full
+T6 implementation through T13. The extractor reports AM1–AM3 only when its
+pressure-plate supports are disjoint; it derives the goal actor and destination
+from the goal form, reports the full S2 pool for AM1, and reports both live and
+full segment budgets for AM3. Each emitted claim names its S1/S2 premises and
+grade. `doc/constraint-method/evidence/t6-budget-arithmetic-checks-2026-09-22.lisp`
+ran eight assertions successfully in a clean staged diagnostic, including the
+overlapping-support guard. No sealed material was opened.
 
 ## T7 — S5 height and reach lattice
 
@@ -880,7 +888,13 @@ is a stronger experiment than RO's or G14's: commit predictions before coding,
 score the first completed run, and at scoring read only S5's own paragraph in
 section 4, stopping before the next extractor, per M8.
 
-**Status.** PROPOSED. **Approval.** Not requested.
+**Status.** COMPLETE, 2026-09-22. **Approval.** Granted when D instructed the
+session to continue with T7. The first staged run is a retained MISS because
+it reported current support tops instead of achievable carried-object tops.
+The corrected second run regenerates connector tops 1, 2, and 5/2 and the
+held-tray unreachable-from-ground row. Register 7.31 preserves the first score;
+7.32 records the correction score. The five-assertion clean staged check is
+`doc/constraint-method/evidence/s5-height-reach-checks-2026-09-22.lisp`.
 
 ## T8 — S6 beam sightline table
 
@@ -893,7 +907,14 @@ actually establish them; a run that does not establish them says so.
 **Contamination scope.** C1, and the sealed-paragraph discipline of T7. G9 is TAG
 ONLY and must not be opened to obtain this information.
 
-**Status.** PROPOSED. **Approval.** Not requested.
+**Status.** COMPLETE, 2026-09-22. **Approval.** Granted when D instructed the
+session to continue with T8. The first score is a disclosed regeneration check
+because the prior authorized sealed scan displayed S6. The report evaluates all
+512 direct gate subsets in copied start states with no propagation or search,
+and its six-assertion check is
+`doc/constraint-method/evidence/s6-sightline-checks-2026-09-22.lisp`.
+Register 7.34 records the score, including the empty location-occluder kill
+list.
 
 ## T9 — S7 landmark graph and orderings
 
@@ -905,7 +926,13 @@ simultaneous role requirement or a segment premise.
 
 **Contamination scope.** C1, and the sealed-paragraph discipline of T7.
 
-**Status.** PROPOSED. **Approval.** Not requested.
+**Status.** COMPLETE, 2026-09-22. **Approval.** Granted when D instructed the
+session to continue with T9. The first score is a disclosed regeneration check
+because the prior authorized sealed scan displayed S7. The explicit location
+goal has no S1 device-state conjunct, so the delete-relaxed extractor emits no
+controller expansion or route ordering; it is a measured MISS rather than an
+invented K1–K9 chain. The four-assertion check is
+`doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`.
 
 ## T10 — End-to-end closure on crelay-topo
 

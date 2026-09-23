@@ -1304,16 +1304,10 @@
 
 ;;; T6 -- Mechanized budget arithmetic
 ;;; Consumes S1 and S2 to emit the impossibility constraints AM1–AM3.
-;;; AM1: The budget is exactly tight.  Five body-cost gates consume 1+1+1+2+3 = 8
-;;;      plate keepers, and the occupant pool is 8.  Opening all simultaneously
-;;;      requires every body on a plate.  Grade 1+2.
-;;; AM2: The agent spends itself.  Agent1 is one of eight.  The goal requires
-;;;      agent1 at a location with no plate, so it must rest on ground/box/tray.
-;;;      Grade 1.
-;;; AM3: Therefore, in the goal state the budget tightens. If reached inside
-;;;      an open cycle (7 available), at least ONE of the five body-cost gates
-;;;      must be closed.  If outside (3 available), at least TWO must be closed.
-;;;      Grade 1.
+;;; AM1: A tight, disjoint support budget leaves no occupant outside a plate.
+;;; AM2: A goal actor that leaves the occupant pool spends one support body.
+;;; AM3: The remaining live and full-pool budgets bound the support cost that
+;;;      must close in each segment.
 ;;; No problem object names anywhere (C1). Named substrate interfaces: ON,
 ;;; PRESSURE-PLATE, HAS-LOCATION, GOAL-FN (established as precedent in S4).
 
@@ -1347,110 +1341,107 @@
 
 (defun budget-arithmetic-gate-costs (device-costs)
   "For each device in DEVICE-COSTS, the number of distinct plates it requires.
-   Returns (device cost) where cost is a positive integer or :unknown."
+   Returns (device cost) where cost is a positive integer."
   (mapcar (lambda (entry)
-            (let* ((plates (second entry))
-                   (count (if (member :disjoint plates)
-                            (length (remove :disjoint plates))
-                            (length plates))))
-              (list (first entry) count)))
+            (list (first entry) (length (second entry))))
           device-costs))
 
 
 (defun budget-arithmetic-total-cost (gate-costs)
-  "Sum of all gate costs.  Returns an integer or :unknown if any cost is unknown."
+  "Sum of all gate costs."
   (let ((total 0))
-    (dolist (entry gate-costs (if (eq total :unknown) :unknown total))
-      (if (eq (second entry) :unknown)
-        (setf total :unknown)
-        (incf total (second entry))))))
-
-
-(defun budget-arithmetic-occupant-pool-size ()
-  "From S2: the total support-occupant pool, reading the ON placement relation's
-   key-position extent.  Returns an integer or NIL if the pool cannot be determined."
-  (let* ((functionals (functional-relation-entries))
-         (placements (placement-relations functionals))
-         (on-placement (find 'on placements :key #'first)))
-    (when (and on-placement (string= (second on-placement) "dynamic"))
-      (length (census-spec-extent (fifth on-placement))))))
+    (dolist (entry gate-costs total)
+      (incf total (second entry)))))
 
 
 (defun budget-arithmetic-segment-occupancy ()
   "The occupant pool by segment: outside a cycle (live only) vs. inside a cycle
    (live + ghost).  Returns (outside-count inside-count) or NIL."
-  (let ((pool-size (budget-arithmetic-occupant-pool-size)))
-    (when pool-size
-      (let* ((functionals (functional-relation-entries))
-             (placements (placement-relations functionals))
-             (on-placement (find 'on placements :key #'first))
-             (keys (census-spec-extent (fifth on-placement)))
+  (let* ((functionals (functional-relation-entries))
+         (placements (placement-relations functionals))
+         (on-placement (find 'on placements :key #'first)))
+    (when (and on-placement (string= (second on-placement) "dynamic"))
+      (let* ((keys (census-spec-extent (fifth on-placement)))
              (pairs (layer-pairs))
              (live-count (+ (count "live" (mapcar (lambda (obj) (census-layer-class obj pairs)) keys)
                                     :test #'string=)
-                           (count "unpaired" (mapcar (lambda (obj) (census-layer-class obj pairs)) keys)
+                            (count "unpaired" (mapcar (lambda (obj) (census-layer-class obj pairs)) keys)
                                    :test #'string=))))
-        (list live-count pool-size)))))
+        (list live-count (length keys))))))
 
 
-(defun budget-arithmetic-goal-location-type ()
-  "The type of the goal destination, by examining (HAS-LOCATION actor location)
-   in the goal form.  Returns the location type or NIL."
-  (let ((goal-form (get 'goal-fn :form)))
-    (when (consp goal-form)
-      (let ((location-type (traversal-endpoint-type)))
-        (when location-type
-          (let ((spec (nth-value 1 (gethash 'has-location *relations*))))
-            (when spec
-              (nth 1 spec))))))))
+(defun budget-arithmetic-find-relation-call (form relation)
+  "The first call to RELATION in FORM, or NIL."
+  (cond ((atom form) nil)
+        ((eq (first form) relation) form)
+        (t (loop for item in form
+                 for call = (budget-arithmetic-find-relation-call item relation)
+                 when call return call))))
 
 
-(defun budget-arithmetic-goal-location-has-plate-p ()
-  "Whether any pressure-plate is at the goal location in the initial state.
-   Returns T, NIL, or :unknown."
-  (let ((goal-form (get 'goal-fn :form))
-        (plates (census-type-instances 'pressure-plate)))
-    (when (and (consp goal-form) plates)
-      (let ((goal-location (second (member 'has-location (flatten goal-form)))))
-        (if goal-location
-          (let ((at-goal (remove-if-not
-                          (lambda (fact)
-                            (and (eq (first fact) 'has-position)
-                                 (member (second fact) plates)
-                                 (eq (third fact) goal-location)))
-                          (list-static-db))))
-            (if at-goal :no-plate nil))
-          :unknown)))))
+(defun budget-arithmetic-goal-actor-leaves-pool-p ()
+  "Whether the goal moves an ON-pool body to a location without a pressure plate."
+  (let* ((functionals (functional-relation-entries))
+         (placements (placement-relations functionals))
+         (on-placement (find 'on placements :key #'first))
+         (goal-call (budget-arithmetic-find-relation-call (get 'goal-fn :form)
+                                                           'has-location))
+         (plates (census-type-instances 'pressure-plate)))
+    (when (and on-placement goal-call)
+      (let ((actor (second goal-call))
+            (location (third goal-call))
+            (pool (census-spec-extent (fifth on-placement))))
+        (and (member actor pool)
+             (not (find location
+                        (list-static-db)
+                        :test (lambda (place fact)
+                                (and (eq (first fact) 'has-position)
+                                     (member (second fact) plates)
+                                     (eq (third fact) place))))))))))
 
 
-(defun budget-arithmetic-constraints (gate-costs occupancy)
+(defun budget-arithmetic-disjoint-supports-p (device-costs)
+  "Whether no pressure plate supplies two body-cost devices."
+  (let ((supports (loop for entry in device-costs append (second entry))))
+    (= (length supports) (length (remove-duplicates supports)))))
+
+
+(defun budget-arithmetic-constraints (gate-costs occupancy goal-actor-leaves-pool-p
+                                      supports-disjoint-p)
   "Derives AM1–AM3 from gate costs and occupancy.  Returns a list of constraint
    descriptions as strings."
   (let ((total (budget-arithmetic-total-cost gate-costs))
         (outside (first occupancy))
         (inside (second occupancy))
         (constraints nil))
-    (when (and (integerp total) (integerp outside) (integerp inside))
-      (push (format nil "AM1: Budget is tight.  ~D body-cost gates demand ~D total plate keepers; ~
-                        occupant pool is ~D.  All gates open only if every body is on a plate."
-                    (length gate-costs) total outside)
-            constraints)
-      (push (format nil "AM2: Agent spends itself.  Agent occupies 1 of ~D in occupant pool.  ~
-                        Goal location has no plate, so agent must rest on ground/box/tray in goal."
-                    outside)
-            constraints)
-      (let ((outside-available (- outside 1)))
-        (push (format nil "AM3a: Outside cycle (agent available): ~D occupants available for gates. ~
-                          Cost budget is ~D; total demand is ~D.  At least ~D cost must close."
-                      outside-available outside-available total
-                      (max 0 (- total outside-available)))
+    (when (and (integerp total) (integerp outside) (integerp inside)
+               supports-disjoint-p)
+      (when (= total inside)
+        (push (format nil "AM1 [grade 1 -> 2; S1 controls, S2 ON pool]: Budget is tight.  ~
+                           ~D body-cost devices demand ~D total plate keepers; the full ~
+                           occupant pool is ~D.  All can be open only if every body is on a plate."
+                      (length gate-costs) total inside)
               constraints))
-      (let ((inside-available (- inside 1)))
-        (push (format nil "AM3b: Inside cycle (agent available): ~D occupants available for gates. ~
-                          Cost budget is ~D; total demand is ~D.  At least ~D cost must close."
-                      inside-available inside-available total
-                      (max 0 (- total inside-available)))
-              constraints)))
+      (when goal-actor-leaves-pool-p
+        (push (format nil "AM2 [grade 1 -> 2; S1 controls, S2 ON pool, goal form]: ~
+                           The goal actor occupies 1 of ~D bodies in the full occupant pool ~
+                           and its destination has no pressure plate."
+                      inside)
+              constraints)
+        (let ((outside-available (- outside 1)))
+          (push (format nil "AM3a [grade 1 -> 2; S1 controls, S2 live ON pool]: ~
+                             Outside a cycle, ~D bodies remain for supports; demand is ~D, ~
+                             so at least ~D support cost must close."
+                        outside-available total
+                        (max 0 (- total outside-available)))
+                constraints))
+        (let ((inside-available (- inside 1)))
+          (push (format nil "AM3b [grade 1 -> 2; S1 controls, S2 full ON pool]: ~
+                             Inside a cycle, ~D bodies remain for supports; demand is ~D, ~
+                             so at least ~D support cost must close."
+                        inside-available total
+                        (max 0 (- total inside-available)))
+                constraints))))
     (nreverse constraints)))
 
 
@@ -1462,19 +1453,391 @@
   (let* ((facts (control-facts))
          (device-costs (budget-arithmetic-body-cost-devices facts))
          (gate-costs (budget-arithmetic-gate-costs device-costs))
-         (occupancy (budget-arithmetic-segment-occupancy)))
+         (occupancy (budget-arithmetic-segment-occupancy))
+         (goal-actor-leaves-pool-p (budget-arithmetic-goal-actor-leaves-pool-p))
+         (supports-disjoint-p (budget-arithmetic-disjoint-supports-p device-costs)))
     (format t "~2%T6  MECHANIZED BUDGET ARITHMETIC  [grade 1 -> 2]~%")
     (format t "~A~%" (make-string 62 :initial-element #\-))
     (cond ((null gate-costs)
            (format t "  no body-cost devices found.~%"))
           ((null occupancy)
            (format t "  occupant pool not determined; cannot compute constraints.~%"))
-          (t (let ((constraints (budget-arithmetic-constraints gate-costs occupancy)))
+          ((not supports-disjoint-p)
+           (format t "  body-cost support sets overlap; no summed-cost constraint is sound.~%"))
+          (t (let ((constraints (budget-arithmetic-constraints gate-costs occupancy
+                                                               goal-actor-leaves-pool-p
+                                                               supports-disjoint-p)))
                (dolist (constraint constraints)
                  (format t "~%  ~A~%" constraint))
                (format t "~%  NOTE: these are impossibility constraints on state assignments, ~
                           not on action sequences.  They refute the fully-open assignment without ~
                           searching.~%"))))
+    (values)))
+
+
+;;; T7 -- S5 height and reach lattice
+
+
+(defun height-lattice-overrides ()
+  "Every authored (HAS-HEIGHT object height) override, sorted by object."
+  (sort (loop for fact in (list-static-db)
+              when (and (consp fact) (eq (first fact) 'has-height))
+                collect (list (second fact) (third fact)))
+        #'string< :key (lambda (entry) (symbol-name (first entry)))))
+
+
+(defun height-lattice-type-rows ()
+  "The vertical defaults and authored override count for each vertical type."
+  (let ((overrides (height-lattice-overrides)))
+    (mapcar (lambda (entry)
+              (let ((type (first entry)))
+                (list type
+                      (second entry)
+                      (third entry)
+                      (fourth entry)
+                      (count-if (lambda (override)
+                                  (member (first override)
+                                          (census-type-instances type)))
+                                overrides))))
+            *vertical-type-constants*)))
+
+
+(defun height-lattice-location-levels (state)
+  "Each declared location and its staged floor elevation."
+  (mapcar (lambda (location)
+            (list location
+                  (funcall (symbol-function 'location-elevation) state location)))
+          (census-type-instances 'location)))
+
+
+(defun height-lattice-support-tops (state)
+  "Each declared support and its staged top elevation."
+  (mapcar (lambda (support)
+            (list support
+                  (funcall (symbol-function 'top) state support)))
+          (census-type-instances 'support)))
+
+
+(defun height-lattice-type-top (type base)
+  "The top of TYPE when it rests at BASE under the vertical constants."
+  (let ((entry (find type *vertical-type-constants* :key #'first)))
+    (if (eq (third entry) :vertical)
+      (+ base (second entry))
+      base)))
+
+
+(defun height-lattice-placement-supports (state)
+  "Potential support tops admitted by the placement substrate.
+ Grounded trays are inert, so only held trays enter the enumeration."
+  (let ((supports (list (list 'ground 0))))
+    (dolist (type '(box fan))
+      (dolist (object (census-type-instances type))
+        (push (list object
+                    (if (vertical-axis-p object)
+                      (funcall (symbol-function 'object-height) state object)
+                      0))
+              supports)))
+    (when (and (census-type-instances 'agent)
+               (census-type-instances 'tray))
+      (dolist (agent (census-type-instances 'agent))
+        (dolist (tray (census-type-instances 'tray))
+          (push (list tray
+                      (funcall (symbol-function 'object-height) state agent))
+                supports))))
+    (sort (remove-duplicates supports :test #'equal)
+          #'string< :key (lambda (entry) (symbol-name (first entry))))))
+
+
+(defun height-lattice-achievable-tops (state)
+  "Every carried object's structural top values after a legal placement.
+ This enumerates placement forms, not locations that a plan can reach."
+  (let ((supports (height-lattice-placement-supports state)))
+    (mapcar (lambda (object)
+              (let ((height (funcall (symbol-function 'object-height) state object)))
+                (list object
+                      (sort (remove-duplicates
+                             (mapcar (lambda (support)
+                                       (+ (second support) height))
+                                     supports))
+                            #'<))))
+            (census-type-instances 'cargo))))
+
+
+(defun height-lattice-placement-matrix (state)
+  "Every staged agent-base/candidate-support-top pair and its reach result."
+  (let ((rows nil))
+    (dolist (agent (census-type-instances 'agent) (nreverse rows))
+      (let ((base (funcall (symbol-function 'base) state agent)))
+        (dolist (support (height-lattice-placement-supports state))
+          (push (list agent
+                      base
+                      (first support)
+                      (second support)
+                      (funcall (symbol-function 'within-agent-placement-reach)
+                               state agent (second support)))
+                rows))))))
+
+
+(defun height-lattice-ground-unreachable-supports (state)
+  "Candidate support tops no ground-level agent can reach for placement."
+  (remove-if (lambda (support)
+               (<= (second support) *vertical-reach-limit*))
+             (height-lattice-placement-supports state)))
+
+
+(defun report-height-and-reach-lattice ()
+  "S5, grade 2.  Reports vertical defaults, staged support tops, placement
+ reach, and support tops unreachable from a ground-level placement."
+  (let* ((state *start-state*)
+         (type-rows (height-lattice-type-rows))
+         (overrides (height-lattice-overrides))
+         (levels (height-lattice-location-levels state))
+         (tops (height-lattice-achievable-tops state))
+         (matrix (height-lattice-placement-matrix state))
+         (unreachable (height-lattice-ground-unreachable-supports state)))
+    (format t "~2%S5  HEIGHT AND REACH LATTICE  [grade 2]~%")
+    (format t "~A~%" (make-string 62 :initial-element #\-))
+    (format t "  type heights (~D types; ~D authored override~:P)~%"
+            (length type-rows) (length overrides))
+    (dolist (row type-rows)
+      (format t "    ~(~A~)  height ~A  axis ~A  base ~A~@[  overrides ~D~]~%"
+              (first row) (second row) (third row) (fourth row)
+              (unless (zerop (fifth row)) (fifth row))))
+    (format t "~%  location levels~%")
+    (dolist (level levels)
+      (format t "    ~(~A~)  ~A~%" (first level) (second level)))
+    (format t "~%  achievable carried-object tops~%")
+    (dolist (entry tops)
+      (format t "    ~(~A~)  ~{~A~^, ~}~%" (first entry) (second entry)))
+    (format t "~%  placement legality matrix (agent base -> support top)~%")
+    (dolist (row matrix)
+      (format t "    ~(~A~) ~A -> ~(~A~) ~A  ~:[NO~;YES~]~%"
+              (first row) (second row) (third row) (fourth row) (fifth row)))
+    (format t "~%  unreachable from ground (placement reach limit ~A)~%"
+            *vertical-reach-limit*)
+    (if unreachable
+      (dolist (support unreachable)
+        (format t "    ~(~A~)  top ~A~%" (first support) (second support)))
+      (format t "    none~%"))
+    (values)))
+
+
+;;; T8 -- S6 beam sightline table
+
+
+(defun sightline-gate-subsets (gates)
+  "Every subset of GATES, including the empty subset."
+  (if (null gates)
+    (list nil)
+    (let ((subsets (sightline-gate-subsets (rest gates))))
+      (append subsets
+              (mapcar (lambda (subset)
+                        (cons (first gates) subset))
+                      subsets)))))
+
+
+(defun sightline-fixed-endpoints ()
+  "The fixed apparatus endpoint types accepted by BEAM-VISIBLE."
+  (append (census-type-instances 'transmitter)
+          (census-type-instances 'receiver)
+          (census-type-instances 'floor-repeater)
+          (census-type-instances 'wall-repeater)))
+
+
+(defun sightline-connector-tops (state)
+  "S5's distinct structural connector top elevations."
+  (sort (remove-duplicates
+         (loop for entry in (height-lattice-achievable-tops state)
+               when (member (first entry) (census-type-instances 'connector))
+                 append (second entry)))
+        #'<))
+
+
+(defun sightline-state-with-open-gates (gates open-gates)
+  "A start-state copy with exactly OPEN-GATES asserted as open.
+ This deliberately bypasses propagation: S6 varies only the gate bits."
+  (let ((state (copy-problem-state *start-state*)))
+    (dolist (gate gates)
+      (delete-proposition (list 'open gate) (problem-state.idb state)))
+    (dolist (gate open-gates)
+      (add-proposition (list 'open gate) (problem-state.idb state)))
+    (invalidate-problem-state-hash state)
+    state))
+
+
+(defun sightline-visible-records (gates)
+  "Every visible S6 row over all direct gate subsets."
+  (let ((records nil)
+        (subsets (sightline-gate-subsets gates)))
+    (dolist (open-gates subsets records)
+      (let ((state (sightline-state-with-open-gates gates open-gates)))
+        (dolist (location (census-type-instances 'location))
+          (dolist (top (sightline-connector-tops state))
+            (dolist (endpoint (sightline-fixed-endpoints))
+              (when (funcall (symbol-function 'beam-visible)
+                             state location top endpoint
+                             (funcall (symbol-function 'top) state endpoint))
+                (push (list location top endpoint open-gates) records))))))))
+    )
+
+
+(defun sightline-visible-subsets (location top endpoint records)
+  "The gate subsets under which LOCATION/TOP can see ENDPOINT."
+  (loop for record in records
+        when (and (eq location (first record))
+                  (= top (second record))
+                  (eq endpoint (third record)))
+          collect (fourth record)))
+
+
+(defun sightline-row-status (visible-subsets subset-count)
+  "ALWAYS, NEVER, or CONDITIONAL for one collapsed S6 row."
+  (cond ((null visible-subsets) :never)
+        ((= (length visible-subsets) subset-count) :always)
+        (t :conditional)))
+
+
+(defun sightline-required-open-gates (visible-subsets)
+  "Gates present in every visible subset for one conditional S6 row."
+  (if visible-subsets
+    (reduce (lambda (left right)
+              (intersection left right))
+            (rest visible-subsets)
+            :initial-value (first visible-subsets))))
+
+
+(defun sightline-location-occluder-records (state)
+  "Every location occluder that blocks one S6 beam at its interpolated height."
+  (let ((records nil))
+    (dolist (location (census-type-instances 'location))
+      (dolist (top (sightline-connector-tops state))
+        (dolist (endpoint (sightline-fixed-endpoints))
+          (let ((far-elevation (funcall (symbol-function 'top) state endpoint)))
+            (dolist (fact (list-static-db))
+              (when (and (eq (first fact) 'los-via)
+                         (eq (second fact) location)
+                         (eq (fourth fact) endpoint))
+                (dolist (occluder (third fact))
+                  (when (and (member occluder (census-type-instances 'location))
+                             (funcall (symbol-function 'los-location-occluded)
+                                      state nil occluder location top endpoint far-elevation))
+                    (push (list location top endpoint occluder) records)))))))))
+    (nreverse records)))
+
+
+(defun report-sightline-row (location top endpoint visible-subsets subset-count)
+  "Print one collapsed S6 visibility row."
+  (let ((status (sightline-row-status visible-subsets subset-count)))
+    (format t "    ~(~A~) @ ~A -> ~(~A~)  ~A"
+            location top endpoint status)
+    (when (eq status :conditional)
+      (format t "  requires open ~{~(~A~)~^, ~}"
+              (sightline-required-open-gates visible-subsets)))
+    (terpri)))
+
+
+(defun report-beam-sightline-table ()
+  "S6, grade 2.  Evaluates BEAM-VISIBLE for every S5 connector top, location,
+ fixed endpoint, and direct gate subset without propagation or search."
+  (let* ((gates (census-type-instances 'gate))
+         (subsets (sightline-gate-subsets gates))
+         (records (sightline-visible-records gates))
+         (state *start-state*))
+    (format t "~2%S6  BEAM SIGHTLINE TABLE  [grade 2]~%")
+    (format t "~A~%" (make-string 62 :initial-element #\-))
+    (format t "  direct gate subsets: ~D; no propagation applied~%" (length subsets))
+    (format t "~%  visibility rows~%")
+    (dolist (location (census-type-instances 'location))
+      (dolist (top (sightline-connector-tops state))
+        (dolist (endpoint (sightline-fixed-endpoints))
+          (report-sightline-row
+           location top endpoint
+           (sightline-visible-subsets location top endpoint records)
+           (length subsets)))))
+    (format t "~%  location-occluder kill list~%")
+    (let ((occluders (sightline-location-occluder-records state)))
+      (if occluders
+        (dolist (record occluders)
+          (format t "    ~(~A~) @ ~A -> ~(~A~) blocked at ~(~A~)~%"
+                  (first record) (second record) (third record) (fourth record)))
+        (format t "    none~%")))
+    (values)))
+
+
+;;; T9 -- S7 landmark graph and orderings
+
+
+(defun landmark-goal-conjuncts (form)
+  "The explicit positive conjuncts in FORM, or FORM itself when it is atomic."
+  (if (and (consp form) (eq (first form) 'and))
+    (rest form)
+    (list form)))
+
+
+(defun landmark-control-fact (device)
+  "The S1 control fact for DEVICE, if the explicit goal names one."
+  (find device (control-facts) :key #'third))
+
+
+(defun landmark-primitive (primitive)
+  "A delete-relaxed landmark for one S1 control primitive."
+  (cond ((member primitive (census-type-instances 'pressure-plate))
+         (format nil "some occupant on ~(~A~)" primitive))
+        ((member primitive (census-type-instances 'toggle-plate))
+         (format nil "toggle ~(~A~)" primitive))
+        ((member primitive (census-type-instances 'switch))
+         (format nil "toggle ~(~A~) from a reachable location" primitive))
+        (t (format nil "establish ~(~A~)" primitive))))
+
+
+(defun landmark-device-expansion (device)
+  "The relaxed S1 primitive requirements for DEVICE."
+  (let ((fact (landmark-control-fact device)))
+    (when fact
+      (mapcar (lambda (clause)
+                (mapcar #'landmark-primitive clause))
+              (second fact)))))
+
+
+(defun landmark-goal-device (conjunct)
+  "The device named by a unary explicit goal condition, or NIL."
+  (when (and (consp conjunct) (= (length conjunct) 2))
+    (let ((candidate (second conjunct)))
+      (when (landmark-control-fact candidate)
+        candidate))))
+
+
+(defun report-landmark-graph-and-orderings ()
+  "S7, grade 4.  Backward-chains explicit device goals through S1 controls
+ under the delete relaxation; it does not infer movement routes or role overlap."
+  (let ((goal (get 'goal-fn :form))
+        (devices nil))
+    (format t "~2%S7  LANDMARK GRAPH AND ORDERINGS  [grade 4]~%")
+    (format t "~A~%" (make-string 62 :initial-element #\-))
+    (format t "  relaxation: delete relaxation; achieved landmarks persist.~%")
+    (format t "  no simultaneous-role, keeper-return, segment, or route claim is emitted.~%")
+    (format t "~%  explicit goal landmarks~%")
+    (dolist (conjunct (landmark-goal-conjuncts goal))
+      (let ((device (landmark-goal-device conjunct)))
+        (if device
+          (progn
+            (pushnew device devices)
+            (format t "    ~(~S~) requires device ~(~A~)~%" conjunct device))
+          (format t "    ~(~S~)  movement/query landmark; S1 expansion unavailable.~%"
+                  conjunct))))
+    (format t "~%  S1 controller expansions~%")
+    (if devices
+      (dolist (device (nreverse devices))
+        (format t "    ~(~A~)~%" device)
+        (dolist (clause (landmark-device-expansion device))
+          (format t "      AND ~{~A~^; ~}~%" clause)))
+      (format t "    none: the explicit goal has no controlled-device condition.~%"))
+    (format t "~%  greedy-necessary orderings~%")
+    (if devices
+      (dolist (device devices)
+        (format t "    establish controller primitives for ~(~A~) before ~(~A~).~%"
+                device device))
+      (format t "    none: route/order extraction needs a separately stated movement relaxation.~%"))
     (values)))
 
 
@@ -2643,9 +3006,11 @@ counted as layer-blind roots."
   (report-control-algebra)
   (report-functional-relation-census)
   (report-budget-arithmetic)
+  (report-height-and-reach-lattice)
+  (report-beam-sightline-table)
+  (report-landmark-graph-and-orderings)
   (report-region-quotient)
   (report-cut-keeper-table)
-  (format t "~2%S5-S7 not yet written.~%")
   (format t "RO requires an explicit segment input and is not generated; call~%")
   (format t "REPORT-ROLE-OBLIGATIONS with a stated scenario.~%")
   (values))

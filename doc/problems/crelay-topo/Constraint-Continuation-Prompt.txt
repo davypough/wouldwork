@@ -1,35 +1,31 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Refreshed 2026-09-22 for the T13 G15-application handoff.
+Refreshed 2026-09-22 after completing T9.
 STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
-CURRENT TASK -- T13 SELECT AND APPROVE A CONCRETE G15 APPLICATION
----------------------------------------------------------------
+CURRENT TASK -- T10 END-TO-END CLOSURE REMAINS IN PROGRESS
+------------------------------------------------------------
 CURRENT HANDOFF -- authoritative over all historical instructions below
-T12 is complete. G15 is specified by the portable, documentation-only
-launch-configuration check:
-  doc/constraint-method/Launch-Configuration-Checklist.md
-It requires a concrete actor/view, launch and landing, movement and support
-conditions, the propagated successor of every controller action, and separate
-reach/cargo checks before a quotient traversal receives a realization or
-budget. Its labels reject only a stated construction and preserve missing
-conditions as conditional or open. It adds no extractor and authorizes no
-runtime work.
+T13/T6 through T9 are COMPLETE. T9 is a disclosed regeneration check because
+the authorized sealed scan also displayed S7. Its delete-relaxed report
+correctly leaves the explicit location-only goal as an unexpanded
+movement/query landmark: no S1 device-state conjunct exists to expand. It
+therefore emits no K1-K9 chain and is recorded as a MISS rather than inventing
+a route, segment premise, or simultaneous role requirement. The four assertion
+check at `doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`
+passed without profile-load warnings. Register 7.35–7.36 records the disclosure
+and score.
 
-T13 is PROPOSED and needs D's explicit choice before source work begins.
-Present these scopes:
-1. a read-only check of a newly proposed B2 elevation resource, which D must
-   identify and approve first;
-2. a general extractor-design task; or
-3. a different problem's proposed quotient traversal.
+T10 remains IN PROGRESS, but there is no approved run. Its B2 construction
+branch remains closed after the elevation audit and recorder split-lift
+follow-up. Do not inspect new construction material, stage, replay, validate,
+search, change an instance, or resume B2/B3/B4 without separate approval.
 
-Do not choose a scope, inspect new source material, or begin analysis before
-D approves one. T10 remains in progress, but its B2 construction branch stays
-closed after the recorder split-lift follow-up. Do not resume B2, B3/B4, a new
-baseline, staging, replay, validation, search, an instance change, or
-extractor work without the resulting task's separate approval.
+All prior T9, T8, T7, and T13/T6 instructions below are historical where they
+conflict with this block. The implementation plan is the authoritative state
+record.
 
 D approved the read-only recorder elevation-resource follow-up. It is
 complete. Read next, in this order:
