@@ -10,9 +10,10 @@ not concrete until its launch configuration survives every intervening
 controller transition. The plan remains authoritative for task state; this
 document is authoritative for this check's required evidence and result labels.
 
-**Next task.** T13 must select and obtain approval for a concrete application
-before this checklist is used for any new source analysis. It does not reopen a
-closed construction branch by itself.
+**Application.** T13 completed on 2026-09-22 by selecting T6 implementation,
+not an application of this checklist, so the checklist has not yet been applied
+to any traversal. Using it for new source analysis needs its own approved
+scope. It does not reopen a closed construction branch by itself.
 
 **Contamination.** This specification used only G15 and its permitted
 construction audit. No sealed material was opened, and no problem was staged,

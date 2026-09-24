@@ -1,13 +1,45 @@
 Crelay-Topo Constraint Analysis -- Continuation Prompt
 ====================================================
-Refreshed 2026-09-22 after completing T9.
+Refreshed 2026-09-24 during the documentation consistency pass.
 STATE FILES ARE AUTHORITATIVE. This current block and
 Constraint-Restart-Checkpoint.txt supersede historical next-step commands below.
 Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 
-CURRENT TASK -- T10 END-TO-END CLOSURE REMAINS IN PROGRESS
+CURRENT TASK -- NONE APPROVED; D TO CHOOSE THE NEXT STEP
 ------------------------------------------------------------
-CURRENT HANDOFF -- authoritative over all historical instructions below
+CURRENT HANDOFF -- 2026-09-24, authoritative over all historical instructions below
+No task is approved to start. T0-T9 and T11-T13 are COMPLETE: T13 closed on
+2026-09-22 when D chose full T6 implementation, and T6-T9 followed. T10 is
+IN PROGRESS but paused; no run is pending or approved. Its B2 construction
+branch stays closed until D names a new, separately justified elevation
+resource and approves its read-only check. B3/B4 are not approved.
+
+The candidates for D's choice are listed in the implementation plan's Current
+Task: correct the generic ledger reporter; file the lk4 schema-gap
+candidate; resume T10 with a new resource or baseline; or open the first
+uncontaminated problem. None has a task id or approval yet. The 2026-09-24
+documentation pass and profile regeneration are complete; re-deriving AM4/AM8
+in the abstract model from S5/S6 output remains an open hand-analysis item.
+
+State: main ledger sixteen premises, nine links, three bounds; seven of nine
+links found (lk1/lk2/lk3/lk7/lk8 CLOSED, lk9/lk4 REALIZED, lk5/lk6 OPEN).
+Twenty reported puzzle searches: eighteen through the gate6/source probe plus
+the separate B1 and B2 experiments. Four distinct archives; all four SHA-256
+hashes rechecked on 2026-09-24 and matching the restart checkpoint. G15 is
+OPEN; its checklist exists but has not been applied to any traversal. The
+T10 analysis from 2026-09-22 on is exposed, not a clean prediction; the
+2026-09-24 session was supplied no puzzle memory and opened no sealed file.
+
+Next session: read the plan's Current Task and the restart checkpoint's
+current block, present the candidates to D, and wait. Read no new source
+material and stage, search, replay or validate nothing until D approves one.
+Record of this pass:
+doc/constraint-method/evidence/doc-consistency-review-2026-09-24.txt.
+The static profile was regenerated on 2026-09-24 (new SHA-256 83772F5D...,
+938 lines); S0-S4 are byte-identical to before. See PROFILE REGENERATED under
+VERIFICATION AND CONTAMINATION HANDOFF.
+
+HISTORICAL HANDOFF -- 2026-09-22 after T9, superseded by the block above
 T13/T6 through T9 are COMPLETE. T9 is a disclosed regeneration check because
 the authorized sealed scan also displayed S7. Its delete-relaxed report
 correctly leaves the explicit location-only goal as an unexpanded
@@ -301,7 +333,8 @@ MAIN LEDGER AND TEST STATUS
 --------------------------
 Sixteen premises, nine spine links, three cost bounds. CLOSED: lk1/lk2/lk3/lk7/lk8.
 REALIZED: lk9/lk4. OPEN: lk5/lk6. Seven of nine main links found. Eighteen
-reported puzzle searches include three historical restoration searches; imports
+reported puzzle searches through the gate6/source probe include three historical
+restoration searches; the separate B1 and B2 experiments make twenty; imports
 add none. BD2 retains UNKNOWN cutoff8 coverage and original raw COMPLETE/NIL.
 BD3 records cutoff10 crossing exhaustion with confirmed truncation and 130956
 cutoff hits. The two newer cutoff-12 return-access/resource results are
@@ -325,7 +358,7 @@ Generic ledger command/report wording findings await a separate implementation
 step; see doc/constraint-method/evidence/t10-consistency-review-2026-09-21.txt.
 Use explicit checkpoint recommendations for future approved runs. The old gate8
 opening-cost inference was withdrawn; its split is not a prerequisite. The lk4
-schema-gap candidate awaits D's hand filing. T11 is approved but DEFERRED.
+schema-gap candidate awaits D's hand filing. T11 is COMPLETE (register 7.29).
 
 HANDOFF VERIFICATION
 --------------------
@@ -356,7 +389,9 @@ Do not search the whole prediction register for headings or print matching
 lines.  Do not inspect old conversation/memory records for problem answers.
 If a range becomes stale, stop at the stated boundary; do not broaden it.
 
-Constraint-Prediction-Register.txt, 2803 lines, current line ranges:
+Constraint-Prediction-Register.txt, 2929 lines, current line ranges
+(7.30-7.36 mapped 2026-09-24 by a heading-only scan of lines after 2803,
+approved by D; no section content was displayed):
   101-223       section 3, sealed ALGORITHMS, permitted for implementation
   398-447       sections 7.1-7.2, permitted scoring history
   448-512       DO NOT READ: section 7.3 quotes sealed content
@@ -368,6 +403,13 @@ Constraint-Prediction-Register.txt, 2803 lines, current line ranges:
   2575-2644     section 7.27, RO first score
   2647-2756     section 7.28, G14 FIX COMMITMENTS
   2759-2803     section 7.29, completed G14 fix score
+  2805-2831     section 7.30, S5 commitments, written before its first run
+  2832-2851     section 7.31, S5 first score (retained MISS)
+  2852-2868     section 7.32, S5 second score after correction
+  2869-2884     section 7.33, S6 commitment and disclosure
+  2885-2902     section 7.34, S6 first score (disclosed regeneration check)
+  2903-2914     section 7.35, S7 commitment and disclosure
+  2915-2929     section 7.36, S7 first score (disclosed MISS)
 
 For completed T11 history, read Constraint-Role-Obligations.txt in full --
 sections 1-5 are RO's pre-implementation specification, section 6 is what
@@ -380,9 +422,9 @@ completed extractor, then stop before the next extractor.  Never print the
 whole section 4.  Sections 4 and 5 are not required to score the G14 fix or
 RO: neither has a sealed value paragraph.
 
-Constraint-Schema-Gaps.txt, 907 lines (WHERE THIS FITS was appended after853;
+Constraint-Schema-Gaps.txt, 916 lines (WHERE THIS FITS was appended after853;
 G15 is at863-897, including its T12 specification update and T13 handoff;
-G14's completion update is at900-907):
+G14's completion update is at900-907; the G15 status note is at910-916):
   1-437         G1-G7 and introduction, permitted
   696-725       G12, destination and transition proof gap, permitted
   726-748       G13, relative writer target, permitted
@@ -393,6 +435,7 @@ G14's completion update is at900-907):
   863-897       G15, launch configuration/propagation audit question, T12
                 specification update, and T13 handoff, permitted
   900-907       G14 completion update, permitted
+  910-916       G15 status note, 2026-09-24: T13 handoff superseded, permitted
 Other gaps' status is summarized below; do not widen an extraction through G9.
 
 Then read:
@@ -539,6 +582,12 @@ Staging resets problem settings and state.  Set threads before rebuilding
 any replay state: crossing the serial/parallel boundary restages.  Concrete
 realization, when separately approved, uses short SOLVE-SUBGOAL chains,
 unquoted goals and *threads* 0, followed by independent action validation.
+[Superseded 2026-09-21 for T10: standalone searches now start from a saved
+checkpoint at threads 16 (two-argument form), search-found phases stay
+REALIZED with validated NIL, and final acceptance is
+VALIDATE-SEARCH-CHECKPOINT. See doc/search-strategies/standalone-checkpoints.md
+and the restart checkpoint. The threads-0 rule still applies to one-argument
+goal chaining, which the engine refuses in parallel mode.]
 Do not silently deepen searches.  Do not use the Filesystem extension;
 use shell or apply_patch, preserving literal dollar-prefixed Lisp symbols.
 NOTE, 2026-09-20: in the session that wrote this prompt the Filesystem
@@ -548,8 +597,8 @@ spend turns retrying it.
 
 CURRENT ARTIFACTS AND STATUS
 ----------------------------
-Constraint-Prediction-Register.txt       HAND, sealed 3-6; history through 7.29
-Constraint-Static-Profile.txt            GENERATED, 640 lines, S0-S4
+Constraint-Prediction-Register.txt       HAND, sealed 3-6; history through 7.36
+Constraint-Static-Profile.txt            GENERATED, 938 lines, S0-S7 and T6
 Constraint-Schema-Gaps.txt               HAND, through G15; G14 closed, T12 specified
 Constraint-Abstract-Model.txt            HAND, partial; stale claims corrected
 Constraint-Role-Obligations.txt          HAND, 417 lines: RO1-RO6 and the
@@ -578,7 +627,7 @@ tech/constraint-ledger.lisp             METHOD-LEVEL, T2-T5's product: a second
 doc/constraint-method/evidence/         METHOD-LEVEL check, run and sample
                                         output evidence, the counterpart of
                                         this directory's constraint-evidence/
-tech/constraint-profile.lisp            loadable diagnostic, S0-S4 and RO
+tech/constraint-profile.lisp            loadable diagnostic, S0-S7, T6 and RO
 constraint-evidence/s4-first-run-2026-09-20.txt
 constraint-evidence/s4-first-load-2026-09-20.txt
 constraint-evidence/s4-helper-checks-2026-09-20.lisp
@@ -694,6 +743,19 @@ Generated-profile SHA-256, 640 lines, 41,214 bytes:
 EFD35D3926255B4C715338CABA147CF6DAC53D223DFB287AF365853F2B8BD596
 All five of the above were RE-VERIFIED on 2026-09-20 during this
 documentation update.  Nothing was executed to produce them.
+
+PROFILE REGENERATED -- 2026-09-24
+D ran WRITE-STATIC-CONSTRAINT-PROFILE after T6-T9, with no warnings reported.
+New generated-profile SHA-256, 938 lines, 53,556 bytes:
+83772F5D32B21588B5F76E19C96B2FCF9B3D82C01AA39B3ABA1D43E4A9CF2E8F
+Section order is S0, S1, S2, T6, S5, S6, S7, S3, S4, then the RO note.
+S0-S4 are byte-identical to the previous report: lines 1-347 (S0-S2) plus
+lines 649-936 (S3-S4), followed by the old file's two blank lines and its
+"S5-S7 not yet written." line, reproduce the old 41,101-byte prefix hash
+9E4A9B0ADB114554CC32475E99D75812B276DE0B59B5936EFC6079AFC2770AE8 exactly.
+Because the new sections sit between S2 and S3, that prefix is no longer a
+literal prefix of the file; check S0-S4 by that reconstruction instead.
+The EFD35D39... hash above belongs to the pre-T6 profile and is superseded.
 
 Register prefix hashes, all re-verified 2026-09-20:
   original 140,954-byte prefix, still unchanged:

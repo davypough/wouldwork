@@ -345,6 +345,307 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
       *start-state* reading, NOT the bound: 1 of 8 keys assigned, 1 distinct value occupied
 
 
+T6  MECHANIZED BUDGET ARITHMETIC  [grade 1 -> 2]
+--------------------------------------------------------------
+
+  AM1 [grade 1 -> 2; S1 controls, S2 ON pool]: Budget is tight.  5 body-cost devices demand 8 total plate keepers; the full occupant pool is 8.  All can be open only if every body is on a plate.
+
+  AM2 [grade 1 -> 2; S1 controls, S2 ON pool, goal form]: The goal actor occupies 1 of 8 bodies in the full occupant pool and its destination has no pressure plate.
+
+  AM3a [grade 1 -> 2; S1 controls, S2 live ON pool]: Outside a cycle, 3 bodies remain for supports; demand is 8, so at least 5 support cost must close.
+
+  AM3b [grade 1 -> 2; S1 controls, S2 full ON pool]: Inside a cycle, 7 bodies remain for supports; demand is 8, so at least 1 support cost must close.
+
+  NOTE: these are impossibility constraints on state assignments, not on action sequences.  They refute the fully-open assignment without searching.
+
+
+S5  HEIGHT AND REACH LATTICE  [grade 2]
+--------------------------------------------------------------
+  type heights (21 types; 3 authored overrides)
+    location  height 0  axis NONE  base 0
+    agent  height 3/2  axis VERTICAL  base 0
+    box  height 1  axis VERTICAL  base 0
+    connector  height 1  axis VERTICAL  base 0
+    jammer  height 1  axis VERTICAL  base 0
+    tray  height 0  axis VERTICAL  base 0
+    fan  height 0  axis VERTICAL  base 0
+    pressure-plate  height 0  axis VERTICAL  base 0
+    toggle-plate  height 0  axis VERTICAL  base 0
+    floor-blower  height 0  axis VERTICAL  base 0
+    angled-blower  height 0  axis VERTICAL  base 0
+    gate  height 4  axis VERTICAL  base 0
+    screen  height 4  axis VERTICAL  base 0
+    wall  height 4  axis VERTICAL  base 0  overrides 2
+    edge  height 3/2  axis VERTICAL  base 0  overrides 1
+    floor-repeater  height 1  axis VERTICAL  base 0
+    wall-repeater  height 1  axis HORIZONTAL  base 1
+    transmitter  height 0  axis NONE  base 1
+    receiver  height 0  axis NONE  base 1
+    switch  height 0  axis NONE  base 1
+    gun  height 0  axis NONE  base 1
+
+  location levels
+    location1  0
+    location2  0
+    location3  0
+    location4  0
+    location5  0
+    location6  3/2
+    location7  0
+    location8  0
+    location9  0
+    location10  0
+    location11  0
+    location12  0
+    location13  0
+    location14  0
+    location15  0
+    location16  0
+    location17  0
+    location18  0
+    location19  0
+    location20  3/2
+    location21  0
+
+  achievable carried-object tops
+    box1  1, 2, 5/2
+    box1*  1, 2, 5/2
+    connector1  1, 2, 5/2
+    connector1*  1, 2, 5/2
+    tray1  0, 1, 3/2
+    tray1*  0, 1, 3/2
+
+  placement legality matrix (agent base -> support top)
+    agent1 0 -> box1 1  YES
+    agent1 0 -> box1* 1  YES
+    agent1 0 -> ground 0  YES
+    agent1 0 -> tray1 3/2  NO
+    agent1 0 -> tray1* 3/2  NO
+    agent1* 0 -> box1 1  YES
+    agent1* 0 -> box1* 1  YES
+    agent1* 0 -> ground 0  YES
+    agent1* 0 -> tray1 3/2  NO
+    agent1* 0 -> tray1* 3/2  NO
+
+  unreachable from ground (placement reach limit 1)
+    tray1  top 3/2
+    tray1*  top 3/2
+
+
+S6  BEAM SIGHTLINE TABLE  [grade 2]
+--------------------------------------------------------------
+  direct gate subsets: 512; no propagation applied
+
+  visibility rows
+    location1 @ 1 -> transmitter1  NEVER
+    location1 @ 1 -> receiver1  NEVER
+    location1 @ 1 -> repeater1  NEVER
+    location1 @ 2 -> transmitter1  NEVER
+    location1 @ 2 -> receiver1  NEVER
+    location1 @ 2 -> repeater1  NEVER
+    location1 @ 5/2 -> transmitter1  NEVER
+    location1 @ 5/2 -> receiver1  NEVER
+    location1 @ 5/2 -> repeater1  NEVER
+    location2 @ 1 -> transmitter1  NEVER
+    location2 @ 1 -> receiver1  NEVER
+    location2 @ 1 -> repeater1  NEVER
+    location2 @ 2 -> transmitter1  NEVER
+    location2 @ 2 -> receiver1  NEVER
+    location2 @ 2 -> repeater1  NEVER
+    location2 @ 5/2 -> transmitter1  NEVER
+    location2 @ 5/2 -> receiver1  NEVER
+    location2 @ 5/2 -> repeater1  NEVER
+    location3 @ 1 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location3 @ 1 -> receiver1  NEVER
+    location3 @ 1 -> repeater1  NEVER
+    location3 @ 2 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location3 @ 2 -> receiver1  NEVER
+    location3 @ 2 -> repeater1  NEVER
+    location3 @ 5/2 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location3 @ 5/2 -> receiver1  NEVER
+    location3 @ 5/2 -> repeater1  NEVER
+    location4 @ 1 -> transmitter1  NEVER
+    location4 @ 1 -> receiver1  NEVER
+    location4 @ 1 -> repeater1  NEVER
+    location4 @ 2 -> transmitter1  NEVER
+    location4 @ 2 -> receiver1  NEVER
+    location4 @ 2 -> repeater1  NEVER
+    location4 @ 5/2 -> transmitter1  NEVER
+    location4 @ 5/2 -> receiver1  NEVER
+    location4 @ 5/2 -> repeater1  NEVER
+    location5 @ 1 -> transmitter1  NEVER
+    location5 @ 1 -> receiver1  NEVER
+    location5 @ 1 -> repeater1  NEVER
+    location5 @ 2 -> transmitter1  NEVER
+    location5 @ 2 -> receiver1  NEVER
+    location5 @ 2 -> repeater1  NEVER
+    location5 @ 5/2 -> transmitter1  NEVER
+    location5 @ 5/2 -> receiver1  NEVER
+    location5 @ 5/2 -> repeater1  NEVER
+    location6 @ 1 -> transmitter1  NEVER
+    location6 @ 1 -> receiver1  NEVER
+    location6 @ 1 -> repeater1  NEVER
+    location6 @ 2 -> transmitter1  NEVER
+    location6 @ 2 -> receiver1  NEVER
+    location6 @ 2 -> repeater1  NEVER
+    location6 @ 5/2 -> transmitter1  NEVER
+    location6 @ 5/2 -> receiver1  NEVER
+    location6 @ 5/2 -> repeater1  NEVER
+    location7 @ 1 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location7 @ 1 -> receiver1  NEVER
+    location7 @ 1 -> repeater1  NEVER
+    location7 @ 2 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location7 @ 2 -> receiver1  NEVER
+    location7 @ 2 -> repeater1  NEVER
+    location7 @ 5/2 -> transmitter1  CONDITIONAL  requires open gate4, gate3
+    location7 @ 5/2 -> receiver1  NEVER
+    location7 @ 5/2 -> repeater1  NEVER
+    location8 @ 1 -> transmitter1  CONDITIONAL  requires open gate4
+    location8 @ 1 -> receiver1  NEVER
+    location8 @ 1 -> repeater1  ALWAYS
+    location8 @ 2 -> transmitter1  CONDITIONAL  requires open gate4
+    location8 @ 2 -> receiver1  NEVER
+    location8 @ 2 -> repeater1  ALWAYS
+    location8 @ 5/2 -> transmitter1  CONDITIONAL  requires open gate4
+    location8 @ 5/2 -> receiver1  NEVER
+    location8 @ 5/2 -> repeater1  ALWAYS
+    location9 @ 1 -> transmitter1  CONDITIONAL  requires open gate4
+    location9 @ 1 -> receiver1  NEVER
+    location9 @ 1 -> repeater1  ALWAYS
+    location9 @ 2 -> transmitter1  CONDITIONAL  requires open gate4
+    location9 @ 2 -> receiver1  ALWAYS
+    location9 @ 2 -> repeater1  ALWAYS
+    location9 @ 5/2 -> transmitter1  CONDITIONAL  requires open gate4
+    location9 @ 5/2 -> receiver1  ALWAYS
+    location9 @ 5/2 -> repeater1  ALWAYS
+    location10 @ 1 -> transmitter1  NEVER
+    location10 @ 1 -> receiver1  NEVER
+    location10 @ 1 -> repeater1  NEVER
+    location10 @ 2 -> transmitter1  NEVER
+    location10 @ 2 -> receiver1  NEVER
+    location10 @ 2 -> repeater1  NEVER
+    location10 @ 5/2 -> transmitter1  NEVER
+    location10 @ 5/2 -> receiver1  NEVER
+    location10 @ 5/2 -> repeater1  NEVER
+    location11 @ 1 -> transmitter1  NEVER
+    location11 @ 1 -> receiver1  NEVER
+    location11 @ 1 -> repeater1  NEVER
+    location11 @ 2 -> transmitter1  NEVER
+    location11 @ 2 -> receiver1  NEVER
+    location11 @ 2 -> repeater1  NEVER
+    location11 @ 5/2 -> transmitter1  NEVER
+    location11 @ 5/2 -> receiver1  NEVER
+    location11 @ 5/2 -> repeater1  NEVER
+    location12 @ 1 -> transmitter1  NEVER
+    location12 @ 1 -> receiver1  CONDITIONAL  requires open gate7
+    location12 @ 1 -> repeater1  NEVER
+    location12 @ 2 -> transmitter1  NEVER
+    location12 @ 2 -> receiver1  CONDITIONAL  requires open gate7
+    location12 @ 2 -> repeater1  NEVER
+    location12 @ 5/2 -> transmitter1  NEVER
+    location12 @ 5/2 -> receiver1  CONDITIONAL  requires open gate7
+    location12 @ 5/2 -> repeater1  NEVER
+    location13 @ 1 -> transmitter1  NEVER
+    location13 @ 1 -> receiver1  CONDITIONAL  requires open gate7
+    location13 @ 1 -> repeater1  NEVER
+    location13 @ 2 -> transmitter1  NEVER
+    location13 @ 2 -> receiver1  CONDITIONAL  requires open gate7
+    location13 @ 2 -> repeater1  NEVER
+    location13 @ 5/2 -> transmitter1  NEVER
+    location13 @ 5/2 -> receiver1  CONDITIONAL  requires open gate7
+    location13 @ 5/2 -> repeater1  NEVER
+    location14 @ 1 -> transmitter1  NEVER
+    location14 @ 1 -> receiver1  NEVER
+    location14 @ 1 -> repeater1  NEVER
+    location14 @ 2 -> transmitter1  NEVER
+    location14 @ 2 -> receiver1  NEVER
+    location14 @ 2 -> repeater1  NEVER
+    location14 @ 5/2 -> transmitter1  NEVER
+    location14 @ 5/2 -> receiver1  NEVER
+    location14 @ 5/2 -> repeater1  NEVER
+    location15 @ 1 -> transmitter1  NEVER
+    location15 @ 1 -> receiver1  ALWAYS
+    location15 @ 1 -> repeater1  NEVER
+    location15 @ 2 -> transmitter1  NEVER
+    location15 @ 2 -> receiver1  ALWAYS
+    location15 @ 2 -> repeater1  ALWAYS
+    location15 @ 5/2 -> transmitter1  NEVER
+    location15 @ 5/2 -> receiver1  ALWAYS
+    location15 @ 5/2 -> repeater1  ALWAYS
+    location16 @ 1 -> transmitter1  NEVER
+    location16 @ 1 -> receiver1  CONDITIONAL  requires open gate8
+    location16 @ 1 -> repeater1  NEVER
+    location16 @ 2 -> transmitter1  NEVER
+    location16 @ 2 -> receiver1  CONDITIONAL  requires open gate8
+    location16 @ 2 -> repeater1  NEVER
+    location16 @ 5/2 -> transmitter1  NEVER
+    location16 @ 5/2 -> receiver1  CONDITIONAL  requires open gate8
+    location16 @ 5/2 -> repeater1  NEVER
+    location17 @ 1 -> transmitter1  NEVER
+    location17 @ 1 -> receiver1  CONDITIONAL  requires open gate8
+    location17 @ 1 -> repeater1  NEVER
+    location17 @ 2 -> transmitter1  NEVER
+    location17 @ 2 -> receiver1  CONDITIONAL  requires open gate8
+    location17 @ 2 -> repeater1  NEVER
+    location17 @ 5/2 -> transmitter1  NEVER
+    location17 @ 5/2 -> receiver1  CONDITIONAL  requires open gate8
+    location17 @ 5/2 -> repeater1  NEVER
+    location18 @ 1 -> transmitter1  NEVER
+    location18 @ 1 -> receiver1  CONDITIONAL  requires open gate8
+    location18 @ 1 -> repeater1  NEVER
+    location18 @ 2 -> transmitter1  NEVER
+    location18 @ 2 -> receiver1  CONDITIONAL  requires open gate8
+    location18 @ 2 -> repeater1  NEVER
+    location18 @ 5/2 -> transmitter1  NEVER
+    location18 @ 5/2 -> receiver1  CONDITIONAL  requires open gate8
+    location18 @ 5/2 -> repeater1  NEVER
+    location19 @ 1 -> transmitter1  NEVER
+    location19 @ 1 -> receiver1  NEVER
+    location19 @ 1 -> repeater1  NEVER
+    location19 @ 2 -> transmitter1  NEVER
+    location19 @ 2 -> receiver1  NEVER
+    location19 @ 2 -> repeater1  NEVER
+    location19 @ 5/2 -> transmitter1  NEVER
+    location19 @ 5/2 -> receiver1  NEVER
+    location19 @ 5/2 -> repeater1  NEVER
+    location20 @ 1 -> transmitter1  NEVER
+    location20 @ 1 -> receiver1  NEVER
+    location20 @ 1 -> repeater1  NEVER
+    location20 @ 2 -> transmitter1  NEVER
+    location20 @ 2 -> receiver1  NEVER
+    location20 @ 2 -> repeater1  NEVER
+    location20 @ 5/2 -> transmitter1  NEVER
+    location20 @ 5/2 -> receiver1  NEVER
+    location20 @ 5/2 -> repeater1  NEVER
+    location21 @ 1 -> transmitter1  NEVER
+    location21 @ 1 -> receiver1  CONDITIONAL  requires open gate8
+    location21 @ 1 -> repeater1  NEVER
+    location21 @ 2 -> transmitter1  NEVER
+    location21 @ 2 -> receiver1  CONDITIONAL  requires open gate8
+    location21 @ 2 -> repeater1  CONDITIONAL  requires open gate8
+    location21 @ 5/2 -> transmitter1  NEVER
+    location21 @ 5/2 -> receiver1  CONDITIONAL  requires open gate8
+    location21 @ 5/2 -> repeater1  CONDITIONAL  requires open gate8
+
+  location-occluder kill list
+    none
+
+
+S7  LANDMARK GRAPH AND ORDERINGS  [grade 4]
+--------------------------------------------------------------
+  relaxation: delete relaxation; achieved landmarks persist.
+  no simultaneous-role, keeper-return, segment, or route claim is emitted.
+
+  explicit goal landmarks
+    (has-location agent1 location19)  movement/query landmark; S1 expansion unavailable.
+
+  S1 controller expansions
+    none: the explicit goal has no controlled-device condition.
+
+  greedy-necessary orderings
+    none: route/order extraction needs a separately stated movement relaxation.
+
+
 S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 --------------------------------------------------------------
 
@@ -633,8 +934,5 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
     Total sequential crossers are NOT simultaneous body demand.
 
   UNCONDITIONAL STRANDING: unresolved; no verdict emitted.
-
-
-S5-S7 not yet written.
 RO requires an explicit segment input and is not generated; call
 REPORT-ROLE-OBLIGATIONS with a stated scenario.

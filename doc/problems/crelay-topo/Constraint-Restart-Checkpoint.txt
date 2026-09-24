@@ -1,6 +1,23 @@
-T10 restart checkpoint -- refreshed 2026-09-22
+T10 restart checkpoint -- refreshed 2026-09-24
 ============================================
-CURRENT HANDOFF -- T10 END-TO-END CLOSURE REMAINS IN PROGRESS, 2026-09-22
+CURRENT HANDOFF -- 2026-09-24, authoritative over every block below
+No task is approved to start. T0-T9 and T11-T13 are complete; T13 closed on
+2026-09-22 when D chose full T6 implementation. T10 is IN PROGRESS but paused:
+no run is pending or approved, and the B2 construction branch is closed until
+D names a new, separately justified elevation resource. The candidates for D's
+next choice are listed in the implementation plan's Current Task. A
+documentation consistency pass was approved and completed on 2026-09-24; it
+changed no ledger record, archive or instance (D regenerated the profile).
+All four archive SHA-256 hashes below were rechecked on 2026-09-24 and match.
+Twenty reported puzzle searches: eighteen through the gate6/source probe, plus
+the separate B1 and B2 experiments. The static profile was regenerated on
+2026-09-24 (SHA-256 83772F5D..., 938 lines, S0-S4 byte-identical); earlier
+"profile hash matched" notes below refer to the superseded pre-T6 file.
+Next session: read the plan's Current Task, then the continuation prompt's
+CURRENT HANDOFF, then present the candidates to D and wait. The cold-import
+commands below are reference only.
+
+HISTORICAL HANDOFF -- 2026-09-22, superseded by the block above
 T13/T6 through T9 are complete. T9's disclosed S7 run is a MISS: its
 delete-relaxed extractor correctly cannot expand the location-only goal through
 S1 and does not invent a route or K1-K9 chain. The clean check at
@@ -153,8 +170,9 @@ is automatically supplied again, disclose it rather than claim a clean context.
 STATE COUNTS
 Sixteen premises, nine main-spine links, three cost bounds. Five CLOSED links:
 lk1/lk2/lk3/lk7/lk8; lk9/lk4 REALIZED; lk5/lk6 OPEN. Seven of nine found.
-Eighteen reported searches include three old restoration searches. Archive import
-is replay, not another search. Source and keeper experimental phases remain
+Eighteen reported searches through the gate6/source probe include three old
+restoration searches; the separate B1 and B2 experiments make twenty in all.
+Archive import is replay, not another search. Source and keeper experimental phases remain
 REALIZED/validated NIL separately; the two newest return-access/resource
 exhaustions are separate grade-3 experimental bounds, not main-ledger records.
 None were adopted as mandatory links. BD2: cutoff8 crossing, UNKNOWN historical
@@ -277,6 +295,14 @@ Load these data-only scripts in order, under constraint-evidence/:
 9. ingest-lk4-found-2026-09-20.lisp
 10. ingest-lk5-bound-2026-09-21.lisp
 11. ingest-lk5-cutoff10-bound-2026-09-21.lisp
+EVIDENCE NAME ERRATA (recorded 2026-09-24; ledger and scripts deliberately
+left unedited so reconstruction stays byte-identical). Four run-evidence names
+cited in the ledger and ingest scripts were never created. The records they
+mean are:
+  lk1-first-run-2026-09-20.txt   -> lk1-ingest-2026-09-20.txt
+  lk1-validation-2026-09-20.txt  -> runs-ingest-2026-09-20.txt
+  lk2-validation-2026-09-20.txt  -> runs-ingest-2026-09-20.txt
+  lk4-bound-8-2026-09-20.txt     -> lk4-bound-2026-09-20.txt
 Do not re-ingest against an already updated ledger: events append. The source
 and keeper candidate phases are documented separately, not in this spine ledger.
 

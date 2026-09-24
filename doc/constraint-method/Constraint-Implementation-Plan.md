@@ -12,7 +12,8 @@ second source.
 A session that opens this file is being asked to continue the work, not to
 report on it. Unless the user's message says otherwise:
 
-1. **Take the CURRENT TASK below.** It is the next waiting task, always.
+1. **Take the CURRENT TASK below.** It is the next waiting task, always. If it
+   says no task is approved, present its candidates to D and wait.
 2. **Read its entry in full**, plus the sources that entry names, plus
    `doc/problems/<problem>/Constraint-Continuation-Prompt.txt` for the problem it
    touches — that prompt is authoritative for reading boundaries, permitted line
@@ -33,206 +34,66 @@ report on it. Unless the user's message says otherwise:
 
 ## Current Task
 
-**T10 — End-to-end closure on crelay-topo.**
+**No task is approved to start. The next step is D's choice among the
+candidates below.** Refreshed 2026-09-24 during the documentation consistency
+pass; this section replaces all earlier next-step text, which is preserved
+verbatim under "T10 handoff history" at the end of the T10 entry.
 
-T9 completed on 2026-09-22 as a disclosed regeneration check. Its delete-
-relaxed S7 report correctly leaves the explicit location-only goal unexpanded:
-there is no S1 device-state conjunct to backward-chain. It therefore does not
-regenerate the exposed K1–K9 outline and is recorded as a MISS, rather than
-inventing an unsound route or simultaneous role requirement. The four-assertion
-check passed without profile-load warnings. Evidence:
-`doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`.
+**Where the work stands.**
+- T0–T9 and T11–T13 are COMPLETE. T13 was closed on 2026-09-22 when D chose
+  full T6 implementation; T6–T9 followed the same day.
+- T10 is IN PROGRESS but paused. No run is pending and none is approved. Its
+  B2 construction branch is closed: the nominal six-action route was rejected
+  by the construction audit, and the follow-up found no elevation resource
+  reachable from B1. Reopening B2 needs D to name a new, separately justified
+  elevation resource and approve its read-only check. B3/B4 are not approved.
+- Main ledger: sixteen premises, nine links, three bounds. lk1/lk2/lk3/lk7/lk8
+  CLOSED, lk9/lk4 REALIZED, lk5/lk6 OPEN — seven of nine links found.
+- Twenty reported puzzle searches: eighteen through the gate6/source probe
+  (including three historical restoration searches), plus the separate B1 and
+  B2 experiments. Archive imports and failed setup launches are not searches.
+- Four checkpoint archives, kept distinct, under
+  `doc/problems/crelay-topo/constraint-evidence/`: `t10-location15-checkpoint.txt`
+  (7/19), `t10-repeater-source-checkpoint.txt` (8/27), `t10-keeper-checkpoint.txt`
+  (9/32) and `t10-b1-checkpoint.txt` (1/9, separate fresh-origin experiment).
+  All four SHA-256 hashes were rechecked on 2026-09-24 and match the restart
+  checkpoint.
+- D's maximum reasonable search cutoff is 12. It authorizes no run and no
+  automatic deepening.
+- Exposure: the 2026-09-21 event led to a fresh session; the 2026-09-22
+  supplied-memory exposure was disclosed and D authorized continued analysis.
+  T10 analysis from 2026-09-22 on is therefore exposed, not a clean prediction
+  experiment. The 2026-09-24 session was supplied no puzzle memory and opened
+  no sealed material.
 
-T10 remains in progress, but no run is pending. The B2 branch stays closed:
-the nominal six-action construction is rejected and the recorder split-lift
-resource is unavailable from B1. No construction analysis, source audit,
-staging, replay, validation, search, instance change, or further extractor
-work is authorized by T9’s completion. T11 and T12 are complete. All older
-current-task text below is historical where it conflicts with this header.
+**Candidates for D's choice — none approved, none given a task id yet:**
+1. *Documentation consistency pass* — DONE 2026-09-24, all 21 findings
+   dispositioned. Record: `evidence/doc-consistency-review-2026-09-24.txt`. One
+   hand-analysis follow-up it deliberately did not do: re-derive AM4/AM8 in
+   `Constraint-Abstract-Model.txt` from the S5/S6 output.
+2. *Regenerate the static profile* — DONE 2026-09-24 by D. New SHA-256
+   `83772F5D…`, 938 lines; S0–S4 byte-identical to before. Details in the
+   continuation prompt under PROFILE REGENERATED.
+3. *Correct the generic ledger reporter* — stale command text and overstrong
+   exhaustion wording, per `evidence/t10-consistency-review-2026-09-21.txt`.
+4. *File the lk4 schema-gap candidate* — D's hand filing.
+5. *Resume T10* — requires a newly justified elevation resource for B2, or a
+   different baseline, and its own approval.
+6. *Open the first uncontaminated problem* — the honest test of discovery that
+   T10's notes reserve for its own task.
 
-Follow-up, 2026-09-22: D approved a read-only investigation of a possible
-recorder-based elevation resource. The mechanism is conditionally sound only
-if a ghost already holds tray1* at location20: a ghost switch-on can sustain
-the ghost tray there, then a live switch-off opens physical gate2 while a live
-rider remains supported. It is unavailable from B1. Carrying tray1* away from
-plate1 closes recording gate1 before the ghost can use its required passage
-toward blower1; live tray1 cannot restore the recording view and cannot be
-manipulated by the ghost. No other authored support reaches the elevated
-approach. The B2 branch remains closed. Evidence:
-`doc/problems/crelay-topo/constraint-evidence/b2-recorder-elevation-resource-followup-2026-09-22.txt`.
-No runtime operation, new baseline, B3/B4, or extractor is authorized. T11 is
-complete; T12's read-only G15 specification is complete.
+**Standing items unchanged by this refresh.** T10's final acceptance remains an
+approved final-goal search from a chosen checkpoint followed by
+`validate-search-checkpoint` with SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P
+all T. Search-found phases stay REALIZED with validated NIL unless D asks for a
+replay. The gate8-opening alternative stays unapproved and its old arithmetic
+inference withdrawn. G15 is OPEN; its checklist exists but has not been applied
+to any traversal.
 
-Handoff, 2026-09-22: D approved the read-only revised-construction derivation.
-The proposed B2 route omitted a launch-elevation prerequisite: location6 is
-at3/2, the nearby ground launches at0, and the jump-rise limit is1. The
-blower fallback also needs a support/transition that survives opening gate2:
-switching off its lift drops an unsupported actor before the next move.
-This rejects the nominal six-action construction, not B2's reachability.
-The six-action B2 and combined29-action estimates are withdrawn as execution
-guidance; the second-fork and later B3/B4 endpoints remain conditional.
-Read `doc/problems/crelay-topo/constraint-evidence/b2-construction-audit-2026-09-22.txt`.
-Portable question G15 was appended without reading sealed gap content.
-No Lisp/search/replay/tests ran during the audit. Four archive hashes, the
-profile hash and three register-prefix hashes match; register content was
-not displayed. The main ledger remains unchanged. Historical18 searches plus
-the separate B1/B2 runs gives20; setup failures/imports add none.
-
-The revised derivation and follow-up elevation-resource audit found no
-complete route or current elevation resource in the authored geometry. Any
-valid B2 needs an independently retained level-3/2 approach while switch1 is
-off and gate2 is open; the existing blower cannot provide that because
-stopping it drops the actor. The cargo return and second fork are therefore
-conditional only. No location or transition was proposed.
-
-NEXT SESSION: read the continuation prompt and restart checkpoint, then
-present T13's three scopes for D's choice. Do not read new source material or
-begin analysis until that choice is approved. The B2 construction branch stays
-closed unless D identifies a new elevation resource and approves the first
-scope. All older next-step text below is historical where it conflicts.
-
-Latest result, 2026-09-22: D approved B2. One threads16/cutoff12 search from
-restored B1 found no solution; direct truncation T, 381717 cutoff hits,
-18.166 seconds. No B2 checkpoint was created; B1's hash remains unchanged.
-This separate experimental bound does not explain the failure or refute the
-baseline. Evidence: `doc/problems/crelay-topo/constraint-evidence/b2-baseline-result-2026-09-22.txt`.
-Recommend read-only audit of the nominal construction's movement and recorder
-assumptions, subject to new approval. No further runtime operation is approved.
-Earlier pending-B2 text below is historical and superseded by this result.
-
-Latest preparation, 2026-09-22: D approved B2 preparation after this session
-disclosed supplied older puzzle memory and a related registry lookup. This
-remains an exposed session. The B1 archive hash and stored endpoint were
-checked without import. The concrete one-run proposal, restoration scope,
-endpoint acceptance and bounded outcome readings are in
-`doc/problems/crelay-topo/constraint-evidence/b2-baseline-proposal-2026-09-22.txt`.
-No B2 operation is approved. No Lisp or tests ran; no sealed material was read.
-On 2026-09-22 D approved read-only development of the alternative baseline after
-the disclosed supplied-memory exposure; this remains an exposed, not clean,
-prediction session. The analysis produced a fresh two-cycle baseline candidate:
-the first cycle moves tray1 to plate1 while agent1* holds gate1, then cancels
-cleanly; box1 is moved to plate2; the second start forks cargo witnesses onto
-both plates. The new ghost can therefore leave R1 through recording gate1 and
-reach R2 through recording gate3 without depending on agent1* as a gate1
-witness. The baseline is not a checkpoint replacement, replayable sequence, or
-source/gate6 solution.
-
-D then approved read-only source-restoration analysis from that baseline. A
-new ghost can hold plate3, opening physical gate4 for the low source beam while
-the live agent pairs connector1 at location9. The baseline fork leaves tray1*
-and box1* on plates1/2, so their live counterparts can move independently to
-plates4/5 while the ghosts preserve gates1/3. With agent1 empty-handed, this
-is a source-derived candidate for red repeater power, physical gate6, and
-location14. It is neither a measured path nor a refutation of the earlier
-cutoff-12 bounds, which began from the different keeper checkpoint. Evidence:
-`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-analysis-2026-09-22.txt`.
-`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt`.
-
-D then approved read-only staged-construction analysis. The candidate separates
-into B1 first-cycle tray transfer/cancellation (nominal 9 actions), B2 box
-transfer and second fork (6), B3 ghost plate3 plus source pairing (5), and B4
-live gate6 witnesses plus location14 crossing (9). Each is proposed at the
-standing cutoff ceiling 12; the 29-action combined skeleton cannot be tested as
-one fresh-start probe.
-
-D approved B1. Its fresh-start threads16/cutoff12 search found the exact closed
-tray1-on-plate1 boundary at minimum depth9. The post-search export form then
-failed to parse because of a PowerShell pathname escape. D separately approved
-action-sequence recovery; the canonical nine actions were replayed and exported
-without invoking a solver. The recovered one-phase B1 archive has depth9,
-nine actions, and SHA-256
-`D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7`.
-Evidence: `doc/problems/crelay-topo/constraint-evidence/b1-baseline-result-2026-09-22.txt`.
-
-**Next-session entry:** read the continuation prompt, restart checkpoint, and
-the four 2026-09-22 analyses plus the B1 recommendation/result. The pending
-choice is whether to approve B2 from the recovered B1 checkpoint. Do not rerun
-B1, import archives, start B2, begin a new baseline, or resume deferred T11
-automatically without that approval.
-Handoff verification on 2026-09-22 rechecked all three archive hashes, the full
-generated-profile hash and all three recorded register-prefix hashes: all match.
-Register bytes were hashed only; no sealed content was displayed or interpreted.
-
-The approved audit's single cutoff-12 return-access probe completed from the
-depth-32 keeper candidate.  It found no solution and directly observed cutoff
-truncation, so it is a bound for only that exact combined source/gate6/location14
-goal—not a stranding proof or a refutation of another resource assignment.  The
-approved narrower source/gate6 conjunction also exhausted at the same ceiling
-with direct truncation.  Neither result authorizes an automatic next search.
-The two Talos test failures were fixed first at D's request. D now reports that
-`(test-talos)` runs successfully. Focused assistant checks also passed both
-repaired fixtures and all 55 cutoff assertions. No engine behavior changed. Evidence:
-`evidence/talos-two-test-fixes-2026-09-21.txt` and its two retained logs.
-
-Read `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt` for boundaries,
-then `Constraint-Restart-Checkpoint.txt` for exact inventories, archive hashes,
-restart commands and ledger reconstruction. Do not use memory or old conversations
-for puzzle answers. On 2026-09-21 an exposed session was stopped for a fresh
-session. On 2026-09-22 supplied-memory exposure was disclosed again and D
-explicitly authorized continued analysis. Keep these two events distinct;
-the latter analysis is not an independent clean prediction experiment.
-
-**Starting point for the analysis:** the saved keeper candidate at cumulative
-**depth 32, nine checkpoints**, not the old depth-19 seed. Agent1 is empty-handed
-on the ground at location10. Tray1 holds plate3, keeping gate4 open; connector1
-at location9 is paired to transmitter1 and repeater1, both relays red. Plates4/5
-are empty, gate6 is closed, switch2 is off and gate7 is closed. Gate8 is still
-closed. Ghost agent/tray hold plate1/plate2; ghost connector is at location9,
-both boxes at location6. One recorder cycle remains open.
-
-**Audit/probe conclusion:** switch2 access requires physical gate6 to have both
-plate4/plate5 witnesses while the agent is empty-handed; source-power tray1 and
-connector1 cannot also be assumed to fill those supports.  The two approved
-cutoff-12 experiments found neither the full source/gate6/location14 state nor
-the narrower source/gate6 state.  They do not identify a missing resource or
-prove the branch impossible, irreversibly stranded, or fit for crossing.
-**No new search, validation/replay, extractor, code change or ledger restructuring
-is authorized.** Substantial searches remain D's to run.
-
-**State and evidence:**
-- Main spine: seven of nine found; LK1/LK2/LK3/LK7/LK8 CLOSED,
-  LK9/LK4 REALIZED, LK5/LK6 OPEN. Sixteen premises and three bounds in the ledger.
-- Eighteen reported searches include three historical restoration searches. The
-  two newest are separate cutoff-12 experiments, not ledger links or bounds.
-- BD2: crossing cutoff8, coverage UNKNOWN. BD3: crossing cutoff10, truncation T,
-  130,956 hits, threads16, GRAPH, symmetry NIL, minimum-steps pruning T.
-- Separate source-power phase: 8 actions, 7.164 s, depth27, REALIZED/validated NIL.
-- Separate keeper phase: 5 actions, 0.209 s, depth32, REALIZED/validated NIL.
-  Power was temporarily interrupted then restored, as its endpoint goal allowed.
-- Separate return-access experiment: cutoff12, threads16, no solution for
-  `(and (color repeater1 red) (open gate6) (has-location agent1 location14))`;
-  truncation T, 779,648 hits, GRAPH, symmetry NIL, minimum-steps pruning T.
-- Separate gate6/source experiment: cutoff12, threads16, no solution for
-  `(and (color repeater1 red) (open gate6))`; truncation T, 779,445 hits,
-  GRAPH, symmetry NIL, minimum-steps pruning T.
-- Both experimental phases are preserved separately, not adopted as mandatory
-  spine links or main-ledger bounds; neither closes LK5. Their results are in
-  the corresponding
-  `repeater-source-result-2026-09-21.txt` and
-  `keeper-replacement-result-2026-09-21.txt`, plus
-  `switch2-return-access-result-2026-09-21.txt` and
-  `gate6-source-resource-result-2026-09-21.txt`, under
-  `constraint-evidence/`.
-
-**All three archives now exist and were hashed/read as files, not replayed:**
-`t10-location15-checkpoint.txt` (7 checkpoints/19 actions),
-`t10-repeater-source-checkpoint.txt` (8/27), and
-`t10-keeper-checkpoint.txt` (9/32). Keep all three; branch variables remain
-`*t10-checkpoint*`, `*t10-source-checkpoint*`, and `*t10-keeper-checkpoint*`.
-No speculative endpoint replaces an earlier checkpoint automatically.
-
-D's maximum reasonable search cutoff is **12**. This ceiling is not a new run
-or automatic deepening authorization. All prior recommended probes are complete;
-no search command is pending. Normally skip independent replay of search-found
-phases; retain REALIZED/validated NIL and the final composed-path acceptance.
-
-**Outstanding separate work:** the generic ledger reporter still emits stale
-checkpoint commands and overstrong exhaustion wording; use explicit dated
-recommendations until a separate fix is approved. See
-`evidence/t10-consistency-review-2026-09-21.txt`. The gate8-opening alternative
-is unapproved and its old arithmetic inference was corrected. The lk4 schema-gap
-candidate awaits D's hand filing. T11 remains approved but deferred. No other
-extractor or implementation task is selected.
+**Next-session entry.** Read this section, the continuation prompt's CURRENT
+HANDOFF and the restart checkpoint's current block. Then present the
+candidates above to D and wait. Read no new source material, and stage,
+search, replay or validate nothing, until D chooses and approves one.
 
 ## Prohibitions that bind every session
 
@@ -267,7 +128,7 @@ are not duplicated here; read them there and treat them as binding.
 (stage <problem>)
 (load (merge-pathnames "tech/constraint-profile.lisp"
                        (asdf:system-source-directory :wouldwork)))
-(report-static-constraint-profile)   ; all generated extractors, S0-S4
+(report-static-constraint-profile)   ; all generated extractors: S0-S7 and T6
 (report-role-obligations <scenario>) ; RO, explicit scenario required
 ```
 
@@ -342,6 +203,11 @@ and are not restated here.
 | `doc/problems/<p>/Constraint-Abstract-Model.txt` | bodies x roles x segments, the budget, and what is deliberately not claimed |
 | `doc/problems/<p>/Constraint-Role-Obligations.txt` | the RO audit, its specification, and the G14 fix design |
 | `tech/constraint-profile.lisp` | the extractors themselves |
+| `doc/constraint-method/Launch-Configuration-Checklist.md` | the G15 launch-configuration check: required evidence and result labels (T12) |
+| `src/ww-search-checkpoint.lisp` | standalone search checkpoints: `export-search-checkpoint`, `import-search-checkpoint` (by replay), `validate-search-checkpoint` |
+| `doc/search-strategies/standalone-checkpoints.md` | user-level description of the standalone checkpoint workflow |
+| `doc/problems/<p>/Constraint-Realization-Ledger.txt` | the problem's interactive-phase ledger; program-written, reproduced by the ingest scripts in order |
+| `doc/problems/<p>/Constraint-Restart-Checkpoint.txt` | archive inventory and hashes, cold-restore commands, ledger reconstruction order |
 
 The register is append-only in section 7 and sealed in sections 3–6; this plan
 never edits it.
@@ -424,7 +290,7 @@ Two invariants constrain everything below:
 | T3 | Search recommender | COMPLETE | approved in session, 2026-09-20 | T2 |
 | T4 | Result ingester | COMPLETE | approved in session, 2026-09-20 | T2, T3 |
 | T5 | Question generator | COMPLETE | approved in session, 2026-09-20 | T1, T2 |
-| T6 | Mechanized budget arithmetic | COMPLETE | approved 2026-09-22; eight acceptance assertions passed | — |
+| T6 | Mechanized budget arithmetic | COMPLETE | approved 2026-09-22 via T13's selection; eight acceptance assertions passed | T13 (selection only) |
 | T7 | S5 height and reach lattice | COMPLETE | approved 2026-09-22; first miss and correction score recorded | — |
 | T8 | S6 beam sightline table | COMPLETE | approved 2026-09-22; disclosed regeneration score recorded | T7 |
 | T9 | S7 landmark graph and orderings | COMPLETE | approved 2026-09-22; disclosed miss recorded | — |
@@ -433,9 +299,11 @@ Two invariants constrain everything below:
 | T12 | Specify the G15 launch-configuration check | COMPLETE | approved in session, 2026-09-22 | — |
 | T13 | Select and approve a concrete application of G15 | COMPLETE | selected and approved T6 implementation, 2026-09-22 | T12 |
 
-**T11 is listed last because it runs last, not because it is unapproved.** D
-deferred it on 2026-09-20 so the architecture tasks settle first. It is
-per-problem cleanup and blocks nothing here.
+**T11 carries a late id but was already in flight when this plan opened.** D
+deferred it on 2026-09-20 so the architecture tasks could settle first; it ran
+and completed on 2026-09-22. It was per-problem cleanup and blocked nothing
+here. (Corrected 2026-09-24: this note previously said T11 is "listed last
+because it runs last".)
 
 **Build order rationale.** T1–T5 before T6–T9, against the instinct to finish the
 extractors first. A thin end-to-end loop over the *existing* S0–S4 and RO output
@@ -486,6 +354,13 @@ own reading boundary and contamination scope.
 T6 implementation. This is an implementation selection, so G15's traversal
 report form does not apply. No source material was opened before the selection.
 
+**Departure from acceptance, stated rather than resolved (recorded 2026-09-24).**
+The criterion above asks for "one named traversal or resource proposal". D
+instead chose an implementation task, so no traversal was named, no G15 report
+form was copied into a scope, and the checklist remains unapplied. The
+criterion is left as written; the task is COMPLETE because D made the strategic
+selection it existed to obtain. T6's approval came through this selection.
+
 ## T12 — Specify the G15 launch-configuration check
 
 **Goal.** Turn G15's portable missing question into a read-only procedure that
@@ -518,8 +393,10 @@ the stated view, and the approved fix labels them without changing what RO
 allocates.
 
 **Why it carries a late id.** Ids are identifiers, not an order. This task was
-in flight when the plan opened; it is listed first on the board because it runs
-first, and it keeps its own id forever.
+in flight when the plan opened, and it keeps its own id forever. D deferred it
+behind the architecture tasks on 2026-09-20; it completed on 2026-09-22.
+(Corrected 2026-09-24: this paragraph previously said it is listed first
+because it runs first, which contradicted both the board and the deferral.)
 
 **Specification.** `Constraint-Role-Obligations.txt` section 7, and commitments
 P1–P8 in register 7.28. Both are approved; neither is to be re-specified, and
@@ -593,6 +470,11 @@ computed `standing`. The ledger's reporter therefore prints
 `standing CONDITIONAL` beside RO's `status CONDITIONAL`. If D prefers one word
 across both, the change belongs in the specification before T2 starts.
 
+*Resolution, recorded 2026-09-24.* No amendment was made before T2 started.
+Section 8 of the schema adopted the two-word split, and the ledger reporter
+prints a NOTE saying `standing` is not RO's `status`. D may still ask for one
+word; that would now be a specification amendment plus a reporter change.
+
 ## T2 — Realization ledger
 
 **Goal.** The interactive phase's state: links, their status, the premises each
@@ -616,7 +498,9 @@ the other, so they load in either order.
 **Contamination scope.** None required. Nothing sealed was opened; nothing was
 staged; no extractor ran.
 
-**Status.** COMPLETE, 2026-09-20, pending D's own run of the acceptance checks.
+**Status.** COMPLETE, 2026-09-20. D's acceptance runs on lumpy subsequently
+passed (see "Acceptance suite" in T10); the earlier "pending D's own run"
+qualifier was removed on 2026-09-24.
 
 **Approval.** Granted in session by D on 2026-09-20 ("let's continue with the next
 task here and now"), together with the standing instruction that technical choices
@@ -659,8 +543,9 @@ commitments and a staged run; this one has neither. Its acceptance checks were r
 first and in a clean image regardless, because that is the order M9 makes a habit
 of.
 
-**Five underspecifications found and settled** during implementation are listed in
-section 16 of the schema document, which was corrected in the same turn.
+**Five underspecifications found and settled** during implementation are the first
+five items of section 16 of the schema document, which was corrected in the same
+turn. Later tasks appended further items to that section.
 
 ## T3 — Search recommender
 
@@ -1174,7 +1059,8 @@ needs its endpoint inspected before claiming readiness for the excursion.
 T10 UPDATE, 2026-09-20 -- LK7 VALIDATED; LK8 NEXT
 D found and validated lk7 in five additional actions, cumulative depth 11.
 SUCCESS-P T, ACTION-COUNT 5, goal checked and satisfied. Five of nine links
-are CLOSED: lk1, lk2, lk3, lk7. T10 remains approved and IN PROGRESS.
+are CLOSED: lk1, lk2, lk3, lk7. [Corrected 2026-09-24: four of nine, as the
+list shows.] T10 remains approved and IN PROGRESS.
 The stated goal is met by tray1 on plate4 and agent1 on plate5; the stronger
 non-agent witness intent was NOT established. Do not infer excursion readiness.
 Next approved probe: lk8, agent1 at location14, cutoff 6, threads 0, from
@@ -1349,3 +1235,212 @@ necessity, stranding, or a particular failed resource.  It remains separate
 from LK5, leaving the main ledger at three bounds and seven found main links.
 No further search is authorized.  Evidence:
 `constraint-evidence/gate6-source-resource-result-2026-09-21.txt`.
+
+
+### T10 handoff history (superseded, kept verbatim)
+
+Moved here unchanged from the Current Task section on 2026-09-24. It records
+the 2026-09-21/22 handoffs in the order they were written, which is not
+chronological. Where it conflicts with Current Task, Current Task governs;
+nothing below is a next-step instruction.
+
+**T10 — End-to-end closure on crelay-topo.**
+
+T9 completed on 2026-09-22 as a disclosed regeneration check. Its delete-
+relaxed S7 report correctly leaves the explicit location-only goal unexpanded:
+there is no S1 device-state conjunct to backward-chain. It therefore does not
+regenerate the exposed K1–K9 outline and is recorded as a MISS, rather than
+inventing an unsound route or simultaneous role requirement. The four-assertion
+check passed without profile-load warnings. Evidence:
+`doc/constraint-method/evidence/s7-landmark-checks-2026-09-22.lisp`.
+
+T10 remains in progress, but no run is pending. The B2 branch stays closed:
+the nominal six-action construction is rejected and the recorder split-lift
+resource is unavailable from B1. No construction analysis, source audit,
+staging, replay, validation, search, instance change, or further extractor
+work is authorized by T9’s completion. T11 and T12 are complete. All older
+current-task text below is historical where it conflicts with this header.
+
+Follow-up, 2026-09-22: D approved a read-only investigation of a possible
+recorder-based elevation resource. The mechanism is conditionally sound only
+if a ghost already holds tray1* at location20: a ghost switch-on can sustain
+the ghost tray there, then a live switch-off opens physical gate2 while a live
+rider remains supported. It is unavailable from B1. Carrying tray1* away from
+plate1 closes recording gate1 before the ghost can use its required passage
+toward blower1; live tray1 cannot restore the recording view and cannot be
+manipulated by the ghost. No other authored support reaches the elevated
+approach. The B2 branch remains closed. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/b2-recorder-elevation-resource-followup-2026-09-22.txt`.
+No runtime operation, new baseline, B3/B4, or extractor is authorized. T11 is
+complete; T12's read-only G15 specification is complete.
+
+Handoff, 2026-09-22: D approved the read-only revised-construction derivation.
+The proposed B2 route omitted a launch-elevation prerequisite: location6 is
+at3/2, the nearby ground launches at0, and the jump-rise limit is1. The
+blower fallback also needs a support/transition that survives opening gate2:
+switching off its lift drops an unsupported actor before the next move.
+This rejects the nominal six-action construction, not B2's reachability.
+The six-action B2 and combined29-action estimates are withdrawn as execution
+guidance; the second-fork and later B3/B4 endpoints remain conditional.
+Read `doc/problems/crelay-topo/constraint-evidence/b2-construction-audit-2026-09-22.txt`.
+Portable question G15 was appended without reading sealed gap content.
+No Lisp/search/replay/tests ran during the audit. Four archive hashes, the
+profile hash and three register-prefix hashes match; register content was
+not displayed. The main ledger remains unchanged. Historical18 searches plus
+the separate B1/B2 runs gives20; setup failures/imports add none.
+
+The revised derivation and follow-up elevation-resource audit found no
+complete route or current elevation resource in the authored geometry. Any
+valid B2 needs an independently retained level-3/2 approach while switch1 is
+off and gate2 is open; the existing blower cannot provide that because
+stopping it drops the actor. The cargo return and second fork are therefore
+conditional only. No location or transition was proposed.
+
+NEXT SESSION: read the continuation prompt and restart checkpoint, then
+present T13's three scopes for D's choice. Do not read new source material or
+begin analysis until that choice is approved. The B2 construction branch stays
+closed unless D identifies a new elevation resource and approves the first
+scope. All older next-step text below is historical where it conflicts.
+
+Latest result, 2026-09-22: D approved B2. One threads16/cutoff12 search from
+restored B1 found no solution; direct truncation T, 381717 cutoff hits,
+18.166 seconds. No B2 checkpoint was created; B1's hash remains unchanged.
+This separate experimental bound does not explain the failure or refute the
+baseline. Evidence: `doc/problems/crelay-topo/constraint-evidence/b2-baseline-result-2026-09-22.txt`.
+Recommend read-only audit of the nominal construction's movement and recorder
+assumptions, subject to new approval. No further runtime operation is approved.
+Earlier pending-B2 text below is historical and superseded by this result.
+
+Latest preparation, 2026-09-22: D approved B2 preparation after this session
+disclosed supplied older puzzle memory and a related registry lookup. This
+remains an exposed session. The B1 archive hash and stored endpoint were
+checked without import. The concrete one-run proposal, restoration scope,
+endpoint acceptance and bounded outcome readings are in
+`doc/problems/crelay-topo/constraint-evidence/b2-baseline-proposal-2026-09-22.txt`.
+No B2 operation is approved. No Lisp or tests ran; no sealed material was read.
+On 2026-09-22 D approved read-only development of the alternative baseline after
+the disclosed supplied-memory exposure; this remains an exposed, not clean,
+prediction session. The analysis produced a fresh two-cycle baseline candidate:
+the first cycle moves tray1 to plate1 while agent1* holds gate1, then cancels
+cleanly; box1 is moved to plate2; the second start forks cargo witnesses onto
+both plates. The new ghost can therefore leave R1 through recording gate1 and
+reach R2 through recording gate3 without depending on agent1* as a gate1
+witness. The baseline is not a checkpoint replacement, replayable sequence, or
+source/gate6 solution.
+
+D then approved read-only source-restoration analysis from that baseline. A
+new ghost can hold plate3, opening physical gate4 for the low source beam while
+the live agent pairs connector1 at location9. The baseline fork leaves tray1*
+and box1* on plates1/2, so their live counterparts can move independently to
+plates4/5 while the ghosts preserve gates1/3. With agent1 empty-handed, this
+is a source-derived candidate for red repeater power, physical gate6, and
+location14. It is neither a measured path nor a refutation of the earlier
+cutoff-12 bounds, which began from the different keeper checkpoint. Evidence:
+`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-analysis-2026-09-22.txt`.
+`doc/problems/crelay-topo/constraint-evidence/recorder-baseline-source-resource-analysis-2026-09-22.txt`.
+
+D then approved read-only staged-construction analysis. The candidate separates
+into B1 first-cycle tray transfer/cancellation (nominal 9 actions), B2 box
+transfer and second fork (6), B3 ghost plate3 plus source pairing (5), and B4
+live gate6 witnesses plus location14 crossing (9). Each is proposed at the
+standing cutoff ceiling 12; the 29-action combined skeleton cannot be tested as
+one fresh-start probe.
+
+D approved B1. Its fresh-start threads16/cutoff12 search found the exact closed
+tray1-on-plate1 boundary at minimum depth9. The post-search export form then
+failed to parse because of a PowerShell pathname escape. D separately approved
+action-sequence recovery; the canonical nine actions were replayed and exported
+without invoking a solver. The recovered one-phase B1 archive has depth9,
+nine actions, and SHA-256
+`D004ADBDB1F055E907F95C6A603CE3D8B48C4696AD24C3BD6AD3CBF83322DBA7`.
+Evidence: `doc/problems/crelay-topo/constraint-evidence/b1-baseline-result-2026-09-22.txt`.
+
+**Next-session entry:** read the continuation prompt, restart checkpoint, and
+the four 2026-09-22 analyses plus the B1 recommendation/result. The pending
+choice is whether to approve B2 from the recovered B1 checkpoint. Do not rerun
+B1, import archives, start B2, begin a new baseline, or resume deferred T11
+automatically without that approval.
+Handoff verification on 2026-09-22 rechecked all three archive hashes, the full
+generated-profile hash and all three recorded register-prefix hashes: all match.
+Register bytes were hashed only; no sealed content was displayed or interpreted.
+
+The approved audit's single cutoff-12 return-access probe completed from the
+depth-32 keeper candidate.  It found no solution and directly observed cutoff
+truncation, so it is a bound for only that exact combined source/gate6/location14
+goal—not a stranding proof or a refutation of another resource assignment.  The
+approved narrower source/gate6 conjunction also exhausted at the same ceiling
+with direct truncation.  Neither result authorizes an automatic next search.
+The two Talos test failures were fixed first at D's request. D now reports that
+`(test-talos)` runs successfully. Focused assistant checks also passed both
+repaired fixtures and all 55 cutoff assertions. No engine behavior changed. Evidence:
+`evidence/talos-two-test-fixes-2026-09-21.txt` and its two retained logs.
+
+Read `doc/problems/crelay-topo/Constraint-Continuation-Prompt.txt` for boundaries,
+then `Constraint-Restart-Checkpoint.txt` for exact inventories, archive hashes,
+restart commands and ledger reconstruction. Do not use memory or old conversations
+for puzzle answers. On 2026-09-21 an exposed session was stopped for a fresh
+session. On 2026-09-22 supplied-memory exposure was disclosed again and D
+explicitly authorized continued analysis. Keep these two events distinct;
+the latter analysis is not an independent clean prediction experiment.
+
+**Starting point for the analysis:** the saved keeper candidate at cumulative
+**depth 32, nine checkpoints**, not the old depth-19 seed. Agent1 is empty-handed
+on the ground at location10. Tray1 holds plate3, keeping gate4 open; connector1
+at location9 is paired to transmitter1 and repeater1, both relays red. Plates4/5
+are empty, gate6 is closed, switch2 is off and gate7 is closed. Gate8 is still
+closed. Ghost agent/tray hold plate1/plate2; ghost connector is at location9,
+both boxes at location6. One recorder cycle remains open.
+
+**Audit/probe conclusion:** switch2 access requires physical gate6 to have both
+plate4/plate5 witnesses while the agent is empty-handed; source-power tray1 and
+connector1 cannot also be assumed to fill those supports.  The two approved
+cutoff-12 experiments found neither the full source/gate6/location14 state nor
+the narrower source/gate6 state.  They do not identify a missing resource or
+prove the branch impossible, irreversibly stranded, or fit for crossing.
+**No new search, validation/replay, extractor, code change or ledger restructuring
+is authorized.** Substantial searches remain D's to run.
+
+**State and evidence:**
+- Main spine: seven of nine found; LK1/LK2/LK3/LK7/LK8 CLOSED,
+  LK9/LK4 REALIZED, LK5/LK6 OPEN. Sixteen premises and three bounds in the ledger.
+- Eighteen reported searches include three historical restoration searches. The
+  two newest are separate cutoff-12 experiments, not ledger links or bounds.
+- BD2: crossing cutoff8, coverage UNKNOWN. BD3: crossing cutoff10, truncation T,
+  130,956 hits, threads16, GRAPH, symmetry NIL, minimum-steps pruning T.
+- Separate source-power phase: 8 actions, 7.164 s, depth27, REALIZED/validated NIL.
+- Separate keeper phase: 5 actions, 0.209 s, depth32, REALIZED/validated NIL.
+  Power was temporarily interrupted then restored, as its endpoint goal allowed.
+- Separate return-access experiment: cutoff12, threads16, no solution for
+  `(and (color repeater1 red) (open gate6) (has-location agent1 location14))`;
+  truncation T, 779,648 hits, GRAPH, symmetry NIL, minimum-steps pruning T.
+- Separate gate6/source experiment: cutoff12, threads16, no solution for
+  `(and (color repeater1 red) (open gate6))`; truncation T, 779,445 hits,
+  GRAPH, symmetry NIL, minimum-steps pruning T.
+- Both experimental phases are preserved separately, not adopted as mandatory
+  spine links or main-ledger bounds; neither closes LK5. Their results are in
+  the corresponding
+  `repeater-source-result-2026-09-21.txt` and
+  `keeper-replacement-result-2026-09-21.txt`, plus
+  `switch2-return-access-result-2026-09-21.txt` and
+  `gate6-source-resource-result-2026-09-21.txt`, under
+  `constraint-evidence/`.
+
+**All three archives now exist and were hashed/read as files, not replayed:**
+`t10-location15-checkpoint.txt` (7 checkpoints/19 actions),
+`t10-repeater-source-checkpoint.txt` (8/27), and
+`t10-keeper-checkpoint.txt` (9/32). Keep all three; branch variables remain
+`*t10-checkpoint*`, `*t10-source-checkpoint*`, and `*t10-keeper-checkpoint*`.
+No speculative endpoint replaces an earlier checkpoint automatically.
+
+D's maximum reasonable search cutoff is **12**. This ceiling is not a new run
+or automatic deepening authorization. All prior recommended probes are complete;
+no search command is pending. Normally skip independent replay of search-found
+phases; retain REALIZED/validated NIL and the final composed-path acceptance.
+
+**Outstanding separate work:** the generic ledger reporter still emits stale
+checkpoint commands and overstrong exhaustion wording; use explicit dated
+recommendations until a separate fix is approved. See
+`evidence/t10-consistency-review-2026-09-21.txt`. The gate8-opening alternative
+is unapproved and its old arithmetic inference was corrected. The lk4 schema-gap
+candidate awaits D's hand filing. T11 remains approved but deferred. No other
+extractor or implementation task is selected.

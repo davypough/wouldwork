@@ -55,21 +55,23 @@ Raw analysis material for individual problems: goal deductions, solution traces,
 
 ---
 
-## Parallel-search investigation
+## Parallel search
 
-Start with [parallel-search-defaults.md](parallel-search-defaults.md): completed integration, default operation and validation. Earlier investigation documents below retain historical results.
-The maintained design and evidence are:
+Start with [search-strategies/parallel-search-defaults.md](search-strategies/parallel-search-defaults.md): completed integration, default operation and validation. [search-strategies/parallel search architecture.md](<search-strategies/parallel search architecture.md>) explains the design in functional terms, and [search-strategies/contention-probe.md](search-strategies/contention-probe.md) describes the optional contention diagnostic.
 
-- [Snapshot audit](parallel-snapshot-audit.md): ownership and lifecycle protections.
-- [Traversal cache results](parallel-traversal-cache-results.md): completed bounded diagnostic; its recommended integration is now installed.
-- [Corner support and generalization](parallel-snapshot-generalization.md): historical extension and user-reported result; superseded by the default closeout.
-- [Selector review](parallel-selector-review.md) and [timing](parallel-selector-timing.md): retained patch and validation.
-- [Baseline](parallel-baseline.md) and [handoff](parallel-search-handoff.md): detailed evidence and investigation context; earlier status/approval entries are chronological, not current instructions.
+The earlier investigation documents (snapshot audit, traversal-cache results,
+snapshot generalization, selector review and timing, baseline and handoff) were
+removed from `doc/` in commit 7660707, "finalize parallel efficiency upgrades";
+the defaults document supersedes them. Copies from the selector-timing work
+survive under `artifacts/selector-timing-01/`, and git history holds the rest.
+(Corrected 2026-09-24: this section previously linked those files at `doc/`
+root, where they no longer exist.)
 
-The original snapshot proposal, completed serial-overhead plan and old selector
-continuation were removed during the 2026-09-14 documentation cleanup because
-the retained documents supersede them. Raw reports, diagnostics, caches and
-reference worktrees remain preserved.
+## Standalone checkpoints
+
+[search-strategies/standalone-checkpoints.md](search-strategies/standalone-checkpoints.md)
+describes searching from a saved checkpoint, exporting and importing it, and
+validating the composed path; the constraint-led method's T10 work relies on it.
 
 ## Conventions
 

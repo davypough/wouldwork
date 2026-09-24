@@ -778,7 +778,7 @@ transport question are untouched, and RO emits no stranding verdict by
 construction. G14 records a reporting defect found on that run.
 
 
-G14  AN INHERITED PREMISE IS NOT FILTERED BY THE VIEW ITS CONSUMER STATES [OPEN]
+G14  AN INHERITED PREMISE IS NOT FILTERED BY THE VIEW ITS CONSUMER STATES [CLOSED]
 ------------------------------------------------------------------
 Found      2026-09-20, on RO's first staged run (register 7.27).
 Grade      the printed premises are grade 1 and individually correct;
@@ -905,3 +905,12 @@ consumer view without changing RO's allocation. The staged physical-view run
 reported OPEN as IN-VIEW and RECORDING-OPEN as retained OUT-OF-VIEW; the
 allocation remained unchanged. The score is against committed predictions,
 not a sealed value paragraph.
+
+
+G15 STATUS NOTE -- 2026-09-24
+-----------------------------
+Status: OPEN, unchanged. T13 completed on 2026-09-22 when D selected T6
+implementation instead of an application of the launch-configuration
+checklist, so the checklist has not been applied to any traversal. The T13
+handoff in the G15 status update above is superseded. See the implementation
+plan's Current Task for the candidates awaiting D's choice.

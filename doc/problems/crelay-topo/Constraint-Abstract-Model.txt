@@ -11,6 +11,17 @@ assignment or a concrete plan. The initial inventory predates S3; section
 Constraint-Role-Obligations.txt now holds RO1-RO6 and the proposed next
 analysis. No RO component has been implemented or run.
 
+STATUS UPDATE, 2026-09-24 (documentation pass; supersedes the paragraph
+above and the S5/S6/S7/RO lines of section 6 where they conflict). RO is
+implemented and scored (register 7.27), and its G14 fix is scored (7.29).
+T6 now regenerates AM1-AM3 mechanically in the generated profile's T6
+section. S5, S6 and S7 are implemented and scored (register 7.30-7.36);
+their output is in the regenerated Constraint-Static-Profile.txt. This file
+has NOT yet been re-derived from that output: whether S5/S6 settle AM4's
+conditional beam competition or AM8's gate4 question is still to be
+assessed here, per T8's acceptance ("a run that does not establish them
+says so"). AM4 and AM8 therefore remain CONDITIONAL in this file.
+
 WHERE THIS FITS
 ---------------
 Per-problem analysis.  Method-level task state and the session-start reading
