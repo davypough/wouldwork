@@ -244,14 +244,19 @@ needs — as data, so C3 still holds of the code:
     :search-goal      the goal form, UNQUOTED.  A quoted goal installs (quote ...),
                       which the translator reads as trivially true.
     :search-start     :chain (the next milestone of the active chain), a list of
-                      dynamic facts, or a string naming a form to evaluate
+                      dynamic facts, or a string naming a form to evaluate.
+                      Since T14 (2026-09-24) a string names the variable holding a
+                      standalone search checkpoint
+    :search-archive   T14: optional; the saved checkpoint archive a string start
+                      imports, relative to the repository root.  Required unless
+                      :search-preamble is :continue
     :search-cutoff    a positive integer.  *depth-cutoff* 0 or negative means no
                       cutoff at all, so it is never a default
     :search-threads   0 unless the link states otherwise
     :search-settings  further (parameter . value) pairs this link needs, since
                       staging restores everything else from the problem spec
     :recommendation   the recommendation as committed: its date, cutoff, threads,
-                      start, the premise closure and live guesses at the time, the
+                      start (and since T14 its archive), the premise closure and live guesses at the time, the
                       bound it deepens past if any, and the success and exhaustion
                       readings.  T4 files a bound against this text rather than
                       against a memory of it.
@@ -887,6 +892,20 @@ questionnaire. One point of substance:
    STATED is a description. Both are now first-class answer kinds rather than
    being squeezed into a choice or left out of the generator, which would have
    made the coverage claim false in the one place it is easiest not to notice.
+
+T14, on 2026-09-24, brought the recommender up to date with standalone search
+checkpoints. Two points of substance:
+
+10. **An exhaustion reading says what was found, not what exists.** The template
+    now records that the search found no realization within the cutoff under
+    the settings and pruning in force, and states how the measured truncation
+    (T, NIL or UNKNOWN) bounds its coverage. Readings committed before T14 stay
+    on their records as written.
+11. **A checkpoint start is its own kind of start.** A string `:search-start`
+    names a checkpoint variable; `:search-archive` names the archive it is
+    imported from. Its commands import, set the cutoff, assign the search's
+    returned checkpoint and print the run metadata T4 needs; its advice on a
+    find is to export to a new archive and file REALIZED with validated NIL.
 
 ## 17  Deliberately not settled
 

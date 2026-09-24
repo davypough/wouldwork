@@ -35,13 +35,16 @@ report on it. Unless the user's message says otherwise:
 ## Current Task
 
 **No task is approved to start. The next step is D's choice among the
-candidates below.** Refreshed 2026-09-24 during the documentation consistency
-pass; this section replaces all earlier next-step text, which is preserved
+remaining candidates below.** T14 completed on 2026-09-24. This section,
+refreshed that day, replaces all earlier next-step text, which is preserved
 verbatim under "T10 handoff history" at the end of the T10 entry.
 
 **Where the work stands.**
-- T0–T9 and T11–T13 are COMPLETE. T13 was closed on 2026-09-22 when D chose
-  full T6 implementation; T6–T9 followed the same day.
+- T0–T9 and T11–T14 are COMPLETE. T13 was closed on 2026-09-22 when D chose
+  full T6 implementation; T6–T9 followed the same day. T14 (2026-09-24) made
+  the ledger's generic recommendations match the checkpoint workflow, so
+  future recommendations can be printed by the reporter rather than written
+  by hand.
 - T10 is IN PROGRESS but paused. No run is pending and none is approved. Its
   B2 construction branch is closed: the nominal six-action route was rejected
   by the construction audit, and the follow-up found no elevation resource
@@ -66,7 +69,7 @@ verbatim under "T10 handoff history" at the end of the T10 entry.
   experiment. The 2026-09-24 session was supplied no puzzle memory and opened
   no sealed material.
 
-**Candidates for D's choice — none approved, none given a task id yet:**
+**Candidates for D's choice — items 4–7 open, none approved or given a task id:**
 1. *Documentation consistency pass* — DONE 2026-09-24, all 21 findings
    dispositioned. Record: `evidence/doc-consistency-review-2026-09-24.txt`. One
    hand-analysis follow-up it deliberately did not do: re-derive AM4/AM8 in
@@ -74,13 +77,14 @@ verbatim under "T10 handoff history" at the end of the T10 entry.
 2. *Regenerate the static profile* — DONE 2026-09-24 by D. New SHA-256
    `83772F5D…`, 938 lines; S0–S4 byte-identical to before. Details in the
    continuation prompt under PROFILE REGENERATED.
-3. *Correct the generic ledger reporter* — stale command text and overstrong
-   exhaustion wording, per `evidence/t10-consistency-review-2026-09-21.txt`.
+3. *Correct the generic ledger reporter* — DONE as **T14**, 2026-09-24.
 4. *File the lk4 schema-gap candidate* — D's hand filing.
 5. *Resume T10* — requires a newly justified elevation resource for B2, or a
    different baseline, and its own approval.
 6. *Open the first uncontaminated problem* — the honest test of discovery that
    T10's notes reserve for its own task.
+7. *Re-derive AM4/AM8* in `Constraint-Abstract-Model.txt` from the S5/S6
+   output (hand analysis left open by item 1).
 
 **Standing items unchanged by this refresh.** T10's final acceptance remains an
 approved final-goal search from a chosen checkpoint followed by
@@ -298,6 +302,7 @@ Two invariants constrain everything below:
 | T11 | Implement and score the G14 fix | COMPLETE | approved, four parts | — |
 | T12 | Specify the G15 launch-configuration check | COMPLETE | approved in session, 2026-09-22 | — |
 | T13 | Select and approve a concrete application of G15 | COMPLETE | selected and approved T6 implementation, 2026-09-22 | T12 |
+| T14 | Bring the ledger's search recommendations up to date | COMPLETE | approved in session, 2026-09-24; D's runs passed 346 + 54 | T3, T4 |
 
 **T11 carries a late id but was already in flight when this plan opened.** D
 deferred it on 2026-09-20 so the architecture tasks could settle first; it ran
@@ -316,6 +321,100 @@ validated plan, and teaches nothing about the loop.
 **The risk in that order** is building the ledger before knowing everything the
 later extractors will need to put in it. Mitigated by keeping each link record's
 premise list open-ended from the start (T1).
+
+## T14 — Bring the ledger's search recommendations up to date
+
+**Goal.** Make T3's generic recommendation reporter match the standalone
+checkpoint workflow and the corrected exhaustion semantics, so its printout can
+be used as written instead of being replaced by hand-written dated
+recommendations. Findings 2 and 3 of
+`evidence/t10-consistency-review-2026-09-21.txt`.
+
+**Scope.**
+1. A link whose `:search-start` is a string names a checkpoint variable. A new
+   optional link key, `:search-archive`, gives the saved archive's path relative
+   to the repository root. The printed commands are: stage, threads, import the
+   archive into the variable, cutoff, settings, `(setf <var> (solve-subgoal
+   <var> <goal>))`, then the run-metadata form. A `:continue` link omits stage,
+   threads and import but keeps the cutoff. Without `:continue` and without an
+   archive, the reporter prints what is missing and no commands.
+2. Checkpoint cautions and on-find advice: set threads before import; an
+   exhaustion returns the checkpoint unchanged and a find returns a new one;
+   export a find to a new archive and keep the old; no routine replay (REALIZED,
+   validated NIL); `validate-search-checkpoint` only for the final milestone.
+3. Every future exhaustion reading says what the search FOUND under its
+   settings and pruning, qualified by measured truncation (T / NIL / UNKNOWN),
+   and no longer says a realization does not EXIST within the cutoff.
+4. The cold-restart chain printout names the checkpoint-start links and says
+   they are restored by archive import, not by re-running the chain.
+
+**Not in scope.** Stored recommendations and bounds in any existing ledger
+(history, left as committed); the chain and stated-start command blocks except
+for item 3's wording; the load-preamble line those blocks print.
+
+**Acceptance.** Written before the work, 2026-09-24:
+- For a checkpoint link the printed commands, read as Lisp forms, equal the
+  forms of the dated LK5 cutoff-10 recommendation
+  (`doc/problems/crelay-topo/constraint-evidence/lk5-cutoff10-recommendation-2026-09-21.txt`),
+  so they are runnable as printed; the `:continue` variant prints only the
+  cutoff, search and metadata forms.
+- Checkpoint cautions and on-find advice contain no goal-chain cautions and no
+  routine-replay instruction.
+- The new exhaustion reading contains neither "exists" nor any of the bound
+  lint words.
+- Every existing ledger acceptance assertion still passes, except any that pin
+  the old wording; those are listed before they are changed.
+- New checks cover items 1–4; `COMPILE-FILE` reports no warnings; C3 holds.
+- `doc/problems/crelay-topo/Constraint-Realization-Ledger.txt` still reads and
+  writes back byte-identical.
+
+**Placement.** DECIDED: inside T3's block of `tech/constraint-ledger.lisp`, and
+new acceptance cases in a separate dated check file under `evidence/`, so the
+2026-09-20 suite remains the record of what T2–T5 were accepted against.
+
+**Contamination scope.** None required. No sealed file, no staging, no search.
+
+**Status.** COMPLETE, 2026-09-24. Implemented and first checked in the
+assistant's sandbox (stock SBCL, no Wouldwork loaded); D's authoritative run on
+lumpy then passed both suites (346 and 54 assertions), loaded the file in the
+live image without warnings, and printed crelay-topo's own LK5 recommendation
+in full with the checkpoint commands and the BD2 deepening line.
+**Approval.** Granted in session by D. Findings 2 and 3 of
+`evidence/t10-consistency-review-2026-09-21.txt` are resolved; its advice to
+use hand-written dated recommendations instead of the reporter is superseded
+for recommendations written after 2026-09-24.
+
+**Left as is, noted for a later touch.** The report's heading over the on-find
+advice still reads "on a find, the action sequence is here:", which fits the
+older start kinds better than a checkpoint start; older acceptance cases may
+pin it, so it was not changed inside T14.
+
+**Results against acceptance.**
+- `COMPILE-FILE` of `tech/constraint-ledger.lisp`: zero warnings, zero style
+  warnings. No problem object name appears in it (C3).
+- New suite `evidence/ledger-reporter-checks-2026-09-24.lisp`: 54 assertions
+  passed. It reads the LK5 cutoff-10 recommendation's hand-written forms and
+  checks the generated commands equal them; covers the `:continue` variant, the
+  missing-archive refusal, cautions, on-find advice, the new exhaustion wording,
+  the chain-replay note, and the crelay-topo ledger's byte-identical round trip.
+- 2026-09-20 suite: 346 assertions passed after exactly two were replaced, both
+  pinning the old wording ("not that lk4 is impossible", "cannot close or refute
+  a link"); their replacements check the same intent in the new wording and are
+  marked in place.
+
+**Two findings made during the work, both fixed inside this scope.**
+1. The reporter crashed on crelay-topo's own LK5 recommendation: its
+   hand-transcribed `:deepens` holds the bound id (`bd2`), not the `(bound
+   cutoff)` pair the recommender stores. The reporter now accepts either and
+   reads the cutoff from the bound. The ledger file is unchanged.
+2. A `:continue` link may have no archive, so the on-find export path falls
+   back to the problem's `constraint-evidence/` directory rather than the
+   repository root.
+
+**Technical decisions.** A string start means a checkpoint variable, because
+the only string start ever used (LK5) is one; the stored recommendation now
+also records `:archive`; the schema document's link keys and section 16 were
+updated to match.
 
 ## T0 — Wire the coordination scheme
 

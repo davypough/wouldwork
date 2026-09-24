@@ -61,7 +61,7 @@
 (defparameter *ledger-kind-keys*
   '((:premise :discharged-by)
     (:link :from :to :intent :closed-by :evidence :validated :attempts :refuted-by
-     :segment-bridge :search-goal :search-start :search-cutoff :search-threads
+     :segment-bridge :search-goal :search-start :search-archive :search-cutoff :search-threads
      :search-settings :search-preamble :search-final :chain-order :recommendation :measured)
     (:bound :for-link :measured :interpretation-committed :segment-bridge)
     (:question :candidates :default :answer-kind :template :blocks :answer :answer-premise
@@ -313,7 +313,7 @@
 
 (defun make-ledger-link (id statement provenance &key from to intent depends-on premise-gaps
                                                       segment sources search-goal search-start
-                                                      search-cutoff search-threads
+                                                      search-archive search-cutoff search-threads
                                                       search-settings search-preamble
                                                       search-final chain-order)
   "Section 6.2.  A link opens :OPEN with nothing closing it; M4's split between :REALIZED and
@@ -325,6 +325,7 @@
                                    :evidence nil :validated nil :attempts nil
                                    :refuted-by nil :segment-bridge nil
                                    :search-goal search-goal :search-start search-start
+                                   :search-archive search-archive
                                    :search-cutoff search-cutoff
                                    :search-threads search-threads
                                    :search-settings search-settings
@@ -926,7 +927,17 @@
 ;;;
 ;;; C3 HOLDS.  Every problem term -- the problem name, the start facts, the goal form --
 ;;; comes from the ledger as data.  The only names in this code are Wouldwork's own
-;;; interface: STAGE, WW-SET, SOLVE-SUBGOAL, WW-UNDO, *THREADS*, *DEPTH-CUTOFF*.
+;;; interface: STAGE, WW-SET, SOLVE-SUBGOAL, WW-UNDO, *THREADS*, *DEPTH-CUTOFF*, the
+;;; standalone checkpoint entry points IMPORT-SEARCH-CHECKPOINT, EXPORT-SEARCH-CHECKPOINT and
+;;; VALIDATE-SEARCH-CHECKPOINT, and the run-metadata globals in *LEDGER-RUN-METADATA-FORM*.
+;;;
+;;; THREE KINDS OF START (T14, 2026-09-24).  :CHAIN searches the active goal chain with the
+;;; one-argument SOLVE-SUBGOAL.  A LIST of facts is a stated start for the two-argument form.
+;;; A STRING names a variable holding a standalone search checkpoint; the link's optional
+;;; :SEARCH-ARCHIVE gives that checkpoint's saved archive, relative to the repository root.
+;;; Checkpoint recommendations omit the QUICKLOAD line, per the method's convention that D
+;;; already has Wouldwork loaded; the older two kinds keep it because their acceptance
+;;; cases pin it.
 ;;; ---------------------------------------------------------------------------
 
 (defun ledger-bound-cutoff (record)
@@ -967,6 +978,98 @@
     (format nil "~S" form)))
 
 
+(defparameter *ledger-run-metadata-form*
+  "(list :outcome *last-search-outcome* :cutoff *depth-cutoff* :threads *threads* :cutoff-truncated *depth-cutoff-truncated* :cutoff-hits *depth-cutoff-hits* :search-mode *tree-or-graph* :symmetry-pruning *symmetry-pruning* :min-steps-pruning *min-steps-pruning-enabled*)"
+  "The read-only run metadata a checkpoint search reports back before anything is filed.  T4
+   needs the truncation reading and the pruning in force to file an exhaustion at its real
+   strength, and asking for them in the printed block is what stops them being forgotten.")
+
+
+(defun ledger-archive-form-text (archive)
+  "ARCHIVE, a path relative to the repository root, as the MERGE-PATHNAMES form a user pastes.
+   Relative to the system source directory so the command does not depend on the REPL's
+   current directory."
+  (format nil "(merge-pathnames ~S (asdf:system-source-directory :wouldwork))" archive))
+
+
+(defun ledger-checkpoint-search-commands (ledger link cutoff threads)
+  "The command lines for a link that starts from a standalone search checkpoint.  A fresh
+   start stages, sets *THREADS* BEFORE the import because crossing the serial/parallel
+   boundary rebuilds the staging and invalidates in-memory checkpoints, and imports the
+   archive by replay.  A :CONTINUE link already holds the checkpoint in a live image, so it
+   starts at the cutoff.  The cutoff is always set: a search printed without it runs at
+   whatever cutoff the session last had.  The search line assigns the result back, because a
+   find returns a NEW checkpoint and an unassigned find is lost."
+  (let ((variable (getf link :search-start))
+        (lines nil))
+    (unless (eq (getf link :search-preamble) :continue)
+      (push (format nil "(stage ~(~A~))" (getf ledger :problem)) lines)
+      (push (format nil "(ww-set *threads* ~D)" threads) lines)
+      (push (format nil "(defparameter ~A (import-search-checkpoint ~A))"
+                    variable (ledger-archive-form-text (getf link :search-archive)))
+            lines))
+    (push (format nil "(ww-set *depth-cutoff* ~D)" cutoff) lines)
+    (dolist (setting (getf link :search-settings))
+      (push (format nil "(ww-set ~(~A~) ~A)" (car setting) (ledger-form-text (cdr setting)))
+            lines))
+    (push (format nil "(setf ~A (solve-subgoal ~A ~A))"
+                  variable variable (ledger-form-text (getf link :search-goal)))
+          lines)
+    (push *ledger-run-metadata-form* lines)
+    (nreverse lines)))
+
+
+(defun ledger-checkpoint-search-cautions (link)
+  "Cautions for a checkpoint start.  None of the goal-chain cautions apply: there is no chain
+   to discard, and the two-argument form is what a checkpoint search is."
+  (let ((variable (getf link :search-start)))
+    (append
+      (if (eq (getf link :search-preamble) :continue)
+        (list (format nil "this CONTINUES from the checkpoint already held in ~A; do not re-stage or re-import unless the image was restarted." variable)
+              (format nil "changing *threads* rebuilds the staging and invalidates ~A; re-import it after any thread change." variable))
+        (list "staging resets settings and state, so set the parameters after (stage ...)."
+              "set *threads* BEFORE the import: crossing the serial/parallel boundary rebuilds the staging and invalidates in-memory checkpoints."
+              "the import replays the archive's saved actions to rebuild its exact endpoint; it is not a search."))
+      (list "the goal is unquoted by design; a quoted goal installs (quote ...), read as trivially true."
+            "*depth-cutoff* 0 or negative means no cutoff at all, which is why it is set explicitly."
+            (format nil "an exhaustion returns ~A unchanged; a find returns a NEW checkpoint, which the SETF keeps." variable)
+            "no automatic deepening and no predecessor retry: a deeper run needs its own recommendation."
+            "report the metadata form's output with the outcome; T4 files an exhaustion at its measured strength."))))
+
+
+(defun ledger-checkpoint-export-path (link &optional ledger)
+  "Where a find from LINK is saved: beside the archive it started from, under a name carrying
+   the link and the recommendation date, so the starting archive is never overwritten.  A
+   :CONTINUE link may name no archive; its find then goes to the problem's
+   constraint-evidence/ directory when LEDGER is supplied, the method's per-problem home."
+  (let* ((archive (getf link :search-archive))
+         (slash (and archive (position #\/ archive :from-end t)))
+         (directory (cond (slash (subseq archive 0 (1+ slash)))
+                          (ledger (format nil "doc/problems/~A/constraint-evidence/"
+                                          (getf ledger :problem)))
+                          (t ""))))
+    (format nil "~A~(~A~)-checkpoint-~A.txt" directory (getf link :id)
+            (or (getf (getf link :recommendation) :date) "undated"))))
+
+
+(defun ledger-checkpoint-evidence-retrieval (link &optional ledger)
+  "What to do with a find from a checkpoint start.  D's standing preference is that
+   search-found phases are not replayed routinely: they are filed REALIZED with validated NIL,
+   and the one validation that counts is VALIDATE-SEARCH-CHECKPOINT on the final checkpoint."
+  (let ((variable (getf link :search-start)))
+    (append
+      (list (format nil "the find is the new checkpoint now held in ~A.  Save it to a NEW archive, keeping the one it started from:" variable)
+            (format nil "  (export-search-checkpoint ~A ~A)"
+                    variable (ledger-archive-form-text (ledger-checkpoint-export-path link ledger)))
+            "file it REALIZED with validated NIL; search-found phases are not replayed routinely.")
+      (if (getf link :search-final)
+        (list "this is the FINAL milestone: the plan is accepted only when"
+              (format nil "  (validate-search-checkpoint ~A)" variable)
+              "returns SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P all T.")
+        (list "*solution-paths* holds only this segment; it is not the composed plan."
+              "the composed plan is validated once, by VALIDATE-SEARCH-CHECKPOINT after the final milestone.")))))
+
+
 (defun ledger-search-commands (ledger link cutoff threads)
   "The command lines of a recommendation, in the order they must be entered.  Settings come
    after STAGE because staging resets problem settings and state, and *THREADS* comes before
@@ -975,6 +1078,9 @@
    printing the preamble would tell the reader to stage, which discards the very chain the
    milestone is continuing.  The first real use of this component printed that preamble for
    every chained milestone, which is the bug this branch fixes."
+  (when (stringp (getf link :search-start))
+    (return-from ledger-search-commands
+      (ledger-checkpoint-search-commands ledger link cutoff threads)))
   (let ((start (getf link :search-start))
         (goal (getf link :search-goal))
         (lines nil))
@@ -986,12 +1092,10 @@
       (dolist (setting (getf link :search-settings))
         (push (format nil "(ww-set ~(~A~) ~A)" (car setting) (ledger-form-text (cdr setting)))
               lines)))
-    (push (cond ((eq start :chain)
-                 (format nil "(solve-subgoal ~A)" (ledger-form-text goal)))
-                ((stringp start)
-                 (format nil "(solve-subgoal ~A ~A)" start (ledger-form-text goal)))
-                (t (format nil "(solve-subgoal ~A ~A)"
-                           (ledger-form-text start) (ledger-form-text goal))))
+    (push (if (eq start :chain)
+            (format nil "(solve-subgoal ~A)" (ledger-form-text goal))
+            (format nil "(solve-subgoal ~A ~A)"
+                    (ledger-form-text start) (ledger-form-text goal)))
           lines)
     (nreverse lines)))
 
@@ -999,6 +1103,8 @@
 (defun ledger-search-cautions (link)
   "The cautions that belong beside the commands, selected by what this recommendation does.
    They are templates, not prose authored per link, so none of them can drift."
+  (when (stringp (getf link :search-start))
+    (return-from ledger-search-cautions (ledger-checkpoint-search-cautions link)))
   (let ((cautions
           (list "staging resets settings and state, so set the parameters after (stage ...)."
                 "crossing the serial/parallel boundary with (ww-set *threads* ...) rebuilds the system."
@@ -1020,13 +1126,16 @@
     cautions))
 
 
-(defun ledger-evidence-retrieval (link)
+(defun ledger-evidence-retrieval (link &optional ledger)
   "Where a find leaves its action sequence, which is not the same place in all three cases and
    cost this method a failed command the first time it mattered.  A MID-CHAIN milestone sets
    *SOLUTION-PATHS* to NIL deliberately -- there is no solution until the chain finishes -- and
    its own path lives in the session's phase record.  Only the FINAL milestone publishes a
-   cumulative path, and the engine restores *START-STATE* to the chain's origin when it does."
-  (cond ((and (eq (getf link :search-start) :chain) (not (getf link :search-final)))
+   cumulative path, and the engine restores *START-STATE* to the chain's origin when it does.
+   A checkpoint start has its own advice, in LEDGER-CHECKPOINT-EVIDENCE-RETRIEVAL."
+  (cond ((stringp (getf link :search-start))
+         (ledger-checkpoint-evidence-retrieval link ledger))
+        ((and (eq (getf link :search-start) :chain) (not (getf link :search-final)))
          (list "this is a MID-CHAIN milestone, so *solution-paths* is NIL by design."
                "  (defparameter *phase* (car (last (goal-chain-session-phases *goal-chain-session*))))"
                "  (defparameter *path* (solution.path (goal-chain-phase-solution *phase*)))"
@@ -1062,12 +1171,21 @@
 
 (defun ledger-exhaustion-reading (id cutoff)
   "What an exhaustion would establish, written before the run.  This is the sentence the whole
-   schema exists to make unrevisable after the fact."
+   schema exists to make unrevisable after the fact.
+   T14, 2026-09-24: it says what the search FOUND, not what EXISTS.  Parallel truncation
+   instrumentation, pruning and the NIL/UNKNOWN distinction (schema section 16) mean a
+   search that finds nothing within the cutoff has not shown that nothing exists there.
+   Readings committed before this change stay on their records as written."
   (format nil "an exhaustion is a GRADE-3 COST BOUND relative to the stated start state at ~
-               cutoff ~D.  It establishes that no realization of ~(~A~) exists within ~D ~
-               actions from that state, and nothing further: not that none exists deeper, not ~
-               that ~(~A~) is impossible, and not a refutation of any premise.  It is filed ~
-               as a :BOUND record, which cannot close or refute a link."
+               cutoff ~D.  It records that the search found no realization of ~(~A~) within ~
+               ~D actions from that state under the settings and pruning in force, and ~
+               nothing further: not a claim about what lies within that depth outside the ~
+               covered space, nor about greater depths, nor a verdict on ~(~A~), nor a ~
+               refutation of any premise.  Its coverage is read from the measured truncation: ~
+               T means the cutoff cut off nodes with successors; NIL means none was observed, ~
+               which does not certify unpruned exhaustive coverage; UNKNOWN means coverage was ~
+               not measured.  It is filed as a :BOUND record, which is barred from closing or ~
+               refuting a link."
           cutoff id cutoff id))
 
 
@@ -1078,7 +1196,10 @@
   (and (getf link :search-goal)
        (getf link :search-start)
        (integerp (getf link :search-cutoff))
-       (> (getf link :search-cutoff) 0)))
+       (> (getf link :search-cutoff) 0)
+       (or (not (stringp (getf link :search-start)))
+           (eq (getf link :search-preamble) :continue)
+           (getf link :search-archive))))
 
 
 (defun recommend-ledger-search (ledger id &key cutoff threads deepen (date (ledger-today)))
@@ -1110,6 +1231,7 @@
                             :cutoff cutoff
                             :threads threads
                             :start (getf link :search-start)
+                            :archive (getf link :search-archive)
                             :premises (ledger-closure ledger id)
                             :guesses (ledger-live-guesses ledger id)
                             :standing (ledger-standing ledger id)
@@ -1138,8 +1260,13 @@
            (unless (getf link :search-goal)
              (format t "        :SEARCH-GOAL, the unquoted goal form for this link.~%"))
            (unless (getf link :search-start)
-             (format t "        :SEARCH-START, either :CHAIN or the start facts to search ~
-                        from.~%"))
+             (format t "        :SEARCH-START, either :CHAIN, the start facts to search ~
+                        from, or the name of a checkpoint variable.~%"))
+           (when (and (stringp (getf link :search-start))
+                      (not (eq (getf link :search-preamble) :continue))
+                      (not (getf link :search-archive)))
+             (format t "        :SEARCH-ARCHIVE, the saved checkpoint archive to import, ~
+                        relative to the repository root.~%"))
            (unless (and (integerp (getf link :search-cutoff))
                         (> (getf link :search-cutoff) 0))
              (format t "        :SEARCH-CUTOFF, a positive depth.~%")))
@@ -1155,14 +1282,20 @@
            (format t "        success:    ~A~%" (getf recommendation :success))
            (format t "        exhaustion: ~A~%" (getf recommendation :exhaustion))
            (format t "      on a find, the action sequence is here:~%")
-           (dolist (line (ledger-evidence-retrieval link))
+           (dolist (line (ledger-evidence-retrieval link ledger))
              (format t "        ~A~%" line))
            (when (getf recommendation :deepens)
-             (format t "      DEEPENING: ~(~A~) measured this link to cutoff ~D; this run ~
-                        raises it to ~D.~%"
-                     (first (getf recommendation :deepens))
-                     (second (getf recommendation :deepens))
-                     (getf recommendation :cutoff))
+             ;; RECOMMEND-LEDGER-SEARCH stores (bound cutoff); a hand-transcribed
+             ;; recommendation may store the bound id alone, and its cutoff is then read
+             ;; from that bound.
+             (let* ((deepens (getf recommendation :deepens))
+                    (previous (if (consp deepens) (first deepens) deepens))
+                    (measured (if (consp deepens)
+                                (second deepens)
+                                (ledger-bound-cutoff (ledger-record ledger deepens)))))
+               (format t "      DEEPENING: ~(~A~) measured this link to cutoff ~D; this run ~
+                          raises it to ~D.~%"
+                       previous measured (getf recommendation :cutoff)))
              (format t "        The earlier bound is not superseded until a new bound is filed ~
                         against the same start state.~%"))))))
 
@@ -1206,6 +1339,15 @@
                    (getf link :status))))
     (format t "~%  ~D of ~D milestones are already settled; the rest are the work.~%"
             settled (length links))
+    (let ((checkpoint-links (remove-if-not (lambda (record)
+                                             (and (eq (getf record :kind) :link)
+                                                  (stringp (getf record :search-start))))
+                                           (getf ledger :records))))
+      (when checkpoint-links
+        (format t "  CHECKPOINT STARTS: ~{~(~A~)~^, ~} start from saved checkpoints.  Restore ~
+                   them by~%  importing their archives as their own recommendations print; ~
+                   re-running this chain~%  is not a restart mechanism for them.~%"
+                (mapcar (lambda (record) (getf record :id)) checkpoint-links))))
     (format t "  A milestone whose cutoff was raised must be re-run at the raised cutoff, which~%")
     (format t "  its own recommendation states; this block prints the chain's opening cutoff.~%")))
 

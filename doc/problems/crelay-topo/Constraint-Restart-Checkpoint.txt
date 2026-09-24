@@ -1,8 +1,9 @@
 T10 restart checkpoint -- refreshed 2026-09-24
 ============================================
 CURRENT HANDOFF -- 2026-09-24, authoritative over every block below
-No task is approved to start. T0-T9 and T11-T13 are complete; T13 closed on
-2026-09-22 when D chose full T6 implementation. T10 is IN PROGRESS but paused:
+No task is approved to start. T0-T9 and T11-T14 are complete; T13 closed on
+2026-09-22 when D chose full T6 implementation, and T14 (2026-09-24) brought the
+ledger's generic recommendations up to date with checkpoint starts. T10 is IN PROGRESS but paused:
 no run is pending or approved, and the B2 construction branch is closed until
 D names a new, separately justified elevation resource. The candidates for D's
 next choice are listed in the implementation plan's Current Task. A
@@ -307,9 +308,9 @@ Do not re-ingest against an already updated ledger: events append. The source
 and keeper candidate phases are documented separately, not in this spine ledger.
 
 OTHER OPEN ITEMS
-Generic ledger command/reporter inconsistencies are recorded in method evidence
-(t10-consistency-review-2026-09-21.txt) and await a separate implementation step.
-Use explicit recommendations when a future search is approved. The old gate8
+Generic ledger command/reporter inconsistencies recorded in
+t10-consistency-review-2026-09-21.txt were resolved by T14 on 2026-09-24; the
+reporter's checkpoint recommendations may be used when a future search is approved. The old gate8
 opening-cost inference was withdrawn; its split proposal is not an instruction.
 The lk4 schema-gap candidate awaits D's hand filing. T11 is complete: G14's
 reporting/provenance fix passed its clean checks and first staged score without

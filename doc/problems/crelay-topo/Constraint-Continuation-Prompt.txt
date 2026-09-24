@@ -8,16 +8,20 @@ Method authority: doc/constraint-method/Constraint-Implementation-Plan.md.
 CURRENT TASK -- NONE APPROVED; D TO CHOOSE THE NEXT STEP
 ------------------------------------------------------------
 CURRENT HANDOFF -- 2026-09-24, authoritative over all historical instructions below
-No task is approved to start. T0-T9 and T11-T13 are COMPLETE: T13 closed on
-2026-09-22 when D chose full T6 implementation, and T6-T9 followed. T10 is
+No task is approved to start. T0-T9 and T11-T14 are COMPLETE: T13 closed on
+2026-09-22 when D chose full T6 implementation, and T6-T9 followed. T14
+(2026-09-24) brought the ledger's generic recommendations up to date with the
+standalone checkpoint workflow; D's runs passed 346 + 54 assertions. Future
+recommendations may be printed by REPORT-LEDGER-RECOMMENDATION instead of being
+hand-written, after setting the link's :search-start and :search-archive. T10 is
 IN PROGRESS but paused; no run is pending or approved. Its B2 construction
 branch stays closed until D names a new, separately justified elevation
 resource and approves its read-only check. B3/B4 are not approved.
 
 The candidates for D's choice are listed in the implementation plan's Current
-Task: correct the generic ledger reporter; file the lk4 schema-gap
-candidate; resume T10 with a new resource or baseline; or open the first
-uncontaminated problem. None has a task id or approval yet. The 2026-09-24
+Task: file the lk4 schema-gap candidate; resume T10 with a new resource or
+baseline; open the first uncontaminated problem; or re-derive AM4/AM8 in the
+abstract model. None has a task id or approval yet. The 2026-09-24
 documentation pass and profile regeneration are complete; re-deriving AM4/AM8
 in the abstract model from S5/S6 output remains an open hand-analysis item.
 
@@ -354,9 +358,9 @@ for the original final goal and validate-search-checkpoint on the chosen complet
 checkpoint, with SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P all T and exact
 endpoint equality. Ordinary solve or a latest segment alone does not establish it.
 
-Generic ledger command/report wording findings await a separate implementation
-step; see doc/constraint-method/evidence/t10-consistency-review-2026-09-21.txt.
-Use explicit checkpoint recommendations for future approved runs. The old gate8
+Generic ledger command/report wording findings were resolved by T14 on
+2026-09-24 (doc/constraint-method/evidence/ledger-reporter-checks-2026-09-24.lisp);
+the reporter's checkpoint recommendations may now be used for future approved runs. The old gate8
 opening-cost inference was withdrawn; its split is not a prerequisite. The lk4
 schema-gap candidate awaits D's hand filing. T11 is COMPLETE (register 7.29).
 

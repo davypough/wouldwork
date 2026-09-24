@@ -465,8 +465,11 @@
     (check (eql 0 (getf recommendation :threads)))
     (check (equal '(ww::pr3) (getf recommendation :guesses)))
     (check (search "GRADE-3 COST BOUND" (getf recommendation :exhaustion)))
-    (check (search "not that lk4 is impossible" (getf recommendation :exhaustion)))
-    (check (search "cannot close or refute a link" (getf recommendation :exhaustion)))
+    ;; T14, 2026-09-24: the two assertions below replaced ones pinning the pre-T14 wording,
+    ;; "not that lk4 is impossible" and "cannot close or refute a link".  The reading now
+    ;; says what was FOUND and avoids the bound lint words; the intent is unchanged.
+    (check (search "nor a verdict on lk4" (getf recommendation :exhaustion)))
+    (check (search "barred from closing or refuting a link" (getf recommendation :exhaustion)))
     (check (search "VALIDATE-ACTION-SEQUENCE" (getf recommendation :success)))
     (check (search "pr3" (getf recommendation :success)))
     (check (ww::check-ledger-well-formed ledger))))
