@@ -1,0 +1,142 @@
+T19 -- MC mechanic coverage -- evidence
+Opened 2026-09-25.  Specification: doc/constraint-method/Extractor-Specifications.md section 8.
+Acceptance: plan, T19 entry (A1-A8).
+
+======================================================================
+PART 1 -- EXPECTED READINGS (A2), written before the first run
+======================================================================
+
+Source of the expectation: probs/problem-crelay-topo.lisp, read by hand.
+  includes (lines 43-58): gate plate elevation tray box switch floor-blower ladder
+    step jump beam-relay walkability visibility reachability topo-lower-bound recorder
+  nested public technologies: switch nests reachability (already included);
+    no other included public technology nests a public one (tech/ include lines).
+  floor-blower (blower1); ladder (ladder1 ladder2 ladder3)
+  (has-position blower1 location4)          line 88
+  (aimed-at blower1 location20)             line 90
+  (controls ((switch1)) blower1 normal)     line 136
+  (has-position ladder1 location3)          line 84
+  (has-position ladder2 location8)          line 85
+  (has-position ladder3 location11)         line 86
+  (traverse-via jumping location20 ((gate2)) location6)    line 181
+  (traverse-via jumping location20 () location5)           line 182
+  (traverse-via> climbing location3 ((ladder1)) location1) line 183
+  (traverse-via> climbing location8 ((ladder2)) location5) line 184
+  (traverse-via> climbing location11 ((ladder3)) location10) line 185
+
+Expected verdict block (exact):
+
+  public technologies spliced (16): 13 covered, 3 UNCOVERED
+    beam-relay        COVERED    extractors S6 RC
+    box               COVERED    extractors S2 S5
+    elevation         COVERED    infrastructure -- authors levels; read by S5
+    floor-blower      COVERED    contract (also S1)
+    gate              COVERED    extractors S1 S3 S4
+    jump              UNCOVERED
+    ladder            COVERED    contract (also S3)
+    plate             COVERED    extractors S1 S2 T6
+    reachability      COVERED    infrastructure -- reach relations; read by S4
+    recorder          UNCOVERED
+    step              UNCOVERED
+    switch            COVERED    extractors S1 S4
+    topo-lower-bound  COVERED    infrastructure -- search pruning bound
+    tray              COVERED    extractors S2 S5
+    visibility        COVERED    infrastructure -- line of sight; read by S6
+    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+
+  UNCOVERED (3): jump recorder step
+
+Expected floor-blower rows (exact, except the walking line):
+
+    blower1
+      source       location4
+      destination  location20
+      control      ((switch1)) normal
+      exits from location20 (2 + w), by mode; each mode's own predicate is not evaluated
+        jumping (2): location5, location6 ((gate2))
+        walking (w): <derived>
+
+  The walking arcs are derived from segment geometry at staging (S3 reads 190
+  walking arcs, a transitive closure of minimal door-sets per location pair), so
+  they are not hand-derivable.  Check: the walking line lists exactly the
+  walking-mode arcs of TRAVERSAL-ARC-FACTS with location20 at either end; w may
+  be 0, in which case the line is absent.
+
+Expected ladder rows (exact):
+
+    ladder1  at location3
+      climbing  location3 --> location1  family ((ladder1))  ladder at source: yes
+    ladder2  at location8
+      climbing  location8 --> location5  family ((ladder2))  ladder at source: yes
+    ladder3  at location11
+      climbing  location11 --> location10  family ((ladder3))  ladder at source: yes
+
+  Assumes no other arc's family names a ladder; S3's mode count (climbing 3,
+  jumping 4) and the authored arcs above support that.
+
+Baseline for A7: doc/problems/crelay-topo/Constraint-Static-Profile.txt before T19,
+  SHA-256 294dc749ce2c43353c9b8afd37708d58650dc9db6e5d9dd1a15f36dfc8b56417
+
+======================================================================
+PART 2 -- RESULTS (A3-A7), appended after D's run
+======================================================================
+
+Pre-run check (A, 2026-09-25, not the acceptance run).  The whole of
+tech/constraint-profile.lisp READs cleanly (233 forms) under SBCL 2.2.9 in the cloud
+workspace.  The MC block compiled there without warnings against mocks of
+LIST-STATIC-DB, TRAVERSAL-ARC-FACTS, CONTROL-FACTS, CENSUS-TYPE-INSTANCES and
+*SPLICED-TECH-NAMES* built from the part 1 facts, plus one mock walking arc
+(location1 -- location20, family ((gate1))) to exercise the reversed-symmetric branch.
+t19-mechanic-coverage-checks-2026-09-25.lisp then passed 20 of 20 checks on the mocks.
+This validates the format strings and the check file, not the staged data.  The
+acceptance run is D's on lumpy.
+
+Files changed by T19 so far:
+  tech/constraint-profile.lisp  MC block before the entry points; REPORT-MECHANIC-COVERAGE
+    first in REPORT-STATIC-CONSTRAINT-PROFILE; header paths fixed (lines 4, 47) and
+    the stale STATUS sentence updated (line 54)
+  doc/constraint-method/Extractor-Specifications.md  section 8 and index row
+  doc/constraint-method/Constraint-Implementation-Plan.md  T19 entry, board, Current Task
+  doc/constraint-method/evidence/t19-mechanic-coverage-checks-2026-09-25.lisp  (new)
+
+----------------------------------------------------------------------
+Acceptance run (D, lumpy, 2026-09-25)
+----------------------------------------------------------------------
+
+t19-mechanic-coverage-checks-2026-09-25.lisp on staged crelay-topo: 20 checks passed.
+  A4  the 16 expected public technologies; one verdict row each; UNCOVERED jump recorder step
+  A3  blower1 rows and ladder1-3 rows present exactly as in part 1.  The walking exits
+      at location20 are 19, equal to the independent count from TRAVERSAL-ARC-FACTS:
+        walking (19): location1 ((gate1)), location10 ((gate3)), location11 ((gate3 gate5)),
+        location12 ((gate3 gate5)), location13 ((gate3 gate5)), location14 ((gate3 gate5
+        gate6 screen1)), location15 ((gate3 gate5 gate7)), location16 ((gate3 gate5 gate7
+        gate8)), location17 ((gate3 gate5 gate7 gate8)), location18 ((gate3 gate5 gate7
+        gate8)), location19 ((gate3 gate5 gate7 gate8 gate9)), location2 ((gate1)),
+        location21 ((gate3 gate5 gate7 gate8)), location3, location4, location5, location7,
+        location8 ((gate3)), location9 ((gate3))
+      so the exit header reads (21) = 2 jumping + 19 walking.
+  A5  negative test: floor-blower UNCOVERED, UNCOVERED list gains it, no contract printed
+  A6  C3: none of 72 problem object names in the MC block
+
+Reading note (A).  The walking exits are the transitive closure S3 reads (one minimal
+door-set per location pair), and walking's elevation predicate is not evaluated;
+location20 is at 3/2, so none is a legal walk from the hover point.  The two jumping
+exits are the useful ones, which is what the row's caveat says.  Evaluating mode
+predicates from a state belongs to T22 ("from here" report), not to MC.
+
+A7  D regenerated doc/problems/crelay-topo/Constraint-Static-Profile.txt:
+      new SHA-256  c0b42d66a3bf9487c5f382665d8221fb797311422bfc5601e2c6cf10d6b9a92e
+      with the MC block (from "MC  MECHANIC COVERAGE" up to "S0  TYPE EXTENT CENSUS")
+      removed, the file hashes to 294dc749ce2c43353c9b8afd37708d58650dc9db6e5d9dd1a15f36dfc8b56417,
+      the pre-T19 baseline in part 1.  Every existing section is byte-identical; MC is
+      the only change (48 lines).
+    (The git HEAD copy of the profile, 83772f5d..., is older than that baseline and was
+    not used.)
+
+File hashes at close:
+  tech/constraint-profile.lisp                                   c4df3b3f51e12cf29941120c9f737142e6b26890ed748e2eb504198e793dde3a
+  doc/constraint-method/evidence/t19-mechanic-coverage-checks-2026-09-25.lisp
+                                                                 8befac63925b3d3920d109f06c1d9289fa292d980079f78213dedc969e75fb52
+
+A6 load clause: D reports the hand LOAD of tech/constraint-profile.lisp was clean,
+no warnings (2026-09-25).  T19 COMPLETE.

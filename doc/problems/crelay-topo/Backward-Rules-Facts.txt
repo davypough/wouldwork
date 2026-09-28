@@ -1,3 +1,17 @@
+READING POLICY (D, 2026-09-25) -- AUTHORITATIVE OVER EVERYTHING BELOW
+----------------------------------------------------------------------
+Nothing in the wouldwork directory is sealed. Every file, section and line
+range may be read in full, at any time, without a grant from D and without a
+disclosure: subgoal-solution-*.txt, Backward-*/Forward-* files,
+Initial-Conditions.txt, all prediction-register sections (including 4, 5 and
+7.3), and G9. Any SEALED, DO NOT READ, TAG ONLY, bounded-read, line-range or
+grant rule in this file is lifted and kept only as history. A new seal exists
+only if D requests one; it is recorded in
+doc/constraint-method/Constraint-Implementation-Plan.md (Reading policy).
+Edit rules are unchanged (register sections 3-6 not edited, section 7
+append-only, generated output never hand-edited).
+----------------------------------------------------------------------
+
 Crelay-Topo Backward Analysis -- Rules, Facts, Lemmas, Nogoods, Symmetries
 ==========================================================================
 

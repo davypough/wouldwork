@@ -1,0 +1,373 @@
+T24 -- CP cycle-plan check -- evidence
+======================================
+
+Specification: doc/constraint-method/Extractor-Specifications.md section 13.
+Acceptance: plan, T24 entry (approved by D, 2026-09-26, scope (a)).
+
+PART 1 -- A2 EXPECTED READINGS, WRITTEN BEFORE ANY CODE
+-------------------------------------------------------
+
+1.1  Sources
+
+- D's design record: doc/problems/crelay-topo/constraint-evidence/
+  b2-ghost-tray-loc5-check-2026-09-24.txt (cycles 1-3, final leg).
+- The validated action list: constraint-evidence/validate-c3-alt-2026-09-25.lisp
+  (80 actions, cycles 1-3) and the 7-action final leg recorded in the design
+  record (actions 81-87); together the 87-action path that passed
+  VALIDATE-SEARCH-CHECKPOINT.
+- The current profile: doc/problems/crelay-topo/Constraint-Static-Profile.txt
+  (S1 control table and exclusion pairs, S2 ON pool and layers, CC G15 row,
+  NH H3.1 for RC's common gate and least off-plate count).
+
+1.2  Encoding rules (A's technical choices)
+
+- One segment per interval in which a set of devices must be active at the
+  same time: a gated walk, a lift, a crossing, or the lit state.  Intervals
+  that need no device (moves inside a region, pickups, placements) are not
+  segments.
+- Recording segments are the ghost's own gated moves; they read the
+  recording view, where only ghost bodies hold plates.
+- :held pins only the plates a required device needs, with every body the
+  replay shows on that plate.  Bodies on plates no required device needs are
+  not listed.
+- :available-witnesses is () throughout: D's plan pins every required plate,
+  so no plate is left to the matching.
+- :off-plate lists the bodies the segment uses off plates (crosser, carrier,
+  held cargo, relays); it is read only by B3.
+- Every segment inside a cycle has :cycle :open and :ghosts :present; the
+  plan has no segment outside a cycle (every stage is a recorder cycle, and
+  the final leg runs while cycle 3 is still open).
+
+1.3  Plan data
+
+(:name "crelay-topo D plan (87-action path)"
+ :provenance "D's recorder-cycle design pr18-pr22; validate-c3-alt-2026-09-25 + final leg"
+ :stages
+ ((:id "c1" :intent "setup: connector1 onto plate1"
+   :segments
+   ((:id "c1.fetch" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 4-8: agent1 through gate1 and gate3 to location9 and back"
+     :available-witnesses ()
+     :require (gate1 gate3)
+     :held ((agent1* plate1) (tray1 plate2) (tray1* plate2))
+     :off-plate (agent1 connector1))))
+  (:id "c2" :intent "ghost-held tray1* at location5 as a landing; box1 out of the alcove to plate2"
+   :segments
+   ((:id "c2.ghost-in" :view :recording :cycle :open :ghosts :present
+     :provenance "action 13: agent1* through gate1 to location7"
+     :available-witnesses ()
+     :require (gate1)
+     :held ((connector1* plate1))
+     :off-plate (agent1*))
+    (:id "c2.live-in" :view :physical :cycle :open :ghosts :present
+     :provenance "action 16: agent1 through gate1 to location4"
+     :available-witnesses ()
+     :require (gate1)
+     :held ((connector1 plate1) (connector1* plate1))
+     :off-plate (agent1))
+    (:id "c2.lift" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 17-19: blower1 lifts agent1 to location20; jump onto tray1*"
+     :available-witnesses ()
+     :require (blower1)
+     :off-plate (agent1 agent1* tray1*))
+    (:id "c2.alcove" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 20-23: switch1 off, through gate2 to location6 and back with box1"
+     :available-witnesses ()
+     :require (gate2)
+     :off-plate (agent1 agent1* tray1* box1)
+     :landing tray1*)
+    (:id "c2.home" :view :physical :cycle :open :ghosts :present
+     :provenance "action 30: agent1 through gate1 to location1"
+     :available-witnesses ()
+     :require (gate1)
+     :held ((connector1 plate1) (connector1* plate1))
+     :off-plate (agent1))))
+  (:id "c3" :intent "build the lit stack and carry it to location15"
+   :segments
+   ((:id "c3.ghost-in" :view :recording :cycle :open :ghosts :present
+     :provenance "action 33: agent1* through gate1 to location7"
+     :available-witnesses ()
+     :require (gate1)
+     :held ((connector1* plate1))
+     :off-plate (agent1*))
+    (:id "c3.live-in" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 36-38: connector1 off plate1, agent1 through gate1 to location7"
+     :available-witnesses ()
+     :require (gate1)
+     :held ((connector1* plate1))
+     :off-plate (agent1 connector1))
+    (:id "c3.lift1" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 42-44: blower1 lifts agent1 to location20; box1 onto tray1*"
+     :available-witnesses ()
+     :require (blower1)
+     :off-plate (agent1 agent1* tray1* box1))
+    (:id "c3.lift2" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 49-51: blower1 lifts agent1 to location20; connector1 onto box1, paired"
+     :available-witnesses ()
+     :require (blower1)
+     :off-plate (agent1 agent1* tray1* box1 connector1))
+    (:id "c3.live-gate5" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 54-56: agent1 carries tray1 through gate3 and gate5 onto plate4"
+     :available-witnesses ()
+     :require (gate3 gate5)
+     :held ((box1* plate2))
+     :off-plate (agent1 tray1))
+    (:id "c3.ghost-gate5" :view :recording :cycle :open :ghosts :present
+     :provenance "actions 57-58: agent1* carries the stack through gate3 and gate5 onto plate5"
+     :available-witnesses ()
+     :require (gate3 gate5)
+     :held ((box1* plate2))
+     :off-plate (agent1* tray1* box1 connector1))
+    (:id "c3.switch2" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 59-61: agent1 through gate6 to location14, switch2 on, back"
+     :available-witnesses ()
+     :require (gate6)
+     :held ((tray1 plate4) (agent1* plate5))
+     :off-plate (agent1))
+    (:id "c3.ghost-home" :view :recording :cycle :open :ghosts :present
+     :provenance "action 68: agent1* through gate1, gate3 and gate5 to location2"
+     :available-witnesses ()
+     :require (gate1 gate3 gate5)
+     :held ((connector1* plate1) (box1* plate2))
+     :off-plate (agent1* tray1*))
+    (:id "c3.ghost-relay" :view :recording :cycle :open :ghosts :present
+     :provenance "action 75: agent1* carries connector1* through gate1 and gate3 to location9"
+     :available-witnesses ()
+     :require (gate1 gate3)
+     :held ((tray1* plate1) (box1* plate2))
+     :off-plate (agent1* connector1*))
+    (:id "c3.lit" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 76-80: agent1* on plate3; agent1 carries the stack through gate7; receiver1 active"
+     :available-witnesses ()
+     :require (gate7 gate8)
+     :held ((agent1* plate3))
+     :off-plate (agent1 tray1 box1 connector1 connector1*))))
+  (:id "f" :intent "final leg to location19"
+   :segments
+   ((:id "f.gate8" :view :physical :cycle :open :ghosts :present
+     :provenance "action 81: agent1 through gate8 to location18"
+     :available-witnesses ()
+     :require (gate8)
+     :held ((agent1* plate3))
+     :off-plate (agent1 tray1 box1 connector1 connector1*))
+    (:id "f.gate9" :view :physical :cycle :open :ghosts :present
+     :provenance "actions 82-87: tray1, connector1, box1 on plate8, plate6, plate7; through gate9"
+     :available-witnesses ()
+     :require (gate9)
+     :held ((connector1 plate6) (box1 plate7) (tray1 plate8))
+     :off-plate (agent1))))))
+
+1.4  Segment breakdown confirmed by D (2026-09-26)
+
+D confirmed the breakdown and added: during playback the ghost ignores the
+environment, since its path is a recorded script.  So each ghost move is
+checked only in the recording view, as the recording segments do; the live
+switch2 toggle before c3.ghost-home cannot block it.  The first draft's
+c3.stack (actions 40-53) was split into c3.lift1 and c3.lift2, because
+blower1 is off between the two lifts (switch1 off, drop to location4);
+neither lift is followed by a gate2 crossing, so neither gives a B4 row.
+The first draft's cycle-3 action numbers were off by one or two and were
+corrected before this section was written.
+
+1.5  Expected CP output
+
+Line formats fixed here, as the specification (13.6) leaves them open:
+- B1 prints one row per required plate, in plate name order, naming the
+  device that demands it, then its holders in name order; a segment with
+  no required plate prints one row "no plate required" (A4 counts only
+  rows naming a plate).
+- B2 prints one row; B3 and B4 print only when their condition arises.
+- The RO caveat is printed once, in the READING line.
+
+Hand derivation, per segment: required plates from S1's control table
+(gate1 == plate1, gate3 == plate2, gate6 == (and plate4 plate5),
+gate9 == (and plate6 plate7 plate8); blower1, gate2, gate5, gate7 switch
+literals only; gate8 == receiver1, device-mediated).  B3: NH H3.1 gives
+RC's common set for receiver1 as gate4 (plate3), least off-plate bodies 2.
+B2: switch1 is demanded on in c2.lift, c3.lift1, c3.lift2 and off in
+c2.alcove, never both in one segment; switch2 off in c3.live-gate5,
+c3.ghost-gate5, c3.ghost-home, on in c3.lit, never both.  B4: CC's one G15
+row (switch1: lift blower1, barrier gate2) pairs c2.lift -> c2.alcove only.
+B0: every body is in S2's ON pool; every held body in a recording segment
+is a ghost; no body is in two of held, off-plate and available.
+
+CP  CYCLE-PLAN CHECK  [grade per row]
+--------------------------------------------------------------
+  READING: checks a stated stage plan against plate, body and view budgets.  PASS says no budget forbids the segment; it is not a plan witness.  CONFLICT rejects the stated budget, not the stage's idea.  Per-plate eligibility beyond the view (reach, elevation, history) is not evaluated.
+
+  plan crelay-topo D plan (87-action path)
+    provenance D's recorder-cycle design pr18-pr22; validate-c3-alt-2026-09-25 + final leg
+    stages 4
+  segments (18): 18 PASS, 0 CONDITIONAL, 0 CONFLICT
+
+  stage c1  PASS  setup: connector1 onto plate1
+    segment c1.fetch  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by agent1*
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate3: held by tray1, tray1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+
+  stage c2  PASS  ghost-held tray1* at location5 as a landing; box1 out of the alcove to plate2
+    segment c2.ghost-in  view recording  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c2.live-in  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1, connector1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c2.lift  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  no plate required
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c2.alcove  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  no plate required
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B4  PASS  [grade 1; CC]  after c2.lift: switch1 stops blower1 (lift to location20) and opens gate2 (G15 FLAG); landing tray1* is a support
+        note  where the landing stands is not evaluated
+    segment c2.home  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1, connector1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+
+  stage c3  PASS  build the lit stack and carry it to location15
+    segment c3.ghost-in  view recording  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.live-in  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.lift1  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  no plate required
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.lift2  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  no plate required
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.live-gate5  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate3: held by box1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.ghost-gate5  view recording  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate3: held by box1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.switch2  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate4 for gate6: held by tray1
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate5 for gate6: held by agent1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.ghost-home  view recording  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by connector1*
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate3: held by box1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.ghost-relay  view recording  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate1: held by tray1*
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate3: held by box1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+    segment c3.lit  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate3 for gate4 (beam, gate8): held by agent1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B3  PASS  [grade 2; S1 RC]  gate8 needs receiver1: RC's usable chains all need gate4 (plate3); off-plate bodies 5, least 2
+        note  chains are not matched to bodies; a stacked riser is not in RC's stations
+
+  stage f  PASS  final leg to location19
+    segment f.gate8  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate3 for gate4 (beam, gate8): held by agent1*
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B3  PASS  [grade 2; S1 RC]  gate8 needs receiver1: RC's usable chains all need gate4 (plate3); off-plate bodies 5, least 2
+        note  chains are not matched to bodies; a stacked riser is not in RC's stations
+    segment f.gate9  view physical  cycle open  ghosts present  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate6 for gate9: held by connector1
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate7 for gate9: held by box1
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate8 for gate9: held by tray1
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+
+  plan PASS
+
+1.6  Expected negative-test readings (A5), on plan copies
+
+- N1 c3.lit with agent1* moved from :held to :off-plate: B1 row
+  "plate3 for gate4 (beam, gate8): matched" CONFLICT, shortage: plate3
+  and no free witness; segment, stage c3 and plan CONFLICT.
+- N2 a segment requiring (gate5 gate7): B2 CONFLICT, switch2 demanded on
+  (gate7) and off (gate5), S1 EXCLUSION {gate5, gate7}.
+- N3 c2.alcove without :landing: B4 CONDITIONAL with checklist 2.2's
+  question; segment, stage c2 and plan CONDITIONAL.
+- N4 f.gate9 with :held removed and :available-witnesses (connector1 box1):
+  three B1 rows "matched", CONFLICT, shortage: RO's violator is plate6,
+  plate7, plate8 against 2 witnesses.
+- A4 non-interference: RO's 2026-09-20 scenario as a one-segment plan
+  (view physical, cycle none, ghosts absent, available (box1 connector1
+  tray1), require (gate9)): three B1 rows "matched" PASS; RO's allocation
+  helpers return PERFECT, forced members (box1 connector1 tray1), no forced
+  pairing.
+
+PART 2 -- FIRST RUN (D, lumpy, 2026-09-26)
+------------------------------------------
+
+2.1  Code and checks
+
+- Section CP in tech/constraint-profile.lisp, entry point
+  REPORT-CYCLE-PLAN-CHECK, placed after FH and before the profile entry
+  points; not called by REPORT-STATIC-CONSTRAINT-PROFILE.
+- Checks: t24-cycle-plan-check-checks-2026-09-26.lisp (A3-A7).  The plan is
+  read from part 1.3 of this file, and the expected block from part 1.5.
+- Before the run, A compiled the CP block in SBCL against stubbed staging
+  data (the crelay-topo control table, pools, one G15 row and a stand-in RC
+  chain set): the part 1.5 block matched and the 19 checks passed.  That was
+  a logic test only; the run below is the evidence.
+
+2.2  Technical choices made in code, where section 13 is silent (A's)
+
+- :available-witnesses () states that no witness is free; only :unknown or
+  an absent key is unknown (RO's reading of an absent key).  N1 depends on
+  this.
+- B3: a device-mediated literal demanded inactive gives CONDITIONAL "not
+  evaluated"; usable chains with no bootstrap chain give CONDITIONAL "no
+  bootstrap chain" (the off-plate least is taken over bootstrap chains).
+- B4: a G15 pair whose S1 relation is DISTINCT CLAUSES prints "G15 CHECK";
+  EQUIVALENCE pairs are not B4 rows (the toggle keeps both active).
+- B1 shortage text: "matched; shortage, violator <plates> against <n>
+  witnesses (<witnesses>)", RO's Hall violator and its neighbourhood.
+
+2.3  Run output (verbatim)
+
+CP checks, T24
+  pass  A7: regenerated profile (1526 lines) equals the file (1526 lines)
+  pass  A3: expected block read (102 lines)
+  pass  A3: generated block (102 lines) equals expected (102 lines)
+  segments with a B1 mismatch:
+  pass  A4: each of 18 segments has one B1 row per required plate
+  pass  A4 RO: three B1 rows matched PASS
+  pass  A4 RO: segment PASS
+  pass  A4 RO: matching PERFECT
+  pass  A4 RO: forced members box1 connector1 tray1
+  pass  A4 RO: no forced pairing
+  pass  A5 N1: plate3 (beam, gate8) shortage CONFLICT
+  pass  A5 N1: plan CONFLICT
+  pass  A5 N2: B2 CONFLICT on switch2 with S1's exclusion pair
+  pass  A5 N3: B4 CONDITIONAL with checklist 2.2's question
+  pass  A5 N3: plan CONDITIONAL
+  pass  A5 N4: three B1 shortage rows, violator plate6-8 against 2 witnesses
+  pass  A6: CP block located
+  pass  A6: no LABELS or FLET in the CP block
+  staged names found in the CP block: normal inverted
+  pass  A6: no staged object name (78 checked) in the CP block, except declared normal, inverted
+  used before definition:
+  pass  A6: callees-first, 22 functions
+CP checks: 19 passed, 0 failed
+
+2.4  Verdict
+
+A3-A7 pass on the first run.  The part 1.5 block, including its 18 PASS
+segments, matched line for line.  A6 load: no warnings reported by D.

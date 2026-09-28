@@ -64,7 +64,7 @@
 (define-types
   agent       (agent1)
   gate        (gate1)  ;only the dynamic gate (controlled by receiver1); corner's walls/window are static occlusion baked into the los facts
-  wall        (wall1 wall2 wall3)
+  wall        (wall1 wall2)
   window      (window1)
   location    (location1 location2 location3 location4)  ;corner area1..area4
   connector   (connector1 connector2 connector3)
@@ -127,13 +127,9 @@
   ;; coordinates.lisp) and DERIVE-BEAM-CROSSINGS-BEFORE-GATE (tech/-beam-crossing-
   ;; coordinates.lisp) below.  wall1/gate1 split at
   ;; y=11/2 keeps all three gate1-conditioned beams below the split and the location1-
-  ;; >receiver2 wall crossing above it, so neither segment is fragmented.  wall3 caps the
-  ;; notch shared with problem-claustro-topo.lisp.  No current authored endpoint sightline
-  ;; crosses it, but it remains part of the given map geometry rather than being removed
-  ;; merely because this problem's present locations do not use it.
+  ;; >receiver2 wall crossing above it, so neither segment is fragmented.
   (wall-segment> wall1 8 11/2 8 8)
   (wall-segment> wall2 8 0 8 3)
-  (wall-segment> wall3 11 10 16 10)
   (gate-segment> gate1 8 3 8 11/2)
   (window-segment> window1 8 8 8 11)
 

@@ -11,3 +11,4 @@ _to_delete/
 tmp/
 .aider*
 *.log
+.aider.tags.cache.v4/

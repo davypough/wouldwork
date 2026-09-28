@@ -1,0 +1,189 @@
+T21 -- I6 necessity hints (NH): evidence
+========================================
+
+Task: doc/constraint-method/Constraint-Implementation-Plan.md, T21 entry.
+Specification: doc/constraint-method/Extractor-Specifications.md, section 10.
+
+
+PART 1 -- EXPECTED READINGS (A2), written 2026-09-25 before any NH code
+-----------------------------------------------------------------------
+
+Sources: probs/problem-crelay-topo.lisp (DEFINE-TYPES, DEFINE-INIT, goal)
+and, where a source row is generated rather than authored, the current
+profile doc/problems/crelay-topo/Constraint-Static-Profile.txt (SHA-256
+cc4623c6..., part 2).  The expected block follows; the bases after it.
+
+NH  NECESSITY HINTS  [grade per hint]
+--------------------------------------------------------------
+  READING: a hint restates static limits as a candidate plan element for the Briefing (Problem-Solving Guide, Phase 1 step 3).  NECESSARY: every plan meets it, under the grade shown.  CANDIDATE: one way to meet a limit; others may exist.  A hint is not a plan, and a graph candidate is not a proof.
+
+  hints (14): 7 NECESSARY, 7 CANDIDATE
+
+  H1 body budget (3)
+    H1.1  NECESSARY  [grade 1 -> 2; T6 S2]
+      limit  plate demand 8 (5 devices) exceeds the 3 bodies outside a cycle (4 live, less the goal actor agent1)
+      hint   a state holding more than 3 plates needs ghost bodies (4 in the ON pool)
+    H1.2  NECESSARY  [grade 1 -> 2; T6 S2]
+      limit  plate demand 8 exceeds the 7 bodies inside a cycle (8 in the ON pool, less the goal actor agent1)
+      hint   at least 1 plate is free at every moment: the plate demands are met in sequence, never all at once
+    H1.3  NECESSARY  [grade 1 -> 2; T6 S2]
+      limit  gate9 needs 3 plates at once (plate6, plate7, plate8); 3 bodies outside a cycle besides the goal actor agent1
+      hint   opening gate9 outside a cycle takes every one of them; any other plate held at the same time needs a ghost
+
+  H2 keepers left behind (2)
+    H2.1  NECESSARY  [grade 2, graph candidate; S4 S1]
+      limit  crossing gate6 from R3 {location11 location12 location13} to R4 {location14} needs plate4, plate5 held; they lie on the R3 side only (approach-only)
+      hint   before crossing gate6 into R4, leave 2 bodies other than the crosser on plate4, plate5 (off the goal route)
+      note   coming back from R4 to R3 through gate6 needs the same plates held: the bodies stay until the crosser returns
+    H2.2  NECESSARY  [grade 2, graph candidate; S4 S1]
+      limit  crossing gate9 from R6 {location16 location17 location18 location21} to R7 {location19} needs plate6, plate7, plate8 held; they lie on the R6 side only (approach-only)
+      hint   before crossing gate9 into R7, leave 3 bodies other than the crosser on plate6, plate7, plate8 (goal route)
+      note   coming back from R7 to R6 through gate9 needs the same plates held: the bodies stay until the crosser returns
+
+  H3 beam-held devices (3)
+    H3.1  NECESSARY  [grade 2; S1 RC]
+      limit  gate8 == receiver1 holds only while receiver1 is active; every usable beam to receiver1 (40 bootstrap, 12 latch) needs gate4 open (plate3)
+      hint   while gate8 must hold, a body stands on plate3, and at least 2 bodies are off plates for the beam
+      note   RC scope: physical view only; off-plate counts are least values
+    H3.2  CANDIDATE  [grade 2; RC]
+      limit  beams to receiver1 whose last connector stands at location15 (R5): least off-plate bodies 3
+      hint   transmitter1 -> location8@1 -> repeater1 -> location15@2 -> receiver1  risers ground, box1; bodies 3, off plates 3
+      hint   transmitter1 -> location9@1 -> location15@2 -> receiver1  risers ground, box1; bodies 3, off plates 3
+      hint   transmitter1 -> location9@1 -> repeater1 -> location15@2 -> receiver1  risers ground, box1; bodies 3, off plates 3
+      hint   transmitter1 -> location9@2 -> location15@1 -> receiver1  risers box1, ground; bodies 3, off plates 3
+    H3.3  CANDIDATE  [grade 2; RC]
+      limit  beams to receiver1 whose last connector stands at location9 (R2): least off-plate bodies 2
+      hint   transmitter1 -> location7@1 -> location9@2 -> receiver1  risers ground, box1; bodies 3, off plates 2, self-kept plate2
+      hint   transmitter1 -> location9@2 -> receiver1  risers box1; bodies 2, off plates 2
+
+  H4 controllers off the goal route (1)
+    H4.1  NECESSARY  [grade 2, graph candidate; S4 S3 S1]
+      limit  switch2 drives gate5, gate7 (goal route); it is operated only from location14 (R4)
+      hint   an excursion off the goal route: reaching R4 from R1 also needs gate6 (plate4, plate5)
+      note   {gate5, gate7} EXCLUSION on switch2: never active together; the route crosses them under different settings of switch2
+
+  H5 lift landings (1)
+    H5.1  CANDIDATE  [grade 1; CC MC S5]
+      limit  switch1 drives lift blower1 (location4 -> location20) and gate2 on an exit from location20: gate2 is active only while blower1 is inactive (G15 FLAG)
+      hint   keep the lift through the toggle: a support at location20 (box1, box1*, tray1, tray1*), then leave through gate2: jumping (1): location6 ((gate2))
+      hint   or leave location20 while blower1 runs, by an exit not through gate2: jumping (1): location5; walking (19): location1 ((gate1)), location10 ((gate3)), location11 ((gate3 gate5)), location12 ((gate3 gate5)), location13 ((gate3 gate5)), location14 ((gate3 gate5 gate6 screen1)), location15 ((gate3 gate5 gate7)), location16 ((gate3 gate5 gate7 gate8)), location17 ((gate3 gate5 gate7 gate8)), location18 ((gate3 gate5 gate7 gate8)), location19 ((gate3 gate5 gate7 gate8 gate9)), location2 ((gate1)), location21 ((gate3 gate5 gate7 gate8)), location3, location4, location5, location7, location8 ((gate3)), location9 ((gate3))
+      note   each mode's own rule is not evaluated: a listed exit is a candidate, not a legal move
+
+  H6 active at the start (3)
+    H6.1  CANDIDATE  [grade 1; S1, start state]
+      limit  gate2 == (not switch1) holds at the start: switch1 is not switched-on
+      hint   gate2 is free until switch1 changes (off the goal route)
+    H6.2  CANDIDATE  [grade 1; S1, start state]
+      limit  gate3 == plate2 holds at the start: plate2 is depressed, held by tray1
+      hint   gate3 is free while tray1 stays on plate2 (goal route)
+    H6.3  CANDIDATE  [grade 1; S1, start state]
+      limit  gate5 == (not switch2) holds at the start: switch2 is not switched-on
+      hint   gate5 is free until switch2 changes (goal route)
+
+  H7 placement limits (1)
+    H7.1  CANDIDATE  [grade 2; S5]
+      limit  tray1, tray1* at top 3/2 take no placement from a grounded agent (placement reach limit 1)
+      hint   place onto them from a raised location: location20 (level 3/2), location6 (level 3/2)
+      note   placement reach from that location to the support, and a base raised by standing on a support, are not evaluated
+
+Bases.
+
+H1.  CONTROLS: plate-driven devices gate1 (plate1), gate3 (plate2), gate4
+(plate3), gate6 (plate4 plate5), gate9 (plate6 plate7 plate8): 5 devices,
+T = 8, disjoint.  ON keys: agent1 box1 connector1 tray1 live, their four
+starred copies ghost: L = 4, N = 8.  Goal (has-location agent1 location19);
+no plate at location19, so g = 1: S_out = 3, S_in = 7.  T > 3 (H1.a),
+ghosts 4 and T > 7 (H1.b, 8 - 7 = 1 free).  Least single-clause demands:
+gate9 3 >= 3 (H1.c, c = S_out); gate6 2 < 3.  Post-mortem 3.4 example 1.
+
+H2.  S4 spine rows with APPROACH-ONLY plates: gate6 R3 -> R4 (plate4 at
+location13, plate5 at location12, both R3) and gate9 R6 -> R7 (plate6-8 at
+location16-18, R6); in reverse both are DEPARTURE-ONLY.  gate1 and gate3
+have BOTH, so no row.  Goal route from R1 (location1) to R7: gate1 gate3
+gate5 gate7 gate8 gate9 (S4 GRAPH-REQUIRED); gate6 is off it.
+
+H3.  gate8 == receiver1; receiver1 is S1's only device-mediated primitive,
+status relation active.  Chains cross-read from RC (profile lines 878-1086,
+generated; not hand-derivable): 40 bootstrap, 12 latch; gate4 is in every
+one (bootstrap and latch), gate8 is removed as receiver1's own device; gate4
+== plate3.  Least off-plate over bootstrap: 2.  Receiver-end locations of
+bootstrap chains: location9 (R2) and location15 (R5).  Least there: 2
+(chains 1, 2) and 3 (chains 6, 8, 9, 10).  Chain 9 is post-mortem 3.4's
+example 3 (ground connector at location9, raised connector at location15;
+D's pr21).  H3.1 is example 2 (plate3 held while crossing gate8).
+
+H4.  Goal-route controllers of kind switch: switch2 (gate5 inverted, gate7
+normal).  Its only reach site is location14 (S4: ((location14 "r4" nil))).
+Relaxed required devices R1 -> R4: gate1 gate3 gate5 gate6; less the goal
+route: gate6 (plate4 plate5).  {gate5, gate7} is an S1 exclusion pair, both
+on the route.  switch1 drives no route device; receiver1 and the plates are
+not switch or latch controllers.
+
+H5.  CC's one G15 row: switch1, lift blower1 (location4 -> location20),
+barrier gate2, EXCLUSION.  Exits from location20 are MC's (profile line
+40-41; walking arcs are derived from geometry, cross-read): through gate2,
+jumping location6; the rest, jumping location5 and 19 walking.  S5
+placement supports less ground: box1 box1* tray1 tray1*.  Post-mortem 3.4
+example 4: the landing at location5 (D's pr19) is the jumping exit listed.
+
+H6.  Start state: switch1 and switch2 not switched on (no init fact);
+(on tray1 plate2), so plate2 depressed.  Aggregates holding: gate2 (not
+switch1), gate3 (plate2), gate5 (not switch2).  Not holding: blower1,
+gate1, gate4, gate6, gate7, gate8, gate9.  gate3 and gate5 are pr14's two
+spine devices.
+
+H7.  S5 unreachable from ground: tray1, tray1* at top 3/2 (limit 1).
+Raised locations: location6 and location20 at 3/2; 3/2 - 3/2 <= 1.
+
+
+PART 2 -- BASELINE FOR A7, recorded 2026-09-25 before the first run
+-------------------------------------------------------------------
+
+Pre-T21 generated profile, doc/problems/crelay-topo/Constraint-Static-Profile.txt:
+  SHA-256 cc4623c638dd206fdcd74d2e95301698ebbee176de2105081cbedf2982f33d85
+Pre-T21 tech/constraint-profile.lisp:
+  SHA-256 16ae790e75333275dc8b26f422890f282dfe0ca56b5bc50a0903f5f1def28a45
+A7 passes when the regenerated profile, with the text NH adds removed (the
+two newlines before its header line, through the line before "RO requires
+an explicit segment input"), is byte-identical to the pre-T21 profile.
+
+
+PART 3 -- FIRST RUN (D, lumpy, 2026-09-25)
+------------------------------------------
+
+Checks (t21-necessity-hints-checks-2026-09-25.lisp): A3, A4 and A5 passed
+(17 checks); A3's generated block, 72 lines, equals part 1's.  The A6 name
+scan FAILED: its object list is every constant in *TYPES*, which includes
+constants the tech files declare, not only the problem's objects.  The NH
+block names the CONTROLS modes NORMAL and INVERTED (already declared in its
+substrate-vocabulary comment) and S5's GROUND marker (removed from H5's
+support list).  CC passed the same scan because its code never names them.
+
+Fix (A, 2026-09-25): GROUND added to the NH header's declared vocabulary
+(comment only); the check now prints every staged name it finds and passes
+only when they are a subset of the declared constants normal, inverted,
+ground.  A problem object name still fails it.
+
+
+PART 4 -- SECOND RUN AND A7 (D, lumpy, 2026-09-25)
+--------------------------------------------------
+
+Checks: 18 passed.
+  A3  generated block (72 lines) equals expected (72 lines)
+  A4  H1 AM3a/AM3b rows; H2 2 approach-only directions; H3 1 mediated
+      device; H4 1 goal-route switch controller; H5 1 G15 row; H6 3 devices
+      active in the start database; H7 1 unreachable top
+  A5  no ghost layer: "met in sequence", no :inside row; without the lift:
+      H5 empty
+  A6  no LABELS or FLET; staged names found in the NH block: normal
+      inverted (declared substrate constants); no problem object name
+A6 callees-first: script check of the NH block, no forward references;
+  parentheses and format directives balanced (A, before the first run).
+A7: regenerated profile, 1526 lines,
+  SHA-256 1b7d22e27c70df552dbf6e33478102795898a92e9b7d0cea0596d0724418cf17
+  With the text NH adds removed (74 lines):
+  SHA-256 cc4623c638dd206fdcd74d2e95301698ebbee176de2105081cbedf2982f33d85
+  = the pre-T21 profile (part 2).  PASS: every existing section is
+  byte-identical; only NH is new.
+Final tech/constraint-profile.lisp:
+  SHA-256 421031d229b37aa580a311b469478abdeb8dc0f949f60a8ca3e3b38adc4d2012

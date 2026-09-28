@@ -38,6 +38,12 @@
 ;;; M2 does not seal: it is program-written and deliberately user-amendable.  The reader
 ;;; keeps every key it does not recognise and the writer writes it back, so a hand
 ;;; annotation is never silently dropped.
+;;;
+;;; T27 (2026-09-26): STAGES AND THE FILE OF RECORD.  The ledger's unit is a stage of D's
+;;; approved plan (schema sections 6.5, 7.5, 9.1), and the ledger FILE is the record:
+;;; LEDGER-FILE-APPLY reads it, checks it, applies one operation and writes it back (section
+;;; 12.1), so no replay of ingest scripts defines a ledger.  Stages need a version-2 ledger,
+;;; made by MAKE-STAGE-LEDGER; a version-1 ledger reads, checks and reports as before T27.
 
 (in-package :ww)
 
@@ -47,7 +53,8 @@
 ;;; ---------------------------------------------------------------------------
 
 (defparameter *ledger-kind-prefixes*
-  '((:premise . "PR") (:link . "LK") (:bound . "BD") (:question . "QN"))
+  '((:premise . "PR") (:link . "LK") (:bound . "BD") (:question . "QN")
+    (:stage . "ST"))
   "Section 2.  Ids are stable and append-only; the prefix names the kind and never changes.")
 
 
@@ -63,27 +70,39 @@
     (:link :from :to :intent :closed-by :evidence :validated :attempts :refuted-by
      :segment-bridge :search-goal :search-start :search-archive :search-cutoff :search-threads
      :search-settings :search-preamble :search-final :chain-order :recommendation :measured)
-    (:bound :for-link :measured :interpretation-committed :segment-bridge)
+    (:bound :for-link :for-stage :measured :interpretation-committed :segment-bridge)
     (:question :candidates :default :answer-kind :template :blocks :answer :answer-premise
-     :gap-candidate))
+     :gap-candidate)
+    (:stage :plan-file :plan-stage :intent :starts-from :check :realization :endpoint
+     :closed-by :validated :attempts :refuted-by :superseded-by :proof-obligation
+     :segment-bridge :measured))
   "Section 6.  :SEGMENT-BRIDGE is the explicit bridging premise WF16 requires of a record
    whose dependency crosses an incompatible segment.  The :SEARCH-* keys and :RECOMMENDATION
    are T3's: they hold the problem terms a runnable recommendation needs, as data, and the
-   recommendation committed before the run.")
+   recommendation committed before the run.  The :STAGE keys are T27's (section 6.5); a
+   stage references its plan-data file rather than copying the plan's segments.")
 
 
 (defparameter *ledger-statuses*
   '((:premise :in-force :discharged :retracted :refuted)
     (:link :open :realized :closed :refuted :invalidated)
     (:bound :standing :orphaned :superseded)
-    (:question :open :answered :withdrawn :invalidated))
+    (:question :open :answered :withdrawn :invalidated)
+    (:stage :open :realized :closed :refuted :invalidated :superseded))
   "Section 7.  The stored LIFECYCLE.  It is not the conditional/established distinction,
    which is computed by LEDGER-STANDING and never stored.")
 
 
-(defparameter *ledger-dead-statuses* '(:retracted :refuted)
-  "A disjunct is dead in these two statuses and in no other.  DISCHARGED is alive: the
-   premise was replaced by a derivation, not withdrawn.")
+(defparameter *ledger-dead-statuses* '(:retracted :refuted :superseded)
+  "A disjunct is dead in these statuses and in no other.  DISCHARGED is alive: the premise
+   was replaced by a derivation, not withdrawn.  SUPERSEDED (T27, section 8) is a stage D
+   replaced; a bound's own :SUPERSEDED never matters here, because a bound is never
+   depended on.")
+
+
+(defparameter *ledger-stage-check-labels* '(:pass :conditional :conflict)
+  "Section 6.5, WF25.  The CP labels a stage's :CHECK may carry.  A :CONFLICT stage cannot
+   be realized or closed.")
 
 
 (defparameter *ledger-default-search-threads* 16
@@ -248,14 +267,15 @@
 (defun ledger-standing (ledger id)
   "Section 8.  :ESTABLISHED, :CONDITIONAL or :UNFOUNDED, recomputed from the dependency
    closure on every call and never stored.  This is invariant I1 mechanized: there is no field
-   an optimistic caller could set to have a guess printed as a fact."
+   an optimistic caller could set to have a guess printed as a fact.  Rule 3 covers a stage as
+   well as a link (T27): a search-found endpoint not yet validated keeps it conditional."
   (let ((record (ledger-record ledger id)))
     (cond ((ledger-unfounded-p ledger id) :unfounded)
           ((ledger-conditional-record-p record) :conditional)
           ((some (lambda (each) (ledger-conditional-record-p (ledger-record ledger each)))
                  (ledger-closure ledger id))
            :conditional)
-          ((and (eq (getf record :kind) :link)
+          ((and (member (getf record :kind) '(:link :stage))
                 (eq (first (getf record :closed-by)) :search-measured)
                 (not (getf record :validated)))
            :conditional)
@@ -280,6 +300,12 @@
 (defun make-realization-ledger (problem &optional (date (ledger-today)))
   "An empty ledger for one problem.  Ids are ledger-local (section 2)."
   (list :version 1 :problem problem :written date :records nil))
+
+
+(defun make-stage-ledger (problem &optional (date (ledger-today)))
+  "An empty VERSION-2 ledger for one problem: the only version that admits :STAGE records
+   (WF19).  MAKE-REALIZATION-LEDGER stays version 1, which T2's checks pin (section 12)."
+  (list :version 2 :problem problem :written date :records nil))
 
 
 (defun make-ledger-record (&key id kind statement provenance depends-on premise-gaps
@@ -334,15 +360,16 @@
                                    :recommendation nil :measured nil)))
 
 
-(defun make-ledger-bound (id statement provenance &key for-link measured
+(defun make-ledger-bound (id statement provenance &key for-link for-stage measured
                                                        interpretation-committed depends-on
                                                        premise-gaps segment sources)
   "Section 6.3.  There is no :REFUTES key here and the grammar has nowhere to write one; that
-   is guard X1, and WF8 is its enforcement on the other side."
+   is guard X1, and WF8 is its enforcement on the other side.  At most one of FOR-LINK and
+   FOR-STAGE is given (WF23)."
   (make-ledger-record :id id :kind :bound :statement statement :provenance provenance
                       :depends-on depends-on :premise-gaps premise-gaps :segment segment
                       :status :standing :sources sources
-                      :extra (list :for-link for-link :measured measured
+                      :extra (list :for-link for-link :for-stage for-stage :measured measured
                                    :interpretation-committed interpretation-committed
                                    :segment-bridge nil)))
 
@@ -363,6 +390,25 @@
                                    :answer-kind answer-kind :template template :blocks blocks
                                    :answer nil :answer-premise nil
                                    :gap-candidate gap-candidate)))
+
+
+(defun make-ledger-stage (id statement plan-file plan-stage intent starts-from depends-on
+                          proof-obligation &key premise-gaps segment segment-bridge sources)
+  "Section 6.5.  One stage of D's approved plan.  The provenance is built here, grade 4 by
+   the plan stage, so WF20 cannot be broken by a caller.  DEPENDS-ON carries D's approval
+   premise, the tricks the stage uses, and its STARTS-FROM stage unless that is :INITIAL
+   (WF19).  The stage opens :OPEN with no check, realization, endpoint or closure."
+  (make-ledger-record :id id :kind :stage :statement statement
+                      :provenance (list :derived :grade 4
+                                        :by (format nil "~A stage ~A" plan-file plan-stage))
+                      :depends-on depends-on :premise-gaps premise-gaps :segment segment
+                      :status :open :sources sources
+                      :extra (list :plan-file plan-file :plan-stage plan-stage :intent intent
+                                   :starts-from starts-from :check nil :realization nil
+                                   :endpoint nil :closed-by nil :validated nil :attempts nil
+                                   :refuted-by nil :superseded-by nil
+                                   :proof-obligation proof-obligation
+                                   :segment-bridge segment-bridge :measured nil)))
 
 
 (defun add-ledger-record (ledger record)
@@ -442,30 +488,36 @@
       (push (cons each (ledger-standing ledger each)) pairs))))
 
 
-(defun ledger-apply-retraction (ledger id cause date before)
-  "What a retraction does to one dependent, decided by its RECOMPUTED standing and by nothing
-   else.  A bound is never invalidated: the measurement happened, and what a retraction can
-   change is whether the analysis still reaches the state it was measured from."
+(defun ledger-apply-retraction (ledger id cause date before verb)
+  "What a retraction or a supersession does to one dependent, decided by its RECOMPUTED
+   standing and by nothing else.  A bound is never invalidated: the measurement happened, and
+   what a retraction can change is whether the analysis still reaches the state it was
+   measured from.  A superseded stage keeps its status and gets the event (T27, section 9).
+   VERB is \"retracted\" or \"superseded\"; with \"retracted\" every note is as before T27."
   (let ((record (ledger-record ledger id))
         (standing (ledger-standing ledger id))
         (was (cdr (assoc id before))))
     (cond ((eq (getf record :kind) :bound)
            (ledger-set-value record :status :orphaned)
            (ledger-add-event record date :orphaned
-                             (format nil "~A retracted; start-state premise withdrawn" cause)))
-          ((and (eq standing :unfounded) (member (getf record :kind) '(:link :question)))
+                             (format nil "~A ~A; start-state premise withdrawn" cause verb)))
+          ((and (eq (getf record :kind) :stage) (eq (getf record :status) :superseded))
+           (ledger-add-event record date :standing-changed
+                             (format nil "~A ~A; status superseded kept, standing ~(~A~)"
+                                     cause verb standing)))
+          ((and (eq standing :unfounded) (member (getf record :kind) '(:link :question :stage)))
            (ledger-set-value record :status :invalidated)
-           (ledger-add-event record date :invalidated (format nil "~A retracted" cause)))
+           (ledger-add-event record date :invalidated (format nil "~A ~A" cause verb)))
           ((and (eq standing :unfounded) (eq (getf record :kind) :premise))
            (ledger-set-value record :status :retracted)
            (ledger-add-event record date :retracted
-                             (format nil "no surviving support after ~A was retracted" cause)))
+                             (format nil "no surviving support after ~A was ~A" cause verb)))
           (t (ledger-add-event record date :standing-changed
                                (if (eq standing was)
-                                 (format nil "~A retracted; a clause survived, standing still ~(~A~)"
-                                         cause standing)
-                                 (format nil "~A retracted; standing ~(~A~) -> ~(~A~)"
-                                         cause was standing)))))))
+                                 (format nil "~A ~A; a clause survived, standing still ~(~A~)"
+                                         cause verb standing)
+                                 (format nil "~A ~A; standing ~(~A~) -> ~(~A~)"
+                                         cause verb was standing)))))))
 
 
 (defun retract-ledger-premise (ledger id reason &optional (date (ledger-today)))
@@ -482,7 +534,7 @@
       (ledger-set-value record :status :retracted)
       (ledger-add-event record date :retracted reason)
       (dolist (each (ledger-dependents ledger id))
-        (ledger-apply-retraction ledger each id date before)))
+        (ledger-apply-retraction ledger each id date before "retracted")))
     ledger))
 
 
@@ -502,6 +554,137 @@
     (ledger-set-value record :discharged-by by)
     (ledger-add-event record date :discharged note)
     ledger))
+
+
+;;; ---------------------------------------------------------------------------
+;;; T27, stage operations (sections 6.5, 7.5, 9.1).  Each takes the ledger first, so
+;;; each can be applied to the ledger file by LEDGER-FILE-APPLY (section 12.1).
+;;; ---------------------------------------------------------------------------
+
+(defun ledger-stage-record (ledger id)
+  "The stage record ID, or a signal naming what ID is instead.  Every stage operation starts
+   here, so none of them can act on a link or a premise by mistake."
+  (let ((record (ledger-record ledger id)))
+    (unless (and record (eq (getf record :kind) :stage))
+      (error "~S is not a stage in this ledger." id))
+    record))
+
+
+(defun supersede-ledger-stage (ledger id successor reason &optional (date (ledger-today)))
+  "Section 9.1.  D revised the plan and SUCCESSOR, a stage already in the ledger, replaces
+   ID.  The stage is kept, marked and pointed at its successor; then its dependents are
+   recomputed exactly as for a retraction.  :SUPERSEDED counts as dead (section 8), so a stage
+   that started from ID alone is invalidated and a bound measured from ID's endpoint is
+   orphaned.  A superseded stage is never revived."
+  (let ((record (ledger-stage-record ledger id)))
+    (ledger-stage-record ledger successor)
+    (when (eq id successor)
+      (error "~S cannot supersede itself." id))
+    (let ((before (ledger-dependent-standings ledger id)))
+      (ledger-set-value record :status :superseded)
+      (ledger-set-value record :superseded-by successor)
+      (ledger-add-event record date :superseded
+                        (format nil "superseded by ~(~A~): ~A" successor reason))
+      (dolist (each (ledger-dependents ledger id))
+        (ledger-apply-retraction ledger each id date before "superseded")))
+    ledger))
+
+
+(defun set-ledger-stage-check (ledger id label run &optional (date (ledger-today)))
+  "Section 6.5.  Records the CP label the stage's plan data received, with its date and the
+   evidence file of the run.  A later check replaces the earlier one; the event keeps both."
+  (let ((record (ledger-stage-record ledger id)))
+    (unless (member label *ledger-stage-check-labels*)
+      (error "~S is not a CP label; expected one of ~S." label *ledger-stage-check-labels*))
+    (ledger-set-value record :check (list :label label :date date :run run))
+    (ledger-add-event record date :amended
+                      (format nil "cycle-plan check ~(~A~), run ~A" label run))
+    ledger))
+
+
+(defun realize-ledger-stage (ledger id realization endpoint closed-by
+                             &key validated nodes seconds (date (ledger-today)))
+  "Section 7.5.  Records how the stage was realized (:HAND, :SEARCH or :MIXED), its ENDPOINT
+   (:CHECKPOINT, :ACTIONS, :SHA256; ACTIONS may be a prefix of the archive, section 6.5) and
+   what closes it.  The stage becomes :REALIZED, or :CLOSED when VALIDATED is true, so a
+   hand-derived stage validated in the same step needs one call.  An incomplete endpoint is
+   left to WF21, which LEDGER-FILE-APPLY runs before anything is written."
+  (let ((record (ledger-stage-record ledger id)))
+    (unless (member realization '(:hand :search :mixed))
+      (error "~S is not a realization; expected :HAND, :SEARCH or :MIXED." realization))
+    (ledger-set-value record :realization realization)
+    (ledger-set-value record :endpoint endpoint)
+    (ledger-set-value record :closed-by closed-by)
+    (ledger-set-value record :validated (and validated t))
+    (ledger-set-value record :status (if validated :closed :realized))
+    (ledger-set-value record :measured (list :nodes nodes :seconds seconds))
+    (ledger-add-event record date :realized
+                      (format nil "~(~A~); endpoint ~A at ~D action~:P"
+                              realization (getf endpoint :checkpoint) (getf endpoint :actions)))
+    (when validated
+      (ledger-add-event record date :closed "validated from the initial state"))
+    ledger))
+
+
+(defun close-ledger-stage (ledger id validation-run &optional (date (ledger-today)))
+  "Section 7.5.  Closes a stage already :REALIZED, once its endpoint has been validated from
+   the initial state by a separate run, VALIDATION-RUN naming its evidence.  A search-found
+   stage stays :REALIZED until D asks for this."
+  (let ((record (ledger-stage-record ledger id)))
+    (unless (eq (getf record :status) :realized)
+      (error "~S is ~(~A~); only a realized stage is closed." id (getf record :status)))
+    (ledger-set-value record :validated t)
+    (ledger-set-value record :status :closed)
+    (ledger-add-event record date :closed
+                      (format nil "validated from the initial state: ~A" validation-run))
+    ledger))
+
+
+(defun file-ledger-stage-bound (ledger id &key statement start-state search-expression
+                                              cutoff threads run (truncated :unknown)
+                                              pruning interpretation depends-on nodes
+                                              seconds (date (ledger-today)))
+  "Sections 6.3 and 10.  An exhausted search for stage ID, filed as a GRADE-3 COST BOUND with
+   :FOR-STAGE and added to the stage's :ATTEMPTS; the stage's status does not change.
+   INTERPRETATION is the reading committed in the stage's evidence before the run, and is
+   required.  The four X2 fields must be given.  DEPENDS-ON names the stage the search started
+   from, so a supersession upstream orphans the bound; the bound takes that stage's segment,
+   the state it measured.  The statement defaults to T4's template, and any statement given
+   still faces the X4 lint (WF18) before the ledger is written."
+  (let* ((record (ledger-stage-record ledger id))
+         (origin (getf record :starts-from))
+         (bound-id (ledger-next-id ledger "BD")))
+    (unless interpretation
+      (error "A bound for ~S needs the reading committed before the run; none was given." id))
+    (loop for (key value) on (list :start-state start-state :search-expression search-expression
+                                   :cutoff cutoff :threads threads)
+            by #'cddr
+          unless value
+            do (error "X2: a bound for ~S is ill-formed without ~S." id key))
+    (unless (member truncated '(t nil :unknown))
+      (error "Cutoff truncation must be T, NIL, or :UNKNOWN, not ~S." truncated))
+    (add-ledger-record ledger
+      (make-ledger-bound bound-id
+                         (or statement
+                             (format nil "no realization of ~(~A~) was found within ~D actions ~
+                                          from the stated start state" id cutoff))
+                         (list :search-measured :outcome :exhausted :start-state start-state
+                               :search-expression search-expression :cutoff cutoff
+                               :threads threads :cutoff-truncated truncated :pruning pruning
+                               :run run)
+                         :for-stage id
+                         :measured (list :nodes nodes :seconds seconds)
+                         :interpretation-committed interpretation
+                         :depends-on depends-on
+                         :segment (if (eq origin :initial)
+                                    (getf record :segment)
+                                    (getf (ledger-record ledger origin) :segment))
+                         :sources (list (format nil "run evidence ~A" run))))
+    (ledger-set-value record :attempts (append (getf record :attempts) (list bound-id)))
+    (ledger-add-event record date :amended
+                      (format nil "exhausted at cutoff ~D; filed as ~(~A~), a cost bound"
+                              cutoff bound-id))
+    bound-id))
 
 
 ;;; ---------------------------------------------------------------------------
@@ -535,16 +718,21 @@
 
 (defun check-ledger-references (ledger)
   "WF2: every id named anywhere in a record exists.  A dangling id must not be allowed to look
-   like a dead disjunct and quietly kill a clause."
+   like a dead disjunct and quietly kill a clause.  T27 adds :SUPERSEDED-BY, :FOR-STAGE and a
+   :STARTS-FROM other than :INITIAL."
   (dolist (record (getf ledger :records))
     (let ((id (getf record :id))
+          (origin (getf record :starts-from))
           (named nil))
       (dolist (clause (getf record :depends-on))
         (setf named (append named clause)))
       (setf named (append named (getf record :blocks) (getf record :attempts)))
-      (dolist (key '(:discharged-by :refuted-by :answer-premise :for-link))
+      (dolist (key '(:discharged-by :refuted-by :answer-premise :for-link
+                     :superseded-by :for-stage))
         (when (getf record key)
           (push (getf record key) named)))
+      (when (and origin (not (eq origin :initial)))
+        (push origin named))
       (dolist (other named)
         (unless (ledger-record ledger other)
           (error "WF2: ~S names ~S, which is not in the ledger." id other))))))
@@ -620,7 +808,8 @@
 
 (defun check-ledger-closure-fields (ledger)
   "WF8, WF14, WF15, WF17: a bound closes nothing, a link is closed only when validated, a
-   refutation names a derivation, and an answered question points at the premise it wrote."
+   refutation of a link or a stage names a derivation, and an answered question points at the
+   premise it wrote.  A stage's closure is checked more strictly by WF21."
   (dolist (record (getf ledger :records))
     (let ((id (getf record :id))
           (kind (getf record :kind)))
@@ -630,19 +819,19 @@
                      (eq (getf (ledger-record ledger value) :kind) :bound))
             (error "WF8: ~S names bound ~S in ~S; an exhausted search closes nothing and refutes nothing."
                    id value key))))
-      (when (eq kind :link)
-        (when (and (eq (getf record :status) :closed)
-                   (or (null (getf record :closed-by)) (not (getf record :validated))))
-          (error "WF14: link ~S is :CLOSED without a validated closure; an unvalidated find is :REALIZED."
-                 id))
-        (when (eq (getf record :status) :refuted)
-          (let ((by (ledger-record ledger (getf record :refuted-by))))
-            (unless (and by
-                         (eq (first (getf by :provenance)) :derived)
-                         (member (ledger-provenance-value (getf by :provenance) :grade)
-                                 '(1 2)))
-              (error "WF15: link ~S is :REFUTED without a grade-1 or grade-2 derivation in :REFUTED-BY."
-                     id)))))
+      (when (and (eq kind :link)
+                 (eq (getf record :status) :closed)
+                 (or (null (getf record :closed-by)) (not (getf record :validated))))
+        (error "WF14: link ~S is :CLOSED without a validated closure; an unvalidated find is :REALIZED."
+               id))
+      (when (and (member kind '(:link :stage)) (eq (getf record :status) :refuted))
+        (let ((by (ledger-record ledger (getf record :refuted-by))))
+          (unless (and by
+                       (eq (first (getf by :provenance)) :derived)
+                       (member (ledger-provenance-value (getf by :provenance) :grade)
+                               '(1 2)))
+            (error "WF15: ~(~A~) ~S is :REFUTED without a grade-1 or grade-2 derivation in :REFUTED-BY."
+                   kind id))))
       (when (and (eq kind :question) (eq (getf record :status) :answered))
         (let ((premise (ledger-record ledger (getf record :answer-premise))))
           (unless (and premise
@@ -687,6 +876,102 @@
                    (getf record :id) word)))))))
 
 
+(defun check-ledger-stage-shape (ledger record)
+  "WF19, WF20 for one stage: only in a version-2 ledger; starts from :INITIAL or from a stage
+   one of its clauses names; grade 4 with its proof obligation, resting on something."
+  (let ((id (getf record :id))
+        (origin (getf record :starts-from))
+        (provenance (getf record :provenance))
+        (obligation (getf record :proof-obligation)))
+    (unless (eql (getf ledger :version) 2)
+      (error "WF19: stage ~S is in a version-~S ledger; stages need version 2." id
+             (getf ledger :version)))
+    (unless (or (eq origin :initial)
+                (and (eq (getf (ledger-record ledger origin) :kind) :stage)
+                     (some (lambda (clause) (member origin clause))
+                           (getf record :depends-on))))
+      (error "WF19: stage ~S starts from ~S, which is neither :INITIAL nor a stage named in its clauses."
+             id origin))
+    (unless (and (eq (first provenance) :derived)
+                 (eql (ledger-provenance-value provenance :grade) 4)
+                 (stringp obligation)
+                 (plusp (length obligation))
+                 (getf record :depends-on))
+      (error "WF20: stage ~S is not a grade-4 derivation with a proof obligation resting on something."
+             id))))
+
+
+(defun check-ledger-stage-lifecycle (record)
+  "WF21, WF25 for one stage: a realized stage has an endpoint; a closed one is validated, has
+   a closure and a complete endpoint; a check is well formed, and neither may carry CONFLICT."
+  (let* ((id (getf record :id))
+         (status (getf record :status))
+         (endpoint (getf record :endpoint))
+         (check (getf record :check)))
+    (when (and (eq status :realized) (null endpoint))
+      (error "WF21: stage ~S is :REALIZED without an endpoint." id))
+    (when (and (eq status :closed)
+               (not (and (getf record :validated)
+                         (getf record :closed-by)
+                         (getf endpoint :checkpoint)
+                         (getf endpoint :actions)
+                         (getf endpoint :sha256))))
+      (error "WF21: stage ~S is :CLOSED without validation, a closure, and an endpoint with checkpoint, actions and sha256."
+             id))
+    (when (and check
+               (not (and (member (getf check :label) *ledger-stage-check-labels*)
+                         (getf check :date)
+                         (getf check :run))))
+      (error "WF25: stage ~S has a malformed :CHECK ~S." id check))
+    (when (and (member status '(:realized :closed))
+               (or (null check) (eq (getf check :label) :conflict)))
+      (error "WF25: stage ~S is ~(~A~) without a passing or conditional cycle-plan check."
+             id status))))
+
+
+(defun check-ledger-stages (ledger)
+  "WF19-WF22, WF24, WF25.  Each stage's shape and lifecycle; each superseded stage names
+   another stage and its :SUPERSEDED-BY chain has no cycle; no two stages still in the plan
+   share a plan file and plan stage."
+  (let ((live nil))
+    (dolist (record (getf ledger :records))
+      (when (eq (getf record :kind) :stage)
+        (let ((id (getf record :id)))
+          (check-ledger-stage-shape ledger record)
+          (check-ledger-stage-lifecycle record)
+          (if (eq (getf record :status) :superseded)
+            (let ((seen (list id))
+                  (next (getf record :superseded-by)))
+              (unless (and next (eq (getf (ledger-record ledger next) :kind) :stage))
+                (error "WF22: superseded stage ~S names no successor stage." id))
+              (loop while next
+                    do (when (member next seen)
+                         (error "WF22: the superseded-by chain from ~S returns to ~S." id next))
+                       (push next seen)
+                       (setf next (getf (ledger-record ledger next) :superseded-by))))
+            (let ((key (list (getf record :plan-file) (getf record :plan-stage))))
+              (when (member key live :test #'equal)
+                (error "WF24: stage ~S repeats plan stage ~S of ~S held by a stage still in the plan."
+                       id (second key) (first key)))
+              (push key live))))))))
+
+
+(defun check-ledger-bound-targets (ledger)
+  "WF23: a bound attempts at most one link or stage, and a bound for a stage is listed in
+   that stage's :ATTEMPTS."
+  (dolist (record (getf ledger :records))
+    (when (eq (getf record :kind) :bound)
+      (let ((id (getf record :id))
+            (stage (getf record :for-stage)))
+        (when (and (getf record :for-link) stage)
+          (error "WF23: bound ~S names both a link and a stage." id))
+        (when (and stage
+                   (not (and (eq (getf (ledger-record ledger stage) :kind) :stage)
+                             (member id (getf (ledger-record ledger stage) :attempts)))))
+          (error "WF23: bound ~S is for ~S, which is not a stage listing it in :ATTEMPTS."
+                 id stage))))))
+
+
 (defun check-ledger-well-formed (ledger)
   "Section 11.  Signals on the first violation; it does not warn and continue."
   (check-ledger-identity ledger)
@@ -695,6 +980,8 @@
   (check-ledger-provenance ledger)
   (check-ledger-grades ledger)
   (check-ledger-closure-fields ledger)
+  (check-ledger-stages ledger)
+  (check-ledger-bound-targets ledger)
   (check-ledger-segments ledger)
   (check-ledger-bound-statements ledger)
   t)
@@ -793,6 +1080,19 @@
     pathname))
 
 
+(defun ledger-file-apply (path operation &rest arguments)
+  "Section 12.1.  The ledger FILE is the record.  Reads PATH and checks what it read, so a hand
+   edit that broke well-formedness is caught here rather than later; applies OPERATION, any
+   ledger function taking the ledger as its first argument, to ARGUMENTS; and writes the file
+   back.  WRITE-REALIZATION-LEDGER checks the result before it opens its temporary file, so a
+   signal at any step leaves PATH byte-identical.  The version read is the version written."
+  (let ((ledger (read-realization-ledger path)))
+    (check-ledger-well-formed ledger)
+    (apply operation ledger arguments)
+    (write-realization-ledger ledger path)
+    ledger))
+
+
 ;;; ---------------------------------------------------------------------------
 ;;; The reporter (section 13)
 ;;; ---------------------------------------------------------------------------
@@ -850,15 +1150,17 @@
 
 
 (defun report-ledger-bounds (ledger)
-  "Section 10, guard X3.  Bounds print in their own section, never interleaved with link
-   verdicts, and the closing sentence is a template."
+  "Section 10, guard X3.  Bounds print in their own section, never interleaved with link or
+   stage verdicts, and the closing sentence is a template."
   (let ((bounds (remove-if-not (lambda (record) (eq (getf record :kind) :bound))
                                (getf ledger :records))))
     (format t "~%  COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)  (~D)~%" (length bounds))
     (dolist (bound bounds)
       (let ((provenance (getf bound :provenance)))
         (format t "    ~(~A~)  attempted ~(~A~); status ~(~A~)~%"
-                (getf bound :id) (or (getf bound :for-link) :none) (getf bound :status))
+                (getf bound :id)
+                (or (getf bound :for-link) (getf bound :for-stage) :none)
+                (getf bound :status))
         (format t "      exhausted at cutoff ~S, threads ~S, from: ~A~%"
                 (ledger-provenance-value provenance :cutoff)
                 (ledger-provenance-value provenance :threads)
@@ -889,10 +1191,70 @@
               (getf record :status) (getf record :statement)))))
 
 
+(defun ledger-stage-order (ledger)
+  "Section 13, plan order: breadth-first from :INITIAL.  First the stages starting from the
+   initial state, then those starting from any of them, level by level; within a level, by
+   id number.  A superseded stage keeps its place.  WF19 and WF3 make every stage's
+   :STARTS-FROM chain end at :INITIAL, so every stage is reached."
+  (let* ((stages (remove-if-not (lambda (record) (eq (getf record :kind) :stage))
+                                (getf ledger :records)))
+         (level (list :initial))
+         (order nil))
+    (loop while level
+          do (let ((next (sort (mapcar (lambda (record) (getf record :id))
+                                       (remove-if-not (lambda (record)
+                                                        (member (getf record :starts-from) level))
+                                                      stages))
+                               #'< :key (lambda (id) (parse-integer (symbol-name id) :start 2)))))
+               (setf order (append order next))
+               (setf level next)))
+    order))
+
+
+(defun report-ledger-stage (ledger id)
+  "One stage, in the line format T27's A2 evidence fixes: header, successor if superseded,
+   plan, intent, start, check, realization, endpoint, live guesses in id order, attempts."
+  (let* ((record (ledger-record ledger id))
+         (check (getf record :check))
+         (endpoint (getf record :endpoint))
+         (guesses (sort (copy-list (ledger-live-guesses ledger id)) #'<
+                        :key (lambda (each) (parse-integer (symbol-name each) :start 2)))))
+    (format t "    ~(~A~)  ~A  ~(~A~); standing ~(~A~)~%"
+            id (getf record :plan-stage) (getf record :status) (ledger-standing ledger id))
+    (when (eq (getf record :status) :superseded)
+      (format t "      superseded by: ~(~A~)~%" (getf record :superseded-by)))
+    (format t "      plan: ~A, stage ~A~%" (getf record :plan-file) (getf record :plan-stage))
+    (format t "      intent: ~A~%" (getf record :intent))
+    (format t "      starts from: ~(~A~)~%" (getf record :starts-from))
+    (if check
+      (format t "      check: ~(~A~), ~A, ~A~%"
+              (getf check :label) (getf check :date) (getf check :run))
+      (format t "      check: none~%"))
+    (format t "      realization: ~(~A~)~%" (or (getf record :realization) "none"))
+    (if endpoint
+      (format t "      endpoint: ~A, ~D actions, sha256 ~A~%"
+              (getf endpoint :checkpoint) (getf endpoint :actions) (getf endpoint :sha256))
+      (format t "      endpoint: none~%"))
+    (format t "      live guesses (~D):~{ ~(~A~)~}~%" (length guesses) guesses)
+    (if (getf record :attempts)
+      (format t "      attempts:~{ ~(~A~)~}~%" (getf record :attempts))
+      (format t "      attempts: none~%"))))
+
+
+(defun report-ledger-stages (ledger)
+  "The STAGES section of a version-2 ledger: every stage in plan order.  Bounds against a stage
+   are listed here by id only; they print in full under COST BOUNDS (guard X3)."
+  (let ((order (ledger-stage-order ledger)))
+    (format t "~%  STAGES (~D)  [plan order; standing computed, never stored]~%" (length order))
+    (dolist (id order)
+      (report-ledger-stage ledger id))))
+
+
 (defun report-realization-ledger (ledger)
-  "The whole ledger, in the order a session reads it: what is open and what blocks it first,
-   then the settled records, then the cost bounds under their own heading, then the questions,
-   then what died.  Nothing is omitted: a retracted record is evidence."
+  "The whole ledger, in the order a session reads it: for a version-2 ledger its stages in
+   plan order first (T27); then what is open and what blocks it, the settled records, the
+   cost bounds under their own heading, the questions, then what died.  Nothing is omitted:
+   a retracted record is evidence.  A version-1 ledger prints exactly as before T27."
   (format t "~%~%LEDGER  REALIZATION LEDGER  [interactive-phase state for ~A]~%"
           (getf ledger :problem))
   (format t "-------------------------------------------------------------~%")
@@ -901,6 +1263,8 @@
   (format t "  printed CONDITIONAL rests on at least one live guess or one cost bound.~%")
   (format t "  NOTE: RO prints \"status CONDITIONAL\" for what this reporter calls STANDING.~%")
   (format t "  This file's :STATUS is the stored lifecycle, which RO has no analogue for.~%")
+  (when (eql (getf ledger :version) 2)
+    (report-ledger-stages ledger))
   (let ((open (remove-if-not (lambda (record)
                                (and (eq (getf record :kind) :link)
                                     (member (getf record :status) '(:open :realized))))
@@ -1476,7 +1840,7 @@
 (defun file-ledger-surprise (ledger id question candidates &optional (date (ledger-today)))
   "M5.  A surprising outcome is not a result to be absorbed; it is a question the schema failed
    to ask.  It is recorded here as a question marked :GAP-CANDIDATE, and
-   REPORT-LEDGER-GAP-CANDIDATES prints it for the problem's Constraint-Schema-Gaps.txt.  That
+   REPORT-LEDGER-GAP-CANDIDATES prints it for doc/constraint-method/Schema-Gaps.txt.  That
    file is hand-maintained, so nothing writes to it from here."
   (let ((question-id (ledger-next-id ledger "QN")))
     (add-ledger-record ledger
@@ -1510,7 +1874,7 @@
 
 
 (defun report-ledger-gap-candidates (ledger)
-  "The surprises this ledger has collected, as text for the problem's Constraint-Schema-Gaps.txt.
+  "The surprises this ledger has collected, as text for doc/constraint-method/Schema-Gaps.txt.
    Printed, never written: that file is hand-maintained and M2's regeneration rule does not
    cover it."
   (let ((candidates (remove-if-not (lambda (record)
@@ -1521,8 +1885,8 @@
             (length candidates))
     (format t "--------------------------------------------------------------~%")
     (format t "  M5: a surprising outcome is a question the schema failed to ask.  Append these~%")
-    (format t "  to the problem's Constraint-Schema-Gaps.txt BY HAND, stated domain-generally.~%")
-    (format t "  Nothing here writes to that file.~%")
+    (format t "  to doc/constraint-method/Schema-Gaps.txt BY HAND, tagged with this problem as~%")
+    (format t "  their origin and stated domain-generally.  Nothing here writes to that file.~%")
     (dolist (candidate candidates)
       (format t "~%    ~(~A~)  blocks ~:[nothing~;~:*~{~(~A~)~^, ~}~]~%"
               (getf candidate :id) (getf candidate :blocks))

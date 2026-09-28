@@ -1,0 +1,22 @@
+12c12
+<     beam-relay        COVERED    extractors S6 RC
+---
+>     beam-relay        COVERED    contract (also S6 RC; RL scenario)
+90a91,107
+> 
+>   contract beam-relay
+>     controls  the derived COLOR of every relay (connector or repeater), recomputed in each propagation after the crossing set, and each receiver's ACTIVE fact (RECORDING-ACTIVE in the recording view)
+>     moves     connectors only: PICKUP-CONNECTOR lifts one and deletes every PAIRED fact it owns and every one naming it; PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps them, but a held connector has no location and neither receives nor sends a beam; PUT-CONNECTOR places without pairing; CONNECT-CONNECTOR places the held connector at a location the agent reaches and stores 1 to *max-connector-pairings* outgoing PAIRED facts, to termini structurally visible from any location the agent can walk to, never to a connector at the placement location
+>     requires  lighting runs in propagation layers from every transmitter (layer 0). A relay settles in the first layer in which any clear link from a lit source reaches it: one hue lights it; two or more hues in that layer leave it dark, and a dark relay feeds nothing; a hue arriving in a later layer is ignored. A connector is also dark when a connector at its location is already lit. Clear link: a stored PAIRED fact in either direction (COUPLED for fixed apparatus), a live sightline in the reading view, and no cut by an active crossing (physical view only). Pairings persist while their beam is blocked or cut; only pickup clears them. Capacity counts a connector's outgoing pairings; incoming links are unlimited. A receiver is reached only by a relay of its hue whose own outgoing pairing (or coupling) names it, visible and uncut; beam-direct may reach it independently. CONNECT-CONNECTOR needs no lit connector of the same recorder layer at the placement location. Layers are propagation order, not travel time or action order
+>     capacity: 3 outgoing pairings per connector (*max-connector-pairings*); incoming links unlimited
+>     transmitters by hue: blue transmitter2; red transmitter1
+>     receivers by hue: blue receiver3; red receiver1, receiver2
+>     connectors (3): connector1, connector2, connector3
+>     repeaters (0)
+>     start-state links (0 stored pairings): none
+>     direct feeds by RC station (4 with a visible transmitter; 3 COMPETING HUES), each transmitter with the gates it requires open:
+>       location1@1: blue transmitter2 ALWAYS; red transmitter1 ALWAYS  COMPETING HUES
+>       location2@1: blue transmitter2 ALWAYS; red transmitter1 ALWAYS  COMPETING HUES
+>       location3@1: blue transmitter2 ALWAYS; red transmitter1 ALWAYS  COMPETING HUES
+>       location4@1: red transmitter1 requires open gate1
+>     Pairing one connector to two hues settles it in layer 1 with a CONFLICT (dark, feeds nothing). A direct transmitter link reaches a connector in layer 1, ahead of any relayed hue, so a relayed hue lights it only while that direct link is unpaired, blocked or cut. Separately possible per-hue routes are not claimed to compose; a joint arrangement needs REPORT-RELAY-LIGHTING-SCENARIO.

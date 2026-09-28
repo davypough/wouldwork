@@ -1,0 +1,45 @@
+10c10
+<   public technologies spliced (8): 7 covered, 1 UNCOVERED
+---
+>   public technologies spliced (8): 8 covered, 0 UNCOVERED
+12c12
+<     floor-gears       UNCOVERED
+---
+>     floor-gears       COVERED    contract (also S1 CC; EQ scenario)
+15c15
+<     step              COVERED    extractors S2 T6; blower mounting in the floor-blower contract; gears-mounted fans have no component
+---
+>     step              COVERED    extractors S2 T6; boarding a fixed floor blower in the floor-blower contract, a gears-mounted fan in the floor-gears contract
+20c20
+<   UNCOVERED (1): floor-gears
+---
+>   UNCOVERED (0):
+36a37,64
+> 
+>   contract floor-gears
+>     controls  the gears' CONTROLS aggregate (uncontrolled default on) unless jammed; TURNING is that state. A stream exists only while a fan is mounted and the gears turn: turning gears with no fan lift nothing, and a fan on stopped gears is inert
+>     moves     a non-fan occupant resting ON the mounted fan, with its stack, to AIMED-AT; when no floor drive aimed there has a fan and turns, an occupant there not ON a support drops back to the gears' location. A loose fan resting on a mounted fan is toppled to the ground at the source
+>     requires  removal by PICKUP-FAN: empty hands, REACHABLE, vertical reach to the fan, and a clear top (an occupied fan cannot be lifted). MOUNT-FAN: holding the fan, manipulation allowed, the gears' location REACHABLE, no fan already mounted there, vertical reach to the working height; turning gears accept it. A floor-mounted fan is a flush steppable support at the gears' location; a fan on the ground or a box is not steppable. Boarding is a STEP from the ground there onto the clear fan, support use allowed. One fan occupies one mount at a time; any gears type accepts it. Recorder problems reject floor gears
+>     fans (1); every gears instance accepts any fan (MOUNT-FAN), one mount per fan at a time
+>       fan1  start MOUNTED on wgears1, WALL-HUNG (no location); compatible mounts fgears1, wgears1
+>       1 fan for 2 mounts: at most 1 mount can have a stream at once; a fan moved to one mount leaves its old mount without a stream
+>     mounts (2)
+>     fgears1  floor gears at location10 -> location11 (level 10); working height 0
+>       control      uncontrolled default on, unless jammed
+>       start        VACANT, TURNING, NO FAN: no stream
+>       mount from   location10 (floor 0: within vertical reach) (engine REACHABLE, start state; floor level only)
+>       removal (PICKUP-FAN, empty hands, reach to the fan): the stream stops; the gears keep turning; a jam of fgears1 is redundant while no fan is mounted
+>       arcs gated by its stream (0; clauses in S3), passable while it has no fan or does not turn in the mover's view: none
+>       installation: the fan becomes a flush steppable support at location10; a fan lying on the ground or a box is not steppable
+>       boarding: STEP from the ground at location10 onto the fan, top clear, support use allowed; while the gears turn, a non-fan occupant ON it is launched with its stack to location11 (level 10)
+>       landing: kept only while some floor drive aimed at location11 has a fan and turns; otherwise an occupant not ON a support drops back to location10 -- stand on a support there or leave by an exit first
+>       exits from location11 (12), by mode; each mode's own predicate is not evaluated
+>         walking (12): location1 ((wblower2 wblower3 wblower4)), location10, location12 ((wblower2 wblower3 wblower4 wgears1)), location13 ((wblower3 wblower4)), location2 ((wblower2 wblower3 wblower4 wgears1)), location3 ((gate1 gate2 wblower2 wblower3 wblower4 wgears1)), location4 ((wblower3 wblower4)) (directed), location5 ((wblower2 wblower3 wblower4)), location6 ((wblower4)) (directed), location7 ((wblower3 wblower4)), location8 (directed), location9 ((wblower4))
+>     wgears1  wall gears at location2 -> location1 (level 0); working height 1
+>       control      uncontrolled default on, unless jammed
+>       start        fan1 mounted, turning: EFFECTIVE STREAM
+>       mount from   location2 (floor 0: within vertical reach) (engine REACHABLE, start state; floor level only)
+>       removal (PICKUP-FAN, empty hands, reach to the fan): the stream stops; the gears keep turning; a jam of wgears1 is redundant while no fan is mounted
+>       arcs gated by its stream (32; clauses in S3), passable while it has no fan or does not turn in the mover's view: walking location10<->location12, walking location10<->location2, walking location10<->location3, walking location11<->location12, walking location11<->location2, walking location11<->location3, walking location12<->location13, walking location12<->location2, walking location12<->location4, walking location12<->location5, walking location12<->location6, walking location12<->location7, walking location12<->location8, walking location12<->location9, walking location13<->location2, walking location13<->location3, walking location1->location12, walking location1->location2, walking location1->location3, walking location2<->location3, walking location2<->location4, walking location2<->location5, walking location2<->location6, walking location2<->location7, walking location2<->location8, walking location2<->location9, walking location3<->location4, walking location3<->location5, walking location3<->location6, walking location3<->location7, walking location3<->location8, walking location3<->location9
+>       stream physics: the wall-blower contract
+>     These rows state compatibility and prerequisites only: not that a fan can be carried between mounts, a mount reached, or a lift used.  A settled state's equipment needs REPORT-EQUIPMENT-SCENARIO.

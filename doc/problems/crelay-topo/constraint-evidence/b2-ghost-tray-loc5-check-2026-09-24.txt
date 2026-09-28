@@ -1,0 +1,343 @@
+B2 ghost-held tray at location5 -- read-only check -- 2026-09-24
+================================================================
+
+AUTHORIZATION AND SCOPE
+D named a new elevation resource for the closed B2 branch and approved a
+read-only, step-by-step check of it. No Lisp, staging, import, search,
+replay, validation or instance edit runs. No sealed file is opened. The
+check stops at the first step that fails.
+
+USER-ASSERTED PREMISE (proposed pr18, not yet ingested)
+At the start of the recording that uses the resource: connector1 is on
+plate1 holding gate1 open, tray1 is at location7, and agent1 is at
+recorder1 empty-handed.
+
+ROUTE UNDER CHECK
+1 Setup: connector1 onto plate1; agent1 back at the recorder.
+2 Recording: ghost carries tray1* from location7 to location5 and holds it.
+3 Playback: live agent1 turns switch1 on; blower1 lifts it to location20.
+4 Live agent1 jumps from location20 onto the ghost-held tray at location5.
+5 From the tray, live agent1 turns switch1 off; gate2 opens.
+6 Live agent1 jumps from the tray through gate2 to location6.
+7 Live agent1 picks up box1 and jumps back out through gate2 with it.
+
+STEP 1 -- SETUP.  RESULT: PASSES ON HAND READING (not measured).
+Same structure as the measured B1 experiment (ghost holds plate1, live agent
+brings an object to plate1, returns to recorder1, cancels), with connector1
+from location9 in place of tray1 from location7.
+- put-connector (beam-relay.lisp) places through PLACEMENT-OPTIONS
+  (-placement.lisp); a plate is an offered support, so connector1 may rest
+  on plate1.
+- location9 is past gate3; tray1 stays on plate2, so gate3 stays open for
+  the whole trip, unlike B1 where lifting tray1 closed it.
+- Carrying connector1 back into R1 needs gate1 (ladder1 carries no cargo),
+  which the ghost on plate1 supplies during playback.
+- Cancelling at recorder1 empty-handed removes the ghosts and keeps
+  connector1 on plate1, so gate1 stays open (recorder rule 24a).
+Resulting pre-recording state matches the premise. Not measured; B1 is an
+analogue, not a witness.
+
+STEP 2 -- GHOST CARRIES TRAY1* TO LOCATION5 AND HOLDS IT.
+RESULT: PASSES ON HAND READING (not measured).
+- The fork (-recorder-session.lisp, START-RECORDER) copies current state:
+  connector1* on plate1, tray1* on plate2 at location7, agent1* at
+  recorder1/location1.
+- Recording gate1 is open from connector1* on plate1, so agent1* walks
+  R1 -> R8 (S3 spine arc R1<->R8, family gate1).
+- pickup-tray (tray.lisp) needs only an unheld tray within pickup reach;
+  lifting tray1* closes recording gate3, which this route never uses.
+- location7 and location5 are both in R8 (S3), no gate between them. S3's
+  caveat applies: same region is not by itself proof of a walk; a grounded
+  walk across the open floor is the reading taken here.
+- In the planner, the ghost's recording and playback are one interleaved
+  action stream, and CANCEL-PLAYBACK lets the live agent end the cycle
+  without the ghost finishing. So agent1* may simply stop at location5
+  still holding tray1*. In game terms this is a pause point with the ghost
+  holding the tray (recorder rules 6-7).
+- A held tray keeps HAS-LOCATION at its holder's location (tray.lisp), so
+  tray1* is a held support at location5.
+
+STEP 3 -- LIVE AGENT TURNS SWITCH1 ON; BLOWER1 LIFTS IT TO LOCATION20.
+RESULT: PASSES ON HAND READING (not measured).
+- Live gate1 is open from connector1 on plate1, so agent1 walks R1 -> R8.
+- toggle-switch (switch.lisp) needs REACHABLE switch1 and vertical reach.
+  S4's controller row lists switch1's manipulation reach candidates as
+  location4, location5 and location20 (no barrier) and location6 (gate2).
+- A live toggle is live-side only (switch.lisp): physical switch1 on,
+  physical blower1 turning, physical gate2 closed. The recording view and
+  the ghost holding tray1* at location5 are unaffected (recorder rule 21).
+- blower1 is a flush support at location4 (-placement.lisp). With agent1
+  on it and its live view active, BLOW-OCCUPANTS-AWAY! (-floor-blowing.lisp)
+  relocates agent1 to location20, where DROP-OCCUPANTS! sustains it while
+  the drive stays active in its view. Either order (step on, then toggle;
+  or toggle, then step on) reaches this state.
+
+STEP 4 -- LIVE AGENT JUMPS FROM LOCATION20 ONTO THE GHOST-HELD TRAY AT
+LOCATION5.  RESULT: PASSES ON HAND READING (not measured).
+- Authored edge: (traverse-via jumping location20 () location5), empty
+  family, so no clearance test.
+- JUMP-LANDING-SUPPORT-AT (jump.lisp): a tray is a landing support while a
+  different agent holds it; tray1* is held by agent1*.
+- SUPPORT-USE-ALLOWED (-recorder-core.lisp): rule 19 exception -- a live
+  occupant may use a ghost tray while a ghost holds it, recording in
+  progress. The remote-landing branch applies whatever the source place.
+- Elevation: source location20 level 3/2; held tray top 3/2 (S5; AM4a
+  correction). Rise 0 <= *vertical-reach-limit* 1.
+
+STEP 5 -- FROM THE TRAY, LIVE AGENT TURNS SWITCH1 OFF; GATE2 OPENS.
+RESULT: PASSES ON HAND READING (not measured).
+- Reach: location5 is a switch1 reach candidate with no barrier (S4).
+- Vertical reach: WITHIN-AGENT-VERTICAL-REACH (-support-elevation.lisp)
+  compares |base(switch1) - base(agent1)|. switch1 has no authored z, so
+  FIXED-BASE (-vertical.lisp) takes the APPARATUS-COORDS> default 1;
+  agent1 stands at 3/2. |1 - 3/2| = 1/2 <= 1.
+- Live-side toggle: physical switch1 off, physical blower1 off, physical
+  gate2 open (inverted). agent1 is ON tray1*, so it is supported and no
+  drop applies. The ghost's recording view is unchanged.
+
+STEP 6 -- LIVE AGENT JUMPS FROM THE TRAY THROUGH GATE2 TO LOCATION6.
+RESULT: PASSES ON HAND READING (not measured).
+- Authored edge: (traverse-via jumping location5 ((gate2)) location6).
+- A supported source (agent1 on tray1*) may use an authored jumping edge to
+  land on remote ground (jump.lisp, JUMP-CONFIGURATION-TRANSITIONS).
+- gate2 is open in the live view, so it needs no clearance.
+- Elevation: source 3/2 (tray top), target location6 level 3/2. Rise 0.
+- This is exactly the height the grounded version lacked: from ground at
+  location4/5 the rise is 3/2 > 1, which is why the revised B2 analysis
+  found no entry. The ghost-held tray supplies the missing 3/2.
+
+STEP 7 -- LIVE AGENT PICKS UP BOX1 AND JUMPS BACK OUT THROUGH GATE2.
+RESULT: PASSES ON HAND READING (not measured).
+- pickup-box (box.lisp): CLEARTOP is judged against same-layer weight; box1*
+  superimposed at location6 does not pin box1. Same location; box base 3/2
+  (location6 level), agent base 3/2, so vertical reach 0.
+- Exit edges: the jumping edges into location6 are symmetric TRAVERSE-VIA,
+  so location6 -> location5 and location6 -> location4 exist, family gate2.
+- OBSTACLE-CLEAR (-passability.lisp): an open gate passes regardless of
+  holding; only screens and ladders require empty hands. Physical gate2 is
+  still open (switch1 off).
+- Elevation: 3/2 down to level 0 -- downward jumps are unrestricted.
+
+OVERALL RESULT
+All seven steps pass on hand reading. End of the route: agent1 on ground
+at location5 (or location4) holding box1; connector1 on plate1; live tray1
+never moved and is still on plate2; agent1* holding tray1* at location5;
+second recording cycle still open. The earlier failure is not repeated:
+the ghost's tray never had to hold gate1, and the held tray supplies the
+3/2 rise that the grounded jump into location6 lacked.
+
+NOT ESTABLISHED
+No step is measured. Nothing here moves box1 onward (to plate2 or
+location9), ends the cycle, or restarts B2's second fork. Premise pr18 is
+proposed only; it is not in the ledger.
+
+VALIDATION BY D, 2026-09-24 (replaces "No step is measured" above)
+D loaded validate-b2-ghost-tray-2026-09-24.lisp: fresh stage, 23 actions,
+VALIDATE-ACTION-SEQUENCE, no search.
+  SUCCESS-P T  ACTION-COUNT 23  GOAL-CHECKED-P T  GOAL-SATISFIED-P true
+  (a non-NIL MEMBER tail). An earlier run of the same sequence reported
+  GOAL-SATISFIED-P NIL only because the goal test looked for HOLDING, which
+  is bijective and stored as HOLDING1/HOLDING2; the test was corrected.
+Final state (relevant facts): agent1 at location5 holding box1; agent1* at
+location5 holding tray1*; tray1 on plate2 (location7); connector1 on plate1;
+box1* at location6; physical gates 1, 2, 3, 5 open; recording gates 1, 2, 5
+open; recording cycle 2 in progress.
+Grade: the route is a validated concrete sequence from the initial state.
+It closes the B2 elevation question: box1 can leave the alcove. It does not
+yet move box1 onward, end cycle 2, or start B2's second fork.
+The setup cycle (actions 1-11) matches the earlier T13 B1-prime checkpoint
+(reconstruct-b1-prime-checkpoint-2026-09-22.lisp).
+
+EXTENSION VALIDATED BY D, 2026-09-24 -- BOX1 TO PLATE2, CYCLE 2 CLOSED
+D chose: box1 goes to plate2; the gate8 beam will use a ghost connector on
+the ground at location9 paired with transmitter1 and repeater1. Technical
+choice (assistant's, reversible): arrange the next fork with tray1 on plate1
+(gate1 for the ghost) and connector1 on the ground at location9, so
+connector1* forks there.
+validate-b2-box-plate2-2026-09-24.lisp, fresh stage, 39 actions, no search:
+  SUCCESS-P T  ACTION-COUNT 39  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+Final state: agent1 at location1; tray1 on plate1; box1 on plate2;
+connector1 on ground at location9; recorder cycle closed, 2 cycles used;
+physical gates 1, 2, 3, 5 open; recording gates 1, 2, 3, 5 open.
+This is the B2 endpoint the 2026-09-22 baseline wanted, now validated.
+
+CORRECTION BY D, 2026-09-24 -- the 39-action arrangement above is superseded.
+D's intended next-fork arrangement: box1 on plate2, connector1 kept on plate1,
+tray1 on the ground at location7 (reachable during the next recording). The
+39-action validation stays on record as measured, but it is not the chosen
+B2 endpoint. Revised route (31 actions): validate-b2-box-plate2-rev-2026-09-24.lisp,
+awaiting D's run.
+
+REVISED ENDPOINT VALIDATED BY D, 2026-09-24 -- CYCLE 2 COMPLETE
+validate-b2-box-plate2-rev-2026-09-24.lisp, fresh stage, 31 actions, no search:
+  SUCCESS-P T  ACTION-COUNT 31  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+Final state: agent1 at location1; connector1 on plate1; box1 on plate2;
+tray1 on the ground at location7; cycle closed, 2 cycles used; physical and
+recording gates 1, 2, 3, 5 open. This is the chosen B2 endpoint.
+
+CYCLE 3 PLAN (D, 2026-09-24), user-asserted
+Handoff of box1 and a paired connector1 from the ghost to the live agent:
+the ghost holds tray1* at location5; the live agent stacks box1 and the paired
+connector1 on it; the ghost carries the stack to location12 (past gate5),
+where the live agent stands holding tray1 superimposed; the ghost puts tray1*
+down, and the riders settle onto the live agent's held tray.
+Part A (validation file validate-c3-part-a-2026-09-24.lisp): ghost to
+location5 with tray1*; live agent puts box1 on the ghost-held tray. Taking
+box1 off plate2 keeps physical gate3 open because box1* is still on plate2.
+
+CYCLE 3 PART A, FIRST RUN (D, 2026-09-24): FAILED at action 39,
+(put-box agent1 box1 on tray1* at location5): STATE-MISMATCH -- only GROUND was
+offered. Cause: WITHIN-AGENT-PLACEMENT-REACH allows a rise of at most 1; a held
+tray's top is 3/2 and the grounded agent's base is 0. The S5 placement matrix
+already printed "agent1 0 -> tray1* 3/2 NO" (not consulted before writing).
+D: the model is right; the agent rides blower1 to location20 (level 3/2) to
+place onto the ghost-held tray. D also stated the connector is paired with
+repeater1 and receiver1 before it goes on the box. Part A revised to place the
+box from location20 (reach location20 -> location5 is ALWAYS in S6's table).
+
+CYCLE 3 PART A VALIDATED BY D, 2026-09-24
+validate-c3-part-a-2026-09-24.lisp (revised), 41 actions, no search:
+  SUCCESS-P T  ACTION-COUNT 41  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+box1 on tray1* held by agent1* at location5; agent1 at location20 with
+blower1 turning; 3 cycles used, cycle 3 open.
+PART B (D): pair connector1 at location9 with repeater1 and receiver1.
+CONNECTABLE-TERMINUS (beam-relay.lisp) pairs by structural LOS from any
+traversable vantage; S6 shows a grounded connector at location9 does NOT see
+receiver1 (location9 @ 1 -> receiver1 NEVER), so the pairing holds but the
+beam carries colour only once the connector is raised (@2 or @5/2: ALWAYS).
+Part B file: validate-c3-part-b-2026-09-24.lisp (53 actions).
+PART B FIRST RUN (D): FAILED at action 48, STATE-MISMATCH -- termini order only.
+D's diagnostic: potentially-visible location9 -> receiver1 is T; vantages from
+location9 include 12 and 13. Generated termini lists run in reverse terminus
+order (cf. keeper's (REPEATER1 TRANSMITTER1)); action 48 corrected to
+(repeater1 receiver1). The engine has no pair-while-holding action:
+CONNECT-CONNECTOR always places the connector, so pairing and re-lifting stay
+two actions.
+
+CYCLE 3 PART B VALIDATED BY D, 2026-09-24
+validate-c3-part-b-2026-09-24.lisp, 53 actions, no search: SUCCESS-P T, goal T.
+box1 on tray1* (held by agent1* at location5); connector1 on box1, paired with
+repeater1 and receiver1; agent1 at location20, blower1 on; cycle 3 open.
+Part C file: validate-c3-part-c-2026-09-24.lisp (60 actions) -- the handoff at
+location12. Technical choice (reversible): the ghost puts tray1* on the ground
+at location12, not on plate5.
+
+CYCLE 3 PART C VALIDATED BY D, 2026-09-24 -- HANDOFF WORKS
+validate-c3-part-c-2026-09-24.lisp, 60 actions, no search: SUCCESS-P T, goal T.
+agent1 at location12 holding tray1; box1 on tray1; connector1 on box1, paired
+with repeater1 and receiver1; ghost agent1* at location12, tray1* on the ground
+there; box1* on plate2, connector1* on plate1; gates 1, 3, 5 open (physical and
+recording); switch1 on, blower1 turning; cycle 3 open, 3 cycles used.
+The riders settled from the ghost's released tray onto the live held tray as
+D predicted (-support-settling local release).
+
+ALTERNATIVE CYCLE 3 VALIDATED BY D, 2026-09-25 -- STACK AT LOCATION15, RECEIVER1 LIT
+D proposed a new cycle 3 (50 actions) replacing parts A-C and the unrecorded part
+D1-D3 route (validate-c3-part-d1/-d2/-d3-2026-09-24.lisp exist on disk; their
+validation is not recorded here). File: validate-c3-alt-2026-09-25.lisp = the 31-action
+cycle-1/2 prefix + D's actions 2-50 verbatim (D's action 1 is prefix action 30; the
+prefix's CANCEL-PLAYBACK is kept because START-RECORDER requires no recording in
+progress). Fresh stage, no search:
+  SUCCESS-P T  ACTION-COUNT 80  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+Route in brief: ghost holds tray1* at location5; live agent sets connector1 down at
+location7, stacks box1 on tray1* from location20, then CONNECT-CONNECTOR puts
+connector1 on box1 paired with (repeater1 receiver1) from location20 (first validated
+connect onto a raised box); tray1 to plate4; ghost carries the stack to plate5 (gate6);
+switch2 on (gate7 open, physical gate5 closed); tray1 lifted, agent on plate5, ghost
+releases tray1* so the stack settles onto the live held tray1; ghost resets plate1 with
+tray1*, pairs connector1* at location9 with (repeater1 transmitter1) and stands on
+plate3 (gate4); live agent walks through gate7 to location15.
+Final state (relevant facts): agent1 at location15 holding tray1; box1 on tray1;
+connector1 on box1; RECEIVER1 ACTIVE; connector1, connector1*, repeater1 RED; open
+gates 1, 2, 3, 4, 7, 8; recording gates 1, 2, 3, 4, 5; agent1* on plate3 at location10;
+tray1* on plate1; box1* on plate2; switch2 on; 3 cycles used, cycle 3 open.
+Engine facts: plain PICKUP-CONNECTOR clears pairings (action 9's pairing was discarded
+and redone at action 21); a switch1-off drop returns the agent to the ground at
+location4. Problem goal (has-location agent1 location19) is NOT yet reached: gate9 needs
+plates 6, 7 and 8 held.
+
+COMPLETE ROUTE VALIDATED BY D, 2026-09-25 -- PROBLEM GOAL REACHED
+validate-c3-final-2026-09-25.lisp = the 80-action alternative cycle 3 + a 10-action
+hand-derived final leg: through gate8 (receiver1 active) to location16; tray1 with its
+riders on plate6; connector1 off box1 onto plate7; box1 off tray1 onto plate8 (gate9
+open); through gate9 to location19. Fresh stage, no search:
+  SUCCESS-P T  ACTION-COUNT 90  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+Final state (relevant facts): agent1 at location19; tray1 on plate6, connector1 on
+plate7, box1 on plate8; gate9 open; gate8 closed once connector1 left location15 (as
+expected, after agent1 had passed); 3 recorder cycles used, cycle 3 still open.
+Grade: a hand-derived, D-directed, validated concrete solution to crelay-topo. Exposed
+analysis (T10 from 2026-09-22 on), not a method-derived prediction. T10's written
+acceptance (approved final-goal search + validate-search-checkpoint) is not yet met;
+D decides how T10 closes.
+
+T10 CLOSING SEARCH (OPTION 1), 2026-09-25 -- OUT OF MEMORY
+D chose to close T10 by its written acceptance. D ran
+build-c3-location15-checkpoint-2026-09-25.lisp: 80 actions replayed and exported to
+t10-c3-location15-checkpoint.txt (1 checkpoint, 80 actions; no search). D then ran
+run-t10-final-search-2026-09-25.lisp: one search for (has-location agent1 location19),
+threads 16, cutoff 12, graph mode, symmetry NIL, minimum-steps pruning T. The search
+ran out of memory before finishing. No final checkpoint was exported and no validation
+ran. Counted as a reported puzzle search (21st) with no result: neither a solution nor
+an exhaustion bound. A 10-action solution from this checkpoint is known (hand leg,
+validate-c3-final-2026-09-25.lisp), so a cutoff of 10 or more contains a solution.
+
+T10 CLOSING SEARCH RERUN (CUTOFF 10), 2026-09-25 -- SOLUTION FOUND; FINAL VALIDATION
+FAILED ON A PATH-FORMAT MISMATCH
+run-t10-final-search-2026-09-25.lisp at cutoff 10 (D's option 1), threads 16, GRAPH,
+symmetry NIL, minimum-steps T. 579 s real, 1.24 TB consed. Outcome
+:EXHAUSTED-WITH-SOLUTIONS :COMPLETE, truncation T, 9,995,969 cutoff hits (22nd reported
+search). Minimum-length final leg found: 7 actions (the hand leg was 10):
+  81 walk location15 (gate8) location18
+  82 put-tray tray1 on plate8 at location18          (stack rides)
+  83 pickup-connector-retaining-pairings connector1 at location18
+  84 connect-connector connector1 on plate6 to (repeater1 receiver1) at location16
+     (remote placement from location18)
+  85 pickup-box box1 at location18
+  86 put-box box1 on plate7 at location17 (remote placement; gate9 opens)
+  87 walk location18 (gate9) location19
+Exported: t10-final-checkpoint.txt (2 checkpoints, 87 actions).
+VALIDATE-SEARCH-CHECKPOINT: SUCCESS-P NIL, 87 actions, GOAL-CHECKED-P T, GOAL-SATISFIED-P NIL.
+Diagnosis (source reading; failure index not printed by the run file): phase 1 was built
+by replay with plain action forms, while the search-found phase stores timestamped
+entries (81.0 (MOVE ...)). GOAL-CHAIN-CUMULATIVE-PATH concatenates them;
+NORMALIZE-VALIDATION-ACTIONS classifies the whole list by its first entry only (plain),
+so entry 81 reaches the validator as (81.0 ...) -> "Action 81.0 not found". The fault
+is the mixed-format checkpoint built in this session (the B1-prime build shares the
+pattern), not the found solution. Expected confirmation: failure index 81.
+Confirmed by D: failure index 81, "Action 81.0 not found in problem specification".
+D approved the engine fix (option 1): NORMALIZE-VALIDATION-ACTIONS in
+src/ww-solution-validation.lisp now normalizes each entry on its own (timestamped ->
+action form; plain form kept; state snapshots dropped). Callers: VALIDATE-ACTION-SEQUENCE
+and %VALIDATE-SOLUTION only. Acceptance file (no search):
+validate-t10-final-checkpoint-2026-09-25.lisp -- imports t10-final-checkpoint.txt and runs
+VALIDATE-SEARCH-CHECKPOINT.
+
+T10 FINAL ACCEPTANCE VALIDATION BY D, 2026-09-25 -- PASSED
+validate-t10-final-checkpoint-2026-09-25.lisp (after the NORMALIZE-VALIDATION-ACTIONS fix
+and a full reload): fresh stage, threads 16, t10-final-checkpoint.txt restored by replay
+(2 checkpoints, 87 actions; no search), then VALIDATE-SEARCH-CHECKPOINT:
+  SUCCESS-P T  ACTION-COUNT 87  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+The composed path (80 hand-derived, D-directed actions + 7 search-found) reaches the
+original goal (has-location agent1 location19) from the initial state. T10's validation
+clause is met. Its premise-provenance clause (every premise recorded, user-asserted ones
+listed separately) is NOT yet met: pr18 and D's cycle-2/3 plans are not in the ledger.
+Grade: exposed analysis; demonstrates the loop closes, not discovery.
+
+D1-D3 FILES (recorded 2026-09-25, tidy-up approved by D)
+validate-c3-part-d1/-d2/-d3-2026-09-24.lisp (65, 71, 73 actions; each a prefix of the next)
+were written in the late 2026-09-24 session after its handoff, extending parts A-C:
+D1 hands the stack back to the ghost, the ghost stands on plate5 and the live tray1
+goes on plate4 (gate6); D2 goes through gate6/screen1 empty-handed, turns switch2 on,
+returns, lifts tray1 and joins the ghost on plate5, where the ghost's release settles
+the stack onto the live held tray1; D3 steps off plate5 and carries the stack through
+gate7 to location15. No state file recorded whether D ran them. The route is
+SUPERSEDED by D's alternative cycle 3 (validate-c3-alt-2026-09-25.lisp), which the
+accepted T10 path uses; the D files feed no chain, archive or ledger record. Each
+file's header now carries this status; the action lists are unchanged.
+D3 VALIDATED BY D, 2026-09-25: validate-c3-part-d3-2026-09-24.lisp, fresh stage, no search:
+  SUCCESS-P T  ACTION-COUNT 73  GOAL-CHECKED-P T  GOAL-SATISFIED-P T
+D1 (65) and D2 (71) pass as prefixes. End state: agent1 at location15 holding tray1 with
+box1 and connector1 (paired with repeater1 and receiver1); agent1* on plate5; connector1*
+on plate1; gates 1, 3, 7 open; switch1 and switch2 on. Receiver1 NOT active and gate8
+closed: this route carries the stack to location15 without the source relay that D's
+alternative cycle 3 adds (connector1* at location9, ghost on plate3). File headers updated.

@@ -1,0 +1,261 @@
+--- before-T32
++++ after-T32
+@@ -2765,6 +2765,82 @@
+         (push pick chosen)))))
+ 
+ 
++(defun wall-stream-strikes-p (base top stream)
++  "Wall-blower's body interval: exclusive base, inclusive top. Fans are excluded by callers."
++  (and (< base stream) (<= stream top)))
++
++
++(defun wall-stream-drives ()
++  "Fixed wall blowers and removable wall drives, in deterministic name order."
++  (keeper-sorted-set (append (census-type-instances 'wall-blower)
++                             (census-type-instances 'wall-gears))))
++
++
++(defun relay-state-equals-aggregate-p (relation device axioms)
++  "An S1 axiom admits DEVICE and proves this physical state equals its aggregate."
++  (and (relation-keys-a-device-p relation (list device))
++       (some (lambda (axiom)
++               (and (eq (first axiom) relation) (eq (fifth axiom) :aggregate))) axioms)))
++
++
++(defun relay-wall-required-gates (drive gates controls axioms)
++  "Required physical gates that force a fixed wall drive active, under S1's proven premises."
++  (let ((control (find drive controls :key #'third)))
++    (when (and control (member drive (census-type-instances 'wall-blower))
++               (relay-state-equals-aggregate-p 'turning drive axioms))
++      (remove-if-not
++        (lambda (gate)
++          (let ((other (find gate controls :key #'third)))
++            (and other (eq (fourth control) (fourth other))
++                 (equal (clause-set-key (second control)) (clause-set-key (second other)))
++                 (relay-state-equals-aggregate-p 'open gate axioms))))
++        gates))))
++
++
++(defun relay-wall-exposures (stations gates controls)
++  "Conditional station contacts, not a stability simulation or a body/view assignment."
++  (let* ((state *start-state*)
++         (static (list-static-db))
++         (height (when stations
++                   (funcall (symbol-function 'object-height) state
++                            (first (census-type-instances 'connector)))))
++         (axioms (when (wall-stream-drives) (device-state-axioms controls)))
++         (rows nil))
++    (dolist (station stations (nreverse rows))
++      (dolist (drive (wall-stream-drives))
++        (when (eq (first station) (keeper-fact-value 'has-position drive static))
++          (let* ((base (- (second station) height))
++                 (stream (funcall (symbol-function 'blower-elevation) state drive))
++                 (struck (wall-stream-strikes-p base (second station) stream)))
++            (push (list :station station :drive drive :base base :top (second station)
++                        :stream stream :struck struck
++                        :destination (keeper-fact-value 'aimed-at drive static)
++                        :live-conflict-gates (when struck
++                                              (relay-wall-required-gates drive gates controls axioms)))
++                  rows)))))))
++
++
++(defun relay-wall-exposure-text (row)
++  "Contact and same-view gate conflict, without certifying a ghost or support placement."
++  (format nil "~(~A~) at ~(~A~): base ~A, top ~A, stream ~A; ~A; destination ~(~A~)~A"
++          (getf row :drive) (first (getf row :station))
++          (getf row :base) (getf row :top) (getf row :stream)
++          (if (getf row :struck)
++            "SWEPT if a fan is present and turns in the occupant's view"
++            "connector body UNSWEPT; support motion still unresolved")
++          (getf row :destination)
++          (if (getf row :live-conflict-gates)
++            (format nil "; LIVE STATION CONFLICT while physical ~(~{~A~^, ~}~) open (S1 state/aggregate equivalence); ghost fan state independent"
++                    (getf row :live-conflict-gates))
++            "; required fan activity not established")))
++
++
++(defun relay-chain-qualification-notes (chain)
++  "Qualifications travel with RC chains into NH and other diagnostic consumers."
++  (cons "GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED"
++        (mapcar #'relay-wall-exposure-text (getf chain :wall-exposures))))
++
++
+ (defun relay-chain-evaluate (hops exclusions receiver-devices controls pressure-plates)
+   "One chain's gate set, class and body commitments as a plist."
+   (let* ((stations (remove-if-not #'consp (mapcar #'second hops)))
+@@ -2786,6 +2862,7 @@
+                       (t :bootstrap))))
+     (list :hops hops :stations stations :gates gates :risers risers :class class
+           :bodies bodies :plated plated :off-plate (when bodies (- bodies plated))
++          :wall-exposures (relay-wall-exposures stations gates controls)
+           :plates-needed needed
+           :self-kept (keeper-sorted-set
+                       (intersection needed (loop for station in stations
+@@ -2868,7 +2945,9 @@
+     (format t "        risers INFEASIBLE from the support pool~%")
+     (format t "        connectors ~D; risers ~(~{~A~^, ~}~); bodies ~D, on plates ~D, off plates ~D~%"
+             (length (getf chain :stations)) (getf chain :risers)
+-            (getf chain :bodies) (getf chain :plated) (getf chain :off-plate))))
++            (getf chain :bodies) (getf chain :plated) (getf chain :off-plate)))
++  (dolist (note (relay-chain-qualification-notes chain))
++    (format t "        ~A~%" note)))
+ 
+ 
+ (defun report-relay-chain-summary (receiver chains)
+@@ -2882,7 +2961,7 @@
+             (count :excluded chains :key (lambda (chain) (getf chain :class)))
+             (count :infeasible chains :key (lambda (chain) (getf chain :class))))
+     (if (null bootstrap)
+-      (format t "    no bootstrap chain: the receiver cannot be activated from a closed state~%")
++      (format t "    no geometric bootstrap candidate in RC scope; receiver activation outside this scope UNRESOLVED~%")
+       (progn
+         (format t "    gates open in every bootstrap chain: ~(~{~A~^, ~}~)~:[ none~;~]~%"
+                 (keeper-sorted-set (reduce #'intersection
+@@ -2925,7 +3004,10 @@
+     (format t "  hop's required gates are those whose closing alone blocks it (monotone reading).~%")
+     (format t "  Stations are placements, not reachability claims.  Bodies count the connector and~%")
+     (format t "  its riser (ground 0, held tray 2, other support 1); a station with a plate is~%")
+-    (format t "  counted as keeping it, so off-plate counts are least values.~%")
++    (format t "  counted as keeping it, so off-plate counts are least values within this enumeration.~%")
++    (format t "  GEOMETRIC CANDIDATES: stable simultaneous occupancy and support motion UNRESOLVED.~%")
++    (format t "  BOOTSTRAP/LATCH are geometric classes, not validated realizations. Connector height~%")
++    (format t "  is that used by station enumeration; differing connector heights are not enumerated.~%")
+     (format t "  connectors ~D; fixed couplings ~D (not enumerated); exclusion pairs ~(~{~A~^, ~}~)~%"
+             (length (census-type-instances 'connector)) (relay-chain-coupling-count)
+             (mapcar (lambda (pair) (format nil "{~A, ~A}" (first pair) (second pair))) exclusions))
+@@ -3518,7 +3600,11 @@
+     ("topo-lower-bound" :infrastructure "search pruning bound")
+     ("tray" :extractors "S2 S5")
+     ("visibility" :infrastructure "line of sight; read by S6")
+-    ("walkability" :infrastructure "derives walking arcs; read by S3"))
++    ("walkability" :infrastructure "derives walking arcs; read by S3")
++    ("wall-blower" :contract "also S1 S3 RC CC" report-wall-blower-instances
++     "its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree"
++     "horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination"
++     "own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walking arcs labelled by the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge"))
+   "The contract registry, one entry per public technology name, section 8.3 of the
+    specification.  An entry is (NAME KIND NOTE) for KIND :EXTRACTORS, whose NOTE names the
+    components that already carry the technology's static consequences, and for
+@@ -3623,6 +3709,27 @@
+     (dolist (blower (sort (copy-list (census-type-instances 'floor-blower))
+                           #'string< :key #'symbol-name))
+       (report-floor-blower-row blower facts arcs controls))))
++
++
++(defun report-wall-blower-instances ()
++  "Wall-drive endpoints, stream dimensions, mounting kind and control wiring."
++  (let ((static (list-static-db))
++        (controls (control-facts)))
++    (dolist (drive (wall-stream-drives))
++      (let ((control (find drive controls :key #'third)))
++        (format t "    ~(~A~)  ~A~%" drive
++                (if (member drive (census-type-instances 'wall-blower))
++                  "fixed complete fixture" "wall gears; removable fan required"))
++        (format t "      horizontal   ~(~A~) -> ~(~A~)~%"
++                (keeper-fact-value 'has-position drive static)
++                (keeper-fact-value 'aimed-at drive static))
++        (format t "      stream       elevation ~A; width ~A; base < stream <= top~%"
++                (funcall (symbol-function 'blower-elevation) *start-state* drive)
++                (or (keeper-fact-value 'stream-width drive static) 3))
++        (if control
++          (format t "      control      ~(~S~) ~(~A~), separately in each environmental view~%"
++                  (second control) (fourth control))
++          (format t "      control      uncontrolled default on, unless jammed~%"))))))
+ 
+ 
+ (defun report-ladder-row (ladder facts arcs)
+@@ -3785,12 +3892,13 @@
+ 
+ (defparameter *coupling-role-subsystems*
+   '((barrier . route) (occluder . beam) (lift . lift)
++    (horizontal-transport . transport) (transport . transport)
+     (support-controller . occupancy) (beam-driven . beam))
+   "Each role in the order it prints, paired with the subsystem it belongs to, section
+    9.2 of the specification.")
+ 
+ 
+-(defparameter *coupling-subsystem-order* '(route beam lift occupancy)
++(defparameter *coupling-subsystem-order* '(route beam lift transport occupancy)
+   "The order subsystems print in.")
+ 
+ 
+@@ -3841,6 +3949,12 @@
+   "Every controlled device and every primitive controller, sorted by name."
+   (sort (remove-duplicates (append (mapcar #'third facts) (control-primitives facts)))
+         #'string< :key #'symbol-name))
++
++
++(defun coupling-motion-role (aimed-p floor-p wall-p)
++  "AIMED-AT alone supplies transport, not the floor-blower lift/drop contract."
++  (when aimed-p
++    (cond (floor-p 'lift) (wall-p 'horizontal-transport) (t 'transport))))
+ 
+ 
+ (defun coupling-role-table (facts arcs rows)
+@@ -3858,8 +3972,12 @@
+                                 (when (member object primitives) (list 'primitive)))
+                         (append (when (member object barriers) (list 'barrier))
+                                 (when (member object occluders) (list 'occluder))
+-                                (when (keeper-fact-value 'aimed-at object static)
+-                                  (list 'lift))
++                                (let ((role (coupling-motion-role
++                                              (keeper-fact-value 'aimed-at object static)
++                                              (member object (append (census-type-instances 'floor-blower)
++                                                                     (census-type-instances 'floor-gears)))
++                                              (member object (wall-stream-drives)))))
++                                  (when role (list role)))
+                                 (when (and (member object primitives)
+                                            (member object supports))
+                                   (list 'support-controller))
+@@ -4283,7 +4401,7 @@
+ 
+ 
+ (defun hint-beam-necessity (fact receiver chains controls)
+-  "H3's NECESSARY hint for FACT's device, held only while RECEIVER is active."
++  "S1's necessary receiver condition, with RC bounds conditional on geometric scope."
+   (let* ((device (third fact))
+          (pressure-plates (census-type-instances 'pressure-plate))
+          (usable (remove-if-not (lambda (chain) (member (getf chain :class) '(:bootstrap :latch)))
+@@ -4310,7 +4428,7 @@
+                           (list (format nil "at least ~D bod~:@P ~:[is~;are~] off plates for the beam"
+                                         least (/= least 1)))))))
+     (list :family 3 :label "NECESSARY" :grade "grade 2; S1 RC" :source (list device)
+-          :limit (format nil "~(~A~) == ~(~A~) holds only while ~(~A~) is ~(~A~); every usable beam ~
++          :limit (format nil "~(~A~) == ~(~A~) holds only while ~(~A~) is ~(~A~); within RC's enumerated physical geometric candidates, every chain ~
+                               to ~(~A~) (~D bootstrap, ~D latch) needs ~:[no common gate~;~:*~{~A~^, ~}~]"
+                          device (control-boolean-form (second fact) (fourth fact))
+                          receiver (control-status-relation receiver) receiver
+@@ -4319,9 +4437,10 @@
+                                for entry in gate-plates
+                                collect (format nil "~(~A~) open~@[ (~(~{~A~^, ~}~))~]" gate entry)))
+           :hints (list (if parts
+-                         (format nil "while ~(~A~) must hold, ~{~A~^, and ~}" device parts)
++                         (format nil "within those geometric candidates for ~(~A~), ~{~A~^, and ~}" device parts)
+                          (format nil "while ~(~A~) must hold, RC implies nothing further" device)))
+-          :notes (list "RC scope: physical view only; off-plate counts are least values"))))
++          :notes (list "S1's receiver condition is necessary; RC gate/body bounds are conditional on its physical geometric enumeration, not all recording-view beams"
++                       "Recording sightlines, body/view assignment, forced transport and occupancy stability UNRESOLVED; geometric chains are not validated realizations"))))
+ 
+ 
+ (defun hint-beam-candidates (receiver chains names)
+@@ -4335,13 +4454,18 @@
+       (let* ((group (remove-if-not (lambda (chain) (eq location (hint-chain-end chain))) bootstrap))
+              (least (reduce #'min group :key (lambda (chain) (getf chain :off-plate)))))
+         (push (list :family 3 :label "CANDIDATE" :grade "grade 2; RC" :source (list receiver location)
+-                    :limit (format nil "beams to ~(~A~) whose last connector stands at ~(~A~) (~A): ~
++                    :limit (format nil "physical geometric candidates to ~(~A~) with last connector at ~(~A~) (~A): ~
+                                         least off-plate bodies ~D"
+                                    receiver location (gethash location names) least)
+                     :hints (sort (loop for chain in group
+                                        when (= least (getf chain :off-plate))
+                                          collect (hint-chain-text chain))
+-                                 #'string<))
++                                 #'string<)
++                    :notes (remove-duplicates
++                             (loop for chain in group
++                                   when (= least (getf chain :off-plate))
++                                     append (relay-chain-qualification-notes chain))
++                             :test #'string=))
+               hints)))))
+ 
+ 

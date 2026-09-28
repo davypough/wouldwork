@@ -1,0 +1,66 @@
+1652a1653,1717
+> 
+> 
+> SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
+> --------------------------------------------------------------
+>   SCOPE: a monotone premise closure over passage services (every gate; each drive a traversal clause names) and receiver literals.  Providers: S1 CONTROL options, MC jam sites (OVERRIDE), gears with no fan (EQUIPMENT), RC chains and fixed corridors to a receiver.  No ordering, simultaneity, bodies, reach, occupancy or view is checked.
+>   CLASSES: DIRECT no premise; SUPPORTED premises available without this service; NEEDS <service> FIRST: installing this provider needs the service it will provide (a setup dependency); UNSUPPORTED IN SCOPE.  A service with only NEEDS-FIRST options is a SETUP QUESTION, not an impossibility.  "Through standing providers" repeats the test with premises supplied only by CONTROL, chains, corridors and equipment, never another jam, and is printed when that exposes a setup dependency a further jammer would hide.
+>   RECORDER SPLICED: physical view only; recording-view providers are not read.
+> 
+>   goal actor agent1: start location1 (R1) -> goal location19 (R7)
+>     transit door sets (R1 -> R7, 1): (gate1 gate3 gate5 gate7 gate8 gate9)
+>       necessary: gate1 gate3 gate5 gate7 gate8 gate9
+>     return door sets (R7 -> R1, 8): (gate1 gate3 gate5 gate7 gate8 gate9) (gate1 gate3 gate7 gate8 gate9 ladder3) (gate1 gate5 gate7 gate8 gate9 ladder2) (gate1 gate7 gate8 gate9 ladder2 ladder3) (gate3 gate5 gate7 gate8 gate9 ladder1) (gate3 gate7 gate8 gate9 ladder1 ladder3) (gate5 gate7 gate8 gate9 ladder1 ladder2) (gate7 gate8 gate9 ladder1 ladder2 ladder3)
+>       necessary: gate7 gate8 gate9
+>     final services: none (the goal names no receiver or controlled device)
+>     temporary services (in some transit set, not final): gate1 via plate1, gate3 via plate2, gate5 via switch2, gate7 via switch2, gate8 via receiver1, gate9 via plate6 plate7 plate8
+>       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
+> 
+>   access from R1 (minimal door sets to each region; mode predicates not evaluated)
+>     R1  ()
+>     R2  (gate1 gate3)
+>     R3  (gate1 gate3 gate5)
+>     R4  (gate1 gate3 gate5 gate6 screen1)
+>     R5  (gate1 gate3 gate5 gate7)
+>     R6  (gate1 gate3 gate5 gate7 gate8)
+>     R7  (gate1 gate3 gate5 gate7 gate8 gate9)
+>     R8  (gate1)
+>     R9  (gate1 gate2)
+> 
+>   retrieval (start places of jammers, connectors and fans)
+>     connector1  location9 (R2)
+>     connector1*  absent
+> 
+>   services (10): 10 SUPPORTED, 0 SETUP QUESTION, 0 NO PROVIDER IN SCOPE
+>     gate1 open  == plate1  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, RETURN alternative, TEMPORARY
+>       CONTROL DIRECT: a body on plate1 (T6)
+>     gate2 open  == (not switch1)  start PASSABLE  verdict SUPPORTED
+>       CONTROL DIRECT: switch1 not switched-on
+>     gate3 open  == plate2  start PASSABLE  verdict SUPPORTED  route TRANSIT necessary, RETURN alternative, TEMPORARY
+>       CONTROL DIRECT: a body on plate2 (T6)
+>     gate4 open  == plate3  start BLOCKED  verdict SUPPORTED
+>       CONTROL DIRECT: a body on plate3 (T6)
+>     gate5 open  == (not switch2)  start PASSABLE  verdict SUPPORTED  route TRANSIT necessary, RETURN alternative, TEMPORARY
+>       CONTROL DIRECT: switch2 not switched-on
+>     gate6 open  == (and plate4 plate5)  start BLOCKED  verdict SUPPORTED
+>       CONTROL DIRECT: a body on plate4 (T6); a body on plate5 (T6)
+>     gate7 open  == switch2  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, RETURN necessary, TEMPORARY
+>       CONTROL DIRECT: switch2 switched-on
+>     gate8 open  == receiver1  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, RETURN necessary, TEMPORARY
+>       CONTROL SUPPORTED: receiver1 active
+>     gate9 open  == (and plate6 plate7 plate8)  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, RETURN necessary, TEMPORARY
+>       CONTROL DIRECT: a body on plate6 (T6); a body on plate7 (T6); a body on plate8 (T6)
+>     receiver1 active  start INACTIVE  verdict SUPPORTED
+>       (44 RC chains EXCLUDED or INFEASIBLE, not options)
+>       CHAINS SUPPORTED: 6 RC chains (bootstrap); gate3 open; gate4 open
+>       CHAINS SUPPORTED: 34 RC chains (bootstrap); gate4 open
+>       CHAINS NEEDS receiver1 active FIRST (path gate8 open -> receiver1 active): 12 RC chains (latch); gate4 open; gate8 open
+> 
+>   opposed controls (a primitive needed in both states by different services)
+>     switch2: on for gate7; off for gate5
+> 
+>   setup dependencies (options whose premises lead back to their own service)
+>     receiver1 active: 1 option, 1 even with further jams
+>     setup questions: none
+> 
+>   NOT CLAIMED: an order, simultaneous availability, a body or reach allocation, occupancy, view or a realized setup.  A premise-free provider still needs placing, and a NEEDS-FIRST provider needs another provider in force while it is installed (a handover).  Access is to a site's own region; placement or pickup from another location within reach is not modelled.  For concrete consequences use REPORT-SERVICE-TRANSITION on two settled states.

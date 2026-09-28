@@ -1,0 +1,376 @@
+--- .t33-work/constraint-profile-before.lisp
++++ tech/constraint-profile.lisp
+@@ -2,7 +2,7 @@
+ 
+ ;;; Static constraint profile extractors for the constraint-led analysis method
+ ;;; (doc/constraint-method/Problem-Solving-Guide.md).  The profile is a pure
+-;;; function of a staged problem: it reads the databases the engine has already built and
++;;; function of a staged problem and optional supplied state: it reads engine databases and
+ ;;; reports the invariant structure a hand analysis would otherwise rederive one session
+ ;;; at a time.
+ ;;;
+@@ -29,6 +29,11 @@
+ ;;;
+ ;;;   (report-cycle-plan-check <plan plist>)
+ ;;;
++;;; T33 accepts a complete reference-state scenario; see specification 6.1:
++;;;   (report-relay-view-scenario scenario)
++;;; RC, NH and the whole-profile reporter take the same optional scenario. The writer
++;;; takes it after the pathname. No scenario means explicit UNRESOLVED view results.
++;;;
+ ;;; CONSEQUENT RESTRICTION.  A merely LOADed file gets no tech splice, so everything here
+ ;;; is plain Common Lisp in the :WW package -- ordinary DEFUN and DEFPARAMETER, no
+ ;;; define-query, define-types, define-dynamic-relations or any other DSL defining form.
+@@ -2986,7 +2991,282 @@
+                      :test #'string=))))))))
+ 
+ 
+-(defun report-relay-chain-table ()
++;;;; T33 -- SUPPLIED RELAY VIEW SCENARIOS ;;;;
++;;; Specification 6.1. Queries only, on private copies; no settling or search.
++
++(defun relay-view-call (name state &rest arguments)
++  (apply (symbol-function name) state arguments))
++
++(defun relay-view-input-reason (scenario)
++  "Missing data is unavailable analysis, never a failed sightline."
++  (cond
++    ((null scenario) "no explicit scenario supplied")
++    ((not (typep (getf scenario :state) 'problem-state)) "missing reference problem-state")
++    ((not (eq t (getf scenario :complete-state))) "complete-state assertion missing")
++    ((not (member (getf scenario :phase) '(:ordinary :open :closed :shadow-only)))
++     "explicit recorder phase missing or unsupported")
++    ((not (and (stringp (getf scenario :provenance))
++               (plusp (length (getf scenario :provenance))))) "state provenance missing")
++    ((or (eq :missing (getf scenario :hops :missing))
++         (eq :missing (getf scenario :chains :missing))) "explicit hops/chains keys missing")
++    ((not (or (getf scenario :hops) (getf scenario :chains))) "no supplied hop or chain")))
++
++(defun relay-view-mappings ()
++  "Canonicalize the bijective storage indexes, which preserve argument order."
++  (remove-duplicates
++   (loop for fact in (list-static-db)
++         when (eq 'recording-copy>
++                  (or (car (gethash (first fact) *bijective-canonical*)) (first fact)))
++           collect (list 'recording-copy> (second fact) (third fact)))
++   :test #'equal))
++
++(defun relay-view-context-reason (scenario view mappings)
++  (let* ((facts (database (getf scenario :state)))
++         (open (member '(recording-in-progress) facts :test #'equal))
++         (closed (member '(recorder-cycle-closed) facts :test #'equal))
++         (phase (getf scenario :phase)))
++    (cond
++      ((not (case phase
++              (:ordinary (null mappings))
++              (:open (and mappings open (not closed)))
++              (:closed (and mappings closed (not open)))
++              (:shadow-only (and mappings (not open) (not closed)))))
++       "declared phase disagrees with reference state/mapping")
++      ((and (eq view :recording) (or (null mappings) (eq phase :closed)))
++       "recording context unavailable in this phase")
++      ((not (member "visibility" *spliced-tech-names* :test #'string=))
++       "visibility technology unavailable (neutral hook is not an analysis)")
++      ((and (getf scenario :chains)
++            (not (member "beam-relay" *spliced-tech-names* :test #'string=)))
++       "relay technology unavailable"))))
++
++(defun relay-view-gate-reason (premises)
++  (let ((seen nil))
++    (dolist (premise premises)
++      (destructuring-bind (view gate value) premise
++        (cond
++          ((not (and (member view '(:physical :recording))
++                     (member gate (census-type-instances 'gate))
++                     (member value '(t nil))))
++           (return-from relay-view-gate-reason "invalid gate premise"))
++          ((member (list view gate) seen :test #'equal)
++           (return-from relay-view-gate-reason "duplicate/conflicting gate premise"))
++          ((and (eq view :recording) (not (gethash 'recording-open *relations*)))
++           (return-from relay-view-gate-reason "recording gate context unavailable")))
++        (push (list view gate) seen)))))
++
++(defun relay-view-state (scenario)
++  (let ((state (copy-problem-state (getf scenario :state))))
++    (dolist (premise (getf scenario :gate-premises))
++      (destructuring-bind (view gate value) premise
++        (let ((fact (list (if (eq view :physical) 'open 'recording-open) gate)))
++          (if value
++            (add-proposition fact (problem-state.idb state))
++            (delete-proposition fact (problem-state.idb state))))))
++    (invalidate-problem-state-hash state)
++    state))
++
++(defun relay-view-hop-blockers (state selector near near-top far far-top)
++  "Explain failed engine visibility using its own per-barrier and per-location queries."
++  (let ((fact (find-if (lambda (row) (and (eq (first row) 'los-via)
++                                         (eq (second row) near) (eq (fourth row) far)))
++                       (list-static-db))))
++    (unless fact (return-from relay-view-hop-blockers (list "no LOS entry")))
++    (let* ((crossings (relay-view-call 'los-barrier-crossings state near far))
++           (barriers
++             (unless (eq crossings :unrecorded)
++               (loop for crossing in crossings
++                     unless (relay-view-call 'barrier-crossing-clear-for-object
++                                             state selector crossing near-top far-top)
++                       collect (format nil "barrier ~S" (subseq crossing 0 2)))))
++           (occluders
++             (loop for object in (third fact)
++                   when (if (member object (census-type-instances 'gate))
++                          (and (eq crossings :unrecorded)
++                               (not (relay-view-call 'gate-open-for-object state selector object)))
++                          (relay-view-call 'los-location-occluded state selector object
++                                           near near-top far far-top))
++                     collect (format nil "occluder ~S" object))))
++      (append barriers occluders))))
++
++(defun relay-view-hop-result (state selector hop)
++  (destructuring-bind (near near-top far far-top) hop
++    (if (not (and (member near (census-type-instances 'location))
++                  (member far (append (census-type-instances 'location)
++                                      (sightline-fixed-endpoints)))
++                  (realp near-top) (realp far-top)))
++      (list :input hop :status :invalid :reason "invalid geometric endpoint or height")
++      (let ((clear (relay-view-call 'beam-visible-for-object
++                                    state selector near near-top far far-top)))
++        (list :input hop :status (if clear :clear :blocked)
++              :reason (if clear "engine sightline clear"
++                          (format nil "engine sightline blocked: ~{~A~^; ~}"
++                                  (relay-view-hop-blockers state selector near near-top far far-top))))))))
++
++(defun relay-view-pairing-reason (state connector mappings)
++  "Outgoing pairings are owned selections; incoming links do not use that capacity."
++  (let* ((facts (database state))
++         (pairs (remove-if-not (lambda (fact)
++                                (and (eq (first fact) 'paired)
++                                     (eq (second fact) connector))) facts))
++         (ghost (find connector mappings :key #'third))
++         (live (find connector mappings :key #'second)))
++    (cond
++      ((> (length pairs) *max-connector-pairings*) "outgoing pairing capacity exceeded")
++      ((some (lambda (pair) (eq (third pair) connector)) pairs) "connector paired to itself")
++      ((some (lambda (pair)
++               (let ((target (third pair)))
++                 (and (member target (census-type-instances 'connector))
++                      (or (and ghost (not (find target mappings :key #'third)))
++                          (and live (find target mappings :key #'third)
++                               (not (member '(recording-in-progress) facts :test #'equal)))))))
++             pairs)
++       "pairing violates recording-side dependency policy"))))
++
++(defun relay-view-chain-input-reason (state chain mappings)
++  (cond
++    ((not (and (>= (length chain) 3)
++               (member (first chain) (census-type-instances 'transmitter))
++               (member (car (last chain)) (census-type-instances 'receiver))
++               (every (lambda (object) (member object (census-type-instances 'relay)))
++                      (butlast (rest chain))))) "chain requires source, relays and receiver")
++    ((/= (length chain) (length (remove-duplicates chain))) "chain reuses an identity")
++    (t (loop for object in (butlast (rest chain))
++             thereis (and (member object (census-type-instances 'connector))
++                          (relay-view-pairing-reason state object mappings))))))
++
++(defun relay-view-relay-absent-reason (state selector relay)
++  (cond
++    ((and selector (not (relay-view-call 'recording-shadow-object-present state relay)))
++     "relay absent from recording view")
++    ((and (member relay (census-type-instances 'connector))
++          (not (relay-view-call 'relay-anchor state relay))) "connector has no beam location")))
++
++(defun relay-view-final-link (state selector source receiver active)
++  "Check this particular final relay, not merely some relay reaching the receiver."
++  (let ((anchor (relay-view-call 'relay-anchor state source)))
++    (and
++      (if (member source (census-type-instances 'connector))
++        (and (member (list 'paired source receiver) (database state) :test #'equal)
++             (relay-view-call 'beam-visible-for-object state selector anchor
++                              (relay-view-call 'top state source) receiver
++                              (relay-view-call 'top state receiver)))
++        (and (member (list 'coupled source receiver) (list-static-db) :test #'equal)
++             (relay-view-call 'fixed-beam-corridor-clear-for-object state selector source receiver)))
++      (or selector (not (relay-view-call 'beam-cut-in state anchor receiver active))))))
++
++(defun relay-view-link-result (state selector source target active)
++  (let ((clear
++          (if (member target (census-type-instances 'receiver))
++            (relay-view-final-link state selector source target active)
++            (relay-view-call 'relay-link-clear-for-object state selector source
++                             (if (member source (census-type-instances 'transmitter))
++                               source (relay-view-call 'relay-anchor state source))
++                             target (relay-view-call 'relay-anchor state target) active))))
++    (list :input (list source target) :status (if clear :clear :blocked)
++          :reason (if clear "engine relay link clear"
++                      "required pairing/coupling, sightline or beam-cut check failed"))))
++
++(defun relay-view-install-lighting (state lighting)
++  "Physical receiver query reads COLOR; install only computed colors on the private copy."
++  (dolist (fact (database state))
++    (when (eq (first fact) 'color) (delete-proposition fact (problem-state.idb state))))
++  (dolist (record lighting)
++    (add-proposition (list 'color (first record) (second record)) (problem-state.idb state)))
++  (invalidate-problem-state-hash state))
++
++(defun relay-view-chain-result (state selector chain mappings)
++  (let ((invalid (relay-view-chain-input-reason state chain mappings)))
++    (when invalid
++      (return-from relay-view-chain-result (list :input chain :status :invalid :reason invalid))))
++  (let* ((relays (butlast (rest chain)))
++         (absent (loop for relay in relays
++                       for reason = (relay-view-relay-absent-reason state selector relay)
++                       when reason collect (list relay reason))))
++    (when absent
++      (return-from relay-view-chain-result
++        (list :input chain :status :blocked :reason (format nil "~S" absent))))
++    (let* ((active (unless selector (relay-view-call 'current-crossing-set state)))
++           (links (loop for (source target) on chain while target
++                        collect (relay-view-link-result state selector source target active)))
++           (lighting (relay-view-call 'compute-relay-lighting-for-object state selector active))
++           (hue (relay-chain-chroma (first chain)))
++           (receiver (car (last chain)))
++           (unlit (remove-if (lambda (relay) (eql hue (second (assoc relay lighting)))) relays)))
++      (unless selector (relay-view-install-lighting state lighting))
++      (let* ((reaches (if selector
++                       (relay-view-call 'recording-shadow-relay-beam-reaches-receiver
++                                        state selector lighting receiver)
++                       (relay-view-call 'relay-beam-reaches-receiver state receiver)))
++             (reason (cond
++                       ((some (lambda (row) (eq :blocked (getf row :status))) links)
++                        "required chain link failed; see link rows")
++                       ((not (and hue (eql hue (relay-chain-chroma receiver))))
++                        "source/receiver hue mismatch or missing chroma")
++                       (unlit (format nil "relays not lit with source hue: ~S" unlit))
++                       ((not reaches) "engine receiver evaluation failed")
++                       (t "all supplied links and engine lighting/receiver checks pass"))))
++        (list :input chain :status (if (and reaches (not unlit)
++                                           hue (eql hue (relay-chain-chroma receiver))
++                                           (every (lambda (row) (eq :clear (getf row :status))) links))
++                                      :clear :blocked)
++              :reason reason :links links :lighting lighting :receiver-reached (not (null reaches)))))))
++
++(defun relay-view-one-result (scenario view)
++  (let ((missing (relay-view-input-reason scenario)))
++    (when missing
++      (return-from relay-view-one-result (list :view view :status :unresolved :reason missing))))
++  (let* ((mappings (relay-view-mappings))
++         (reason (or (relay-view-context-reason scenario view mappings)
++                     (relay-view-gate-reason (getf scenario :gate-premises)))))
++    (when reason
++      (return-from relay-view-one-result
++        (list :view view :phase (getf scenario :phase) :status :unresolved :reason reason)))
++    (let* ((state (relay-view-state scenario))
++           (selector (when (eq view :recording)
++                       (relay-view-call 'recording-shadow-view-object state)))
++           (hops (mapcar (lambda (hop) (relay-view-hop-result state selector hop))
++                         (getf scenario :hops)))
++           (chains (mapcar (lambda (chain) (relay-view-chain-result state selector chain mappings))
++                           (getf scenario :chains)))
++           (statuses (mapcar (lambda (row) (getf row :status)) (append hops chains))))
++      (list :view view :phase (getf scenario :phase)
++            :status (cond ((member :invalid statuses) :invalid)
++                          ((member :blocked statuses) :blocked) (t :clear))
++            :reason "supplied tests only; stability, reachability and replay validation UNRESOLVED"
++            :hops hops :chains chains))))
++
++(defun relay-view-results (scenario)
++  "Two independent views of one explicit scenario; never inferred from geometric candidates."
++  (mapcar (lambda (view)
++            (append (relay-view-one-result scenario view)
++                    (list :provenance (getf scenario :provenance)
++                          :gate-premises (copy-tree (getf scenario :gate-premises))
++                          :phase-premise (getf scenario :phase)
++                          :complete-state-premise (getf scenario :complete-state))))
++          '(:physical :recording)))
++
++(defun report-relay-view-scenario (scenario)
++  (let ((*print-pretty* nil))
++    (format t "~%  SUPPLIED RELAY SCENARIO (T33): CLEAR is conditional, not stable/reachable/validated.~%")
++    (when scenario
++      (format t "    provenance: ~A; phase: ~S~%" (getf scenario :provenance) (getf scenario :phase))
++      (format t "    gate premises: ~S; forced bits do not establish controller consistency.~%"
++              (getf scenario :gate-premises))
++      (when (typep (getf scenario :state) 'problem-state)
++        (format t "    reference facts (all other gates/placements/pairings inherited): ~S~%"
++                (database (getf scenario :state)))
++        (format t "    live/ghost mapping: ~S~%" (relay-view-mappings))))
++    (dolist (result (relay-view-results scenario))
++      (format t "    ~A ~A: ~A~%" (getf result :view) (getf result :status) (getf result :reason))
++      (dolist (kind '(:hops :chains))
++        (dolist (row (getf result kind))
++          (format t "      ~A ~S ~A: ~A~%" kind (getf row :input) (getf row :status) (getf row :reason))
++          (dolist (link (getf row :links))
++            (format t "        ~S ~A: ~A~%" (getf link :input) (getf link :status) (getf link :reason)))))))
++  (values))
++
++(defun report-relay-chain-table (&optional scenario)
+   "RC, grade 2.  Stations from S5's placement supports at every location level; hops by
+  BEAM-VISIBLE on start-state copies with gate bits forced, no propagation or search; every
+  simple source-to-receiver chain within the connector pool, classified and costed."
+@@ -2997,9 +3277,10 @@
+          (exclusions (relay-chain-exclusion-pairs controls))
+          (pressure-plates (census-type-instances 'pressure-plate))
+          (stations (relay-chain-stations state)))
+-    (format t "~2%RC  RELAY CHAIN TABLE  [grade 2]~%")
++    (format t "~2%RC  RELAY CHAIN TABLE  [grade 2]~%")
++    (report-relay-view-scenario scenario)
+     (format t "~A~%" (make-string 62 :initial-element #\-))
+-    (format t "  SCOPE: physical view only; recording-view sightlines are not evaluated.  Hops are~%")
++    (format t "  GEOMETRIC ENUMERATION SCOPE: physical view only; supplied scenario views are separate.  Hops are~%")
+     (format t "  tested on start-state copies with gate OPEN bits forced and no propagation.  A~%")
+     (format t "  hop's required gates are those whose closing alone blocks it (monotone reading).~%")
+     (format t "  Stations are placements, not reachability claims.  Bodies count the connector and~%")
+@@ -4762,12 +5043,13 @@
+                    do (report-hint hint index)))))
+ 
+ 
+-(defun report-necessity-hints ()
++(defun report-necessity-hints (&optional scenario)
+   "NH, grade per hint.  Every static limit the sections above state, restated as a
+    candidate plan element for the Briefing."
+   (let* ((*print-pretty* nil)
+          (controls (control-facts)))
+-    (format t "~2%NH  NECESSITY HINTS  [grade per hint]~%")
++    (format t "~2%NH  NECESSITY HINTS  [grade per hint]~%")
++    (report-relay-view-scenario scenario)
+     (format t "~A~%" (make-string 62 :initial-element #\-))
+     (format t "  READING: a hint restates static limits as a candidate plan element for the ~
+                Briefing (Problem-Solving Guide, Phase 1 step 3).  NECESSARY: every plan meets ~
+@@ -5707,7 +5989,7 @@
+     (values)))
+ 
+ 
+-(defun report-static-constraint-profile ()
++(defun report-static-constraint-profile (&optional scenario)
+   "Runs every extractor written so far and prints the whole static profile.  Callers who
+    want the file write it with WRITE-STATIC-CONSTRAINT-PROFILE; this reporter only prints,
+    so each extractor can also be run and scored on its own."
+@@ -5720,18 +6002,18 @@
+   (report-budget-arithmetic)
+   (report-height-and-reach-lattice)
+   (report-beam-sightline-table)
+-  (report-relay-chain-table)
++  (report-relay-chain-table scenario)
+   (report-landmark-graph-and-orderings)
+   (report-region-quotient)
+   (report-cut-keeper-table)
+   (report-coupling-census)
+-  (report-necessity-hints)
++  (report-necessity-hints scenario)
+   (format t "RO requires an explicit segment input and is not generated; call~%")
+   (format t "REPORT-ROLE-OBLIGATIONS with a stated scenario.~%")
+   (values))
+ 
+ 
+-(defun write-static-constraint-profile (pathname)
++(defun write-static-constraint-profile (pathname &optional scenario)
+   "Writes the profile to PATHNAME, superseding whatever is there.  The caller names the
+    file because the profile is domain-general while its home is the problem's own
+    documentation folder.
+@@ -5747,7 +6029,7 @@
+                                       :if-exists :supersede
+                                       :if-does-not-exist :create)
+       (let ((*standard-output* stream))
+-        (report-static-constraint-profile)))
++        (report-static-constraint-profile scenario)))
+     (when (probe-file pathname)
+       (delete-file pathname))
+     (rename-file temporary pathname))

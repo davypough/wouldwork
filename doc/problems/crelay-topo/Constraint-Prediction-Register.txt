@@ -1,3 +1,24 @@
+READING POLICY (D, 2026-09-25) -- AUTHORITATIVE OVER EVERYTHING BELOW
+----------------------------------------------------------------------
+Nothing in the wouldwork directory is sealed. Every file, section and line
+range may be read in full, at any time, without a grant from D and without a
+disclosure: subgoal-solution-*.txt, Backward-*/Forward-* files,
+Initial-Conditions.txt, all prediction-register sections (including 4, 5 and
+7.3), and G9. Any SEALED, DO NOT READ, TAG ONLY, bounded-read, line-range or
+grant rule in this file is lifted and kept only as history. A new seal exists
+only if D requests one; it is recorded in
+doc/constraint-method/Constraint-Implementation-Plan.md (Reading policy).
+Edit rules are unchanged (register sections 3-6 not edited, section 7
+append-only, generated output never hand-edited).
+----------------------------------------------------------------------
+
+FROZEN (D, 2026-09-25). This register is closed: no further commitments or
+scores are appended, and section 7's append rule no longer applies. It stands
+as the record of the crelay-topo validation experiment. New problems keep no
+prediction register (Post-Mortem-2026.md, section 4.1). Section 3's extractor
+specifications are to move to a method-level Extractor Specifications document.
+----------------------------------------------------------------------
+
 Crelay-Topo Constraint Method -- Prediction Register
 ====================================================
 Written 2026-09-19, BEFORE any extractor code exists.
@@ -2927,3 +2948,71 @@ The four clean staged acceptance assertions passed before this score. Evidence:
 `B94279FF72E215C7ED2FBC9545925F15AC1E291DF1F641E24C6296BB201E64DD`; and
 `constraint-evidence/s7-landmark-checks-2026-09-22.log`, SHA-256
 `54DD4757BE8B22DCA6B755F39A9E8F92F4158EB0109B9B0BA444E86CEEDA6E6A`.
+
+7.37  RC RELAY CHAIN TABLE COMMITMENTS.  Written 2026-09-24 before any RC
+code (T16, G17's approved fix).  RC has no sealed specification or value
+paragraph; these are the session's own predictions.  EXPOSURE: the session
+derived much of what follows by hand in T15 (abstract model AM4/AM8 and
+constraint-evidence/am4-am8-rederivation-2026-09-24.txt), so this is a check
+of that hand work by an extractor, not an independent prediction.  It also
+read register section 6 under D's one-session grant.
+
+R1  At level-0 locations RC's tops are S6's (1, 2, 5/2), and every
+    station-to-endpoint status and required-gate set equals S6's.
+R2  No bootstrap chain uses a station at a raised location (level 3/2).
+R3  Every bootstrap chain to the receiver requires the gate controlled by
+    the plate at location10 (gate4); no other gate is common to all.
+R4  No bootstrap chain ends at location12 or location13 (every feeder needs
+    gate5, the receiver end needs gate7, and S1 excludes the pair).  Chains
+    ending at location16, 17, 18 or 21 are all LATCH.
+R5  With one connector, the bootstrap chains are exactly: location9 at top 2
+    (box riser) and at top 5/2 (held-tray riser).  The minimum off-plate body
+    count over all bootstrap chains is 2, and it is attained only by the
+    location9 top-2 chain.
+R6  Two-connector bootstrap chains exist (through the repeater, from
+    location8 or 9 to a raised connector at location15), and none has fewer
+    than two off-plate bodies.  Station-to-station links 7-12, 7-13, 8-12, 8-13 and
+    9-12 need gate5; 9-13 and every link from location3 to 12, 13 or 15 are
+    NEVER.
+
+7.38  RC FIRST SCORE.  Scored 2026-09-24 against 7.37, from a staged run in
+the assistant's sandbox (a copy of this repository's src/, tech/ and the
+instance, loaded under SBCL 2.2.9; that copy reproduced the profile's S6
+section byte-for-byte and every other non-RC section identically).  D's
+regeneration of the profile on lumpy is the authoritative run; if its RC
+section differs from the sandbox log, a correction follows this entry.
+  R1  HIT.  177 station-to-endpoint rows (every level-0 station at 1, 2, 5/2
+      and the raised stations at 5/2) agree with S6 in status and required
+      gates, and every visible row has exactly 2^(9 - required) visible
+      subsets, confirming the monotone conjunctive reading.
+  R2  HIT.  No chain uses a station at location6 or location20.
+  R3  HIT.  Gate4 is the only gate common to all 40 bootstrap chains.
+  R4  HIT.  All 44 chains ending at location12 (27) or location13 (17) are
+      EXCLUDED on {gate5, gate7}; all 12 LATCH chains end at location21; no
+      chain ends at location16-18.
+  R5  PARTIAL.  The one-connector bootstrap chains are exactly location9 at
+      top 2 (box) and 5/2 (held tray), and the least off-plate count is 2.
+      MISS on "attained only by the location9 top-2 chain": it is also
+      attained by transmitter -> location7@1 -> location9@2, whose first
+      connector stands on plate2 and keeps its own gate3 open.
+  R6  HIT.  Two-connector bootstrap chains through the repeater from
+      location8 or 9 to a raised connector at location15 exist; none has
+      fewer than two off-plate bodies.  Links 7-12 and 7-13 need gate3 and
+      gate5; 8-12, 8-13 and 9-12 need gate5; 9-13 and location3 to 12, 13
+      and 15 are NEVER.  Not predicted: location9@1 -> location15@2 is a
+      direct connector hop (the hand geometry of T15 considered 9@1 -> 15@1
+      only).
+Totals: 96 chains -- 40 bootstrap, 12 latch, 44 excluded, 0 infeasible.
+The four-assertion acceptance check passed in the sandbox.  Evidence:
+`../constraint-method/evidence/rc-relay-chain-checks-2026-09-24.lisp` (SHA-256
+FDAE4140849C07216443CCF65662A3231F7F66628C2E724BA23479D14ECCE6B9), its sandbox
+log `../constraint-method/evidence/rc-relay-chain-checks-sandbox-2026-09-24.log`,
+and `constraint-evidence/rc-first-run-sandbox-2026-09-24.log` (SHA-256
+22A69A71C827C9EF3D1E9B75688DAD294CD6B815AFC64268528B9545FC084351).
+
+7.39  RC AUTHORITATIVE RUN.  2026-09-24.  D regenerated the profile on lumpy
+and ran the RC check file: 4 assertions passed.  The regenerated
+Constraint-Static-Profile.txt (1344 lines, 80,193 bytes, SHA-256
+294DC749CE2C43353C9B8AFD37708D58650DC9DB6E5D9DD1A15F36DFC8B56417) is
+byte-identical to the sandbox-generated profile, so the 7.38 score stands
+unchanged and no correction is needed.

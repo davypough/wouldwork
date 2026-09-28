@@ -1,0 +1,408 @@
+;;; T43 run log, 2026-09-28. SBCL 2.2.9, scratch copy of the repository. Check counts, then the SW reports on the validated-path pairs.
+=== BEGIN CLAUSTRO-TOPO
+PASS (no problem name in T43 code claustro)
+PASS (no problem name in T43 code corner)
+PASS (no problem name in T43 code phobia)
+PASS (no problem name in T43 code gate1)
+PASS (no problem name in T43 code location1)
+PASS (no problem name in T43 code agent1)
+PASS (no problem name in T43 code receiver1)
+PASS (no problem name in T43 code jammer1)
+PASS (no problem name in T43 code wblower)
+PASS (no problem name in T43 code fan1)
+PASS (no problem name in T43 code plate1)
+PASS (no problem name in T43 code connector1)
+PASS no LABELS or FLET in T43 code
+PASS A7 only self-dependent option: SETUP QUESTION
+PASS A7 self-dependent option class NEEDS FIRST
+PASS A7 self-dependent path ends at itself
+PASS A7 premise-free option added: SUPPORTED
+PASS A7 with it, the other option still NEEDS FIRST
+PASS A7 unmet premise: NO PROVIDER
+PASS A7 unmet premise: option UNSUPPORTED
+PASS A7 another jam hides the dependency: SUPPORTED with any providers
+PASS A7 standing providers expose it: NEEDS FIRST
+PASS A7 standing path b -> r -> a
+PASS door sets: one clause per row, minimal
+PASS door sets: directed row not walked backward
+PASS door sets: start region free
+PASS A1 gate1 has override options only
+PASS (A1 gate1 DIRECT site (LOCATION1 GROUND))
+PASS (A1 gate1 DIRECT site (LOCATION2 GROUND))
+PASS (A1 gate1 DIRECT site (LOCATION7 GROUND))
+PASS A1 eight plate-room sites
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION3 GROUND))
+PASS (A1 plate-room site supported only with a further jam (LOCATION3 GROUND))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION4 BOX1))
+PASS (A1 plate-room site supported only with a further jam (LOCATION4 BOX1))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION4 GROUND))
+PASS (A1 plate-room site supported only with a further jam (LOCATION4 GROUND))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION4 PLATE1))
+PASS (A1 plate-room site supported only with a further jam (LOCATION4 PLATE1))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION5 GROUND))
+PASS (A1 plate-room site supported only with a further jam (LOCATION5 GROUND))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION5 PLATE2))
+PASS (A1 plate-room site supported only with a further jam (LOCATION5 PLATE2))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION6 GROUND))
+PASS (A1 plate-room site supported only with a further jam (LOCATION6 GROUND))
+PASS (A1 plate-room site needs gate1 first through standing providers (LOCATION6 PLATE3))
+PASS (A1 plate-room site supported only with a further jam (LOCATION6 PLATE3))
+PASS A1 location2 site flagged on receiver1's corridor
+PASS A1 location1 site not flagged
+PASS A1 gate1 SUPPORTED
+PASS (A1 CONTROL via receiver1 active GATE2)
+PASS (A1 CONTROL via receiver1 active GATE3)
+PASS (A1 CONTROL via receiver1 active GATE6)
+PASS (A1 CONTROL via receiver1 active GATE7)
+PASS A1 gate4 CONTROL via receiver1 inactive (leaf)
+PASS A1 receiver1 corridor option needs gate1 and location2 clear
+PASS A1 opposed controls name receiver1
+PASS A1 jammer2's region access sets all name gate5
+PASS A1 transit necessary gate5-gate9
+PASS (SD contains SD  SERVICES AND SETUP DEPENDENCIES  [grade 2])
+PASS (SD contains gate1 open  start BLOCKED  verdict SUPPORTED  route TRANSIT alternative, RETURN alternative, TEMPORARY)
+PASS (SD contains
+      OVERRIDE SUPPORTED; through standing providers NEEDS gate1 open FIRST (path gate2 open -> receiver1 active -> gate1 open): gate2 open; gate3 open)
+PASS (SD contains
+      jam at location2 on ground (jammer1, jammer2); OCCUPIES location2 on transmitter1 -> receiver1's fixed corridor, which needs gate1)
+PASS (SD contains jam at location7 on ground (jammer1, jammer2); JAM-DISALLOWED> from location1)
+PASS (SD contains gate4 open  == (not receiver1))
+PASS (SD contains CONTROL DIRECT: receiver1 inactive)
+PASS (SD contains receiver1: on for gate2, gate3, gate6, gate7; off for gate4)
+PASS (SD contains gate1 open: 8 options, 0 even with further jams)
+PASS (SD contains jammer2  location9 (R6))
+PASS (SD contains R6  (gate1 gate5) (gate2 gate5))
+PASS (SD contains NOT CLAIMED)
+PASS (prefix replays CLAUSTRO-TOPO 5)
+PASS (prefix replays CLAUSTRO-TOPO 6)
+PASS (prefix replays CLAUSTRO-TOPO 28)
+PASS (prefix replays CLAUSTRO-TOPO 29)
+PASS (before state unchanged claustro prefix 5)
+PASS (after state unchanged claustro prefix 6 (box1 put at location2))
+PASS (evaluated claustro prefix 6 (box1 put at location2))
+PASS (engine agreement both states claustro prefix 6 (box1 put at location2))
+PASS (report prints claustro prefix 6 (box1 put at location2))
+PASS (before state unchanged claustro prefix 28)
+PASS (after state unchanged claustro prefix 29 (jammer1 picked up))
+PASS (evaluated claustro prefix 29 (jammer1 picked up))
+PASS (engine agreement both states claustro prefix 29 (jammer1 picked up))
+PASS (report prints claustro prefix 29 (jammer1 picked up))
+PASS A2 receiver1 withdrawn, driving gate2-4, gate6, gate7
+PASS (A2 LOST by the beam interruption GATE2)
+PASS (A2 LOST by the beam interruption GATE3)
+PASS (A2 LOST by the beam interruption GATE6)
+PASS (A2 LOST by the beam interruption GATE7)
+PASS A2 gate4 GAINED by control
+PASS A2 gate1 KEPT by its jam
+PASS A2 handover: gate1 KEPT BY ALTERNATIVE (OVERRIDE)
+PASS A2 handover: no service LOST
+PASS A2 handover: the jam removed is jammer1's
+PASS (A8 unresolved before state: missing problem-state)
+PASS (A8 reason before state: missing problem-state)
+PASS (A8 prints only its reason before state: missing problem-state)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved state: missing problem-state)
+PASS (A8 reason state: missing problem-state)
+PASS (A8 prints only its reason state: missing problem-state)
+PASS (A8 unresolved state: state provenance missing)
+PASS (A8 reason state: state provenance missing)
+PASS (A8 prints only its reason state: state provenance missing)
+PASS (A8 unresolved before state: state marked inconsistent)
+PASS (A8 reason before state: state marked inconsistent)
+PASS (A8 prints only its reason before state: state marked inconsistent)
+PASS (A8 unresolved state: state is not a propagation fixed point)
+PASS (A8 reason state: state is not a propagation fixed point)
+PASS (A8 prints only its reason state: state is not a propagation fixed point)
+PASS (A8 unresolved is not an agent)
+PASS (A8 reason is not an agent)
+PASS (A8 prints only its reason is not an agent)
+PASS (A8 unresolved a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 prints only its reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 unresolved a :FINAL entry is not a proposition)
+PASS (A8 reason a :FINAL entry is not a proposition)
+PASS (A8 prints only its reason a :FINAL entry is not a proposition)
+PASS A8 caller state unchanged by unresolved calls
+T43 CLAUSTRO CHECKS PASSED: 126
+PASS (SD prints CLAUSTRO-TOPO)
+PASS (SW start->start: nothing lost or gained CLAUSTRO-TOPO)
+T43 GENERAL CHECKS PASSED (CLAUSTRO-TOPO): 2
+PASS (prefix replays CLAUSTRO-TOPO 5)
+PASS (prefix replays CLAUSTRO-TOPO 6)
+
+SW  SERVICE TRANSITION  [supplied settled states]
+  before: claustro prefix 5
+  after:  claustro prefix 6 (box1 put at location2)
+  agent agent1 at location3 -> location3
+  engine agreement (provider reading = OBSTACLE-CLEAR): before agrees, after agrees
+  passage services (9)
+    gate1  KEPT: JAM by jammer1
+    gate2  LOST (open -> closed): providers lost CONTROL
+    gate3  LOST (open -> closed): providers lost CONTROL
+    gate4  GAINED (closed -> open) by CONTROL
+    gate5  blocked both (closed)
+    gate6  LOST (open -> closed): providers lost CONTROL
+    gate7  LOST (open -> closed): providers lost CONTROL
+    gate8  blocked both (closed)
+    gate9  blocked both (closed)
+  supplies withdrawn or established
+    receiver1 on -> off; affected devices gate2, gate3, gate4, gate6, gate7
+  arcs for agent1: 9 lost, 9 gained
+    LOST   location10 <-> location9 ((gate6 gate7))
+    LOST   location1 <-> location3 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location1 <-> location4 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location1 <-> location5 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location1 <-> location6 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location2 <-> location3 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location2 <-> location4 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location2 <-> location5 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    LOST   location2 <-> location6 ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    GAINED location3 <-> location7 ((gate4 screen1))
+    GAINED location3 <-> location8 ((gate4 screen1))
+    GAINED location4 <-> location7 ((gate4 screen1))
+    GAINED location4 <-> location8 ((gate4 screen1))
+    GAINED location5 <-> location7 ((gate4 screen1))
+    GAINED location5 <-> location8 ((gate4 screen1))
+    GAINED location6 <-> location7 ((gate4 screen1))
+    GAINED location6 <-> location8 ((gate4 screen1))
+    GAINED location7 -> location1 ((ladder1))
+  mobility from each state's own location: lost none; gained location7 location8
+  retrieval: lost none; gained box1; not retrievable now box2 at location10, jammer2 at location9
+  NOT CLAIMED: which action caused a change, that the second state follows from the first, a realizable ordering, a safe transfer, or future reachability.  Mobility is one engine closure in each state.
+PASS (prefix replays CLAUSTRO-TOPO 28)
+PASS (prefix replays CLAUSTRO-TOPO 29)
+
+SW  SERVICE TRANSITION  [supplied settled states]
+  before: claustro prefix 28
+  after:  claustro prefix 29 (jammer1 picked up at location1)
+  agent agent1 at location1 -> location1
+  engine agreement (provider reading = OBSTACLE-CLEAR): before agrees, after agrees
+  passage services (9)
+    gate1  KEPT BY ALTERNATIVE (OVERRIDE): lost JAM by jammer1; remaining JAM by jammer2
+    gate2  KEPT: CONTROL
+    gate3  KEPT: CONTROL
+    gate4  blocked both (closed)
+    gate5  blocked both (closed)
+    gate6  KEPT: CONTROL
+    gate7  KEPT: CONTROL
+    gate8  blocked both (closed)
+    gate9  blocked both (closed)
+  supplies withdrawn or established
+    no primitive status changed
+    jams removed (jamming jammer1 gate1); added none
+  arcs for agent1: 1 lost, 0 gained
+    LOST   location7 -> location1 ((ladder1))
+  mobility from each state's own location: lost none; gained none
+  retrieval: lost none; gained none; not retrievable now box2 at location10
+  NOT CLAIMED: which action caused a change, that the second state follows from the first, a realizable ordering, a safe transfer, or future reachability.  Mobility is one engine closure in each state.
+=== BEGIN CORNER-TOPO
+PASS A3 gate1 route: transit and return necessary, temporary, not final
+PASS A3 finals
+PASS A3 gate1 CONTROL via receiver1 active
+PASS A3 receiver1 has DIRECT bootstrap chains
+PASS A3 receiver1 latch chains need receiver1 first
+PASS (A3 FINAL receiver has chain options RECEIVER2)
+PASS (A3 FINAL receiver has chain options RECEIVER3)
+PASS A3 no OVERRIDE without a jammer
+PASS (SD contains final services: (active receiver2) (active receiver3))
+PASS (SD contains temporary services (in some transit set, not final): gate1 via receiver1)
+PASS (SD contains gate1 open  == receiver1  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, RETURN necessary, TEMPORARY)
+PASS (SD contains receiver2 active  start INACTIVE  verdict SUPPORTED  route FINAL)
+PASS (prefix replays CORNER-TOPO 14)
+PASS (prefix replays CORNER-TOPO 15)
+PASS (before state unchanged corner prefix 14)
+PASS (after state unchanged corner prefix 15 (connector2 picked up at location4))
+PASS (evaluated corner prefix 15 (connector2 picked up at location4))
+PASS (engine agreement both states corner prefix 15 (connector2 picked up at location4))
+PASS (report prints corner prefix 15 (connector2 picked up at location4))
+PASS A4 gate1 LOST, control withdrawn
+PASS A4 receiver1 withdrawn, affecting gate1
+PASS A4 return to location1 NOT MET
+PASS A4 finals MET
+PASS A4 retrieval lost for the east-side connectors
+PASS (prefix replays CORNER-TOPO 15)
+PASS (A8 unresolved before state: missing problem-state)
+PASS (A8 reason before state: missing problem-state)
+PASS (A8 prints only its reason before state: missing problem-state)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved state: missing problem-state)
+PASS (A8 reason state: missing problem-state)
+PASS (A8 prints only its reason state: missing problem-state)
+PASS (A8 unresolved state: state provenance missing)
+PASS (A8 reason state: state provenance missing)
+PASS (A8 prints only its reason state: state provenance missing)
+PASS (A8 unresolved before state: state marked inconsistent)
+PASS (A8 reason before state: state marked inconsistent)
+PASS (A8 prints only its reason before state: state marked inconsistent)
+PASS (A8 unresolved state: state is not a propagation fixed point)
+PASS (A8 reason state: state is not a propagation fixed point)
+PASS (A8 prints only its reason state: state is not a propagation fixed point)
+PASS (A8 unresolved is not an agent)
+PASS (A8 reason is not an agent)
+PASS (A8 prints only its reason is not an agent)
+PASS (A8 unresolved a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 prints only its reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 unresolved a :FINAL entry is not a proposition)
+PASS (A8 reason a :FINAL entry is not a proposition)
+PASS (A8 prints only its reason a :FINAL entry is not a proposition)
+PASS A8 caller state unchanged by unresolved calls
+T43 CORNER CHECKS PASSED: 56
+PASS (SD prints CORNER-TOPO)
+PASS (SW start->start: nothing lost or gained CORNER-TOPO)
+T43 GENERAL CHECKS PASSED (CORNER-TOPO): 2
+PASS (prefix replays CORNER-TOPO 14)
+PASS (prefix replays CORNER-TOPO 15)
+
+SW  SERVICE TRANSITION  [supplied settled states]
+  before: corner prefix 14
+  after:  corner prefix 15 (connector2 picked up at location4)
+  agent agent1 at location4 -> location4
+  engine agreement (provider reading = OBSTACLE-CLEAR): before agrees, after agrees
+  passage services (1)
+    gate1  LOST (open -> closed): providers lost CONTROL
+  supplies withdrawn or established
+    receiver1 on -> off; affected devices gate1
+    receiver3 off -> on; drives no device
+    pairings removed (paired connector2 transmitter1); added none
+  arcs for agent1: 3 lost, 0 gained
+    LOST   location1 <-> location4 ((gate1))
+    LOST   location2 <-> location4 ((gate1))
+    LOST   location3 <-> location4 ((gate1))
+  mobility from each state's own location: lost location1 location2 location3; gained none
+  retrieval: lost connector1 connector3; gained none; not retrievable now connector1 at location2, connector3 at location3
+  requirements on the second state
+    RETURN location1: NOT MET  (mobility from the target in this state; the agent is not relocated)
+    FINAL (active receiver2): MET
+    FINAL (active receiver3): MET
+  NOT CLAIMED: which action caused a change, that the second state follows from the first, a realizable ordering, a safe transfer, or future reachability.  Mobility is one engine closure in each state.
+=== BEGIN PHOBIA-TOPO
+PASS A5 wblower2 CONTROL needs receiver2 active
+PASS A5 wblower3 CONTROL is receiver2 inactive
+PASS A5 opposed controls name receiver2
+PASS (A5 OVERRIDE options WBLOWER2)
+PASS (A5 OVERRIDE options WBLOWER3)
+PASS A5 wgears1 EQUIPMENT option
+PASS A5 receiver2 no provider in RC's start-state scope
+PASS (SD contains wblower2 clear  == (not receiver2))
+PASS (SD contains wblower3 clear  == receiver2)
+PASS (SD contains receiver2: on for wblower2; off for wblower3)
+PASS (SD contains EQUIPMENT DIRECT: no fan mounted (T42 removal))
+PASS (SD contains fan1  mounted on wgears1, wall-hung (no location))
+PASS (prefix replays PHOBIA-TOPO 43)
+PASS (prefix replays PHOBIA-TOPO 44)
+PASS (before state unchanged phobia prefix 43)
+PASS (after state unchanged phobia prefix 44 (connector1 picked up at location5))
+PASS (evaluated phobia prefix 44 (connector1 picked up at location5))
+PASS (engine agreement both states phobia prefix 44 (connector1 picked up at location5))
+PASS (report prints phobia prefix 44 (connector1 picked up at location5))
+PASS A6 wblower2 KEPT BY ALTERNATIVE (OVERRIDE, jammer1)
+PASS A6 wblower3 GAINED by control
+PASS A6 receiver2 withdrawn, affecting wblower2 and wblower3
+PASS A6 connector1's pairings removed
+PASS A6 no service LOST
+PASS A6 transit to location8 MET
+PASS A6 return from location13 MET
+PASS (prefix replays PHOBIA-TOPO 44)
+PASS (A8 unresolved before state: missing problem-state)
+PASS (A8 reason before state: missing problem-state)
+PASS (A8 prints only its reason before state: missing problem-state)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved before state: state provenance missing)
+PASS (A8 reason before state: state provenance missing)
+PASS (A8 prints only its reason before state: state provenance missing)
+PASS (A8 unresolved state: missing problem-state)
+PASS (A8 reason state: missing problem-state)
+PASS (A8 prints only its reason state: missing problem-state)
+PASS (A8 unresolved state: state provenance missing)
+PASS (A8 reason state: state provenance missing)
+PASS (A8 prints only its reason state: state provenance missing)
+PASS (A8 unresolved before state: state marked inconsistent)
+PASS (A8 reason before state: state marked inconsistent)
+PASS (A8 prints only its reason before state: state marked inconsistent)
+PASS (A8 unresolved state: state is not a propagation fixed point)
+PASS (A8 reason state: state is not a propagation fixed point)
+PASS (A8 prints only its reason state: state is not a propagation fixed point)
+PASS (A8 unresolved is not an agent)
+PASS (A8 reason is not an agent)
+PASS (A8 prints only its reason is not an agent)
+PASS (A8 unresolved a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 prints only its reason a :TRANSIT or :RETURN entry is not a location)
+PASS (A8 unresolved a :FINAL entry is not a proposition)
+PASS (A8 reason a :FINAL entry is not a proposition)
+PASS (A8 prints only its reason a :FINAL entry is not a proposition)
+PASS A8 caller state unchanged by unresolved calls
+T43 PHOBIA CHECKS PASSED: 58
+PASS (SD prints PHOBIA-TOPO)
+PASS (SW start->start: nothing lost or gained PHOBIA-TOPO)
+T43 GENERAL CHECKS PASSED (PHOBIA-TOPO): 2
+PASS (prefix replays PHOBIA-TOPO 43)
+PASS (prefix replays PHOBIA-TOPO 44)
+
+SW  SERVICE TRANSITION  [supplied settled states]
+  before: phobia prefix 43
+  after:  phobia prefix 44 (connector1 picked up at location5)
+  agent agent1 at location5 -> location5
+  engine agreement (provider reading = OBSTACLE-CLEAR): before agrees, after agrees
+  passage services (6)
+    gate1  blocked both (closed)
+    gate2  blocked both (closed)
+    wblower2  KEPT BY ALTERNATIVE (OVERRIDE): lost CONTROL; remaining JAM by jammer1
+    wblower3  GAINED (turning -> stopped) by CONTROL
+    wblower4  blocked both (turning)
+    wgears1  KEPT: NO FAN
+  supplies withdrawn or established
+    receiver2 on -> off; affected devices wblower2, wblower3
+    pairings removed (paired connector1 connector2) (paired connector1 receiver2); added none
+  arcs for agent1: 0 lost, 17 gained
+    GAINED location12 <-> location7 ((wblower2 wblower3 wgears1))
+    GAINED location12 <-> location8 ((wblower2 wblower3 wgears1))
+    GAINED location13 <-> location7 ((wblower3))
+    GAINED location13 <-> location8 ((wblower3))
+    GAINED location1 <-> location7 ((wblower2 wblower3))
+    GAINED location1 <-> location8 ((wblower2 wblower3))
+    GAINED location2 <-> location7 ((wblower2 wblower3 wgears1))
+    GAINED location2 <-> location8 ((wblower2 wblower3 wgears1))
+    GAINED location4 -> location7 ((wblower2 wblower3))
+    GAINED location4 -> location8 ((wblower2 wblower3))
+    GAINED location5 <-> location7 ((wblower2 wblower3))
+    GAINED location5 <-> location8 ((wblower2 wblower3))
+    GAINED location6 -> location7 ((wblower3))
+    GAINED location6 -> location8 ((wblower3))
+    GAINED location7 -> location4 ((wblower3))
+    GAINED location7 <-> location8 ((wblower3))
+    GAINED location8 -> location4 ((wblower3))
+  mobility from each state's own location: lost none; gained location7 location8
+  retrieval: lost none; gained none; not retrievable now none
+  requirements on the second state
+    TRANSIT location8: MET
+    RETURN location13: MET  (mobility from the target in this state; the agent is not relocated)
+  NOT CLAIMED: which action caused a change, that the second state follows from the first, a realizable ordering, a safe transfer, or future reachability.  Mobility is one engine closure in each state.
+=== BEGIN CRELAY-TOPO
+PASS (SD prints CRELAY-TOPO)
+PASS (SD physical-view note CRELAY-TOPO)
+PASS (SW UNRESOLVED with a recorder CRELAY-TOPO)
+T43 GENERAL CHECKS PASSED (CRELAY-TOPO): 3
+=== BEGIN WINDTUNNEL-TOPO
+PASS (SD prints WINDTUNNEL-TOPO)
+PASS (SD physical-view note WINDTUNNEL-TOPO)
+PASS (SW UNRESOLVED with a recorder WINDTUNNEL-TOPO)
+T43 GENERAL CHECKS PASSED (WINDTUNNEL-TOPO): 3
+=== BEGIN RUMIN-TOPO
+PASS (SD prints RUMIN-TOPO)
+PASS (SD physical-view note RUMIN-TOPO)
+PASS (SW UNRESOLVED with a recorder RUMIN-TOPO)
+T43 GENERAL CHECKS PASSED (RUMIN-TOPO): 3

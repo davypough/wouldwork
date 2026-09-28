@@ -1,0 +1,110 @@
+--- before-T32
++++ after-T32
+@@ -7,7 +7,7 @@
+ MC  MECHANIC COVERAGE  [grade 1]
+ --------------------------------------------------------------
+ 
+-  public technologies spliced (8): 7 covered, 1 UNCOVERED
++  public technologies spliced (8): 8 covered, 0 UNCOVERED
+     beam-relay        COVERED    extractors S6 RC
+     gate              COVERED    extractors S1 S3 S4
+     plate             COVERED    extractors S1 S2 T6
+@@ -15,9 +15,9 @@
+     step              COVERED    extractors S2 T6; blower mounting in the floor-blower contract; gears-mounted fans have no component
+     visibility        COVERED    infrastructure -- line of sight; read by S6
+     walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+-    wall-blower       UNCOVERED
+-
+-  UNCOVERED (1): wall-blower
++    wall-blower       COVERED    contract (also S1 S3 RC CC)
++
++  UNCOVERED (0):
+     READING: UNCOVERED means no static contract is declared for that technology.  The coverage gate (Problem-Solving Guide, Phase 0 step 2) requires a hand contract in the Briefing, or a component, before going on.  COVERED by extractors or infrastructure means the named components carry its static consequences; it is not a contract.
+ 
+   contract recorder
+@@ -27,6 +27,15 @@
+     cycles allowed  1 (*max-recorder-cycles*)
+     live -> ghost (2): agent1 -> agent1*, connector1 -> connector1*
+     recorder1  at location1
++
++  contract wall-blower
++    controls  its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree
++    moves     horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination
++    requires  own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walking arcs labelled by the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge
++    blower1  fixed complete fixture
++      horizontal   location3 -> location6
++      stream       elevation 1; width 4; base < stream <= top
++      control      ((plate1)) normal, separately in each environmental view
+ 
+ 
+ S0  TYPE EXTENT CENSUS  [grade 1]
+@@ -446,7 +455,10 @@
+   hop's required gates are those whose closing alone blocks it (monotone reading).
+   Stations are placements, not reachability claims.  Bodies count the connector and
+   its riser (ground 0, held tray 2, other support 1); a station with a plate is
+-  counted as keeping it, so off-plate counts are least values.
++  counted as keeping it, so off-plate counts are least values within this enumeration.
++  GEOMETRIC CANDIDATES: stable simultaneous occupancy and support motion UNRESOLVED.
++  BOOTSTRAP/LATCH are geometric classes, not validated realizations. Connector height
++  is that used by station enumeration; differing connector heights are not enumerated.
+   connectors 2; fixed couplings 0 (not enumerated); exclusion pairs 
+ 
+   stations (6): location, then top (supports) per achievable connector top
+@@ -487,6 +499,8 @@
+     1  transmitter1 -> location1@1 -> repeater1 -> location3@1 -> receiver1  BOOTSTRAP
+         gates gate1; plates for them  (none)
+         connectors 2; risers ground, ground; bodies 2, on plates 0, off plates 2
++        GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
++        blower1 at location3: base 0, top 1, stream 1; SWEPT if a fan is present and turns in the occupant's view; destination location6; LIVE STATION CONFLICT while physical gate1 open (S1 state/aggregate equivalence); ghost fan state independent
+ 
+   summary for receiver1
+     chains 1: bootstrap 1, latch 0, excluded 0, infeasible 0
+@@ -654,23 +668,23 @@
+ 
+ CC  COUPLING CENSUS  [grade 1; occluder role grade 2]
+ --------------------------------------------------------------
+-  subsystems: route (barrier), beam (occluder, beam-driven), lift (lift), occupancy (support-controller)
++  subsystems: route (barrier), beam (occluder, beam-driven), lift (lift), transport (horizontal-transport, transport), occupancy (support-controller)
+ 
+   role table (5 objects)
+-    blower1  device  barrier lift  subsystems route lift
++    blower1  device  barrier horizontal-transport  subsystems route transport
+     gate1  device  occluder  subsystems beam
+     gate2  device  barrier occluder  subsystems route beam
+     plate1  primitive  support-controller  subsystems occupancy
+     receiver1  primitive  beam-driven  subsystems beam
+ 
+   K1 fan-out (1)
+-    plate1  subsystems route beam lift occupancy
+-      blower1 == plate1  barrier lift
++    plate1  subsystems route beam transport occupancy
++      blower1 == plate1  barrier horizontal-transport
+       gate1 == plate1  occluder
+       {blower1, gate1}  EQUIVALENCE
+ 
+   K2 multi-role (2)
+-    blower1  route lift
++    blower1  route transport
+     gate2  route beam
+ 
+   K3 beam feedback (1)
+@@ -696,12 +710,15 @@
+ 
+   H3 beam-held devices (2)
+     H3.1  NECESSARY  [grade 2; S1 RC]
+-      limit  gate2 == receiver1 holds only while receiver1 is active; every usable beam to receiver1 (1 bootstrap, 0 latch) needs gate1 open
+-      hint   while gate2 must hold, at least 2 bodies are off plates for the beam
+-      note   RC scope: physical view only; off-plate counts are least values
++      limit  gate2 == receiver1 holds only while receiver1 is active; within RC's enumerated physical geometric candidates, every chain to receiver1 (1 bootstrap, 0 latch) needs gate1 open
++      hint   within those geometric candidates for gate2, at least 2 bodies are off plates for the beam
++      note   S1's receiver condition is necessary; RC gate/body bounds are conditional on its physical geometric enumeration, not all recording-view beams
++      note   Recording sightlines, body/view assignment, forced transport and occupancy stability UNRESOLVED; geometric chains are not validated realizations
+     H3.2  CANDIDATE  [grade 2; RC]
+-      limit  beams to receiver1 whose last connector stands at location3 (R2): least off-plate bodies 2
++      limit  physical geometric candidates to receiver1 with last connector at location3 (R2): least off-plate bodies 2
+       hint   transmitter1 -> location1@1 -> repeater1 -> location3@1 -> receiver1  risers ground, ground; bodies 2, off plates 2
++      note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
++      note   blower1 at location3: base 0, top 1, stream 1; SWEPT if a fan is present and turns in the occupant's view; destination location6; LIVE STATION CONFLICT while physical gate1 open (S1 state/aggregate equivalence); ghost fan state independent
+ 
+   H4 controllers off the goal route (0)
+     none

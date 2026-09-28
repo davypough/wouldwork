@@ -139,7 +139,8 @@ also registers the parameter value for configuration verification.
 
 ## Validation and retained evidence
 
-New evidence is under artifacts/parallel-closeout-01. Runs used isolated SBCL
+New evidence was under artifacts/parallel-closeout-01 (directory removed by D
+by 2026-09-28). Runs used isolated SBCL
 processes, unique instance files and fresh ASDF caches. The user's REPL was not
 used. No TEST-THREADS invocation or expensive puzzle solve was run.
 

@@ -1,0 +1,17 @@
+;;; Tiny finite chain for T38 depth-only probe checks.
+(in-package :ww)
+(ww-set *problem-name* t38-probe)
+(ww-set *problem-type* planning)
+(ww-set *threads* 16)
+(ww-set *solution-type* min-length)
+(ww-set *tree-or-graph* graph)
+(ww-set *depth-cutoff* 7)
+(define-types point (begin middle finish unreachable))
+(define-dynamic-relations (at point))
+(define-init (at begin))
+(define-action first-step 1 () (at begin) ()
+  (assert (not (at begin)) (at middle)))
+(define-action second-step 1 () (at middle) ()
+  (assert (not (at middle)) (at finish)))
+(define-goal (at finish))
+

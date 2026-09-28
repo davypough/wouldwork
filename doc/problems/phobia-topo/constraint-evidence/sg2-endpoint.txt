@@ -1,0 +1,28 @@
+SG2 accepted from D's successful replay and full endpoint report.
+success=T; failure-index=NIL; reason=NIL.
+Time: 24.0. Value: 0.0.
+  (ACTIVE RECEIVER1)
+  (BLOWING WBLOWER4)
+  (BLOWING WBLOWER2)
+  (COLOR CONNECTOR1 RED)
+  (HAS-LOCATION AGENT1 LOCATION12)
+  (HAS-LOCATION FAN1 LOCATION4)
+  (HAS-LOCATION CONNECTOR1 LOCATION12)
+  (HAS-LOCATION JAMMER1 LOCATION12)
+  (HOLDING1 AGENT1 CONNECTOR2)
+  (HOLDING2 AGENT1 CONNECTOR2)
+  (JAMMING JAMMER1 GATE2)
+  (OPEN GATE1)
+  (OPEN GATE2)
+  (PAIRED CONNECTOR1 RECEIVER1)
+  (PAIRED CONNECTOR1 TRANSMITTER1)
+  (TURNING FGEARS1)
+  (TURNING WBLOWER4)
+  (TURNING WBLOWER2)
+  (TURNING WGEARS1)
+
+All agreed SG2 endpoint conditions satisfied. SG1: 7 actions; SG2: 17 actions;
+24 accumulated replay-validated actions. No search/minimum-length claim.
+Final loft goal not reached or tested. Not a search-checkpoint archive.
+SG2 replay source SHA-256:
+0071EE30C7203C07B5D7A765EA71D3237C48CC01B03C6D4D9E4BB8DDD46C912F

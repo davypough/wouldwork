@@ -1,0 +1,233 @@
+T23 -- I7 probe battery (PB) -- evidence
+========================================
+Specification: doc/constraint-method/Extractor-Specifications.md, section 12.
+Problem: crelay-topo.  Maximum search depth 11 (D, 2026-09-26).  Threads 16.
+
+
+PART 1 -- A2 EXPECTED READINGS (written 2026-09-26, before any code or run)
+----------------------------------------------------------------------------
+
+Bases used (all current files):
+  B1  probs/problem-crelay-topo.lisp DEFINE-INIT and settings
+  B2  doc/problems/crelay-topo/Constraint-Static-Profile.txt (MC, S1, S3, S4)
+  B3  doc/problems/crelay-topo/Constraint-Realization-Ledger.txt, lk1 (found
+      from the staged start, 4 actions, validated)
+  B4  doc/constraint-method/evidence/t22-from-here-2026-09-26.txt (FH at the
+      fresh staging, A3 passed): agent1's only move is to location2; plate1
+      changes after that move; no other controller is within one move
+  B5  hand argument, stated where used
+
+Start facts (B1): agent1 at location1 (R1); connector1 at location9 (R2);
+box1 at location6 (R9); tray1 at location7 on plate2 (R8); recorder1 at
+location1; no PAIRED fact; ghosts have no location.  Start readings of the
+S1 primitives: plate2 depressed (tray1); every other plate not depressed;
+receiver1 not active; switch1, switch2 not switched-on.  The instance sets
+*solution-type* MIN-LENGTH and *max-recorder-cycles* NIL; the battery uses
+FIRST (spec 12.3) and leaves the recorder limit as staged.
+
+1.1  Sources of the probe list
+
+  P1 landmarks (B2):
+    S4 switch reach sites: switch1 -> location20, location4, location5,
+      location6; switch2 -> location14
+    MC lift destinations: blower1 -> location20
+    S4 explicit goal destinations: location19
+    union, less agent1's start location1:
+      location14 location19 location20 location4 location5 location6
+  P1 agents present at the start: agent1 (agent1* has no location).
+  P2 cargo with a start location: box1 (R9), connector1 (R2), tray1 (R8).
+    Ghost copies have no location and take no probe.
+  P3 S1 primitives (11): plate1..plate8, receiver1, switch1, switch2.
+  P4 fixed relays: repeater1 (floor-repeater); wall-repeater is empty.
+
+1.2  Expected probe list (21 probes), in the order the spec prescribes
+
+  P1 landmark (6)
+    P1.1  agent1      (has-location agent1 location14)
+    P1.2  agent1      (has-location agent1 location19)
+    P1.3  agent1      (has-location agent1 location20)
+    P1.4  agent1      (has-location agent1 location4)
+    P1.5  agent1      (has-location agent1 location5)
+    P1.6  agent1      (has-location agent1 location6)
+  P2 resource (3)   -- goal: an OR of HAS-LOCATION over every location
+                       outside the object's start region, in name order
+    P2.1  box1        outside R9 {location6}: the other 20 locations
+    P2.2  connector1  outside R2 {location8 location9 location10}: 18 locations
+    P2.3  tray1       outside R8 {location20 location3 location4 location5
+                      location7}: 16 locations
+  P3 controller (11)
+    P3.1  plate1      (depressed plate1)
+    P3.2  plate2      (not (depressed plate2))
+    P3.3  plate3      (depressed plate3)
+    P3.4  plate4      (depressed plate4)
+    P3.5  plate5      (depressed plate5)
+    P3.6  plate6      (depressed plate6)
+    P3.7  plate7      (depressed plate7)
+    P3.8  plate8      (depressed plate8)
+    P3.9  receiver1   (active receiver1)
+    P3.10 switch1     (switched-on switch1)
+    P3.11 switch2     (switched-on switch2)
+  P4 relay (1)
+    P4.1  repeater1   (exists (?c connector) (paired ?c repeater1))
+
+1.3  START rows
+
+  none.  No P1 landmark is agent1's start location; no cargo starts outside
+  its own region; every P3 goal is the negation of the primitive's start
+  reading by construction; B1 has no PAIRED fact.
+
+1.4  Settled labels
+
+  P1.4  CHEAP 4 @ 4    P1.5  CHEAP 4 @ 4
+    Upper: B3, lk1 from the staged start: START-RECORDER, the ghost walks
+    location1 -> location2 and steps onto plate1, agent1 walks through gate1
+    (the validated path ended at location7; S3 lists all ten R1 x R8 pairs
+    as walking arcs with family ((gate1)), and location1, location4,
+    location5 are all at level 0).
+    Lower (B5): every arc leaving R1 needs gate1 (S3: R1's only spine row is
+    R1 <-> R8 ((gate1)); ladder1 enters R1 one way).  gate1 == plate1, and
+    agent1 cannot hold plate1 while crossing.  No cargo is in R1, so the only
+    other body is a ghost: START-RECORDER, then its move to location2 and
+    its step onto plate1, then agent1's crossing -- 4 actions.
+  P3.1  CHEAP 2 @ 2
+    B4: no one-step successor changes plate1; after the move to location2,
+    agent1's next action does.
+  P3.10 CHEAP 5 @ 5
+    Upper: the P1.4 plan plus one toggle at location4 (an S4 reach site).
+    Lower (B5): every reach site of switch1 lies in R8 or R9, so agent1 must
+    first leave R1 (4 actions, above), then toggle (1).
+
+  Risk stated before the run: the settled CHEAP rows assume the staged
+  lower-bound contributor (topo-lower-bound) prunes against the probe's goal
+  in a standalone search, as lk1's search was not pruned away.  If a
+  settled row comes back not found, check that first.
+
+1.5  Provisional labels (upper bounds by hand, B5; not settled)
+
+  P1.1  location14      NOT FOUND or STOPPED; T10 reached it only after
+                        lk1-lk3, lk7, lk8 (17 actions cumulative)
+  P1.2  location19      NOT FOUND or STOPPED; the known solution has 87
+                        actions and gate9 needs three held plates (NH H1.3)
+  P1.3  location20      CHEAP, about 6: reach location4 (4), toggle switch1
+                        on, step onto blower1 (lift to location20)
+  P1.6  location6       unknown; D's route reached it only by the ghost-held
+                        tray landing (pr19); the direct jumps from level 0
+                        through gate2 (open at the start) climb 3/2
+  P2.1  box1            unknown, likely NOT FOUND; box1 leaves the alcove in
+                        D's design only after pr19
+  P2.2  connector1      CHEAP, at most about 8: reach R2 (5), pick up, carry
+                        through gate3 to R8, put down
+  P2.3  tray1           CHEAP, at most about 7: reach location7 (4), pick
+                        up, carry back through gate1 (ghost still on
+                        plate1), put down
+  P3.2  plate2 released CHEAP, at most 5: reach location7 (4), pick up tray1
+  P3.3  plate3          CHEAP, at most about 6: reach location7 (4), walk
+                        through gate3 to location10, step on
+  P3.4  plate4          CHEAP, at most about 6: reach location7 (4), walk
+  P3.5  plate5          through gate3 and gate5 to the plate, step on
+  P3.6  plate6          NOT FOUND or STOPPED: behind gate7 (switch2 at
+  P3.7  plate7          location14) and gate8 (receiver1)
+  P3.8  plate8
+  P3.9  receiver1       NOT FOUND or STOPPED: every usable chain needs gate4
+                        (plate3) and at least 2 off-plate bodies (NH H3.1)
+  P3.11 switch2         NOT FOUND or STOPPED: location14 is behind gate6,
+                        which needs plate4 and plate5 held by bodies other
+                        than the crosser (NH H2.1)
+  P4.1  repeater1       CHEAP, at most about 7: reach location9 (5), pick up
+                        connector1, connect it to repeater1 (location9 sees
+                        repeater1 ALWAYS, S6)
+
+  Memory: several provisional NOT FOUND rows will run to cutoff 11 at
+  threads 16.  The lk5 cutoff-10 search consed 22 GB from a later state
+  (ledger bd3).  The runner's states limit (spec 12.3) is set by D for the
+  run; a STOPPED row is a legitimate outcome, not a failure of A3.
+
+
+PART 2 -- RUN AND CHECKS (2026-09-26, by D on lumpy)
+----------------------------------------------------
+
+Run: (run-probe-battery 11 5000000 <results>) at *threads* 16 from a fresh
+staging.  Results: t23-probe-battery-results-2026-09-26.lisp.  Checks:
+t23-probe-battery-checks-2026-09-26.lisp -- 72 passed, 0 failed, first run
+(reported by D).  No probe crashed and none was STOPPED.
+
+2.1  Outcome against part 1
+
+  probes (21): 0 START, 12 CHEAP, 9 NOT FOUND, 0 EXHAUSTED, 0 STOPPED
+
+  row    subject      expected (part 1)              generated
+  P1.1   location14   NOT FOUND or STOPPED           NOT FOUND <= 11
+  P1.2   location19   NOT FOUND or STOPPED           NOT FOUND <= 11
+  P1.3   location20   CHEAP, about 6                 CHEAP 6 @ 6
+  P1.4   location4    CHEAP 4 @ 4 (settled)          CHEAP 4 @ 4
+  P1.5   location5    CHEAP 4 @ 4 (settled)          CHEAP 4 @ 4
+  P1.6   location6    unknown                        NOT FOUND <= 11
+  P2.1   box1         unknown, likely NOT FOUND      NOT FOUND <= 11
+  P2.2   connector1   CHEAP, at most about 8         CHEAP 7 @ 7
+  P2.3   tray1        CHEAP, at most about 7         CHEAP 6 @ 6 (see 2.2 a)
+  P3.1   plate1       CHEAP 2 @ 2 (settled)          CHEAP 2 @ 2
+  P3.2   plate2 off   CHEAP, at most 5               CHEAP 8 @ 8 (see 2.2 b)
+  P3.3   plate3       CHEAP, at most about 6         CHEAP 5 @ 5
+  P3.4   plate4       CHEAP, at most about 6         CHEAP 5 @ 5
+  P3.5   plate5       CHEAP, at most about 6         CHEAP 5 @ 5
+  P3.6   plate6       NOT FOUND or STOPPED           NOT FOUND <= 11
+  P3.7   plate7       NOT FOUND or STOPPED           NOT FOUND <= 11
+  P3.8   plate8       NOT FOUND or STOPPED           NOT FOUND <= 11
+  P3.9   receiver1    NOT FOUND or STOPPED           NOT FOUND <= 11
+  P3.10  switch1      CHEAP 5 @ 5 (settled)          CHEAP 5 @ 5
+  P3.11  switch2      NOT FOUND or STOPPED           NOT FOUND <= 11
+  P4.1   repeater1    CHEAP, at most about 7         CHEAP 6 @ 6
+
+  A3: the probe list matched part 1 row for row; all four settled rows
+  matched.  Every CHEAP plan replayed under VALIDATE-ACTION-SEQUENCE with its
+  probe goal (A4).  Every provisional row fell inside its stated expectation
+  except P3.2, whose hand upper bound was wrong (2.2 b).
+
+2.2  Findings
+
+  a. A held tray keeps HAS-LOCATION.  P2.3's plan carries tray1 to location9
+     and never sets it down.  tech/tray.lisp documents this as the one
+     deviation from held cargo having no location (a held tray's riders need
+     it).  Specification 12.2 stated the premise for all cargo, from
+     pickup-box only; it is amended (12.7).  The goal is unchanged: for a
+     tray, "outside its start region" can be met by carrying it there.
+  b. P3.2 needed 8 actions, not the 5 of the hand bound (reach location7 in
+     4, pick up tray1).  No plan was found at cutoffs 5-7.  The plan found
+     first steps the ghost off plate1, walks it back to location1 (the
+     recorder), picks up tray1 and ends with the action STOP-RECORDER.
+     Explained with D's domain answers (2026-09-26):
+       - START-RECORDER forks a ghost of every mobile object (ledger pr11:
+         all four ghost occupants have locations once a cycle is open), so
+         tray1* rests on plate2 as tray1 does.  While a recording cycle is
+         open, tray1* stays on plate2 and keeps it pressed after agent1
+         lifts the live tray (D; S2: DEPRESSED reads every occupant, ghosts
+         included).  The 5-action path therefore never makes plate2 free.
+       - The ghost has to return to the recorder before the cycle can be
+         stopped in the playback phase, unless the live agent reaches the
+         goal, in which case playback terminates (D).
+       - "Stopping" is ambiguous: a cycle has three phases, and each phase
+         stops before the next begins (D).  This record names the action
+         STOP-RECORDER and makes no claim about which phase boundary it
+         marks.
+     The hand bound was wrong because it treated the live tray as plate2's
+     only occupant.  P1.4's 4-action plan is unaffected: its goal reads
+     only agent1's location.  Lesson for hand bounds (not a schema gap):
+     inside an open cycle, a support is free only when its ghost-layer
+     occupants are gone too.
+  c. Every NOT FOUND probe explored about 467,000 states at cutoff 11 (466,758
+     to 467,635).  From this start the depth-11 space is nearly goal-
+     independent, and small: no memory risk at this depth for crelay-topo.
+  d. The progress line printed shifted fields for a run with no plan ("no
+     plan  truncated 0  states T"): the no-plan branch of its FORMAT
+     directive did not consume the plan-length argument.  Fixed after the
+     run with ~*.  Display only: the records and the report were correct.
+
+2.3  Probe map for the Briefing (crelay-topo, maximum depth 11)
+
+  Cheap from the start: agent1 into R8 (location4, location5: 4; location20
+  by the lift: 6); plate1 (2); plate3, plate4, plate5, switch1 (5);
+  connector1 out of R2 (7); tray1 out of R8 (6); plate2 released (8);
+  connector1 paired with repeater1 (6).  Every cheap plan but P3.1's opens
+  gate1 with a ghost on plate1 (a recorder cycle in the first 3 actions).
+  Not found within 11: agent1 at location14, location19, location6; box1 out
+  of the alcove; plate6-8; receiver1; switch2.

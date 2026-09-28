@@ -1,0 +1,252 @@
+;;; T44 run log, 2026-09-28. SBCL 2.2.9, scratch copy of the repository. Check lines, then CP reports on claustro-topo.
+=== T24 REGRESSION (crelay-topo, no reservations)
+CP checks, T24
+  pass  A7: regenerated profile (1719 lines) equals the file (1719 lines)
+  pass  A3: expected block read (102 lines)
+  pass  A3: generated block (102 lines) equals expected (102 lines)
+  segments with a B1 mismatch: 
+  pass  A4: each of 18 segments has one B1 row per required plate
+  pass  A4 RO: three B1 rows matched PASS
+  pass  A4 RO: segment PASS
+  pass  A4 RO: matching PERFECT
+  pass  A4 RO: forced members box1 connector1 tray1
+  pass  A4 RO: no forced pairing
+  pass  A5 N1: plate3 (beam, gate8) shortage CONFLICT
+  pass  A5 N1: plan CONFLICT
+  pass  A5 N2: B2 CONFLICT on switch2 with S1's exclusion pair
+  pass  A5 N3: B4 CONDITIONAL with checklist 2.2's question
+  pass  A5 N3: plan CONDITIONAL
+  pass  A5 N4: three B1 shortage rows, violator plate6-8 against 2 witnesses
+  pass  A6: CP block located
+  pass  A6: no LABELS or FLET in the CP block
+  staged names found in the CP block: normal inverted
+  pass  A6: no staged object name (78 checked) in the CP block, except declared normal, inverted
+  used before definition: 
+  pass  A6: callees-first, 36 functions
+CP checks: 19 passed, 0 failed
+full CP output on the T24 plan and three one-segment plans: byte-identical to the pre-change capture (cmp)
+=== BEGIN CLAUSTRO-TOPO
+COMPILE warnings-p T failure-p NIL
+COMPILE-ORIGINAL warnings-p T failure-p NIL
+PASS (caller plan unchanged A1 final phase)
+PASS A1 plan PASS
+PASS A1 shared plates counted once: three B1 rows
+PASS A1 box2 reserved off plates
+PASS A1 jammer1 eligible for all three plates
+PASS A1 jammer2 eligibility carries the gate2/gate3 premise
+PASS A1 free witnesses box1
+PASS (caller plan unchanged A1 pinned end arrangement)
+PASS A1 pinned plan PASS
+PASS A1 pinned holders
+PASS A1 jammer1 SHARED, sighted from its plate
+PASS A1 jammer2 SHARED, premise gate2/gate3
+PASS A1 pinned: no unpinned plate
+PASS (caller plan unchanged A2 held and jamming)
+PASS (A2 held and jamming CONFLICT C1 held and stationary at once)
+PASS (caller plan unchanged A2 two jam targets)
+PASS (A2 two jam targets CONFLICT C3 jam names gate5, gate1; its relation holds one)
+PASS (caller plan unchanged A2 step weighting a plate)
+PASS (A2 step weighting a plate CONFLICT C2 locations differ: location10, location4)
+PASS (caller plan unchanged A2 two bodies on one plate)
+PASS (A2 two bodies on one plate CONFLICT K1 box1 and jammer1 contend for plate1)
+PASS (caller plan unchanged A2 a box asked to jam)
+PASS (A2 a box asked to jam CONFLICT C7 jam gate1: not a jammer)
+PASS A2 unsighted plate site: CONFLICT
+PASS A2 unsighted plate site: jammer not eligible for that plate
+PASS A2 still eligible for a sighted plate
+PASS A2 no surveyed site at a location: CONDITIONAL
+PASS (caller plan unchanged A2 box1 reserved elsewhere: shortage)
+PASS (A2 box1 reserved elsewhere: shortage CONFLICT for the supplied reservations, refutes this allocation only)
+PASS A2 shortage names both jammers as the only witnesses
+PASS A2 box1 reserved off plates
+PASS (caller plan unchanged A3 phases)
+PASS A3 s1 jam from location1 ground
+PASS A3 release row, not stated available
+PASS A3 released body is not a free witness
+PASS A3 s2 matched with jammer2
+PASS A3 s1 has no required plate
+PASS (caller plan unchanged A3 phases)
+PASS A3 release row, listed available
+PASS A3 released body free only when listed
+PASS A3 unknown phase signals
+PASS A3 unknown role signals
+PASS recording view jam sightline CONDITIONAL
+PASS (no problem name in CP code claustro)
+PASS (no problem name in CP code phobia)
+PASS (no problem name in CP code crelay)
+PASS (no problem name in CP code gate1)
+PASS (no problem name in CP code plate1)
+PASS (no problem name in CP code jammer1)
+PASS (no problem name in CP code box1)
+PASS (no problem name in CP code location1)
+PASS (no problem name in CP code agent1)
+PASS (no problem name in CP code fan1)
+PASS (no problem name in CP code gears1)
+PASS no LABELS or FLET in CP code
+PASS K1 occupant on two supports
+PASS K1 support occupant also on a plate
+PASS K1 live and ghost share a plate
+PASS K1 two live contend
+PASS K2 agent holds two
+PASS K3 gears carry two fans
+PASS K4 reserved ghost while absent
+PASS (no reservation, no B5 row CLAUSTRO-TOPO)
+T44 CLAUSTRO CHECKS PASSED: 63
+=== BEGIN PHOBIA-TOPO
+COMPILE warnings-p T failure-p NIL
+COMPILE-ORIGINAL warnings-p T failure-p NIL
+PASS (caller plan unchanged A4 floor mount supports the agent)
+PASS A4 floor mount and support SHARED, PASS
+PASS (caller plan unchanged A4 wall mount cannot support)
+PASS A4 wall mount with support: C5
+PASS (caller plan unchanged A4 held fan mounted)
+PASS A4 held and mounted: C1
+PASS (caller plan unchanged A4 wall mount placed)
+PASS A4 wall mount has no location: C2
+PASS (no problem name in CP code claustro)
+PASS (no problem name in CP code phobia)
+PASS (no problem name in CP code crelay)
+PASS (no problem name in CP code gate1)
+PASS (no problem name in CP code plate1)
+PASS (no problem name in CP code jammer1)
+PASS (no problem name in CP code box1)
+PASS (no problem name in CP code location1)
+PASS (no problem name in CP code agent1)
+PASS (no problem name in CP code fan1)
+PASS (no problem name in CP code gears1)
+PASS no LABELS or FLET in CP code
+PASS K1 occupant on two supports
+PASS K1 support occupant also on a plate
+PASS K1 live and ghost share a plate
+PASS K1 two live contend
+PASS K2 agent holds two
+PASS K3 gears carry two fans
+PASS K4 reserved ghost while absent
+PASS (no reservation, no B5 row PHOBIA-TOPO)
+T44 PHOBIA CHECKS PASSED: 28
+=== CLAUSTRO PROFILE regenerated: byte-identical to the stored file (SHA-256 6B19AF9D...CE5EC356)
+=== REPORTS
+
+
+CP  CYCLE-PLAN CHECK  [grade per row]
+--------------------------------------------------------------
+  READING: checks a stated stage plan against plate, body and view budgets.  PASS says no budget forbids the segment; it is not a plan witness.  CONFLICT rejects the stated budget, not the stage's idea.  Per-plate eligibility beyond the view (reach, elevation, history) is not evaluated.
+
+  plan A1 final phase
+    provenance T44 check
+    stages 1
+  segments (1): 1 PASS, 0 CONDITIONAL, 0 CONFLICT
+
+  stage s  PASS  check
+    segment final  view physical  cycle none  ghosts absent  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate8: matched
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate8: matched
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate3 for gate8: matched
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  box2: place at location10 [jump support; final..final]
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer1: jam gate5 [final..final]
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer2: jam gate1 [final..final]
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  supports, holders and gears not overcommitted
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: box2 reserved off plates
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: jammer1 eligible for plate1 (jam gate5 sighted from location4 on plate1), plate2 (jam gate5 sighted from location5 on plate2), plate3 (jam gate5 sighted from location6 on plate3)
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: jammer2 eligible for plate1 (jam gate1 sighted from location4 on plate1 if gate2, gate3 open), plate2 (jam gate1 sighted from location5 on plate2 if gate2, gate3 open), plate3 (jam gate1 sighted from location6 on plate3 if gate2, gate3 open)
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: free witnesses box1
+
+  plan PASS
+
+
+CP  CYCLE-PLAN CHECK  [grade per row]
+--------------------------------------------------------------
+  READING: checks a stated stage plan against plate, body and view budgets.  PASS says no budget forbids the segment; it is not a plan witness.  CONFLICT rejects the stated budget, not the stage's idea.  Per-plate eligibility beyond the view (reach, elevation, history) is not evaluated.
+
+  plan A1 pinned end arrangement
+    provenance T44 check
+    stages 1
+  segments (1): 1 PASS, 0 CONDITIONAL, 0 CONFLICT
+
+  stage s  PASS  check
+    segment final  view physical  cycle none  ghosts absent  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate8: held by box1
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate8: held by jammer1
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate3 for gate8: held by jammer2
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  box1: weight plate1 [final..final]
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  box2: place at location10 [jump support; final..final]
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer1: weight plate2 [final..final]; jam gate5 [final..final] -- SHARED; jam gate5 sighted from location5 on plate2
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer2: weight plate3 [final..final]; jam gate1 [final..final] -- SHARED; jam gate1 sighted from location6 on plate3 if gate2, gate3 open
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  supports, holders and gears not overcommitted
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: no unpinned plate required
+
+  plan PASS
+
+
+CP  CYCLE-PLAN CHECK  [grade per row]
+--------------------------------------------------------------
+  READING: checks a stated stage plan against plate, body and view budgets.  PASS says no budget forbids the segment; it is not a plan witness.  CONFLICT rejects the stated budget, not the stage's idea.  Per-plate eligibility beyond the view (reach, elevation, history) is not evaluated.
+
+  plan A2 box1 reserved elsewhere
+    provenance T44 check
+    stages 1
+  segments (1): 0 PASS, 0 CONDITIONAL, 1 CONFLICT
+
+  stage s  CONFLICT  check
+    segment final  view physical  cycle none  ghosts absent  CONFLICT
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  CONFLICT  [grade 1 -> 2; S1 S2 RO]  plate1 for gate8: matched; shortage, violator plate1, plate2, plate3 against 2 witnesses (jammer1, jammer2); for the supplied reservations, refutes this allocation only
+      B1  CONFLICT  [grade 1 -> 2; S1 S2 RO]  plate2 for gate8: matched; shortage, violator plate1, plate2, plate3 against 2 witnesses (jammer1, jammer2); for the supplied reservations, refutes this allocation only
+      B1  CONFLICT  [grade 1 -> 2; S1 S2 RO]  plate3 for gate8: matched; shortage, violator plate1, plate2, plate3 against 2 witnesses (jammer1, jammer2); for the supplied reservations, refutes this allocation only
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  box1: place at location3 [final..final]
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  box2: place at location10 [final..final]
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer1: jam gate5 [final..final]
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer2: jam gate1 [final..final]
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  supports, holders and gears not overcommitted
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: box1 reserved off plates
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: box2 reserved off plates
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: jammer1 eligible for plate1 (jam gate5 sighted from location4 on plate1), plate2 (jam gate5 sighted from location5 on plate2), plate3 (jam gate5 sighted from location6 on plate3)
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: jammer2 eligible for plate1 (jam gate1 sighted from location4 on plate1 if gate2, gate3 open), plate2 (jam gate1 sighted from location5 on plate2 if gate2, gate3 open), plate3 (jam gate1 sighted from location6 on plate3 if gate2, gate3 open)
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: free witnesses none
+
+  plan CONFLICT
+
+
+CP  CYCLE-PLAN CHECK  [grade per row]
+--------------------------------------------------------------
+  READING: checks a stated stage plan against plate, body and view budgets.  PASS says no budget forbids the segment; it is not a plan witness.  CONFLICT rejects the stated budget, not the stage's idea.  Per-plate eligibility beyond the view (reach, elevation, history) is not evaluated.
+
+  plan A3 phases
+    provenance T44 check
+    stages 1
+  segments (2): 2 PASS, 0 CONDITIONAL, 0 CONFLICT
+
+  stage p  PASS  release
+    segment s1  view physical  cycle none  ghosts absent  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  no plate required
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer1: jam gate1 at location1 [s1..s1]; jam gate1 sighted from location1 on ground
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  supports, holders and gears not overcommitted
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: no unpinned plate required
+    segment s2  view physical  cycle none  ghosts absent  PASS
+      B0  PASS  [grade 1; S2]  bodies consistent with the view
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate1 for gate8: matched
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate2 for gate8: matched
+      B1  PASS  [grade 1 -> 2; S1 S2 RO]  plate3 for gate8: matched
+      B2  PASS  [grade 1; S1]  no primitive demanded both ways
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  jammer2: jam gate5 [s2..s2]
+        note  JAM-DISALLOWED> depends on the agent's location; not evaluated
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  supports, holders and gears not overcommitted
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: jammer2 eligible for plate1 (jam gate5 sighted from location4 on plate1), plate2 (jam gate5 sighted from location5 on plate2), plate3 (jam gate5 sighted from location6 on plate3)
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  pool: free witnesses box1, box2
+      B5  PASS  [grade 1 -> 2; S2 roles, functional keys, MC jammer survey]  released after s1: jammer1 jam gate1 at location1 [s1..s1]; not stated available here
+
+  plan PASS

@@ -4,7 +4,7 @@
 ;;; This file is deliberately user-amendable.  Unrecognised keys
 ;;; are preserved on the next write.
 
-(:ledger-version 1 :problem "crelay-topo" :written "2026-09-21")
+(:ledger-version 1 :problem "crelay-topo" :written "2026-09-25")
 
 (:id pr1
  :kind :premise
@@ -700,19 +700,21 @@
  :kind :question
  :statement "does opening the device that labels a spine arc require traversal OUTSIDE that arc, and if so into a region the spine does not visit?"
  :provenance (:derived :grade 1 :by "underdetermination in the analysis")
- :depends-on nil
+ :depends-on ((pr17))
  :premise-gaps nil
  :segment (:view :physical :cycle :none :ghosts :unknown)
- :status :open
+ :status :answered
  :sources ("surprise while ingesting a run for lk4")
- :events ((:date "2026-09-20" :event :opened :by "ledger" :note ""))
+ :events ((:date "2026-09-20" :event :opened :by "ledger" :note "")
+          (:date "2026-09-24" :event :answered :by "ledger" :note
+           "answered for-this-device-yes; recorded as premise pr17"))
  :candidates (:never :sometimes :for-this-device-yes)
  :default :unknown
  :answer-kind :one-of
  :template nil
  :blocks (lk4)
- :answer nil
- :answer-premise nil
+ :answer :for-this-device-yes
+ :answer-premise pr17
  :gap-candidate t)
 
 (:id pr15
@@ -932,4 +934,81 @@
             :cutoff-hits 130956)
  :interpretation-committed "EXHAUSTION: no solution found from this checkpoint at cutoff 10 under the actual settings/pruning. File a grade-3 bound with measured coverage, never a refutation. Reliable NIL means no observed direct cutoff truncation, not unpruned exhaustive coverage. The checkpoint returns unchanged; no predecessor retry or deepening."
  :segment-bridge nil)
+
+(:id pr17
+ :kind :premise
+ :statement "for the device labelling the R3-R5 spine arc, opening it requires traversal outside that arc into a region the spine does not visit: its switch's only manipulation reach candidate lies in an off-spine cul-de-sac behind a two-keeper guard (pr15, pr16), and the excursion was realized as lk7-lk9; filed as schema gap G16"
+ :provenance (:user-asserted :by "D" :asked-as qn10 :date "2026-09-24")
+ :depends-on nil
+ :premise-gaps nil
+ :segment (:view :physical :cycle :none :ghosts :unknown)
+ :status :in-force
+ :sources nil
+ :events ((:date "2026-09-24" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr18
+ :kind :premise
+ :statement "at the start of the recording that uses the ghost-held tray, connector1 rests on plate1 holding gate1 open, tray1 is at location7, and agent1 is at recorder1 empty-handed; a first setup cycle, cancelled at the recorder, produces this arrangement"
+ :provenance (:user-asserted :by "D" :date "2026-09-24")
+ :depends-on nil
+ :premise-gaps ("stated by D as the precondition of the ghost-held-tray cycle; realized in one validated sequence (actions 1-11), not derived from the profile")
+ :segment (:view :physical :cycle :closed :ghosts :absent)
+ :status :in-force
+ :sources ("constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt USER-ASSERTED PREMISE, STEP 1"
+           "constraint-evidence/validate-b2-ghost-tray-2026-09-24.lisp")
+ :events ((:date "2026-09-24" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr19
+ :kind :premise
+ :statement "a ghost of the agent holding tray1* at location5 is an elevated landing support (tray top 3/2): the live agent, lifted to location20 by blower1, jumps onto it, turns switch1 off so gate2 opens, and jumps through gate2 to location6, so box1 can leave the alcove"
+ :provenance (:user-asserted :by "D" :date "2026-09-24")
+ :depends-on nil
+ :premise-gaps ("named by D after the B2 construction audit found no elevation resource reachable from B1; checked by hand, then validated in one concrete sequence (23 actions); the static profile does not derive it")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt STEPS 2-7 and VALIDATION BY D"
+           "constraint-evidence/validate-b2-ghost-tray-2026-09-24.lisp")
+ :events ((:date "2026-09-24" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr20
+ :kind :premise
+ :statement "the second recording cycle ends with box1 on plate2, connector1 on plate1 and tray1 on the ground at location7, the arrangement the third cycle forks from"
+ :provenance (:user-asserted :by "D" :date "2026-09-24")
+ :depends-on nil
+ :premise-gaps ("D's correction of an earlier validated arrangement (tray1 on plate1, connector1 at location9), which is kept on record but not used")
+ :segment (:view :physical :cycle :closed :ghosts :absent)
+ :status :in-force
+ :sources ("constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt CORRECTION BY D and REVISED ENDPOINT VALIDATED"
+           "constraint-evidence/validate-b2-box-plate2-rev-2026-09-24.lisp")
+ :events ((:date "2026-09-24" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr21
+ :kind :premise
+ :statement "receiver1 is lit through repeater1 by two connectors: a ghost connector on the ground at location9 paired with transmitter1 and repeater1, and a live connector raised on box1 on a held tray, paired with repeater1 and receiver1, carried to location15"
+ :provenance (:user-asserted :by "D" :date "2026-09-24")
+ :depends-on nil
+ :premise-gaps ("D's design choice for the gate8 beam; S6 has no connector-to-connector sightlines (G17), so the design was confirmed only by the validated end state (receiver1 active), not derived")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt EXTENSION VALIDATED BY D (D chose)"
+           "constraint-evidence/validate-c3-alt-2026-09-25.lisp")
+ :events ((:date "2026-09-24" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
+
+(:id pr22
+ :kind :premise
+ :statement "in the third recording cycle the ghost holds tray1* at location5 while the live agent, riding blower1 to location20, places box1 and then a connector paired with repeater1 and receiver1 on it; live tray1 on plate4 and the ghost on plate5 open gate6; switch2 on opens gate7; the ghost's released tray1* settles the stack onto the live agent's held tray1 on plate5; the ghost then puts tray1* on plate1, pairs connector1* at location9 with repeater1 and transmitter1 and stands on plate3; the live agent carries the lit stack through gate7 to location15"
+ :provenance (:user-asserted :by "D" :date "2026-09-25")
+ :depends-on nil
+ :premise-gaps ("D's route, written by D as 50 actions and validated from the initial state (80 actions with the cycle-1/2 prefix); it supersedes D's earlier cycle-3 handoff plan (parts A-C) and the unrecorded D1-D3 files")
+ :segment (:view :physical :cycle :open :ghosts :present)
+ :status :in-force
+ :sources ("constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt ALTERNATIVE CYCLE 3 VALIDATED BY D"
+           "constraint-evidence/validate-c3-alt-2026-09-25.lisp")
+ :events ((:date "2026-09-25" :event :opened :by "ledger" :note ""))
+ :discharged-by nil)
 

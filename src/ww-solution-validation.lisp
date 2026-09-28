@@ -25,19 +25,17 @@
 (defun normalize-validation-actions (action-list)
   "Return plain action forms from ACTION-LIST.
 
-ACTION-LIST may contain plain forms or timestamped solution moves.  State snapshots
-interleaved with timestamped moves are ignored."
-  (let ((first-entry (first action-list)))
-    (if (and (consp first-entry)
-             (numberp (first first-entry))
-             (consp (second first-entry)))
-      (mapcar #'second
-              (remove-if-not (lambda (entry)
-                               (and (consp entry)
-                                    (numberp (first entry))
-                                    (consp (second entry))))
-                             action-list))
-      action-list)))
+ACTION-LIST may contain plain forms, timestamped solution moves, or a mixture of both,
+as when a replay-built checkpoint phase precedes a search-found one.  Each entry is
+normalized on its own.  State snapshots interleaved with timestamped moves are ignored."
+  (loop for entry in action-list
+        when (and (consp entry)
+                  (numberp (first entry))
+                  (consp (second entry)))
+          collect (second entry)
+        else when (and (consp entry)
+                       (symbolp (first entry)))
+          collect entry))
 
 
 (defun validate-action-sequence (initial-state action-list &key goal-test verbose)

@@ -1,0 +1,897 @@
+T41 focused check run, 2026-09-28 (SBCL 2.2.9, scratch copy of the repository; no search).
+
+== Corner (stage corner-topo; compile and load tech/constraint-profile.lisp; t41 then t40 checks) ==
+COMPILE-FILE tech/constraint-profile.lisp: WARNINGS-P NIL FAILURE-P NIL
+PASS beam-relay is a contract
+PASS corner zero UNCOVERED
+PASS contract beam-relay printed
+PASS capacity row
+PASS no start links
+PASS three competing stations
+PASS compose note
+PASS (station feeds reproduce RC hops (LOCATION1 1 (GROUND) NIL))
+PASS (station feeds reproduce RC hops (LOCATION2 1 (GROUND) NIL))
+PASS (station feeds reproduce RC hops (LOCATION3 1 (GROUND) NIL))
+PASS (station feeds reproduce RC hops (LOCATION4 1 (GROUND) NIL))
+PASS location4 red needs gate1
+PASS (reference sequence replays (corner prefix 14))
+PASS (caller state unchanged corner prefix 14)
+PASS (evaluated corner prefix 14)
+PASS (lighting agreement corner prefix 14)
+PASS (color agreement corner prefix 14)
+PASS (receiver agreement corner prefix 14)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER2 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR2)
+PASS (no unexplained outcome CONNECTOR3 CONNECTOR1)
+PASS (engine clear = sight and uncut CONNECTOR3 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1 CONNECTOR3)
+PASS (engine clear = sight and uncut CONNECTOR1 CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR3)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS p14 crossing7 active
+PASS p14 direct blue link cut, not clear
+PASS p14 connector3 red in layer 1
+PASS p14 connector1 red in layer 2 from connector3
+PASS p14 relayed red delivered
+PASS p14 receiver1 active, delivered
+PASS p14 receiver3 wrong hue
+PASS p14 connector2 unreached, its feed cut
+PASS p14 T33 chain clear physically
+PASS p14 T33 recording unresolved
+PASS (reference sequence replays (corner prefix 15))
+PASS (caller state unchanged corner prefix 15)
+PASS (evaluated corner prefix 15)
+PASS (lighting agreement corner prefix 15)
+PASS (color agreement corner prefix 15)
+PASS (receiver agreement corner prefix 15)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER2 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR3 CONNECTOR1)
+PASS (engine clear = sight and uncut CONNECTOR3 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1 CONNECTOR3)
+PASS (engine clear = sight and uncut CONNECTOR1 CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR3)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS p15 no active crossing
+PASS p15 connector1 blue in layer 1
+PASS p15 connector3 red later ignored at connector1
+PASS p15 receiver1 dark (wrong hue), receiver3 active
+PASS p15 connector2 absent (held)
+PASS p15 T33 chain blocked
+PASS (fixture settles consistently
+PASS (caller state unchanged fixture: connector2 paired to both hues)
+PASS (evaluated fixture: connector2 paired to both hues)
+PASS (lighting agreement fixture: connector2 paired to both hues)
+PASS (color agreement fixture: connector2 paired to both hues)
+PASS (receiver agreement fixture: connector2 paired to both hues)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR2)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR2)
+PASS (engine clear = sight and uncut TRANSMITTER2 CONNECTOR2)
+PASS (no unexplained outcome CONNECTOR3 CONNECTOR2)
+PASS (engine clear = sight and uncut CONNECTOR3 CONNECTOR2)
+PASS (no unexplained outcome CONNECTOR2 CONNECTOR3)
+PASS (engine clear = sight and uncut CONNECTOR2 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS conflict in layer 1, dark
+PASS both hues delivered into the conflict
+PASS dark relay feeds nothing downstream
+PASS receiver3 link DARK, inactive
+PASS report prints CONFLICT
+PASS (reference sequence replays (corner prefix 7))
+PASS (caller state unchanged corner prefix 7)
+PASS (evaluated corner prefix 7)
+PASS (lighting agreement corner prefix 7)
+PASS (color agreement corner prefix 7)
+PASS (receiver agreement corner prefix 7)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR2)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS p7 connector1 owns two pairings
+PASS (reference sequence replays (corner prefix 8))
+PASS (caller state unchanged corner prefix 8)
+PASS (evaluated corner prefix 8)
+PASS (lighting agreement corner prefix 8)
+PASS (color agreement corner prefix 8)
+PASS (receiver agreement corner prefix 8)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS p8 gate1 closed
+PASS p8 pickup cleared connector1's pairings
+PASS p8 connector2 pairing persists through the blocked beam
+PASS (reference sequence replays variant: prefix 13, walk, pickup)
+PASS (caller state unchanged variant pickup)
+PASS (evaluated variant pickup)
+PASS (lighting agreement variant pickup)
+PASS (color agreement variant pickup)
+PASS (receiver agreement variant pickup)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR3)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS pickup removes the incoming link named by connector3
+PASS held connector1 absent
+PASS (reference sequence replays variant: prefix 13, walk, retaining pickup)
+PASS (caller state unchanged variant retaining pickup)
+PASS (evaluated variant retaining pickup)
+PASS (lighting agreement variant retaining pickup)
+PASS (color agreement variant retaining pickup)
+PASS (receiver agreement variant retaining pickup)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (no unexplained outcome CONNECTOR3 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1 CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR3)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS retaining pickup keeps owned and incoming links
+PASS retained links end at an absent endpoint
+PASS receiver1 dark while connector1 is held
+PASS (reference sequence replays (corner prefix 13))
+PASS (caller state unchanged corner prefix 13)
+PASS (evaluated corner prefix 13)
+PASS (lighting agreement corner prefix 13)
+PASS (color agreement corner prefix 13)
+PASS (receiver agreement corner prefix 13)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER2 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR2)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR2)
+PASS (no unexplained outcome CONNECTOR3 CONNECTOR1)
+PASS (engine clear = sight and uncut CONNECTOR3 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1 CONNECTOR3)
+PASS (engine clear = sight and uncut CONNECTOR1 CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR3)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS p13 connector1 at capacity with one incoming
+PASS (fixture settles consistently
+PASS (caller state unchanged fixture: four outgoing)
+PASS (evaluated fixture: four outgoing)
+PASS (lighting agreement fixture: four outgoing)
+PASS (color agreement fixture: four outgoing)
+PASS (receiver agreement fixture: four outgoing)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER2 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER2 CONNECTOR1)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS four outgoing is over capacity
+PASS report prints OVER CAPACITY
+PASS (unresolved not a propagation fixed point)
+PASS (unresolved state provenance missing)
+PASS (unresolved state provenance missing)
+PASS (unresolved missing problem-state)
+PASS (unresolved view must be)
+PASS (unresolved recorder technology not spliced)
+PASS unresolved report prints only the reason
+PASS unsettled caller state unchanged
+PASS (caller state unchanged corner start)
+PASS (evaluated corner start)
+PASS (lighting agreement corner start)
+PASS (color agreement corner start)
+PASS (receiver agreement corner start)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR2)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR3)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (stored status iff some feeder delivers or direct RECEIVER2)
+PASS (stored status iff some feeder delivers or direct RECEIVER3)
+PASS start: every connector unreached
+PASS start state unchanged
+T41 CORNER CHECKS PASSED: 228
+PASS pool of 37 published
+PASS every stored beam is reported in stored order
+PASS (relevant corner segment present (TRANSMITTER1 LOCATION4))
+PASS (row text lists stored order (TRANSMITTER1 LOCATION4))
+PASS (relevant corner segment present (TRANSMITTER2 LOCATION2))
+PASS (row text lists stored order (TRANSMITTER2 LOCATION2))
+PASS (relevant corner segment present (LOCATION2 RECEIVER1))
+PASS (row text lists stored order (LOCATION2 RECEIVER1))
+PASS (relevant corner segment present (LOCATION3 RECEIVER1))
+PASS (row text lists stored order (LOCATION3 RECEIVER1))
+PASS (relevant corner segment present (TRANSMITTER1 LOCATION1))
+PASS (row text lists stored order (TRANSMITTER1 LOCATION1))
+PASS (relevant corner segment present (LOCATION1 LOCATION4))
+PASS (row text lists stored order (LOCATION1 LOCATION4))
+PASS (relevant corner segment present (LOCATION4 LOCATION1))
+PASS (row text lists stored order (LOCATION4 LOCATION1))
+PASS transmitter1->location4 source order
+PASS transmitter2->location2 source order
+PASS gate1 after all transmitter1->location4 crossings
+PASS gate1 after all transmitter2->location4 crossings
+PASS gate1 first on location4->location1
+PASS gate1 last on location1->location4
+PASS location-to-location reverse order
+PASS (crossing on exactly two canonical beams CROSSING1)
+PASS (crossing on exactly two canonical beams CROSSING2)
+PASS (crossing on exactly two canonical beams CROSSING3)
+PASS (crossing on exactly two canonical beams CROSSING4)
+PASS (crossing on exactly two canonical beams CROSSING5)
+PASS (crossing on exactly two canonical beams CROSSING6)
+PASS (crossing on exactly two canonical beams CROSSING7)
+PASS (crossing on exactly two canonical beams CROSSING8)
+PASS (crossing on exactly two canonical beams CROSSING9)
+PASS (crossing on exactly two canonical beams CROSSING10)
+PASS (crossing on exactly two canonical beams CROSSING11)
+PASS (crossing on exactly two canonical beams CROSSING12)
+PASS (crossing on exactly two canonical beams CROSSING13)
+PASS (crossing on exactly two canonical beams CROSSING14)
+PASS (crossing on exactly two canonical beams CROSSING15)
+PASS (crossing on exactly two canonical beams CROSSING16)
+PASS (crossing on exactly two canonical beams CROSSING17)
+PASS (crossing on exactly two canonical beams CROSSING18)
+PASS (crossing on exactly two canonical beams CROSSING19)
+PASS (crossing on exactly two canonical beams CROSSING20)
+PASS (crossing on exactly two canonical beams CROSSING21)
+PASS (crossing on exactly two canonical beams CROSSING22)
+PASS (crossing on exactly two canonical beams CROSSING23)
+PASS (crossing on exactly two canonical beams CROSSING24)
+PASS (crossing on exactly two canonical beams CROSSING25)
+PASS (crossing on exactly two canonical beams CROSSING26)
+PASS (crossing on exactly two canonical beams CROSSING27)
+PASS (crossing on exactly two canonical beams CROSSING28)
+PASS (crossing on exactly two canonical beams CROSSING29)
+PASS (crossing on exactly two canonical beams CROSSING30)
+PASS (crossing on exactly two canonical beams CROSSING31)
+PASS (crossing on exactly two canonical beams CROSSING32)
+PASS (crossing on exactly two canonical beams CROSSING33)
+PASS (crossing on exactly two canonical beams CROSSING34)
+PASS (crossing on exactly two canonical beams CROSSING35)
+PASS (crossing on exactly two canonical beams CROSSING36)
+PASS (crossing on exactly two canonical beams CROSSING37)
+PASS (engine parameters increase along stored order LOCATION1 LOCATION2)
+PASS (engine parameters increase along stored order LOCATION1 LOCATION3)
+PASS (engine parameters increase along stored order LOCATION1 LOCATION4)
+PASS (engine parameters increase along stored order LOCATION1 RECEIVER2)
+PASS (engine parameters increase along stored order LOCATION1 RECEIVER3)
+PASS (engine parameters increase along stored order LOCATION2 LOCATION4)
+PASS (engine parameters increase along stored order LOCATION2 RECEIVER1)
+PASS (engine parameters increase along stored order LOCATION2 RECEIVER2)
+PASS (engine parameters increase along stored order LOCATION2 RECEIVER3)
+PASS (engine parameters increase along stored order LOCATION3 LOCATION4)
+PASS (engine parameters increase along stored order LOCATION3 RECEIVER1)
+PASS (engine parameters increase along stored order LOCATION3 RECEIVER3)
+PASS (engine parameters increase along stored order LOCATION4 RECEIVER1)
+PASS (engine parameters increase along stored order LOCATION4 RECEIVER2)
+PASS (engine parameters increase along stored order TRANSMITTER1 LOCATION1)
+PASS (engine parameters increase along stored order TRANSMITTER1 LOCATION2)
+PASS (engine parameters increase along stored order TRANSMITTER1 LOCATION4)
+PASS (engine parameters increase along stored order TRANSMITTER2 LOCATION2)
+PASS (engine parameters increase along stored order TRANSMITTER2 LOCATION3)
+PASS (engine parameters increase along stored order TRANSMITTER2 LOCATION4)
+PASS crossing7 point
+PASS crossing8 point
+PASS no split missing on corner
+PASS possible, not active
+PASS (caller state unchanged corner start state)
+PASS (evaluated corner start state)
+PASS (engine fixed point corner start state)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS start: no live beam
+PASS start: no active crossing
+PASS (reference prefix replays 2)
+PASS (caller state unchanged corner trace prefix 2)
+PASS (evaluated corner trace prefix 2)
+PASS (engine fixed point corner trace prefix 2)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (cut agrees TRANSMITTER1 LOCATION1)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING2)
+PASS (no unexplained label CROSSING2)
+PASS (ACTIVE iff stored active CROSSING2)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING1)
+PASS (no unexplained label CROSSING1)
+PASS (ACTIVE iff stored active CROSSING1)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING3)
+PASS (no unexplained label CROSSING3)
+PASS (ACTIVE iff stored active CROSSING3)
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS prefix 2: only transmitter1->location1 live
+PASS (prefix 2: reached, other beam not live CROSSING2)
+PASS (prefix 2: reached, other beam not live CROSSING1)
+PASS (prefix 2: reached, other beam not live CROSSING3)
+PASS (reference prefix replays 14)
+PASS (caller state unchanged corner trace prefix 14)
+PASS (evaluated corner trace prefix 14)
+PASS (engine fixed point corner trace prefix 14)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (cut agrees LOCATION2 RECEIVER1)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING12)
+PASS (no unexplained label CROSSING12)
+PASS (ACTIVE iff stored active CROSSING12)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING21)
+PASS (no unexplained label CROSSING21)
+PASS (ACTIVE iff stored active CROSSING21)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING17)
+PASS (no unexplained label CROSSING17)
+PASS (ACTIVE iff stored active CROSSING17)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING30)
+PASS (no unexplained label CROSSING30)
+PASS (ACTIVE iff stored active CROSSING30)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING27)
+PASS (no unexplained label CROSSING27)
+PASS (ACTIVE iff stored active CROSSING27)
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (cut agrees LOCATION2 RECEIVER3)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING34)
+PASS (no unexplained label CROSSING34)
+PASS (ACTIVE iff stored active CROSSING34)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING22)
+PASS (no unexplained label CROSSING22)
+PASS (ACTIVE iff stored active CROSSING22)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING33)
+PASS (no unexplained label CROSSING33)
+PASS (ACTIVE iff stored active CROSSING33)
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (cut agrees TRANSMITTER1 LOCATION4)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING10)
+PASS (no unexplained label CROSSING10)
+PASS (ACTIVE iff stored active CROSSING10)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING7)
+PASS (no unexplained label CROSSING7)
+PASS (ACTIVE iff stored active CROSSING7)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING15)
+PASS (no unexplained label CROSSING15)
+PASS (ACTIVE iff stored active CROSSING15)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING14)
+PASS (no unexplained label CROSSING14)
+PASS (ACTIVE iff stored active CROSSING14)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING13)
+PASS (no unexplained label CROSSING13)
+PASS (ACTIVE iff stored active CROSSING13)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING12)
+PASS (no unexplained label CROSSING12)
+PASS (ACTIVE iff stored active CROSSING12)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION4 CROSSING11)
+PASS (no unexplained label CROSSING11)
+PASS (ACTIVE iff stored active CROSSING11)
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (cut agrees TRANSMITTER2 LOCATION2)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING1)
+PASS (no unexplained label CROSSING1)
+PASS (ACTIVE iff stored active CROSSING1)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING7)
+PASS (no unexplained label CROSSING7)
+PASS (ACTIVE iff stored active CROSSING7)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING9)
+PASS (no unexplained label CROSSING9)
+PASS (ACTIVE iff stored active CROSSING9)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING8)
+PASS (no unexplained label CROSSING8)
+PASS (ACTIVE iff stored active CROSSING8)
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS prefix 14: crossing7 is the only active crossing
+PASS prefix 14: transmitter1->location4 cut
+PASS prefix 14: transmitter2->location2 cut
+PASS (prefix 14: shielded beyond crossing7 CROSSING15)
+PASS (prefix 14: shielded beyond crossing7 CROSSING14)
+PASS (prefix 14: shielded beyond crossing7 CROSSING13)
+PASS (prefix 14: shielded beyond crossing7 CROSSING12)
+PASS (prefix 14: shielded beyond crossing7 CROSSING11)
+PASS prefix 14: crossing12 reached by location2->receiver1, other beam not reaching
+PASS prefix 14: location2->receiver1 uncut
+PASS prefix 14: receiver1 active, gate1 open
+PASS prefix 14 report
+PASS (reference prefix replays 15)
+PASS (caller state unchanged corner trace prefix 15)
+PASS (evaluated corner trace prefix 15)
+PASS (engine fixed point corner trace prefix 15)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (cut agrees LOCATION2 RECEIVER1)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING12)
+PASS (no unexplained label CROSSING12)
+PASS (ACTIVE iff stored active CROSSING12)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING21)
+PASS (no unexplained label CROSSING21)
+PASS (ACTIVE iff stored active CROSSING21)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING17)
+PASS (no unexplained label CROSSING17)
+PASS (ACTIVE iff stored active CROSSING17)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING30)
+PASS (no unexplained label CROSSING30)
+PASS (ACTIVE iff stored active CROSSING30)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER1 CROSSING27)
+PASS (no unexplained label CROSSING27)
+PASS (ACTIVE iff stored active CROSSING27)
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (cut agrees LOCATION2 RECEIVER3)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING34)
+PASS (no unexplained label CROSSING34)
+PASS (ACTIVE iff stored active CROSSING34)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING22)
+PASS (no unexplained label CROSSING22)
+PASS (ACTIVE iff stored active CROSSING22)
+PASS (label agrees with engine reaching LOCATION2 RECEIVER3 CROSSING33)
+PASS (no unexplained label CROSSING33)
+PASS (ACTIVE iff stored active CROSSING33)
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (cut agrees TRANSMITTER2 LOCATION2)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING1)
+PASS (no unexplained label CROSSING1)
+PASS (ACTIVE iff stored active CROSSING1)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING7)
+PASS (no unexplained label CROSSING7)
+PASS (ACTIVE iff stored active CROSSING7)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING9)
+PASS (no unexplained label CROSSING9)
+PASS (ACTIVE iff stored active CROSSING9)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION2 CROSSING8)
+PASS (no unexplained label CROSSING8)
+PASS (ACTIVE iff stored active CROSSING8)
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS prefix 15: no active crossing
+PASS prefix 15: transmitter2->location2 uncut
+PASS (fixture settles consistently ((HAS-LOCATION CONNECTOR2 LOCATION4) (PAIRED CONNECTOR1 TRANSMITTER1) (PAIRED CONNECTOR2 TRANSMITTER2)))
+PASS (caller state unchanged fixture: before closed gate)
+PASS (evaluated fixture: before closed gate)
+PASS (engine fixed point fixture: before closed gate)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (cut agrees TRANSMITTER1 LOCATION1)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING2)
+PASS (no unexplained label CROSSING2)
+PASS (ACTIVE iff stored active CROSSING2)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING1)
+PASS (no unexplained label CROSSING1)
+PASS (ACTIVE iff stored active CROSSING1)
+PASS (label agrees with engine reaching TRANSMITTER1 LOCATION1 CROSSING3)
+PASS (no unexplained label CROSSING3)
+PASS (ACTIVE iff stored active CROSSING3)
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (cut agrees TRANSMITTER2 LOCATION4)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING3)
+PASS (no unexplained label CROSSING3)
+PASS (ACTIVE iff stored active CROSSING3)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING20)
+PASS (no unexplained label CROSSING20)
+PASS (ACTIVE iff stored active CROSSING20)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING19)
+PASS (no unexplained label CROSSING19)
+PASS (ACTIVE iff stored active CROSSING19)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING16)
+PASS (no unexplained label CROSSING16)
+PASS (ACTIVE iff stored active CROSSING16)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING18)
+PASS (no unexplained label CROSSING18)
+PASS (ACTIVE iff stored active CROSSING18)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION4 CROSSING17)
+PASS (no unexplained label CROSSING17)
+PASS (ACTIVE iff stored active CROSSING17)
+PASS before-gate fixture: gate1 closed
+PASS before-gate fixture: crossing3 active on the source side of closed gate1
+PASS before-gate fixture: transmitter2->location4 cut
+PASS before-gate fixture: later crossings beyond cut
+PASS (fixture settles consistently
+PASS (caller state unchanged fixture: beyond closed gate)
+PASS (evaluated fixture: beyond closed gate)
+PASS (engine fixed point fixture: beyond closed gate)
+PASS active set is the stored CROSSING-ACTIVE set
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING19 CROSSING14 CROSSING35) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING20 CROSSING15 CROSSING9 CROSSING6) LOCATION3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING36 CROSSING30) LOCATION4))
+PASS (cut agrees LOCATION4 LOCATION1)
+PASS (label agrees with engine reaching LOCATION4 LOCATION1 CROSSING30)
+PASS (no unexplained label CROSSING30)
+PASS (ACTIVE iff stored active CROSSING30)
+PASS (label agrees with engine reaching LOCATION4 LOCATION1 CROSSING36)
+PASS (no unexplained label CROSSING36)
+PASS (ACTIVE iff stored active CROSSING36)
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION1 (CROSSING28 CROSSING27 CROSSING29) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING25) LOCATION4))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING32 CROSSING31) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION2 (CROSSING34 CROSSING22 CROSSING33) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING32 CROSSING34 CROSSING26) LOCATION4))
+PASS (cut agrees LOCATION3 LOCATION4)
+PASS (label agrees with engine reaching LOCATION3 LOCATION4 CROSSING32)
+PASS (no unexplained label CROSSING32)
+PASS (ACTIVE iff stored active CROSSING32)
+PASS (label agrees with engine reaching LOCATION3 LOCATION4 CROSSING34)
+PASS (no unexplained label CROSSING34)
+PASS (ACTIVE iff stored active CROSSING34)
+PASS (label agrees with engine reaching LOCATION3 LOCATION4 CROSSING26)
+PASS (no unexplained label CROSSING26)
+PASS (ACTIVE iff stored active CROSSING26)
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (cut agrees LOCATION3 RECEIVER1)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING5)
+PASS (no unexplained label CROSSING5)
+PASS (ACTIVE iff stored active CROSSING5)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING8)
+PASS (no unexplained label CROSSING8)
+PASS (ACTIVE iff stored active CROSSING8)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING35)
+PASS (no unexplained label CROSSING35)
+PASS (ACTIVE iff stored active CROSSING35)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING13)
+PASS (no unexplained label CROSSING13)
+PASS (ACTIVE iff stored active CROSSING13)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING23)
+PASS (no unexplained label CROSSING23)
+PASS (ACTIVE iff stored active CROSSING23)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING18)
+PASS (no unexplained label CROSSING18)
+PASS (ACTIVE iff stored active CROSSING18)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING36)
+PASS (no unexplained label CROSSING36)
+PASS (ACTIVE iff stored active CROSSING36)
+PASS (label agrees with engine reaching LOCATION3 RECEIVER1 CROSSING28)
+PASS (no unexplained label CROSSING28)
+PASS (ACTIVE iff stored active CROSSING28)
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION3 (CROSSING31 CROSSING24 CROSSING37) RECEIVER3))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING29) RECEIVER1))
+PASS (beam reported once iff engine live, in its trial orientation (LOCATION4 (CROSSING33 CROSSING37) RECEIVER2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING2 CROSSING1 CROSSING3) LOCATION1))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER1 (CROSSING4 CROSSING6 CROSSING5) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING1 CROSSING7 CROSSING9 CROSSING8) LOCATION2))
+PASS (beam reported once iff engine live, in its trial orientation (TRANSMITTER2 (CROSSING2 CROSSING10 CROSSING4) LOCATION3))
+PASS (cut agrees TRANSMITTER2 LOCATION3)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION3 CROSSING2)
+PASS (no unexplained label CROSSING2)
+PASS (ACTIVE iff stored active CROSSING2)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION3 CROSSING10)
+PASS (no unexplained label CROSSING10)
+PASS (ACTIVE iff stored active CROSSING10)
+PASS (label agrees with engine reaching TRANSMITTER2 LOCATION3 CROSSING4)
+PASS (no unexplained label CROSSING4)
+PASS (ACTIVE iff stored active CROSSING4)
+PASS (beam reported once iff engine live, in its trial orientation
+PASS beyond-gate fixture: gate1 closed
+PASS beyond-gate fixture: location4->location1 live
+PASS (beyond-gate fixture: beyond closed gate1 CROSSING30)
+PASS (beyond-gate fixture: beyond closed gate1 CROSSING36)
+PASS beyond-gate fixture: crossing36 reached by location3->receiver1, inactive for the gate
+PASS beyond-gate fixture: crossing36 inactive
+PASS beyond-gate fixture: location3<->location4, live both ways, reported once from location3
+PASS (unresolved not a propagation fixed point)
+PASS (unresolved provenance missing)
+PASS (unresolved provenance missing)
+PASS (unresolved missing problem-state)
+PASS unsettled caller state unchanged
+PASS unresolved report prints only the reason
+PASS start state unchanged
+T40 CHECKS PASSED: 462
+
+== Windtunnel (stage windtunnel-topo; load compiled profile; t41 windtunnel checks) ==
+PASS (reference sequence replays windtunnel validated trace)
+PASS (caller state unchanged windtunnel final state)
+PASS (evaluated windtunnel final state)
+PASS (lighting agreement windtunnel final state)
+PASS (color agreement windtunnel final state)
+PASS (receiver agreement windtunnel final state)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1*)
+PASS (relay lit iff engine lit, same hue and layer REPEATER1)
+PASS (no unexplained outcome CONNECTOR1 REPEATER1)
+PASS (engine clear = sight and uncut CONNECTOR1 REPEATER1)
+PASS (no unexplained outcome REPEATER1 CONNECTOR1)
+PASS (engine clear = sight and uncut REPEATER1 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR1)
+PASS (engine clear = sight and uncut TRANSMITTER1 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1* REPEATER1)
+PASS (engine clear = sight and uncut CONNECTOR1* REPEATER1)
+PASS (no unexplained outcome REPEATER1 CONNECTOR1*)
+PASS (engine clear = sight and uncut REPEATER1 CONNECTOR1*)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS (caller state unchanged windtunnel final state)
+PASS (evaluated windtunnel final state)
+PASS (lighting agreement windtunnel final state)
+PASS (color agreement windtunnel final state)
+PASS (receiver agreement windtunnel final state)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1)
+PASS (relay lit iff engine lit, same hue and layer CONNECTOR1*)
+PASS (relay lit iff engine lit, same hue and layer REPEATER1)
+PASS (no unexplained outcome CONNECTOR1 REPEATER1)
+PASS (no unexplained outcome REPEATER1 CONNECTOR1)
+PASS (no unexplained outcome TRANSMITTER1 CONNECTOR1)
+PASS (no unexplained outcome CONNECTOR1* REPEATER1)
+PASS (engine clear = sight and uncut CONNECTOR1* REPEATER1)
+PASS (no unexplained outcome REPEATER1 CONNECTOR1*)
+PASS (engine clear = sight and uncut REPEATER1 CONNECTOR1*)
+PASS (stored status iff some feeder delivers or direct RECEIVER1)
+PASS 17 actions
+PASS cycle open
+PASS views labelled
+PASS recording view has no crossing set
+PASS views differ in lighting
+PASS (reference sequence replays windtunnel start)
+PASS recording without an open cycle is unresolved
+PASS windtunnel MC beam-relay contract
+PASS start state unchanged
+T41 WINDTUNNEL CHECKS PASSED: 45
+
+== RL reports: corner validated trace prefixes 8, 14, 15 ==
+
+RL  RELAY LIGHTING IN ONE SUPPLIED STATE  [supplied state]
+--------------------------------------------------------------
+  provenance: corner validated trace, prefix 8
+  view physical; active crossings nil
+  engine agreement: lighting holds, colors holds, receivers hold
+  relays by propagation layer (layers are propagation order, not time):
+    connector1: ABSENT (no location in this view)
+    connector2: UNREACHED
+      paired owns connector2 -> transmitter1: transmitter1->connector2 sight BLOCKED NOT CLEAR
+    connector3: UNREACHED
+  connector capacity (outgoing/capacity, incoming):
+    connector1: 0/3, incoming 0
+    connector2: 1/3, incoming 0
+    connector3: 0/3, incoming 0
+  receivers (physical view status fact):
+    receiver1 needs red: inactive; engine relay no, direct no
+      no relay link names it
+    receiver2 needs red: inactive; engine relay no, direct no
+      no relay link names it
+    receiver3 needs blue: inactive; engine relay no, direct no
+      no relay link names it
+  T33 chains, physical view: BLOCKED -- supplied tests only; stability, reachability and replay validation UNRESOLVED
+    (transmitter1 connector3 connector1 receiver1) BLOCKED: ((CONNECTOR1 "connector has no beam location"))
+  T33 chains, recording view: UNRESOLVED -- recording context unavailable in this phase
+  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.
+
+RL  RELAY LIGHTING IN ONE SUPPLIED STATE  [supplied state]
+--------------------------------------------------------------
+  provenance: corner validated trace, prefix 14
+  view physical; active crossings (crossing7)
+  engine agreement: lighting holds, colors holds, receivers hold
+  relays by propagation layer (layers are propagation order, not time):
+    connector3 layer 1: LIT red; arrivals transmitter1 red
+      paired owns connector3 -> connector1: connector3->connector1 sight CLEAR DELIVERED red; connector1->connector3 sight CLEAR IGNORED red (target settled in layer 1)
+      paired owns connector3 -> transmitter1: transmitter1->connector3 sight CLEAR DELIVERED red
+    connector1 layer 2: LIT red; arrivals connector3 red
+      paired owns connector1 -> transmitter2: transmitter2->connector1 sight CLEAR CUT NOT CLEAR
+      paired incoming from connector3 -> connector1: connector3->connector1 sight CLEAR DELIVERED red; connector1->connector3 sight CLEAR IGNORED red (target settled in layer 1)
+    connector2: UNREACHED
+      paired owns connector2 -> transmitter1: transmitter1->connector2 sight CLEAR CUT NOT CLEAR
+  connector capacity (outgoing/capacity, incoming):
+    connector1: 3/3, incoming 1
+    connector2: 1/3, incoming 0
+    connector3: 3/3, incoming 0
+  receivers (physical view status fact):
+    receiver1 needs red: ACTIVE; engine relay yes, direct no
+      from connector1 red: sight CLEAR DELIVERS
+    receiver2 needs red: ACTIVE; engine relay yes, direct no
+      from connector3 red: sight CLEAR DELIVERS
+    receiver3 needs blue: inactive; engine relay no, direct no
+      from connector1 red: sight CLEAR WRONG HUE
+  T33 chains, physical view: CLEAR -- supplied tests only; stability, reachability and replay validation UNRESOLVED
+    (transmitter1 connector3 connector1 receiver1) CLEAR: all supplied links and engine lighting/receiver checks pass
+  T33 chains, recording view: UNRESOLVED -- recording context unavailable in this phase
+  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.
+
+RL  RELAY LIGHTING IN ONE SUPPLIED STATE  [supplied state]
+--------------------------------------------------------------
+  provenance: corner validated trace, prefix 15
+  view physical; active crossings nil
+  engine agreement: lighting holds, colors holds, receivers hold
+  relays by propagation layer (layers are propagation order, not time):
+    connector1 layer 1: LIT blue; arrivals transmitter2 blue
+      paired owns connector1 -> transmitter2: transmitter2->connector1 sight CLEAR DELIVERED blue
+      paired incoming from connector3 -> connector1: connector3->connector1 sight CLEAR IGNORED red (target settled in layer 1); connector1->connector3 sight CLEAR IGNORED blue (target settled in layer 1)
+    connector3 layer 1: LIT red; arrivals transmitter1 red
+      paired owns connector3 -> connector1: connector3->connector1 sight CLEAR IGNORED red (target settled in layer 1); connector1->connector3 sight CLEAR IGNORED blue (target settled in layer 1)
+      paired owns connector3 -> transmitter1: transmitter1->connector3 sight CLEAR DELIVERED red
+    connector2: ABSENT (no location in this view)
+  connector capacity (outgoing/capacity, incoming):
+    connector1: 3/3, incoming 1
+    connector2: 0/3, incoming 0
+    connector3: 3/3, incoming 0
+  receivers (physical view status fact):
+    receiver1 needs red: inactive; engine relay no, direct no
+      from connector1 blue: sight CLEAR WRONG HUE
+    receiver2 needs red: ACTIVE; engine relay yes, direct no
+      from connector3 red: sight CLEAR DELIVERS
+    receiver3 needs blue: ACTIVE; engine relay yes, direct no
+      from connector1 blue: sight CLEAR DELIVERS
+  T33 chains, physical view: BLOCKED -- supplied tests only; stability, reachability and replay validation UNRESOLVED
+    (transmitter1 connector3 connector1 receiver1) BLOCKED: relays not lit with source hue: (CONNECTOR1)
+  T33 chains, recording view: UNRESOLVED -- recording context unavailable in this phase
+  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.
+
+== RL reports: windtunnel validated 17-action trace, final state (cycle open), both views ==
+RL  RELAY LIGHTING IN ONE SUPPLIED STATE  [supplied state]
+--------------------------------------------------------------
+  provenance: windtunnel validated 17-action trace, final state
+  view physical; active crossings nil
+  engine agreement: lighting holds, colors holds, receivers hold
+  relays by propagation layer (layers are propagation order, not time):
+    connector1 layer 1: LIT blue; arrivals transmitter1 blue
+      paired owns connector1 -> repeater1: connector1->repeater1 sight CLEAR DELIVERED blue; repeater1->connector1 sight CLEAR IGNORED blue (target settled in layer 1)
+      paired owns connector1 -> transmitter1: transmitter1->connector1 sight CLEAR DELIVERED blue
+    repeater1 layer 2: LIT blue; arrivals connector1 blue
+      paired incoming from connector1 -> repeater1: connector1->repeater1 sight CLEAR DELIVERED blue; repeater1->connector1 sight CLEAR IGNORED blue (target settled in layer 1)
+      paired incoming from connector1* -> repeater1: connector1*->repeater1 sight CLEAR IGNORED blue (target settled in layer 2); repeater1->connector1* sight CLEAR DELIVERED blue
+    connector1* layer 3: LIT blue; arrivals repeater1 blue
+      paired owns connector1* -> repeater1: connector1*->repeater1 sight CLEAR IGNORED blue (target settled in layer 2); repeater1->connector1* sight CLEAR DELIVERED blue
+  connector capacity (outgoing/capacity, incoming):
+    connector1: 2/2, incoming 0
+    connector1*: 2/2, incoming 0
+  receivers (physical view status fact):
+    receiver1 needs blue: ACTIVE; engine relay yes, direct no
+      from connector1* blue: sight CLEAR DELIVERS
+  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.
+RL  RELAY LIGHTING IN ONE SUPPLIED STATE  [supplied state]
+--------------------------------------------------------------
+  provenance: windtunnel validated 17-action trace, final state
+  view recording; active crossings nil
+  engine agreement: lighting holds, colors holds, receivers hold
+  relays by propagation layer (layers are propagation order, not time):
+    connector1: ABSENT (no location in this view)
+      paired owns connector1 -> repeater1: connector1->repeater1 ENDPOINT ABSENT; repeater1->connector1 ENDPOINT ABSENT
+      paired owns connector1 -> transmitter1: transmitter1->connector1 ENDPOINT ABSENT
+    connector1*: UNREACHED
+      paired owns connector1* -> repeater1: connector1*->repeater1 sight CLEAR SOURCE DARK; repeater1->connector1* sight CLEAR SOURCE DARK
+    repeater1: UNREACHED
+      paired incoming from connector1 -> repeater1: connector1->repeater1 ENDPOINT ABSENT; repeater1->connector1 ENDPOINT ABSENT
+      paired incoming from connector1* -> repeater1: connector1*->repeater1 sight CLEAR SOURCE DARK; repeater1->connector1* sight CLEAR SOURCE DARK
+  connector capacity (outgoing/capacity, incoming):
+    connector1: 2/2, incoming 0
+    connector1*: 2/2, incoming 0
+  receivers (recording view status fact):
+    receiver1 needs blue: inactive; engine relay no, direct no
+      from connector1*: sight CLEAR DARK
+  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.
+
+== Profiles regenerated through WRITE-STATIC-CONSTRAINT-PROFILE (SHA-256) ==
+claustro before 88303a097d3069ed6ff5a70096c96ea6f2ddd710db9c9a01e0acb89cffae0e78
+claustro after  88303a097d3069ed6ff5a70096c96ea6f2ddd710db9c9a01e0acb89cffae0e78
+corner before 6722c679dd7d01c914f4babb519e8dc0d70315acc2b0b2b584143958c9fc4b47
+corner after  ca6ec36c0b6ae19d85ca41424a8a27c6c54eb58497a01ecab92d0e7d20320657
+crelay before 92bc79385b9964c185e0f330b664f29b53192f67fb46e9f0c4541b4e2f81f811
+crelay after  fec5986f18bf1160810f7ac32860d7d1221e8cd81d517520220e3ee0449c6828
+phobia before 23a4fe3704ee651a32e65aa867a0e0813344a31ffab784b1ce84c7faba43304d
+phobia after  e5f1425cc16814986722a28e4fff27877e17d11308b3e8efbba0ec899d78d892
+rumin before 0dd9cc9ee71553a8ffb7c92616695e0922801040622e14b0bc7696435fc69929
+rumin after  d01d7eeeb4058bc6cb118198fe7c675f6650cecc0f96b5f78f53625397bf784f
+windtunnel before f499513674cf4f1e56f0eb0e595dd9e954f1ed8fe28ed0371505f498312fcf04
+windtunnel after  816fd8d9ac728e60748e5298f76b1c2e942d7c3a065df7fae97251ee6b56f39e
+
+== Diff hunks before -> after (all above the S0 header, i.e. within MC) ==
+corner: S0 header at line 93; hunks 12c12 90a91,107 
+crelay: S0 header at line 91; hunks 11c11 29a30,55 
+phobia: S0 header at line 67; hunks 11c11 21a22,36 
+rumin: S0 header at line 63; hunks 11c11 28a29,46 
+windtunnel: S0 header at line 41; hunks 11c11 21a22,36 
+claustro: identical

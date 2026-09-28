@@ -9,6 +9,14 @@ This is the design T2–T5 are built from. The plan file remains authoritative f
 task state; this file is authoritative for the shape of a ledger record and for
 what happens to one when a premise is withdrawn.
 
+**Revised by T27 (2026-09-26), before code**, under T27's approved acceptance
+criteria, scope (a). The revision makes the stage the ledger's unit and the
+ledger file its own record: the `:stage` kind (§6.5, §7.5), stage supersession
+(§9.1), ledger version 2 and the file-of-record discipline (§12, §12.1), rules
+WF19–WF25 (§11), the entry points T27 adds (§13), and worked example C (§15a).
+Links, bounds, questions and version-1 ledgers keep their meaning unchanged.
+The change is listed as item 12 of §16.
+
 **Contamination.** Nothing sealed was opened to write this. It was written
 against RO's existing output shape
 (`doc/problems/crelay-topo/Constraint-Role-Obligations.txt` and
@@ -62,12 +70,13 @@ produced T22 and the pre-test-12 alcove verdict is not available to write down.
 ## 2  Ids
 
 Ids are stable, append-only and never renumbered, the same discipline as G1–G14
-and register §7.x. Four prefixes, one per kind:
+and register §7.x. Five prefixes, one per kind:
 
     PR<n>   premise
     LK<n>   link
     BD<n>   bound
     QN<n>   question
+    ST<n>   stage          (T27; version-2 ledgers only)
 
 A record is never deleted. A record that dies is given a terminal status with a
 reason. The next free id for a prefix is one above the highest `<n>` present;
@@ -84,8 +93,8 @@ references, if they are ever wanted, are out of scope here.
 Every record, of every kind, is a plist carrying these keys. All are required;
 an absent key is an ill-formed record, not a defaulted one.
 
-    :id            PR3 | LK2 | BD1 | QN4
-    :kind          :premise | :link | :bound | :question
+    :id            PR3 | LK2 | BD1 | QN4 | ST2
+    :kind          :premise | :link | :bound | :question | :stage
     :statement     a string; what the record asserts, in one sentence
     :provenance    §4
     :depends-on    §5, a list of clauses, possibly empty
@@ -117,6 +126,11 @@ RO's scenario already uses:
 `:none` means the record is segment-independent and must be true in every
 segment — a claim strong enough that WF13 requires a grade-1 or grade-2
 derivation to make it.
+
+A stage spans several of the plan's segments (§6.5). Its `:segment` is the
+segment in force **at its endpoint**, the state the next stage starts from. The
+plan's segments themselves stay in the plan-data file and are not copied into
+the ledger.
 
 ### 3.2  Events
 
@@ -152,7 +166,7 @@ The grades are the method's own, unchanged from the continuation prompt:
 | 1 | DEFINITIONAL: follows from predicate definitions and static facts | any kind |
 | 2 | INDUCTIVE: initial case and preservation by every applicable action | any kind |
 | 3 | COST BOUND: exhaustion at a cutoff, relative to its initial state | **`:bound` only** |
-| 4 | TRACE/ORDERING: a statement about plans, with its own proof obligation | `:link`, `:premise` |
+| 4 | TRACE/ORDERING: a statement about plans, with its own proof obligation | `:link`, `:premise`, `:stage` |
 
 Three rules follow, and they carry most of the weight of §10:
 
@@ -168,6 +182,10 @@ Three rules follow, and they carry most of the weight of §10:
 
 `:user-asserted` never carries a grade. That is the point of I1: a guess is not
 weakly derived, it is not derived.
+
+A stage is always grade 4 (WF20): it is a claim about the plan's order — this
+stage, from that start, reaches this intent — and its obligation is discharged
+only by a validated endpoint.
 
 **Shape note.** A provenance is a species keyword followed by a plist, so the
 plist begins one past the head and a `GETF` over the whole form reads the pairs
@@ -205,7 +223,7 @@ measurement rests on its start state, which is its own field, not a premise.
 
 ---
 
-## 6  The four kinds
+## 6  The five kinds
 
 ### 6.1  `:premise`
 
@@ -268,13 +286,23 @@ that states its own start and 0 for a `:chain` link, because
 one-argument `SOLVE-SUBGOAL` is goal chaining. Asking for a parallel chain search
 signals; nothing is coerced.
 
+Links remain valid in both ledger versions. The stage procedure (§6.5) does not
+create them; they are kept for version-1 ledgers and for any component that
+still records a sub-step as a link.
+
 ### 6.3  `:bound`
 
 A cost measurement. See §10; its mandatory fields are the ones that make it
 unreadable as an impossibility.
 
     :for-link       LK<n> | nil     which link was being attempted
+    :for-stage      ST<n> | nil     which stage was being attempted (T27)
     :measured       plist: nodes, seconds, depth reached — optional detail
+
+At most one of `:for-link` and `:for-stage` is non-nil (WF23). A bound filed
+against a stage lists, in its `:depends-on`, the stage its search started
+from, or nothing when it started from the initial state, so that a
+supersession upstream orphans it (§9.1).
 
 There is no `:refutes` key. The grammar has nowhere to write one.
 
@@ -316,6 +344,62 @@ convenient reading RO already refuses to take. `:unknown` is accepted in every
 kind and writes no premise.
 
 An answer of `:unknown` leaves the question `:open` and writes no premise.
+
+### 6.5  `:stage` (T27)
+
+One stage of D's approved stage plan (Problem-Solving Guide, Phase 2): the unit
+the Phase 3 loop realizes. The plan's content — intent, segments, required
+devices — lives in the plan-data file (Extractor Specifications §13.2); the
+stage record carries what the ledger adds to it: which plan stage this is, what
+it rests on, how it was realized, and where it ended.
+
+    :plan-file         "<path of the plan-data file, relative to the repository root>"
+    :plan-stage        "<the plan stage's :id string in that file>"
+    :intent            "<the stage's intent, as the plan states it>"
+    :starts-from       :initial | ST<n>    the stage whose endpoint this starts from
+    :check             nil | (:label :pass | :conditional | :conflict
+                              :date "<date>" :run "<CP evidence file>")
+    :realization       nil | :hand | :search | :mixed
+    :endpoint          nil | (:checkpoint "<archive path>" :actions <n>
+                              :sha256 "<hex>")
+    :closed-by         nil | (:derived ...) | (:search-measured :outcome :found ...)
+    :validated         t | nil     the endpoint's validation from the initial state
+    :attempts          (BD<n> ...)     bounds measured against this stage
+    :refuted-by        nil | PR/ST id of a grade-1 or grade-2 derivation
+    :superseded-by     nil | ST<n>     the stage that replaces this one (§9.1)
+    :proof-obligation  "<what the endpoint must show>"
+    :segment-bridge    as for links and bounds (WF16)
+
+**Provenance.** Always `(:derived :grade 4 :by "<plan file> stage <plan-stage>")`
+with a non-empty `:proof-obligation` (WF20). The plan is D's, so the stage's
+`:depends-on` carries a clause on the user-asserted premise recording D's
+approval of the plan, one clause per trick of D's the stage uses, and, unless
+it starts from `:initial`, a clause naming its `:starts-from` stage (WF19). A
+stage therefore stays CONDITIONAL while any of D's premises beneath it is a
+guess, even after its endpoint validates: validation establishes that the
+endpoint is reached, not that the plan was the right one. That is I1, applied
+to plans.
+
+**`:check`** records the CP run (Extractor Specifications §13) the stage passed
+before it entered the ledger; `nil` means it has not been checked. A stage whose
+check label is `:conflict` cannot be realized or closed (WF25).
+
+**`:endpoint`** names the checkpoint archive exported at the stage's end, with
+its action count from the initial state and its SHA-256, the same hash the
+Handoff records. The archive holds the action sequence, so a stage has no
+`:evidence` key.
+
+`:actions` may be **less** than the archive's own action count. A stage that
+ends inside a longer validated sequence names that sequence's archive and the
+number of its actions that end the stage; its endpoint is the state after those
+first actions. Import replays and validates every action of the archive, so it
+passes through that state. This is how a plan whose early stages were validated
+as a prefix of a later sequence, without their own export, is recorded
+honestly: the stage names the archive that contains its endpoint, not an
+archive nobody made.
+
+**`:attempts`** is informational, exactly as for a link: never a dependency
+edge, never a closure (WF8).
 
 ---
 
@@ -378,6 +462,23 @@ and still prints, under its own heading.
 (no longer blocks anything) | `:invalidated` (every record it blocked was
 invalidated).
 
+### 7.5  Stage (T27)
+
+| Status | Meaning | Entered by |
+|---|---|---|
+| `:open` | in the approved plan, not yet realized | creation |
+| `:realized` | an endpoint was exported; not yet validated from the initial state | a search find, or a hand sequence not yet validated |
+| `:closed` | realized **and** `:validated t` | validation of the endpoint from the initial state |
+| `:refuted` | shown impossible | a grade-1 or grade-2 derivation named in `:refuted-by` |
+| `:invalidated` | a clause it rested on went empty | §9, §9.1 |
+| `:superseded` | D revised the plan and this stage was replaced | §9.1 |
+
+A search-found stage stays `:realized` with `:validated nil` unless D asks for a
+replay, as the guide's checkpoint rules already say of search-found phases; a
+hand-derived stage is validated before it is closed. A `:superseded` stage keeps
+its endpoint, attempts and events, and is never revived: re-adopting it means a
+new stage record with a new id, for the reason §7.1 gives for premises.
+
 ---
 
 ## 8  Standing — computed, never stored
@@ -392,17 +493,24 @@ Every record has a standing, recomputed on each query and on each print:
 The rule, in order:
 
 1. If any clause in the record's own `:depends-on`, or in any record reachable
-   through those clauses, has every disjunct in status `:retracted` or
-   `:refuted` → **UNFOUNDED**.
+   through those clauses, has every disjunct in status `:retracted`,
+   `:refuted` or `:superseded` → **UNFOUNDED**. (`:superseded` is a stage's
+   status; a bound's `:superseded` is never a disjunct, because a bound is
+   never depended on.)
 2. Otherwise, if the closure contains an `:in-force` premise whose provenance is
    `:user-asserted`, or any `:bound` record, or a `:search-measured` record with
    `:outcome :exhausted` → **CONDITIONAL**.
-3. Otherwise, if the record is a `:link` whose `:closed-by` is a `:found` result
-   with `:validated nil` → **CONDITIONAL**, regardless of the rest.
+3. Otherwise, if the record is a `:link` or a `:stage` whose `:closed-by` is a
+   `:found` result with `:validated nil` → **CONDITIONAL**, regardless of the
+   rest.
 4. Otherwise → **ESTABLISHED**.
 
 A `:discharged` premise is transparent: step 2 looks through it to its
 `:discharged-by` record.
+
+Supersession changes the standing of a stage's **dependents**, never of the
+superseded stage itself: its own clauses are as alive as before, so it keeps
+the standing its closure gives it. Its status says it left the plan.
 
 **On vocabulary.** RO prints `grade 1; status CONDITIONAL`. That printed word is
 this schema's *standing*, not its `:status`. The ledger's reporter prints
@@ -424,8 +532,9 @@ exactly this and nothing else:
 2. Compute the dependents set: the transitive closure of the inverse
    `:depends-on` edge.
 3. For each dependent, recompute standing (§8) and act on the result only:
-   - standing became **UNFOUNDED** and the record is a `:link` or `:question` →
-     status `:invalidated`, with an `:invalidated` event naming the retracted id;
+   - standing became **UNFOUNDED** and the record is a `:link`, `:stage` or
+     `:question` → status `:invalidated`, with an `:invalidated` event naming
+     the retracted id;
    - standing became UNFOUNDED and the record is a `:premise` → status
      `:retracted`, event naming the cause. A premise with no surviving support
      is withdrawn, not merely marked;
@@ -444,6 +553,25 @@ Cascade is by *empty clause*, not by *mention*. A record listing
 `(PR3 PR7)` survives the retraction of PR3. That is the whole reason for §5's
 shape, and it is T2's sharpest acceptance test.
 
+A stage already `:superseded` keeps that status when a retraction reaches it:
+it gets the event, not a second terminal status.
+
+### 9.1  Supersession (T27)
+
+`SUPERSEDE-LEDGER-STAGE` takes a ledger, the `ST` id being replaced, the id of
+its successor (already added, WF22), a reason and a date. It sets the stage's
+`:status` to `:superseded`, writes `:superseded-by`, appends a `:superseded`
+event, and then runs steps 2–4 of §9 with the superseded stage in place of the
+retracted premise. Because §8 step 1 counts `:superseded` as dead, a stage that
+started from the replaced stage's endpoint, and names it alone in a clause, is
+invalidated; a bound measured from that endpoint is orphaned. That is the
+honest reading: its start state is no longer in the plan. Its endpoint and
+evidence survive in its record.
+
+A dependent that should survive the revision is expressed in the clause shape,
+not by an exception: a stage that can start from either of two endpoints lists
+both in one clause, `(ST2 ST5)`, and then survives the supersession of one.
+
 ---
 
 ## 10  Exhaustion
@@ -455,8 +583,9 @@ They are numbered X1-X4 rather than G1-G4 to keep them clear of the
 schema-gap ids.
 
 **X1 — Type.** `:bound` is not admissible in `:closed-by`, `:refuted-by`, or
-any other field that terminates a link. WF8. A bound id may appear only in
-`:attempts`, which the reporter prints under the link as an attempt.
+any other field that terminates a link or a stage. WF8. A bound id may appear
+only in `:attempts`, which the reporter prints under the link or stage as an
+attempt.
 
 **X2 — Mandatory context.** A bound is ill-formed without `:start-state`,
 `:search-expression`, `:cutoff` and `:threads`, all four inside its
@@ -465,7 +594,7 @@ the state it was measured from and the cutoff it stopped at. The writer signals
 an error on a missing field rather than defaulting one.
 
 **X3 — Fixed rendering.** The reporter prints bounds in their own section,
-never interleaved with link verdicts:
+never interleaved with link or stage verdicts:
 
     COST BOUNDS  (GRADE 3 -- NOT IMPOSSIBILITY)
     ------------------------------------------
@@ -476,7 +605,9 @@ never interleaved with link verdicts:
         impossibility claim.  LK4 remains open.
         evidence: constraint-evidence/<file>
 
-The closing sentence is a fixed template, not authored per record.
+The closing sentence is a fixed template, not authored per record. For a bound
+filed against a stage the template names the stage id in place of the link id.
+The stage section lists the stage's attempts by id only.
 
 **X4 — Statement lint.** The writer refuses a bound whose `:statement` contains
 *impossible*, *cannot*, *no solution*, *refutes*, or *unreachable*, and signals
@@ -489,7 +620,9 @@ gets quoted into the register.
 states what a success and what an exhaustion would each establish. T4 files the
 outcome against that statement. The bound record carries
 `:interpretation-committed "<the T3 text>"` so the two can be compared without
-trusting memory.
+trusting memory. For a stage the committed text is the expected reading the
+guide's Phase 3 step 8 writes into the stage's evidence before the run, and the
+bound quotes it the same way.
 
 ---
 
@@ -501,7 +634,8 @@ component that wrote it, and it should manifest immediately.
 
     WF1   every :id is unique and matches its :kind's prefix
     WF2   every id in :depends-on, :blocks, :attempts, :closed-by, :refuted-by,
-          :discharged-by and :answer-premise exists in the ledger
+          :discharged-by, :answer-premise, :starts-from (other than :initial),
+          :superseded-by and :for-stage exists in the ledger
     WF3   the :depends-on graph is acyclic
     WF4   every required envelope key (§3) is present
     WF5   :status is in its kind's domain (§7)
@@ -519,7 +653,8 @@ component that wrote it, and it should manifest immediately.
     WF12  :user-asserted provenance occurs only on a :premise record
     WF13  :segment :none occurs only on a :derived grade 1 or grade 2 record
     WF14  a :closed link has :validated t and a non-nil :closed-by
-    WF15  a :refuted link names a grade-1 or grade-2 record in :refuted-by
+    WF15  a :refuted link or stage names a grade-1 or grade-2 record in
+          :refuted-by
     WF16  no dependency edge crosses incompatible segments — differing :view,
           or :ghosts :absent against :ghosts :present — without an explicit
           bridging premise in the depending record's :segment-bridge
@@ -527,9 +662,33 @@ component that wrote it, and it should manifest immediately.
           is :user-asserted with :asked-as that question's id
     WF18  a :bound's :statement passes the §10 X4 lint
 
+T27 adds, for version-2 ledgers:
+
+    WF19  a :stage record occurs only in a version-2 ledger.  Its :starts-from
+          is :initial or the id of another :stage, and a stage id there also
+          appears in some clause of its :depends-on
+    WF20  a :stage's :provenance is :derived grade 4, with a non-empty
+          :proof-obligation, and its :depends-on is non-empty
+    WF21  a :realized stage has an :endpoint; a :closed stage has :validated t,
+          a non-nil :closed-by, and an :endpoint carrying :checkpoint, :actions
+          and :sha256
+    WF22  a :superseded stage names in :superseded-by another stage, and the
+          :superseded-by chain is acyclic
+    WF23  a :bound has at most one of :for-link and :for-stage non-nil; a
+          :for-stage names a :stage, and the bound's id is in that stage's
+          :attempts
+    WF24  no two stages other than :superseded ones share both :plan-file and
+          :plan-stage
+    WF25  :check is nil or (:label L :date D :run R) with L in :pass,
+          :conditional, :conflict; a :realized or :closed stage has a non-nil
+          :check whose label is not :conflict
+
 WF16 exists because G12 is open and G8 has no extractor. A ledger that silently
 composes a physical-view premise with a recording-view one would reproduce
-G14's defect one level up, where no reader would see it.
+G14's defect one level up, where no reader would see it. It applies to stages
+unchanged: a stage whose endpoint segment differs in view or ghosts from its
+predecessor's needs a `:segment-bridge` naming the premise that bridges them —
+usually the trick that opens or closes the recorder cycle.
 
 ---
 
@@ -538,10 +697,20 @@ G14's defect one level up, where no reader would see it.
 The ledger is a text file of top-level Common Lisp forms, readable by `READ`.
 
     ;; header comment lines, regenerated on each write
-    (:ledger-version 1 :problem "<name>" :written "<date>")
+    (:ledger-version 2 :problem "<name>" :written "<date>")
     (:id PR1 :kind :premise ...)
-    (:id LK1 :kind :link ...)
+    (:id ST1 :kind :stage ...)
     ...
+
+**Versions.** Version 1 is the pre-T27 format; version 2 admits `:stage`
+records and nothing else changes. `MAKE-STAGE-LEDGER` creates version 2, and a
+new problem's ledger is made with it. `MAKE-REALIZATION-LEDGER` still creates
+version 1, unchanged, because T2's acceptance checks pin that
+(`evidence/ledger-checks-2026-09-20.lisp`, case 21) and T27's A4 requires them
+to pass unchanged. The reader accepts both and the writer writes back the
+version it read, so a version-1 ledger (crelay-topo's) reads, checks and
+reports exactly as before T27. There is no upgrade from version 1 to version 2
+(T27 scope (a)).
 
 Reading and writing rules, so round-trip is lossless:
 
@@ -562,6 +731,31 @@ Reading and writing rules, so round-trip is lossless:
 - **C3 holds.** No problem object name appears in the code. They appear in the
   ledger as data, which is what RO's caller-supplied scenario already
   established as the permitted pattern.
+
+### 12.1  The file is the record (T27)
+
+A ledger file is its own authority. It is not rebuilt, and no list of scripts
+defines it. Every change goes through `LEDGER-FILE-APPLY` (§13), which:
+
+1. reads the file and runs `CHECK-LEDGER-WELL-FORMED` on what it read, so a bad
+   hand edit fails at the next change, not silently later;
+2. applies exactly one ledger operation (any operation of §13 that takes the
+   ledger as its first argument);
+3. runs `CHECK-LEDGER-WELL-FORMED` on the result;
+4. writes the file only if both checks passed. A signal at any step leaves the
+   file byte-identical.
+
+The operation's own event carries its date, who made the change and, in
+`:note` or the record's `:sources`, the evidence file it rests on. That event
+trail replaces the ingest-script chain: a later reader learns what happened
+from the file, and the problem's Handoff records the file's SHA-256 at the end
+of each session instead of a rebuild order. A data-only load file may still
+call `LEDGER-FILE-APPLY` several times, for a stage's worth of changes; it is
+evidence of how the change was made, not a part of the record.
+
+Hand edits remain allowed (§3) and are checked at the next `LEDGER-FILE-APPLY`.
+Version-1 ledgers already built by script (crelay-topo) keep their recorded
+rebuild order as history; they are not re-derived.
 
 ---
 
@@ -643,11 +837,52 @@ followed fails the checks instead of going unnoticed.
     LEDGER-RUN-PROVENANCE        (recommendation outcome run truncated pruning)
     LEDGER-PREMISE-CLAUSES       (ids)
 
+T27 adds, in the same file:
+
+    MAKE-STAGE-LEDGER            (problem &optional date)   version 2   §12
+    MAKE-LEDGER-STAGE            (id statement plan-file plan-stage intent
+                                  starts-from depends-on proof-obligation
+                                  &key ...)                              §6.5
+    SET-LEDGER-STAGE-CHECK       (ledger id label run &optional date)   §6.5
+    REALIZE-LEDGER-STAGE         (ledger id realization endpoint closed-by
+                                  &key validated nodes seconds date)     §7.5
+    CLOSE-LEDGER-STAGE           (ledger id validation-run &optional date)  §7.5
+    FILE-LEDGER-STAGE-BOUND      (ledger id &key statement start-state
+                                  search-expression cutoff threads run
+                                  truncated pruning interpretation
+                                  depends-on nodes seconds date)         §6.3, §10
+    SUPERSEDE-LEDGER-STAGE       (ledger id successor reason &optional date)  §9.1
+    LEDGER-FILE-APPLY            (path operation &rest arguments)       §12.1
+    LEDGER-STAGE-ORDER           (ledger)   stages in plan order
+    REPORT-LEDGER-STAGES         (ledger)
+
+`REALIZE-LEDGER-STAGE` enters `:realized`; it also closes the stage when called
+with `:validated t`, so a hand-derived stage validated in one step needs one
+call. `CLOSE-LEDGER-STAGE` closes a stage already realized, after a separate
+validation run. `FILE-LEDGER-STAGE-BOUND` writes the bound with `:for-stage`
+and adds its id to the stage's `:attempts`; like T4's ingester it requires the
+committed interpretation and runs the X2 and X4 checks.
+
+**Plan order.** `LEDGER-STAGE-ORDER` is breadth-first from `:initial`: first
+the stages whose `:starts-from` is `:initial`, then the stages starting from
+any of those, and so on level by level; within a level, by id number. A
+superseded stage keeps its place in that order, and its successor is printed
+with it.
+
 The reporter prints, in this order: open links with their blocking premises and
 what would close each; conditional records with the premises making them
 conditional; established records; the cost-bound section of §10 X3; open
 questions; then retracted and invalidated records under their own heading, never
 omitted.
+
+For a version-2 ledger, `REPORT-REALIZATION-LEDGER` first prints a STAGES
+section from `REPORT-LEDGER-STAGES`, then the sections above, unchanged. Per
+stage in plan order it prints: id, plan stage, status and standing; the
+successor, if superseded; plan file; intent; starting point; check; realization;
+endpoint (archive, actions, SHA-256) or none; live guesses in id order; and
+attempts by id. The exact line format is fixed by T27's A2 evidence
+(`evidence/t27-stage-ledger-2026-09-26.txt`, part 1). A version-1 ledger prints
+exactly as before.
 
 T2's acceptance criteria are in the plan and are not restated here. Two of them
 are tests of this document rather than of the code, and are worth naming:
@@ -823,6 +1058,108 @@ from, and `:orphaned` says exactly that and no more.
 
 ---
 
+## 15a  Worked example C — stages (T27)
+
+A plan of three stages, `c1`, `c2` and `c3`, in plan-data file
+`constraint-evidence/stage-plan-2026-10-01.lisp`, checked by CP and approved by
+D. Statements and events are abbreviated.
+
+**The premises.**
+
+    PR1  "D approved the stage plan stage-plan-2026-10-01.lisp"
+         (:user-asserted :by "D" :date "2026-10-01")
+    PR2  "a ghost holds a tray as a step"          (:user-asserted ...)  a trick
+    PR3  "the lift's landing is the ghost's tray"  (:user-asserted ...)  a trick
+
+**The stages, as first entered.**
+
+    (:id ST1 :kind :stage
+     :statement "c1 realizes its intent from the initial state"
+     :provenance (:derived :grade 4 :by "stage-plan-2026-10-01.lisp stage c1")
+     :depends-on ((PR1))
+     :plan-file "doc/problems/<p>/constraint-evidence/stage-plan-2026-10-01.lisp"
+     :plan-stage "c1" :intent "..." :starts-from :initial
+     :check (:label :pass :date "2026-10-01" :run "constraint-evidence/stage-01-c1/cp.txt")
+     :proof-obligation "the endpoint validates from the initial state and meets c1's intent"
+     :segment (:view :physical :cycle :closed :ghosts :absent)
+     :status :open ...)
+
+    ST2  plan-stage "c2", :starts-from ST1, :depends-on ((PR1) (ST1) (PR2))
+    ST3  plan-stage "c3", :starts-from ST2, :depends-on ((PR1) (ST2) (PR3))
+
+**ST1 hand-derived and validated in one step.**
+
+    (REALIZE-LEDGER-STAGE ledger 'ST1 :hand
+      '(:checkpoint "constraint-evidence/stage-01-c1/c1-checkpoint.txt"
+        :actions 11 :sha256 "<hex>")
+      '(:derived :grade 1 :by "VALIDATE-ACTION-SEQUENCE from the initial state")
+      :validated t)
+
+    ST1   :status :closed, :validated t, :endpoint as given
+          + :realized and :closed events
+
+ST1's standing is CONDITIONAL: PR1 is a guess. Its endpoint is established by
+the validation; whether c1 belongs in the plan rests on D.
+
+**ST2 by search, exhausted once.** The expected reading was written into
+`stage-02-c2/` before the run.
+
+    (FILE-LEDGER-STAGE-BOUND ledger 'ST2 :start-state "ST1's endpoint" ...
+      :cutoff 10 :threads 16 :depends-on '((ST1)) :interpretation "<the committed text>")
+
+    BD1   :for-stage ST2, :depends-on ((ST1)), :status :standing
+    ST2   :attempts (BD1), :status unchanged, :open
+
+**D revises c2.** The plan file gains stage `c2b`; ST4 is added for it, starting
+from ST1, and ST2 is superseded:
+
+    ST4  plan-stage "c2b", :starts-from ST1, :depends-on ((PR1) (ST1) (PR2))
+    (SUPERSEDE-LEDGER-STAGE ledger 'ST2 'ST4 "D revised c2 after BD1" "2026-10-02")
+
+    ST2   :status :superseded, :superseded-by ST4
+    ST3   clause (ST2) has no surviving disjunct -> UNFOUNDED -> :invalidated
+    BD1   depends on ST1 only; not a dependent of ST2.  Still :standing.
+    ST1   not a dependent.  Untouched.
+
+BD1 stays standing because it measured ST1's endpoint, which the revision did
+not touch. ST3 is invalidated because it would have started from ST2's
+endpoint; D's revised c3 enters as a new stage starting from ST4. Had ST3 been
+written with the clause `(ST2 ST4)`, it would have survived. ST2 itself stays
+CONDITIONAL (§8): its own clauses are alive, and its status says it left the
+plan.
+
+**Every change above is one `LEDGER-FILE-APPLY` call** (§12.1), for example
+
+    (LEDGER-FILE-APPLY path #'SUPERSEDE-LEDGER-STAGE 'ST2 'ST4
+                       "D revised c2 after BD1" "2026-10-02")
+
+and the file after each call is the record. The Handoff records its SHA-256.
+
+**What it prints**, the STAGES section in plan order (abbreviated; the exact
+line format is in T27's A2 evidence):
+
+    STAGES (4)  [plan order; standing computed, never stored]
+      st1  c1  closed; standing conditional
+        ...
+        endpoint: constraint-evidence/stage-01-c1/c1-checkpoint.txt, 11 actions, sha256 <hex>
+        live guesses (1): pr1
+        attempts: none
+      st2  c2  superseded; standing conditional
+        superseded by: st4
+        ...
+        endpoint: none
+        live guesses (2): pr1 pr2
+        attempts: bd1
+      st4  c2b  open; standing conditional
+        ...
+      st3  c3  invalidated; standing unfounded
+        ...
+
+The order is breadth-first (§13): st1; then st2 and st4, which start from it;
+then st3, which starts from st2.
+
+---
+
 ## 16  Amended during implementation
 
 T2 was implemented against this document on 2026-09-20 and five things were
@@ -907,6 +1244,26 @@ checkpoints. Two points of substance:
     returned checkpoint and print the run metadata T4 needs; its advice on a
     find is to export to a new archive and file REALIZED with validated NIL.
 
+T27, on 2026-09-26, revised this document before code (header note):
+
+12. **The stage is the ledger's unit, and the file is the record.** crelay-topo's
+    ledger was organized by spine link while its plan came from D's stages, and it
+    was defined by replaying 13 ingest scripts in order (post-mortem 4.1). The
+    `:stage` kind (§6.5, §7.5) records one stage of D's approved plan by
+    reference to the plan-data file; supersession (§9.1) handles D's revisions
+    through the existing empty-clause cascade, with `:superseded` counted dead in
+    §8; `LEDGER-FILE-APPLY` (§12.1) makes every change a checked read-apply-write
+    of the file, so no rebuild order exists. Version 2 carries the change;
+    version-1 ledgers are unchanged and not upgraded. Two points were settled
+    while writing T27's A2 fixture, before code: an endpoint may end inside a
+    longer archive (`:actions` below the archive's count, §6.5), since
+    crelay-topo's early stages were validated only as prefixes of later
+    sequences; and a superseded stage keeps its own standing (§8), which the
+    first draft of example C had printed as UNFOUNDED. A third, found reading
+    T2's checks before code: case 21 of `evidence/ledger-checks-2026-09-20.lisp`
+    pins version 1 for `MAKE-REALIZATION-LEDGER`, so version 2 is made by a new
+    `MAKE-STAGE-LEDGER` instead (§12, §13).
+
 ## 17  Deliberately not settled
 
 - **Placement.** Settled, not deferred: `tech/constraint-ledger.lisp`, its own
@@ -924,3 +1281,8 @@ checkpoints. Two points of substance:
 - **Multi-problem ledgers.** Ids are ledger-local (§2).
 - **Operators.** The abstract model's section 4 block is a decision of D's, not
   a gap this schema fills. Nothing above imports an operator vocabulary.
+- **A per-stage search recommender.** Declined with T27 scope (c). The T3
+  recommender works per link and is not used by the stage procedure; a stage's
+  expected reading is written into its evidence by hand (guide, Phase 3 step 8)
+  and quoted by `FILE-LEDGER-STAGE-BOUND`.
+- **Upgrading a version-1 ledger.** Declined with T27 scope (b).
