@@ -33,9 +33,37 @@ accessible; ask about missing inputs rather than guessing. Record them in
 `doc/problems/<problem>/Handoff.md`. Preserve a resumed problem's current state.
 D may choose to proceed without a missing diagram. Raise spec/diagram mismatches with D; do not silently change the spec.
 
+## Spec-diagram check — Confirm the problem is well-defined
+
+Do this before generating the static profile: the profile is derived from the spec, so a
+spec error found later wastes the profile and any reasoning built on it. When a diagram is
+supplied, A views the whole diagram, not a summary of it. Through the device link, stage
+the original file and view it as an overview plus overlapping full-resolution tiles (about
+1,500 px on the long edge each), since a single view is downscaled and loses fine labels.
+A 300 dpi grayscale letter-size scan (about 3 MB) has proved sufficient. If the diagram
+cannot be loaded, say so and ask D rather than proceeding. First confirm the title names
+this problem and the drawing covers the whole spec boundary; an older or different drawing
+is reported, not compared.
+
+Check, item by item: boundary and internal segments (walls, edges, windows, gates) with
+their endpoints, names and heights; location coordinates and levels; fixture positions
+(plates, ladders, recorders, transmitters, receivers) and apparatus coordinates; hue
+markings; starting places of movable objects and starting pairings; CONTROLS wiring and
+modes; authored traversal (stairs, jumps, ladders) including the barriers each crosses,
+and reach facts and disallowals; and objects shown in one but not the other. Also flag spec
+content that is commented out, and anything the diagram cannot settle. Record each finding
+in the Briefing's **Spec-diagram check** as MATCH, MISMATCH (with both readings) or
+UNSETTLED. D resolves every MISMATCH; A changes the spec only on D's instruction. Generate
+the static profile only after D accepts the check; if the spec changes later, regenerate
+the profile. With no diagram, record "none" and proceed.
+
 ## Static profile — Read the problem and its constraints
 
-Read the spec and diagram. Supply the staging and profile commands below; D runs them. Read the generated profile before discussing subgoals. Explain the goal,
+Read the spec and diagram. Supply the staging and profile commands below; D runs them. Read the generated profile before discussing subgoals.
+After reading it, cross-check its derived structure against the diagram: S3 regions and
+crossings, S6 NEVER rows and kill list, and SD transit door sets. A derived fact the drawing
+contradicts (a door missing from a crossing, a region joined or split) goes back to the
+Spec-diagram check as a MISMATCH for D. Explain the goal,
 controllers and crossings, couplings, beam needs and body budget in domain terms. Every UNCOVERED mechanic needs a source-grounded hand contract in the Briefing
 before proceeding (what it controls, lifts or moves, and its prerequisites), or a separately approved method component. Static hints remain qualified.
 S6 rows read start-state bodies: a body at a location within `*beam-occlusion-tolerance*` of a sightline
@@ -304,7 +332,7 @@ subgoal when useful). Existing Stage-Plan.md files remain historical records;
 new stages go in the Briefing's log. A ledger is optional. State lives in the
 Handoff; evidence and the log retain provenance and results.
 
-Briefing.md: profile path/hash and maximum depth, then **Summary**, **Difficulties**,
+Briefing.md: profile path/hash and maximum depth, then **Spec-diagram check**, **Summary**, **Difficulties**,
 **Contracts** (including UNCOVERED mechanics), **Hints** (qualified, with sources),
 **Subgoal log** (`subgoal | whose idea | check | result`, with evidence links),
 and **Result** (full-path validation and any limits).
