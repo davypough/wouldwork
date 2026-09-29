@@ -34,7 +34,11 @@ MISMATCH / to fix
 UNSETTLED (not on drawing): heights and levels (consistent with edges: 3/2 platforms, edge5
 2), CONTROLS wiring, reach-disallowed location10-location17, pairing capacity, recorder cycles.
 
-Status: items 1-2 await D. Profile must be regenerated after the spec settles.
+Status: paused 2026-09-29. D decided to replace the mode-based traversal representation
+(traverse-via <mode> ...) with separator-based facts (traverse-via <source> <separators>
+<destination>), using rumin-topo as the base test case. Items 1-2 are superseded by that
+refactor; see the project doc claude/traversal-separator-plan.md. The current profile
+(generated before the spec edits) is stale and must be regenerated after migration.
 
 ## Summary
 
@@ -90,8 +94,8 @@ No UNCOVERED mechanics (MC: 15 of 15 covered).
 
 | subgoal | whose idea | check | result |
 |---|---|---|---|
-| SG1: agent1 into R1 through gate1, cycle 1 open (ghost holds tray1* at location2; live agent1 carries connector1 from location13 to location4, places it on the ghost-held tray, pairs it to transmitter1 and to connector1* at location13) | A | CONSISTENT: location2@5/2->transmitter1 ALWAYS (S6); location2@5/2->location13@5/2 ALWAYS (RC); location13@5/2->receiver1 ALWAYS (S6). NEEDS: live placement onto a ghost-held tray from location4; live pairing to a ghost connector (rule 20) | proposed |
+| SG1: agent1 into R1 through gate1, cycle 1 open (ghost holds tray1* at location2; live agent1 carries connector1 from location13 to location4, places it on the ghost-held tray, pairs it to transmitter1 and to connector1* at location13) | A | CONSISTENT: location2@5/2->transmitter1 ALWAYS (S6); location2@5/2->location13@5/2 ALWAYS (RC); location13@5/2->receiver1 ALWAYS (S6). NEEDS: live placement onto a ghost-held tray from location4; live pairing to a ghost connector (rule 20) | ON HOLD 2026-09-29: preceded the spec-diagram check; re-derive after the traversal refactor and profile regeneration |
 
 ## Result
 
-None yet.
+None. Analysis paused at the spec-diagram check pending the traversal refactor.

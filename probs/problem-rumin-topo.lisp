@@ -168,8 +168,8 @@
 
   ;; Authorized elevation changes
   (traverse-via jumping location8 () location9)
-  (traverse-via jumping location13 (edge2) location17)
-  (traverse-via jumping location13 (edge3) location17)
+  ;(traverse-via jumping location13 (edge2) location17)  ;CHANGED: edges not expressible until the separator plan
+  ;(traverse-via jumping location13 (edge3) location17)  ;CHANGED: edges not expressible until the separator plan
   ;(traverse-via jumping location2 () location4)
   (traverse-via stairway location2 () location4)
   (traverse-via stairway location9 ((gate4)) location10)  ;CHANGED: gate4 stands at the stairhead beside location9

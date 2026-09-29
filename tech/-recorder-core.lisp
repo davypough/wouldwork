@@ -74,7 +74,7 @@
 (register-symmetry-coupling 'recording-copy>)
 
 
-(defun derive-recording-copy-literals (literals)
+(define-problem-helper derive-recording-copy-literals (literals)  ;CHANGED: registered helper, so restaging never stubs it
   "Derive (RECORDING-COPY> <live> <live>*) for every mobile object whose name ends in an
    asterisk, so a problem that declares the ghost instance need not also declare the mapping.
    Runs as an initialization literal generator, before CHECK-PROPOSITION and before any
