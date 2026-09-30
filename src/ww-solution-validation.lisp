@@ -210,7 +210,9 @@ to the search's candidate-validation diagnostics."
    ACTION-LIST may be either:
      - Plain actions: ((ACTION arg1 arg2) (ACTION2 arg1) ...)
      - Timestamped actions: ((1.0 (ACTION arg1 arg2)) (2.0 (ACTION2 arg1)) ...)
-   If VERBOSE is true, shows diagnostic output for each action."
+   If VERBOSE is true, shows diagnostic output for each action.
+   When the goal is satisfied, every registered solution validator must also accept
+   the complete path, as a search's candidate validation requires."
   (let* ((actions (normalize-validation-actions action-list))
          (action-count (length actions)))
     (format t "~%Validating ~D action~:P...~2%" action-count)
@@ -223,8 +225,14 @@ to the search's candidate-validation diagnostics."
               :goal-test (and (fboundp 'goal-fn) (symbol-function 'goal-fn))
               :verbose verbose)))
       (if (action-sequence-validation-success-p result)
-        (check-validation-result
-          (action-sequence-validation-final-state result) action-count)
+        (if (or (not (action-sequence-validation-goal-satisfied-p result))
+                (report-solution-validator-verdicts
+                  actions (action-sequence-validation-final-state result)))
+          (check-validation-result
+            (action-sequence-validation-final-state result) action-count)
+          (progn
+            (format t "~%VALIDATION FAILED: a solution validator rejected the complete path.~%")
+            nil))
         (progn
           (report-validation-failure
             (action-sequence-validation-failure-index result)
@@ -232,6 +240,29 @@ to the search's candidate-validation diagnostics."
             (action-sequence-validation-failure-reason result)
             (action-sequence-validation-final-state result))
           nil)))))
+
+
+(defun report-solution-validator-verdicts (action-list final-state)
+  "Run every registered solution validator on ACTION-LIST from *START-STATE* to FINAL-STATE.
+
+ACTION-LIST holds plain or printed-phrase action forms; display connectives are stripped
+and each form is numbered from 1, the path shape the validators accept.  Prints one
+verdict line per validator and returns T when all accept.  With no validators registered
+it prints nothing and returns T."
+  (let ((path (loop for form in (normalize-validation-actions action-list)
+                    for index from 1
+                    for action = (find (first form) *actions* :key #'action.name)
+                    collect (list index
+                                  (cons (first form)
+                                        (strip-display-connectives action (rest form))))))
+        (all-valid t))
+    (dolist (validator *solution-validators* all-valid)
+      (multiple-value-bind (valid-p diagnostic)
+          (funcall (symbol-function validator) *start-state* path final-state)
+        (format t "~%Solution validator ~A: ~:[REJECTED ~S~;ACCEPTED~*~]~%"
+                validator valid-p diagnostic)
+        (unless valid-p
+          (setf all-valid nil))))))
 
 
 (defun apply-action-to-state (action-form state next-action-form &optional verbose)

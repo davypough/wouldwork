@@ -4,7 +4,11 @@ T17, opened 2026-09-25. Written with D section by section; a section is final
 only when D has agreed it. Roles in the discussion: D supplies domain knowledge
 and guidance (the puzzle, its tricks, what matters); the assistant supplies the
 technical analysis and recommendations. Evidence is named by file; paths are
-relative to `doc/problems/crelay-topo/` unless they start with `doc/` or `tech/`.
+relative to `doc/constraint-method/archive/crelay-topo-experiment/` (where
+crelay-topo's register, ledger and `constraint-evidence/` moved on 2026-09-30;
+they were written relative to `doc/problems/crelay-topo/`) unless they start
+with `doc/` or `tech/`. Section 4.1's per-document table describes the files as
+they stood on 2026-09-25.
 
 Sections: 1 Architecture (FINAL) · 2 Strategy (FINAL) · 3 Effectiveness (FINAL) ·
 4 Weak points (FINAL) · 5 Improvements (filed as PROPOSED tasks when agreed).

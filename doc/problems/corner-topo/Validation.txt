@@ -1,0 +1,40 @@
+;;; corner-topo -- complete validated solution, 15 actions.
+;;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T
+;;; To re-validate: (stage corner-topo), then evaluate this form separately.
+(validate-solution :verbose
+  (1 (pickup-connector > agent1 picks up connector1 at location1))
+  (2 (connect-connector > agent1 connects connector1 on ground to (receiver1 transmitter1) at location1))
+  (3 (move agent1 ((walk location1 nil location2))))
+  (4 (pickup-connector > agent1 picks up connector2 at location2))
+  (5 (move agent1 ((walk location2 (gate1) location4))))
+  (6 (connect-connector > agent1 connects connector2 on ground to (transmitter1) at location4))
+  (7 (move agent1 ((walk location4 (gate1) location1))))
+  (8 (pickup-connector > agent1 picks up connector1 at location1))
+  (9 (move agent1 ((walk location1 nil location2))))
+  (10 (connect-connector > agent1 connects connector1 on ground to (receiver3 receiver1 transmitter2) at location2))
+  (11 (move agent1 ((walk location2 nil location3))))
+  (12 (pickup-connector > agent1 picks up connector3 at location3))
+  (13 (connect-connector > agent1 connects connector3 on ground to (connector1 receiver2 transmitter1) at location3))
+  (14 (move agent1 ((walk location3 (gate1) location4))))
+  (15 (pickup-connector > agent1 picks up connector2 at location4)))
+
+Final state:
+  Time: 15.0
+  Value: 0.0
+  Propositions:
+    (ACTIVE RECEIVER3)
+    (ACTIVE RECEIVER2)
+    (COLOR CONNECTOR1 BLUE)
+    (COLOR CONNECTOR3 RED)
+    (HAS-LOCATION AGENT1 LOCATION4)
+    (HAS-LOCATION CONNECTOR1 LOCATION2)
+    (HAS-LOCATION CONNECTOR3 LOCATION3)
+    (HOLDING1 AGENT1 CONNECTOR2)
+    (HOLDING2 AGENT1 CONNECTOR2)
+    (PAIRED CONNECTOR1 RECEIVER3)
+    (PAIRED CONNECTOR1 RECEIVER1)
+    (PAIRED CONNECTOR1 TRANSMITTER2)
+    (PAIRED CONNECTOR3 CONNECTOR1)
+    (PAIRED CONNECTOR3 RECEIVER2)
+    (PAIRED CONNECTOR3 TRANSMITTER1)
+

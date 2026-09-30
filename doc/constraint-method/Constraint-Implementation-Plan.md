@@ -107,7 +107,7 @@ These are specific to building the components:
 | `doc/constraint-method/Status-Algebra-and-Record-Schema.md` | the ledger's record schema and status algebra (T1, revised by T27) |
 | `doc/constraint-method/Post-Mortem-2026.md` | T17 findings; design basis for T18–T27 |
 | `doc/constraint-method/evidence/` | method-level check, run and load evidence |
-| `doc/constraint-method/archive/` | the plan before T18 (T0–T17 entries), before T30 (T18–T29 entries) and before T46 (T30–T45 entries, T40–T45 shared requirements, component build history); the G15 checklist |
+| `doc/constraint-method/archive/` | the plan before T18 (T0–T17 entries), before T30 (T18–T29 entries) and before T46 (T30–T45 entries, T40–T45 shared requirements, component build history); the G15 checklist; `crelay-topo-experiment/`: crelay-topo's FROZEN prediction register, its version-1 ledger and its T10 evidence, moved there 2026-09-30 |
 | `tech/constraint-profile.lisp` | the static extractors (S0–S7, T6, RC, RO, MC incl. beam-crossing, beam-relay and floor-gears rows, SD); supplied-state views, crossings, relay lighting, equipment and service transitions (6.1, BX, RL, EQ, SW) |
 | `tech/constraint-ledger.lisp` | ledger (stages, file of record), recommender, ingester, question generator (T2–T5, T27) |
 | `tech/constraint-state-probe.lisp` | one-step applicable-action probe from a replayed prefix |
@@ -117,10 +117,9 @@ These are specific to building the components:
 | `src/ww-search-checkpoint.lisp` | standalone search checkpoints: export, import (by replay), validate |
 | `doc/search-strategies/standalone-checkpoints.md` | user-level description of the checkpoint workflow |
 | `doc/problems/<p>/Handoff.md` | a problem's current state (the only per-problem state file) |
-| `doc/problems/<p>/Briefing.md`, `Stage-Plan.md` | Phase 1 and 2 records (new problems) |
+| `doc/problems/<p>/Briefing.md` | the problem's analysis and subgoal log, with its evidence |
+| `doc/problems/<p>/Actions.lisp`, `Validation.txt`, `Checkpoint.txt` | accepted actions from the start; closure validation with its `validate-solution` form; the latest search checkpoint (Guide, Records and templates) |
 | `doc/problems/<p>/Constraint-Static-Profile.txt` | generated extractor output |
-| `doc/problems/<p>/Constraint-Realization-Ledger.txt` | the problem's ledger |
-| `doc/problems/crelay-topo/Constraint-Prediction-Register.txt` | FROZEN record of the crelay-topo validation experiment |
 
 ## Objective
 
@@ -128,7 +127,8 @@ The method begins with recorded intake: problem spec, optional corresponding
 diagram or "none", and D's maximum search depth. Then come the static profile
 (with hand contracts for uncovered mechanics), a subgoal dialogue beginning
 with a summary and anticipated difficulties, and full-path validation from
-the start using VALIDATE-ACTION-SEQUENCE or VALIDATE-SEARCH-CHECKPOINT.
+the start by loading the problem's `Actions.lisp` (VALIDATE-ACTION-SEQUENCE
+plus every registered solution validator).
 Optional probes and other tools inform D's intuition when requested; an
 advance stage plan and ledger are not required. The Problem-Solving Guide
 is authoritative for this procedure.

@@ -120,8 +120,9 @@ crossing the serial/parallel boundary restages, so set threads before replay/imp
    checkpoint. Keep the expected interpretation and commands in its evidence.
    Review the endpoint before choosing another subgoal or search. When a hand
    outline reaches the goal and each step is checked, D may validate it whole.
-4. Record the result in the Briefing's subgoal log, save accepted actions and
-   checkpoint evidence, and update the Handoff. An exhaustion is a bound relative
+4. Record the result and its evidence in the Briefing's subgoal log, keep the
+   accepted actions in `Actions.lisp` and any exported checkpoint in
+   `Checkpoint.txt` (see Records), and update the Handoff. An exhaustion is a bound relative
    to its start, settings and cutoff, never a refutation. Record termination and
    truncation separately; an out-of-memory crash is neither a bound nor a result.
    Discuss a lower cutoff with D after such a crash; do not silently retry.
@@ -140,18 +141,19 @@ Search form (replace placeholders; retain the prior checkpoint until review):
 ```
 Use the two-argument checkpoint form, not serial goal chaining. Exhaustion returns its input unchanged; keep results in separate variables. Restore by staging,
 setting threads 16, then `(import-search-checkpoint <archive-path>)`, which replays
-without searching. Record archive SHA-256 hashes in the Handoff. Search-found segments remain REALIZED, validated NIL, until separate replay; do not routinely
+without searching. The archive path is the problem's `Checkpoint.txt`; each export
+overwrites it. Record its SHA-256 in the Handoff. After endpoint review, append the
+search-found actions to `Actions.lisp` as that subgoal's segment. Search-found segments remain REALIZED, validated NIL, until separate replay; do not routinely
 replay them unless D requests it. Hand-derived sequences must be validated. Checkpoint details: `doc/search-strategies/standalone-checkpoints.md`.
 
 ## Closure — Validate the complete path from the start
 
-Use `(validate-search-checkpoint <final-checkpoint>)`, or after fresh staging (threads not needed), replay all accumulated actions against the actual goal:
-```lisp
-(validate-action-sequence *start-state* <complete-action-list>
-                          :goal-test (symbol-function 'goal-fn) :verbose t)
-```
-Require SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P all T; mere executability is insufficient. Keep the result and complete path as evidence, record premises
-and gaps, and mark the Handoff CLOSED. A final search is needed only if the accepted path has not yet reached the goal. Do not infer global shortest length
+After fresh staging (threads not needed), load `Actions.lisp`, which replays all
+accumulated actions from the start against the actual goal. Require SUCCESS-P,
+GOAL-CHECKED-P and GOAL-SATISFIED-P all T, and every registered solution validator
+(e.g. the recorder's) to accept; mere executability is insufficient. When
+they are, the file writes `Validation.txt`. Record premises and gaps in the Briefing's
+Result, and mark the Handoff CLOSED. A final search is needed only if the accepted path has not yet reached the goal. Do not infer global shortest length
 from minimum-length searches for individual subgoals.
 
 ## Quick static checks
@@ -235,11 +237,13 @@ the ledger schema is `doc/constraint-method/Status-Algebra-and-Record-Schema.md`
   roles are `:weight`, `:jam`, `:place`, `:hold`, `:mount`, `:support` (13.8).
   B5 then reports shared and conflicting jobs, capacity, the eligible pool and
   releases; a shortage refutes only that allocation. Nothing is reserved unless stated.
-- **Ledger:** load `tech/constraint-ledger.lisp` (no staging needed). Create once
-  with `(write-realization-ledger (make-stage-ledger "<problem>") <ledger-path>)`.
-  Later changes use `(ledger-file-apply <ledger-path> #'<operation> <arguments>)`;
-  report with `(report-realization-ledger (read-realization-ledger <ledger-path>))`.
-  Use schema stage operations for checks, endpoints, bounds and supersession.
+- **Ledger:** not used for new problems. Its stage records assume per-stage files
+  that the flat records layout excludes, and the Briefing's log covers its role
+  (the recommender's default evidence folder, `doc/problems/<p>/constraint-evidence/`,
+  is from that layout). crelay-topo's version-1 ledger is archived in
+  `doc/constraint-method/archive/crelay-topo-experiment/`.
+  If a problem's premises and retractions outgrow the log, queue adapting
+  `tech/constraint-ledger.lisp` to the flat layout in the implementation plan.
 - **Supplied relay views:** `(report-relay-view-scenario <scenario>)` tests explicit
   complete-state scenarios (specification 6.1). Optional scenarios also go to
   REPORT-RELAY-CHAIN-TABLE, REPORT-NECESSITY-HINTS and profile report/write calls.
@@ -329,18 +333,95 @@ or with literal quoting, avoiding replacement-string substitution. Hash with
 
 ## Records and templates
 
-Under `doc/problems/<problem>/`, keep the generated `Constraint-Static-Profile.txt`,
-Briefing, Handoff, and `constraint-evidence/` (an INDEX.md and a subfolder per
-subgoal when useful). Existing Stage-Plan.md files remain historical records;
-new stages go in the Briefing's log. A ledger is optional. State lives in the
-Handoff; evidence and the log retain provenance and results.
+`doc/problems/<problem>/` is flat (no subdirectories) and holds only the files
+below, under exactly these names; only the diagram's name and type vary.
+Superseded material is deleted; git history is its archive. State lives in the
+Handoff; the Briefing's log retains provenance and results. Dated evidence under
+`doc/constraint-method/evidence/` cites the pre-2026-09-30 layout (per-problem
+`constraint-evidence/` folders) and is not rewritten; its check scripts run at
+their own commit.
+
+- `Handoff.md` — current state (template below).
+- `Briefing.md` — analysis and subgoal log (template below).
+- `Constraint-Static-Profile.txt` — generated; never hand-edited (M2).
+- `Actions.lisp` — every accepted action from the original start, once a subgoal
+  is accepted (template below). A candidate is appended after a
+  `;; SG<n> candidate` comment and replayed from the start; on acceptance the
+  comment becomes `;; SG<n>`, on rejection the candidate is corrected or removed.
+- `Checkpoint.txt` — the latest exported search checkpoint, only while a
+  continuation needs one.
+- `Validation.txt` — written by `Actions.lisp` when the goal is validated: the
+  numbered `(validate-solution :verbose ...)` form for the complete solution,
+  which D can evaluate after staging, followed by the validated final state.
+- The diagram, if supplied.
 
 Briefing.md: profile path/hash and maximum depth, then **Spec-diagram check**, **Summary**, **Difficulties**,
 **Contracts** (including UNCOVERED mechanics), **Hints** (qualified, with sources),
-**Subgoal log** (`subgoal | whose idea | check | result`, with evidence links),
+**Subgoal log** (`subgoal | whose idea | check | result`, followed per subgoal by its
+commands, expected interpretation, D's reported result and the endpoint review),
 and **Result** (full-path validation and any limits).
 
-Handoff.md template (unchanged):
+Actions.lisp template. Load it after `(stage <problem>)` in a separate top-level
+form; a form that stages and loads together can see the previous problem's GOAL-FN.
+```lisp
+;;; <problem> -- accepted actions from the original start.
+(in-package :ww)
+
+(defparameter *accepted-actions*
+  '(;; SG1 <endpoint in a few words>
+    (<action> ...)
+    ;; SG2 candidate <endpoint in a few words>
+    (<action> ...)))
+
+(loop for form in *accepted-actions*
+      for index from 1
+      for action = (find (first form) *actions* :key #'action.name)
+      do (unless action
+           (error "Action ~D is unknown: ~S" index form))
+         (unless (= (length (strip-display-connectives action (rest form)))
+                    (length (action.effect-variables action)))
+           (error "Action ~D is malformed: ~S" index form)))
+
+(defparameter *accepted-validation*
+  (validate-action-sequence *start-state* *accepted-actions*
+                            :goal-test (symbol-function 'goal-fn) :verbose t))
+
+(format t "~%~D actions: success=~S goal-checked=~S goal-satisfied=~S failure-index=~S reason=~S~%"
+        (length *accepted-actions*)
+        (action-sequence-validation-success-p *accepted-validation*)
+        (action-sequence-validation-goal-checked-p *accepted-validation*)
+        (action-sequence-validation-goal-satisfied-p *accepted-validation*)
+        (action-sequence-validation-failure-index *accepted-validation*)
+        (action-sequence-validation-failure-reason *accepted-validation*))
+(display-validation-state (action-sequence-validation-final-state *accepted-validation*))
+
+(defparameter *accepted-validators-p*
+  (and (action-sequence-validation-goal-satisfied-p *accepted-validation*)
+       (report-solution-validator-verdicts
+         *accepted-actions* (action-sequence-validation-final-state *accepted-validation*))))
+
+(when (and (action-sequence-validation-success-p *accepted-validation*)
+           (action-sequence-validation-goal-checked-p *accepted-validation*)
+           (action-sequence-validation-goal-satisfied-p *accepted-validation*)
+           *accepted-validators-p*)
+  (with-open-file (*standard-output*
+                   (merge-pathnames "doc/problems/<problem>/Validation.txt"
+                                    (asdf:system-source-directory :wouldwork))
+                   :direction :output :if-exists :supersede)
+    (format t ";;; <problem> -- complete validated solution, ~D actions.~%" (length *accepted-actions*))
+    (format t ";;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T; solution validators accepted~%")
+    (format t ";;; To re-validate: (stage <problem>), then evaluate this form separately.~%")
+    (format t "(validate-solution :verbose")
+    (let ((*print-case* :downcase)
+          (*print-pretty* nil))
+      (loop for form in *accepted-actions*
+            for index from 1
+            do (format t "~%  ~S" (list index form))))
+    (format t ")~2%Final state:~%")
+    (display-validation-state (action-sequence-validation-final-state *accepted-validation*))))
+```
+
+Handoff.md template:
 ```text
 # <problem> — Handoff
 Updated <date>.  Status: <phase, stage>.
@@ -348,9 +429,9 @@ Problem spec: <file path>.
 Corresponding diagram: <file path or "none">.
 Maximum search depth: <D's cutoff>, set <date>.
 ## Next step       one line: who does what
-## State           ledger file SHA-256 and stage counts; current endpoint in domain terms
+## State           accepted actions in Actions.lisp; current endpoint in domain terms
 ## Checkpoints     file | phases/actions | SHA-256 | what it is
 ## Restore         the exact REPL forms
 ## Open items      at most a few lines
 ```
-When there is no ledger or checkpoint, state that explicitly.
+When there are no accepted actions or no checkpoint, state that explicitly.

@@ -62,8 +62,9 @@
 ;;; and S3, the gate-labelled region quotient, scored PARTIAL on its first run (7.19) and
 ;;; carrying the spine/composed classification its second score earned (7.20), since the
 ;;; rows the coordinate derivation supplies are a transitive closure and not an adjacency
-;;; list.  S0, the type extent census, is not in section 3 of the problem's
-;;; Constraint-Prediction-Register.txt: it closes G2 of doc/constraint-method/Schema-Gaps.txt and runs
+;;; list.  S0, the type extent census, is not in section 3 of crelay-topo's
+;;; Constraint-Prediction-Register.txt (now doc/constraint-method/archive/crelay-topo-experiment/):
+;;; it closes G2 of doc/constraint-method/Schema-Gaps.txt and runs
 ;;; as step 0, since every later extractor needs the emptiness facts before it may read a
 ;;; control aggregate as an axiom.  S4 adds the qualified cut-keeper table under the
 ;;; approved interpretation in register 7.23.  RO, the role-obligation analysis, adds

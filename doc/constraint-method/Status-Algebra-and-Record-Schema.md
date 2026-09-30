@@ -17,6 +17,13 @@ WF19–WF25 (§11), the entry points T27 adds (§13), and worked example C (§15
 Links, bounds, questions and version-1 ledgers keep their meaning unchanged.
 The change is listed as item 12 of §16.
 
+**Status, 2026-09-30.** The ledger is not used for new problems (Problem-Solving
+Guide, Optional tools); this schema is kept for crelay-topo's version-1 ledger,
+now at `doc/constraint-method/archive/crelay-topo-experiment/`, together with
+the `constraint-evidence/` files cited below. Per-problem paths in this document
+(`doc/problems/<problem>/Constraint-Realization-Ledger.txt`,
+`constraint-evidence/...`) describe the layout it was written for.
+
 **Contamination.** Nothing sealed was opened to write this. It was written
 against RO's existing output shape
 (`doc/problems/crelay-topo/Constraint-Role-Obligations.txt` and

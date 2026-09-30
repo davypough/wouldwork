@@ -7,7 +7,9 @@ its source, which is named above it; it keeps its original references
 (e.g. "sealed", "register 7.x", crelay-topo examples) as history. The
 sources themselves are unchanged: the crelay-topo register is frozen, and
 the other sources are in `archive/` or were in `doc/problems/crelay-topo/archive/`
-(deleted 2026-09-30; see git history).
+(deleted 2026-09-30; see git history). Paths below under
+`doc/problems/crelay-topo/` (the register, `constraint-evidence/`) now resolve
+under `doc/constraint-method/archive/crelay-topo-experiment/` (moved 2026-09-30).
 
 New components (T19–T26) add their specification here when their task
 writes it. A change to a component is written here, dated, beneath the
@@ -45,7 +47,7 @@ component's current text; the old text stays.
 | CP cycle-plan check (not in the profile) | per row (1 to 2) | §13 (§13.8: T44) | T24, T44 (plan) |
 | ME memory estimate (own file, searches; engine guard) | none (estimate) | §14 | T26 (plan) |
 
-Register = `doc/problems/crelay-topo/Constraint-Prediction-Register.txt`.
+Register = `doc/constraint-method/archive/crelay-topo-experiment/Constraint-Prediction-Register.txt`.
 Archived plan = `doc/constraint-method/archive/Implementation-Plan-2026-09-25.md`.
 Post-mortem verdicts per component: `Post-Mortem-2026.md` section 1.6.
 
