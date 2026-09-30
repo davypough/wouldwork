@@ -77,6 +77,14 @@ Replay only; no search:
         (asdf:system-source-directory :wouldwork)))
 ```
 
+**Traversal-separator migration (2026-09-29).** crelay-topo's jump facts now name what
+separates each pair (`doc/traversal-separator-plan.md`, Phase 3); only the fact form
+changed, nothing in the frozen register or ledger.  The checkpoints still carry the old
+jump witnesses, so on the current tree a replay fails at the first of them.  Restore at
+commit cfb7c11 (the migration baseline), or read the new witnesses as:
+`(JUMP (LOCATION20 GROUND) NIL ...)` -> `(BLOWER1)`, and each alcove jump's `(GATE2)` ->
+`(EDGE1 GATE2)`.  The checkpoint files are left byte-identical to their recorded SHA-256.
+
 For another archive: `(stage crelay-topo)`, then `(ww-set *threads* 16)`, then
 `(import-search-checkpoint (merge-pathnames "doc/problems/crelay-topo/constraint-evidence/<file>" (asdf:system-source-directory :wouldwork)))`.
 

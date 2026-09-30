@@ -34,6 +34,7 @@
   screen (screen1)
   wall (wall1 wall2 wall3)
   edge (edge1)
+  staircase (staircase1)
   window (window1)
   location (location1 location2 location3 location4 location5 location6 location7 location8
             location9 location10 location11 location12 location13)
@@ -113,21 +114,18 @@
   ;; location10, sealing against the boundary at y 10 and 17.  Walking across the slab
   ;; at ground level is thereby blocked on that side; the elevation-3/2 crossing
   ;; location12 <-> location13 lies entirely inside the footprint (gated by
-  ;; gate8/gate9), and the level change onto the slab is the authored JUMPING edge
+  ;; gate8/gate9), and the level change onto the slab is the authored jump over edge1
   ;; below.  This is EDGE, not WALL: it marks the vertical boundary between two
   ;; different-elevation regions rather than a freestanding linear partition.  Its
-  ;; default height 3/2 spans that step for terrain and LOS checks, but EDGE is absent
-  ;; from jump's vaultable-object type; the JUMPING edge below therefore crosses with an
-  ;; empty feature list rather than treating edge1 as a vault barrier.
+  ;; default height 3/2 spans that step for terrain and LOS checks; the jump clause
+  ;; names it as the separator crossed, and an edge is never vaulted.
   ;;
   ;; The slab's west side, location13 <-> location11, carries no edge at all: it is
-  ;; instead the authored STAIRWAY crossing below, unconditional in both directions
-  ;; and blind to the elevation difference by design (tech/stairs.lisp).  With no edge
-  ;; there, -walkability-coordinates.lisp's zone flood-fill merges location11 into the
-  ;; slab's own 2D zone and derives a WALKING edge between them; that edge is inert --
-  ;; walking-segment-for-clause's elevation-equality check always rejects it as a usable
-  ;; WALK, since the two locations sit at different elevations -- so the STAIRWAY edge remains
-  ;; the only way to actually cross.
+  ;; instead the authored staircase1 crossing below, unconditional in both directions
+  ;; (tech/stairs.lisp).  With no edge there, -walkability-coordinates.lisp's zone
+  ;; flood-fill merges location11 into the slab's own 2D zone, but derives no walk
+  ;; between them because they sit at different levels, so the staircase is the only
+  ;; way across.
   (wall-segment> wall1 24 0 24 2)
   (wall-segment> wall2 24 4 24 101/10)  ;extended 1/10 to intercept gate3
   (wall-segment> wall3 11 10 16 10)
@@ -176,9 +174,9 @@
   (jam-disallowed> location7 location1 gate4)
 
   ;; Specifically authorized acts and activities between locations
-  (traverse-via> climbing location7 ((ladder1)) location1)
-  (traverse-via jumping location10 () location12)  ;authorized elevation change
-  (traverse-via stairway location13 () location11)  ;authorized elevation change, unrestricted both ways
+  (traverse-via> location7 ((ladder1)) location1)
+  (traverse-via location10 ((edge1)) location12)  ;jump over edge1; the 3/2 rise needs a support
+  (traverse-via location13 ((staircase1)) location11)  ;stairs on the slab's west side, both ways
   (beam-via transmitter1 (gate1 location2) receiver1)  ;authorizes direct beam
 )
 

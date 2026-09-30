@@ -1,7 +1,8 @@
 ;;; Filename: jump.lisp
 
 ;;; Jumping traversal kind, plus the explicit support-changing transitions only jumping
-;;; provides.  A clause naming an EDGE or a WALL is a jump, and this file registers the one
+;;; provides.  A clause naming an EDGE, a WALL, or a floor drive (FLOOR-BLOWER or
+;;; FLOOR-GEARS) is a jump, and this file registers the one
 ;;; predicate that decides it: the landing may rise no more than *vertical-reach-limit*
 ;;; above the launch, and every feature in the clause that is not currently passable must
 ;;; be low enough to clear within that same bound.  Level and downward landings are
@@ -10,7 +11,12 @@
 ;;; An edge is a static separator -- the vertical face between two levels -- so it names
 ;;; the jump without being vaulted: it stays in the segment's witness, but -traversal's
 ;;; TRAVERSAL-CLAUSE-PROFILE removes it from the features the clearance rules see.  A wall
-;;; is a marker too, and stays a feature, since clearing it is the point.  In a bare-level
+;;; is a marker too, and stays a feature, since clearing it is the point.  A floor drive is
+;;; a static marker like an edge: a clause naming it is a drop off the side of its stream,
+;;; from the hovering AIMED-AT destination to ground beside it, where nothing else is drawn
+;;; between the two.  An occupant is at that destination only while the stream holds it,
+;;; so the drive needs no clearance test.  A wall drive's destination is ordinary ground,
+;;; so wall drives are not markers.  In a bare-level
 ;;; problem, -traversal also hands this builder a walk-kind clause across a level
 ;;; difference, which is what an unnamed jumping edge used to mean.
 ;;;
@@ -29,15 +35,17 @@
 ;;; depends on the state it is evaluated in.
 ;;;
 ;;; REQUIRES:
-;;;   types     : agent, location  --  box, tray, wall, and edge are declared optional here
+;;;   types     : agent, location  --  box, tray, wall, edge, floor-blower, and floor-gears
+;;;               are declared optional here
 ;;;   nested    : -vertical (top, location-elevation);
 ;;;               -support-elevation (support occupancy and *vertical-reach-limit*, which
 ;;;               this file reuses rather than defining its own jump-specific parameter);
 ;;;               -passability (holding and
 ;;;               obstacle-clear); -threat (safe); -traversal; -mobility-action
 ;;; PROVIDES:
-;;;   types     : box, tray, wall, edge  --  declared optional; jumping remains usable without
-;;;               them; vaultable-object (either gate screen wall)
+;;;   types     : box, tray, wall, edge, floor-blower, floor-gears  --  declared optional;
+;;;               jumping remains usable without them; vaultable-object
+;;;               (either gate screen wall)
 ;;;   kind      : jump, registered with -traversal
 ;;;   cache     : *vertical-reach-limit*, registered with -traversal's segment cache
 ;;;   queries   : jump-elevation-reachable, vaultable-object-passable,
@@ -58,7 +66,7 @@
 (in-package :ww)
 
 
-(define-optional-types box tray wall edge)
+(define-optional-types box tray wall edge floor-blower floor-gears)
 
 
 (define-types
@@ -148,7 +156,9 @@
 
 
 (register-traversal-kind 'jump 'jump-segment-for-clause
-                         '(edge wall) '(edge) '(gate screen))
+                         '(edge wall floor-blower floor-gears)
+                         '(edge floor-blower floor-gears)
+                         '(gate screen))
 
 
 ;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR both read *VERTICAL-REACH-LIMIT*, so it

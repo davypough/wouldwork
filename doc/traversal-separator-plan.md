@@ -1,6 +1,6 @@
 # Separator-based traversal — implementation plan
 
-Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0, 1 and 2 closed 2026-09-29; Phase 3 next.
+Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0-3 closed 2026-09-29; Phase 4 next.
 Base test case: probs/problem-rumin-topo.lisp. Then claustro-topo, corner-topo, crelay-topo;
 phobia-topo and windtunnel-topo author no traverse-via facts but must still stage.
 Implementation happens in a fresh session. Work one phase at a time; D reloads with
@@ -324,6 +324,35 @@ Phase 2 result (2026-09-29, done):
 Phase 3 — other topo specs. Migrate claustro-topo, corner-topo, crelay-topo; confirm
 phobia-topo and windtunnel-topo stage. Acceptance: `(test-topo)` passes after deliberate
 re-recording, with each geometry change explained.
+
+Phase 3 result (2026-09-29, done):
+- `(test-topo)`: 6 problems staged, 0 failures, after a deliberate re-record of
+  problem-test-topo-geometry.lisp.  Every digest moved because every TRAVERSE-VIA row lost its
+  mode argument.  The row counts that moved were each checked against the arrangement: the
+  drop is exactly two rows per same-zone pair at different levels, which the walking
+  derivation no longer emits (D4a); no drop came from merging authored and derived facts.
+    claustro 100 -> 96 (2 pairs), crelay 388 -> 350 (19), phobia 118 -> 100 (9) and
+    TRAVERSE-VIA> 38 -> 32 (3 directed pairs), rumin 148 -> 106 (21).  corner (12) and
+    windtunnel (24 / 6) unchanged in count.
+- claustro-topo: `staircase (staircase1)` added; location10/location12 names edge1,
+  location13/location11 names staircase1, the ladder fact drops its mode.  The edge1 comment
+  no longer describes the inert cross-level walk the derivation used to emit.
+- crelay-topo: the three alcove jumps name `(edge1 gate2)` (gate2 stands on edge1); the ladder
+  facts drop their mode.  location20/location5 had nothing drawn between them: location20 is
+  the top of blower1's stream.  Decision with D: a floor drive is a jump marker, static like an
+  edge, so the fact is `(traverse-via location20 ((blower1)) location5)` -- a drop off the side
+  of the stream.  A `()` there would have claimed a walk, and the bare-level jump reading does
+  not apply with coordinates (D2).
+- tech/jump.lisp: jump registers `floor-blower` and `floor-gears` as markers and statics
+  (declared optional).  Wall drives are not markers: their destination is ordinary ground.
+- test/crelay-route-replay.lisp: witnesses follow the new facts ((BLOWER1), (EDGE1 GATE2)).
+  PASS; its 27-action sequence validates.
+- corner-topo authors no traversal facts; phobia-topo and windtunnel-topo stage unchanged.
+- The frozen crelay T10 checkpoint (t10-final-checkpoint.txt) holds three old-form jump
+  witnesses, so its Restore replay no longer validates on the current tree.  Left
+  byte-identical; doc/problems/crelay-topo/Handoff.md says it restores at commit cfb7c11 and
+  gives the new witnesses.
+- PHASE 3 CLOSED 2026-09-29.  Next session starts Phase 4.
 
 Phase 4 — analysis tooling and docs. `topo-lower-bound.lisp`, `-support-elevation.lisp`,
 `constraint-profile.lisp`, the Guide. Acceptance: regenerate rumin-topo's static profile;

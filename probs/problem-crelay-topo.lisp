@@ -175,14 +175,16 @@
   (gate-segment> gate9 8 24 12 24)
   (screen-segment> screen1 28 16 28 19)
 
-  ;; Authorized elevation changes
-  (traverse-via jumping location4 ((gate2)) location6)
-  (traverse-via jumping location5 ((gate2)) location6)
-  (traverse-via jumping location20 ((gate2)) location6)
-  (traverse-via jumping location20 () location5)
-  (traverse-via> climbing location3 ((ladder1)) location1)
-  (traverse-via> climbing location8 ((ladder2)) location5)
-  (traverse-via> climbing location11 ((ladder3)) location10)
+  ;; Authorized elevation changes.  location6's alcove lies behind edge1, which carries
+  ;; gate2 on its top.  location20 is the top of blower1's stream, so the drop to
+  ;; location5 beside it names the stream's drive.
+  (traverse-via location4 ((edge1 gate2)) location6)
+  (traverse-via location5 ((edge1 gate2)) location6)
+  (traverse-via location20 ((edge1 gate2)) location6)
+  (traverse-via location20 ((blower1)) location5)
+  (traverse-via> location3 ((ladder1)) location1)
+  (traverse-via> location8 ((ladder2)) location5)
+  (traverse-via> location11 ((ladder3)) location10)
 )
 
 
