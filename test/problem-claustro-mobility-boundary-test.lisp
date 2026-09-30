@@ -10,6 +10,10 @@
 ;;; intentional stairs variant: stairs from elevation 0 to 2 bypass the box and compose
 ;;; with the same raised walk/downward-jump route in one MOVE.
 ;;;
+;;; This is a bare-level problem: the jumping pairs name no edge, and each crosses a level
+;;; difference, so -traversal reads their empty clause as a jump.  The stairs lane must name
+;;; its staircase, since an unnamed two-unit rise would read as an out-of-reach jump.
+;;;
 ;;; Expected minimum path length: 3.
 
 (in-package :ww)
@@ -29,7 +33,8 @@
   location (location1 location7 location10 location11 location12 location13
             stairs10 stairs11 stairs12 stairs13)
   box (box2)
-  ladder (ladder1))
+  ladder (ladder1)
+  staircase (slab-stairs))
 
 
 (include-tech jump)
@@ -45,23 +50,23 @@
   (has-location box2 location10)
   (has-elevation location12 2)
   (has-elevation location13 2)
-  (traverse-via jumping location10 () location12)
-  (traverse-via walking location12 () location13)
-  (traverse-via jumping location13 () location11)
+  (traverse-via location10 () location12)
+  (traverse-via location12 () location13)
+  (traverse-via location13 () location11)
 
   ;; The real problem's directed, exactly-positioned, empty-handed ladder traversal.
   (has-location ladder-agent location7)
   (has-position ladder1 location7)
-  (traverse-via> climbing location7 ((ladder1)) location1)
+  (traverse-via> location7 ((ladder1)) location1)
 
   ;; Variant lane: stairs deliberately supply the two-unit ascent without a support-state
   ;; boundary, so the entire stairs/walk/downward-jump route is one transparent MOVE.
   (has-location stairs-agent stairs10)
   (has-elevation stairs12 2)
   (has-elevation stairs13 2)
-  (traverse-via stairway stairs10 () stairs12)
-  (traverse-via walking stairs12 () stairs13)
-  (traverse-via jumping stairs13 () stairs11))
+  (traverse-via stairs10 ((slab-stairs)) stairs12)
+  (traverse-via stairs12 () stairs13)
+  (traverse-via stairs13 () stairs11))
 
 
 (define-init-action initialize-derived-state
@@ -106,7 +111,7 @@
     (assoc 'stairs11
            (mobility-results *start-state* 'stairs-agent 'stairs10))
     '(stairs11
-       ((stairs stairs10 nil stairs12)
+       ((stairs stairs10 (slab-stairs) stairs12)
         (walk stairs12 nil stairs13)
         (jump stairs13 nil stairs11))))
   (null (configuration-transition-results *start-state* 'stairs-agent)))

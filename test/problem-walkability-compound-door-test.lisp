@@ -84,7 +84,7 @@
 
 
 (define-query compound-walking-family-is (?from location ?to location ?expected)
-  (do (bind (traverse-via walking ?from $actual ?to))
+  (do (bind (traverse-via ?from $actual ?to))
       (equal $actual ?expected)))
 
 

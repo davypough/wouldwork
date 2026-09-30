@@ -46,7 +46,8 @@
   transmitter (shared-transmitter)
   location (pickup-site place-site pair-origin
             live-target-site ghost-target-site landing-site
-            live-lit-site ghost-lit-site))
+            live-lit-site ghost-lit-site)
+  edge (pickup-edge))
 
 
 ;;;; TECHNOLOGY INCLUDES ;;;;
@@ -116,7 +117,9 @@
   (has-location ghost-held-tray place-site)
   (has-location live-ground-tray place-site)
   (has-location ghost-ground-tray place-site)
-  (traverse-via jumping pickup-site () place-site)
+  ;; The pair is at one level, so the clause names an edge to make it a jump: a walk
+  ;; offers no remote support landing.
+  (traverse-via pickup-site ((pickup-edge)) place-site)
 
   ;; Physical landing matrix used by -gears-fan's shared landing-support query.
   (has-location live-landing-box landing-site)
@@ -277,19 +280,19 @@
                 'live-landing-box)
            (eql (landing-support landing-site ghost-pickup-box nil)
                 'ghost-landing-box)
-           (member '(jump (pickup-site ground) nil
+           (member '(jump (pickup-site ground) (pickup-edge)
                            (place-site live-held-tray))
                    $live-transitions :test #'equal)
-           (member '(jump (pickup-site ground) nil
+           (member '(jump (pickup-site ground) (pickup-edge)
                            (place-site ghost-held-tray))
                    $live-transitions :test #'equal)
-           (not (member '(jump (pickup-site ground) nil
+           (not (member '(jump (pickup-site ground) (pickup-edge)
                                 (place-site ghost-ground-tray))
                         $live-transitions :test #'equal))
-           (member '(jump (pickup-site ground) nil
+           (member '(jump (pickup-site ground) (pickup-edge)
                            (place-site ghost-held-tray))
                    $ghost-transitions :test #'equal)
-           (not (member '(jump (pickup-site ground) nil
+           (not (member '(jump (pickup-site ground) (pickup-edge)
                                 (place-site live-held-tray))
                         $ghost-transitions :test #'equal)))))
 

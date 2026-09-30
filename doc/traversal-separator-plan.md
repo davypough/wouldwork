@@ -1,6 +1,6 @@
 # Separator-based traversal — implementation plan
 
-Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0 and 1 closed 2026-09-29; Phase 2 next.
+Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0, 1 and 2 closed 2026-09-29; Phase 3 next.
 Base test case: probs/problem-rumin-topo.lisp. Then claustro-topo, corner-topo, crelay-topo;
 phobia-topo and windtunnel-topo author no traverse-via facts but must still stage.
 Implementation happens in a fresh session. Work one phase at a time; D reloads with
@@ -278,6 +278,48 @@ Phase 1 result (2026-09-29, done):
 
 Phase 2 — unit tests. Migrate the test files in section 8 and add the new test problem.
 Acceptance: `(test-talos)` matches the Phase 0 baseline plus the new test.
+
+Phase 2 result (2026-09-29, done):
+- `(test-talos)`: 118 problems, 0 failures; 26 mutation cases, 0 surviving mutants.
+- All 17 fact-authoring test files migrated.  Most needed only the mode argument dropped.
+  Changes of substance:
+  - problem-traversal-substrate-test: rewritten against REGISTER-TRAVERSAL-KIND.  Three probe
+    kinds (walk; stairs with a static RAMP marker; climb with LADDER) share one builder that
+    labels by inferred kind.  New claims: schema (location list location), fluent index (2),
+    symmetrics ((0 2)); D5 preference over canonical clause order; D6 replay; mixed-marker
+    and duplicate-pair rejections.
+  - Same-level jump lanes now name an edge (jump-test's six lanes, recorder-isolation's
+    pickup-site/place-site): a same-level () is a walk, and D7 gives a walk no support
+    landing.  Their expected witnesses gained the edge.
+  - Every stairway fact names a staircase (stairs-test, terrain-consistency-test,
+    claustro-mobility-boundary-test's stairs lane, jump-test lane 4).
+  - claustro-mobility-boundary-test keeps () on its two cross-level jumps: it is a
+    bare-level problem, so it now exercises D2's bare-level jump reading.
+  - jump-test's edge-rejection claim is inverted (edges now mark jumps but are never
+    vaulted); walkability-test's ladder-in-a-walk scenario is removed and replaced by a
+    claim that such a clause is refused; ladder-test's authoring claim follows the per-clause
+    check (two cases whose premise no longer exists were replaced by symmetric-ladder-in-a-
+    second-clause and mixed-kind directed fact).
+  - D4(a) is pinned in walkability-coordinates-test (the coincident loft pair gets no fact)
+    and terrain-consistency-test (STAIR-LOW/STAIR-HIGH's family is exactly ((STAIR1))).
+- New test/problem-traversal-separator-test.lisp, on coordinate geometry with real builders:
+  staircase-or-edge preference vs the support transition's edge; gate-on-edge (crelay) open
+  and shut; directed jump; kind-aware merge (derived () + authored ((LEDGE)) = (NIL (LEDGE)),
+  the jump clause still used for a support landing); D2 rejection; edge-fit (init check 4)
+  driven through TERRAIN-EDGE-FIT-COMPLAINT with TERRAIN-ARRANGEMENT-FOR-STATE.  Gates in a
+  coordinate problem need GATE-SEGMENT> records; here both stand on EDGE1 as supported doors.
+- Two tech fixes, pulled forward:
+  - tech/-mobility.lisp, MOBILITY-SEGMENT-REPLAYABLE-P (Phase 1 bug): replay offered a
+    support transition to the D6 acceptors, whose configuration endpoint crashed
+    TRAVERSAL-PAIR-FAMILIES.  Acceptors are now consulted only for a segment ending at a
+    location.  Exposed by jump-test's printed solution.
+  - tech/-support-elevation.lisp (from Phase 4): VERTICAL-REACH-JUMP-FACT-RELEVANT-P reads the
+    4-element fact and judges only jump-kind clauses; VERTICAL-REACH-JUMPING-RELEVANT-P no
+    longer filters on 'JUMPING.
+- Secondary files checked: engine-route-recording, step, passability, position, gun-blower
+  need nothing; beam-los-coordinates had one stale comment.  test/crelay-route-replay.lisp
+  is deferred to Phase 3 with crelay-topo (its jump witnesses gain EDGE1).
+- PHASE 2 CLOSED 2026-09-29.  Next session starts Phase 3.
 
 Phase 3 — other topo specs. Migrate claustro-topo, corner-topo, crelay-topo; confirm
 phobia-topo and windtunnel-topo stage. Acceptance: `(test-topo)` passes after deliberate

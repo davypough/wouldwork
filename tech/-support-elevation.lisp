@@ -197,25 +197,32 @@
 
 
 (define-problem-helper vertical-reach-jump-fact-relevant-p (state fact)
-  (let* ((relation (first fact))
-         (source (third fact))
-         (family (fourth fact))
-         (destination (fifth fact))
-         (source-value
-           (funcall (symbol-function 'location-elevation) state source))
-         (destination-value
-           (funcall (symbol-function 'location-elevation) state destination))
-         (source-values
-           (if (eq relation 'traverse-via)
-             (list source-value destination-value)
-             (list source-value)))
-         (landing-rises-p
-           (if (eq relation 'traverse-via)
-             (/= source-value destination-value)
-             (> destination-value source-value))))
-    (or landing-rises-p
-        (vertical-reach-jump-feature-relevant-p
-          state family source-values))))
+  "True when FACT, a (relation source family destination) traversal literal, offers a jump
+   the limit can decide: some clause of FACT's family is of jump kind, and either the
+   landing rises or a vaultable feature in those clauses stands above a launch level.  Only
+   jump-kind clauses count -- a walk, stairway or climb over the same pair is never
+   bounded by *VERTICAL-REACH-LIMIT*.  Called only when jump is spliced, so -traversal's
+   clause kinds are present; SYMBOL-FUNCTION because this file does not nest it."
+  (destructuring-bind (relation source family destination) fact
+    (let* ((jump-clauses
+             (funcall (symbol-function 'traversal-family-kind-clauses)
+                      state source destination family 'jump))
+           (source-value
+             (funcall (symbol-function 'location-elevation) state source))
+           (destination-value
+             (funcall (symbol-function 'location-elevation) state destination))
+           (source-values
+             (if (eq relation 'traverse-via)
+               (list source-value destination-value)
+               (list source-value)))
+           (landing-rises-p
+             (if (eq relation 'traverse-via)
+               (/= source-value destination-value)
+               (> destination-value source-value))))
+      (and jump-clauses
+           (or landing-rises-p
+               (vertical-reach-jump-feature-relevant-p
+                 state jump-clauses source-values))))))
 
 
 (define-problem-helper vertical-reach-positive-height-box-p (state)
@@ -232,7 +239,6 @@
          (some
            (lambda (fact)
              (and (member (first fact) '(traverse-via traverse-via>))
-                  (eq (second fact) 'jumping)
                   (vertical-reach-jump-fact-relevant-p state fact)))
            (list-static-db)))))
 

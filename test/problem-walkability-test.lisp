@@ -8,7 +8,9 @@
 ;;;
 ;;; Independent characterization scenarios verify:
 ;;; - directional asymmetry and disjunctive obstacle handling;
-;;; - empty-hand passage through screens and ladders, and rejection while holding;
+;;; - empty-hand passage through screens, and rejection while holding;
+;;; - rejection of a ladder in a walk clause: a clause naming a ladder is a climb, and this
+;;;   problem registers no climbing;
 ;;; - exact elevation equality and rejection of a one-level mismatch;
 ;;; - derived traversability for a supported agent while MOVE remains unavailable;
 ;;; - reflexive traversability without a no-op MOVE successor; and
@@ -31,7 +33,7 @@
   location (main-start main-mid main-goal
             canonical-start canonical-a canonical-b canonical-goal
             shortest-start shortest-mid shortest-goal
-            screen-start screen-goal ladder-start ladder-goal
+            screen-start screen-goal
             closed-start closed-goal
             level-start level-peer level-high
             supported-start supported-goal isolated-site)
@@ -58,32 +60,31 @@
   (open open-gate)
   (open open-gate-b)
 
-  (traverse-via> walking main-start () main-mid)
-  (traverse-via walking main-mid
+  (traverse-via> main-start () main-mid)
+  (traverse-via main-mid
             ((closed-gate) (open-gate screen1) (open-gate-b))
             main-goal)
 
   ;; Two equal-length routes exercise the lexical tie-break; the separate
   ;; direct edge proves that segment count takes precedence over lexical order.
-  (traverse-via> walking canonical-start () canonical-a)
-  (traverse-via> walking canonical-a () canonical-goal)
-  (traverse-via> walking canonical-start () canonical-b)
-  (traverse-via> walking canonical-b () canonical-goal)
-  (traverse-via> walking shortest-start () shortest-mid)
-  (traverse-via> walking shortest-mid () shortest-goal)
-  (traverse-via> walking shortest-start () shortest-goal)
+  (traverse-via> canonical-start () canonical-a)
+  (traverse-via> canonical-a () canonical-goal)
+  (traverse-via> canonical-start () canonical-b)
+  (traverse-via> canonical-b () canonical-goal)
+  (traverse-via> shortest-start () shortest-mid)
+  (traverse-via> shortest-mid () shortest-goal)
+  (traverse-via> shortest-start () shortest-goal)
 
-  (traverse-via walking screen-start ((open-gate screen1)) screen-goal)
-  (traverse-via walking ladder-start ((open-gate ladder1)) ladder-goal)
-  (traverse-via walking closed-start ((closed-gate)) closed-goal)
+  (traverse-via screen-start ((open-gate screen1)) screen-goal)
+  (traverse-via closed-start ((closed-gate)) closed-goal)
 
   (has-elevation level-start 2)
   (has-elevation level-peer 2)
   (has-elevation level-high 3)
-  (traverse-via walking level-start () level-peer)
-  (traverse-via walking level-start () level-high)
+  (traverse-via level-start () level-peer)
+  (traverse-via level-start () level-high)
 
-  (traverse-via walking supported-start () supported-goal))
+  (traverse-via supported-start () supported-goal))
 
 (define-init-action initialize-derived-state
   0
@@ -110,6 +111,20 @@
 (define-test-helper move-action-produces-successor-p (state agent)
   "Whether the installed MOVE action produces a successor for AGENT in STATE."
   (not (null (move-action-updates state agent))))
+
+
+(define-test-claim walk-clause-refuses-ladder
+  ;; A ladder marks a climb, and this problem registers only walking, whose clauses may
+  ;; name gates, screens and gears.  So a ladder beside a gate is not an obstacle a walk
+  ;; can clear empty-handed, as it once was; it is an item no registered kind permits.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((traverse-via screen-start ((open-gate ladder1)) screen-goal))
+        :checks '(traversal-init-check)))
+    'init-check-failure
+    :containing "expected an instance of one of"
+    :check 'traversal-init-check))
 
 
 (define-test-claim move-produces-one-successor-per-endpoint
@@ -179,14 +194,11 @@
     (not (one-step-walkable main-agent closed-start closed-goal))
     (not (traversable main-agent closed-start closed-goal))
 
-    ;; Empty hands pass screen and ladder barriers; holding blocks both.
+    ;; Empty hands pass a screen barrier; holding blocks it.
     (one-step-walkable main-agent screen-start screen-goal)
-    (one-step-walkable main-agent ladder-start ladder-goal)
     (holding holding-agent carried-connector)
     (not (one-step-walkable
            holding-agent screen-start screen-goal))
-    (not (one-step-walkable
-           holding-agent ladder-start ladder-goal))
 
     ;; Elevations must be exactly equal.
     (= (location-elevation level-start) 2)

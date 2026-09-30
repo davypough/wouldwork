@@ -53,11 +53,15 @@
 
 (define-problem-helper mobility-segment-replayable-p (state agent source segment)
   "True when SEGMENT is a legal crossing out of SOURCE in STATE: one a provider offers, or,
-   failing that, one some registered replay acceptor accepts."
+   failing that, one some registered replay acceptor accepts.  Only a segment ending at a
+   location is offered to the acceptors: MOVE's replay tries every one-step route as a
+   grounded crossing first, and a support transition, whose endpoints are (location place)
+   configurations, is not a segment at all."
   (or (member segment (mobility-provider-segments state agent source) :test #'equal)
-      (some (lambda (acceptor)
-              (funcall (symbol-function acceptor) state agent source segment))
-            *mobility-replay-acceptors*)))
+      (and (member (fourth segment) (gethash 'location *types*) :test #'eq)
+           (some (lambda (acceptor)
+                   (funcall (symbol-function acceptor) state agent source segment))
+                 *mobility-replay-acceptors*))))
 
 
 (define-problem-helper mobility-route-key (route)

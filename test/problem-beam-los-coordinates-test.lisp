@@ -119,8 +119,8 @@
   (wall-segment> corner-wall 5 20 5 22)
   (has-height interior-wall 2)
 
-  ;; An edge has the same finite-height LOS model as a wall.  It remains excluded from
-  ;; jumping because it is not a vaultable feature.
+  ;; An edge has the same finite-height LOS model as a wall.  In traversal an edge marks a
+  ;; jump clause, but it is never vaulted: it is not a vaultable feature.
   (edge-segment> interior-edge 5 69 5 71)
 
   ;; CLOSED-GATE and OPEN-GATE properly cross their lanes.  CORNER-GATE begins

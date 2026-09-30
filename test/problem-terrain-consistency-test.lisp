@@ -9,12 +9,13 @@
 ;;;      it.  Every interval EDGE1 covers flanks one single-level zone on each side, so
 ;;;      both edge checks are determinate there: EDGE1's base must be 0 and its top 3/2,
 ;;;      which the type table's default edge height of 3/2 supplies, and its step must be
-;;;      crossed -- by the one authored STAIRWAY edge between GROUND1 and SLAB1, since the
-;;;      check asks that a crossing exist and never where.
+;;;      crossed -- by the one authored staircase clause, (STAIR2), between GROUND1 and
+;;;      SLAB1, since the check asks that a crossing exist and never where.
 ;;;   2. STAIR-LOW at 0 and STAIR-HIGH at 2 share the third compartment's zone.  Nothing
-;;;      separates them geometrically, so the derived WALKING edge between them is dead --
-;;;      ONE-STEP-WALKABLE rejects a step between levels -- and the authored STAIRWAY edge is
-;;;      what makes the pair legitimate.  The zone check passes exactly because of it.
+;;;      separates them geometrically, yet the walking derivation emits no walk fact between
+;;;      them, because a walk keeps its endpoints on one level.  The authored staircase
+;;;      clause, (STAIR1), is the pair's whole family, and it is what makes the pair
+;;;      legitimate.  The zone check passes exactly because of it.
 ;;;   3. WALL1 divides compartments 2 and 3.  It is a wall, not an edge, so the edge check
 ;;;      ignores it however its flanking levels read.
 ;;;   4. Four drive fixtures pin the static level-change classification: floor gears and a
@@ -56,6 +57,7 @@
             lift-low1 lift-high1 lift-low2 lift-high2)
   edge     (edge1)
   wall     (wall1)
+  staircase (stair1 stair2)
   floor-gears  (lift-gears)
   floor-blower (fixed-lift)
   wall-gears   (wall-drive)
@@ -125,12 +127,12 @@
 
   ;; The authored crossing that makes compartment 3's level difference legitimate.
   ;; Removing it is what the zone check exists to catch.
-  (traverse-via stairway stair-low () stair-high)
+  (traverse-via stair-low ((stair1)) stair-high)
 
   ;; The crossing over EDGE1's step.  The traversability check asks only that one exist,
-  ;; not that every flanking pair carry one, so this single edge between GROUND1 and SLAB1
+  ;; not that every flanking pair carry one, so this single fact between GROUND1 and SLAB1
   ;; covers the whole edge; removing it is what that check exists to catch.
-  (traverse-via stairway ground1 () slab1))
+  (traverse-via ground1 ((stair2)) slab1))
 
 
 ;;;; CHARACTERIZATION FIXTURES ;;;;
@@ -217,7 +219,7 @@
                                (terrain-test-drifted-levels))))
 
   ;; EDGE1's step is crossed, so the traversability check is satisfied -- by the single
-  ;; authored stairway TRAVERSE-VIA between GROUND1 and SLAB1, not by every flanking pair
+  ;; authored staircase clause between GROUND1 and SLAB1, not by every flanking pair
   ;; carrying one.
   (null (terrain-uncrossed-edge-complaints
           (terrain-test-arrangement) (terrain-test-edges)
@@ -270,10 +272,12 @@
                    (terrain-test-arrangement) nil nil
                    (terrain-test-drifted-levels))))
 
-  ;; Compartment 3 holds two levels in one zone and raises nothing, because the stairway
-  ;; TRAVERSE-VIA joins them.  That authored fact is the whole difference between it and
+  ;; Compartment 3 holds two levels in one zone and raises nothing, because the staircase
+  ;; clause joins them.  That authored fact is the whole difference between it and
   ;; GROUND2.
-  (member 'stairway *terrain-level-change-modes*)
+  (member 'stairs *terrain-level-change-kinds*)
+  (eq (first (traversal-clause-profile '(stair1))) 'stairs)
+  (eq (first (traversal-clause-profile nil)) 'walk)
   (member '(stair-low stair-high) (terrain-authored-level-changes) :test #'equal)
   (null (terrain-arrangement-complaints
           (terrain-test-arrangement) nil nil (terrain-test-levels)))
@@ -304,19 +308,22 @@
     (= (object-height edge1) 3/2)
     (= (top edge1) 3/2)
 
-    ;; Walking is derived within a compartment and blocked across EDGE1 and WALL1.
-    (bind (traverse-via walking ground1 $ground-doors ground2))
+    ;; Walking is derived within a compartment and blocked across EDGE1 and WALL1.  The
+    ;; GROUND1/SLAB1 family is the authored staircase alone: no walk clause crosses EDGE1.
+    (bind (traverse-via ground1 $ground-doors ground2))
     (null $ground-doors)
-    (bind (traverse-via walking stair-low $stair-doors stair-high))
-    (null $stair-doors)
-    (not (bind (traverse-via walking ground1 $crossing-doors slab1)))
-    (not (bind (traverse-via walking slab2 $partition-doors stair-low)))
+    (bind (traverse-via ground1 $crossing-family slab1))
+    (equal $crossing-family '((stair2)))
+    (not (bind (traverse-via slab2 $partition-doors stair-low)))
 
-    ;; The derived edge across compartment 3's level change is dead, which is why the
-    ;; authored stairway TRAVERSE-VIA has to be there.
+    ;; No walk is derived across compartment 3's level change, so the pair's family is the
+    ;; authored staircase alone -- a merged () would appear here as a second clause -- and
+    ;; the one step between them is a stairs segment, not a walk.
+    (bind (traverse-via stair-low $stair-family stair-high))
+    (equal $stair-family '((stair1)))
     (not (one-step-walkable walker stair-low stair-high))
-    (bind (traverse-via stairway stair-low $stair-means stair-high))
-    (null $stair-means)))
+    (ww-loop for $segment in (traversal-segments walker stair-low)
+             thereis (equal $segment '(stairs stair-low (stair1) stair-high)))))
 
 
 (define-goal

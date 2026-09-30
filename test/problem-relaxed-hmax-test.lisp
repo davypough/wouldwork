@@ -58,8 +58,8 @@
   (reach-via> hmax-origin () hmax-directed-site)
   (reach-via hmax-origin () hmax-off-switch)
   (reach-via hmax-origin () hmax-on-switch)
-  (traverse-via walking hmax-origin () hmax-box-site)
-  (traverse-via walking hmax-box-site ((hmax-gate)) hmax-goal-site))
+  (traverse-via hmax-origin () hmax-box-site)
+  (traverse-via hmax-box-site ((hmax-gate)) hmax-goal-site))
 
 
 (define-init-action initialize-derived-state

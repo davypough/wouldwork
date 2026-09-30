@@ -28,10 +28,13 @@
 ;;; directed-edge asymmetry, rejection of an unsafe landing, rejection of an occupied box
 ;;; top while preserving its ground landing, rejection of an over-limit local box mount,
 ;;; exclusive ownership of grounded jumps by mobility rather than the configuration-
-;;; transition substrate, and rejection of an edge instance from a jumping TRAVERSE-VIA
-;;; feature list --
+;;; transition substrate, and the two roles a jump clause's separators play: an edge or a
+;;; wall marks the clause as a jump, but only a wall, gate or screen is a feature to clear --
 ;;; VAULTABLE-OBJECT deliberately excludes edge, since an edge has no independent "top" to
-;;; vault onto.  The move-type tag itself is also characterized: a genuinely vaulting
+;;; vault onto, so an edge stays in the witness and out of the clearance test.  Every lane
+;;; whose crossing is not a vault names an edge for exactly that reason: a clause naming no
+;;; edge or wall between same-level locations is a walk, and a walk offers no support
+;;; landing (decision D7).  The move-type tag itself is also characterized: a genuinely vaulting
 ;;; transition (lane 4) is tagged VAULT, while a non-empty but fully passable feature list
 ;;; (the remote-mount canonicalization contract below) still tags JUMP.
 ;;;
@@ -80,7 +83,9 @@
   gate (default-gate)
   screen (cargo-screen passable-screen)
   wall (vault-wall default-wall)
-  edge (probe-edge)
+  edge (probe-edge transfer-edge screen-probe-edge unsafe-edge occupied-edge
+        remote-mount-edge remote-tray-edge)
+  staircase (carry-stairs)
   gun (unsafe-gun))
 
 
@@ -105,7 +110,7 @@
   (has-location vault-box vault-start)
   (has-height vault-box 1)
   (has-height vault-wall 2)
-  (traverse-via> jumping vault-start ((vault-wall)) vault-goal)
+  (traverse-via> vault-start ((vault-wall)) vault-goal)
 
   ;; Planned lane 2: the only useful transition is the local box-to-ground drop.
   (has-location drop-agent drop-site)
@@ -113,9 +118,9 @@
   (on drop-agent drop-box)
 
   ;; Planned lane 3: both box tops are elevation 4, so the jump between them has zero
-  ;; elevation gain and is unaffected by any upward-reach limit.  The edge is authored
+  ;; elevation gain and is unaffected by any upward-reach limit.  The fact is authored
   ;; target-first so the required source-to-target traversal depends on TRAVERSE-VIA
-  ;; symmetry in jumping mode.
+  ;; symmetry for a jump clause.
   (has-location transfer-agent transfer-start)
   (has-location transfer-source-box transfer-start)
   (has-height transfer-source-box 4)
@@ -124,7 +129,7 @@
   (has-height transfer-target-box 3)
   (has-location transfer-base-box transfer-goal)
   (on transfer-target-box transfer-base-box)
-  (traverse-via jumping transfer-goal () transfer-start)
+  (traverse-via transfer-goal ((transfer-edge)) transfer-start)
 
   ;; Planned lane 4: one mobility route first climbs stairs from elevation 0 to 2, then
   ;; jumps to elevation 3 -- exactly the fixed limit above that hypothetical source.  Both
@@ -137,10 +142,10 @@
   (holding carrying-agent carried-box)
   (has-elevation carry-start 2)
   (has-elevation carry-goal 3)
-  (traverse-via> stairway carry-approach () carry-start)
+  (traverse-via> carry-approach ((carry-stairs)) carry-start)
   (has-elevation cargo-screen 1)
   (has-height cargo-screen 2)
-  (traverse-via> jumping carry-start ((vault-wall cargo-screen)) carry-goal)
+  (traverse-via> carry-start ((vault-wall cargo-screen)) carry-goal)
 
   ;; Exact-boundary query probes.  The fixed *vertical-reach-limit* governs both
   ;; JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR identically: source 2 reaches 3 but not
@@ -154,13 +159,13 @@
   ;; short-circuits vaulting clearance before the fixed elevation limit is ever consulted.
   ;; This probe remains stationary; the goal inspects the generated child.
   (has-location screen-probe-agent screen-probe-start)
-  (traverse-via> jumping screen-probe-start ((passable-screen)) screen-probe-goal)
+  (traverse-via> screen-probe-start ((passable-screen screen-probe-edge)) screen-probe-goal)
 
   ;; An uncontrolled gun is lethal after initialization, so the transition action must
   ;; produce no child
   ;; at its threatened destination.
   (has-location unsafe-probe-agent unsafe-start)
-  (traverse-via> jumping unsafe-start () unsafe-goal)
+  (traverse-via> unsafe-start ((unsafe-edge)) unsafe-goal)
   (threatens unsafe-gun unsafe-goal)
 
   ;; The destination box is occupied by a non-box support occupant.  The edge must still
@@ -169,7 +174,7 @@
   (has-location occupied-target-box occupied-goal)
   (has-location blocking-connector occupied-goal)
   (on blocking-connector occupied-target-box)
-  (traverse-via> jumping occupied-start () occupied-goal)
+  (traverse-via> occupied-start ((occupied-edge)) occupied-goal)
 
   ;; A clear height-2 local box is one unit beyond the fixed *vertical-reach-limit*; the
   ;; mount must fail regardless of any agent's height, since none is consulted.
@@ -182,8 +187,8 @@
   ;; canonicalization must retain only the lexical first.
   (has-location remote-mount-agent remote-mount-start)
   (has-location remote-target-box remote-mount-goal)
-  (traverse-via jumping remote-mount-start () remote-mount-goal)
-  (traverse-via> jumping remote-mount-start ((passable-screen)) remote-mount-goal)
+  (traverse-via remote-mount-start ((remote-mount-edge)) remote-mount-goal)
+  (traverse-via> remote-mount-start ((passable-screen remote-mount-edge)) remote-mount-goal)
 
   ;; A held tray is a jump landing support only for another agent.  The holder's unit
   ;; height puts the zero-thickness tray top exactly one unit above the source floor.
@@ -192,7 +197,7 @@
   (has-height remote-tray-holder 1)
   (holding remote-tray-holder remote-held-tray)
   (has-location remote-held-tray remote-tray-goal)
-  (traverse-via jumping remote-tray-start () remote-tray-goal))
+  (traverse-via remote-tray-start ((remote-tray-edge)) remote-tray-goal))
 
 
 (define-init-action initialize-derived-state
@@ -283,7 +288,7 @@
   (equal
     (configuration-transition-results
       *start-state* 'remote-mount-agent)
-    '((jump (remote-mount-start ground) (passable-screen)
+    '((jump (remote-mount-start ground) (passable-screen remote-mount-edge)
             (remote-mount-goal remote-target-box)))))
 
 
@@ -291,26 +296,34 @@
   (equal
     (configuration-transition-results
       *start-state* 'remote-tray-mount-agent)
-    '((jump (remote-tray-start ground) nil
+    '((jump (remote-tray-start ground) (remote-tray-edge)
             (remote-tray-goal remote-held-tray)))))
 
 
-(define-test-claim jump-vaultable-object-excludes-edge
-  ;; A genuine wall passes TRAVERSAL-INIT-CHECK's per-mode clause type check unchanged.
+(define-test-claim jump-edges-mark-without-vaulting
+  ;; A wall and an edge each mark a clause as a jump, and both pass TRAVERSAL-INIT-CHECK.
   (null
     (validate-init-literals
-      '((traverse-via jumping vault-start ((default-wall)) vault-goal))
+      '((traverse-via vault-start ((default-wall)) vault-goal))
       :checks '(traversal-init-check)))
-  ;; An edge instance in that same list position is rejected: VAULTABLE-OBJECT is
-  ;; (either gate screen wall), and edge is deliberately not a member -- it has no
-  ;; independent "top" a jump could vault onto.
+  (null
+    (validate-init-literals
+      '((traverse-via vault-start ((probe-edge)) vault-goal))
+      :checks '(traversal-init-check)))
+  ;; Both are jump markers, but only the wall is a feature: the edge is static and leaves
+  ;; the means.  VAULTABLE-OBJECT is (either gate screen wall) and excludes edge, which has
+  ;; no independent "top" a jump could vault onto.
+  (equal (traversal-clause-profile '(probe-edge vault-wall)) '(jump (vault-wall)))
+  (equal (traversal-clause-profile '(probe-edge)) '(jump nil))
+  (not (vaultable-object-list *start-state* '(probe-edge)))
+  ;; An edge beside a staircase is two ways across in one clause, and is refused.
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((traverse-via jumping vault-start ((probe-edge)) vault-goal))
+        '((traverse-via vault-start ((carry-stairs probe-edge)) vault-goal))
         :checks '(traversal-init-check)))
     'init-check-failure
-    :containing "expected an instance of one of"
+    :containing "mixes the separators"
     :check 'traversal-init-check))
 
 
@@ -324,7 +337,7 @@
     (not (on vault-agent vault-box))
     (has-location vault-box vault-start)
     (not (support-occupied vault-box))
-    (not (traverse-via> jumping vault-goal ((vault-wall)) vault-start))
+    (not (traverse-via> vault-goal ((vault-wall)) vault-start))
 
     ;; Planned lane 2 dropped locally without relocating either participant.
     (has-location drop-agent drop-site)
@@ -341,8 +354,8 @@
     (support-occupied transfer-target-box)
     (on transfer-target-box transfer-base-box)
     (= (top transfer-target-box) 4)
-    (traverse-via jumping transfer-start () transfer-goal)
-    (traverse-via jumping transfer-goal () transfer-start)
+    (traverse-via transfer-start ((transfer-edge)) transfer-goal)
+    (traverse-via transfer-goal ((transfer-edge)) transfer-start)
 
     ;; Planned lane 4 retained cargo after one composed stairs/jump MOVE.  The canonical
     ;; route proves that the jump provider used the intermediate floor elevation 2 rather
@@ -358,7 +371,7 @@
       (assoc 'carry-goal
              (mobility-results carrying-agent carry-approach))
       '(carry-goal
-         ((stairs carry-approach nil carry-start)
+         ((stairs carry-approach (carry-stairs) carry-start)
           (vault carry-start (cargo-screen vault-wall) carry-goal))))
 
     ;; Inclusive upward boundary and just-over rejection for the fixed, agent-independent
@@ -436,7 +449,6 @@
   (vertical-reach-limit-relevant-p *start-state*)
   (some (lambda (fact)
           (and (member (first fact) '(traverse-via traverse-via>))
-               (eq (second fact) 'jumping)
                (vertical-reach-jump-fact-relevant-p *start-state* fact)))
         (list-static-db))
   (not (search "*VERTICAL-REACH-LIMIT*"

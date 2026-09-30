@@ -15,7 +15,8 @@
 ;;; supported upper doorway while retaining the edge as a planar walking solid.  Two further
 ;;; locations exercise valid placement exactly on an uncovered induced grid line and
 ;;; at an unambiguous induced grid vertex.  A loft shares LEFT-START's x/y coordinates
-;;; but remains a distinct, non-walkable location because its elevation is five.  With
+;;; but remains a distinct, non-walkable location because its elevation is five: the
+;;; derivation emits no walk fact between locations at different levels.  With
 ;;; only GATE-A open, an empty-handed agent crosses the second partition through SCREEN-A,
 ;;; while a holding agent cannot.
 ;;; A direct geometry probe confirms that the rectangular-cell derivation preserves
@@ -208,7 +209,7 @@
 
 (define-query coordinate-walking-family-is
     (?from location ?to location ?expected)
-  (do (bind (traverse-via walking ?from $actual ?to))
+  (do (bind (traverse-via ?from $actual ?to))
       (equal $actual ?expected)))
 
 
@@ -230,10 +231,11 @@
     (coordinate-walking-family-is right-goal right-line nil)
     (coordinate-walking-family-is right-goal right-vertex nil)
 
-    ;; Geometry deliberately ignores z, so coincident LEFT-START/LEFT-LOFT receives the
-    ;; same raw symmetric edge as any same-zone pair.  Walking then compares the two
-    ;; independently authored levels and refuses that candidate in both directions.
-    (coordinate-walking-family-is left-start left-loft nil)
+    ;; Geometry deliberately ignores z, so coincident LEFT-START/LEFT-LOFT share a zone like
+    ;; any same-zone pair.  But a walk keeps its endpoints on one level, so the derivation
+    ;; emits no fact for the pair at all, in either direction, and walking never reaches it.
+    (not (bind (traverse-via left-start $loft-family left-loft)))
+    (not (bind (traverse-via left-loft $loft-reverse-family left-start)))
     (= (location-elevation left-start) 0)
     (= (location-elevation left-loft) 5)
     (not (one-step-walkable main-agent left-start left-loft))
@@ -271,13 +273,13 @@
 
     ;; Ordinary segment geometry is symmetric and emits no directional facts.
     (not (exists (?from location ?to location)
-           (bind (traverse-via> walking ?from $directional-family ?to))))
+           (bind (traverse-via> ?from $directional-family ?to))))
 
     ;; The wall/edge/window island has no derived edge to any other location.
     (not (exists (?other location)
-           (bind (traverse-via walking sealed-site $sealed-family ?other))))
+           (bind (traverse-via sealed-site $sealed-family ?other))))
     (not (exists (?other location)
-           (bind (traverse-via> walking sealed-site $sealed-directional-family ?other))))
+           (bind (traverse-via> sealed-site $sealed-directional-family ?other))))
 
     ;; MAIN-AGENT passes GATE-A and then the screen, reaching every non-sealed
     ;; location.  No extra location may leak into its exact six-location closure.

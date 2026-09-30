@@ -32,6 +32,8 @@
             supported-low supported-high)
   gate (open-gate closed-gate)
   screen (screen1)
+  staircase (main-stairs directional-stairs carrying-stairs screen-stairs closed-stairs
+             unsafe-stairs canonical-stairs-a canonical-stairs-b supported-stairs)
   connector (carried-connector)
   box (support-box)
   gun (danger))
@@ -59,29 +61,29 @@
   (has-elevation stairs-foot 0)
   (has-elevation stairs-top 20)
   (has-elevation main-goal 20)
-  (traverse-via> walking main-start () stairs-foot)
-  (traverse-via stairway stairs-foot ((open-gate)) stairs-top)
-  (traverse-via> walking stairs-top () main-goal)
+  (traverse-via> main-start () stairs-foot)
+  (traverse-via stairs-foot ((main-stairs open-gate)) stairs-top)
+  (traverse-via> stairs-top () main-goal)
 
-  (traverse-via> stairway directional-low () directional-high)
+  (traverse-via> directional-low ((directional-stairs)) directional-high)
 
   ;; Carrying is allowed on unobstructed stairs.  A screen uses the shared
   ;; passability rule and therefore requires empty hands.
-  (traverse-via stairway carrying-low () carrying-high)
-  (traverse-via stairway screen-low ((screen1)) screen-high)
-  (traverse-via stairway closed-low ((closed-gate)) closed-high)
+  (traverse-via carrying-low ((carrying-stairs)) carrying-high)
+  (traverse-via screen-low ((screen-stairs screen1)) screen-high)
+  (traverse-via closed-low ((closed-gate closed-stairs)) closed-high)
 
   ;; An unsafe landing cannot become a closure through-node.
-  (traverse-via stairway unsafe-low () unsafe-middle)
-  (traverse-via walking unsafe-middle () unsafe-goal)
+  (traverse-via unsafe-low ((unsafe-stairs)) unsafe-middle)
+  (traverse-via unsafe-middle () unsafe-goal)
 
   ;; Equal-length heterogeneous routes retain one deterministic witness.
-  (traverse-via> stairway canonical-start () canonical-a)
-  (traverse-via> stairway canonical-start () canonical-b)
-  (traverse-via> walking canonical-a () canonical-goal)
-  (traverse-via> walking canonical-b () canonical-goal)
+  (traverse-via> canonical-start ((canonical-stairs-a)) canonical-a)
+  (traverse-via> canonical-start ((canonical-stairs-b)) canonical-b)
+  (traverse-via> canonical-a () canonical-goal)
+  (traverse-via> canonical-b () canonical-goal)
 
-  (traverse-via stairway supported-low () supported-high))
+  (traverse-via supported-low ((supported-stairs)) supported-high))
 
 
 (define-init-action initialize-derived-state
@@ -125,13 +127,13 @@
          (equal
            (second (update.instantiations goal-update))
            '((walk main-start nil stairs-foot)
-             (stairs stairs-foot (open-gate) stairs-top)
+             (stairs stairs-foot (main-stairs open-gate) stairs-top)
              (walk stairs-top nil main-goal))))))
 
 
 (define-query stairs-scenarios-valid ()
   (and
-    ;; TRAVERSE-VIA in stairway mode is symmetric; TRAVERSE-VIA> is not.
+    ;; A symmetric staircase fact is crossed both ways; a directed one is not.
     (traversable main-agent stairs-foot stairs-top)
     (traversable main-agent stairs-top stairs-foot)
     (traversable main-agent directional-low directional-high)
@@ -178,7 +180,7 @@
     (and (= (length goal-updates) 1)
          (equal
            (second (update.instantiations (first goal-updates)))
-           '((stairs canonical-start nil canonical-a)
+           '((stairs canonical-start (canonical-stairs-a) canonical-a)
              (walk canonical-a nil canonical-goal))))))
 
 

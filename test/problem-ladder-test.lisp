@@ -59,16 +59,16 @@
   (has-location climber entry)
   (has-position ladder1 lower)
   (has-position ladder2 middle)
-  (traverse-via> walking entry () lower)
-  (traverse-via> climbing lower ((ladder1 screen1)) middle)
-  (traverse-via> climbing middle ((ladder2)) upper)
-  (traverse-via> walking upper () goal)
+  (traverse-via> entry () lower)
+  (traverse-via> lower ((ladder1 screen1)) middle)
+  (traverse-via> middle ((ladder2)) upper)
+  (traverse-via> upper () goal)
 
   ;; Carrying blocks the ladder itself.
   (has-location carrying-agent carry-start)
   (holding carrying-agent carried-box)
   (has-position ladder3 carry-start)
-  (traverse-via> climbing carry-start ((ladder3)) carry-goal)
+  (traverse-via> carry-start ((ladder3)) carry-goal)
 
   ;; A supported source uses one explicit ladder configuration transition.  The walking edge
   ;; beyond its landing proves that transition remains a single support-state boundary.
@@ -76,15 +76,15 @@
   (has-location support-box supported-start)
   (on supported-agent support-box)
   (has-position ladder4 supported-start)
-  (traverse-via> climbing supported-start ((ladder4)) supported-goal)
-  (traverse-via> walking supported-goal () supported-beyond)
+  (traverse-via> supported-start ((ladder4)) supported-goal)
+  (traverse-via> supported-goal () supported-beyond)
 
   ;; A misplaced listed ladder is only a decoy; the source-positioned listed ladder must
   ;; provide the valid segment.
   (has-location misplaced-agent misplaced-start)
   (has-position ladder5 misplaced-ladder-site)
   (has-position misplaced-source-ladder misplaced-start)
-  (traverse-via> climbing misplaced-start
+  (traverse-via> misplaced-start
               ((ladder5 misplaced-source-ladder))
               misplaced-goal)
 
@@ -92,19 +92,19 @@
   (has-location unlisted-agent unlisted-start)
   (has-position ladder6 unlisted-start)
   (has-position listed-source-ladder unlisted-start)
-  (traverse-via> climbing unlisted-start
+  (traverse-via> unlisted-start
               ((listed-source-ladder unlisted-screen))
               unlisted-goal)
 
   ;; Every item in the flat means conjunction must pass.
   (has-location gate-agent gate-start)
   (has-position ladder7 gate-start)
-  (traverse-via> climbing gate-start ((ladder7 closed-gate)) gate-goal)
+  (traverse-via> gate-start ((ladder7 closed-gate)) gate-goal)
 
   ;; A clear edge may not land at a lethal destination.
   (has-location unsafe-agent unsafe-start)
   (has-position ladder8 unsafe-start)
-  (traverse-via> climbing unsafe-start ((ladder8)) unsafe-goal)
+  (traverse-via> unsafe-start ((ladder8)) unsafe-goal)
   (threatens unsafe-gun unsafe-goal)
 
   ;; Two listed and positioned ladders are effect-equivalent.  The provider must select
@@ -112,7 +112,7 @@
   (has-location canonical-agent canonical-start)
   (has-position canonical-ladder-a canonical-start)
   (has-position canonical-ladder-b canonical-start)
-  (traverse-via> climbing canonical-start
+  (traverse-via> canonical-start
               ((canonical-ladder-b canonical-ladder-a))
               canonical-goal))
 
@@ -279,43 +279,43 @@
   (null
     (validate-init-literals
       '((has-position ladder6 unlisted-start)
-        (traverse-via> climbing unlisted-start ((ladder6)) unlisted-goal))
+        (traverse-via> unlisted-start ((ladder6)) unlisted-goal))
+      :checks '(ladder-init-check)))
+  ;; A clause naming a ladder is a climb, and a climb must be directed.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder6 unlisted-start)
+          (traverse-via unlisted-start ((ladder6)) unlisted-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "a climb must be directed"
+    :check 'ladder-init-check)
+  ;; That holds even when the ladder sits in a second clause beside a walk.
+  (expect-condition
+    (lambda ()
+      (validate-init-literals
+        '((has-position ladder6 unlisted-start)
+          (traverse-via unlisted-start ((unlisted-screen) (ladder6)) unlisted-goal))
+        :checks '(ladder-init-check)))
+    'init-check-failure
+    :containing "a climb must be directed"
+    :check 'ladder-init-check)
+  ;; A directed fact may mix a valid climb clause with a walk clause; the walk clause names
+  ;; no ladder and is not this check's business.
+  (null
+    (validate-init-literals
+      '((has-position ladder6 unlisted-start)
+        (traverse-via> unlisted-start ((ladder6) (unlisted-screen)) unlisted-goal))
       :checks '(ladder-init-check)))
   (expect-condition
     (lambda ()
       (validate-init-literals
-        '((has-position ladder6 unlisted-start)
-          (traverse-via climbing unlisted-start ((ladder6)) unlisted-goal))
-        :checks '(ladder-init-check)))
-    'init-check-failure
-    :containing "Climbing traversal must be directed"
-    :check 'ladder-init-check)
-  (expect-condition
-    (lambda ()
-      (validate-init-literals
-        '((has-position ladder6 unlisted-start)
-          (traverse-via> climbing unlisted-start ((unlisted-screen)) unlisted-goal))
-        :checks '(ladder-init-check)))
-    'init-check-failure
-    :containing "has no listed ladder positioned at its source"
-    :check 'ladder-init-check)
-  (expect-condition
-    (lambda ()
-      (validate-init-literals
         '((has-position ladder5 misplaced-ladder-site)
-          (traverse-via> climbing misplaced-start ((ladder5)) misplaced-goal))
+          (traverse-via> misplaced-start ((ladder5)) misplaced-goal))
         :checks '(ladder-init-check)))
     'init-check-failure
     :containing "has no listed ladder positioned at its source"
-    :check 'ladder-init-check)
-  (expect-condition
-    (lambda ()
-      (validate-init-literals
-        '((has-position ladder6 unlisted-start)
-          (traverse-via> climbing unlisted-start () unlisted-goal))
-        :checks '(ladder-init-check)))
-    'init-check-failure
-    :containing "Climbing clause NIL"
     :check 'ladder-init-check))
 
 
