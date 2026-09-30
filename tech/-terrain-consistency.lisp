@@ -26,32 +26,37 @@
 ;;;   of the several location pairs whose line of centres passes through it.  So this asks
 ;;;   only that a crossing exist, never where.
 ;;;
-;;;   Zone levels.  Locations in one zone are joined by derived WALKING edges, and
-;;;   ONE-STEP-WALKABLE rejects every one of those that crosses a level change.  A zone
-;;;   holding more than one level is therefore walking-disconnected across that
-;;;   difference unless a level change spans it.  Grouping a zone's locations by level, the
-;;;   groups must be joined; a location whose level has drifted leaves its own group
-;;;   unjoined and is reachable by nothing.
+;;;   Zone levels.  Locations in one zone are joined by derived walk facts only where they
+;;;   share a level: the derivation emits none across a level change.  A zone holding more
+;;;   than one level is therefore walking-disconnected across that difference unless a
+;;;   level change spans it.  Grouping a zone's locations by level, the groups must be
+;;;   joined; a location whose level has drifted leaves its own group unjoined and is
+;;;   reachable by nothing.
 ;;;
-;;; A LEVEL CHANGE, for the last two checks, is an authored STAIRWAY, JUMPING or CLIMBING
-;;; traversal edge, or a floor drive's lift -- a floor-mounted fan or fixed floor blower
-;;; launches its occupants from its own location to its AIMED-AT destination, which is how
-;;; phobia-topo's agent reaches a loft ten units up with no traversal relation authored
-;;; anywhere.  A WALKING edge is not one: the derivation that emits it is elevation-blind,
-;;; and it is precisely the dead edge these checks detect.  Neither is REACH-VIA, which
-;;; -traversal deliberately leaves outside the mode set: reaching across a step moves
-;;; nobody over it.
+;;; A LEVEL CHANGE, for the last two checks, is an authored traversal fact with at least one
+;;; clause of a level-changing kind -- one naming a staircase, an edge or wall, or a ladder
+;;; -- or a floor drive's lift: a floor-mounted fan or fixed floor blower launches its
+;;; occupants from its own location to its AIMED-AT destination, which is how phobia-topo's
+;;; agent reaches a loft ten units up with no traversal relation authored anywhere.  A walk
+;;; clause is not one.  Neither is REACH-VIA, which -traversal deliberately leaves outside
+;;; the traversal relations: reaching across a step moves nobody over it.
 ;;;
 ;;; Same-zone locations at different levels are deliberate, not exceptional, so the zone
 ;;; check is a connectivity condition over level groups rather than an equality:
 ;;; claustro-topo's slab zone holds location11 at 0 and location13 at 3/2, joined by
-;;; a STAIRWAY edge because the slab's west side carries no edge segment on purpose, and
+;;; a staircase clause because the slab's west side carries no edge segment on purpose, and
 ;;; rumin-topo's zone 1 holds three ground locations and two at 3/2, joined by the
-;;; STAIRWAY and JUMPING pair between location2 and location4.  An equality rule would
-;;; reject both.
+;;; staircase-or-edge fact between location2 and location4.  An equality rule would reject
+;;; both.
+;;;
+;;;   Edge fit.  A traversal clause naming an edge claims that edge stands between the
+;;;   fact's two locations, so the edge's grid intervals must flank the source's zone and
+;;;   the destination's.  An edge that does not partition its surroundings flanks one zone
+;;;   on both sides, and then fits any pair inside that zone.  Abstains for an edge with no
+;;;   EDGE-SEGMENT> record.  Runs with the edge-span invariant during initialization.
 ;;;
 ;;; Public WALKABILITY nests this file, so every walking problem receives the edge-span
-;;; invariant automatically.  The two connectivity rules are deliberately not universal:
+;;; invariant and the edge-fit check automatically.  The two connectivity rules are deliberately not universal:
 ;;; a focused model may name locations at different levels specifically to characterize
 ;;; that coordinate-derived WALKING is elevation-blind, without claiming a complete route
 ;;; between them.  TEST-TOPO applies those stronger rules to the five full topology specs.
@@ -61,13 +66,14 @@
 ;;; REQUIRES:
 ;;;   types     : location; edge, declared optional by nested -segment-geometry
 ;;;   nested    : -walkability-coordinates (the arrangement, the TERRAIN-COMPLAINTS seam,
-;;;               and -segment-geometry's EDGE-SEGMENT>); -vertical (BASE, TOP)
+;;;               -segment-geometry's EDGE-SEGMENT>, and -traversal's clause kinds);
+;;;               -vertical (BASE, TOP)
 ;;; PROVIDES:
 ;;;   query     : terrain-complaints  --  overrides -walkability-coordinates' empty
-;;;               default with the edge-span invariant above
+;;;               default with the edge-span invariant and the edge-fit check above
 ;;;   functions : terrain-policy-complaints-for-state  --  the two stronger topology
 ;;;               review policies for TEST-TOPO
-;;;   parameter : *terrain-level-change-modes*
+;;;   parameter : *terrain-level-change-kinds*
 
 (include-tech -walkability-coordinates)
 (include-tech -vertical)
@@ -75,14 +81,13 @@
 (in-package :ww)
 
 
-(defparameter *terrain-level-change-modes*
-  '(stairway jumping climbing)
-  "The traversal modes that carry a mover across a level change.  WALKING is excluded
-   because the derivation emitting it is elevation-blind -- a walking edge across a step is
-   precisely the dead edge these checks detect.  A mode whose technology the problem did not
-   include simply has no facts and contributes nothing, which is why this file needs no
-   dependency on stairs, jump, or ladder.  Floor drives lift their occupants too, and are
-   gathered separately from AIMED-AT rather than from this list.")
+(defparameter *terrain-level-change-kinds*
+  '(stairs jump climb)
+  "The traversal clause kinds that carry a mover across a level change.  WALK is excluded:
+   a walk keeps its endpoints on one level.  A kind whose technology the problem did not
+   include registers no markers, so no clause is ever of that kind, which is why this file
+   needs no dependency on stairs, jump, or ladder.  Floor drives lift their occupants too,
+   and are gathered separately from AIMED-AT rather than from this list.")
 
 
 (define-query terrain-complaints (?arrangement)
@@ -129,10 +134,13 @@
 
 
 (defun terrain-arrangement-invariant-complaints (arrangement edges spans levels)
-  "Complaints where an edge's authored vertical span contradicts its determinate step.
-   This is safe for every walking model and therefore runs during coordinate initialization."
-  (terrain-edge-complaints arrangement edges spans
-                           (terrain-zone-levels arrangement levels)))
+  "Complaints where an edge's authored vertical span contradicts its determinate step, or
+   where an authored traversal clause names an edge that does not stand between its two
+   locations.  Both are safe for every walking model and therefore run during coordinate
+   initialization."
+  (append (terrain-edge-complaints arrangement edges spans
+                                   (terrain-zone-levels arrangement levels))
+          (terrain-edge-fit-complaints arrangement edges)))
 
 
 (defun terrain-arrangement-policy-complaints (arrangement edges levels)
@@ -204,6 +212,54 @@
               (- (cdr (first steps)) (car (first steps)))))))
 
 
+(defun terrain-edge-fit-complaints (arrangement edges)
+  "One complaint per authored traversal clause member that is an edge standing between
+   neither order of its fact's two locations.  Read from the static database like
+   TERRAIN-AUTHORED-LEVEL-CHANGES, where a traversal key is (RELATION SOURCE DESTINATION)
+   and its value the one-element list of the fluent family.  A symmetric fact may be stored
+   under both orders, so complaints are deduplicated by text, which names the pair in a
+   fixed order for that relation."
+  (let ((zone-of (terrain-location-zones arrangement))
+        (complaints nil))
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
+          when (and (consp key) (member (first key) '(traverse-via traverse-via>)))
+            do (dolist (clause (first value))
+                 (dolist (item clause)
+                   (let ((complaint (terrain-edge-fit-complaint
+                                      arrangement key (assoc item edges) zone-of)))
+                     (when complaint
+                       (pushnew complaint complaints :test #'string=))))))
+    (nreverse complaints)))
+
+
+(defun terrain-edge-fit-complaint (arrangement key record zone-of)
+  "The complaint RECORD's edge raises as a member of a clause in the traversal fact stored
+   under KEY, or NIL.  RECORD is NIL when the member is not an edge with a segment, and
+   then there is nothing to check."
+  (destructuring-bind (relation source destination) key
+    (when (and record
+               (gethash source zone-of)
+               (gethash destination zone-of)
+               (notany (lambda (pair)
+                         (terrain-change-spans-pair-p (list source destination) pair zone-of))
+                       (terrain-edge-zone-pairs arrangement record)))
+      (when (and (eq relation 'traverse-via)
+                 (string< (symbol-name destination) (symbol-name source)))
+        (rotatef source destination))
+      (format nil
+              "EDGE ~A is named in a ~(~A~) clause between ~A and ~A, but it does not ~
+               stand between them.~%~
+               ~A lies in zone~P ~{~A~^, ~} and ~A in zone~P ~{~A~^, ~}, while the edge's ~
+               intervals flank the zone pairs ~{~A~^, ~}.~%~
+               Name the edge that separates the two locations, or correct the fact's ~
+               endpoints."
+              (first record) relation source destination
+              source (length (gethash source zone-of)) (gethash source zone-of)
+              destination (length (gethash destination zone-of))
+              (gethash destination zone-of)
+              (terrain-edge-zone-pairs arrangement record)))))
+
+
 (defun terrain-uncrossed-edge-complaints (arrangement edges zone-levels zone-of levels changes)
   "One complaint per edge naming a determinate level step that nothing crosses."
   (loop for record in edges
@@ -224,9 +280,9 @@
                (not (terrain-zone-pairs-crossed-p pairs zone-of changes)))
       (format nil
               "EDGE ~A separates level ~A from level ~A, but nothing crosses it.~%~
-               No STAIRWAY, JUMPING or CLIMBING edge joins a location on one side to a ~
-               location on the other, and no floor drive lifts anything across, so the ~
-               step is there and impassable.~%~
+               No traversal clause naming a staircase, edge, wall or ladder joins a ~
+               location on one side to a location on the other, and no floor drive lifts ~
+               anything across, so the step is there and impassable.~%~
                Locations at level ~A: ~{~A~^, ~}~%~
                Locations at level ~A: ~{~A~^, ~}~%~
                Author a crossing between one of each, or make the segment a WALL if the ~
@@ -318,11 +374,10 @@
                               no authored level change joins level~P ~{~A~^, ~} to the ~
                               rest of the zone.~%~
                               Locations there: ~{~A~^, ~}~%~
-                              Every derived WALKING edge across a level change is dead -- ~
-                              ONE-STEP-WALKABLE rejects a step between levels -- so ~
-                              either the level is wrong, or the crossing needs an ~
-                              authored STAIRWAY, JUMPING or CLIMBING edge, or a floor ~
-                              drive aimed at it."
+                              The walking derivation joins no locations at different ~
+                              levels, so either the level is wrong, or the crossing ~
+                              needs an authored clause naming the staircase, edge, wall ~
+                              or ladder between them, or a floor drive aimed at it."
                              zone present (length unjoined) unjoined
                              (terrain-zone-locations-at zone unjoined levels zone-of))
                      complaints))
@@ -408,16 +463,19 @@
 
 
 (defun terrain-authored-level-changes ()
-  "Every authored traversal that could cross a level change, as (source destination).  Read
-   straight from the static database rather than through relation binds, so a mode the
-   problem's technologies never registered costs nothing here.  A traversal key is
-   (RELATION MODE SOURCE DESTINATION), the fluent payload having been stripped."
+  "Every authored traversal that could cross a level change, as (source destination): a
+   fact with at least one clause of a level-changing kind.  Read straight from the static
+   database rather than through relation binds.  A traversal key is (RELATION SOURCE
+   DESTINATION), the fluent family having been stripped into the value's one element."
   (let ((changes nil))
-    (loop for key being the hash-keys of *static-db*
+    (loop for key being the hash-keys of *static-db* using (hash-value value)
           when (and (consp key)
                     (member (first key) '(traverse-via traverse-via>))
-                    (member (second key) *terrain-level-change-modes*))
-            do (push (list (third key) (fourth key)) changes))
+                    (some (lambda (clause)
+                            (member (first (traversal-clause-profile clause))
+                                    *terrain-level-change-kinds*))
+                          (first value)))
+            do (push (list (second key) (third key)) changes))
     changes))
 
 

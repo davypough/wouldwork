@@ -54,13 +54,14 @@
 
 (define-problem-helper replay-grounded-movement-result
     (state agent source route)
-  "Check every supplied transparent segment before constructing its endpoint."
+  "Check every supplied transparent segment before constructing its endpoint.  A segment
+   need not be the one search would choose, only a legal one: see
+   MOBILITY-SEGMENT-REPLAYABLE-P."
   (unless (and route (eql (second source) 'ground))
     (return-from replay-grounded-movement-result nil))
   (let ((location (first source)))
     (dolist (segment route)
-      (unless (member segment (mobility-provider-segments state agent location)
-                      :test #'equal)
+      (unless (mobility-segment-replayable-p state agent location segment)
         (return-from replay-grounded-movement-result nil))
       (setf location (fourth segment)))
     (unless (eql location (first source))

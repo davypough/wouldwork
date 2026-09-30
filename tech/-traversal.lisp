@@ -1,32 +1,45 @@
 ;;; Filename: -traversal.lisp
 
 ;;; Traversal substrate: one topology relation for every way an agent crosses between two
-;;; locations, replacing the five near-identical relation pairs -- WALK-VIA/WALK-VIA>,
-;;; STAIRS-VIA/STAIRS-VIA>, JUMP-VIA/JUMP-VIA>, CLIMB-VIA> -- and the four near-identical
-;;; provider queries that read them.  What genuinely differed between those technologies
-;;; was never the relation or the iteration; it was one predicate each, and that is all
-;;; each of them registers here now.
+;;; locations.  A fact states what separates the two locations, and nothing else:
 ;;;
-;;;   (traverse-via  <mode> <source> <dnf> <destination>)   symmetric
-;;;   (traverse-via> <mode> <source> <dnf> <destination>)   directed, source first
+;;;   (traverse-via  <source> <dnf> <destination>)   symmetric
+;;;   (traverse-via> <source> <dnf> <destination>)   directed, source first
 ;;;
-;;; Directionality stays in the name, as everywhere else in this domain: the engine
-;;; mirrors a relation whose argument types repeat and whose name does not end in ">", and
-;;; the repeated type here is LOCATION, so prepending the mode leaves the two location
-;;; positions as the mirrored pair.  The mode cannot be bound out of a fact -- a fluentless
-;;; storage key needs every non-fluent argument ground -- so TRAVERSAL-SEGMENTS iterates
-;;; the mode type rather than reading it off the edge.
+;;; The payload is DNF: () means nothing separates the pair; anything else is a list of
+;;; clauses, OR over clauses and AND within one -- the same convention CONTROLS uses.  Every
+;;; way to cross between one pair sits in one fact, so a spec reads like its diagram:
+;;; whatever is drawn between two locations goes in the brackets.
 ;;;
-;;; The payload is DNF everywhere, which is the change that closes the comprehension
-;;; hazard behind the old shape: WALK-VIA read its list as OR-over-clauses while
-;;; STAIRS-VIA, JUMP-VIA and CLIMB-VIA> read theirs as a flat conjunction, and both
-;;; readings accept (), the common case, so the divergence almost never bit.  Now () is
-;;; direct and unguarded, and anything else is a list of clauses: OR over clauses, AND
-;;; within one -- the same convention CONTROLS uses.  A mode picks the first clause its
-;;; own predicate accepts, in canonical order, so an edge can offer alternative routes
-;;; whatever the mode.
+;;; The kind of move is inferred per clause, never authored.  Each kind's technology
+;;; registers its MARKER types, and a clause naming a marker is of that kind -- a ladder
+;;; makes a climb, a staircase a stairway, an edge or a wall a jump -- while a clause naming
+;;; no marker is a walk.  A clause naming markers of two kinds is an authoring error.
+;;; Gates, screens and gears are companions any kind may carry.  Kind is a function of a
+;;; clause's types alone, so the DNF family algebra uses it without a state: a clause
+;;; subsumes another only when both are of the same kind, or a derived walking () would
+;;; erase an authored jump clause and the support transitions that read it.
 ;;;
-;;; REACH-VIA is deliberately not a mode here.  Reaching across a barrier authorizes
+;;; One exception is applied at segment time only.  In a problem whose locations carry bare
+;;; levels rather than LOCATION-COORDS> geometry, a walk-kind clause across a level
+;;; difference is read as a jump -- what an unnamed jumping edge used to mean.  With
+;;; geometry on both endpoints, TRAVERSAL-INIT-CHECK rejects such a clause instead.
+;;;
+;;; STATIC types (staircase, edge) are separators with no state.  They stay in a segment's
+;;; witness, so a printed route shows what it crossed, but TRAVERSAL-CLAUSE-PROFILE removes
+;;; them from the clause's MEANS, which is all a builder hands to a clearance test --
+;;; OBSTACLE-CLEAR and the jump clearance rules know nothing of them.
+;;;
+;;; A fact yields at most one grounded segment: the kinds are tried in
+;;; *TRAVERSAL-KIND-PREFERENCE* order, cheapest first, and within a kind the family's
+;;; clauses in canonical order.  Support transitions, which are not segments, read every
+;;; clause of their own kind through TRAVERSAL-FAMILY-KIND-CLAUSES.
+;;;
+;;; Directionality stays in the name, as everywhere else in this domain: the engine mirrors
+;;; a relation whose argument types repeat and whose name does not end in ">", and the
+;;; repeated type here is LOCATION.
+;;;
+;;; REACH-VIA is deliberately not a traversal.  Reaching across a barrier authorizes
 ;;; manipulation, not movement: REACHABLE is no mobility provider, applies no elevation or
 ;;; distance test, and its payload means "these gates must be open" rather than "these
 ;;; obstacles must be passable for the mover".  Folding it in would put a relation that
@@ -36,17 +49,19 @@
 ;;;   types     : agent, location
 ;;;   nested    : -mobility (the provider registry) alone.  This file calls no obstacle,
 ;;;               threat or elevation rule of its own -- every one of those lives in a
-;;;               mode's builder, and that mode's technology nests what it needs.  The
-;;;               clause types the init check validates against likewise come from
-;;;               whichever technology registered the mode
+;;;               kind's builder, and that kind's technology nests what it needs.  The one
+;;;               elevation read, for the bare-level jump reading, is made only when jump
+;;;               is registered, and jump nests -vertical
 ;;; PROVIDES:
-;;;   types     : traversal-mode (walking stairway jumping climbing)
-;;;   relations : (traverse-via traversal-mode location $list location),
-;;;               (traverse-via> traversal-mode location $list location)
+;;;   relations : (traverse-via location $list location),
+;;;               (traverse-via> location $list location)
 ;;;   queries   : traversal-segments  --  the single mobility provider, cached;
-;;;               traversal-segments-for-source  --  the computation behind it
+;;;               traversal-segments-for-source  --  the computation behind it;
+;;;               traversal-pair-families
+;;;   acceptor  : traversal-segment-replayable-p, registered with -mobility for replay
 ;;;   init      : traversal-init-check
-;;;   functions : register-traversal-mode, register-traversal-cache-parameter, and the
+;;;   functions : register-traversal-kind, register-traversal-cache-parameter,
+;;;               traversal-clause-profile, traversal-family-kind-clauses, and the
 ;;;               canonical DNF family algebra the coordinate zone-graph derivation in
 ;;;               -walkability-coordinates uses
 
@@ -55,55 +70,119 @@
 (in-package :ww)
 
 
-(define-types
-  traversal-mode (walking stairway jumping climbing))
-
-
 (define-static-relations
-  (traverse-via traversal-mode location $list location)  ;symmetric traversal edge; $list = DNF clauses: () direct, else OR over clauses, AND within
-  (traverse-via> traversal-mode location $list location))  ;directed traversal edge, source first, same $list convention
+  (traverse-via location $list location)  ;symmetric; $list = DNF clauses of separators: () direct, else OR over clauses, AND within
+  (traverse-via> location $list location))  ;directed, source first, same $list convention
 
 
-;;;; MODE REGISTRY ;;;;
-;;;; A mode's technology registers the one predicate that distinguishes it, so this file
-;;;; names no gate, ladder, box or elevation rule of its own, and a problem including only
-;;;; some of the technologies simply has fewer modes registered.
+;;;; KIND REGISTRY ;;;;
+;;;; A kind's technology registers its builder and the types its clauses may name, so this
+;;;; file names no gate, ladder, staircase, edge or elevation rule of its own, and a
+;;;; problem including only some of the technologies simply has fewer kinds registered.
 
 
-(defparameter *traversal-modes* nil
-  "Registered (MODE BUILDER OBSTACLE-TYPES) entries for the staged problem.  DEFPARAMETER
-   rather than DEFVAR so the list resets each time a problem is respliced and loaded.")
+(defparameter *traversal-kind-preference* '(walk stairs climb jump)
+  "Every traversal kind, in the order a fact's grounded segment prefers them: cheapest
+   first.  Registration order is irrelevant; this list alone decides.")
 
 
-(define-problem-helper register-traversal-mode (mode builder obstacle-types)
-  "Register MODE's segment builder and the object types its payload clauses may name.
+(defparameter *traversal-kinds* nil
+  "Registered (KIND BUILDER MARKER-TYPES STATIC-TYPES PERMITTED-TYPES) entries for the
+   staged problem.  PERMITTED-TYPES is the union of the markers, the static types and the
+   companions.  DEFPARAMETER rather than DEFVAR so the list resets each time a problem is
+   respliced and loaded.")
+
+
+(define-problem-helper register-traversal-kind
+    (kind builder marker-types static-types companion-types)
+  "Register KIND's segment builder and the object types its clauses may name.  A clause
+   naming a member of MARKER-TYPES is of KIND; STATIC-TYPES are stateless separators kept
+   in the witness but removed from the means; COMPANION-TYPES may accompany the markers.
    BUILDER is called as (BUILDER state agent source destination clause) and returns a
    normalized (label source witness destination) segment, or NIL when that clause does not
-   permit the crossing.  Registering a mode twice, or one outside TRAVERSAL-MODE, is an
-   authoring error rather than a silent overwrite."
-  (reject-worker-read-write 'register-traversal-mode)
-  (unless (member mode (gethash 'traversal-mode *types*))
-    (error "Traversal mode must be an instance of TRAVERSAL-MODE: ~S" mode))
-  (when (assoc mode *traversal-modes*)
-    (error "Traversal mode is registered more than once: ~S" mode))
-  (setf *traversal-modes*
-        (append *traversal-modes* (list (list mode builder obstacle-types))))
-  mode)
+   permit the crossing.  Registering a kind twice, or one outside
+   *TRAVERSAL-KIND-PREFERENCE*, is an authoring error rather than a silent overwrite."
+  (reject-worker-read-write 'register-traversal-kind)
+  (unless (member kind *traversal-kind-preference*)
+    (error "Traversal kind must be one of ~S: ~S" *traversal-kind-preference* kind))
+  (when (assoc kind *traversal-kinds*)
+    (error "Traversal kind is registered more than once: ~S" kind))
+  (setf *traversal-kinds*
+        (append *traversal-kinds*
+                (list (list kind builder marker-types static-types
+                            (union marker-types (union static-types companion-types))))))
+  kind)
 
 
-(define-problem-helper traversal-mode-entry (mode)
-  "MODE's registry entry, or an error naming the technology the problem is missing."
-  (or (assoc mode *traversal-modes*)
-      (error "~%No technology registers the traversal mode ~S.~%~
-              Registered modes: ~S~%~
-              A traverse-via fact naming a mode means including the technology that owns ~
-              it -- walkability, stairs, jump, or ladder."
-             mode (mapcar #'first *traversal-modes*))))
+;;;; CLAUSE KINDS ;;;;
+
+
+(defparameter *traversal-clause-profiles*
+  (make-hash-table :test #'equal)
+  "Maps a clause to its (KIND MEANS) profile.  Both depend only on the clause's types, so
+   each distinct clause is classified once per staged problem.")
+
+
+(define-problem-helper traversal-clause-profile (clause)
+  "CLAUSE's (KIND MEANS): KIND by its marker types, WALK when it names none; MEANS the
+   clause without its static separators, in the clause's own order.  A clause mixing two
+   kinds' markers is rejected by TRAVERSAL-INIT-CHECK before any profile is asked for."
+  (multiple-value-bind (profile present) (gethash clause *traversal-clause-profiles*)
+    (if present
+      profile
+      (setf (gethash clause *traversal-clause-profiles*)
+            (let ((kinds (traversal-clause-marker-kinds clause))
+                  (statics (loop for entry in *traversal-kinds* append (fourth entry))))
+              (when (rest kinds)
+                (error "Traversal clause ~S names the separators of ~S." clause kinds))
+              (list (or (first kinds) 'walk)
+                    (remove-if (lambda (item)
+                                 (init-member-of-any-type-p item statics))
+                               clause)))))))
+
+
+(defun traversal-clause-marker-kinds (clause)
+  "The registered kinds, in preference order, whose marker types some member of CLAUSE
+   belongs to.  WALK registers no markers, so it never appears here."
+  (loop for kind in *traversal-kind-preference*
+        for entry = (assoc kind *traversal-kinds*)
+        when (and entry
+                  (some (lambda (item)
+                          (init-member-of-any-type-p item (third entry)))
+                        clause))
+          collect kind))
+
+
+(define-problem-helper traversal-clause-segment-kind (state source destination clause)
+  "CLAUSE's kind for a crossing from SOURCE to DESTINATION: its profile kind, except that a
+   walk across a level difference is read as a jump when jump is registered.  Only a
+   bare-level problem can reach that exception: with LOCATION-COORDS> on both endpoints
+   TRAVERSAL-INIT-CHECK rejects the authored clause, and the coordinate derivation never
+   emits one."
+  (let ((kind (first (traversal-clause-profile clause))))
+    (if (and (eq kind 'walk)
+             (assoc 'jump *traversal-kinds*)
+             (/= (funcall (symbol-function 'location-elevation) state source)
+                 (funcall (symbol-function 'location-elevation) state destination)))
+      'jump
+      kind)))
+
+
+(define-problem-helper traversal-family-kind-clauses
+    (state source destination family kind)
+  "FAMILY's canonical clauses whose segment kind from SOURCE to DESTINATION is KIND.  An
+   empty family is the direct case and offers the single empty clause."
+  (remove-if-not (lambda (clause)
+                   (eq (traversal-clause-segment-kind state source destination clause)
+                       kind))
+                 (if family
+                   (traversal-canonical-family family)
+                   (list nil))))
 
 
 ;;;; CANONICAL DNF FAMILY ALGEBRA ;;;;
-;;;; A family is an antichain of obstacle clauses: OR over clauses, AND within each.
-;;;; Shared by the clause selection below and by -walkability-coordinates' zone
+;;;; A family is an antichain of separator clauses within each kind: OR over clauses, AND
+;;;; within each.  Shared by the segment choice below and by -walkability-coordinates' zone
 ;;;; graph, which builds families by extension and union rather than by authoring.
 
 
@@ -132,14 +211,18 @@
 
 
 (defun traversal-minimize-family (family)
-  ;; Canonical clauses, duplicates removed, and every nonminimal superset discarded.
+  ;; Canonical clauses, duplicates removed, and every nonminimal superset of the same kind
+  ;; discarded.  A subset of another kind subsumes nothing: () walks, (edge2) jumps, and
+  ;; both crossings must survive.
   (let* ((clauses (remove-duplicates
                     (mapcar #'traversal-canonical-clause family)
                     :test #'equal))
          (minimal (remove-if (lambda (clause)
                                (some (lambda (other)
                                        (and (not (equal other clause))
-                                            (subsetp other clause)))
+                                            (subsetp other clause)
+                                            (eq (first (traversal-clause-profile other))
+                                                (first (traversal-clause-profile clause)))))
                                      clauses))
                              clauses)))
     (sort (copy-list minimal) #'traversal-clause-precedes-p)))
@@ -178,19 +261,22 @@
 
 
 (define-problem-helper traversal-segment-for-family
-    (state agent mode source destination family)
-  "The first segment MODE's builder accepts over FAMILY's clauses, in canonical order, or
-   NIL.  An empty family is the direct case and offers the single empty clause, so a mode
-   whose crossing needs no obstacle still gets exactly one attempt -- and the builders read
-   an empty clause as trivially clear, exactly as ALL-CLEAR does."
-  (let ((builder (second (traversal-mode-entry mode))))
-    (loop for clause in (if family
-                          (traversal-canonical-family family)
-                          (list nil))
-          for segment = (funcall (symbol-function builder)
-                                 state agent source destination clause)
-          when segment
-            return segment)))
+    (state agent source destination family)
+  "The one grounded segment FAMILY offers from SOURCE to DESTINATION, or NIL: the first
+   segment a registered builder accepts, trying kinds in *TRAVERSAL-KIND-PREFERENCE* order
+   and each kind's clauses in canonical order."
+  (loop for kind in *traversal-kind-preference*
+        for entry = (assoc kind *traversal-kinds*)
+        for segment = (and entry
+                           (loop for clause in (traversal-family-kind-clauses
+                                                 state source destination family kind)
+                                 for candidate = (funcall (symbol-function (second entry))
+                                                          state agent source destination
+                                                          clause)
+                                 when candidate
+                                   return candidate))
+        when segment
+          return segment))
 
 
 ;;;; SEGMENT CACHE ;;;;
@@ -211,7 +297,7 @@
 ;;;; move and destroy the hit rate.  *TRAVERSAL-CACHE-PARANOID* exists to hold the argument
 ;;;; to account: see the file's companion note in claude/traversal-caching-plan.md.
 ;;;;
-;;;; Adding a mode, an obstacle kind, or an override that reads a dynamic relation means
+;;;; Adding a kind, a separator type, or an override that reads a dynamic relation means
 ;;;; adding that relation here.  Run a full suite under the paranoid special afterwards.
 
 (defvar *traversal-cache-enabled* t
@@ -226,8 +312,8 @@
    check on *TRAVERSAL-STATE-DEPENDENCIES* being complete, and on the returned lists being
    treated as read-only by their callers; a run under it is roughly three times slower.
    DEFVAR for the same reason as *TRAVERSAL-CACHE-ENABLED*, and it matters more here --
-   (TEST-TALOS) stages 102 problems, and a DEFPARAMETER would have been reset to NIL by the
-   first of them, leaving the whole suite silently unchecked.")
+   (TEST-TALOS) stages over a hundred problems, and a DEFPARAMETER would have been reset to
+   NIL by the first of them, leaving the whole suite silently unchecked.")
 
 
 (defparameter *traversal-state-dependencies*
@@ -265,8 +351,8 @@
 
 (define-problem-helper register-traversal-cache-parameter (symbol)
   "Declare that a builder reads SYMBOL's value, so the cache key carries it.  A separate
-   registrar rather than a fifth argument to REGISTER-TRAVERSAL-MODE: the parameter belongs
-   to the technology that reads it, and not every mode has one."
+   registrar rather than a sixth argument to REGISTER-TRAVERSAL-KIND: the parameter belongs
+   to the technology that reads it, and not every kind has one."
   (reject-worker-read-write 'register-traversal-cache-parameter)
   (register-worker-read-configuration symbol)
   (pushnew symbol *traversal-cache-parameters* :test #'eq)
@@ -342,42 +428,82 @@
 
 
 (define-query traversal-segments-for-source (?agent agent ?from location)
-  ;; Every mode's symmetric and directed edges out of ?FROM, each reduced to at most one
-  ;; segment.  The mode is iterated rather than bound because a fluentless key needs it
-  ;; ground; four binds per location pair replaces the eight the four separate providers
-  ;; used to make.
+  ;; The symmetric and directed facts out of ?FROM, each reduced to at most one segment.
+  ;; Two binds per location pair, where the mode loop this replaces made eight.
   (do (assign $segments nil)
-      (doall (?mode traversal-mode)
-        (doall (?to location)
-          (do (assign $symmetric nil)
-              (assign $directed nil)
-              (if (bind (traverse-via ?mode ?from $symmetric-family ?to))
-                (assign $symmetric
-                        (traversal-segment-for-family
-                          state ?agent ?mode ?from ?to $symmetric-family)))
-              (if (bind (traverse-via> ?mode ?from $directed-family ?to))
-                (assign $directed
-                        (traversal-segment-for-family
-                          state ?agent ?mode ?from ?to $directed-family)))
-              (if $symmetric
-                (assign $segments (cons $symmetric $segments)))
-              (if $directed
-                (assign $segments (cons $directed $segments))))))
+      (doall (?to location)
+        (do (assign $symmetric nil)
+            (assign $directed nil)
+            (if (bind (traverse-via ?from $symmetric-family ?to))
+              (assign $symmetric
+                      (traversal-segment-for-family
+                        state ?agent ?from ?to $symmetric-family)))
+            (if (bind (traverse-via> ?from $directed-family ?to))
+              (assign $directed
+                      (traversal-segment-for-family
+                        state ?agent ?from ?to $directed-family)))
+            (if $symmetric
+              (assign $segments (cons $symmetric $segments)))
+            (if $directed
+              (assign $segments (cons $directed $segments)))))
       $segments))
 
 
 (register-mobility-provider 'traversal-segments)
 
 
+;;;; REPLAY ACCEPTANCE ;;;;
+;;;; A fact yields one grounded segment in search, but a replayed MOVE may cross by any
+;;;; clause of the pair's fact that succeeds in that state (decision D6): a hand-written
+;;;; (jump location13 (edge3) location17) is legal even though search would take the stairs.
+
+
+(define-problem-helper traversal-segment-replayable-p (state agent source segment)
+  "True when some clause of a traversal fact from SOURCE to SEGMENT's destination, run
+   through the builder of its own kind, produces exactly SEGMENT -- the same label and the
+   same witness.  A clause whose kind no technology registered offers nothing."
+  (let ((destination (fourth segment)))
+    (loop for family in (funcall (symbol-function 'traversal-pair-families)
+                                 state source destination)
+          thereis (loop for clause in (if family
+                                        (traversal-canonical-family family)
+                                        (list nil))
+                        for entry = (assoc (traversal-clause-segment-kind
+                                             state source destination clause)
+                                           *traversal-kinds*)
+                        thereis (and entry
+                                     (equal segment
+                                            (funcall (symbol-function (second entry))
+                                                     state agent source destination
+                                                     clause)))))))
+
+
+(define-query traversal-pair-families (?from location ?to location)
+  ;; The families of the symmetric and directed facts from ?FROM to ?TO, one entry per fact
+  ;; present.  A fact whose family is () contributes NIL, which the caller reads as the
+  ;; single empty clause.
+  (do (assign $families nil)
+      (if (bind (traverse-via ?from $symmetric-family ?to))
+        (push $symmetric-family $families))
+      (if (bind (traverse-via> ?from $directed-family ?to))
+        (push $directed-family $families))
+      $families))
+
+
+(register-mobility-replay-acceptor 'traversal-segment-replayable-p)
+
+
 ;;;; INITIALIZATION VALIDATION ;;;;
 
 
 (define-init-check traversal-init-check (literals)
-  (:consumes gate screen ladder wall gears
+  (:consumes gate screen ladder wall edge staircase gears
              floor-gears wall-gears angled-gears
              floor-blower wall-blower angled-blower)
   (check-init-traversal-endpoints literals)
-  (check-init-traversal-payloads literals))
+  (check-init-traversal-payloads literals)
+  (check-init-traversal-duplicates literals)
+  (check-init-traversal-levels literals))
 
 
 (define-init-check-helper check-init-traversal-endpoints (literals)
@@ -386,9 +512,9 @@
    set of the closure."
   (dolist (relation '(traverse-via traverse-via>))
     (dolist (literal (positive-init-literals-with-relation relation literals))
-      (destructuring-bind (mode source clauses destination)
+      (destructuring-bind (source family destination)
           (rest (init-literal-proposition literal))
-        (declare (ignore mode clauses))
+        (declare (ignore family))
         (when (eql source destination)
           (fail-init-check literal
             "Traversal source and destination are the same location: ~S.  Mobility is already reflexive; remove the self-loop or correct an endpoint."
@@ -396,21 +522,89 @@
 
 
 (define-init-check-helper check-init-traversal-payloads (literals)
-  "Every traversal payload is DNF, and each clause item must belong to a type the mode's
-   own technology registered -- a wall is vaultable on a jumping edge but means nothing on
-   a walking one, so the permitted set is per mode rather than shared.  A fact naming an
-   unregistered mode fails here, which is what catches a JUMPING edge in a problem that
-   never included jump."
+  "Every traversal payload is DNF over the separator types some registered kind permits,
+   and each clause is checked against its own kind by CHECK-INIT-TRAVERSAL-CLAUSE."
+  (let ((permitted (remove-duplicates
+                     (loop for entry in *traversal-kinds* append (fifth entry)))))
+    (dolist (relation '(traverse-via traverse-via>))
+      (dolist (literal (init-literals-with-relation relation literals))
+        (let ((family (third (init-literal-proposition literal))))
+          (init-check-dnf-list-items-have-types literal family permitted)
+          (dolist (clause (or family (list nil)))
+            (check-init-traversal-clause literal clause)))))))
+
+
+(define-init-check-helper check-init-traversal-clause (literal clause)
+  "One clause is one way across, so it may name the markers of one kind only, and every
+   member must be a type that kind permits -- a wall is vaultable in a jump but means
+   nothing beside a staircase.  A walk-kind clause needs walking, or jump for the
+   bare-level reading, to be registered."
+  (let* ((kinds (traversal-clause-marker-kinds clause))
+         (entry (assoc (or (first kinds) 'walk) *traversal-kinds*)))
+    (when (rest kinds)
+      (fail-init-check literal
+        "Clause ~S mixes the separators of ~{~(~A~)~^ and ~} crossings.  One clause is one way across; give each its own alternative clause."
+        clause kinds))
+    (if entry
+      (init-check-list-items-have-types literal clause (fifth entry))
+      (unless (assoc 'jump *traversal-kinds*)
+        (fail-init-check literal
+          "Clause ~S is a walk, but no included technology registers walking.  Include walkability, or name the staircase, edge or ladder that makes it another kind."
+          clause)))))
+
+
+(define-init-check-helper check-init-traversal-duplicates (literals)
+  "Each location pair is authored at most once per relation, holding every way across in
+   one family.  A symmetric pair is the same pair in either order.  Merging silently would
+   hide an authoring slip, so the rejection shows the family to write instead."
   (dolist (relation '(traverse-via traverse-via>))
-    (dolist (literal (init-literals-with-relation relation literals))
-      (destructuring-bind (mode source clauses destination)
-          (rest (init-literal-proposition literal))
-        (declare (ignore source destination))
-        (init-check-dnf-list-items-have-types
-          literal clauses (third (traversal-mode-entry mode)))))))
+    (let ((seen (make-hash-table :test #'equal)))
+      (dolist (literal (positive-init-literals-with-relation relation literals))
+        (destructuring-bind (source family destination)
+            (rest (init-literal-proposition literal))
+          (let* ((key (if (and (eq relation 'traverse-via)
+                               (string< (symbol-name destination) (symbol-name source)))
+                        (list destination source)
+                        (list source destination)))
+                 (prior (gethash key seen)))
+            (when prior
+              (fail-init-check literal
+                "Traversal pair ~S ~S is authored twice under ~S.  Author it once, with the combined family ~S.~%First literal: ~S"
+                source destination relation
+                (traversal-normalize-family
+                  (traversal-minimize-family
+                    (append (or (third (init-literal-proposition prior)) (list nil))
+                            (or family (list nil)))))
+                prior))
+            (setf (gethash key seen) literal)))))))
+
+
+(define-init-check-helper check-init-traversal-levels (literals)
+  "A walk-kind clause keeps its endpoints on one level.  When both endpoints take their
+   level from LOCATION-COORDS> and the levels differ, the clause must name the staircase,
+   edge or ladder that separates them.  Without coordinates on both ends the clause is left
+   to the bare-level jump reading of TRAVERSAL-CLAUSE-SEGMENT-KIND."
+  (let ((levels (init-literal-map 'location-coords> literals 1 4)))
+    (dolist (relation '(traverse-via traverse-via>))
+      (dolist (literal (positive-init-literals-with-relation relation literals))
+        (destructuring-bind (source family destination)
+            (rest (init-literal-proposition literal))
+          (multiple-value-bind (source-level source-present) (gethash source levels)
+            (multiple-value-bind (destination-level destination-present)
+                (gethash destination levels)
+              (when (and source-present
+                         destination-present
+                         (/= source-level destination-level))
+                (dolist (clause (or family (list nil)))
+                  (unless (traversal-clause-marker-kinds clause)
+                    (fail-init-check literal
+                      "Walk clause ~S joins ~S at level ~S to ~S at level ~S.  Name the staircase, edge or ladder that separates them."
+                      clause source source-level destination destination-level)))))))))))
+
 
 (register-worker-read-memo '*traversal-canonical-families* :empty-table)
+(register-worker-read-memo '*traversal-clause-profiles* :empty-table)
 (register-worker-read-memo '*traversal-dependency-key-cache* :empty-table)
-(register-worker-read-memo '*traversal-segment-cache* :empty-table)                           ; CHANGED
+(register-worker-read-memo '*traversal-segment-cache* :empty-table)
 (register-worker-read-configuration '*traversal-state-dependencies*
-                                    '*traversal-cache-parameters* '*traversal-modes*)
+                                    '*traversal-cache-parameters* '*traversal-kinds*)

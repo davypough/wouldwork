@@ -423,8 +423,7 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
     (dolist (location locations)
       (setf (gethash (list location location) routes) (list nil)))
     (dolist (record records)
-      (destructuring-bind (relation mode from family to) record
-        (declare (ignore mode))
+      (destructuring-bind (relation from family to) record
         (topo-relaxed-add-route-family routes from to family)
         (when (eq relation 'traverse-via)
           (topo-relaxed-add-route-family routes to from family))))

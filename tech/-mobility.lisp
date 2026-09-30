@@ -2,20 +2,32 @@
 
 ;;; Mobility substrate: composes pure traversal providers into a canonical transparent
 ;;; movement closure.  Providers return normalized segments of the form
-;;; (mode source witness destination).  MOBILITY-RESULTS returns
+;;; (label source witness destination).  MOBILITY-RESULTS returns
 ;;; (destination route) pairs, including (source nil) for reflexivity.
+;;;
+;;; A provider offers one canonical segment per crossing, but a replayed MOVE may name a
+;;; different legal one -- a jump where search would prefer the stairs beside it.  A
+;;; technology that can judge such a segment registers a replay acceptor, and
+;;; MOBILITY-SEGMENT-REPLAYABLE-P consults the acceptors only when the provider segments do
+;;; not already contain it.  Search never calls them.
 ;;;
 ;;; REQUIRES:
 ;;;   types    : agent, location
 ;;; PROVIDES:
 ;;;   queries  : mobility-results, mobility-locations, traversable
-;;;   functions: register-mobility-provider and canonical closure helpers
+;;;   functions: register-mobility-provider, register-mobility-replay-acceptor,
+;;;              mobility-segment-replayable-p, and canonical closure helpers
 
 (in-package :ww)
 
 
 (defparameter *mobility-providers* nil
   "Problem-local query names that return traversal segments from one source.")
+
+
+(defparameter *mobility-replay-acceptors* nil
+  "Problem-local helper names, each called as (ACCEPTOR state agent source segment), that
+   accept a replayed segment no provider offers in that state.")
 
 
 (defparameter *mobility-route-keys* (make-hash-table :test #'equal)
@@ -30,6 +42,22 @@
     (error "Mobility provider must name an installed query: ~S" provider))
   (pushnew provider *mobility-providers* :test #'eq)
   provider)
+
+
+(define-problem-helper register-mobility-replay-acceptor (acceptor)
+  "Register a problem helper that accepts replayed segments no provider offers."
+  (reject-worker-read-write 'register-mobility-replay-acceptor)
+  (pushnew acceptor *mobility-replay-acceptors* :test #'eq)
+  acceptor)
+
+
+(define-problem-helper mobility-segment-replayable-p (state agent source segment)
+  "True when SEGMENT is a legal crossing out of SOURCE in STATE: one a provider offers, or,
+   failing that, one some registered replay acceptor accepts."
+  (or (member segment (mobility-provider-segments state agent source) :test #'equal)
+      (some (lambda (acceptor)
+              (funcall (symbol-function acceptor) state agent source segment))
+            *mobility-replay-acceptors*)))
 
 
 (define-problem-helper mobility-route-key (route)
@@ -142,4 +170,4 @@
   (not (null (assoc ?to (mobility-results ?agent ?from) :test #'eq))))
 
 (register-worker-read-memo '*mobility-route-keys* :empty-table)
-(register-worker-read-configuration '*mobility-providers*)
+(register-worker-read-configuration '*mobility-providers* '*mobility-replay-acceptors*)

@@ -1,6 +1,6 @@
 # Separator-based traversal — implementation plan
 
-Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phase 0 closed 2026-09-29; Phase 1 next.
+Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0 and 1 closed 2026-09-29; Phase 2 next.
 Base test case: probs/problem-rumin-topo.lisp. Then claustro-topo, corner-topo, crelay-topo;
 phobia-topo and windtunnel-topo author no traverse-via facts but must still stage.
 Implementation happens in a fresh session. Work one phase at a time; D reloads with
@@ -229,6 +229,52 @@ Migrate rumin-topo (facts in section 1; add `staircase (staircase1 staircase2 st
 to its types). Acceptance: `(stage rumin-topo)` succeeds with no init complaints;
 a hand-written replay of each rumin crossing in section 5 validates; `*traversal-cache-paranoid*`
 run of a short rumin search shows no stale entries.
+
+Phase 1 result (2026-09-29, done):
+- `(stage rumin-topo)` stages with no init complaints.  First stage after the change printed
+  four `redefining ... in DEFUN` warnings for the new plain DEFUNs
+  (TRAVERSAL-CLAUSE-MARKER-KINDS, WALKABILITY-COORDINATES-MERGE-FAMILY,
+  TERRAIN-EDGE-FIT-COMPLAINT(S)): the prescan stubs any DEFUN absent from the previously
+  loaded src/problem.lisp.  One-time only; gone on the next reload + stage.
+- `test/rumin-separator-replay.lisp` (new; loads and stages rumin-topo itself): 16
+  hand-written MOVE cases, 10 legal and 6 illegal, plus the preferred-segment checks.
+  PASS.  Grounded mobility from location13 is `((STAIRS LOCATION13 (STAIRCASE2) LOCATION17)
+  (WALK LOCATION13 NIL LOCATION4))`.
+- `*traversal-cache-paranoid*` rumin search at depth 8: no stale entries.
+- Files changed: tech/-traversal.lisp (rewritten), walkability.lisp, stairs.lisp, jump.lisp,
+  ladder.lisp, -walkability-coordinates.lisp, -terrain-consistency.lisp, -mobility.lisp,
+  -mobility-action.lisp, topo-lower-bound.lisp; probs/problem-rumin-topo.lisp.
+- Implementation choices beyond the plan text:
+  - Registry entry is (KIND BUILDER MARKER-TYPES STATIC-TYPES PERMITTED-TYPES).  Kind is
+    decided by marker types alone (walk = no marker), so the family algebra is kind-aware
+    without a state; *TRAVERSAL-KIND-PREFERENCE* = (walk stairs climb jump) fixes D5.
+    Registrations: walk (no markers; gate screen gears), stairs (staircase, static),
+    climb (ladder), jump (edge static, wall; gate screen).
+  - Static separators (staircase, edge) stay in the segment witness but are removed from
+    the means handed to clearance tests (TRAVERSAL-CLAUSE-PROFILE).
+  - D2's bare-level reading is applied at segment time (TRAVERSAL-CLAUSE-SEGMENT-KIND);
+    the coords case is init check 5 in -traversal.
+  - Walk and stairs clauses may no longer name a ladder: any clause with a ladder is a climb.
+  - Ladder init check now applies per climb clause (CHECK-INIT-CLIMBING-CLAUSES): a
+    directed fact may mix a climb clause with clauses of other kinds.
+  - Init check 4 (edge fit) lives in -terrain-consistency with the edge-span invariant,
+    since only it has the zone arrangement.
+  - D6 goes through a replay-acceptor registry in -mobility, because step.lisp includes
+    -mobility-action without any traversal technology.  Grounded segments only: a
+    hand-written support transition must still be the provider's first choice.
+  - topo-lower-bound.lisp's one destructuring fix moved from Phase 4 into Phase 1 (rumin
+    includes it).  Its relaxation keeps only gates, so staircases, edges and ladders are
+    free crossings there, as ladders already were.
+- Behaviour changes to expect later:
+  - rumin's location2/location4 fact gains the (edge1) jump the old spec had commented
+    out; only the downward jump is within reach.
+  - The walking derivation no longer emits cross-level walk facts, so TEST-TOPO's
+    TRAVERSE-VIA rows change (re-record in Phase 3, with this as the cause).
+  - -support-elevation's jump relevance diagnostic sees no jump facts until Phase 4.
+  - Phase 2 test files to watch: problem-terrain-consistency-test (lines 186, 264-278 use
+    *TERRAIN-LEVEL-CHANGE-MODES* and the old key layout); problem-traversal-substrate-test
+    (REGISTER-TRAVERSAL-MODE, *TRAVERSAL-MODES*).
+- PHASE 1 CLOSED 2026-09-29.  Next session starts Phase 2.
 
 Phase 2 — unit tests. Migrate the test files in section 8 and add the new test problem.
 Acceptance: `(test-talos)` matches the Phase 0 baseline plus the new test.

@@ -1,14 +1,15 @@
 ;;; Filename: -walkability-coordinates.lisp
 
-;;; Walkability coordinates substrate: derives the WALKING traversal edges (and, for
+;;; Walkability coordinates substrate: derives the walk-kind traversal facts (and, for
 ;;; rides into an air stream's destination, their directed form) from raw segment
 ;;; geometry, for a problem that
 ;;; would rather author 2D positions than hand-list which locations can walk to which.
 ;;; Nested under public walkability and under -stream-passability; entirely inert unless
 ;;; the problem actually asserts WALL-SEGMENT>, EDGE-SEGMENT>, or BOUNDARY-WALL -- a
-;;; problem that hand-authors its walking edges directly is unaffected.  Edge segments block
+;;; problem that hand-authors its walking facts directly is unaffected.  Edge segments block
 ;;; walking exactly like wall segments -- both feed the same solids list below.  LOS gives
-;;; edges finite height, but walking remains elevation-blind and jumping excludes edges.
+;;; edges finite height; walking stays elevation-blind here, and an authored clause naming
+;;; an edge is a jump across it.
 ;;;
 ;;; Walking connectivity is a region-adjacency question.  Every wall/gate/window/screen
 ;;; segment and boundary edge is axis-aligned (a diagonal one is an authoring mistake,
@@ -74,11 +75,17 @@
 ;;; elevated platform's ground-level footprint as wall or edge segments (edge is the
 ;;; better fit -- it is precisely the vertical surface between two different-elevation
 ;;; regions), keep the platform's own locations inside that footprint, and connect the
-;;; levels only with authored STAIRWAY, JUMPING, or CLIMBING edges (which this
-;;; derivation never touches); ONE-STEP-WALKABLE's
-;;; elevation-equality check rejects any derived edge between different levels, including
-;;; two distinct locations sharing the same x/y point.  See problem-claustro-topo's slab
-;;; (edge1/edge2) and problem-phobia-topo's location10/location11 pair for the patterns.
+;;; levels only with authored clauses naming the staircase, edge or ladder between them.
+;;; The derivation emits nothing for a pair at different levels -- walking could never use
+;;; it, including two distinct locations sharing the same x/y point, and a walk clause
+;;; there would be read as a jump in a bare-level reading.  See problem-claustro-topo's
+;;; slab (edge1/edge2) and problem-phobia-topo's location10/location11 pair for the
+;;; patterns.
+;;;
+;;; A derived family for a pair that already has an authored fact in the same relation is
+;;; unioned into that fact rather than asserted beside it: one fact per pair per relation.
+;;; The union is kind-aware (see -traversal), so a derived () walk never absorbs an authored
+;;; jump or stairs clause.
 ;;;
 ;;; Reuses LOCATION-COORDS> (nested from -location-coordinates, shared with
 ;;; visibility's -beam-los-coordinates substrate) for location coordinates.  Reuses the
@@ -95,13 +102,14 @@
 ;;;               requires; screen declared optional by nested -passability, spliced by
 ;;;               walkability.lisp before this file
 ;;;   nested    : -traversal (traverse-via/traverse-via> and the DNF family algebra);
-;;;               -location-coordinates (LOCATION-COORDS>); -vertical (BASE and TOP,
-;;;               used only to recognize a door supported above a coincident wall/edge)
+;;;               -location-coordinates (LOCATION-COORDS>); -vertical (BASE and TOP, to
+;;;               recognize a door supported above a coincident wall/edge, and
+;;;               LOCATION-ELEVATION, to skip pairs at different levels)
 ;;; PROVIDES:
 ;;;   relations : wall-segment>, edge-segment>, gate-segment>, window-segment>,
 ;;;               screen-segment>, boundary-wall  --  default to no facts; a problem
 ;;;               that asserts wall-segment>, edge-segment>, or boundary-wall gets its
-;;;               WALKING traversal edges derived automatically rather than authored
+;;;               walk-kind traversal facts derived automatically rather than authored
 ;;;   queries   : walkability-coordinates-stream-specs  --  default no streams;
 ;;;               redefined by -stream-passability where wall blowers exist;
 ;;;               walkability-coordinates-supported-door-solid-pairs -- vertical
@@ -728,16 +736,25 @@
 ;;;; INITIALIZATION ;;;;
 
 
+(defun walkability-coordinates-merge-family (authored derived)
+  "The one family for a pair carrying both an AUTHORED and a DERIVED family: their
+   kind-aware union.  Either may be NIL, the direct value, which the union must see as one
+   empty clause -- hence a Lisp function rather than inline query code."
+  (traversal-normalize-family
+    (traversal-family-union (or authored (list nil)) (or derived (list nil)))))
+
+
 (define-init-action derive-walking-from-segments
-  ;; Derives the WALKING traversal edges (and their directed form for rides into stream
+  ;; Derives the walk-kind traversal facts (and their directed form for rides into stream
   ;; destinations) from the
   ;; problem's raw segment geometry -- see the file header for the region-connectivity
   ;; derivation.  Runs only when the problem has asserted WALL-SEGMENT>, EDGE-SEGMENT>,
   ;; or BOUNDARY-WALL -- inert otherwise, so a problem that hand-authors its own walking
-  ;; edges is unaffected.  Only one direction per symmetric pair is asserted: traverse-via
+  ;; facts is unaffected.  Only one direction per symmetric pair is asserted: traverse-via
   ;; has no ">" suffix, so WW mirrors it both ways itself; a pair whose ride edges
   ;; widen a destination's inbound direction gets its two explicit traverse-via>
-  ;; directions instead, never both kinds.
+  ;; directions instead, never both kinds.  A pair at different levels is skipped, and a
+  ;; pair already authored in the same relation gets the union of the two families.
   0
   ()
   (or (exists (?wall wall)
@@ -764,16 +781,26 @@
           (report-terrain-complaints $terrain-complaints))
         (doall (?source location)
           (doall (?destination location)
-            (if (member ?destination
-                        (rest (member ?source (gethash 'location *types*))))
+            (if (and (member ?destination
+                             (rest (member ?source (gethash 'location *types*))))
+                     (= (location-elevation ?source) (location-elevation ?destination)))
               (do (assign $spec (walkability-coordinates-pair-spec
                                   $arrangement ?source ?destination))
                   (if $spec
                     (if (eql (first $spec) :sym)
                       (do (assign $family (second $spec))
-                          (traverse-via walking ?source $family ?destination))
+                          (if (bind (traverse-via ?source $authored ?destination))
+                            (assign $family (walkability-coordinates-merge-family
+                                              $authored $family)))
+                          (traverse-via ?source $family ?destination))
                       (do (assign $forward (second $spec))
                           (assign $backward (third $spec))
-                          (traverse-via> walking ?source $forward ?destination)
-                          (traverse-via> walking ?destination $backward ?source))))))))
+                          (if (bind (traverse-via> ?source $authored-forward ?destination))
+                            (assign $forward (walkability-coordinates-merge-family
+                                               $authored-forward $forward)))
+                          (if (bind (traverse-via> ?destination $authored-backward ?source))
+                            (assign $backward (walkability-coordinates-merge-family
+                                                $authored-backward $backward)))
+                          (traverse-via> ?source $forward ?destination)
+                          (traverse-via> ?destination $backward ?source))))))))
         (convert-databases-to-integers))))

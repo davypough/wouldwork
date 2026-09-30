@@ -23,6 +23,7 @@
   wall (wall1 wall2 wall3 wall4 wall5 wall7 wall8 wall9 wall10 wall11 wall12 wall13 wall14 wall15 wall16)
   window (window1)
   edge (edge1 edge2 edge3 edge4 edge5)
+  staircase (staircase1 staircase2 staircase3)
   location (location1 location2 location3 location4 location5
             location6 location7 location8 location9 location10
             location11 location12 location13 location14 location15 location16 location17)
@@ -166,16 +167,14 @@
 
   (window-segment> window1 19 4 19 7)
 
-  ;; Authorized elevation changes
-  (traverse-via jumping location8 () location9)
-  ;(traverse-via jumping location13 (edge2) location17)  ;CHANGED: edges not expressible until the separator plan
-  ;(traverse-via jumping location13 (edge3) location17)  ;CHANGED: edges not expressible until the separator plan
-  ;(traverse-via jumping location2 () location4)
-  (traverse-via stairway location2 () location4)
-  (traverse-via stairway location9 ((gate4)) location10)  ;CHANGED: gate4 stands at the stairhead beside location9
-  (traverse-via stairway location13 () location17)
-  ;(traverse-via> climbing location5 ((ladder1)) location13)
-  (traverse-via> climbing location14 ((ladder2)) location5)
+  ;; Authorized elevation changes.  Each fact names what separates its two locations; the
+  ;; kind of move follows from it -- a staircase is stairs, an edge a jump, a ladder a climb.
+  (traverse-via location2 ((staircase1) (edge1)) location4)
+  (traverse-via location8 ((edge4)) location9)
+  (traverse-via location9 ((gate4 staircase3)) location10)  ;gate4 stands at the stairhead beside location9
+  (traverse-via location13 ((staircase2) (edge2) (edge3)) location17)
+  ;(traverse-via> location5 ((ladder1)) location13)
+  (traverse-via> location14 ((ladder2)) location5)
 
   ;; WINDOW1 is the see-through panel beside GATE1 in the same x=19 partition, not a second
   ;; doorway.  Reach passes a window exactly as sight does, so the coordinate derivation

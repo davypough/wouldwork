@@ -1,9 +1,11 @@
 ;;; Filename: ladder.lisp
 
-;;; Ladder mobility mode.  Registers the one predicate that makes a traversal edge a
-;;; climb: one of the ladders named in the chosen clause must be positioned exactly at the
-;;; source, and every enabling implement in that clause must be usable.  The segment
-;;; witness places the selected ladder first, followed by the other canonicalized means.
+;;; Ladder traversal kind.  A clause naming a LADDER is a climb, and this file registers the
+;;; one predicate that decides it: one of the ladders named in the clause must be
+;;; positioned exactly at the source, and every enabling implement in that clause must be
+;;; usable.  The segment witness places the selected ladder first, followed by the other
+;;; canonicalized means.  A climb registers no static separators, so its means are its
+;;; whole clause.
 ;;;
 ;;; A climbing clause therefore reads in two registers at once -- its ladders are
 ;;; candidates, of which one must be in place, while every member including those ladders
@@ -25,7 +27,7 @@
 ;;;   nested    : -position; -passability; -threat; -traversal; -mobility-action
 ;;; PROVIDES:
 ;;;   types     : ladder  --  declared optional; the two declarations resolve compatibly
-;;;   mode      : climbing, registered with -traversal
+;;;   kind      : climb, registered with -traversal
 ;;;   queries   : usable-ladder-at-source, positioned-ladders-for-means,
 ;;;               ladder-configuration-transitions
 ;;;   provider  : ladder-configuration-transitions registered with
@@ -81,8 +83,8 @@
             destination))))
 
 
-(register-traversal-mode 'climbing 'ladder-segment-for-clause
-                         '(gate screen ladder))
+(register-traversal-kind 'climb 'ladder-segment-for-clause
+                         '(ladder) nil '(gate screen))
 
 
 ;;;; SUPPORT-CHANGING TRANSITIONS ;;;;
@@ -90,12 +92,12 @@
 
 (define-problem-helper ladder-configuration-transition-for-family
     (state agent source-configuration destination family)
-  "Return the first feasible supported-source LADDER transition in FAMILY, or NIL."
+  "Return the first feasible supported-source LADDER transition among FAMILY's climb-kind
+   clauses, or NIL."
   (let ((source (first source-configuration))
         (destination-configuration (list destination 'ground)))
-    (loop for clause in (if family
-                          (traversal-canonical-family family)
-                          (list nil))
+    (loop for clause in (traversal-family-kind-clauses
+                          state source destination family 'climb)
           for segment = (ladder-segment-for-clause
                           state agent source destination clause)
           when segment
@@ -112,8 +114,7 @@
       (assign $transitions nil)
       (if (not (eql $source-place 'ground))
         (doall (?destination location)
-          (if (bind (traverse-via>
-                      climbing $source $family ?destination))
+          (if (bind (traverse-via> $source $family ?destination))
             (do (assign $transition
                         (ladder-configuration-transition-for-family
                           state ?agent ?source-configuration
@@ -133,34 +134,37 @@
 
 (define-init-check ladder-init-check (literals)
   (:consumes ladder)
-  (check-init-climbing-edges literals))
+  (check-init-climbing-clauses literals))
 
 
-(define-init-check-helper check-init-climbing-edges (literals)
-  "Require every climb to use the directed relation and every alternative clause to name
-   at least one ladder fixed at that edge's source.  A symmetric climb is misleading: the
-   ladder's functional HAS-POSITION can make it usable from only one endpoint.  A clause
-   without a source-positioned ladder can never produce a segment."
+(define-init-check-helper check-init-climbing-clauses (literals)
+  "A clause naming a ladder is a climb.  Every climb clause must sit in a directed fact and
+   name at least one ladder fixed at that fact's source.  A symmetric climb is misleading:
+   the ladder's functional HAS-POSITION can make it usable from only one endpoint.  A climb
+   clause without a source-positioned ladder can never produce a segment.  Clauses of other
+   kinds in the same fact are not this check's business."
   (dolist (literal
             (positive-init-literals-with-relation 'traverse-via literals))
-    (when (eql (second (init-literal-proposition literal)) 'climbing)
+    (when (some (lambda (clause)
+                  (some (lambda (item) (init-type-member-p item 'ladder)) clause))
+                (third (init-literal-proposition literal)))
       (fail-init-check literal
-        "Climbing traversal must be directed.  Use traverse-via> with the ladder's location as the source.")))
+        "A clause naming a ladder is a climb, and a climb must be directed.  Author it in a traverse-via> fact with the ladder's location as the source.")))
   (dolist (literal
             (positive-init-literals-with-relation 'traverse-via> literals))
-    (destructuring-bind (mode source family destination)
+    (destructuring-bind (source family destination)
         (rest (init-literal-proposition literal))
       (declare (ignore destination))
-      (when (eql mode 'climbing)
-        (dolist (clause (if family family (list nil)))
-          (unless (some (lambda (item)
-                          (and (init-type-member-p item 'ladder)
-                               (some (lambda (position-literal)
-                                       (equal (init-literal-proposition position-literal)
-                                              `(has-position ,item ,source)))
-                                     (positive-init-literals-with-relation
-                                       'has-position literals))))
-                        clause)
-            (fail-init-check literal
-              "Climbing clause ~S has no listed ladder positioned at its source ~S."
-              clause source)))))))
+      (dolist (clause family)
+        (when (and (some (lambda (item) (init-type-member-p item 'ladder)) clause)
+                   (notany (lambda (item)
+                             (and (init-type-member-p item 'ladder)
+                                  (some (lambda (position-literal)
+                                          (equal (init-literal-proposition position-literal)
+                                                 `(has-position ,item ,source)))
+                                        (positive-init-literals-with-relation
+                                          'has-position literals))))
+                           clause))
+          (fail-init-check literal
+            "Climb clause ~S has no listed ladder positioned at its source ~S."
+            clause source))))))
