@@ -14,7 +14,7 @@ MC  MECHANIC COVERAGE  [grade 1]
     jammer            COVERED    contract (also S1)
     step              COVERED    extractors S2 T6; boarding a fixed floor blower in the floor-blower contract, a gears-mounted fan in the floor-gears contract
     visibility        COVERED    infrastructure -- line of sight; read by S6
-    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+    walkability       COVERED    infrastructure -- derives walk-kind facts; read by S3
     wall-blower       COVERED    contract (also S1 S3 RC CC)
 
   UNCOVERED (0):
@@ -52,14 +52,13 @@ MC  MECHANIC COVERAGE  [grade 1]
       installation: the fan becomes a flush steppable support at location10; a fan lying on the ground or a box is not steppable
       boarding: STEP from the ground at location10 onto the fan, top clear, support use allowed; while the gears turn, a non-fan occupant ON it is launched with its stack to location11 (level 10)
       landing: kept only while some floor drive aimed at location11 has a fan and turns; otherwise an occupant not ON a support drops back to location10 -- stand on a support there or leave by an exit first
-      exits from location11 (12), by mode; each mode's own predicate is not evaluated
-        walking (12): location1 ((wblower2 wblower3 wblower4)), location10, location12 ((wblower2 wblower3 wblower4 wgears1)), location13 ((wblower3 wblower4)), location2 ((wblower2 wblower3 wblower4 wgears1)), location3 ((gate1 gate2 wblower2 wblower3 wblower4 wgears1)), location4 ((wblower3 wblower4)) (directed), location5 ((wblower2 wblower3 wblower4)), location6 ((wblower4)) (directed), location7 ((wblower3 wblower4)), location8 (directed), location9 ((wblower4))
+      exits from location11 (0), by kind; each kind's own predicate is not evaluated
     wgears1  wall gears at location2 -> location1 (level 0); working height 1
       control      uncontrolled default on, unless jammed
       start        fan1 mounted, turning: EFFECTIVE STREAM
       mount from   location2 (floor 0: within vertical reach) (engine REACHABLE, start state; floor level only)
       removal (PICKUP-FAN, empty hands, reach to the fan): the stream stops; the gears keep turning; a jam of wgears1 is redundant while no fan is mounted
-      arcs gated by its stream (32; clauses in S3), passable while it has no fan or does not turn in the mover's view: walking location10<->location12, walking location10<->location2, walking location10<->location3, walking location11<->location12, walking location11<->location2, walking location11<->location3, walking location12<->location13, walking location12<->location2, walking location12<->location4, walking location12<->location5, walking location12<->location6, walking location12<->location7, walking location12<->location8, walking location12<->location9, walking location13<->location2, walking location13<->location3, walking location1->location12, walking location1->location2, walking location1->location3, walking location2<->location3, walking location2<->location4, walking location2<->location5, walking location2<->location6, walking location2<->location7, walking location2<->location8, walking location2<->location9, walking location3<->location4, walking location3<->location5, walking location3<->location6, walking location3<->location7, walking location3<->location8, walking location3<->location9
+      arcs gated by its stream (29; clauses in S3), passable while it has no fan or does not turn in the mover's view: walk location10<->location12, walk location10<->location2, walk location10<->location3, walk location12<->location13, walk location12<->location2, walk location12<->location4, walk location12<->location5, walk location12<->location6, walk location12<->location7, walk location12<->location8, walk location12<->location9, walk location13<->location2, walk location13<->location3, walk location1->location12, walk location1->location2, walk location1->location3, walk location2<->location3, walk location2<->location4, walk location2<->location5, walk location2<->location6, walk location2<->location7, walk location2<->location8, walk location2<->location9, walk location3<->location4, walk location3<->location5, walk location3<->location6, walk location3<->location7, walk location3<->location8, walk location3<->location9
       stream physics: the wall-blower contract
     These rows state compatibility and prerequisites only: not that a fan can be carried between mounts, a mount reached, or a lift used.  A settled state's equipment needs REPORT-EQUIPMENT-SCENARIO.
 
@@ -88,7 +87,7 @@ MC  MECHANIC COVERAGE  [grade 1]
   contract wall-blower
     controls  its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree
     moves     horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination
-    requires  own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walking arcs labelled by the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge
+    requires  own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walk-kind clauses naming the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge
     wblower2  fixed complete fixture
       horizontal   location5 -> location4
       stream       elevation 1; width 3; base < stream <= top
@@ -110,7 +109,7 @@ MC  MECHANIC COVERAGE  [grade 1]
 S0  TYPE EXTENT CENSUS  [grade 1]
 --------------------------------------------------------------
 
-  type extents (61 types)
+  type extents (60 types)
     agent  1  authored  SINGLETON
     angled-blower  0  optional  EMPTY
     angled-blower+angled-gears+floor-blower+floor-gears+wall-blower+wall-gears  5  synthesized  components floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower
@@ -162,7 +161,6 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     threat  0  authored  EMPTY  components gun
     toggle-plate  0  optional  EMPTY
     transmitter  1  authored  SINGLETON
-    traversal-mode  4  authored
     tray  0  optional  EMPTY
     vertical-object  29  authored  components location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun switch pressure-plate toggle-plate floor-blower angled-blower
     visibility-object  18  authored  components gate transmitter receiver floor-repeater wall-repeater gun location
@@ -299,8 +297,8 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
     on  dynamic  key (1)  value (2)  signature (support-occupant support)
     screen-segment>  static  key (1)  value (2 3 4 5 6)  signature (screen rational rational rational rational rational)
     stream-width  static  key (1)  value (2)  signature ((either wall-blower wall-gears) rational)
-    traverse-via  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
-    traverse-via>  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
+    traverse-via  static  key (1 3)  value (2)  signature (location list location)
+    traverse-via>  static  key (1 3)  value (2)  signature (location list location)
     wall-segment>  static  key (1)  value (2 3 4 5 6)  signature (wall rational rational rational rational rational)
     window-segment>  static  key (1)  value (2 3 4 5 6)  signature (window rational rational rational rational rational)
 
@@ -655,119 +653,121 @@ S7  LANDMARK GRAPH AND ORDERINGS  [grade 4]
 S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 --------------------------------------------------------------
 
-  traversal arcs read (97)
-    59 symmetric (traverse-via), 38 directed (traverse-via>)
-    mode walking: 97 arcs, 13 with an empty family
+  traversal arcs read (82)
+    50 symmetric (traverse-via), 32 directed (traverse-via>)
+    kind walk: 82 arcs, 11 with an empty family
 
-  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY clause family.  Arcs of traverse-via> are never contracted, whatever their family.
-  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries its own predicate -- an elevation equality, a jump rule -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
+  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY door family.  Static separators -- staircases, edges, floor drives -- are not doors.  Arcs of traverse-via> are never contracted, whatever their family.
+  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries its own predicate -- a jump's reach limit, a ladder's position -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
 
-  regions (10 over 13 endpoints of type location)
+  regions (11 over 13 endpoints of type location)
     R1  (2): location1 location4
-    R2  (2): location10 location11
-    R3  (1): location12
-    R4  (2): location13 location6
-    R5  (1): location2
-    R6  (1): location3
-    R7  (1): location5
-    R8  (1): location7
-    R9  (1): location8
-    R10  (1): location9
+    R2  (1): location10
+    R3  (1): location11
+    R4  (1): location12
+    R5  (2): location13 location6
+    R6  (1): location2
+    R7  (1): location3
+    R8  (1): location5
+    R9  (1): location7
+    R10  (1): location8
+    R11  (1): location9
+    on no arc at all (1): location11
 
-  region crossings (73 rows: 17 spine, 26 composed)
+  region crossings (73 rows: 17 spine, 25 composed)
     NOTE: these rows are the transitive CLOSURE, one minimal door-set per location pair. The spine preserves reachability; it is not a physical doorway count.
-    R10 --> R1  mode walking  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R10 <-> R2  mode walking  family ((wblower4))  2 location arcs  SPINE
-    R10 <-> R3  mode walking  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
-    R10 <-> R4  mode walking  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R10 --> R4  mode walking  family ((wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
-    R10 <-> R5  mode walking  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
-    R10 <-> R6  mode walking  family ((gate1 gate2 wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wgears1)
-    R10 <-> R7  mode walking  family ((wblower2 wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R10 <-> R8  mode walking  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R10 --> R9  mode walking  family () direct  1 location arc  SPINE
-    R1 <-> R10  mode walking  family ((wblower2 wblower3 wblower4))  1 location arc  composed
-    R1 --> R10  mode walking  family ((wblower2 wblower3 wblower4))  1 location arc  composed
-    R1 <-> R2  mode walking  family ((wblower2 wblower3 wblower4))  2 location arcs  composed
-    R1 --> R2  mode walking  family ((wblower2 wblower3 wblower4))  2 location arcs  composed
-    R1 <-> R3  mode walking  family ((wgears1))  1 location arc  composed
-    R1 --> R3  mode walking  family ((wgears1))  1 location arc  composed
-    R1 <-> R4  mode walking  family ((wblower2))  2 location arcs  composed
-    R1 --> R4  mode walking  family ((wblower2))  2 location arcs  composed
-    R1 <-> R5  mode walking  family ((wgears1))  1 location arc  composed
-    R1 --> R5  mode walking  family ((wgears1))  1 location arc  SPINE
-    R1 <-> R6  mode walking  family ((gate1 gate2 wgears1))  1 location arc  composed
-    R1 --> R6  mode walking  family ((gate1 gate2 wgears1))  1 location arc  composed
-    R1 <-> R7  mode walking  family ((wblower2))  1 location arc  composed
-    R1 --> R7  mode walking  family ((wblower2))  1 location arc  SPINE
-    R1 <-> R8  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R1 --> R8  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R1 <-> R9  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R1 --> R9  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R2 --> R1  mode walking  family ((wblower3 wblower4))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R2 <-> R3  mode walking  family ((wblower2 wblower3 wblower4 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
-    R2 <-> R4  mode walking  family ((wblower3 wblower4))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R2 --> R4  mode walking  family ((wblower4))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation
-    R2 <-> R5  mode walking  family ((wblower2 wblower3 wblower4 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
-    R2 <-> R6  mode walking  family ((gate1 gate2 wblower2 wblower3 wblower4 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wgears1)
-    R2 <-> R7  mode walking  family ((wblower2 wblower3 wblower4))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R2 <-> R8  mode walking  family ((wblower3 wblower4))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
-    R2 --> R9  mode walking  family () direct  2 location arcs  SPINE
-    R3 --> R1  mode walking  family () direct  1 location arc  SPINE
-    R3 <-> R4  mode walking  family ((wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
-    R3 <-> R5  mode walking  family ((wgears1))  1 location arc  SPINE
-    R3 <-> R6  mode walking  family ((gate1 gate2))  1 location arc  SPINE
-    R3 <-> R7  mode walking  family ((wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
-    R3 <-> R8  mode walking  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R3 <-> R9  mode walking  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R4 --> R10  mode walking  family ((wblower3 wblower4))  1 location arc  composed
-    R4 --> R1  mode walking  family () direct  2 location arcs  SPINE
-    R4 --> R2  mode walking  family ((wblower3 wblower4))  2 location arcs  composed
-    R4 <-> R5  mode walking  family ((wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
-    R4 <-> R6  mode walking  family ((gate1 gate2 wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wgears1)
-    R4 <-> R7  mode walking  family ((wblower2))  2 location arcs  SPINE
-    R4 <-> R8  mode walking  family ((wblower3))  1 location arc  composed
-    R4 --> R8  mode walking  family ((wblower3))  1 location arc  composed
-    R4 <-> R9  mode walking  family ((wblower3))  1 location arc  composed
-    R4 --> R9  mode walking  family ((wblower3))  1 location arc  SPINE
-    R5 --> R1  mode walking  family () direct  1 location arc  SPINE
-    R5 <-> R6  mode walking  family ((gate1 gate2 wgears1))  1 location arc  composed
-    R5 <-> R7  mode walking  family ((wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
-    R5 <-> R8  mode walking  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R5 <-> R9  mode walking  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
-    R6 --> R1  mode walking  family ((gate1 gate2))  1 location arc  composed
-    R6 <-> R7  mode walking  family ((gate1 gate2 wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower2)
-    R6 <-> R8  mode walking  family ((gate1 gate2 wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower2 wblower3)
-    R6 <-> R9  mode walking  family ((gate1 gate2 wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower2 wblower3)
-    R7 --> R1  mode walking  family () direct  1 location arc  SPINE
-    R7 <-> R8  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R7 <-> R9  mode walking  family ((wblower2 wblower3))  1 location arc  composed
-    R8 --> R1  mode walking  family ((wblower3))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
-    R8 --> R4  mode walking  family () direct  1 location arc  SPINE
-    R8 <-> R9  mode walking  family ((wblower3))  1 location arc  SPINE
-    R9 --> R10  mode walking  family ((wblower4))  1 location arc  SPINE
-    R9 --> R1  mode walking  family ((wblower3))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
-    R9 --> R2  mode walking  family ((wblower4))  2 location arcs  composed
-    R9 --> R4  mode walking  family () direct  1 location arc  SPINE
+    R10 --> R11  kind walk  family ((wblower4))  1 location arc  SPINE
+    R10 --> R1  kind walk  family ((wblower3))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
+    R10 --> R2  kind walk  family ((wblower4))  1 location arc  composed
+    R10 <-> R4  kind walk  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R10 <-> R5  kind walk  family ((wblower3))  1 location arc  SPINE
+    R10 --> R5  kind walk  family () direct  1 location arc  SPINE
+    R10 <-> R6  kind walk  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R10 <-> R7  kind walk  family ((gate1 gate2 wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower3 wgears1)
+    R10 <-> R8  kind walk  family ((wblower2 wblower3))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
+    R10 <-> R9  kind walk  family ((wblower3))  1 location arc  SPINE
+    R11 --> R10  kind walk  family () direct  1 location arc  SPINE
+    R11 --> R1  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
+    R11 <-> R2  kind walk  family ((wblower4))  1 location arc  SPINE
+    R11 <-> R4  kind walk  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R11 <-> R5  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower4)
+    R11 --> R5  kind walk  family ((wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
+    R11 <-> R6  kind walk  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R11 <-> R7  kind walk  family ((gate1 gate2 wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower3 wgears1)
+    R11 <-> R8  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
+    R11 <-> R9  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
+    R1 <-> R10  kind walk  family ((wblower2 wblower3))  1 location arc  composed
+    R1 --> R10  kind walk  family ((wblower2 wblower3))  1 location arc  composed
+    R1 <-> R11  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  composed
+    R1 --> R11  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  composed
+    R1 <-> R2  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  composed
+    R1 --> R2  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  composed
+    R1 <-> R4  kind walk  family ((wgears1))  1 location arc  composed
+    R1 --> R4  kind walk  family ((wgears1))  1 location arc  composed
+    R1 <-> R5  kind walk  family ((wblower2))  2 location arcs  composed
+    R1 --> R5  kind walk  family ((wblower2))  2 location arcs  composed
+    R1 <-> R6  kind walk  family ((wgears1))  1 location arc  composed
+    R1 --> R6  kind walk  family ((wgears1))  1 location arc  SPINE
+    R1 <-> R7  kind walk  family ((gate1 gate2 wgears1))  1 location arc  composed
+    R1 --> R7  kind walk  family ((gate1 gate2 wgears1))  1 location arc  composed
+    R1 <-> R8  kind walk  family ((wblower2))  1 location arc  composed
+    R1 --> R8  kind walk  family ((wblower2))  1 location arc  SPINE
+    R1 <-> R9  kind walk  family ((wblower2 wblower3))  1 location arc  composed
+    R1 --> R9  kind walk  family ((wblower2 wblower3))  1 location arc  composed
+    R2 --> R10  kind walk  family () direct  1 location arc  SPINE
+    R2 --> R1  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
+    R2 <-> R4  kind walk  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R2 <-> R5  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
+    R2 --> R5  kind walk  family ((wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
+    R2 <-> R6  kind walk  family ((wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3 wgears1)
+    R2 <-> R7  kind walk  family ((gate1 gate2 wblower2 wblower3 wblower4 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower3 wgears1)
+    R2 <-> R8  kind walk  family ((wblower2 wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
+    R2 <-> R9  kind walk  family ((wblower3 wblower4))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower3)
+    R4 --> R1  kind walk  family () direct  1 location arc  SPINE
+    R4 <-> R5  kind walk  family ((wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
+    R4 <-> R6  kind walk  family ((wgears1))  1 location arc  SPINE
+    R4 <-> R7  kind walk  family ((gate1 gate2))  1 location arc  SPINE
+    R4 <-> R8  kind walk  family ((wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
+    R4 <-> R9  kind walk  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
+    R5 --> R10  kind walk  family ((wblower3))  1 location arc  composed
+    R5 --> R11  kind walk  family ((wblower3 wblower4))  1 location arc  composed
+    R5 --> R1  kind walk  family () direct  2 location arcs  SPINE
+    R5 --> R2  kind walk  family ((wblower3 wblower4))  1 location arc  composed
+    R5 <-> R6  kind walk  family ((wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (wgears1)
+    R5 <-> R7  kind walk  family ((gate1 gate2 wblower2 wgears1))  2 location arcs  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wgears1)
+    R5 <-> R8  kind walk  family ((wblower2))  2 location arcs  SPINE
+    R5 <-> R9  kind walk  family ((wblower3))  1 location arc  composed
+    R5 --> R9  kind walk  family ((wblower3))  1 location arc  composed
+    R6 --> R1  kind walk  family () direct  1 location arc  SPINE
+    R6 <-> R7  kind walk  family ((gate1 gate2 wgears1))  1 location arc  composed
+    R6 <-> R8  kind walk  family ((wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2)
+    R6 <-> R9  kind walk  family ((wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (wblower2 wblower3)
+    R7 --> R1  kind walk  family ((gate1 gate2))  1 location arc  composed
+    R7 <-> R8  kind walk  family ((gate1 gate2 wblower2 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower2)
+    R7 <-> R9  kind walk  family ((gate1 gate2 wblower2 wblower3 wgears1))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation via (gate1 gate2 wblower2 wblower3)
+    R8 --> R1  kind walk  family () direct  1 location arc  SPINE
+    R8 <-> R9  kind walk  family ((wblower2 wblower3))  1 location arc  composed
+    R9 --> R1  kind walk  family ((wblower3))  1 location arc  NON-MINIMAL -- a cheaper route exists; see the derivation
+    R9 --> R5  kind walk  family () direct  1 location arc  SPINE
 
   adjacency spine (17)
-    R10 <-> R2  mode walking  family ((wblower4))
-    R10 --> R9  mode walking  family () direct
-    R1 --> R5  mode walking  family ((wgears1))
-    R1 --> R7  mode walking  family ((wblower2))
-    R2 --> R9  mode walking  family () direct
-    R3 --> R1  mode walking  family () direct
-    R3 <-> R5  mode walking  family ((wgears1))
-    R3 <-> R6  mode walking  family ((gate1 gate2))
-    R4 --> R1  mode walking  family () direct
-    R4 <-> R7  mode walking  family ((wblower2))
-    R4 --> R9  mode walking  family ((wblower3))
-    R5 --> R1  mode walking  family () direct
-    R7 --> R1  mode walking  family () direct
-    R8 --> R4  mode walking  family () direct
-    R8 <-> R9  mode walking  family ((wblower3))
-    R9 --> R10  mode walking  family ((wblower4))
-    R9 --> R4  mode walking  family () direct
+    R10 --> R11  kind walk  family ((wblower4))
+    R10 <-> R5  kind walk  family ((wblower3))
+    R10 --> R5  kind walk  family () direct
+    R10 <-> R9  kind walk  family ((wblower3))
+    R11 --> R10  kind walk  family () direct
+    R11 <-> R2  kind walk  family ((wblower4))
+    R1 --> R6  kind walk  family ((wgears1))
+    R1 --> R8  kind walk  family ((wblower2))
+    R2 --> R10  kind walk  family () direct
+    R4 --> R1  kind walk  family () direct
+    R4 <-> R6  kind walk  family ((wgears1))
+    R4 <-> R7  kind walk  family ((gate1 gate2))
+    R5 --> R1  kind walk  family () direct
+    R5 <-> R8  kind walk  family ((wblower2))
+    R6 --> R1  kind walk  family () direct
+    R8 --> R1  kind walk  family () direct
+    R9 --> R5  kind walk  family () direct
 
   doors on arcs (6)
     gate1 gate2 wblower2 wblower3 wblower4 wgears1
@@ -798,10 +798,10 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1 gate2))
-        R3 -> R6, device absent: source reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R7" "R8" "R9"); destination reaches ("R6")
+      spine kind walk, family ((gate1 gate2))
+        R4 -> R7, device absent: source reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R8" "R9"); destination reaches ("R7")
           graph cut in this direction: YES
-        R6 -> R3, device absent: source reaches ("R6"); destination reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R7" "R8" "R9")
+        R7 -> R4, device absent: source reaches ("R7"); destination reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R8" "R9")
           graph cut in this direction: YES
 
     wblower2 == (not receiver2)
@@ -810,13 +810,13 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
         beam dependency unresolved; requires sightline analysis.
       positive pressure alternatives nil; individually mandatory nil
       inverted aggregate: no positive keeper demand inferred.
-      spine mode walking, family ((wblower2))
-        R1 -> R7, device absent: source reaches ("R1" "R3" "R5" "R6"); destination reaches ("R1" "R3" "R5" "R6" "R7")
+      spine kind walk, family ((wblower2))
+        R1 -> R8, device absent: source reaches ("R1" "R4" "R6" "R7"); destination reaches ("R1" "R4" "R6" "R7" "R8")
           graph cut in this direction: YES
-      spine mode walking, family ((wblower2))
-        R4 -> R7, device absent: source reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R6" "R8" "R9"); destination reaches ("R1" "R3" "R5" "R6" "R7")
+      spine kind walk, family ((wblower2))
+        R5 -> R8, device absent: source reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R9"); destination reaches ("R1" "R4" "R6" "R7" "R8")
           graph cut in this direction: YES
-        R7 -> R4, device absent: source reaches ("R1" "R3" "R5" "R6" "R7"); destination reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R6" "R8" "R9")
+        R8 -> R5, device absent: source reaches ("R1" "R4" "R6" "R7" "R8"); destination reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R9")
           graph cut in this direction: YES
 
     wblower3 == receiver2
@@ -826,18 +826,20 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((wblower3))
-        R4 -> R9, device absent: source reaches ("R1" "R3" "R4" "R5" "R6" "R7"); destination reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R6" "R7" "R9")
+      spine kind walk, family ((wblower3))
+        R10 -> R5, device absent: source reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R1" "R4" "R5" "R6" "R7" "R8")
+          graph cut in this direction: NO, bypass exists
+        R5 -> R10, device absent: source reaches ("R1" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R8")
           graph cut in this direction: YES
-      spine mode walking, family ((wblower3))
-        R8 -> R9, device absent: source reaches ("R1" "R3" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R6" "R7" "R9")
+      spine kind walk, family ((wblower3))
+        R10 -> R9, device absent: source reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R1" "R4" "R5" "R6" "R7" "R8" "R9")
           graph cut in this direction: YES
-        R9 -> R8, device absent: source reaches ("R1" "R10" "R2" "R3" "R4" "R5" "R6" "R7" "R9"); destination reaches ("R1" "R3" "R4" "R5" "R6" "R7" "R8")
+        R9 -> R10, device absent: source reaches ("R1" "R4" "R5" "R6" "R7" "R8" "R9"); destination reaches ("R1" "R10" "R11" "R2" "R4" "R5" "R6" "R7" "R8")
           graph cut in this direction: YES
 
   explicit goal destinations (1); goal form (has-location agent1 location11)
-    agent1: location4 (R1) -> location11 (R2)
-      GRAPH-REQUIRED candidates (wblower2 wblower3); concrete necessity UNRESOLVED.
+    agent1: location4 (R1) -> location11 (R3)
+      baseline graph disconnected; no device-cut conclusion.
     jammer1: initially location1; no explicit destination, crossings UNRESOLVED.
     connector1: initially location6; no explicit destination, crossings UNRESOLVED.
     connector2: initially location3; no explicit destination, crossings UNRESOLVED.
@@ -925,7 +927,7 @@ NH  NECESSITY HINTS  [grade per hint]
       note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
       note   wgears1 at location2: base 0, top 1, stream 1; SWEPT if a fan is present and turns in the occupant's view; destination location1; required fan activity not established
     H3.3  CANDIDATE  [grade 2; RC]
-      limit  physical geometric candidates to receiver1 with last connector at location12 (R3): least off-plate bodies 1
+      limit  physical geometric candidates to receiver1 with last connector at location12 (R4): least off-plate bodies 1
       hint   transmitter1 -> location12@1 -> receiver1  risers ground; bodies 1, off plates 1
       note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
     H3.4  NECESSARY  [grade 2; S1 RC]
@@ -943,7 +945,7 @@ NH  NECESSITY HINTS  [grade per hint]
   H6 active at the start (1)
     H6.1  CANDIDATE  [grade 1; S1, start state]
       limit  wblower2 == (not receiver2) holds at the start: receiver2 is not active
-      hint   wblower2 is free until receiver2 changes (goal route)
+      hint   wblower2 is free until receiver2 changes (off the goal route)
 
   H7 placement limits (0)
     none
@@ -954,30 +956,31 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
   SCOPE: a monotone premise closure over passage services (every gate; each drive a traversal clause names) and receiver literals.  Providers: S1 CONTROL options, MC jam sites (OVERRIDE), gears with no fan (EQUIPMENT), RC chains and fixed corridors to a receiver.  No ordering, simultaneity, bodies, reach, occupancy or view is checked.
   CLASSES: DIRECT no premise; SUPPORTED premises available without this service; NEEDS <service> FIRST: installing this provider needs the service it will provide (a setup dependency); UNSUPPORTED IN SCOPE.  A service with only NEEDS-FIRST options is a SETUP QUESTION, not an impossibility.  "Through standing providers" repeats the test with premises supplied only by CONTROL, chains, corridors and equipment, never another jam, and is printed when that exposes a setup dependency a further jammer would hide.
 
-  goal actor agent1: start location4 (R1) -> goal location11 (R2)
-    transit door sets (R1 -> R2, 1): (wblower2 wblower3 wblower4)
-      necessary: wblower2 wblower3 wblower4
-    return door sets (R2 -> R1, 1): ()
+  goal actor agent1: start location4 (R1) -> goal location11 (R3)
+    transit door sets (R1 -> R3, 0): none
+      necessary: none
+    return door sets (R3 -> R1, 0): none
       necessary: none
     final services: none (the goal names no receiver or controlled device)
-    temporary services (in some transit set, not final): wblower2 via receiver2, wblower3 via receiver2, wblower4
+    temporary services (in some transit set, not final): none
       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
 
-  access from R1 (minimal door sets to each region; mode predicates not evaluated)
+  access from R1 (minimal door sets to each region; kind predicates not evaluated)
     R1  ()
     R2  (wblower2 wblower3 wblower4)
-    R3  (wgears1)
-    R4  (wblower2)
-    R5  (wgears1)
-    R6  (gate1 gate2 wgears1)
-    R7  (wblower2)
-    R8  (wblower2 wblower3)
+    R3  not reached in the relaxed graph
+    R4  (wgears1)
+    R5  (wblower2)
+    R6  (wgears1)
+    R7  (gate1 gate2 wgears1)
+    R8  (wblower2)
     R9  (wblower2 wblower3)
-    R10  (wblower2 wblower3 wblower4)
+    R10  (wblower2 wblower3)
+    R11  (wblower2 wblower3 wblower4)
 
   retrieval (start places of jammers, connectors and fans)
-    connector1  location6 (R4)
-    connector2  location3 (R6)
+    connector1  location6 (R5)
+    connector2  location3 (R7)
     fan1  mounted on wgears1, wall-hung (no location)
     jammer1  location1 (R1)
 
@@ -994,7 +997,7 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
         jam at location12 on ground (jammer1)
       OVERRIDE DIRECT: no premise
         jam at location3 on ground (jammer1)
-    wblower2 clear  == (not receiver2)  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, TEMPORARY
+    wblower2 clear  == (not receiver2)  start BLOCKED  verdict SUPPORTED
       CONTROL UNSUPPORTED IN SCOPE: receiver2 active
       OVERRIDE DIRECT: no premise
         jam at location1 on ground (jammer1)
@@ -1002,14 +1005,14 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
         jam at location2 on ground (jammer1)
         jam at location4 on ground (jammer1)
         jam at location5 on ground (jammer1)
-    wblower3 clear  == receiver2  start PASSABLE  verdict SUPPORTED  route TRANSIT necessary, TEMPORARY
+    wblower3 clear  == receiver2  start PASSABLE  verdict SUPPORTED
       CONTROL DIRECT: receiver2 inactive
       OVERRIDE DIRECT: no premise
         jam at location11 on ground (jammer1)
         jam at location6 on ground (jammer1)
         jam at location7 on ground (jammer1)
         jam at location8 on ground (jammer1)
-    wblower4 clear  start BLOCKED  verdict SUPPORTED  route TRANSIT necessary, TEMPORARY
+    wblower4 clear  start BLOCKED  verdict SUPPORTED
       no controller: uncontrolled drive turns unless jammed
       OVERRIDE DIRECT: no premise
         jam at location10 on ground (jammer1)

@@ -22,7 +22,7 @@ MC  MECHANIC COVERAGE  [grade 1]
     topo-lower-bound  COVERED    infrastructure -- search pruning bound
     tray              COVERED    extractors S2 S5
     visibility        COVERED    infrastructure -- line of sight; read by S6
-    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+    walkability       COVERED    infrastructure -- derives walk-kind facts; read by S3
 
   UNCOVERED (0):
     READING: UNCOVERED means no static contract is declared for that technology.  The coverage gate (Problem-Solving Guide, Phase 0 step 2) requires a hand contract in the Briefing, or a component, before going on.  COVERED by extractors or infrastructure means the named components carry its static consequences; it is not a contract.
@@ -47,9 +47,17 @@ MC  MECHANIC COVERAGE  [grade 1]
 
   contract jump
     controls  nothing; a jump has no CONTROLS entry and no state
-    moves     an agent across an authored jumping arc (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one
-    requires  the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); every clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray
+    moves     an agent across a jump-kind clause -- one naming an edge, a wall or a floor drive, or in a bare-level problem naming none across a level difference -- (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one
+    requires  the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); edges and floor drives are static and always passable; every other clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray
     reach limit 1 (*vertical-reach-limit*); a raise is the least launch elevation above the source floor, reached by standing on a support (S5 tops)
+    location13 -> location17  clause ()  level 3/2 -> 0
+      no feature  from the floor
+    location17 -> location13  clause ()  level 0 -> 3/2
+      no feature  raise 1/2 above the floor
+    location2 -> location4  clause ()  level 0 -> 3/2
+      no feature  raise 1/2 above the floor
+    location4 -> location2  clause ()  level 3/2 -> 0
+      no feature  from the floor
     location8 -> location9  clause ()  level 0 -> 3/2
       no feature  raise 1/2 above the floor
     location9 -> location8  clause ()  level 3/2 -> 0
@@ -57,10 +65,10 @@ MC  MECHANIC COVERAGE  [grade 1]
 
   contract ladder
     controls  nothing; a ladder has no CONTROLS entry and no state
-    moves     an agent from a climbing arc's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination
+    moves     an agent across a climb-kind clause (one naming a ladder) from its fact's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination
     requires  a ladder named in the arc's clause positioned at its source (ladder-init-check), every other means in the clause clear, and a safe destination
     ladder2  at location14
-      climbing  location14 --> location5  family ((ladder2))  ladder at source: yes
+      climb  location14 --> location5  family ((ladder2))  ladder at source: yes
 
   contract recorder
     controls  the recording session, not a device (no CONTROLS entry): START-RECORDER opens a cycle -- a live agent at a recorder's position, empty-handed, no ghost left from a closed cycle, within *max-recorder-cycles*; STOP-RECORDER (by a ghost agent) or CANCEL-PLAYBACK (by a live agent) closes it
@@ -71,10 +79,11 @@ MC  MECHANIC COVERAGE  [grade 1]
     recorder1  at location3
 
   contract stairs
-    controls  nothing; stairway has no device state
-    moves     an agent along an authored stairway arc, in its permitted direction, through a MOVE stairs segment
-    requires  all means of one alternative clause passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them
-    location10 <-> location9; family nil
+    controls  nothing; a staircase has no state
+    moves     an agent across a stairs-kind clause (one naming a staircase), in its fact's permitted direction, through a MOVE stairs segment
+    requires  all means of one alternative clause (the clause without its staircase) passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them
+    location10 <-> location9; family ((gate4))
+    location13 <-> location17; family nil
     location2 <-> location4; family nil
 
 
@@ -122,6 +131,7 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     relay  4  authored  components connector floor-repeater wall-repeater
     repeater  0  authored  EMPTY  components floor-repeater wall-repeater
     screen  0  optional  EMPTY
+    staircase  3  authored
     steppable-object  4  authored  components pressure-plate toggle-plate fan floor-blower angled-blower
     support  8  authored  components pressure-plate toggle-plate box fan tray floor-blower angled-blower
     support-occupant  10  authored  components agent box jammer connector fan tray
@@ -130,7 +140,6 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     threat  0  authored  EMPTY  components gun
     toggle-plate  0  optional  EMPTY
     transmitter  2  authored
-    traversal-mode  4  authored
     tray  2  authored
     vaultable-object  21  authored  components gate screen wall
     vertical-object  61  authored  components location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun switch pressure-plate toggle-plate floor-blower angled-blower
@@ -274,8 +283,8 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
     recorder-cycles-used  dynamic  key none -- keyless global fluent  value (1)  signature (fixnum)
     recording-copy>  static  key none -- bijective, functional both ways  value (1 2)  signature (mobile-object mobile-object)
     screen-segment>  static  key (1)  value (2 3 4 5 6)  signature (screen rational rational rational rational rational)
-    traverse-via  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
-    traverse-via>  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
+    traverse-via  static  key (1 3)  value (2)  signature (location list location)
+    traverse-via>  static  key (1 3)  value (2)  signature (location list location)
     wall-segment>  static  key (1)  value (2 3 4 5 6)  signature (wall rational rational rational rational rational)
     window-segment>  static  key (1)  value (2 3 4 5 6)  signature (window rational rational rational rational rational)
 
@@ -33616,47 +33625,50 @@ S7  LANDMARK GRAPH AND ORDERINGS  [grade 4]
 S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 --------------------------------------------------------------
 
-  traversal arcs read (74)
-    73 symmetric (traverse-via), 1 directed (traverse-via>)
-    mode climbing: 1 arc, 0 with an empty family
-    mode jumping: 1 arc, 1 with an empty family
-    mode stairway: 2 arcs, 2 with an empty family
-    mode walking: 70 arcs, 17 with an empty family
+  traversal arcs read (56)
+    55 symmetric (traverse-via), 1 directed (traverse-via>)
+    kind climb: 1 arc, 0 with an empty family
+    kind jump: 3 arcs, 3 with an empty family
+    kind stairs: 3 arcs, 2 with an empty family
+    kind walk: 49 arcs, 11 with an empty family
 
-  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY clause family.  Arcs of traverse-via> are never contracted, whatever their family.
-  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries its own predicate -- an elevation equality, a jump rule -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
+  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY door family.  Static separators -- staircases, edges, floor drives -- are not doors.  Arcs of traverse-via> are never contracted, whatever their family.
+  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries its own predicate -- a jump's reach limit, a ladder's position -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
 
-  regions (7 over 17 endpoints of type location)
-    R1  (6): location1 location10 location11 location12 location8 location9
-    R2  (5): location13 location17 location2 location3 location4
-    R3  (1): location14
-    R4  (2): location15 location5
-    R5  (1): location16
-    R6  (1): location6
-    R7  (1): location7
+  regions (8 over 17 endpoints of type location)
+    R1  (5): location1 location11 location12 location8 location9
+    R2  (1): location10
+    R3  (5): location13 location17 location2 location3 location4
+    R4  (1): location14
+    R5  (2): location15 location5
+    R6  (1): location16
+    R7  (1): location6
+    R8  (1): location7
 
-  region crossings (12 rows: 6 spine, 6 composed)
+  region crossings (13 rows: 7 spine, 6 composed)
     NOTE: these rows are the transitive CLOSURE, one minimal door-set per location pair. The spine preserves reachability; it is not a physical doorway count.
-    R1 <-> R2  mode walking  family ((gate1))  20 location arcs  SPINE
-    R1 <-> R3  mode walking  family ((gate5))  4 location arcs  SPINE
-    R1 <-> R6  mode walking  family ((gate2))  4 location arcs  SPINE
-    R1 <-> R7  mode walking  family ((gate2 gate3))  4 location arcs  composed
-    R2 <-> R3  mode walking  family ((gate1 gate5))  5 location arcs  composed
-    R2 <-> R6  mode walking  family ((gate1 gate2))  5 location arcs  composed
-    R2 <-> R7  mode walking  family ((gate1 gate2 gate3))  5 location arcs  composed
-    R3 --> R4  mode climbing  family ((ladder2))  1 location arc  SPINE
-    R3 <-> R6  mode walking  family ((gate2 gate5))  1 location arc  composed
-    R3 <-> R7  mode walking  family ((gate2 gate3 gate5))  1 location arc  composed
-    R4 <-> R5  mode walking  family ((gate6))  2 location arcs  SPINE
-    R6 <-> R7  mode walking  family ((gate3))  1 location arc  SPINE
+    R1 <-> R2  kind stairs  family ((gate4))  1 location arc  SPINE
+    R1 <-> R3  kind walk  family ((gate1))  12 location arcs  SPINE
+    R1 <-> R4  kind walk  family ((gate5))  4 location arcs  SPINE
+    R1 <-> R7  kind walk  family ((gate2))  4 location arcs  SPINE
+    R1 <-> R8  kind walk  family ((gate2 gate3))  4 location arcs  composed
+    R3 <-> R4  kind walk  family ((gate1 gate5))  3 location arcs  composed
+    R3 <-> R7  kind walk  family ((gate1 gate2))  3 location arcs  composed
+    R3 <-> R8  kind walk  family ((gate1 gate2 gate3))  3 location arcs  composed
+    R4 --> R5  kind climb  family ((ladder2))  1 location arc  SPINE
+    R4 <-> R7  kind walk  family ((gate2 gate5))  1 location arc  composed
+    R4 <-> R8  kind walk  family ((gate2 gate3 gate5))  1 location arc  composed
+    R5 <-> R6  kind walk  family ((gate6))  2 location arcs  SPINE
+    R7 <-> R8  kind walk  family ((gate3))  1 location arc  SPINE
 
-  adjacency spine (6)
-    R1 <-> R2  mode walking  family ((gate1))
-    R1 <-> R3  mode walking  family ((gate5))
-    R1 <-> R6  mode walking  family ((gate2))
-    R3 --> R4  mode climbing  family ((ladder2))
-    R4 <-> R5  mode walking  family ((gate6))
-    R6 <-> R7  mode walking  family ((gate3))
+  adjacency spine (7)
+    R1 <-> R2  kind stairs  family ((gate4))
+    R1 <-> R3  kind walk  family ((gate1))
+    R1 <-> R4  kind walk  family ((gate5))
+    R1 <-> R7  kind walk  family ((gate2))
+    R4 --> R5  kind climb  family ((ladder2))
+    R5 <-> R6  kind walk  family ((gate6))
+    R7 <-> R8  kind walk  family ((gate3))
 
   doors on arcs (7)
     gate1 gate2 gate3 gate4 gate5 gate6 ladder2
@@ -33678,7 +33690,7 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
   Pressure counts require ON's functional key and the relevant view's occupancy semantics.
   Device-state conclusions additionally require the printed S1 axiom premises.
 
-  controlled devices (6); spine rows (6); spine check :VERIFIED-AGAINST-QUOTIENT
+  controlled devices (6); spine rows (7); spine check :VERIFIED-AGAINST-QUOTIENT
 
     gate1 == receiver1
       state open: state == aggregate; empty-type premises (jammer)
@@ -33688,10 +33700,10 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1))
-        R1 -> R2, device absent: source reaches ("R1" "R3" "R4" "R5" "R6" "R7"); destination reaches ("R2")
+      spine kind walk, family ((gate1))
+        R1 -> R3, device absent: source reaches ("R1" "R2" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R3")
           graph cut in this direction: YES
-        R2 -> R1, device absent: source reaches ("R2"); destination reaches ("R1" "R3" "R4" "R5" "R6" "R7")
+        R3 -> R1, device absent: source reaches ("R3"); destination reaches ("R1" "R2" "R4" "R5" "R6" "R7" "R8")
           graph cut in this direction: YES
 
     gate2 == (not receiver1)
@@ -33701,28 +33713,28 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
         beam dependency unresolved; requires sightline analysis.
       positive pressure alternatives nil; individually mandatory nil
       inverted aggregate: no positive keeper demand inferred.
-      spine mode walking, family ((gate2))
-        R1 -> R6, device absent: source reaches ("R1" "R2" "R3" "R4" "R5"); destination reaches ("R6" "R7")
+      spine kind walk, family ((gate2))
+        R1 -> R7, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R7" "R8")
           graph cut in this direction: YES
-        R6 -> R1, device absent: source reaches ("R6" "R7"); destination reaches ("R1" "R2" "R3" "R4" "R5")
+        R7 -> R1, device absent: source reaches ("R7" "R8"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: YES
 
     gate3 == plate1
       state open: state == aggregate; empty-type premises (jammer)
       state recording-open: state == aggregate; empty-type premises (jammer)
-      controller plate1: PRESSURE; position location6; region R6
+      controller plate1: PRESSURE; position location6; region R7
       positive pressure alternatives ((plate1)); individually mandatory (plate1)
       conditional shortage: available eligible ON witnesses < 1 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate3))
-        R6 -> R7, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R7")
+      spine kind walk, family ((gate3))
+        R7 -> R8, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7"); destination reaches ("R8")
           graph cut in this direction: YES
-          mandatory pressure plate1 at R6: APPROACH-ONLY
+          mandatory pressure plate1 at R7: APPROACH-ONLY
             KEEPER-OBLIGATED candidate while device state requires this aggregate;
             permanent stranding UNRESOLVED (movement and lifecycle coverage).
-        R7 -> R6, device absent: source reaches ("R7"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
+        R8 -> R7, device absent: source reaches ("R8"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6" "R7")
           graph cut in this direction: YES
-          mandatory pressure plate1 at R6: DEPARTURE-ONLY
+          mandatory pressure plate1 at R7: DEPARTURE-ONLY
 
     gate4 == plate2
       state open: state == aggregate; empty-type premises (jammer)
@@ -33731,7 +33743,15 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives ((plate2)); individually mandatory (plate2)
       conditional shortage: available eligible ON witnesses < 1 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      no movement-spine occurrence; nonmovement function UNRESOLVED, not inert.
+      spine kind stairs, family ((gate4))
+        R1 -> R2, device absent: source reaches ("R1" "R3" "R4" "R5" "R6" "R7" "R8"); destination reaches ("R2")
+          graph cut in this direction: YES
+          mandatory pressure plate2 at R1: APPROACH-ONLY
+            KEEPER-OBLIGATED candidate while device state requires this aggregate;
+            permanent stranding UNRESOLVED (movement and lifecycle coverage).
+        R2 -> R1, device absent: source reaches ("R2"); destination reaches ("R1" "R3" "R4" "R5" "R6" "R7" "R8")
+          graph cut in this direction: YES
+          mandatory pressure plate2 at R1: DEPARTURE-ONLY
 
     gate5 == (and receiver2 plate3)
       state open: state == aggregate; empty-type premises (jammer)
@@ -33742,36 +33762,36 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives ((plate3)); individually mandatory (plate3)
       conditional shortage: available eligible ON witnesses < 1 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate5))
-        R1 -> R3, device absent: source reaches ("R1" "R2" "R6" "R7"); destination reaches ("R3" "R4" "R5")
+      spine kind walk, family ((gate5))
+        R1 -> R4, device absent: source reaches ("R1" "R2" "R3" "R7" "R8"); destination reaches ("R4" "R5" "R6")
           graph cut in this direction: YES
           mandatory pressure plate3 at R1: APPROACH-ONLY
             KEEPER-OBLIGATED candidate while device state requires this aggregate;
             permanent stranding UNRESOLVED (movement and lifecycle coverage).
-        R3 -> R1, device absent: source reaches ("R3" "R4" "R5"); destination reaches ("R1" "R2" "R6" "R7")
+        R4 -> R1, device absent: source reaches ("R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R7" "R8")
           graph cut in this direction: YES
           mandatory pressure plate3 at R1: DEPARTURE-ONLY
 
     gate6 == plate4
       state open: state == aggregate; empty-type premises (jammer)
       state recording-open: state == aggregate; empty-type premises (jammer)
-      controller plate4: PRESSURE; position location15; region R4
+      controller plate4: PRESSURE; position location15; region R5
       positive pressure alternatives ((plate4)); individually mandatory (plate4)
       conditional shortage: available eligible ON witnesses < 1 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate6))
-        R4 -> R5, device absent: source reaches ("R4"); destination reaches ("R5")
+      spine kind walk, family ((gate6))
+        R5 -> R6, device absent: source reaches ("R5"); destination reaches ("R6")
           graph cut in this direction: YES
-          mandatory pressure plate4 at R4: APPROACH-ONLY
+          mandatory pressure plate4 at R5: APPROACH-ONLY
             KEEPER-OBLIGATED candidate while device state requires this aggregate;
             permanent stranding UNRESOLVED (movement and lifecycle coverage).
-        R5 -> R4, device absent: source reaches ("R5"); destination reaches ("R4")
+        R6 -> R5, device absent: source reaches ("R6"); destination reaches ("R5")
           graph cut in this direction: YES
-          mandatory pressure plate4 at R4: DEPARTURE-ONLY
+          mandatory pressure plate4 at R5: DEPARTURE-ONLY
 
   explicit goal destinations (1); goal form (and (has-location agent1 location16) (ghost-stops-recorder))
     UNRESOLVED goal form (ghost-stops-recorder); no destination extracted.
-    agent1: location3 (R2) -> location16 (R5)
+    agent1: location3 (R3) -> location16 (R6)
       GRAPH-REQUIRED candidates (gate1 gate5 gate6); concrete necessity UNRESOLVED.
     connector1: initially location13; no explicit destination, crossings UNRESOLVED.
     connector2: initially location10; no explicit destination, crossings UNRESOLVED.
@@ -33862,24 +33882,28 @@ NH  NECESSITY HINTS  [grade per hint]
 --------------------------------------------------------------
   READING: a hint restates static limits as a candidate plan element for the Briefing (Problem-Solving Guide, Phase 1 step 3).  NECESSARY: every plan meets it, under the grade shown.  CANDIDATE: one way to meet a limit; others may exist.  A hint is not a plan, and a graph candidate is not a proof.
 
-  hints (12): 5 NECESSARY, 7 CANDIDATE
+  hints (13): 6 NECESSARY, 7 CANDIDATE
 
   H1 body budget (0)
     none
 
-  H2 keepers left behind (3)
+  H2 keepers left behind (4)
     H2.1  NECESSARY  [grade 2, graph candidate; S4 S1]
-      limit  crossing gate3 from R6 {location6} to R7 {location7} needs plate1 held; it lies on the R6 side only (approach-only)
-      hint   before crossing gate3 into R7, leave 1 body other than the crosser on plate1 (off the goal route)
-      note   coming back from R7 to R6 through gate3 needs the same plates held: the bodies stay until the crosser returns
+      limit  crossing gate3 from R7 {location6} to R8 {location7} needs plate1 held; it lies on the R7 side only (approach-only)
+      hint   before crossing gate3 into R8, leave 1 body other than the crosser on plate1 (off the goal route)
+      note   coming back from R8 to R7 through gate3 needs the same plates held: the bodies stay until the crosser returns
     H2.2  NECESSARY  [grade 2, graph candidate; S4 S1]
-      limit  crossing gate5 from R1 {location1 location10 location11 location12 location8 location9} to R3 {location14} needs plate3 held; it lies on the R1 side only (approach-only)
-      hint   before crossing gate5 into R3, leave 1 body other than the crosser on plate3 (goal route)
-      note   coming back from R3 to R1 through gate5 needs the same plates held: the bodies stay until the crosser returns
+      limit  crossing gate4 from R1 {location1 location11 location12 location8 location9} to R2 {location10} needs plate2 held; it lies on the R1 side only (approach-only)
+      hint   before crossing gate4 into R2, leave 1 body other than the crosser on plate2 (off the goal route)
+      note   coming back from R2 to R1 through gate4 needs the same plates held: the bodies stay until the crosser returns
     H2.3  NECESSARY  [grade 2, graph candidate; S4 S1]
-      limit  crossing gate6 from R4 {location15 location5} to R5 {location16} needs plate4 held; it lies on the R4 side only (approach-only)
-      hint   before crossing gate6 into R5, leave 1 body other than the crosser on plate4 (goal route)
-      note   coming back from R5 to R4 through gate6 needs the same plates held: the bodies stay until the crosser returns
+      limit  crossing gate5 from R1 {location1 location11 location12 location8 location9} to R4 {location14} needs plate3 held; it lies on the R1 side only (approach-only)
+      hint   before crossing gate5 into R4, leave 1 body other than the crosser on plate3 (goal route)
+      note   coming back from R4 to R1 through gate5 needs the same plates held: the bodies stay until the crosser returns
+    H2.4  NECESSARY  [grade 2, graph candidate; S4 S1]
+      limit  crossing gate6 from R5 {location15 location5} to R6 {location16} needs plate4 held; it lies on the R5 side only (approach-only)
+      hint   before crossing gate6 into R6, leave 1 body other than the crosser on plate4 (goal route)
+      note   coming back from R6 to R5 through gate6 needs the same plates held: the bodies stay until the crosser returns
 
   H3 beam-held devices (7)
     H3.1  NECESSARY  [grade 2; S1 RC]
@@ -33888,16 +33912,16 @@ NH  NECESSITY HINTS  [grade per hint]
       note   S1's receiver condition is necessary; RC gate/body bounds are conditional on its physical geometric enumeration, not all recording-view beams
       note   Recording sightlines, body/view assignment, forced transport and occupancy stability UNRESOLVED; geometric chains are not validated realizations
     H3.2  CANDIDATE  [grade 2; RC]
-      limit  physical geometric candidates to receiver1 with last connector at location10 (R1): least off-plate bodies 3
+      limit  physical geometric candidates to receiver1 with last connector at location10 (R2): least off-plate bodies 3
       hint   transmitter1 -> location2@2 -> location10@1 -> receiver1  risers box1, ground; bodies 3, off plates 3
       hint   transmitter1 -> location2@2 -> location9@5/2 -> location10@1 -> receiver1  risers box1, ground, ground; bodies 4, off plates 3, self-kept plate2
       note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
     H3.3  CANDIDATE  [grade 2; RC]
-      limit  physical geometric candidates to receiver1 with last connector at location13 (R2): least off-plate bodies 3
+      limit  physical geometric candidates to receiver1 with last connector at location13 (R3): least off-plate bodies 3
       hint   transmitter1 -> location2@2 -> location13@5/2 -> receiver1  risers box1, ground; bodies 3, off plates 3
       note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
     H3.4  CANDIDATE  [grade 2; RC]
-      limit  physical geometric candidates to receiver1 with last connector at location17 (R2): least off-plate bodies 3
+      limit  physical geometric candidates to receiver1 with last connector at location17 (R3): least off-plate bodies 3
       hint   transmitter1 -> location2@2 -> location17@1 -> receiver1  risers box1, ground; bodies 3, off plates 3
       hint   transmitter1 -> location2@2 -> location9@5/2 -> location17@1 -> receiver1  risers box1, ground, ground; bodies 4, off plates 3, self-kept plate2
       note   GEOMETRIC CANDIDATE, physical sightlines only; recording sightlines, body/view assignment and occupancy stability UNRESOLVED
@@ -33939,28 +33963,29 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
   CLASSES: DIRECT no premise; SUPPORTED premises available without this service; NEEDS <service> FIRST: installing this provider needs the service it will provide (a setup dependency); UNSUPPORTED IN SCOPE.  A service with only NEEDS-FIRST options is a SETUP QUESTION, not an impossibility.  "Through standing providers" repeats the test with premises supplied only by CONTROL, chains, corridors and equipment, never another jam, and is printed when that exposes a setup dependency a further jammer would hide.
   RECORDER SPLICED: physical view only; recording-view providers are not read.
 
-  goal actor agent1: start location3 (R2) -> goal location16 (R5)
-    transit door sets (R2 -> R5, 1): (gate1 gate5 gate6 ladder2)
+  goal actor agent1: start location3 (R3) -> goal location16 (R6)
+    transit door sets (R3 -> R6, 1): (gate1 gate5 gate6 ladder2)
       necessary: gate1 gate5 gate6 ladder2
-    return door sets (R5 -> R2, 0): none
+    return door sets (R6 -> R3, 0): none
       necessary: none
     final services: none (the goal names no receiver or controlled device)
     temporary services (in some transit set, not final): gate1 via receiver1, gate5 via plate3 receiver2, gate6 via plate4
       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
 
-  access from R2 (minimal door sets to each region; mode predicates not evaluated)
+  access from R3 (minimal door sets to each region; kind predicates not evaluated)
     R1  (gate1)
-    R2  ()
-    R3  (gate1 gate5)
-    R4  (gate1 gate5 ladder2)
-    R5  (gate1 gate5 gate6 ladder2)
-    R6  (gate1 gate2)
-    R7  (gate1 gate2 gate3)
+    R2  (gate1 gate4)
+    R3  ()
+    R4  (gate1 gate5)
+    R5  (gate1 gate5 ladder2)
+    R6  (gate1 gate5 gate6 ladder2)
+    R7  (gate1 gate2)
+    R8  (gate1 gate2 gate3)
 
   retrieval (start places of jammers, connectors and fans)
-    connector1  location13 (R2)
+    connector1  location13 (R3)
     connector1*  absent
-    connector2  location10 (R1)
+    connector2  location10 (R2)
     connector2*  absent
 
   services (8): 8 SUPPORTED, 0 SETUP QUESTION, 0 NO PROVIDER IN SCOPE

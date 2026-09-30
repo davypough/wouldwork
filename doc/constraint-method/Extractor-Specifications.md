@@ -96,11 +96,15 @@ S3  GATE-LABELLED REGION QUOTIENT                            grade 2
              traverse-via>), each with its clause list.
     Algorithm
       1 build a directed graph over locations; label each arc with its
-        clause list and its mode (walking/jumping/climbing).
-      2 contract arcs whose clause list is EMPTY, treating an arc as
+        door family and its kind (walk/stairs/jump/climb).  A fact splits
+        into one arc per kind its clauses infer (-traversal's clause kind
+        inference); an arc's doors are its clauses' means, i.e. without
+        static separators (staircase, edge, floor drive), which are never
+        doors.
+      2 contract arcs whose door family is EMPTY, treating an arc as
         bidirectional only when authored by traverse-via (not >).
         Record the contraction rule used; a clause naming a ladder or
-        screen is NOT empty.
+        screen is NOT empty; one naming only a staircase or an edge is.
       3 emit the quotient, its arcs with clauses, and per-arc
         directedness.
       4 flag any gate appearing on no arc (a gate that blocks no
@@ -1236,7 +1240,7 @@ database: source (HAS-POSITION), destination (AIMED-AT), control (the
 CONTROLS entry's clauses and mode, or "no CONTROLS entry"), and the exit arcs
 at the destination: every traversal arc read by S3's `traversal-arc-facts`
 that leaves the destination (a symmetric arc with the destination at either
-end; a directed arc with it as source), printed as mode, other endpoint,
+end; a directed arc with it as source), printed as kind, other endpoint,
 family and relation. Couplings (other devices on the same controller) are
 not listed here: S1's exclusion and equivalence pairs hold them, and T20's
 census will extend them.
@@ -1246,15 +1250,15 @@ census will extend them.
 Source: `tech/ladder.lisp`.
 
 - **Controls.** Nothing: a ladder has no CONTROLS entry and no state.
-- **Moves.** An agent from a climbing arc's source to its destination, one
-  way (`traverse-via>` climbing). A supported agent at the source lands on
-  the ground at the destination.
+- **Moves.** An agent across a climb-kind clause (one naming a ladder) from
+  its fact's source to its destination, one way (`traverse-via>`). A
+  supported agent at the source lands on the ground at the destination.
 - **Requires.** A ladder named in the clause positioned at the arc's source
   (enforced by `ladder-init-check`), every other means in the clause clear,
   and a safe destination.
 
 Instance rows, one per ladder instance: its HAS-POSITION location, then every
-traversal arc whose family names it, printed as mode, source, destination,
+traversal arc whose family names it, printed as kind, source, destination,
 family, and whether the ladder stands at that arc's source.
 
 ### 8.6 Checks (T19 A2–A6)
@@ -1289,20 +1293,22 @@ entry). With these, every public technology crelay-topo splices is COVERED.
 **8.7.1 Contract: jump.** Source: `tech/jump.lisp`.
 
 - **Controls.** Nothing: a jump has no CONTROLS entry and no state.
-- **Moves.** An agent across an authored jumping arc (symmetric, or one way
-  when directed), landing on the floor or on a box or held-tray top at the
+- **Moves.** An agent across a jump-kind clause -- one naming an edge, a wall
+  or a floor drive, or in a bare-level problem naming none across a level
+  difference -- (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the
   far end; locally, onto a box or held-tray top at its own location, and
   down from one.
 - **Requires.** The landing at most `*vertical-reach-limit*` above the launch
   elevation (the floor, or the top of the support the agent stands on).
-  Every clause member a gate, screen or wall. Each member not passable (a
+  Edges and floor drives are static and always passable; every other
+  clause member a gate, screen or wall. Each member not passable (a
   closed gate, a non-passable screen, every wall) has its top at most that
   limit above the launch. A safe destination. Downward and level landings
   are unrestricted. A grounded tray is no landing, nor the agent's own
   held tray.
 
 Instance rows. A reach-limit line, then one row per direction of every
-traversal arc of mode `jumping` (`traversal-arc-facts`, in its order; a
+traversal arc of kind `jump` (`traversal-arc-facts`, in its order; a
 symmetric arc prints its stored direction, then the reverse): source,
 destination, the clause, and the two floor levels (`LOCATION-ELEVATION`,
 staged start). One reading per clause state:
@@ -1462,8 +1468,9 @@ Those exclusions, reach, legal support use, occupancy, availability and actual
 view must still pass for JAM-TARGET. Gate bits are hypothetical; controllers
 are not propagated. No placement or action is asserted to be reachable.
 
-**stairs.** List every stairway traversal arc, its direction and alternative
-clause family. MOVE requires all means in the chosen clause passable for the
+**stairs.** List every stairs-kind traversal arc (a clause naming a staircase),
+its direction and alternative door family (the doors beside the staircase;
+NIL for the staircase alone). MOVE requires all means in the chosen clause passable for the
 mover and a safe destination, with no elevation-difference/equality restriction.
 A symmetric arc permits both directions; directed arcs permit only the authored
 one. Empty hands are required only when the clause's means impose that rule.
@@ -1471,7 +1478,7 @@ one. Empty hands are required only when the clause's means impose that rule.
 Acceptance before completion: claustro MC zero UNCOVERED; fixed MC/RC/H3 rows
 name gate1 and location2 for receiver1; engine query agreement and missing vs
 empty corridor distinctions; finite-height gate and occupancy qualification;
-jammer sightlines, gate assumptions and directional exclusions; stairway row
+jammer sightlines, gate assumptions and directional exclusions; stairs row
 and contract. Verify input state/facts unchanged, compile without warnings,
 regenerate claustro through its reporter, and compare full crelay/windtunnel
 profiles byte for byte against pre-change captures. No search or replay.
@@ -1956,7 +1963,7 @@ or a later crossing needs it again. ACCESS: minimal door sets from the goal
 actor's start region to every region. RETRIEVAL: each jammer, connector and
 fan with its start place and region. Access is to a site's own region;
 placement or pickup from another location within reach is not modelled.
-S3's mode predicates (elevation, jumps, ladder position) are not evaluated.
+S3's kind predicates (jump reach, ladder position) are not evaluated.
 
 **Output: profile section SD (after NH).** Scope and grade; goal actor,
 regions, transit and return sets, FINAL and TEMPORARY services; access and
@@ -2247,7 +2254,7 @@ row that is not EQUIVALENCE (FLAG or CHECK): keep the lift through the
 toggle by a support at the destination (S5's placement supports, less the
 ground), then leave through the barrier's exits; or leave the destination
 while the lift runs by an exit whose family does not name the barrier.
-Exits are MC's, grouped by mode; a note says each mode's own rule is not
+Exits are MC's, grouped by kind; a note says each kind's own rule is not
 evaluated.
 
 **H6 active at the start** [grade 1; S1, start state]. One CANDIDATE hint

@@ -12,7 +12,7 @@ MC  MECHANIC COVERAGE  [grade 1]
     beam-relay        COVERED    contract (also S6 RC; RL scenario)
     gate              COVERED    extractors S1 S3 S4
     visibility        COVERED    infrastructure -- line of sight; read by S6
-    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+    walkability       COVERED    infrastructure -- derives walk-kind facts; read by S3
 
   UNCOVERED (0):
     READING: UNCOVERED means no static contract is declared for that technology.  The coverage gate (Problem-Solving Guide, Phase 0 step 2) requires a hand contract in the Briefing, or a component, before going on.  COVERED by extractors or infrastructure means the named components carry its static consequences; it is not a contract.
@@ -110,7 +110,7 @@ MC  MECHANIC COVERAGE  [grade 1]
 S0  TYPE EXTENT CENSUS  [grade 1]
 --------------------------------------------------------------
 
-  type extents (54 types)
+  type extents (53 types)
     agent  1  authored  SINGLETON
     angled-blower  0  optional  EMPTY
     angled-blower+floor-blower  0  synthesized  EMPTY  components floor-blower angled-blower
@@ -156,7 +156,6 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     threat  0  authored  EMPTY  components gun
     toggle-plate  0  optional  EMPTY
     transmitter  2  authored
-    traversal-mode  4  authored
     tray  0  optional  EMPTY
     vertical-object  16  authored  components location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun switch pressure-plate toggle-plate floor-blower angled-blower
     visibility-object  10  authored  components gate transmitter receiver floor-repeater wall-repeater gun location
@@ -286,8 +285,8 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
     los-via  static  key (1 3)  value (2)  signature (visibility-object list visibility-object)
     on  dynamic  key (1)  value (2)  signature (support-occupant support)
     screen-segment>  static  key (1)  value (2 3 4 5 6)  signature (screen rational rational rational rational rational)
-    traverse-via  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
-    traverse-via>  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
+    traverse-via  static  key (1 3)  value (2)  signature (location list location)
+    traverse-via>  static  key (1 3)  value (2)  signature (location list location)
     wall-segment>  static  key (1)  value (2 3 4 5 6)  signature (wall rational rational rational rational rational)
     window-segment>  static  key (1)  value (2 3 4 5 6)  signature (window rational rational rational rational rational)
 
@@ -787,10 +786,10 @@ S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 
   traversal arcs read (6)
     6 symmetric (traverse-via), 0 directed (traverse-via>)
-    mode walking: 6 arcs, 3 with an empty family
+    kind walk: 6 arcs, 3 with an empty family
 
-  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY clause family.  Arcs of traverse-via> are never contracted, whatever their family.
-  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries its own predicate -- an elevation equality, a jump rule -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
+  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY door family.  Static separators -- staircases, edges, floor drives -- are not doors.  Arcs of traverse-via> are never contracted, whatever their family.
+  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries its own predicate -- a jump's reach limit, a ladder's position -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
 
   regions (2 over 4 endpoints of type location)
     R1  (3): location1 location2 location3
@@ -798,10 +797,10 @@ S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 
   region crossings (1 rows: 1 spine, 0 composed)
     NOTE: these rows are the transitive CLOSURE, one minimal door-set per location pair. The spine preserves reachability; it is not a physical doorway count.
-    R1 <-> R2  mode walking  family ((gate1))  3 location arcs  SPINE
+    R1 <-> R2  kind walk  family ((gate1))  3 location arcs  SPINE
 
   adjacency spine (1)
-    R1 <-> R2  mode walking  family ((gate1))
+    R1 <-> R2  kind walk  family ((gate1))
 
   doors on arcs (1)
     gate1
@@ -832,7 +831,7 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1))
+      spine kind walk, family ((gate1))
         R1 -> R2, device absent: source reaches ("R1"); destination reaches ("R2")
           graph cut in this direction: YES
         R2 -> R1, device absent: source reaches ("R2"); destination reaches ("R1")
@@ -949,7 +948,7 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
     temporary services (in some transit set, not final): gate1 via receiver1
       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
 
-  access from R1 (minimal door sets to each region; mode predicates not evaluated)
+  access from R1 (minimal door sets to each region; kind predicates not evaluated)
     R1  ()
     R2  (gate1)
 

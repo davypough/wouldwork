@@ -49,7 +49,9 @@ Check, item by item: boundary and internal segments (walls, edges, windows, gate
 their endpoints, names and heights; location coordinates and levels; fixture positions
 (plates, ladders, recorders, transmitters, receivers) and apparatus coordinates; hue
 markings; starting places of movable objects and starting pairings; CONTROLS wiring and
-modes; authored traversal (stairs, jumps, ladders) including the barriers each crosses,
+modes; authored traversal facts, whose brackets must hold whatever the diagram draws
+between the two locations (staircases, edges, ladders, gates; an arrowhead means
+`traverse-via>`),
 and reach facts and disallowals; and objects shown in one but not the other. Also flag spec
 content that is commented out, and anything the diagram cannot settle. Record each finding
 in the Briefing's **Spec-diagram check** as MATCH, MISMATCH (with both readings) or
@@ -171,10 +173,11 @@ MOVE takes a list of route transitions. Formats illustrated by claustro-topo:
 (move agent1 ((walk location1 (gate1 gate3) location4)))
 (move agent1 ((ladder location7 (ladder1) location1)))
 (move agent1 ((jump (location10 ground) nil (location10 box2))))
-(move agent1 ((jump (location10 box2) nil (location12 ground))))
-(move agent1 ((stairs location13 nil location11)))
+(move agent1 ((jump (location10 box2) (edge1) (location12 ground))))
+(move agent1 ((stairs location13 (staircase1) location11)))
 ```
-Use the actual route barriers; NIL means none. Plain MOVE is accepted. Actions
+The witness is the clause of the pair's traversal fact that the move uses, staircases
+and edges included; NIL means an empty clause. Plain MOVE is accepted. Actions
 with multiple outcomes need their printed phrase to select the outcome, e.g.
 `(jam-target > agent1 jams gate5 with jammer1 at location8 on ground)`.
 Validation accepts mixed plain and timestamped action lists.

@@ -1,6 +1,6 @@
 # Separator-based traversal — implementation plan
 
-Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0-3 closed 2026-09-29; Phase 4 next.
+Status: PLAN, agreed with D on 2026-09-29 (D1-D7 approved). Phases 0-4 closed 2026-09-29; plan complete.
 Base test case: probs/problem-rumin-topo.lisp. Then claustro-topo, corner-topo, crelay-topo;
 phobia-topo and windtunnel-topo author no traverse-via facts but must still stage.
 Implementation happens in a fresh session. Work one phase at a time; D reloads with
@@ -358,6 +358,34 @@ Phase 4 — analysis tooling and docs. `topo-lower-bound.lisp`, `-support-elevat
 `constraint-profile.lisp`, the Guide. Acceptance: regenerate rumin-topo's static profile;
 S3 regions and SD door sets list no edges or staircases as doors; MC contracts describe
 kinds.
+
+Phase 4 result (2026-09-29, done):
+- topo-lower-bound.lisp and -support-elevation.lisp were already migrated (Phases 1 and 2).
+- tech/constraint-profile.lisp: TRAVERSAL-SIGNATURE-LAYOUT reads (location $list location); it
+  used to look for a mode position, so S3 and every arc reader would have failed on the new
+  relation.  TRAVERSAL-ARC-FACTS keeps its (relation kind source family destination) shape: a
+  fact splits into one arc per clause kind (new TRAVERSAL-ARC-KIND-FAMILIES, using the engine's
+  TRAVERSAL-CLAUSE-SEGMENT-KIND at the staged start), and an arc's family holds the clauses'
+  MEANS only (new TRAVERSAL-ARC-DOOR-FAMILY): staircases, edges and floor drives are never
+  doors, so a stairs or jump arc naming nothing else is empty and contracts, as the old
+  stairway/jumping () facts did.  Jump and stairs instance reports select JUMP and STAIRS;
+  printed traversal "mode" labels read "kind"; MC contract text for jump, ladder, stairs and
+  walkability describes kinds.
+- Docs: Problem-Solving-Guide.md (claustro MOVE witnesses name edge1 and staircase1; the
+  spec-diagram check says a fact's brackets hold what the diagram draws, arrowhead =
+  traverse-via>); Extractor-Specifications.md (S3 steps 1-2, 8.4/8.5/8.7 wording, stairs).
+- rumin-topo profile regenerated.  No staircase or edge appears after S0; doors on arcs are
+  gate1-gate6 and ladder2.  Arcs 74 -> 56: walk 70 -> 49 (the 21 cross-level pairs dropped
+  by D4a, as in Phase 3), jump 1 -> 3 (edge1, edge4, edge2/edge3), stairs 2 -> 3.  Regions
+  7 -> 8: location10 leaves R1 because its stairs fact with location9 is now ((gate4 staircase3)),
+  a spec change made before Phase 0; R1 <-> R2 is a new stairs SPINE row with family ((gate4)).
+- The other five topo profiles regenerated (no scenario, as before).  Door lists unchanged
+  apart from wording; no edge, staircase or floor drive appears as a door.  Walk arcs fell
+  by exactly Phase 3's dropped cross-level pairs: claustro 48 -> 46, crelay 190 -> 171,
+  phobia 97 -> 82 (9 symmetric pairs, 3 directed pairs); corner and windtunnel unchanged.
+  Only phobia's regions moved (10 -> 11): location10 and location11 separate, because the
+  loft pair's inert walk () is gone (D4a); only fgears1's lift reaches location11.
+- PHASE 4 CLOSED 2026-09-29.
 
 ## 10. Risks
 

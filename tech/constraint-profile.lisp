@@ -1910,8 +1910,8 @@
    positions of the relation's signature.  -traversal.lisp says the engine mirrors a
    relation whose argument types repeat, and that the repeated type here is the location
    type -- so the REPETITION is the endpoint marker, and the extractor reads it off the
-   signature rather than being told a name (A18).  The mode position and the fluent family
-   position each occur once and are passed over."
+   signature rather than being told a name (A18).  The fluent family position occurs once
+   and is passed over."
   (let ((signature (gethash *traversal-symmetric-relation* *static-relations*)))
     (find-if (lambda (spec)
                (and (census-spec-type-names spec)
@@ -1920,48 +1920,81 @@
 
 
 (defun traversal-signature-layout ()
-  "Where each part of a traversal proposition sits, as (mode-position family-position
-   source-position destination-position), all 1-based into the signature and therefore
-   directly usable as NTH into a proposition, whose first element is the relation name.
-   Computed rather than assumed: the endpoint type is the repeated one, the family is the
-   relation's single fluent, and the mode is whatever declared type is left."
+  "Where each part of a traversal proposition sits, as (family-position source-position
+   destination-position), all 1-based into the signature and therefore directly usable as
+   NTH into a proposition, whose first element is the relation name.  Computed rather than
+   assumed: the endpoint type is the repeated one and the family is the relation's single
+   fluent."
   (let* ((signature (gethash *traversal-symmetric-relation* *static-relations*))
          (endpoint-type (traversal-endpoint-type))
          (fluents (gethash *traversal-symmetric-relation* *fluent-relation-indices*))
-         (endpoints nil)
-         (mode-position nil))
+         (endpoints nil))
     (loop for spec in signature
           for position from 1
-          do (cond ((equal spec endpoint-type) (push position endpoints))
-                   ((member position fluents))
-                   ((census-spec-type-names spec) (setf mode-position position))))
+          when (equal spec endpoint-type)
+            do (push position endpoints))
     (setf endpoints (nreverse endpoints))
-    (list mode-position (first fluents) (first endpoints) (second endpoints))))
+    (list (first fluents) (first endpoints) (second endpoints))))
+
+
+(defun traversal-arc-door-family (clauses)
+  "CLAUSES, each sorted by name, as one kind's door family: NIL when one is empty;
+   otherwise the distinct clauses no other clause is a proper subset of, shortest first."
+  (unless (member nil clauses)
+    (let ((distinct (remove-duplicates clauses :test #'equal)))
+      (sort (remove-if (lambda (clause)
+                         (some (lambda (other)
+                                 (and (not (equal other clause)) (subsetp other clause)))
+                               distinct))
+                       distinct)
+            #'traversal-clause-precedes-p))))
+
+
+(defun traversal-arc-kind-families (source family destination)
+  "FAMILY split by clause kind, as (kind door-family) entries in
+   *TRAVERSAL-KIND-PREFERENCE* order.  A clause's kind is the engine's segment kind at the
+   staged start, so a bare-level walk across a level difference reads as a jump here
+   exactly as the engine reads it.  Its doors are its MEANS: the clause without its static
+   separators (staircase, edge, floor drive), which have no state and are never doors.  A
+   kind's door family is NIL, the direct case, when any of its clauses has no means left."
+  (let ((groups nil))
+    (dolist (clause (or family (list nil)))
+      (let ((kind (funcall (symbol-function 'traversal-clause-segment-kind)
+                           *start-state* source destination clause))
+            (means (second (funcall (symbol-function 'traversal-clause-profile) clause))))
+        (push (sort (copy-list means) #'string< :key #'symbol-name) (getf groups kind))))
+    (loop for kind in *traversal-kind-preference*
+          for clauses = (getf groups kind)
+          when clauses
+            collect (list kind (traversal-arc-door-family clauses)))))
 
 
 (defun traversal-arc-facts ()
-  "Every traversal edge in the static database, normalized to (relation mode source family
-   destination) whatever order the signature declares.  Authored and derived edges arrive
-   identically: -walkability-coordinates derives the walking edges from raw segment
-   geometry during initialization and asserts them as ordinary propositions of these two
-   relations, so the extractor reads two relations and never the geometry behind them.
-   A symmetric arc has its endpoints put in name order, so the two spellings of one
-   undirected crossing collapse to one entry whether or not the engine stored a mirror; a
-   directed arc keeps the order it was asserted in."
+  "Every traversal edge in the static database, normalized to (relation kind source family
+   destination) whatever order the signature declares.  One fact gives one arc per kind
+   its clauses infer (TRAVERSAL-ARC-KIND-FAMILIES), so a pair crossable by stairs or by a
+   jump yields a STAIRS arc and a JUMP arc, as the mode facts it replaced did.  Authored
+   and derived edges arrive identically: -walkability-coordinates derives the walk-kind
+   facts from raw segment geometry during initialization and asserts them as ordinary
+   propositions of these two relations, so the extractor reads two relations and never the
+   geometry behind them.  A symmetric arc has its endpoints put in name order, so the two
+   spellings of one undirected crossing collapse to one entry whether or not the engine
+   stored a mirror; a directed arc keeps the order it was asserted in."
   (let ((layout (traversal-signature-layout))
         (arcs nil))
     (dolist (fact (list-static-db))
       (when (and (consp fact)
                  (member (first fact) (list *traversal-symmetric-relation*
                                             *traversal-directed-relation*)))
-        (let ((source (nth (third layout) fact))
-              (destination (nth (fourth layout) fact)))
+        (let ((source (nth (second layout) fact))
+              (destination (nth (third layout) fact)))
           (when (and (eq (first fact) *traversal-symmetric-relation*)
                      (string> (symbol-name source) (symbol-name destination)))
             (rotatef source destination))
-          (pushnew (list (first fact) (nth (first layout) fact) source
-                         (nth (second layout) fact) destination)
-                   arcs :test #'equal))))
+          (dolist (entry (traversal-arc-kind-families source (nth (first layout) fact)
+                                                      destination))
+            (pushnew (list (first fact) (first entry) source (second entry) destination)
+                     arcs :test #'equal)))))
     (sort arcs #'string<
           :key (lambda (arc) (format nil "~A|~A|~A|~A"
                                      (third arc) (fifth arc) (second arc) (first arc))))))
@@ -2031,7 +2064,7 @@
 
 
 (defun quotient-arc-rows (arcs names)
-  "Step 3.  One row per (from, to, mode, family, directedness), carrying the count of
+  "Step 3.  One row per (from, to, kind, family, directedness), carrying the count of
    location arcs standing behind it (A20).  Printing every location arc would bury the
    quotient in the thing it abstracts; printing one row without the count would hide that a
    region pair is joined by several independent doorways, which is the first thing S4 must
@@ -2057,7 +2090,7 @@
 
 
 (defun report-traversal-arcs (arcs)
-  "Step 1.  What was read, by relation and by mode, before any contraction.  Printed first
+  "Step 1.  What was read, by relation and by kind, before any contraction.  Printed first
    so a reader can tell an empty quotient caused by an empty input from one caused by total
    contraction."
   (format t "~%  traversal arcs read (~D)~%" (length arcs))
@@ -2066,11 +2099,11 @@
           *traversal-symmetric-relation*
           (count *traversal-directed-relation* arcs :key #'first)
           *traversal-directed-relation*)
-  (dolist (mode (sort (remove-duplicates (mapcar #'second arcs))
+  (dolist (kind (sort (remove-duplicates (mapcar #'second arcs))
                       #'string< :key #'symbol-name))
-    (let ((of-mode (remove-if-not (lambda (arc) (eq mode (second arc))) arcs)))
-      (format t "    mode ~(~A~): ~D arc~:P, ~D with an empty family~%"
-              mode (length of-mode) (count-if #'null of-mode :key #'fourth)))))
+    (let ((of-kind (remove-if-not (lambda (arc) (eq kind (second arc))) arcs)))
+      (format t "    kind ~(~A~): ~D arc~:P, ~D with an empty family~%"
+              kind (length of-kind) (count-if #'null of-kind :key #'fourth)))))
 
 
 (defun report-region-blocks (blocks arcs endpoints)
@@ -2078,11 +2111,12 @@
    in the output as step 2 requires, and with the qualification that makes the blocks
    readable: this is a DOOR-COST quotient and not a reachability quotient."
   (format t "~%  contraction rule: two endpoints share a region when an arc of ~(~A~) ~
-             joins them with an EMPTY clause family.  Arcs of ~(~A~) are never contracted, ~
+             joins them with an EMPTY door family.  Static separators -- staircases, edges, ~
+             floor drives -- are not doors.  Arcs of ~(~A~) are never contracted, ~
              whatever their family.~%"
           *traversal-symmetric-relation* *traversal-directed-relation*)
-  (format t "  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries ~
-             its own predicate -- an elevation equality, a jump rule -- which this ~
+  (format t "  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries ~
+             its own predicate -- a jump's reach limit, a ladder's position -- which this ~
              extractor does not evaluate, having no state to evaluate it in.  Two ~
              endpoints in one region therefore need not be mutually reachable.~%")
   (format t "~%  regions (~D over ~D endpoint~:P of type ~(~A~))~%"
@@ -2163,7 +2197,7 @@
 
 
 (defun keeper-row-next (row region)
-  "Directedness is preserved, including for door-free and climbing edges."
+  "Directedness is preserved, including for door-free and climb-kind edges."
   (cond ((equal region (first row)) (second row))
         ((and (eq (fifth row) :both) (equal region (second row))) (first row))))
 
@@ -2242,7 +2276,7 @@
 
 (defun report-quotient-arcs (rows)
   "Step 3's second half.  Every crossing between two regions, with its clause family, its
-   mode, its directedness, how many location arcs stand behind it, and whether it is part
+   kind, its directedness, how many location arcs stand behind it, and whether it is part
    of the adjacency SPINE or a COMPOSITION of spine rows.
    THE DISTINCTION IS THE POINT.  The coordinate derivation emits a minimal door-set for
    every LOCATION PAIR, so these rows are a transitive closure and not an adjacency list:
@@ -2257,7 +2291,7 @@
                location pair. The spine preserves reachability; it is not a physical doorway count.~%")
     (dolist (entry classified)
       (let ((row (first entry)))
-        (format t "    ~A ~A ~A  mode ~(~A~)  family ~(~A~)  ~D location arc~:P  ~A~@[ via ~(~A~)~]~%"
+        (format t "    ~A ~A ~A  kind ~(~A~)  family ~(~A~)  ~D location arc~:P  ~A~@[ via ~(~A~)~]~%"
                 (first row)
                 (if (eq (fifth row) :both) "<->" "-->")
                 (second row)
@@ -2275,7 +2309,7 @@
     (dolist (entry classified)
       (when (eq (second entry) :spine)
         (let ((row (first entry)))
-          (format t "    ~A ~A ~A  mode ~(~A~)  family ~(~A~)~%"
+          (format t "    ~A ~A ~A  kind ~(~A~)  family ~(~A~)~%"
                   (first row)
                   (if (eq (fifth row) :both) "<->" "-->")
                   (second row) (third row)
@@ -2492,7 +2526,7 @@
           ((null crossings)
            (format t "      no movement-spine occurrence; nonmovement function UNRESOLVED, not inert.~%"))
           (t (dolist (row crossings)
-               (format t "      spine mode ~(~A~), family ~(~S~)~%" (third row) (fourth row))
+               (format t "      spine kind ~(~A~), family ~(~S~)~%" (third row) (fourth row))
                (report-keeper-direction (first row) (second row) device mandatory spine facts names)
                (when (eq (fifth row) :both)
                  (report-keeper-direction (second row) (first row) device mandatory spine facts names)))))))
@@ -4766,7 +4800,7 @@ counted as layer-blind roots."
 ;;; sits here, after every block it reads, because this file is ordered callees-first.
 ;;;
 ;;; SUBSTRATE VOCABULARY (C3).  Technology names, the types FLOOR-BLOWER, LADDER, RECORDER,
-;;; WALL and VAULTABLE-OBJECT, the traversal mode JUMPING, the relations HAS-POSITION, AIMED-AT
+;;; WALL and VAULTABLE-OBJECT, the traversal kinds JUMP and STAIRS, the relations HAS-POSITION, AIMED-AT
 ;;; and CONTROLS, and the settings *VERTICAL-REACH-LIMIT* and *MAX-RECORDER-CYCLES* are named:
 ;;; each is a tech/ interface, and a contract is by definition a statement about one
 ;;; technology.  No problem object name appears; every instance comes from the staged
@@ -4803,16 +4837,16 @@ counted as layer-blind roots."
      "holding a jammer, reachable placement, no directional JAM-DISALLOWED> exclusion, legal placement/support/view and target sightline from the placed jammer's top. Ground/plate/box sightline rows are candidates only; gate bits are hypotheses")
     ("jump" :contract "also S3 S5" report-jump-instances
      "nothing; a jump has no CONTROLS entry and no state"
-     "an agent across an authored jumping arc (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one"
-     "the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); every clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray")
+     "an agent across a jump-kind clause -- one naming an edge, a wall or a floor drive, or in a bare-level problem naming none across a level difference -- (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one"
+     "the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); edges and floor drives are static and always passable; every other clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray")
     ("ladder" :contract "also S3" report-ladder-instances
      "nothing; a ladder has no CONTROLS entry and no state"
-     "an agent from a climbing arc's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination"
+     "an agent across a climb-kind clause (one naming a ladder) from its fact's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination"
      "a ladder named in the arc's clause positioned at its source (ladder-init-check), every other means in the clause clear, and a safe destination")
     ("stairs" :contract "also S3" report-stairs-instances
-     "nothing; stairway has no device state"
-     "an agent along an authored stairway arc, in its permitted direction, through a MOVE stairs segment"
-     "all means of one alternative clause passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them")
+     "nothing; a staircase has no state"
+     "an agent across a stairs-kind clause (one naming a staircase), in its fact's permitted direction, through a MOVE stairs segment"
+     "all means of one alternative clause (the clause without its staircase) passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them")
     ("plate" :extractors "S1 S2 T6")
     ("reachability" :infrastructure "reach relations; read by S4")
     ("recorder" :contract "also S2 RO CP" report-recorder-instances
@@ -4824,11 +4858,11 @@ counted as layer-blind roots."
     ("topo-lower-bound" :infrastructure "search pruning bound")
     ("tray" :extractors "S2 S5")
     ("visibility" :infrastructure "line of sight; read by S6")
-    ("walkability" :infrastructure "derives walking arcs; read by S3")
+    ("walkability" :infrastructure "derives walk-kind facts; read by S3")
     ("wall-blower" :contract "also S1 S3 RC CC" report-wall-blower-instances
      "its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree"
      "horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination"
-     "own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walking arcs labelled by the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge"))
+     "own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walk-kind clauses naming the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge"))
   "The contract registry, one entry per public technology name, section 8.3 of the
    specification.  An entry is (NAME KIND NOTE) for KIND :EXTRACTORS, whose NOTE names the
    components that already carry the technology's static consequences, and for
@@ -4890,24 +4924,24 @@ counted as layer-blind roots."
 
 
 (defun report-mechanic-exits (location arcs)
-  "Every traversal arc that leaves LOCATION, grouped by mode: a symmetric arc with LOCATION
+  "Every traversal arc that leaves LOCATION, grouped by kind: a symmetric arc with LOCATION
    at either end, or a directed arc with LOCATION as its source.  These are S3's input arcs,
-   read before any contraction; the mode predicates -- elevation, jump clearance -- are not
+   read before any contraction; the kind predicates -- jump reach and clearance -- are not
    evaluated, so an arc listed here is a candidate exit, not a legal move."
   (let ((exits (remove-if-not (lambda (arc)
                                 (or (eq (third arc) location)
                                     (and (eq (first arc) *traversal-symmetric-relation*)
                                          (eq (fifth arc) location))))
                               arcs)))
-    (format t "      exits from ~(~A~) (~D), by mode; each mode's own predicate is not evaluated~%"
+    (format t "      exits from ~(~A~) (~D), by kind; each kind's own predicate is not evaluated~%"
             location (length exits))
-    (dolist (mode (sort (remove-duplicates (mapcar #'second exits))
+    (dolist (kind (sort (remove-duplicates (mapcar #'second exits))
                         #'string< :key #'symbol-name))
       (let ((texts (sort (loop for arc in exits
-                               when (eq (second arc) mode)
+                               when (eq (second arc) kind)
                                  collect (mechanic-exit-text location arc))
                          #'string<)))
-        (format t "        ~(~A~) (~D): ~{~A~^, ~}~%" mode (length texts) texts)))))
+        (format t "        ~(~A~) (~D): ~{~A~^, ~}~%" kind (length texts) texts)))))
 
 
 (defun report-floor-blower-row (blower facts arcs controls)
@@ -5040,15 +5074,15 @@ counted as layer-blind roots."
 
 
 (defun report-jump-instances ()
-  "The jump contract's instance rows: the reach limit, then every traversal arc of mode
-   JUMPING in S3's arc order, a symmetric arc in its stored direction and then the reverse.
+  "The jump contract's instance rows: the reach limit, then every traversal arc of kind
+   JUMP in S3's arc order, a symmetric arc in its stored direction and then the reverse.
    Levels and tops are read from the staged start; they are static."
   (let ((state *start-state*)
-        (arcs (remove-if-not (lambda (arc) (eq (second arc) 'jumping)) (traversal-arc-facts))))
+        (arcs (remove-if-not (lambda (arc) (eq (second arc) 'jump)) (traversal-arc-facts))))
     (format t "    reach limit ~A (*vertical-reach-limit*); a raise is the least launch elevation above the source floor, reached by standing on a support (S5 tops)~%"
             *vertical-reach-limit*)
     (unless arcs
-      (format t "    no jumping arc~%"))
+      (format t "    no jump arc~%"))
     (dolist (arc arcs)
       (report-jump-direction (third arc) (fifth arc) (fourth arc) state)
       (when (eq (first arc) *traversal-symmetric-relation*)
@@ -5122,9 +5156,10 @@ counted as layer-blind roots."
 
 
 (defun report-stairs-instances ()
-  "Authored stairway arcs, retaining alternative clauses and direction."
+  "Stairs-kind arcs, retaining alternative clauses and direction.  A family lists only
+   the doors beside the staircase; NIL means the staircase alone."
   (dolist (arc (traversal-arc-facts))
-    (when (eq (second arc) 'stairway)
+    (when (eq (second arc) 'stairs)
       (format t "    ~(~A~) ~:[<->~;->~] ~(~A~); family ~(~S~)~%"
               (third arc) (eq (first arc) *traversal-directed-relation*)
               (fifth arc) (fourth arc)))))
@@ -5195,7 +5230,7 @@ counted as layer-blind roots."
 
 
 (defun equipment-arc-text (arc)
-  "One traversal ARC as mode and endpoints with direction; S3 prints its clauses."
+  "One traversal ARC as kind and endpoints with direction; S3 prints its clauses."
   (format nil "~(~A~) ~(~A~)~:[<->~;->~]~(~A~)"
           (second arc) (third arc) (eq (first arc) *traversal-directed-relation*) (fifth arc)))
 
@@ -5977,7 +6012,7 @@ counted as layer-blind roots."
                       (format nil "~(~A~) SUSTAINED by ~(~{~A~^, ~}~); it drops to ~(~A~) if they stop or lose their fan, unless it first stands ON a support there or leaves"
                               (first entry) (second entry) (getf record :source)))
                     (getf record :occupants)))
-    (format t "      exits from ~(~A~) (mode predicates not evaluated): ~{~A~^, ~}~%"
+    (format t "      exits from ~(~A~) (kind predicates not evaluated): ~{~A~^, ~}~%"
             (getf record :destination) (getf record :exits)))
   (let ((agreement (getf result :agreement)))
     (format t "  engine agreement: mounting ~:[DISAGREES~;agrees~]; removal ~:[DISAGREES~;agrees~]; boarding ~:[DISAGREES~;agrees~]~%"
@@ -6438,15 +6473,15 @@ counted as layer-blind roots."
 
 
 (defun hint-exit-text (location arcs)
-  "LOCATION's exits among ARCS, grouped by mode as MC prints them, groups joined by '; '."
+  "LOCATION's exits among ARCS, grouped by kind as MC prints them, groups joined by '; '."
   (format nil "~{~A~^; ~}"
-          (loop for mode in (sort (remove-duplicates (mapcar #'second arcs)) #'string<
+          (loop for kind in (sort (remove-duplicates (mapcar #'second arcs)) #'string<
                                   :key #'symbol-name)
                 collect (let ((texts (sort (loop for arc in arcs
-                                                 when (eq (second arc) mode)
+                                                 when (eq (second arc) kind)
                                                    collect (mechanic-exit-text location arc))
                                            #'string<)))
-                          (format nil "~(~A~) (~D): ~{~A~^, ~}" mode (length texts) texts)))))
+                          (format nil "~(~A~) (~D): ~{~A~^, ~}" kind (length texts) texts)))))
 
 
 (defun hint-lift-rows (controls arcs)
@@ -6484,7 +6519,7 @@ counted as layer-blind roots."
                                        (format nil "no exit from ~(~A~) avoids ~(~A~): the lift is kept ~
                                                     only by a support there"
                                                destination (third barrier))))
-                        :notes (list "each mode's own rule is not evaluated: a listed exit is a candidate, not a legal move"))
+                        :notes (list "each kind's own rule is not evaluated: a listed exit is a candidate, not a legal move"))
                   hints)))))))
 
 
@@ -7225,7 +7260,7 @@ counted as layer-blind roots."
                                                   set)))))
     (format t "      READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.~%")
     (when (getf phases :access)
-      (format t "~%  access from ~A (minimal door sets to each region; mode predicates not evaluated)~%"
+      (format t "~%  access from ~A (minimal door sets to each region; kind predicates not evaluated)~%"
               (getf phases :from))
       (dolist (region (sort (remove-duplicates (loop for region being the hash-values of names collect region)
                                                :test #'string=)

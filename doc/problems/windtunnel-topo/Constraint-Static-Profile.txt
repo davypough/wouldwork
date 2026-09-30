@@ -14,7 +14,7 @@ MC  MECHANIC COVERAGE  [grade 1]
     recorder          COVERED    contract (also S2 RO CP)
     step              COVERED    extractors S2 T6; boarding a fixed floor blower in the floor-blower contract, a gears-mounted fan in the floor-gears contract
     visibility        COVERED    infrastructure -- line of sight; read by S6
-    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+    walkability       COVERED    infrastructure -- derives walk-kind facts; read by S3
     wall-blower       COVERED    contract (also S1 S3 RC CC)
 
   UNCOVERED (0):
@@ -46,7 +46,7 @@ MC  MECHANIC COVERAGE  [grade 1]
   contract wall-blower
     controls  its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree
     moves     horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination
-    requires  own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walking arcs labelled by the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge
+    requires  own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walk-kind clauses naming the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge
     blower1  fixed complete fixture
       horizontal   location3 -> location6
       stream       elevation 1; width 4; base < stream <= top
@@ -56,7 +56,7 @@ MC  MECHANIC COVERAGE  [grade 1]
 S0  TYPE EXTENT CENSUS  [grade 1]
 --------------------------------------------------------------
 
-  type extents (60 types)
+  type extents (59 types)
     agent  2  authored
     angled-blower  0  optional  EMPTY
     angled-blower+angled-gears+floor-blower+floor-gears+wall-blower+wall-gears  1  synthesized  SINGLETON  components floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower
@@ -107,7 +107,6 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     threat  0  authored  EMPTY  components gun
     toggle-plate  1  authored  SINGLETON
     transmitter  1  authored  SINGLETON
-    traversal-mode  4  authored
     tray  0  optional  EMPTY
     vertical-object  18  authored  components location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun switch pressure-plate toggle-plate floor-blower angled-blower
     visibility-object  11  authored  components gate transmitter receiver floor-repeater wall-repeater gun location
@@ -267,8 +266,8 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
     recording-copy>  static  key none -- bijective, functional both ways  value (1 2)  signature (mobile-object mobile-object)
     screen-segment>  static  key (1)  value (2 3 4 5 6)  signature (screen rational rational rational rational rational)
     stream-width  static  key (1)  value (2)  signature ((either wall-blower wall-gears) rational)
-    traverse-via  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
-    traverse-via>  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
+    traverse-via  static  key (1 3)  value (2)  signature (location list location)
+    traverse-via>  static  key (1 3)  value (2)  signature (location list location)
     wall-segment>  static  key (1)  value (2 3 4 5 6)  signature (wall rational rational rational rational rational)
     window-segment>  static  key (1)  value (2 3 4 5 6)  signature (window rational rational rational rational rational)
 
@@ -548,10 +547,10 @@ S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 
   traversal arcs read (18)
     12 symmetric (traverse-via), 6 directed (traverse-via>)
-    mode walking: 18 arcs, 5 with an empty family
+    kind walk: 18 arcs, 5 with an empty family
 
-  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY clause family.  Arcs of traverse-via> are never contracted, whatever their family.
-  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries its own predicate -- an elevation equality, a jump rule -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
+  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY door family.  Static separators -- staircases, edges, floor drives -- are not doors.  Arcs of traverse-via> are never contracted, whatever their family.
+  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries its own predicate -- a jump's reach limit, a ladder's position -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
 
   regions (4 over 6 endpoints of type location)
     R1  (3): location1 location2 location6
@@ -561,25 +560,25 @@ S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 
   region crossings (12 rows: 5 spine, 7 composed)
     NOTE: these rows are the transitive CLOSURE, one minimal door-set per location pair. The spine preserves reachability; it is not a physical doorway count.
-    R1 <-> R2  mode walking  family ((blower1))  2 location arcs  composed
-    R1 --> R2  mode walking  family ((blower1))  1 location arc  composed
-    R1 <-> R3  mode walking  family ((blower1))  2 location arcs  composed
-    R1 --> R3  mode walking  family ((blower1))  1 location arc  SPINE
-    R1 <-> R4  mode walking  family ((blower1 gate2))  2 location arcs  composed
-    R1 --> R4  mode walking  family ((blower1 gate2))  1 location arc  composed
-    R2 --> R1  mode walking  family () direct  1 location arc  SPINE
-    R2 <-> R3  mode walking  family ((blower1))  1 location arc  SPINE
-    R2 <-> R4  mode walking  family ((blower1 gate2))  1 location arc  composed
-    R3 --> R1  mode walking  family () direct  1 location arc  SPINE
-    R3 <-> R4  mode walking  family ((gate2))  1 location arc  SPINE
-    R4 --> R1  mode walking  family ((gate2))  1 location arc  composed
+    R1 <-> R2  kind walk  family ((blower1))  2 location arcs  composed
+    R1 --> R2  kind walk  family ((blower1))  1 location arc  composed
+    R1 <-> R3  kind walk  family ((blower1))  2 location arcs  composed
+    R1 --> R3  kind walk  family ((blower1))  1 location arc  SPINE
+    R1 <-> R4  kind walk  family ((blower1 gate2))  2 location arcs  composed
+    R1 --> R4  kind walk  family ((blower1 gate2))  1 location arc  composed
+    R2 --> R1  kind walk  family () direct  1 location arc  SPINE
+    R2 <-> R3  kind walk  family ((blower1))  1 location arc  SPINE
+    R2 <-> R4  kind walk  family ((blower1 gate2))  1 location arc  composed
+    R3 --> R1  kind walk  family () direct  1 location arc  SPINE
+    R3 <-> R4  kind walk  family ((gate2))  1 location arc  SPINE
+    R4 --> R1  kind walk  family ((gate2))  1 location arc  composed
 
   adjacency spine (5)
-    R1 --> R3  mode walking  family ((blower1))
-    R2 --> R1  mode walking  family () direct
-    R2 <-> R3  mode walking  family ((blower1))
-    R3 --> R1  mode walking  family () direct
-    R3 <-> R4  mode walking  family ((gate2))
+    R1 --> R3  kind walk  family ((blower1))
+    R2 --> R1  kind walk  family () direct
+    R2 <-> R3  kind walk  family ((blower1))
+    R3 --> R1  kind walk  family () direct
+    R3 <-> R4  kind walk  family ((gate2))
 
   doors on arcs (2)
     blower1 gate2
@@ -611,10 +610,10 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((blower1))
+      spine kind walk, family ((blower1))
         R1 -> R3, device absent: source reaches ("R1"); destination reaches ("R1" "R3" "R4")
           graph cut in this direction: YES
-      spine mode walking, family ((blower1))
+      spine kind walk, family ((blower1))
         R2 -> R3, device absent: source reaches ("R1" "R2"); destination reaches ("R1" "R3" "R4")
           graph cut in this direction: YES
         R3 -> R2, device absent: source reaches ("R1" "R3" "R4"); destination reaches ("R1" "R2")
@@ -638,7 +637,7 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate2))
+      spine kind walk, family ((gate2))
         R3 -> R4, device absent: source reaches ("R1" "R2" "R3"); destination reaches ("R4")
           graph cut in this direction: YES
         R4 -> R3, device absent: source reaches ("R4"); destination reaches ("R1" "R2" "R3")
@@ -771,7 +770,7 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
     temporary services (in some transit set, not final): blower1 via plate1, gate2 via receiver1
       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
 
-  access from R1 (minimal door sets to each region; mode predicates not evaluated)
+  access from R1 (minimal door sets to each region; kind predicates not evaluated)
     R1  ()
     R2  (blower1)
     R3  (blower1)

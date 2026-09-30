@@ -19,7 +19,7 @@ MC  MECHANIC COVERAGE  [grade 1]
     reachability      COVERED    infrastructure -- reach relations; read by S4
     stairs            COVERED    contract (also S3)
     visibility        COVERED    infrastructure -- line of sight; read by S6
-    walkability       COVERED    infrastructure -- derives walking arcs; read by S3
+    walkability       COVERED    infrastructure -- derives walk-kind facts; read by S3
 
   UNCOVERED (0):
     READING: UNCOVERED means no static contract is declared for that technology.  The coverage gate (Problem-Solving Guide, Phase 0 step 2) requires a hand contract in the Briefing, or a component, before going on.  COVERED by extractors or infrastructure means the named components carry its static consequences; it is not a contract.
@@ -245,8 +245,8 @@ MC  MECHANIC COVERAGE  [grade 1]
 
   contract jump
     controls  nothing; a jump has no CONTROLS entry and no state
-    moves     an agent across an authored jumping arc (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one
-    requires  the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); every clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray
+    moves     an agent across a jump-kind clause -- one naming an edge, a wall or a floor drive, or in a bare-level problem naming none across a level difference -- (symmetric, or one way when directed), landing on the floor or on a box or held-tray top at the far end; locally, onto a box or held-tray top at its own location, and down from one
+    requires  the landing at most *vertical-reach-limit* above the launch elevation (the floor, or the top of the support the agent stands on); edges and floor drives are static and always passable; every other clause member a gate, screen or wall, and each one not passable (a closed gate, a non-passable screen, every wall) with its top at most that limit above the launch; a safe destination.  Downward and level landings are unrestricted; a grounded tray is no landing, nor the agent's own held tray
     reach limit 1 (*vertical-reach-limit*); a raise is the least launch elevation above the source floor, reached by standing on a support (S5 tops)
     location10 -> location12  clause ()  level 0 -> 3/2
       no feature  raise 1/2 above the floor
@@ -255,15 +255,15 @@ MC  MECHANIC COVERAGE  [grade 1]
 
   contract ladder
     controls  nothing; a ladder has no CONTROLS entry and no state
-    moves     an agent from a climbing arc's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination
+    moves     an agent across a climb-kind clause (one naming a ladder) from its fact's source to its destination, one way (traverse-via>); a supported agent at the source lands on the ground at the destination
     requires  a ladder named in the arc's clause positioned at its source (ladder-init-check), every other means in the clause clear, and a safe destination
     ladder1  at location7
-      climbing  location7 --> location1  family ((ladder1))  ladder at source: yes
+      climb  location7 --> location1  family ((ladder1))  ladder at source: yes
 
   contract stairs
-    controls  nothing; stairway has no device state
-    moves     an agent along an authored stairway arc, in its permitted direction, through a MOVE stairs segment
-    requires  all means of one alternative clause passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them
+    controls  nothing; a staircase has no state
+    moves     an agent across a stairs-kind clause (one naming a staircase), in its fact's permitted direction, through a MOVE stairs segment
+    requires  all means of one alternative clause (the clause without its staircase) passable for the mover and a safe destination; no elevation-difference or elevation-equality limit. Empty hands only when a clause's means require them
     location11 <-> location13; family nil
 
 
@@ -311,6 +311,7 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     receiver  1  authored  SINGLETON
     repeater  0  authored  EMPTY  components floor-repeater wall-repeater
     screen  1  authored  SINGLETON
+    staircase  1  authored  SINGLETON
     support  5  authored  components pressure-plate toggle-plate box fan tray floor-blower angled-blower
     support-occupant  5  authored  components agent box jammer connector fan tray
     switch  0  optional  EMPTY
@@ -318,7 +319,6 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     threat  0  authored  EMPTY  components gun
     toggle-plate  0  optional  EMPTY
     transmitter  1  authored  SINGLETON
-    traversal-mode  4  authored
     tray  0  optional  EMPTY
     vaultable-object  13  authored  components gate screen wall
     vertical-object  37  authored  components location agent box connector jammer tray fan gate screen wall edge floor-repeater wall-repeater transmitter receiver gun switch pressure-plate toggle-plate floor-blower angled-blower
@@ -351,7 +351,7 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     wall-gears  optional
     wall-repeater  optional
 
-  singleton types (10)
+  singleton types (11)
     agent == agent1  authored
     edge == edge1  authored
     fixed-beam-sink == receiver1  authored
@@ -360,6 +360,7 @@ S0  TYPE EXTENT CENSUS  [grade 1]
     ladder == ladder1  authored
     receiver == receiver1  authored
     screen == screen1  authored
+    staircase == staircase1  authored
     transmitter == transmitter1  authored
     window == window1  authored
 
@@ -486,8 +487,8 @@ S2  FUNCTIONAL-RELATION CENSUS  [grade 1 -> 2]
     reach-via  static  key (1 3)  value (2)  signature (reach-target list reach-target)
     reach-via>  static  key (1 3)  value (2)  signature (location list reach-target)
     screen-segment>  static  key (1)  value (2 3 4 5 6)  signature (screen rational rational rational rational rational)
-    traverse-via  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
-    traverse-via>  static  key (1 2 4)  value (3)  signature (traversal-mode location list location)
+    traverse-via  static  key (1 3)  value (2)  signature (location list location)
+    traverse-via>  static  key (1 3)  value (2)  signature (location list location)
     wall-segment>  static  key (1)  value (2 3 4 5 6)  signature (wall rational rational rational rational rational)
     window-segment>  static  key (1)  value (2 3 4 5 6)  signature (window rational rational rational rational rational)
 
@@ -722,15 +723,15 @@ S7  LANDMARK GRAPH AND ORDERINGS  [grade 4]
 S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 --------------------------------------------------------------
 
-  traversal arcs read (51)
-    50 symmetric (traverse-via), 1 directed (traverse-via>)
-    mode climbing: 1 arc, 0 with an empty family
-    mode jumping: 1 arc, 1 with an empty family
-    mode stairway: 1 arc, 1 with an empty family
-    mode walking: 48 arcs, 9 with an empty family
+  traversal arcs read (49)
+    48 symmetric (traverse-via), 1 directed (traverse-via>)
+    kind climb: 1 arc, 0 with an empty family
+    kind jump: 1 arc, 1 with an empty family
+    kind stairs: 1 arc, 1 with an empty family
+    kind walk: 46 arcs, 8 with an empty family
 
-  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY clause family.  Arcs of traverse-via> are never contracted, whatever their family.
-  NOTE: a region is a set of endpoints NO DOOR separates.  Each mode carries its own predicate -- an elevation equality, a jump rule -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
+  contraction rule: two endpoints share a region when an arc of traverse-via joins them with an EMPTY door family.  Static separators -- staircases, edges, floor drives -- are not doors.  Arcs of traverse-via> are never contracted, whatever their family.
+  NOTE: a region is a set of endpoints NO DOOR separates.  Each kind carries its own predicate -- a jump's reach limit, a ladder's position -- which this extractor does not evaluate, having no state to evaluate it in.  Two endpoints in one region therefore need not be mutually reachable.
 
   regions (6 over 13 endpoints of type location)
     R1  (2): location1 location2
@@ -742,32 +743,32 @@ S3  GATE-LABELLED REGION QUOTIENT  [grade 2]
 
   region crossings (12 rows: 12 spine, 0 composed)
     NOTE: these rows are the transitive CLOSURE, one minimal door-set per location pair. The spine preserves reachability; it is not a physical doorway count.
-    R1 <-> R2  mode walking  family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))  2 location arcs  SPINE
-    R1 <-> R4  mode walking  family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))  8 location arcs  SPINE
-    R1 <-> R5  mode walking  family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))  4 location arcs  SPINE
-    R1 <-> R6  mode walking  family ((gate1 gate5) (gate2 gate5))  2 location arcs  SPINE
-    R2 <-> R3  mode walking  family ((gate8 gate9))  2 location arcs  SPINE
-    R2 <-> R4  mode walking  family ((gate5 gate6 gate7))  4 location arcs  SPINE
-    R2 <-> R5  mode walking  family ((gate4 gate5 gate6 gate7 screen1))  2 location arcs  SPINE
-    R2 <-> R6  mode walking  family ((gate6 gate7))  1 location arc  SPINE
-    R4 <-> R5  mode walking  family ((gate4 screen1))  8 location arcs  SPINE
-    R4 <-> R6  mode walking  family ((gate5))  4 location arcs  SPINE
-    R5 --> R1  mode climbing  family ((ladder1))  1 location arc  SPINE
-    R5 <-> R6  mode walking  family ((gate4 gate5 screen1))  2 location arcs  SPINE
+    R1 <-> R2  kind walk  family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))  2 location arcs  SPINE
+    R1 <-> R4  kind walk  family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))  8 location arcs  SPINE
+    R1 <-> R5  kind walk  family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))  4 location arcs  SPINE
+    R1 <-> R6  kind walk  family ((gate1 gate5) (gate2 gate5))  2 location arcs  SPINE
+    R2 <-> R3  kind walk  family ((gate8 gate9))  1 location arc  SPINE
+    R2 <-> R4  kind walk  family ((gate5 gate6 gate7))  4 location arcs  SPINE
+    R2 <-> R5  kind walk  family ((gate4 gate5 gate6 gate7 screen1))  2 location arcs  SPINE
+    R2 <-> R6  kind walk  family ((gate6 gate7))  1 location arc  SPINE
+    R4 <-> R5  kind walk  family ((gate4 screen1))  8 location arcs  SPINE
+    R4 <-> R6  kind walk  family ((gate5))  4 location arcs  SPINE
+    R5 --> R1  kind climb  family ((ladder1))  1 location arc  SPINE
+    R5 <-> R6  kind walk  family ((gate4 gate5 screen1))  2 location arcs  SPINE
 
   adjacency spine (12)
-    R1 <-> R2  mode walking  family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
-    R1 <-> R4  mode walking  family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
-    R1 <-> R5  mode walking  family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
-    R1 <-> R6  mode walking  family ((gate1 gate5) (gate2 gate5))
-    R2 <-> R3  mode walking  family ((gate8 gate9))
-    R2 <-> R4  mode walking  family ((gate5 gate6 gate7))
-    R2 <-> R5  mode walking  family ((gate4 gate5 gate6 gate7 screen1))
-    R2 <-> R6  mode walking  family ((gate6 gate7))
-    R4 <-> R5  mode walking  family ((gate4 screen1))
-    R4 <-> R6  mode walking  family ((gate5))
-    R5 --> R1  mode climbing  family ((ladder1))
-    R5 <-> R6  mode walking  family ((gate4 gate5 screen1))
+    R1 <-> R2  kind walk  family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
+    R1 <-> R4  kind walk  family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+    R1 <-> R5  kind walk  family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
+    R1 <-> R6  kind walk  family ((gate1 gate5) (gate2 gate5))
+    R2 <-> R3  kind walk  family ((gate8 gate9))
+    R2 <-> R4  kind walk  family ((gate5 gate6 gate7))
+    R2 <-> R5  kind walk  family ((gate4 gate5 gate6 gate7 screen1))
+    R2 <-> R6  kind walk  family ((gate6 gate7))
+    R4 <-> R5  kind walk  family ((gate4 screen1))
+    R4 <-> R6  kind walk  family ((gate5))
+    R5 --> R1  kind climb  family ((ladder1))
+    R5 <-> R6  kind walk  family ((gate4 gate5 screen1))
 
   doors on arcs (11)
     gate1 gate2 gate3 gate4 gate5 gate6 gate7 gate8 gate9 ladder1 screen1
@@ -799,22 +800,22 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
+      spine kind walk, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
         R1 -> R2, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R2 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+      spine kind walk, family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
         R1 -> R4, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R4 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
+      spine kind walk, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
         R1 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R5 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate1 gate5) (gate2 gate5))
+      spine kind walk, family ((gate1 gate5) (gate2 gate5))
         R1 -> R6, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R6 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
@@ -827,12 +828,12 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
+      spine kind walk, family ((gate1 gate3) (gate1 gate5) (gate2 gate3) (gate2 gate5))
         R1 -> R4, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R4 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
+      spine kind walk, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
         R1 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: NO, bypass exists
         R5 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
@@ -844,22 +845,22 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
         beam dependency unresolved; requires sightline analysis.
       positive pressure alternatives nil; individually mandatory nil
       inverted aggregate: no positive keeper demand inferred.
-      spine mode walking, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
+      spine kind walk, family ((gate1 gate3 gate4 screen1) (gate1 gate4 gate5 screen1) (gate2 gate3 gate4 screen1) (gate2 gate4 gate5 screen1))
         R1 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: YES
         R5 -> R1, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate4 gate5 gate6 gate7 screen1))
+      spine kind walk, family ((gate4 gate5 gate6 gate7 screen1))
         R2 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: YES
         R5 -> R2, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate4 screen1))
+      spine kind walk, family ((gate4 screen1))
         R4 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
           graph cut in this direction: YES
         R5 -> R4, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R6")
           graph cut in this direction: NO, bypass exists
-      spine mode walking, family ((gate4 gate5 screen1))
+      spine kind walk, family ((gate4 gate5 screen1))
         R5 -> R6, device absent: source reaches ("R1" "R2" "R3" "R4" "R5" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R6")
           graph cut in this direction: NO, bypass exists
         R6 -> R5, device absent: source reaches ("R1" "R2" "R3" "R4" "R6"); destination reaches ("R1" "R2" "R3" "R4" "R5" "R6")
@@ -872,22 +873,22 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
+      spine kind walk, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
         R1 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
         R2 -> R1, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
-      spine mode walking, family ((gate5 gate6 gate7))
+      spine kind walk, family ((gate5 gate6 gate7))
         R2 -> R4, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R4 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
-      spine mode walking, family ((gate4 gate5 gate6 gate7 screen1))
+      spine kind walk, family ((gate4 gate5 gate6 gate7 screen1))
         R2 -> R5, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R5 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
-      spine mode walking, family ((gate6 gate7))
+      spine kind walk, family ((gate6 gate7))
         R2 -> R6, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R6 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
@@ -900,22 +901,22 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives (nil); individually mandatory nil
       conditional shortage: available eligible ON witnesses < 0 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
+      spine kind walk, family ((gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7))
         R1 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
         R2 -> R1, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
-      spine mode walking, family ((gate5 gate6 gate7))
+      spine kind walk, family ((gate5 gate6 gate7))
         R2 -> R4, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R4 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
-      spine mode walking, family ((gate4 gate5 gate6 gate7 screen1))
+      spine kind walk, family ((gate4 gate5 gate6 gate7 screen1))
         R2 -> R5, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R5 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
           graph cut in this direction: YES
-      spine mode walking, family ((gate6 gate7))
+      spine kind walk, family ((gate6 gate7))
         R2 -> R6, device absent: source reaches ("R2" "R3"); destination reaches ("R1" "R4" "R5" "R6")
           graph cut in this direction: YES
         R6 -> R2, device absent: source reaches ("R1" "R4" "R5" "R6"); destination reaches ("R2" "R3")
@@ -929,7 +930,7 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives ((plate1 plate2 plate3)); individually mandatory (plate1 plate2 plate3)
       conditional shortage: available eligible ON witnesses < 3 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate8 gate9))
+      spine kind walk, family ((gate8 gate9))
         R2 -> R3, device absent: source reaches ("R1" "R2" "R4" "R5" "R6"); destination reaches ("R3")
           graph cut in this direction: YES
           mandatory pressure plate1 at R4: APPROACH-ONLY
@@ -955,7 +956,7 @@ S4  CUT-KEEPER TABLE  [conditional bounds; graph candidates]
       positive pressure alternatives ((plate1 plate2 plate3)); individually mandatory (plate1 plate2 plate3)
       conditional shortage: available eligible ON witnesses < 3 implies
         this normal aggregate cannot activate (minimum simultaneous plate demand).
-      spine mode walking, family ((gate8 gate9))
+      spine kind walk, family ((gate8 gate9))
         R2 -> R3, device absent: source reaches ("R1" "R2" "R4" "R5" "R6"); destination reaches ("R3")
           graph cut in this direction: YES
           mandatory pressure plate1 at R4: APPROACH-ONLY
@@ -1141,7 +1142,7 @@ SD  SERVICES AND SETUP DEPENDENCIES  [grade 2]
     temporary services (in some transit set, not final): gate1, gate2 via receiver1, gate5, gate6 via receiver1, gate7 via receiver1, gate8 via plate1 plate2 plate3, gate9 via plate1 plate2 plate3
       READING: TEMPORARY means needed while crossing and expendable afterward, unless a return or a later crossing needs it again.
 
-  access from R1 (minimal door sets to each region; mode predicates not evaluated)
+  access from R1 (minimal door sets to each region; kind predicates not evaluated)
     R1  ()
     R2  (gate1 gate5 gate6 gate7) (gate2 gate5 gate6 gate7)
     R3  (gate1 gate5 gate6 gate7 gate8 gate9) (gate2 gate5 gate6 gate7 gate8 gate9)
