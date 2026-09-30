@@ -1,6 +1,6 @@
 # windtunnel-topo — Handoff
 
-Updated 2026-09-28. Status: CLOSED — stated goal solved and replay-validated.
+Updated 2026-09-30. Status: CLOSED — stated goal solved and replay-validated.
 Problem spec: `probs/problem-windtunnel-topo.lisp` (repository-relative).
 Corresponding diagram: `doc/problems/windtunnel-topo/windtunnel diagram.png` (repository-relative).
 Maximum search depth: **8**, set by D on 2026-09-27; applies to all searches, including probes.
@@ -113,3 +113,16 @@ mixed arrangement loses receiver1 the same way, so stability does not carry
 through a boundary. agent1 stepping onto plate1 changes physical facts only.
 Profile unchanged. No search. Evidence:
 doc/constraint-method/evidence/t45-boundary-transitions-2026-09-28.md.
+
+Traversal-separator migration, 2026-09-30 (doc/traversal-separator-plan.md).
+The spec authors no traversal facts and was unchanged by Phase 3.  Phase 4 regenerated
+the profile; the diff is wording only ("mode walking" -> "kind walk", traversal-mode
+type dropped, TRAVERSE-VIA signature (location list location)).  Regions, crossings,
+door families and S4 verdicts are unchanged.  Current profile SHA-256
+97272F0B64C997A67174272939C0CA8F32FCE3B6357ADBE57A0EC15E027B7EB6.
+The trace has no jump, stairs or ladder moves.  Replayed 2026-09-30 with
+validate-proposed-trace.lisp: INTEGRATED success, goal-checked, goal-satisfied T;
+RECORDER (T NIL).  Proposed-Trace-Validation.txt was rewritten byte-identical
+(SHA-256 unchanged, 159AB594...).
+`Wind Tunnel Solution.txt` (2026-08-11 search output from a pre-blower1 spec naming
+wgears1) was deleted 2026-09-30 as legacy; it remains in git history.

@@ -6,7 +6,8 @@ places each was first written. Text in fenced blocks is copied verbatim from
 its source, which is named above it; it keeps its original references
 (e.g. "sealed", "register 7.x", crelay-topo examples) as history. The
 sources themselves are unchanged: the crelay-topo register is frozen, and
-the other sources are in `archive/` or `doc/problems/crelay-topo/archive/`.
+the other sources are in `archive/` or were in `doc/problems/crelay-topo/archive/`
+(deleted 2026-09-30; see git history).
 
 New components (T19–T26) add their specification here when their task
 writes it. A change to a component is written here, dated, beneath the
@@ -287,7 +288,8 @@ evidence and regenerate affected output via reporters. No search is needed.
 ## 4. RO role obligations
 
 Source: `Constraint-Role-Obligations.txt` sections 2–4 (crelay-topo,
-2026-09-20), now `doc/problems/crelay-topo/archive/`.
+2026-09-20), formerly `doc/problems/crelay-topo/archive/` (deleted 2026-09-30; see git
+history).
 
 ```text
 2  PROPOSED COMPONENT: ROLE-OBLIGATION ANALYSIS

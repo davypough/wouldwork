@@ -1,6 +1,6 @@
 # crelay-topo — Handoff
 
-Updated 2026-09-25 (T18). **Status: CLOSED.** crelay-topo was the prototype
+Updated 2026-09-30. **Status: CLOSED.** crelay-topo was the prototype
 for the constraint-led method. T10 is complete and the prediction register
 is frozen. No further work on this problem is planned. Procedure and rules:
 `doc/constraint-method/Problem-Solving-Guide.md`. Method tasks:
@@ -58,7 +58,8 @@ All are in `constraint-evidence/`. SHA-256 values were rechecked on 2026-09-25.
 
 | File | Phases/actions | SHA-256 | What it is |
 |---|---|---|---|
-| t10-final-checkpoint.txt | 2/87 | `ED143883…4D1EFD58` | the complete solution |
+| t10-final-checkpoint-migrated.txt | 2/87 | `1A3DA6E0…89961691` | the complete solution, current relation form (2026-09-30) |
+| t10-final-checkpoint.txt | 2/87 | `ED143883…4D1EFD58` | the complete solution as recorded at T10 (old jump witnesses) |
 | t10-c3-location15-checkpoint.txt | 1/80 | `59F34FF7…23D58F93` | D's three cycles; the lit stack at location15 |
 | t10-keeper-checkpoint.txt | 9/32 | `21953443…F82D578D` | spine experiment; keeper endpoint |
 | t10-repeater-source-checkpoint.txt | 8/27 | `659F0EDD…CF2C25DB` | spine experiment; repeater powered |
@@ -73,39 +74,39 @@ Replay only; no search:
 
 ```lisp
 (load (merge-pathnames
-        "doc/problems/crelay-topo/constraint-evidence/validate-t10-final-checkpoint-2026-09-25.lisp"
+        "doc/problems/crelay-topo/constraint-evidence/validate-t10-final-migrated-2026-09-30.lisp"
         (asdf:system-source-directory :wouldwork)))
 ```
 
-**Traversal-separator migration (2026-09-29).** crelay-topo's jump facts now name what
+**Traversal-separator migration (2026-09-29/30).** crelay-topo's jump facts now name what
 separates each pair (`doc/traversal-separator-plan.md`, Phase 3); only the fact form
-changed, nothing in the frozen register or ledger.  The checkpoints still carry the old
-jump witnesses, so on the current tree a replay fails at the first of them.  Restore at
-commit cfb7c11 (the migration baseline), or read the new witnesses as:
-`(JUMP (LOCATION20 GROUND) NIL ...)` -> `(BLOWER1)`, and each alcove jump's `(GATE2)` ->
-`(EDGE1 GATE2)`.  The checkpoint files are left byte-identical to their recorded SHA-256.
+changed, nothing in the frozen register or ledger.  The recorded checkpoints still carry
+the old jump witnesses and fail replay on the current tree; they are left byte-identical
+(restore them at commit cfb7c11).  `t10-final-checkpoint-migrated.txt` is the 87-action
+solution with its three jump witnesses updated: `(JUMP (LOCATION20 GROUND) NIL ...)` ->
+`(BLOWER1)`, and each alcove jump's `(GATE2)` -> `(EDGE1 GATE2)`.  Validated 2026-09-30
+with the script above (a copy of validate-t10-final-checkpoint-2026-09-25.lisp reading the
+migrated file, SHA-256 `48C58223…8292472B`): SUCCESS-P, GOAL-CHECKED-P, GOAL-SATISFIED-P
+all T, 87 actions.  The other checkpoints are not migrated.
 
 For another archive: `(stage crelay-topo)`, then `(ww-set *threads* 16)`, then
 `(import-search-checkpoint (merge-pathnames "doc/problems/crelay-topo/constraint-evidence/<file>" (asdf:system-source-directory :wouldwork)))`.
 
 ## Files
 
-- **Current:** `Constraint-Static-Profile.txt` (generated, 1654 lines,
-  SHA-256 `263947f3…`, regenerated 2026-09-28 by T42: only MC's step verdict line changed; earlier
+- **Current:** `Constraint-Static-Profile.txt` (generated; SHA-256 `063200E5…2BE2448F`, regenerated
+  2026-09-29 by traversal-separator Phase 4: kind wording, walk arcs 190 -> 171; before that, 2026-09-28 by T42: only MC's step verdict line changed; earlier
   by T41: MC's beam-relay contract, which also picked up T33's four RC scenario lines absent from
   the stored 2026-09-26 file), `Constraint-Realization-Ledger.txt`,
-  `constraint-evidence/` (107 files, flat, kept as is), and
+  `constraint-evidence/` (109 files, flat, kept as is), and
   `Constraint-Prediction-Register.txt` (FROZEN; the record of the validation
   experiment).
 - **The design and its decisions:** `constraint-evidence/b2-ghost-tray-loc5-check-2026-09-24.txt`.
-- **Archived by T18 in `archive/`, byte-identical:**
-  `Constraint-Continuation-Prompt.txt`, `Constraint-Restart-Checkpoint.txt`,
-  `Constraint-Abstract-Model.txt`, `Constraint-Role-Obligations.txt` and
-  `Constraint-Schema-Gaps.txt`. Gaps now live in
-  `doc/constraint-method/Schema-Gaps.txt`, and the RO/G14 specifications in
-  `doc/constraint-method/Extractor-Specifications.md`.
-- **Belonging to earlier methods, not reviewed:** the Backward-\*,
-  Forward-\*, Initial-Conditions and subgoal-solution files.
+- **Deleted 2026-09-30 as legacy (in git history):** T18's `archive/` (gaps now live in
+  `doc/constraint-method/Schema-Gaps.txt`, the RO/G14 specifications in
+  `doc/constraint-method/Extractor-Specifications.md`), and the earlier-method Backward-\*,
+  Forward-\*, forward-evidence/, Initial-Conditions, subgoal-solution-\*, test13-progress and
+  Working-Backwards-from-Goal files.
 
 - **T43, 2026-09-28:** profile regenerated through its writer; only the new SD
   section (services and setup dependencies, physical view only) was added.

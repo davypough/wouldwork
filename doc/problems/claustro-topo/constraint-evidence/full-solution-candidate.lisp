@@ -1,6 +1,8 @@
 ;;; claustro-topo -- full candidate solution from the start state, 36 actions.
-;;; Actions 1-8: search result (cp1).  9-12: validated hand sequence (hand-cp1-to-jammer2.lisp).
+;;; Actions 1-8: search result (cp1).  9-12: hand sequence validated from cp1 2026-09-27.
 ;;; 13-36: hand-written 2026-09-27 from the interview (window jam of gate1, handover).
+;;; 2026-09-30: traversal-separator migration -- action 34's jump names (edge1), action 36's
+;;; stairs name (staircase1).  Action 33 (onto box2 within location10) keeps NIL.
 ;;; Validate with VALIDATE-ACTION-SEQUENCE from the staged start and the staged goal.
 
 (;; 1-8  jam gate1, cut the beam with box1 at location2, take jammer1 back through the window
@@ -42,6 +44,6 @@
  ;; 32-36  out through gate5, gate6, gate7; onto box2; jump to the slab; cross; stairs
  (move agent1 ((walk location5 (gate5 gate6 gate7) location10)))
  (move agent1 ((jump (location10 ground) nil (location10 box2))))
- (move agent1 ((jump (location10 box2) nil (location12 ground))))
+ (move agent1 ((jump (location10 box2) (edge1) (location12 ground))))
  (move agent1 ((walk location12 (gate8 gate9) location13)))
- (move agent1 ((stairs location13 nil location11))))
+ (move agent1 ((stairs location13 (staircase1) location11))))

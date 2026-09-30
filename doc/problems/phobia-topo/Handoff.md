@@ -1,5 +1,5 @@
 # phobia-topo — Handoff
-Updated 2026-09-28. Status: CLOSED — original goal validated.
+Updated 2026-09-30. Status: CLOSED — original goal validated.
 Problem spec: probs/problem-phobia-topo.lisp.
 Corresponding diagram: doc/problems/phobia-topo/phobia-topo-diagram.png.
 Maximum search depth: 25. Searches used 16 threads; FIRST fallback authorized
@@ -53,3 +53,17 @@ up at location5): receiver2 withdrawn; wblower2 KEPT BY ALTERNATIVE (jammer1);
 wblower3 GAINED; nothing lost. Solution unchanged; no search. Profile SHA-256
 23262EC2487E78A834F58BBA2A6EC7F4BE4081CEA8DA94F1F5947398FDEFF7EA.
 Evidence: doc/constraint-method/evidence/t43-services-and-setup-2026-09-28.md.
+
+Traversal-separator migration, 2026-09-30 (doc/traversal-separator-plan.md).
+The spec authors no traversal facts and is unchanged across the refactoring.  Phase 3
+dropped the inert cross-level walks (e.g. location10/location11); the path uses none
+(walks between same-level locations and one step onto fan1; location11 is reached by
+fgears1's lift).  Phase 4 regenerated the profile: kind wording, and location10 and
+location11 now separate, renumbering regions R2-R11 (no document cites them by number).
+Current profile SHA-256 CE2BE7BB640A5D797B5FB4DB6FB01DF1D784771EEFDAC142DF8C336CAEFBE2A9.
+Replayed 2026-09-30 via the Restore chain: FULL PATH (54 actions) success, goal-checked,
+goal-satisfied T; complete-validated-path.txt rewritten byte-identical (SHA-256 EFD383E8...).
+Legacy files deleted 2026-09-30 (in git history): sg1-retrieve-c1.lisp, sg2-retrieve-c2.lisp,
+sg3-activate-receiver2.lisp, sg2-checkpoint.txt, sg4-final-goal.lisp,
+sg4-equipment-location13.lisp, sg1-endpoint.txt, sg2-endpoint.txt, sg3-search-result.txt.
+Restore needs only sg3-checkpoint.txt, sg4a, sg4b and sg5.

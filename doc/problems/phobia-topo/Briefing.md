@@ -5,6 +5,11 @@ Profile: [Constraint-Static-Profile.txt](Constraint-Static-Profile.txt).
 SHA-256: `23A4FE3704EE651A32E65AA867A0E0813344A31FFAB784B1CE84C7FABA43304D`.
 Profile read before proposing a subgoal. No search or replay has run.
 
+Legacy files deleted 2026-09-30 (retained in git history): sg1-retrieve-c1.lisp,
+sg2-retrieve-c2.lisp, sg3-activate-receiver2.lisp, sg2-checkpoint.txt, sg4-final-goal.lisp,
+sg4-equipment-location13.lisp, sg1-endpoint.txt, sg2-endpoint.txt, sg3-search-result.txt.
+References below are historical; restore as in Handoff.md (sg3-checkpoint.txt, sg4a, sg4b, sg5).
+
 ## Summary
 
 The goal is agent1 at location11, elevation 10 above location10. Fan1 starts on wgears1 at location2 and is the only removable fan. The intended final lift requires bringing it to fgears1 at location10, mounting it, and stepping onto it.
@@ -49,9 +54,9 @@ Wall-blower streams transport contacted bodies and their cargo and gate walking 
 
 | Subgoal | Whose idea | Check | Result |
 |---|---|---|---|
-| SG1: agent1 back at location4 holding connector1; jammer1 on ground at location4 jamming wblower2; receiver2 inactive | A; agreed by D | SATISFIED by successful replay and D's supplied endpoint | ACCEPTED, 7 actions; [endpoint](constraint-evidence/sg1-endpoint.txt); no search |
-| SG2: agent1 at location12 holding connector2; connector1 at location12 powering receiver1; jammer1 at location12 jamming gate2; fan1 parked on ground at location4 | A; agreed by D | SATISFIED by successful replay and D's endpoint | ACCEPTED, 17 additional actions; [endpoint](constraint-evidence/sg2-endpoint.txt); 24 accumulated actions |
-| SG3: active receiver2, no other endpoint conditions | A; agreed by D | SATISFIED by search endpoint; transmitter1 -> C2 at location2 -> C1 at location5 -> receiver2 | ACCEPTED REALIZED, independently validated NIL; 10 additional actions, 34 cumulative; [output](constraint-evidence/sg3-search-result.txt) |
+| SG1: agent1 back at location4 holding connector1; jammer1 on ground at location4 jamming wblower2; receiver2 inactive | A; agreed by D | SATISFIED by successful replay and D's supplied endpoint | ACCEPTED, 7 actions; `sg1-endpoint.txt` (deleted); no search |
+| SG2: agent1 at location12 holding connector2; connector1 at location12 powering receiver1; jammer1 at location12 jamming gate2; fan1 parked on ground at location4 | A; agreed by D | SATISFIED by successful replay and D's endpoint | ACCEPTED, 17 additional actions; `sg2-endpoint.txt` (deleted); 24 accumulated actions |
+| SG3: active receiver2, no other endpoint conditions | A; agreed by D | SATISFIED by search endpoint; transmitter1 -> C2 at location2 -> C1 at location5 -> receiver2 | ACCEPTED REALIZED, independently validated NIL; 10 additional actions, 34 cumulative; `sg3-search-result.txt` (deleted) |
 
 Opening rationale: retrieve connector1 from location6 before attempting the two gates around connector2. The jammer supplies the outward crossing and remains at location4 for recovery. Connector1 can subsequently supply receiver1 from location12. Later goals are not agreed commitments. Fan1 and connector2 have no SG1 endpoint obligation; review their actual states after realization.
 

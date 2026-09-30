@@ -1,9 +1,14 @@
 # phobia-topo evidence
 
+Legacy files deleted 2026-09-30 (retained in git history): sg1-retrieve-c1.lisp,
+sg2-retrieve-c2.lisp, sg3-activate-receiver2.lisp, sg2-checkpoint.txt, sg4-final-goal.lisp,
+sg4-equipment-location13.lisp, sg1-endpoint.txt, sg2-endpoint.txt, sg3-search-result.txt.
+References below are historical; restore as in Handoff.md (sg3-checkpoint.txt, sg4a, sg4b, sg5).
+
 ## SG1 — retrieve connector1
 
 D agreed to retrieving connector1 first. Maximum search depth remains 25.
-[sg1-retrieve-c1.lisp](sg1-retrieve-c1.lisp) is A's seven-action hand-derived
+`sg1-retrieve-c1.lisp` (deleted) is A's seven-action hand-derived
 candidate, not a validated path. D runs the replay in the existing WW REPL.
 No search is needed for this attempt.
 
@@ -53,13 +58,13 @@ stored final state before acceptance. No final loft-goal claim or shortest-path
 claim is made.
 
 D then supplied the full endpoint: all agreed SG1 conditions hold. SG1 is
-ACCEPTED. See [sg1-endpoint.txt](sg1-endpoint.txt) for the reported state and
+ACCEPTED. See `sg1-endpoint.txt` (deleted) for the reported state and
 replay-source hash. The endpoint remains in the validation result, not in an
 installed or exported search checkpoint.
 
 ## SG2 — retrieve connector2
 
-D agreed the proposed SG2. [sg2-retrieve-c2.lisp](sg2-retrieve-c2.lisp)
+D agreed the proposed SG2. `sg2-retrieve-c2.lisp` (deleted)
 contains 17 hand-derived actions starting from the accepted SG1 validation
 endpoint. It does not restage, search or overwrite the SG1 result. It preflights
 all action formats, replays, and prints both the result and final state.
@@ -82,7 +87,7 @@ result or minimum-length claim. Combined accepted prefix plus candidate is
 
 D reports SG2 replay success=T with failure-index/reason NIL and supplied the
 full endpoint. All agreed conditions hold: SG2 ACCEPTED. See
-[sg2-endpoint.txt](sg2-endpoint.txt). Accepted state is the final-state of
+`sg2-endpoint.txt` (deleted). Accepted state is the final-state of
 *phobia-sg2-validation*. Next read-only check: BEAM-VISIBLE from location12
 at height 1 to receiver2 at height 1 in that exact state, since the original
 profile's location1 occluder has moved. A clear sightline alone will not prove
@@ -102,7 +107,7 @@ geometry, not repaired by moving the original location1 occluder.
 ## SG3 — activate receiver2
 
 D approved one search for `(active receiver2)` from accepted SG2. Script:
-[sg3-activate-receiver2.lisp](sg3-activate-receiver2.lisp). MIN-LENGTH, 16 threads,
+`sg3-activate-receiver2.lisp` (deleted). MIN-LENGTH, 16 threads,
 depth cutoff 25, no other search bound, no deepening or automatic retry.
 The script packages SG1+SG2's accepted 24 actions as one checkpoint phase
 and exports sg2-checkpoint.txt before searching. This technical packaging keeps
@@ -115,7 +120,7 @@ only this depth bound. A found result is REALIZED, independently validated NIL,
 pending endpoint review; do not export it before review. Archive hash is pending
 file creation by D's run. No search result yet.
 
-SG3 result: D supplied [sg3-search-result.txt](sg3-search-result.txt).
+SG3 result: D supplied `sg3-search-result.txt` (deleted).
 MIN-LENGTH search found 10 additional actions in 6.617 seconds; checkpoint 2,
 cumulative depth 34, new checkpoint T. Endpoint satisfies ACTIVE RECEIVER2:
 agent/C1 at location5, C2 and jammer at location2, fan at location4; jammer
