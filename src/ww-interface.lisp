@@ -82,7 +82,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (get-probs-folder-path)
    -- the location where all problem specification files should appear
-      (test problems live in the test folder, per (get-test-folder-path))
+      (test problems live in the test folder, per (get-test-folder-path),
+       and Talos test problems in its talos subfolder, per (get-talos-test-folder-path))
 
 (profile)
    -- employs a basic profiler on the currently staged problem,
@@ -157,6 +158,11 @@ is staged again.
 
 (defun get-test-folder-path ()
   (add-dir (asdf:system-source-directory :wouldwork) "test"))
+
+
+(defun get-talos-test-folder-path ()
+  (add-dir (get-test-folder-path) "talos"))
+
    
 (defun add-dir (root dir)
   "Add to absolute path an additional directory"
@@ -344,11 +350,13 @@ is staged again.
 ;; -------------------- problem.lisp file handling ------------------------ ;;
 
 
-(defparameter *problem-folder-paths* (list (get-probs-folder-path) (get-test-folder-path))
+(defparameter *problem-folder-paths* (list (get-probs-folder-path) (get-test-folder-path)
+                                           (get-talos-test-folder-path))
 "This variable holds all folder pathnames which can hold problems in this system.
    The user cann add custom folder pathnames to this folder using the function
    `add-problem-folder` and remove by `remove-problem-folder`.
-   The Package directory's `probs` and `test` folders, however, are always present at startup.")
+   The Package directory's `probs`, `test` and `test/talos` folders, however, are always present
+   at startup.")
 
 
 (defun add-problem-folder (folder-path)

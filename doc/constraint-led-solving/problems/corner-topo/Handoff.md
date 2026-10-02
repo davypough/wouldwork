@@ -1,5 +1,6 @@
 # corner-topo — Handoff
 Updated 2026-09-30.  Status: CLOSED (full path validated).
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-corner-topo.lisp.
 Corresponding diagram: doc/constraint-led-solving/problems/corner-topo/problem-corner-topo-plus.jpg.
 Maximum search depth: 6 (threads 16), set 2026-09-27.
@@ -15,7 +16,7 @@ Maximum search depth: 6 (threads 16), set 2026-09-27.
                    T41 (2026-09-28): MC now has a beam-relay contract (stations 1-3 see both hues: COMPETING HUES). REPORT-RELAY-LIGHTING-SCENARIO on prefix 14 shows connector1's blue feed CUT and red arriving in layer 2 (receiver1 lit); on prefix 15, blue in layer 1 and connector3's red IGNORED. Confirms the Subgoal log's lighting reasoning.
                    T43 (2026-09-28): profile gains SD only. gate1 is TEMPORARY (transit and return, not final) via receiver1; receiver2/receiver3 are FINAL. REPORT-SERVICE-TRANSITION 14 -> 15: gate1 LOST with receiver1 withdrawn, return to location1 NOT MET, finals MET. Profile SHA-256 F4A60FD1EC6D87702753C8F6AB14E2DF25CE96248064AB32B225446EA50A7479. Evidence: doc/constraint-led-solving/evidence/t43-services-and-setup-2026-09-28.md.
 
-Traversal-separator migration, 2026-09-30 (doc/traversal-separator-plan.md).
+Traversal-separator migration, 2026-09-30 (doc/traversal-separator-plan.md, removed by commit 693d9848; in git history).
 The spec authors no traversal facts and is unchanged across the refactoring; Phase 3
 left its fact count unchanged.  Phase 4 regenerated the profile; the diff is wording
 only (kind for mode, traversal-mode type dropped, TRAVERSE-VIA signature (location list

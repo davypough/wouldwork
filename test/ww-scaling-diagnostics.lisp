@@ -1,5 +1,7 @@
 ;;; REPL-only diagnostics for parallel scaling of SBCL on this machine.
-;;; Load explicitly, then enter (run-scaling-diagnostics), which is independent of
+;;; Load explicitly with
+;;;   (load (merge-pathnames "test/ww-scaling-diagnostics.lisp" (asdf:system-source-directory :wouldwork)))
+;;; then enter (run-scaling-diagnostics), which is independent of
 ;;; wouldwork search, or (profile-search-consing depth-cutoff) in serial mode, which
 ;;; profiles per-function consing of the staged problem, or (profile-search-calls depth-cutoff)
 ;;; in serial mode, which reports calls and exclusive time per function per state.

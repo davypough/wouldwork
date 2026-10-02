@@ -12,3 +12,4 @@ tmp/
 .aider*
 *.log
 .aider.tags.cache.v4/
+*.fasl

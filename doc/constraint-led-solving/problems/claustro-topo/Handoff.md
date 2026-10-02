@@ -1,5 +1,6 @@
 # claustro-topo — Handoff
 Updated 2026-09-30.  Status: CLOSED — solved and validated (36 actions).
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-claustro-topo.lisp (authoritative over the diagram, D 2026-09-27).
 Corresponding diagram: doc/constraint-led-solving/problems/claustro-topo/problem-claustro-topo-plus.drawio.
 Maximum search depth: 8, set 2026-09-27.

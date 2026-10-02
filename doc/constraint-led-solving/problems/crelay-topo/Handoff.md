@@ -1,5 +1,6 @@
 # crelay-topo — Handoff
 Updated 2026-10-02.  Status: CLOSED — solved and validated (87 actions). The method's prototype (T10).
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-crelay-topo.lisp.
 Corresponding diagram: doc/constraint-led-solving/problems/crelay-topo/crelay-topo-diagram.png.
 Maximum search depth: not set under the current Guide (T10 used cutoffs 8-15; the final leg 10).

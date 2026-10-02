@@ -240,8 +240,7 @@ returned segment. Region-quotient rows alone do not specify every location arc.
 ## Optional tools, on D's request
 
 Load diagnostics with `(load (merge-pathnames <file> (asdf:system-source-directory :wouldwork)))`.
-Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`;
-the ledger schema is `doc/constraint-led-solving/Status-Algebra-and-Record-Schema.md`.
+Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
 
 - **Probe battery:** load `tech/constraint-probe-battery.lisp` after the profile.
   `(report-probe-battery-list)` lists without searching. At threads 16,
@@ -260,14 +259,11 @@ the ledger schema is `doc/constraint-led-solving/Status-Algebra-and-Record-Schem
   roles are `:weight`, `:jam`, `:place`, `:hold`, `:mount`, `:support` (13.8).
   B5 then reports shared and conflicting jobs, capacity, the eligible pool and
   releases; a shortage refutes only that allocation. Nothing is reserved unless stated.
-- **Ledger:** not used for new problems. Its stage records assume per-stage files
-  that the flat records layout excludes, and the Briefing's log covers its role
-  (the recommender's legacy default evidence folder, `doc/problems/<p>/constraint-evidence/`,
-  is from that layout). crelay-topo's version-1 ledger was removed with `archive/`
-  on 2026-10-02 and is in git history.
-  If a problem's premises and retractions outgrow the log, record the need to adapt
-  `tech/constraint-ledger.lisp` to the flat layout in `Schema-Gaps.txt` and the
-  affected problem's Handoff; agree implementation with D separately.
+- **Ledger:** removed 2026-10-02 (`tech/constraint-ledger.lisp` and its schema,
+  `Status-Algebra-and-Record-Schema.md`; both in git history). The Briefing's subgoal
+  log covers its role. If a problem's premises and retractions outgrow the log,
+  record the need in `Schema-Gaps.txt` and the problem's Handoff; agree with D
+  whether to restore and adapt the ledger.
 - **Supplied relay views:** `(report-relay-view-scenario <scenario>)` tests explicit
   complete-state scenarios (specification 6.1). Optional scenarios also go to
   REPORT-RELAY-CHAIN-TABLE, REPORT-NECESSITY-HINTS and profile report/write calls.
@@ -360,10 +356,10 @@ or with literal quoting, avoiding replacement-string substitution. Hash with
 `doc/constraint-led-solving/problems/<problem>/` is flat (no subdirectories) and holds only the files
 below, under exactly these names; only the diagram's name and type vary.
 Superseded material is deleted; git history is its archive. State lives in the
-Handoff; the Briefing's log retains provenance and results. Dated evidence under
-`doc/constraint-led-solving/evidence/` cites the pre-2026-09-30 layout (per-problem
-`constraint-evidence/` folders) and is not rewritten; its check scripts run at
-their own commit.
+Handoff; the Briefing's log retains provenance and results. The method-level
+`evidence/` folder (dated check scripts and run records, citing the pre-2026-09-30
+layout) was removed 2026-10-02; it is in git history, and its check scripts run
+only at their own commit.
 
 - `Handoff.md` — current state (template below).
 - `Briefing.md` — analysis and subgoal log (template below).
@@ -473,12 +469,12 @@ conventions and pointers to earlier task records) and crelay-topo's experiment
 record were in `archive/`, removed 2026-10-02; they are in git history. There is
 no active work queue.
 
-Path migration (2026-10-02): historical paths in `evidence/`, verbatim
-quotations and dated schema-gap entries are preserved. To locate moved files,
+Path migration (2026-10-02): historical paths in verbatim quotations and
+dated schema-gap entries are preserved. To locate moved files,
 map `doc/constraint-method/` to this root, `doc/problems/` to its `problems/`,
 and `doc/constraint-pilot/` to its `constraint-pilot/`. The former
 `Problem-Solving-Guide.md` is now `solving-advisor.md`; the former active
 `Constraint-Implementation-Plan.md` became the final plan copy named above.
-Earlier removals and the `archive/` removal still apply. These mappings
+Earlier removals and the `archive/` and `evidence/` removals still apply. These mappings
 do not restore deleted files or make historical scripts runnable. The former
 `doc/README.md` is absent; historical mentions are retained.

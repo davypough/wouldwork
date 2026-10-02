@@ -343,13 +343,14 @@
 
 (defun problem-source-file (filename)
   "Resolve FILENAME (eg, \"problem-blocks3.lisp\") in the standard problem folders
-   below the Wouldwork root -- probs/ first, then test/ -- or NIL if absent from
-   both.  Deliberately independent of ww-interface's user-extensible
+   below the Wouldwork root -- probs/ first, then test/, then test/talos/ -- or NIL
+   if absent from all three.  Deliberately independent of ww-interface's user-extensible
    *problem-folder-paths*, since this runs during the reload-time eval-when
    before ww-interface loads."
   (let ((root (asdf:system-source-directory :wouldwork)))
     (or (probe-file (merge-pathnames filename (merge-pathnames "probs/" root)))
-        (probe-file (merge-pathnames filename (merge-pathnames "test/" root))))))
+        (probe-file (merge-pathnames filename (merge-pathnames "test/" root)))
+        (probe-file (merge-pathnames filename (merge-pathnames "test/talos/" root))))))
 
 
 (defun instance-problem-file (root)

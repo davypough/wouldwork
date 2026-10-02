@@ -25,7 +25,7 @@
 ;;; independent, per tech/README.html).  PAIRED, JAMMING, and MOUNTED-ON are not: each is
 ;;; owned by a technology a recorder problem may or may not include (beam-relay.lisp,
 ;;; jammer.lisp, -gears-fan.lisp), and a problem may type CONNECTOR or FAN instances
-;;; without including that behavioral tech at all -- test/problem-recorder-test.lisp does
+;;; without including that behavioral tech at all -- test/talos/problem-recorder-test.lisp does
 ;;; exactly this, to exercise RECORDING-COPY>'s own mapping machinery in isolation.  Each
 ;;; owner therefore contributes its own fork clause through -recorder-fork-registry, and
 ;;; this file collects whatever was registered.  HAS-LOCATION, HOLDING, and ON need no such

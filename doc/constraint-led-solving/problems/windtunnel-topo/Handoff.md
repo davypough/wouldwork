@@ -1,5 +1,6 @@
 # windtunnel-topo — Handoff
 Updated 2026-09-30.  Status: CLOSED — stated goal solved and validated (17 actions).
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-windtunnel-topo.lisp.
 Corresponding diagram: doc/constraint-led-solving/problems/windtunnel-topo/windtunnel diagram.png.
 Maximum search depth: 8, set 2026-09-27 (the spec's staged *depth-cutoff* is 16).

@@ -7,7 +7,7 @@
 (in-package :ww)
 
 
-;Any additions to this list requires rebuilding problem-test-solutions.lisp
+;Any additions to this list requires rebuilding test/test-solutions.lisp
 ;in the run-test-problems function below.
 (defvar *test-problem-files*
   '("problem-blocks3.lisp" "problem-blocks3a.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
@@ -48,7 +48,7 @@
     "problem-smallspace.lisp"))
 
 
-;Any additions to this list requires deleting problem-test-bt-solutions.lisp
+;Any additions to this list requires deleting test/test-bt-solutions.lisp
 ;and re-running (test-bt) to rebuild it.
 ;One representative chosen per problem class to avoid redundancy.
 ;hanoi and donald have no native depth-cutoff; overrides set in run-bt-test-problems.
@@ -146,8 +146,8 @@
   (reset-parameters)  ; Initial reset for the test suite
   (with-silenced-compilation
     (let* ((problems-to-run *test-problem-files*)
-           (test-solutions-file (merge-pathnames "problem-test-solutions.lisp"
-                                                 (asdf:system-source-directory :wouldwork)))
+           (test-solutions-file (merge-pathnames "test-solutions.lisp"
+                                                 (get-test-folder-path)))
            (problem-test-solutions (if (probe-file test-solutions-file)
                                      (read-hash-table-from-file test-solutions-file)
                                      (make-hash-table :test #'equal)))
@@ -198,8 +198,7 @@
       (format t "Note: A failed problem solution is not necessarily wrong, but different from the reference solution,")
       (format t "a common occurrence when running in parallel mode.")
       (progn (unless (probe-file test-solutions-file)
-               (write-hash-table-to-file problem-test-solutions
-                 (merge-pathnames "problem-test-solutions.lisp" (asdf:system-source-directory :wouldwork))))
+               (write-hash-table-to-file problem-test-solutions test-solutions-file))
              t)
       t)))
 
@@ -343,7 +342,7 @@
 
 
 (defun test-talos ()
-  "Stage and solve every problem file in the test directory.
+  "Stage and solve every problem file in the test and test/talos directories.
    Registered characterization claims run after staging and before search.  An
    attributed claim failure, no solution, or wrong solved length is recorded and
    the run continues; a genuine Lisp error still halts the run immediately, as it
@@ -352,8 +351,10 @@
    make its problem fail.  A final summary lists every failed problem and every
    surviving mutant."
   (let ((problem-files
-          (sort (directory (merge-pathnames "problem-*.lisp"
-                                            (get-test-folder-path)))
+          (sort (append (directory (merge-pathnames "problem-*.lisp"
+                                                    (get-test-folder-path)))
+                        (directory (merge-pathnames "problem-*.lisp"
+                                                    (get-talos-test-folder-path))))
                 #'string-lessp
                 :key #'file-namestring))
         failed-problems
@@ -364,7 +365,8 @@
       (progn
         (dolist (problem-file problem-files)
           (let ((problem-name (parse-problem-name (file-namestring problem-file)))
-                (problem-path (format nil "test/~A" (file-namestring problem-file))))
+                (problem-path (enough-namestring problem-file
+                                                 (asdf:system-source-directory :wouldwork))))
             (print-test-header problem-name "TALOS")
             (setf *expected-min-length* nil)
             (%stage problem-path)
@@ -436,7 +438,7 @@
    No search is run.  These problems take minutes each to solve, and this suite is meant to
    stay cheap enough to run after every change to tech/.
 
-   Expectations live in problem-test-topo-geometry.lisp beside the system: recorded on the
+   Expectations live in test/talos/test-topo-solutions.lisp: recorded on the
    first run, compared on every later one.  After a change that legitimately moves the
    geometry, delete that file, re-run to re-record, and say in the commit what moved and
    why."
@@ -445,8 +447,8 @@
                                              (get-probs-folder-path)))
                  #'string-lessp
                  :key #'file-namestring))
-         (geometry-file (merge-pathnames "problem-test-topo-geometry.lisp"
-                                         (asdf:system-source-directory :wouldwork)))
+         (geometry-file (merge-pathnames "test-topo-solutions.lisp"
+                                         (get-talos-test-folder-path)))
          (recording (not (probe-file geometry-file)))
          (recorded (if recording
                      (make-hash-table :test #'equal)
@@ -608,8 +610,8 @@
   (reset-parameters)
   (with-silenced-compilation
     (let* ((problems-to-run *test-bt-problem-files*)
-           (test-solutions-file (merge-pathnames "problem-test-bt-solutions.lisp"
-                                                 (asdf:system-source-directory :wouldwork)))
+           (test-solutions-file (merge-pathnames "test-bt-solutions.lisp"
+                                                 (get-test-folder-path)))
            (problem-test-solutions (if (probe-file test-solutions-file)
                                       (read-hash-table-from-file test-solutions-file)
                                       (make-hash-table :test #'equal)))

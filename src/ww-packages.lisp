@@ -29,6 +29,7 @@
 	   #:get-src-folder-path
 	   #:get-probs-folder-path
 	   #:get-test-folder-path
+	   #:get-talos-test-folder-path
 	   #:add-problem-folder
            #:remove-problem-folder
            #:save-globals

@@ -1,5 +1,7 @@
 # Constraint-Led Method — Extractor Specifications
 
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
+
 Method level, domain-general. The specification of every static component
 in `tech/constraint-profile.lisp`, gathered here by T18 (2026-09-25) from the
 places each was first written. Text in fenced blocks is copied verbatim from

@@ -1,5 +1,6 @@
 # phobia-topo — Handoff
 Updated 2026-09-30.  Status: CLOSED — original goal validated.
+Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-phobia-topo.lisp.
 Corresponding diagram: doc/constraint-led-solving/problems/phobia-topo/phobia-topo-diagram.png.
 Maximum search depth: 25, set 2026-09-27.
