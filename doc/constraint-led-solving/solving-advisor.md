@@ -16,9 +16,10 @@ D runs substantial searches in the existing Wouldwork REPL on lumpy, package WW.
 - Nothing in the wouldwork directory is sealed. Files may be read in full without
   permission or disclosure. A new seal applies only at D's explicit request; record
   its date, scope and reason in the affected problem's Handoff (or here for a
-  method-wide seal), until D lifts it. There are currently no seals. Archived
-  sealed-reading rules are historical. New problems use no prediction registers;
-  crelay-topo's register is frozen. Generated output is never hand-edited (M2).
+  method-wide seal), until D lifts it. There are currently no seals. Sealed-reading
+  rules in removed archives are historical. New problems use no prediction registers;
+  crelay-topo's frozen register was removed 2026-10-02 (in git history). Generated
+  output is never hand-edited (M2).
 - D sets the maximum search depth from experiments and available time. Every
   search uses `*threads*` 16 and `*solution-type*` MIN-LENGTH at that maximum;
   use a lower cutoff only for a result shown reachable within it. Depth is the only search bound. Run the probe battery only on D's request. Never deepen silently or
@@ -262,8 +263,8 @@ the ledger schema is `doc/constraint-led-solving/Status-Algebra-and-Record-Schem
 - **Ledger:** not used for new problems. Its stage records assume per-stage files
   that the flat records layout excludes, and the Briefing's log covers its role
   (the recommender's legacy default evidence folder, `doc/problems/<p>/constraint-evidence/`,
-  is from that layout). crelay-topo's version-1 ledger is archived in
-  `doc/constraint-led-solving/archive/crelay-topo-experiment/`.
+  is from that layout). crelay-topo's version-1 ledger was removed with `archive/`
+  on 2026-10-02 and is in git history.
   If a problem's premises and retractions outgrow the log, record the need to adapt
   `tech/constraint-ledger.lisp` to the flat layout in `Schema-Gaps.txt` and the
   affected problem's Handoff; agree implementation with D separately.
@@ -466,17 +467,18 @@ entry point; `Extractor-Specifications.md` describes diagnostics and
 `Schema-Gaps.txt` records uncovered needs. Problem records are in `problems/`,
 and the triangle pilot is in `constraint-pilot/`.
 
-Development is complete through T46. The final implementation plan is retained
-only as history in `archive/Implementation-Plan-2026-10-02.md`, including its
-board, maintenance conventions and pointers to earlier task records. Its session
-instructions and current-task pointer are historical, not an active work queue.
+Development is complete through T46. The implementation plans (the final copy
+`archive/Implementation-Plan-2026-10-02.md`, with its board, maintenance
+conventions and pointers to earlier task records) and crelay-topo's experiment
+record were in `archive/`, removed 2026-10-02; they are in git history. There is
+no active work queue.
 
-Path migration (2026-10-02): historical paths in `archive/`, `evidence/`, verbatim
+Path migration (2026-10-02): historical paths in `evidence/`, verbatim
 quotations and dated schema-gap entries are preserved. To locate moved files,
 map `doc/constraint-method/` to this root, `doc/problems/` to its `problems/`,
 and `doc/constraint-pilot/` to its `constraint-pilot/`. The former
 `Problem-Solving-Guide.md` is now `solving-advisor.md`; the former active
-`Constraint-Implementation-Plan.md` is the final archive named above.
-Earlier removals and the crelay-topo archive move still apply. These mappings
+`Constraint-Implementation-Plan.md` became the final plan copy named above.
+Earlier removals and the `archive/` removal still apply. These mappings
 do not restore deleted files or make historical scripts runnable. The former
 `doc/README.md` is absent; historical mentions are retained.

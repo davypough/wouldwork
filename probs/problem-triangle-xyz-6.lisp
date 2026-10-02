@@ -1,7 +1,7 @@
 ;;; Filename: problem-triangle-xyz-6.lisp
 
 ;;; Copy of problem-triangle-xyz.lisp with *N* 6, for the constraint-method pilot
-;;; (doc/constraint-pilot/triangle-xyz-6/).  triangle-xyz stays at N=5 for the regression tests.
+;;; (doc/constraint-led-solving/constraint-pilot/triangle-xyz-6/).  triangle-xyz stays at N=5 for the regression tests.
 
 ;;; Three coordinates (x,y,z) allows easier computation of heuristic.
 

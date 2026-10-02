@@ -1,7 +1,7 @@
 ;;; Filename: constraint-profile.lisp
 
 ;;; Static constraint profile extractors for the constraint-led analysis method
-;;; (doc/constraint-method/Problem-Solving-Guide.md).  The profile is a pure
+;;; (doc/constraint-led-solving/solving-advisor.md).  The profile is a pure
 ;;; function of a staged problem and optional supplied state: it reads engine databases and
 ;;; reports the invariant structure a hand analysis would otherwise rederive one session
 ;;; at a time.
@@ -63,8 +63,8 @@
 ;;; carrying the spine/composed classification its second score earned (7.20), since the
 ;;; rows the coordinate derivation supplies are a transitive closure and not an adjacency
 ;;; list.  S0, the type extent census, is not in section 3 of crelay-topo's
-;;; Constraint-Prediction-Register.txt (now doc/constraint-method/archive/crelay-topo-experiment/):
-;;; it closes G2 of doc/constraint-method/Schema-Gaps.txt and runs
+;;; Constraint-Prediction-Register.txt (archive removed 2026-10-02; in git history):
+;;; it closes G2 of doc/constraint-led-solving/Schema-Gaps.txt and runs
 ;;; as step 0, since every later extractor needs the emptiness facts before it may read a
 ;;; control aggregate as an axiom.  S4 adds the qualified cut-keeper table under the
 ;;; approved interpretation in register 7.23.  RO, the role-obligation analysis, adds
@@ -75,7 +75,7 @@
 ;;; hints, T21) followed, then FH (from here, T22) and CP (cycle-plan check, T24), which are
 ;;; not run by the whole-profile reporter.  SD (services and setup dependencies, T43) closes
 ;;; the profile; its SW transition check is not run by it.  The component index is in
-;;; doc/constraint-method/Extractor-Specifications.md.
+;;; doc/constraint-led-solving/Extractor-Specifications.md.
 
 (in-package :ww)
 
@@ -3969,7 +3969,7 @@ counted as layer-blind roots."
 
 ;;;; BX -- BEAM CROSSINGS AND CUT ORDER (T40) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.10.  The
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.10.  The
 ;;; static rows read the engine's own crossing data: the published pool, each directed
 ;;; beam's stored crossing order and each gate's split of that order.  They name possible
 ;;; crossings only.  The supplied-state scenario evaluates one settled state with the
@@ -4302,7 +4302,7 @@ counted as layer-blind roots."
 
 ;;;; RL -- COMPETING COLORS AND CONNECTOR LINKS (T41) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.11.  The
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.11.  The
 ;;; static rows state beam-relay's pools, start links and the hues each RC station can
 ;;; see directly.  The supplied-state scenario replays one settled state's lighting layer
 ;;; by layer through the engine's own link query and checks the replay against the
@@ -4795,7 +4795,7 @@ counted as layer-blind roots."
 
 ;;;; MC -- MECHANIC COVERAGE (T19, I5) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.  The Phase 0
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.  The Phase 0
 ;;; coverage gate: which public technologies the staged problem splices, and which of them
 ;;; carry a declared static contract.  The whole-profile reporter prints it first, but it
 ;;; sits here, after every block it reads, because this file is ordered callees-first.
@@ -5365,7 +5365,7 @@ counted as layer-blind roots."
 
 ;;;; CC -- COUPLING CENSUS (T20, I3) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 9.  Which
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 9.  Which
 ;;; controls or devices change two subsystems at once: a role table over every controlled
 ;;; device and primitive controller, fan-out primitives (K1), multi-role objects (K2), the
 ;;; gates that can cut a beam-driven controller's last hop (K3), and lift-barrier couplings
@@ -5671,7 +5671,7 @@ counted as layer-blind roots."
 
 ;;;; EQ -- REMOVABLE EQUIPMENT IN ONE SUPPLIED STATE (T42) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.12.  One
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.12.  One
 ;;; settled state's fans, mounts, boarding, mounting, removal and lifts, read with the
 ;;; engine's own queries and checked against its successor generator; optionally the
 ;;; differences from an earlier settled state.  Not part of the profile.  The caller's states
@@ -6058,7 +6058,7 @@ counted as layer-blind roots."
 
 ;;;; NH -- NECESSITY HINTS (T21, I6) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 10.  Each static
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 10.  Each static
 ;;; limit another section already states, restated as a candidate plan element for the
 ;;; Briefing: H1 body budget (T6), H2 keepers left behind (S4), H3 beam-held devices and
 ;;; candidate beams (S1, RC), H4 controllers off the goal route (S4, S3), H5 lift landings
@@ -6676,7 +6676,7 @@ counted as layer-blind roots."
 
 ;;;; SD -- SERVICES AND SETUP DEPENDENCIES (T43) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.13.  A service
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.13.  A service
 ;;; is a condition a crossing or the goal needs: a gate open, a drive named by a traversal
 ;;; clause not blowing, a receiver active.  Each has providers (S1 CONTROL options, MC jam
 ;;; sites, gears left without a fan, RC chains and fixed corridors to a receiver), each a
@@ -7344,7 +7344,7 @@ counted as layer-blind roots."
 
 ;;;; SW -- SERVICE TRANSITION BETWEEN TWO SUPPLIED STATES (T43) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 8.13.  What changes
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.13.  What changes
 ;;; between two settled states: each passage service kept, kept by an alternative provider,
 ;;; lost or gained; the supplies withdrawn and added and the devices they drive; the arcs,
 ;;; mobility and retrieval an agent loses or gains; and stated transit, return and final
@@ -7630,7 +7630,7 @@ counted as layer-blind roots."
 
 ;;;; FH -- FROM HERE (T22, I1) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 11.  The Phase 3
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 11.  The Phase 3
 ;;; step 7 report at one state: F0 the state itself; F1 each agent's MOVE successors, and
 ;;; which primitive controllers a one-step successor, or the agent's own next action after
 ;;; one of its moves, changes; F2 where held cargo can be set down; F3 the live relay state,
@@ -8112,7 +8112,7 @@ counted as layer-blind roots."
 
 ;;;; CP -- CYCLE-PLAN CHECK (T24, I2) ;;;;
 ;;;
-;;; Specification: doc/constraint-method/Extractor-Specifications.md section 13.  Checks a
+;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 13.  Checks a
 ;;; stage plan the user states, as data, against the plate, body and view budgets before any
 ;;; action is written: B0 view, B1 plate budget (RO's matching), B2 control conflict (S1), B3
 ;;; beam (RC), B4 lift landing (CC's G15 rows).  No search runs and no state is evaluated.  CP

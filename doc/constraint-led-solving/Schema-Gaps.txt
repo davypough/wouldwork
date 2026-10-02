@@ -1,6 +1,6 @@
 Constraint-Led Method -- Schema Gaps (method level, all problems)
 ================================================================
-Moved to method level by T18, 2026-09-25 (Post-Mortem-2026.md, 4.1).
+Moved to method level by T18, 2026-09-25 (Post-Mortem-2026.md, 4.1; removed 2026-10-02, in git history).
 
 PATHS (2026-09-30).  crelay-topo's register, ledger and constraint-evidence/
 named below moved to doc/constraint-led-solving/archive/crelay-topo-experiment/.

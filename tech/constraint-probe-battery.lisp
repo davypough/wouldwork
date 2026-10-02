@@ -1,6 +1,6 @@
 ;;; Filename: constraint-probe-battery.lisp
 
-;;; PB -- PROBE BATTERY (T23, I7).  Specification: doc/constraint-method/Extractor-Specifications.md
+;;; PB -- PROBE BATTERY (T23, I7).  Specification: doc/constraint-led-solving/Extractor-Specifications.md
 ;;; section 12.  Small searches from the staged start, one per landmark or resource, deepening
 ;;; one cutoff at a time to the problem's maximum depth: P1 an agent at a landmark location, P2
 ;;; cargo set down outside its start region, P3 a primitive controller changed from its start

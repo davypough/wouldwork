@@ -1,10 +1,10 @@
 ;;; Filename: constraint-ledger.lisp
 
-;;; The realization ledger for the constraint-led analysis method (T2 of
-;;; doc/constraint-method/Constraint-Implementation-Plan.md).  It is the interactive phase's
+;;; The realization ledger for the constraint-led analysis method (T2 of the
+;;; method's implementation plan, removed 2026-10-02; in git history).  It is the interactive phase's
 ;;; state: links, their status, the premises each depends on, and the evidence closing each.
 ;;; Its schema, status algebra, retraction semantics and exhaustion rules are specified in
-;;; doc/constraint-method/Status-Algebra-and-Record-Schema.md, which this file implements
+;;; doc/constraint-led-solving/Status-Algebra-and-Record-Schema.md, which this file implements
 ;;; without adding a design decision of its own.  Section numbers in the docstrings below
 ;;; refer to that file.
 ;;;
@@ -1066,7 +1066,7 @@
         (format stream ";;; Constraint-led method -- realization ledger for ~A.~%"
                 (getf ledger :problem))
         (format stream ";;; Written by WRITE-REALIZATION-LEDGER.  Schema:~%")
-        (format stream ";;;   doc/constraint-method/Status-Algebra-and-Record-Schema.md~%")
+        (format stream ";;;   doc/constraint-led-solving/Status-Algebra-and-Record-Schema.md~%")
         (format stream ";;; This file is deliberately user-amendable.  Unrecognised keys~%")
         (format stream ";;; are preserved on the next write.~%~%")
         (format stream "(:ledger-version ~D :problem ~S :written ~S)~%~%"
@@ -1840,7 +1840,7 @@
 (defun file-ledger-surprise (ledger id question candidates &optional (date (ledger-today)))
   "M5.  A surprising outcome is not a result to be absorbed; it is a question the schema failed
    to ask.  It is recorded here as a question marked :GAP-CANDIDATE, and
-   REPORT-LEDGER-GAP-CANDIDATES prints it for doc/constraint-method/Schema-Gaps.txt.  That
+   REPORT-LEDGER-GAP-CANDIDATES prints it for doc/constraint-led-solving/Schema-Gaps.txt.  That
    file is hand-maintained, so nothing writes to it from here."
   (let ((question-id (ledger-next-id ledger "QN")))
     (add-ledger-record ledger
@@ -1874,7 +1874,7 @@
 
 
 (defun report-ledger-gap-candidates (ledger)
-  "The surprises this ledger has collected, as text for doc/constraint-method/Schema-Gaps.txt.
+  "The surprises this ledger has collected, as text for doc/constraint-led-solving/Schema-Gaps.txt.
    Printed, never written: that file is hand-maintained and M2's regeneration rule does not
    cover it."
   (let ((candidates (remove-if-not (lambda (record)
@@ -1885,7 +1885,7 @@
             (length candidates))
     (format t "--------------------------------------------------------------~%")
     (format t "  M5: a surprising outcome is a question the schema failed to ask.  Append these~%")
-    (format t "  to doc/constraint-method/Schema-Gaps.txt BY HAND, tagged with this problem as~%")
+    (format t "  to doc/constraint-led-solving/Schema-Gaps.txt BY HAND, tagged with this problem as~%")
     (format t "  their origin and stated domain-generally.  Nothing here writes to that file.~%")
     (dolist (candidate candidates)
       (format t "~%    ~(~A~)  blocks ~:[nothing~;~:*~{~(~A~)~^, ~}~]~%"

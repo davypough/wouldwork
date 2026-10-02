@@ -75,21 +75,21 @@
   t)
 
 (defun read-crelay-phrase-test-actions ()
-  "Read the maintained replay form, handling Windows line endings."
+  "Read crelay-topo's accepted actions from its Actions.lisp without evaluating that file."
   (with-open-file
       (stream (asdf:system-relative-pathname
-                :wouldwork "doc/problems/crelay-topo/subgoal3-complete-validation.txt"))
-    (loop for position = (file-position stream)
-          for line = (read-line stream nil nil)
-          while line
-          when (string= (string-trim '(#\Space #\Tab #\Return #\Newline) line)
-                        "(validate-solution")
-            do (file-position stream position)
-               (return (rest (read stream)))
-          finally (error "Crelay replay form not found."))))
+                :wouldwork "doc/constraint-led-solving/problems/crelay-topo/Actions.lisp"))
+    (loop for form = (read stream nil stream)
+          until (eq form stream)
+          when (and (consp form)
+                    (eq (first form) 'defparameter)
+                    (eq (second form) '*accepted-actions*))
+            do (return (second (third form)))
+          finally (error "Crelay *ACCEPTED-ACTIONS* form not found."))))
+
 
 (defun test-crelay-action-phrase-replay ()
-  "After staging crelay-topo, replay all 94 actions in plain and printed form. No solve."
+  "After staging crelay-topo, replay all 87 actions in plain and printed form. No solve."
   (let* ((*package* (find-package :ww))
          ;; STAGE uninterns generated goal symbols; do not retain a read-time symbol.
          (goal-test (symbol-function (find-symbol "GOAL-FN" :ww)))
@@ -101,7 +101,7 @@
          (long (validate-action-sequence *start-state* phrases :goal-test goal-test))
          (plain-state (action-sequence-validation-final-state plain))
          (long-state (action-sequence-validation-final-state long)))
-    (assert (= 94 (length actions)))
+    (assert (= 87 (length actions)))
     (assert (action-sequence-validation-success-p plain))
     (assert (action-sequence-validation-goal-satisfied-p plain))
     (assert (action-sequence-validation-success-p long))
@@ -120,6 +120,6 @@
                        (funcall (symbol-function
                                   (find-symbol "PRINT-RECORDER-REPORT-SEQUENCE" :ww))
                                 "Replay" path stream))))
-        (assert (search "picks up TRAY1 at LOCATION21 from LOCATION21" printed))))
-    (format t "~&CRELAY-ACTION-PHRASES: PASS (94 actions, both forms, goal and recorder)~%"))
+        (assert (search "picks up TRAY1 at LOCATION13 from LOCATION13" printed))))
+    (format t "~&CRELAY-ACTION-PHRASES: PASS (87 actions, both forms, goal and recorder)~%"))
   t)

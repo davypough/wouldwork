@@ -6,7 +6,7 @@ Maximum search depth: not set under the current Guide. crelay-topo was the metho
 2026-09-20 to 2026-09-25); its searches used cutoffs 8 to 15, and the final leg was found at 10.
 The prototype's full record — the frozen prediction register, the version-1 ledger and 109 evidence
 files — is in doc/constraint-led-solving/archive/crelay-topo-experiment/. The post-mortem
-(doc/constraint-led-solving/Post-Mortem-2026.md) assesses it.
+(doc/constraint-led-solving/Post-Mortem-2026.md, removed 2026-10-02; in git history) assesses it.
 
 ## Spec-diagram check
 

@@ -49,7 +49,7 @@ component's current text; the old text stays.
 
 Register = `doc/constraint-led-solving/archive/crelay-topo-experiment/Constraint-Prediction-Register.txt`.
 Archived plan = `doc/constraint-led-solving/archive/Implementation-Plan-2026-09-25.md`.
-Post-mortem verdicts per component: `Post-Mortem-2026.md` section 1.6.
+Post-mortem verdicts per component: `Post-Mortem-2026.md` section 1.6 (removed 2026-10-02; in git history).
 
 ## 1. S1–S7
 
