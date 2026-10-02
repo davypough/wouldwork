@@ -1,0 +1,156 @@
+# Wouldwork Working-Reference Builder — Prompt
+
+Build a readable account of what the specification actually models, then help the user compare
+it with what they intend. Collect scattered facts into one working reference, but lead with
+plain-language behavior and concrete allowed/forbidden examples rather than requiring the user
+to inspect Lisp tables. Tables provide supporting evidence.
+
+**Where this fits.** [spec-advisor.md](spec-advisor.md) introduces this procedure during drafting
+and after staging. It supports soundness, completeness, and consistency review, not just later
+solution analysis. If a mismatch appears, use [inferring-missing-relations.md](inferring-missing-relations.md)
+to investigate it. These capability sections are Talos-oriented; for other problems use the same
+intent-versus-model comparison with the relevant rules and entities. Consult current technology
+sources and `tech/Talos Technology  Summary.txt` for relation semantics.
+
+> **Status:** Sections 1–3 were rewritten against the current `tech/` relation vocabulary. The previous version used retired area/interface relations (`in-area`, `interface`, `traversable>`, `in-los-group`, `reachable-via`) and an older LOS representation. The current system reuses `los-via` as one unified symmetric endpoint relation. Discipline rule 4 and Section 8 were revised: geometry is spec fact in coordinate-derived problems and is no longer quarantined by default.
+
+---
+
+## Inputs
+
+- **Required:** the problem spec `.lisp` file. Read it **fresh from disk every time**. Never rely on memory of a prior version, a prior session's reference, or a remembered conclusion. If a remembered answer surfaces, set it aside and derive from the current artifact.
+- **Optional:** a hand drawing / diagram of the environment.
+- **Intent evidence:** the user's description, confirmed requirements, and allowed/forbidden examples. If absent, explain the model but leave fidelity to intent unconfirmed.
+- **After staging:** load output and direct queries of staged databases for derived tables. Before staging, clearly distinguish predictions from inspected results.
+
+---
+
+## Step 0 — Determine the authoring path
+
+Settle this before transcribing anything; it changes what Sections 1–3 can contain.
+
+**Does the spec assert any `wall-segment>`, `edge-segment>`, or `boundary-wall` facts?**
+
+- **Yes — coordinate-derived.** The movement and sightline tables are *computed at initialization* from raw 2D segment geometry: `-walkability-coordinates` derives the `walking` facts in `traversal-via` / `traversal-via>`, and `-beam-los-coordinates` derives `los-via` plus finite-barrier crossing records. **These facts are not in the file and cannot be transcribed from it.** Record the geometry inputs — `location-coords>`, `apparatus-coords>`, `wall-segment>`, `edge-segment>`, `gate-segment>`, `window-segment>`, `screen-segment>`, `boundary-wall`, and relevant elevations/heights — as the authoritative source, and take the derived edges and crossing records from the load printout, marked as derived output.
+- **No — hand-authored.** The spec states its edges directly. Transcribe them.
+
+Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* hand-authored sightline relations in its own older vocabulary (`los0`/`los1`, `visible0`/`visible1`, `accessible0`/`accessible1`). Transcribe whatever that file actually declares; do not translate it into `tech/` names.
+
+**If a derived table comes back empty or short**, suspect a load-ordering fault before suspecting the geometry. Two failure modes are silent: an init-action skipped because one of its parameter types has no instances, and a type declared *below* the `include-tech` block, which collapses every `doall` over it into a no-op. See `../../load-ordering/loading-and-initialization.md`, Traps 3 and 4.
+
+---
+
+## Non-negotiable discipline
+
+1. **Transcribe, don't recall.** Every structural fact in Sections 1–7 comes verbatim from the current file, or from inspected staged output where the fact is derived; label further deductions and their assumptions separately. Cite line numbers where it aids the transcription check.
+2. **Separate implementation from intent.** The current source and staged behavior establish what is implemented; confirmed user requirements establish what is intended. Correct a transcription error in the reference, but record a real mismatch between model and intent rather than assuming the source is right. Propose a spec correction for review.
+3. **Keep the capability families separate.** Walking (walkability), sight (visibility), and reach (reachability) are distinct graphs with distinct passability rules. Never merge them; a fact true in one is routinely false in the others. In particular: walking is agent-dependent, reach and sight are not; and reach-edge barrier lists admit only gates; screens and ladders are rejected by the current initialization checks.
+4. **Separate what the spec states from what it cannot.** In a coordinate-derived spec, geometry *is* spec fact — record positions and segments in Sections 1–3 like any other declaration. Use Section 8 to compare these declarations with intent and to record what cannot be read off the spec: an unstated adjacency, a diagram-only feature, an intended-but-unmodeled relationship. If the spec has no geometry at all, then wall sides and sightline plausibility do belong in Section 8, as readings of the diagram flagged for confirmation.
+5. **Check the start state.** Inspect staged derived facts where available; otherwise trace the derivation cascade and label the result as a prediction. Examine (the `define-update` functions, in `propagate-consequences!` order) over the init facts and record the initial derived vector with its evidence — open gates, active receivers, crossing states. Don't leave it implicit. Note that on a tech-based spec this driver is usually *derived from splice order* rather than authored, so read the technology include order to get the sequence right.
+6. **Words, not symbols, in legends.** Use tokens like `clear` / `(occluders…)` / `none`. Bare symbols (—, ·) render inconsistently and invite transcription drift.
+7. **Do not invent modeled facts.** Omit irrelevant mechanics, but retain an intended capability that is absent from the spec as an explicit possible omission. Absence from the implementation is not a reason to erase a user requirement.
+8. **Present for intent review before relying on it.** Explain representative behavior and ask whether it matches the intended problem. Separate the user's confirmation of a rule from evidence that the implementation obeys it; a transcription check alone does not establish fidelity.
+9. **Regenerate per problem.** Never reuse a stale reference; rebuild from the current file.
+
+---
+
+## Output: the markdown working reference
+
+Open with a **header block**: source filename; authoring path (coordinate-derived or hand-authored); the technologies included, if any; the `ww-set` config (`*problem-type*`, `*solution-type*`, `*tree-or-graph*`, `*depth-cutoff*`); and any **type members declared in `define-types` but absent from every init relation** — candidates for review, not automatically missing pieces to place.
+
+Then the sections below. Treat them as a **template**: drop any the problem doesn't exercise, and add problem-specific ones where a derived layer doesn't fit the headings.
+
+### 1. Mobility network
+
+From the currently installed traversal modes: `walking`, `stairway`, `jumping`, and `climbing`, all stored in the symmetric `traversal-via` or directed `traversal-via>` relation and composed by `mobility-results`, `mobility-locations`, and `traversable`. Passability comes from `obstacle-clear` / `all-clear` in `tech/-passability.lisp`.
+
+- **The traversal clause convention, stated once.** Every `traversal-via` and `traversal-via>` value is a **DNF obstacle-clause list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. `((gate1) (gate2 gate3))` reads *gate1 open, or else both gate2 and gate3 open*. Record each edge's clause list exactly — collapsing alternatives into one flat list changes the meaning.
+- **Each walking edge** as a `walking` fact with its clause list. Mark direction: `traversal-via` is symmetric; `traversal-via>` is directional, and the reverse direction may have a different clause list or none.
+- **Other mobility modes.** Record `stairway`, `jumping`, and `climbing` facts separately from `walking` even though the mobility closure composes their grounded traversals. They use the same DNF shape. Jump feasibility uses the hypothetical source location's floor elevation, the destination floor elevation, and the highest non-passable feature top. Every usable climbing clause must contain a ladder positioned exactly at the segment source; the selected ladder appears first in the route witness. Support-changing jumps and steps are explicit one-transition boundaries rather than mobility segments, but the central action presents both kinds of result as `move`.
+- **The per-kind passability rule** for each obstacle kind the spec actually uses, read from the selected mode and `obstacle-clear`: a **gate** passes when open; a **screen** or **ladder** passes only when the agent is empty-handed; a **stream device** (gears or fixed blower) follows its current blowing state; and a jump's gates, screens, and walls are path features to pass or clear.
+- **Air streams, if present.** They are derived, not authored: each wall drive's band runs from the solid backstop behind its blower, through its `has-position` swept location, to its `aimed-at` destination, 3 units wide unless `stream-width` overrides. A drive is either mountable `wall-gears` with a removable fan or a fixed `wall-blower`. The swept location is standable exactly while the stream is off.
+- **Flag any location with no `walking` traversal edge at all**, and any location reachable only by a directional edge.
+
+For a coordinate-derived spec, record the geometry inputs and the derived edge count, and note that the edge table comes from the load printout.
+
+### 2. Reachability (getting/putting) network
+
+From symmetric `reach-via`, directional `reach-via>` (reacher first), and `reachable-clear` (`tech/reachability.lisp`).
+
+- **Every reach edge with its barrier list.** Restate the algebra explicitly, because it differs from movement at three points: the list is a **flat conjunction** — every gate in it must be open, with no alternative clauses; `reach-via` is **symmetric**, `reach-via>` is directional, and reach is **not transitive**; and it is **agent-independent**, so carrying does not matter. `reachable` is also trivially true for identical endpoints.
+- **The barrier-clearing rule.** `reachable-clear` admits a barrier only if it is a gate and it is open. A closed gate blocks, and **non-gate barriers are rejected during initialization**; do not model screens or ladders as reach-edge barriers.
+- **Note which locations no reach edge touches.**
+
+### 3. Visibility (line of sight) network
+
+From the symmetric `los-via` relation, its coordinate-derived `los-barrier-crossings>` records, and the visibility-policy queries in `tech/visibility.lisp`.
+
+There are no sightline groups in the current representation — each entry is one endpoint pair in the shared relation.
+
+- **Keep one table, keyed by endpoint rather than consuming role.** Every authored sightline is written once from the location an actor occupies; `los-via` is symmetric, so the engine stores its mirror. The far endpoint identifies how it is used:
+  - a gate is a direct jammer target;
+  - a transmitter, receiver, repeater, or gun is an apparatus endpoint;
+  - a location supports connector-to-connector pairing and a gears target resolved through `has-position`.
+- **A location × visibility-object table of occluder lists.** Use the word-token legend (rule 6): `clear` for an empty list, `(occluders…)` where a sightline exists but carries gates or location candidates, `none` where there is no entry and therefore no sightline. **This table is historically error-prone — transcribe it exactly and call it out in the verification request.**
+- **Record finite-barrier crossings separately.** Coordinate derivation retains walls, edges, gates, and boundary segments in oriented `los-barrier-crossings>` records; do not flatten them into the `los-via` occluder list.
+- **State the policy being applied.** Ordinary `visible` sight never clears a solid crossing by height and requires gate occluders to be open. Beam and elevated-jammer sight can clear finite barriers above their inclusive tops; only beam sight also treats a location occluder as blocked when an occupant there spans the interpolated beam elevation.
+- **Flag any location with no sight data.**
+
+### 4. Object / role inventory
+
+Every movable (cargo) object: start location, kind, the roles it can play (mover, carrier, jammer/placer, beam-blocker, …), and **what world state each can independently force**. Name any scarce, load-bearing resource — a single jammer, one connector short of the pairings needed — explicitly. Overloaded resources drive the puzzle.
+
+### 5. Derived-state dependency chain
+
+Read the truth condition of each derived fluent off the `define-query` helpers and `define-update` combine rules, and write the chain `base fact → derived fluent`. Capture exactly:
+
+- Each controller's drive condition (`energized`, beam-reaches conditions, corridor-clear rules).
+- The per-output combine rule and its modes — `normal` = open when energized, `inverted` = open when not, `toggle` if present — including override precedence. Jamming overrides: a jammed gate is forced open, jammed gears forced stopped.
+- Note that `controls` takes a **DNF clause list** of controllers, same convention as the movement edges.
+- Which outputs are uncontrolled and therefore forceable only by a direct base action such as jamming. These usually pin the terminal action.
+- If beams are in play, the crossing bookkeeping: `beam-via`, `crossings-along-beam>`, `beam-crossings-before-gate>`, and the dynamic `crossing-active`.
+
+### 6. World-mode enumeration
+
+- Identify the **minimal set of agent-controllable base toggles** that fix all derived state (e.g. "is the jammer on gate X?", "is corridor location L occupied?").
+- Describe relevant combinations as named modes. Mark each as reachable by a witnessed path, ruled out by an established invariant, or unverified; do not infer reachability from a consistent assignment alone. For each mode give the **full derived vector** — every gate and fluent — plus which **movement, reach, and sight** passages it opens or closes.
+- List the **transitions**: which action flips which toggle, and hence which mode pairs are adjacent.
+- Watch for mutually exclusive modes — a passage needed for step A opens only in a mode that closes the passage needed for step B. That tension is usually the puzzle's core, and it is what the deadlock patterns in `inferring-missing-relations.md` §5 name.
+
+### 7. Goal reduction
+
+- State the goal fluent(s).
+- Find the **forced terminal action**: the `define-action` whose effect can assert the goal fluent. If only one action or branch can, it is forced. Recurse onto its preconditions.
+- Pin the **mode** the terminal action must fire in — holding and occupancy preconditions often force a specific one — and read that mode's row in Section 6 to see what vantages and edges are then live.
+
+### 8. Intent comparison and unresolved questions
+
+Compare important requirements with the model, including declared geometry: a coordinate being
+present does not establish that it matches the intended drawing. Do not duplicate raw tables;
+record what each requirement means and where the comparison stands.
+
+| Intended rule and source | Modeled behavior and evidence | Review status | Next check or question |
+|---|---|---|---|
+| User-confirmed rule or explicitly provisional interpretation | Source declaration, staged query, or replayed case | Confirmed for tested cases / mismatch / unresolved / not represented | One concrete example or clarification |
+
+For soundness, include a case the model must forbid; for completeness, a case it must allow
+and a check that relevant requirements are represented. For consistency, examine initial and
+derived facts and conflicting conditions. Include action effects and goal meaning, not only
+where movement is possible. Record test scope: finite examples do not establish universal claims.
+
+Legitimate entries: an adjacency the diagram shows but no relation encodes; a feature drawn but not modeled; an intended relationship the spec appears to be missing. Phrase each as a reading of the diagram, or as an open question if none was given, and ask for confirmation. Nothing here is a spec fact.
+
+---
+
+## Self-check before presenting
+
+- Was the authoring path determined first, and do Sections 1–3 reflect it?
+- Does every Section 1–7 claim trace to a line in the current file, or to inspected staged output for a derived fact, with deductions labeled separately?
+- Are movement, reach, and sight kept strictly separate — including their differing barrier rules?
+- Are DNF clause lists recorded as clauses, not flattened?
+- Is `reach-via`'s list recorded as a flat conjunction rather than as alternatives?
+- Is the computed start state internally consistent (re-run the cascade to a fixpoint)?
+- Does Section 8 distinguish intended behavior, implemented behavior, evidence, and unresolved differences?
+- Are allowed and forbidden examples covered, and are completeness and consistency claims scoped to the checks performed?
+- Are unused relation and obstacle kinds omitted rather than invented?
+- Have I named the missing type members and the scarce resources?

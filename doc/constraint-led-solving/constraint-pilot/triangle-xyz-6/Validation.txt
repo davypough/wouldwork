@@ -1,0 +1,33 @@
+;;; triangle-xyz-6 -- complete validated solution, 19 actions.
+;;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T; solution validators accepted
+;;; To re-validate: (stage triangle-xyz-6), then evaluate this form separately.
+(validate-solution :verbose
+  (1 (jump-ru 1 3))
+  (2 (jump-lh 3 1))
+  (3 (jump-ru 1 4))
+  (4 (jump-ru 1 6))
+  (5 (jump-lu 5 1))
+  (6 (jump-rh 3 3))
+  (7 (jump-lu 6 1))
+  (8 (jump-ld 3 1))
+  (9 (jump-rh 1 4))
+  (10 (jump-lu 3 4))
+  (11 (jump-lh 5 2))
+  (12 (jump-rh 2 5))
+  (13 (jump-lh 4 1))
+  (14 (jump-rh 1 4))
+  (15 (jump-lu 4 3))
+  (16 (jump-ld 1 1))
+  (17 (jump-rd 1 3))
+  (18 (jump-ru 3 3))
+  (19 (jump-rd 2 1)))
+
+Final state:
+  Time: 19.0
+  Value: 0.0
+  Propositions:
+    (BOARD-PEGS (PEG6))
+    (CONTENTS> 4 1 3 PEG6)
+    (LOC> PEG6 4 1 3)
+    (PEG-COUNT 1)
+

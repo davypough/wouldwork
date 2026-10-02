@@ -1,0 +1,251 @@
+# Guidelines for Inferring a Missing Relation in a Talos Planning Problem
+
+A companion to specification review: help the user understand a difference between the intended
+problem and the modeled behavior, and assess whether a missing relation explains it. The detailed
+Talos procedure below is a specialized omission investigation, not a general assumption that a
+difficult or apparently unsolvable spec needs more relations.
+
+**Where this fits.** [spec-advisor.md](spec-advisor.md) introduces this procedure when comparison
+with user intent reveals a discrepancy. Use [working-reference-builder.md](working-reference-builder.md)
+to explain the current model first. Its intent comparison supplies requirements and open questions;
+its world-mode section supplies state-dependent evidence, with reachability claims qualified by
+their actual verification. Consult current technology sources for the mechanics involved.
+
+## Before diagnosing an omission
+
+State the user's expected behavior, its source, the model's actual behavior, and one concrete
+case that distinguishes them. Ask the user to clarify uncertain intent before treating it as a
+requirement. Classify the discrepancy:
+
+- **Soundness:** the model admits a forbidden move, effect, or outcome. Look for an extra
+  permission or missing restriction; adding connectivity would usually make this worse.
+- **Completeness:** an intended object, capability, effect, or goal condition is absent, or an
+  intended legal case is rejected. A missing relation is one possible cause, alongside a wrong
+  precondition, loading failure, or inadequate choice of representative locations.
+- **Consistency:** declarations or consequences conflict with each other or with confirmed intent.
+  Trace their sources and resolve the conflict rather than adding a compensating fact.
+- **Uncertainty:** the intended rule or model behavior has not been established. Record a question
+  or propose a focused check; do not label it an omission.
+
+Present findings in the form: **intended behavior → modeled behavior → evidence → proposed
+correction → allowed and forbidden cases to recheck**. Staging and bounded checks can expose a
+mismatch without a full solve. Search failure, a cutoff, or a static gap alone does not prove
+unsolvability or a missing relation. Conversely, a solution does not prove fidelity to intent.
+
+Preserve supplied objects, apparatus, geometry, controller wiring, colors, and heights. An
+additional standing location can be proposed when justified by existing geometry. Do not invent
+equipment, openings, or barriers to obtain a preferred plan. Correcting a confirmed transcription
+error is different from changing the intended puzzle; explain that distinction to the user.
+
+> **Status:** living document. Section 4 was rewritten against the current `tech/` relation vocabulary; the previous version described an area/interface/LOS-group representation (`in-area`, `interface`, `in-los-group`, `reachable-via`) that no longer exists. The current system reuses the name `los-via` for one unified symmetric endpoint relation, not the old LOS-group representation. Section 5 (deadlock patterns) and Section 8 (pitfalls) are expected to grow. Appendix B is a historical exemplar, retained for its reasoning but written in the superseded vocabulary.
+
+---
+
+## 1. Purpose & scope
+
+Once evidence supports an omitted relation or representative location, investigate:
+
+1. **Where** it belongs — which locations, which sightline, which movement or reach edge.
+2. **What barriers or occluders** follow from the supplied geometry and intended rules.
+
+**A missing location is the common case**, and the most tractable to reason about: a location that should exist as a standing spot, sight vantage, or reach endpoint, together with all its incident relations. But the same method applies to any single missing relation instance — a `walking` traversal edge, a `reach-via` opening, or a `los-via` sightline.
+
+**Working hypothesis, not a conclusion.** The specialized procedure assumes the relevant mechanics
+are correct and one relation (or a location and its incident relations) explains the mismatch.
+Record evidence for that hypothesis and revisit it if checks disagree. Always read the current file.
+
+**Before starting, determine whether the relevant facts are authored or derived.** See Section 4's closing note. If the problem asserts `wall-segment>`, `edge-segment>`, or `boundary-wall`, its `walking` traversal and `los-via` facts are computed from geometry at initialization, and hand-adding one is the wrong fix.
+
+---
+
+## 2. Core method: bidirectional reasoning
+
+Work the problem from both ends and find where they fail to meet.
+
+- **Backward from the goal.** Reduce the goal to the forced terminal action(s), then to *their* preconditions, recursively. Goal gates that no controller drives can only be opened one way (e.g. by a jammer), which often pins down the final action and the resource that must be consumed there.
+- **Forward from the start.** Compute what the start state, plus its derived/coupled state, actually makes reachable — by movement, by reach, and by sight. Prune everything that merely *looks* reachable.
+
+**The missing relation advances a frontier.** It does one of:
+
+- **(a) Bridges** the forward-reachable frontier to a backward-required precondition (the two ends meet there), or
+- **(b) Extends the forward frontier** — permits further forward progress from a point where the agent was stalled, or
+- **(c) Enables a backward regression step** — supplies a missing precondition so a required action becomes applicable.
+
+**Do not assume case (a).** A missing relation frequently just unblocks one direction (b or c).
+
+---
+
+## 3. Analytical milestones
+
+A scaffold that has held up in practice. Each milestone is a checkpoint to confirm before proceeding.
+
+1. **Goal reduction.** Reduce the goal to the forced terminal action(s) and the resource(s) they consume.
+2. **Terminal-vantage analysis.** Enumerate every position/state from which the terminal action could fire. Extract the constraints on location, visibility, and reachability.
+3. **Invariants & resource couplings.** Identify conserved or mutually-exclusive quantities (e.g. a single jammer; *holding* vs *jamming* exclusivity; a beam corridor that must stay unoccupied). These are the hard constraints that generate the deadlock.
+4. **Forward-reachability pruning.** Compute true movement/reach/sight reachability from the start. Discard destinations that are plausible but unreachable. Do this **before** committing to any destination.
+5. **Forced corridor.** When pruning leaves a single productive path, commit to it and trace the action sequence along it.
+6. **Deadlock isolation.** Find the exact point where forward progress stalls or a backward precondition cannot be met. The omission lives *here*, not necessarily where the symptom first appears.
+7. **Synthesis.** Derive the missing relation(s), one per unmet need (Section 6).
+8. **Validation.** Compare corrected behavior with intent using allowed and forbidden cases; check consistency and geometry. Validate a complete solution separately when requested (Section 7).
+
+---
+
+## 4. Relation reference (capability lens)
+
+`tech/Talos Technology  Summary.txt` is the authoritative inventory of relations and is kept current; consult it rather than this table for signatures. What follows reads the movement/sight/reach relations as *capabilities*, with the question each answers and how barriers behave — which is what the inference method actually turns on.
+
+| Relation | Capability | Question to ask | Barrier semantics |
+|---|---|---|---|
+| `traversal-via walking location $list location` | Symmetric walking edge | Can the agent *walk between these two spots* now? | `$list` is DNF — see below. The walking predicate also requires equal endpoint elevations and agent-dependent passability. |
+| `traversal-via> walking location $list location` | Directional walking edge | Can the agent walk *this way only*? | Same convention. Emitted for rides into an air stream's destination. |
+| `traversal-via` / `traversal-via>` (`stairway`) | Stairs edge (symmetric or directional) | Can grounded mobility use these stairs? | `$list` is DNF; elevation difference is unrestricted. |
+| `traversal-via` / `traversal-via>` (`jumping`) | Jumping edge (symmetric or directional) | Can grounded mobility *jump* this gap? | `$list` is DNF; feasibility uses the source and destination floor elevations. |
+| `traversal-via> climbing location $list location` | One-way climb (ladders) | Can the agent climb here? | `$list` is DNF, and each usable clause must contain a ladder positioned at the source. |
+| `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open. Symmetric, agent-independent. |
+| `los-via visibility-object $list visibility-object` | Symmetric structural sightline | Is there a possible straight sightline from this location to that location, gate, apparatus, or gun? | Authored facts start from a location and carry gate/location occluders. Coordinate derivation also retains separate finite wall/edge/gate/boundary crossings. Ordinary sight treats solid crossings as opaque; beam and elevated-jammer consumers may clear finite barriers by height. |
+| `los-barrier-crossings> los-endpoint $list visibility-object` | Oriented finite-barrier geometry | Which exact segment crossings does a coordinate-derived sightline encounter? | Derived, not authored. Beam and elevated-jammer policies interpolate elevation at each crossing; equality with a barrier's base or top still blocks. |
+| `beam-via fixed-beam-source $list fixed-beam-sink` | Fixed beam corridor | Does the fixed beam *reach its sink*? | Authored locations block only when an occupant spans the beam height. Coordinate-known walls, edges, boundaries, and closed gates block only across their finite vertical span. |
+| `controls $list <barrier> $mode` | Derived barrier state from controllers | Is this gate *driven open/closed* right now? | `$list` is a DNF clause list of controllers. `normal` = open when energized; `inverted` = open when not; jamming overrides. |
+| `jam-disallowed> location location target` | Explicit jam prohibition | Is jamming ruled out from here? | — |
+
+### The DNF clause convention
+
+`traversal-via`, `traversal-via>`, and `controls` take a **disjunctive-normal-form clause list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a clause**. So `((gate1) (gate2 gate3))` means *gate1 open, or else both gate2 and gate3 open*. A clause is a set of simultaneous conditions; multiple clauses are alternative routes. Every traversal mode uses this same shape; `reach-via` remains a flat conjunction.
+
+Allowed clause items depend on the mode, and `traversal-init-check` rejects anything outside that mode's registered vocabulary:
+
+- `walking`: gates, screens, ladders, and gears.
+- `stairway`: gates, screens, ladders, gears, and fixed blowers.
+- `jumping`: gates, screens, and walls, interpreted as path features to pass or clear.
+- `climbing`: gates, screens, and ladders; every usable clause must include a ladder positioned at the source.
+
+For the passability-based modes, a gate passes when open; a screen or ladder passes only when the agent is empty-handed; and a stream device passes according to its current blowing state.
+
+### Three asymmetries to internalize
+
+1. **Walking is agent-dependent; reach and sight are not.** A path walkable empty-handed may be impassable while carrying a resource. `reachable` and `visible` take no agent argument at all.
+2. **Reach clears only through open gates.** `reachable-clear` (`tech/reachability.lisp`) admits a barrier only if it is a gate and open — current initialization rejects a screen or ladder in a reach barrier list, with no empty-handed exemption. This differs from the same obstacle on a walking traversal edge.
+3. **Traversal edges are disjunctive; reach edges are conjunctive.** A `traversal-via` list offers alternative routes; a `reach-via` list is a flat set of gates that must *all* be open. Writing a reach barrier as if it were DNF is a silent modeling error.
+
+### Authored or derived?
+
+Movement and sightline facts come from one of two places, and this decides how a gap may legitimately be fixed.
+
+- **Hand-authored.** The problem asserts `traversal-via` and `los-via` facts directly. A missing edge is fixed by adding the fact.
+- **Derived from geometry.** If the problem asserts any `wall-segment>`, `edge-segment>`, or `boundary-wall` geometry (usually alongside `gate-segment>`, `window-segment>`, and `screen-segment>`), then `-walkability-coordinates` derives the `walking` facts in `traversal-via`/`traversal-via>` and `-beam-los-coordinates` derives `los-via` and `los-barrier-crossings>` at initialization. **Hand-adding a fact in this case is the wrong fix** — the derivation owns those relations, and an added fact either conflicts with what the derivation produces or is silently overwritten. Inspect the geometry inputs, included derivation rules, exclusions, and loading order. The absence may be correct. Propose an additional representative location where justified, or correct a confirmed transcription error; do not alter given geometry merely to create a sightline.
+
+Check for `wall-segment>`, `edge-segment>`, or `boundary-wall` before synthesizing anything in Section 6.
+
+---
+
+## 5. Deadlock patterns (catalog — grows)
+
+Named couplings that produce "almost solvable" specs. Recognizing the pattern shortcuts the deadlock-isolation milestone. These are structural observations, independent of the relation vocabulary in use.
+
+- **"The opener is the payload."** The single scarce resource that *unlocks* the path is the same one that must be *consumed at the destination*. It cannot be in both places.
+- **"Carrying closes the path it opened."** Moving the resource flips a derived state that was holding the path open, re-sealing it behind the agent. Expect a **stranded-resource sub-problem**: the resource sits on one side, the agent on the other, with no legal way to reunite them.
+- **"Self-defeating vantage."** Occupying the spot needed for the terminal action violates a constraint that the action depends on — for instance, standing in a beam corridor that must stay unoccupied.
+
+Appendix B works all three at once.
+
+---
+
+## 6. Synthesis checklist
+
+First confirm the facts are hand-authored, not derived (Section 4). Then map each **unmet need** to exactly one relation, and choose its barriers deliberately.
+
+- *"The agent must be able to walk here"* → `traversal-via` entries in `walking` mode joining the location to its neighbors — or `traversal-via>` if the passage is one-way. Choose the DNF clause list.
+- *"The agent must be able to use stairs here"* → `traversal-via` / `traversal-via>` in `stairway` mode, with a DNF enabling-means list.
+- *"The agent must be able to jump or climb here"* → `traversal-via` / `traversal-via>` in `jumping` or `climbing` mode, with a DNF feature/means list; every usable climbing clause must contain its positioned ladder.
+- *"The target must be visible from here"* → one `los-via` fact from the vantage location to the relevant endpoint: a gate for direct gate jamming, an apparatus or gun for that fixture, or a location for connector pairing and a gears target resolved through `has-position`. Choose the flat occluder list.
+- *"Cargo must cross a gap from here without the agent walking"* → `reach-via`, with a flat list of barrier gates.
+
+Derive **barriers/occluders** from the intended environment, and check both directions:
+
+1. The edge or sightline is **usable exactly when intended** — in the state the forced corridor reaches it.
+2. The edge or sightline is **not usable when the intended rules forbid it**. An unexpectedly short
+   solution is a reason to check the model, not authority to add a barrier.
+
+The barrier choice is frequently the keystone of the whole inference, not a stylistic afterthought. Note that DNF gives a second lever beyond *which* barriers: a second clause creates an alternative route that opens under different conditions, which can be exactly right or a hole straight through the puzzle.
+
+---
+
+## 7. Validation checklist
+
+- **Intent and regression checks.** Show that the previously missing legal case is now represented,
+  and that nearby forbidden cases remain forbidden. Investigate unexpected shortcuts against
+  confirmed rules rather than suppressing them merely because they are short.
+- **Geometric honesty.** Check locations, directions, heights, and crossings against supplied
+  geometry using each capability's actual rules. Movement, reach, and sight need not agree about
+  passage. Coordinate derivation applies implemented geometry rules; it does not prove that inputs
+  or those rules match the user's intent.
+- **Concrete plan, when requested.** Replay the complete path under the corrected spec and check
+  the original goal and applicable technology validators. Keep this separate from fidelity checks;
+  a search cutoff is not a requirement on the intended puzzle. Obtain approval for expensive search.
+- **Consistency on propagation.** Confirm the terminal action's `propagate-changes!` settles without `inconsistent-state` and without disturbing unrelated derived facts.
+
+---
+
+## 8. Pitfalls & anti-patterns (grows)
+
+- **Hand-adding a derived fact.** The spec asserts wall, edge, or boundary geometry, so the `walking` traversal facts, `los-via`, and barrier-crossing records are computed at init. Investigate the derivation and its inputs, then correct only a demonstrated mismatch with intent.
+- **Assuming a bridge.** Treating the missing relation as case 2(a) when it only extends one frontier (2(b)/2(c)). Check which it is.
+- **Committing to a destination before pruning.** A destination can look viable on sight or reach grounds yet be movement-unreachable. Prune walkability first.
+- **Sightline that contradicts the wall.** Granting a location a clear view of a target that, by its position, should be occluded by the intervening wall's gates.
+- **Unbarred reach edge through a wall.** A `reach-via` with an empty barrier list punches a hole straight through a gated wall and can collapse the puzzle to two actions.
+- **Treating a reach list as DNF.** `reach-via`'s list is a flat conjunction — every gate must be open. Writing it as alternative clauses does not mean what it looks like.
+- **Using screens or ladders as reach barriers.** Current reach initialization permits only gates in the barrier list; mobility exemptions do not apply.
+- **Conflating reach with movement (or sight).** They cross barriers under different rules; a fix valid for one is often invalid for another.
+- **Fixing the symptom site.** The deadlock surfaces downstream of the omission; place the new relations at the deadlock's *cause*.
+- **Wrong `los-via` endpoint.** Authored sightlines always start from a location. A jammer aiming at a gate names that gate; a beam pairing names its apparatus endpoint; and a gears jam target names the location in its `has-position` fact. The relation name no longer encodes the role.
+
+---
+
+## Appendix A — quick procedure
+
+1. Determine whether movement/sightline facts are authored or derived from wall, edge, or boundary geometry.
+2. Reduce the goal to its forced terminal action and consumed resource.
+3. Characterize every legal terminal vantage; note the sight/reach/stand constraints.
+4. List invariants and resource couplings.
+5. Prune forward reachability (movement, then reach, then sight); kill false destinations.
+6. Commit to the forced corridor; trace actions until progress stalls.
+7. Isolate the deadlock; name its pattern.
+8. Propose the relation(s) supported by the confirmed intended behavior and supplied geometry.
+9. Review the proposal, check allowed and forbidden cases and propagation consistency, update the
+   working reference, and separately replay a complete solution if requested. Report unresolved scope.
+
+---
+
+## Appendix B — historical exemplar: `problem-claustro.lisp`, missing `location3`
+
+> **Superseded vocabulary.** This analysis was written against an area/LOS-group representation that no longer exists — `in-area`, `in-los-group`, and `reachable-via` — and against `problem-claustro.lisp`, which has since been deleted (only `problem-claustro-topo.lisp` remains). The current system does have a relation named `los-via`, but its unified symmetric endpoint semantics come from Section 4, not from this exemplar. It is retained because the *reasoning* is a clean worked instance of Sections 2–7, and because it demonstrates all three deadlock patterns interacting. Do not copy its obsolete relation names or representation.
+
+**Goal reduction.** Goal `(open gate5)`. No `controls … gate5` entry exists, so `update-gate-status!` can open gate5 only via jamming. There is one jammer. ⇒ the terminal action is `jam-gate … gate5 …`, and jammer1 must terminate on gate5.
+
+**Terminal vantage.** `jam-gate` requires the agent *holding* the jammer, with a placement `?location` reachable from the agent and `(visible ?location gate5)`. So a vantage with a sightline to gate5 is required.
+
+**Key invariants.** (i) Single jammer. (ii) *Holding* and *jamming* are mutually exclusive states of that one jammer. (iii) Receiver1 is active iff the beam corridor `(gate1 location2)` is clear — gate1 open **and** location2 unoccupied. (iv) gate1 is uncontrolled, so only jamming opens it. (v) gate2/gate3 are `normal`-controlled by receiver1; gate4 is `inverted`.
+
+**Forward-reachability prune.** Seeing gate5 from location1 or location2 needs gate2 **and** gate3 open ⇒ receiver active ⇒ gate1 jammed ⇒ jammer **not** held — contradicting the `holding` precondition. So gate5 cannot be jammed from area1. Carrying the jammer flips the receiver off, which closes gate2/gate3 and (with screen1/ladder1 blocking a carrier) confines the agent to its current area. area3 is unreachable by movement under any single consistent gate state, so the area3 vantage (location8, which sees gate5 via the open gate4) is a **false lead**. ⇒ **area2 is the only productive destination**, where los-group2 sees gate5 directly.
+
+**Forced corridor.** Pick up jammer1 at location1 → jam gate1 at location1 (receiver activates; gate2/gate3 open; gate4 closes) → move into area2.
+
+**Deadlock.** The agent is now in area2 but the jammer sits at location1 holding gate1 open. It cannot be carried across (carrying shuts gate2/gate3 behind the agent) and is not reach-reachable from area2 (no reach edge crosses the gate2/gate3 wall). The jammer is **stranded** relative to the agent — the *"opener is the payload"* and *"carrying closes the path it opened"* patterns combined.
+
+**Synthesized relations.** A walkable area2 spot, sight-equivalent to its neighbors, with a reach opening back to location1 barred by the very wall it crosses. The barrier `(gate2 gate3)` is the keystone: it makes the reach opening usable **only while those gates are open** — i.e. only after gate1 has been jammed and the receiver activated — which forces the agent through the real sequence instead of a two-step shortcut.
+
+**Validation & plan (5 actions, ≤ depth 20).**
+
+1. `pickup-cargo agent1 jammer1` (at location1)
+2. `jam-gate agent1 gate1 location1` — receiver active; gate2/gate3 open
+3. `move agent1 location3` — crosses the now-open interface, empty-handed
+4. `pickup-cargo agent1 jammer1` — reaches back through the open gates to lift the jammer off gate1; receiver off, gate2/gate3 shut (harmless — agent already across)
+5. `jam-gate agent1 gate5 location3` — sightline to gate5 is direct ⇒ jam succeeds ⇒ `(open gate5)`
+
+Anti-trivialization holds: at the start, gate2/gate3 are closed, so location3 is not reach-reachable from location1; the agent cannot place the jammer onto location3 until it has first jammed gate1.
+
+**Pitfalls encountered.**
+
+- *Sightline-vs-wall:* an early attempt gave location3 the right sightline but an *unbarred* reach edge from location1 — a hole punched through the gate2/gate3 wall. Resolved by barring the reach edge.
+- *False destination:* area3 looked viable on sight grounds but is movement-unreachable; rejected only after walkability pruning.
+- *Bridge assumption:* location3 is not a pure forward/backward bridge — it is a **forward-progress enabler** (case 2(b)) that lets the stalled agent in area2 acquire the stranded jammer.

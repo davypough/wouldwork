@@ -147,7 +147,7 @@
   (wall-segment> wall10 6 16 7 16)
   (wall-segment> wall11 6 16 6 18)
   (wall-segment> wall12 6 3 7 3)
-  (wall-segment> wall13 6 0 6 3)
+  (wall-segment> wall13 6 1 6 3)
   (wall-segment> wall14 33 8 35 8)
   (wall-segment> wall15 33 4 33 8)
   (wall-segment> wall16 30 4 33 4)
@@ -201,7 +201,7 @@
 ;; completion, where the final cycle must be closed.
 (define-goal
   (and (has-location agent1 location16)
-       (ghost-stops-recorder)
+       ;(ghost-stops-recorder)
   )
 )
 

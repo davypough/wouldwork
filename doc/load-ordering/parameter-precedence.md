@@ -1,10 +1,14 @@
 # Parameter Precedence
 
-Companion to `ordering-of-operations.md`. That document answers *when* things happen; this one
+Companion to [loading-and-initialization.md](loading-and-initialization.md). That document answers *when* things happen; this one
 answers *where a parameter's value came from and who wins*. The question it exists for is the
 recurring one: "I set this at the REPL, then loaded a problem, and it reverted — why?"
 
 Citations name files and functions, not line numbers.
+
+Source-checked on 2026-10-02. Filenames below assume the default instance. With
+`WOULDWORK_INSTANCE` set before SBCL starts, generated files are
+`src/problem-<instance>.lisp` and `vals-<instance>.lisp` instead.
 
 ---
 
@@ -17,14 +21,17 @@ In the order they act during a system load:
 `vals.lisp` and restores only four parameters by position: `*problem-name*` (0), `*algorithm*` (2),
 `*debug*` (11), `*threads*` (13). It also sets or clears the `:ww-debug` feature.
 
-These four and only these four are restored this early, because each one changes how the rest of the
-system compiles: `*algorithm*` selects translations, `*debug*` gates conditional compilation,
+These four are needed early: `*problem-name*` selects the source to splice,
+`*algorithm*` selects translations, `*debug*` gates conditional compilation,
 `*threads*` determines whether hash tables are `:synchronized` and whether the global-mutation macros
 expand atomically. `reset-global-hash-tables` runs immediately after, from its own `eval-when`, and
 depends on `*threads*` already being correct.
 
 **2. `defvar` / `sb-ext:defglobal` defaults.** `ww-settings.lisp` establishes a value for every
 parameter not already bound. Anything step 1 restored keeps its restored value.
+At the end of that file, if no saved settings file exists,
+`reset-problem-parameters-to-defaults` resets **all managed parameters**, including already-bound
+ones. Existing bindings are therefore preserved only when that reset does not run.
 
 **3. Problem-file `ww-set` forms.** Evaluated as `src/problem.lisp` loads. These override steps 1
 and 2 — with exceptions, below.
@@ -33,11 +40,11 @@ and 2 — with exceptions, below.
 branches:
 
 - `*refreshing*` is true → `save-globals` (write current values out; do *not* read)
-- otherwise `vals.lisp` exists → `read-globals` (**overrides everything set in steps 1–3**)
+- otherwise `vals.lisp` exists → `read-globals` (**overrides the persisted parameters set in steps 1–3**)
 - otherwise → `save-globals`
 
 The middle branch is the one that surprises people. On an ordinary load with a `vals.lisp` present,
-the problem file's own `ww-set` forms are applied in step 3 and then overwritten in step 4 by
+the problem file's own `ww-set` forms for persisted parameters are applied in step 3 and then overwritten in step 4 by
 whatever was saved from your last session. That is deliberate — it is what makes settings persist
 across SBCL restarts — but it means a `ww-set` you add to a problem file will not appear to take
 effect until `vals.lisp` is discarded or re-saved.
@@ -46,7 +53,7 @@ effect until `vals.lisp` is discarded or re-saved.
 
 ## What `vals.lisp` persists
 
-`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 15-element list.
+`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 16-element list.
 Position matters — `read-init-vals` indexes into it directly.
 
 | Pos | Parameter | Default |
@@ -59,24 +66,25 @@ Position matters — `read-init-vals` indexes into it directly.
 | 5 | `*solution-type*` | `first` |
 | 6 | `*progress-reporting-interval*` | `100000` |
 | 7 | `*randomize-search*` | `nil` |
-| 8 | `*branch*` | `-1` |
+| 8 | `*branch*` | `0` |
 | 9 | `*probe*` | `nil` |
 | 10 | `*symmetry-pruning*` | `nil` |
 | 11 | `*debug*` | `0` |
 | 12 | `*goal*` | `nil` |
 | 13 | `*threads*` | `0` |
 | 14 | `*max-recorder-cycles*` | `1` |
+| 15 | `*recorder-prefix-pruning*` | `nil` |
 
 All managed defaults live in `*problem-parameter-defaults*`; the persisted subset and its
 save/read order live in `*persisted-problem-parameters*`. `*default-parameters*` is derived from
 those two registries. `read-globals` pads a short list from the defaults tail, so adding a
 persisted parameter to the end of the list does not invalidate an existing `vals.lisp`.
-The loader also recognizes former layouts containing recorder prefix/interleaving controls
-or adaptive-fallback tuning. It removes those technical fields while preserving a saved
-`*max-recorder-cycles*` value when present.
+`normalize-persisted-problem-parameters` migrates recognized retired recorder layouts,
+pads missing values, and truncates trailing values beyond the current registry.
+`*goal*` values written in the tagged `:wouldwork-goal-v1` format are decoded by `read-globals`.
 
 **Anything not in this table is not persisted.** Technology-owned variables include
-`*recorder-prefix-pruning*`, `*min-steps-fallback-warmup*`,
+`*min-steps-fallback-warmup*`,
 `*min-steps-fallback-sample-interval*`, `*beam-occlusion-tolerance*`,
 `*boundary-wall-height*`, and `*vertical-reach-limit*`. Their owning technology establishes
 the default, omits them from `(params)`, and permits an exceptional problem override with
@@ -86,10 +94,15 @@ Other non-persisted user settings include `*auto-wait*`, `*max-connector-pairing
 parameter — `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
 `*bound-refresh-interval*`, `*donation-check-interval*`, `*donation-threshold*`,
 `*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. The non-persisted search
-settings call `save-globals`, which writes the 15-element list and silently omits them;
+settings call `save-globals`, which writes the 16-element list and omits them;
 the technology-specific settings only reprint the current parameters. Their REPL overrides survive a
 `(refresh)`, but not restaging or restart. Staging restores every managed default first and then
 applies the new problem specification's `ww-set` overrides.
+
+`*worker-read-snapshots*` is also managed but not persisted. Its default is `t`; `ww-set`
+assigns it and prints a dedicated message without saving globals or reloading. Refresh preserves
+it, while staging restores `t` before applying the problem's overrides. These refresh guarantees
+concern managed `ww-set` settings; ordinary technology `defparameter` forms run again on reload.
 
 ---
 
@@ -102,17 +115,18 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
-| `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*` | yes | yes | `save-globals` + reprint |
+| `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*`, `*recorder-prefix-pruning*` | yes | yes | `save-globals` + reprint |
+| `*worker-read-snapshots*` | yes | yes | assign + dedicated message; no persistence or reload |
 | `*max-connector-pairings*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; displayed only when beam-relay and connectors are present |
-| `*solution-type*` | yes | yes | as above; warns if `backtracking` is paired with an optimizing type |
-| `*num-closed-shards*` | yes | yes | as above; also recomputes `*closed-shard-mask*` |
-| `*tree-or-graph*` | yes | yes | as above; refuses `graph` under `backtracking` |
+| `*solution-type*` | yes | yes | save + reprint; warns if `backtracking` is paired with an optimizing type |
+| `*num-closed-shards*` | yes | yes | save + reprint; also recomputes `*closed-shard-mask*` |
+| `*tree-or-graph*` | yes | yes | save + reprint; refuses `graph` under `backtracking` |
 | `*symmetry-pruning*` | yes | yes | **full `asdf:load-system :force t`** |
 | `*problem-type*` | yes | yes | **full reload** (plain `setf` when loading) |
 | `*debug*` | **no — errors** | yes | updates `:ww-debug`, then **full reload** |
 | `*algorithm*` | **no — errors** | yes | may force `*tree-or-graph*` to `tree`, then **full reload** |
 | `*probe*` | **no — errors** | yes | updates `:ww-debug`, zeroes `*debug*`, then **full reload** |
-| `*threads*` | yes | yes | **full reload only when crossing the 0 ↔ non-zero boundary**, otherwise just reprints |
+| `*threads*` | yes | yes | saves; **full reload only when crossing the 0 ↔ non-zero boundary**, otherwise reprints |
 | `*problem-name*` | **yes — required here** | no — prints a refusal | — |
 
 The three erroring parameters — `*debug*`, `*algorithm*`, `*probe*` — are rejected in a problem file
@@ -121,9 +135,13 @@ compile they would need to influence. The error message tells you to set them at
 staging.
 
 `*threads*` is the mirror image: crossing the 0 boundary changes the `:synchronized` flag on every
-global hash table and the atomic-vs-plain expansion of `increment-global`, `push-global`, and
+thread-sensitive global hash table and the atomic-vs-plain expansion of `increment-global`, `push-global`, and
 friends, so it reloads. Changing 4 → 8 changes neither, so it does not. No SBCL restart is needed in
 either case.
+
+Inside a problem file, `*threads*` is assigned without a nested reload. `load-problem` compares
+`current-generated-read-mode` before and after loading and performs a second full reload if
+the mode changed, so generated code matches the problem's final thread setting.
 
 ---
 
@@ -131,14 +149,21 @@ either case.
 
 | Command | `src/problem.lisp` | Problem-file `ww-set` forms | `vals.lisp` |
 |---|---|---|---|
-| `(ql:quickload :wouldwork)` | staged by `ensure-problem-staged` with no argument (autodetect) | applied, then overridden by `read-globals` if `vals.lisp` exists | read |
-| `(stage <problem>)` / `(load-problem "<name>")` | re-spliced from the named source, then full reload | applied — this is how you get a problem's intended defaults | read if present |
+| System load through `(ql:quickload :wouldwork)` | staged by `ensure-problem-staged` with no argument (autodetect) | applied; persisted parameters then restored if saved settings exist | read if present; otherwise created |
+| `(stage <problem>)` | re-spliced from the named source, then full reload | managed defaults reset first, then problem overrides applied | deleted before loading; recreated by `init()` |
+| `(load-problem "<name>")` | explicitly spliced, then full reload with autodetection | applied without the explicit `stage` reset; saved parameters can override them | retained and read if present |
 | `(refresh)` | re-spliced from the *current* problem | **skipped** (`*refreshing*` is true) | written, not read |
-| `(ww-reset)` | deleted, then rebuilt from `problem-blocks3.lisp` | applied from blocks3 | deleted |
+| `(ww-reset)` | deleted, then rebuilt from `problem-blocks3.lisp` | defaults reset, then blocks3 overrides applied | deleted, then recreated |
 
 So: **`(stage X)` gives you the problem's own settings; `(refresh)` gives you yours.** That
 distinction is the whole point of the `*refreshing*` flag, and it is why `init()`'s vals branch is
 three-way rather than two-way.
+
+Use `stage` to switch problems. A direct `load-problem` call retains saved settings, and the
+reload's autodetection can select the source named by those settings instead of the source
+just explicitly spliced. `refresh` safely uses this lower-level function for the current problem.
+Refresh also clears `*goal*` and `*final-goal*`; it preserves search settings, not goal overrides.
+Calling `quickload` on an already-loaded system need not reload it; the table describes an actual load.
 
 `ww-reset` is the escape hatch when a bad `vals.lisp` or a broken problem file prevents loading at
 all — it deletes both and starts from the default problem.
@@ -159,7 +184,7 @@ absent, splice blocks3 and delete `vals.lisp`; else if `vals.lisp` names a probl
 exists, splice that; else delete the inconsistent `vals.lisp` and recover the source from
 `problem.lisp`'s own snapshot header, re-splicing from it if one is found.
 
-See `ordering-of-operations.md`, Stage 2, for what splicing freezes.
+See [loading-and-initialization.md](loading-and-initialization.md), Stage 2, for what splicing freezes.
 
 ---
 
@@ -173,7 +198,7 @@ it."**
 Working as designed. `(refresh)` skips problem-file `ww-set` forms; `(stage)` applies them.
 
 **"I tuned `*tasks-per-thread*`, restarted SBCL, and it's back to default."**
-It isn't in the 15-element `vals.lisp` list. Nothing outside that list persists.
+It isn't in the 16-element `vals.lisp` list. Nothing outside that list is saved there.
 
 **"Setting `*threads*` reloaded the whole system."**
 Only because the value crossed 0. Within either regime it is a plain assignment.
