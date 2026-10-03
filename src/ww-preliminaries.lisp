@@ -469,6 +469,20 @@
         `(pop ,var-name))))
 
 
+(defmacro minimize-global (var-name new-value-form)
+  "Lowers global VAR-NAME to NEW-VALUE-FORM when that is smaller.
+   Under threads, retries a compare-and-swap so a concurrent smaller value is never overwritten."
+  (let ((new (gensym "NEW"))
+        (old (gensym "OLD")))
+    `(let ((,new ,new-value-form))
+       ,(if (> *threads* 0)
+          `(loop for ,old = ,var-name
+                 while (< ,new ,old)
+                 until (eq (sb-ext:compare-and-swap (symbol-value ',var-name) ,old ,new) ,old))
+          `(when (< ,new ,var-name)
+             (setf ,var-name ,new))))))
+
+
 (defun reset-user-syms (symbols)
   "Unintern symbols and unbind any functions stored in function name lists."
   (reject-worker-read-write 'reset-user-syms)

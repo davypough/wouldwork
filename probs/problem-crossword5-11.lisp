@@ -273,14 +273,6 @@
       (return-from compute-bounds? (values (- $cost) (- $upper)))))
 
 
-(defun successors-p ($used-field-ids)
-  ;Tests for a succession of integers (ie, field-ids).
-  (iter (for field-id in $used-field-ids)
-        (for prev-field-id previous field-id)
-        (when prev-field-id
-          (always (= field-id (1+ prev-field-id))))))
-
-
 (defun sort-field-ids ($used-field-ids-ht)
   (when (and $used-field-ids-ht (/= (hash-table-count $used-field-ids-ht) 0))
     (sort (iter (for (field-id *) in-hashtable $used-field-ids-ht)
@@ -291,14 +283,7 @@
 (define-query bounding-function? ()
   (do (bind (used-field-ids-ht $used-field-ids-ht))
       (setf $used-field-ids (sort-field-ids $used-field-ids-ht))  ;(ut::prt $used-field-ids)
-      (if (successors-p $used-field-ids)
-        (if (= *cost* *upper* 0)
-          (do (mv-assign (*cost* *upper*)
-                                   (compute-bounds? $used-field-ids))
-                 (values *cost* *upper*))
-          (values *cost* *upper*))
-        (do (setf *cost* 0 *upper* 0)
-            (compute-bounds? $used-field-ids)))))
+      (compute-bounds? $used-field-ids)))
 
 
 ;------------------------- queries -----------------------

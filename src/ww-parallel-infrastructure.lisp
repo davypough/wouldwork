@@ -613,8 +613,10 @@
 (defun node-can-improve-bound-p (node local-bound)
   "Check if NODE can possibly lead to a solution better than LOCAL-BOUND.
    Every solution reachable from NODE lies at least one action beyond it, so the
-   depth- and time-based objectives charge that action before comparing.  Value-based
-   objectives have no guaranteed per-action increment and test the node's own value.
+   depth- and time-based objectives charge that action before comparing.  MIN-VALUE
+   tests the node's own value, assuming value never decreases along a path.  MAX-VALUE
+   is never pruned here: rewards normally grow along a path, so its bounds come only
+   from BOUNDING-FUNCTION?.
    NODE itself is never a usable solution: WORKER-PROCESS-SUCCESSORS-PHASE1 registers
    a goal before installing anything, so only descendants are at stake here.
    Mirrors the serial NODE-DESCENDANTS-CANNOT-IMPROVE-P with the sense inverted and
@@ -633,9 +635,6 @@
     ;; For MIN-VALUE, prune if current value already >= best
     (min-value
      (< (problem-state.value (node.state node)) local-bound))
-    ;; For MAX-VALUE, prune if current value already <= best (remember: negated)
-    (max-value
-     (< (- (problem-state.value (node.state node))) local-bound))
     (otherwise t)))
 
 

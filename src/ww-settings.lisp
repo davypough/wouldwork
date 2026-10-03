@@ -4,6 +4,10 @@
 
 (in-package :ww)
 
+(defvar *search-registers-dynamic-objects* nil
+  "List of object type names registered by search actions or their helpers.
+NIL means none. Initialization-only registration does not require this declaration.")
+
 (defvar *worker-read-snapshots* t
   "Use worker-owned static reads and registered technology memos in parallel DFS.
 Enabled by default on STAGE. Serial searches use canonical reads without copying.")
@@ -731,6 +735,7 @@ treat their arguments as read-only and be safe to call concurrently."
     (*goal*)
     (*threads* . 0)
     (*worker-read-snapshots* . t)
+    (*search-registers-dynamic-objects*)
     (*max-recorder-cycles* . 1)
     (*recorder-prefix-pruning*)
     (*auto-wait*)
@@ -938,12 +943,6 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *upper-bound* 1000000.0)
   ;The current upper bound if bounds are being calculated.
 
-(sb-ext:defglobal *cost* 0.0)
-  ;The memoized cost bound for left search tree expansions. 
-
-(sb-ext:defglobal *upper* 0.0)
-  ;The memoized upper bound for left search tree expansions.
-
 (defvar *state-codes* (make-hash-table)
   "Holding place for integer state codes in bi-directional search.")
 
@@ -1011,6 +1010,11 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *lower-bound-pruned* 0
   "Count of nodes pruned by any min-steps-remaining lower bound.")
 (declaim (type fixnum *lower-bound-pruned*))
+
+
+(sb-ext:defglobal *bounding-pruned* 0
+  "Count of nodes killed by the user-defined bounding-function?.")
+(declaim (type fixnum *bounding-pruned*))
 
 
 (sb-ext:defglobal *min-steps-contributor-evaluations* 0

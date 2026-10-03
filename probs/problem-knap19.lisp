@@ -101,24 +101,9 @@
       (return-from compute-bounds? (values (- $cost) (- $upper)))))
 
 
-(defun successors-p (lst)
-  "Tests for a succession of integers (ie, item-ids)."
-  (iter (for item-id in lst)
-        (for prev-item-id previous item-id)
-        (when prev-item-id
-          (always (= item-id (1+ prev-item-id))))))
-
-
 (define-query bounding-function? ()
   (do (bind (contents $item-ids))
-      (if (successors-p $item-ids)
-        (if (= *cost* *upper* 0)
-          (do (mv-assign (*cost* *upper*)
-                                   (compute-bounds? $item-ids))
-                 (values *cost* *upper*))
-          (values *cost* *upper*))
-        (do (setf *cost* 0 *upper* 0)
-            (compute-bounds? $item-ids)))))
+      (compute-bounds? $item-ids)))
         
 
 (define-action put

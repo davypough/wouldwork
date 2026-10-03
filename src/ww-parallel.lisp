@@ -56,7 +56,11 @@
                        (>= (node.depth node) *depth-cutoff*))
               (push node tasks)  ; Can't expand further, becomes a task
               (return-from expand-node))
-            
+            ;; Check lower bound on remaining steps (user-defined)
+            (when (and (min-steps-remaining-available-p)
+                       (min-steps-remaining-prunes-node-p (node.state node) (node.depth node)))
+              (increment-global *lower-bound-pruned* 1)
+              (return-from expand-node))  ; Pruned, not a task
             ;; Check bounding function
             (when (eql (bounding-function node) 'kill-node)
               (return-from expand-node))  ; Pruned, not a task
@@ -81,6 +85,14 @@
                     (return-from process-succ))
                   ;; Goal check during task generation
                   (when (goal succ-state)
+                    ;; Only improving goals may replace the serial incumbent.
+                    ;; Keep this inside the goal branch: MAX-VALUE non-goals
+                    ;; can improve later even when their current value is lower.
+                    (when (and *solution-paths*
+                               (member *solution-type*
+                                       '(min-length min-time min-value max-value))
+                               (not (f-value-better succ-state (1+ (node.depth node)))))
+                      (return-from process-succ))
                     (let ((goal-node
                             (make-node :state succ-state
                                        :depth (1+ (node.depth node))
@@ -239,6 +251,12 @@
                 (setf (ws-depth-cutoff-truncated stats) t)))
             (return-from :next-iteration nil))
 
+          ;; Lower bound on remaining steps (user-defined)
+          (when (and (min-steps-remaining-available-p)
+                     (min-steps-remaining-prunes-node-p (node.state current-node) current-depth))
+            (increment-global *lower-bound-pruned* 1)
+            (return-from :next-iteration nil))
+
           ;; Bounding function check (user-defined)
           (when (eql (bounding-function current-node) 'kill-node)
             (return-from :next-iteration nil))
@@ -317,12 +335,17 @@
         
         ;; Optimization bound check
         (when (and *solution-paths*
-                   (member *solution-type* '(min-length min-time min-value max-value)))
+                   (member *solution-type* '(min-length min-time min-value)))
           (unless (f-value-better succ-state succ-depth)
             (return-from process-one)))
         
         ;; Goal check (before duplicate detection - goals always processed)
         (when (goal succ-state)
+          ;; MAX-VALUE prunes only goals that can't better the best solution
+          (when (and *solution-paths*
+                     (eql *solution-type* 'max-value)
+                     (not (f-value-better succ-state succ-depth)))
+            (return-from process-one))
           (cond
             (*hybrid-mode*
              (defer-hybrid-goal current-node succ-state)

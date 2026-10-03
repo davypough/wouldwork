@@ -900,6 +900,10 @@
 (defun check-problem-parameter (param val)
   (case param
     (*worker-read-snapshots* (check-type val boolean))
+    (*search-registers-dynamic-objects*
+     (unless (and (listp val) (every #'symbolp val))
+       (error "Can't set *search-registers-dynamic-objects* to ~S. ~
+               Must be a list of object type names, such as (BEAM), or NIL." val)))
     (*problem-name* t)
     (*depth-cutoff* (unless (typep val 'fixnum)
                       (error "Can't set *depth-cutoff* to ~S. Must be an integer

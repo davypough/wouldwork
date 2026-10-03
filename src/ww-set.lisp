@@ -32,7 +32,7 @@
          (unless *ww-loading*
            (save-globals)
             (display-current-parameters)))
-       (*max-connector-pairings*
+       ((*max-connector-pairings* *search-registers-dynamic-objects*)
          (setf ,param ',val)
          ;; A technology-specific problem setting should survive refresh, but not
          ;; leak into another problem through the persisted globals file.

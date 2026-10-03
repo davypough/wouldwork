@@ -35,6 +35,9 @@
 
 (ww-set *problem-type* planning)
 
+;; Search updates register beam objects, which frozen worker snapshots cannot support.
+(ww-set *search-registers-dynamic-objects* (beam))
+
 (ww-set *solution-type* min-length)
 
 (ww-set *tree-or-graph* graph)

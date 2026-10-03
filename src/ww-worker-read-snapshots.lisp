@@ -40,6 +40,15 @@
 (defun validate-worker-read-snapshot-mode ()
   (validate-generated-read-mode)
   (check-type *worker-read-snapshots* boolean)
+  (when (and (worker-read-snapshots-active-p)
+             *search-registers-dynamic-objects*)
+    (error 'worker-read-snapshot-error
+           :format-control "Problem ~A registers dynamic objects of type~P ~{~A~^, ~} during search. ~
+                            Parallel worker snapshots cannot support this. ~
+                            Use (ww-set *threads* 0) for serial execution."
+           :format-arguments (list *problem-name*
+                                   (length *search-registers-dynamic-objects*)
+                                   *search-registers-dynamic-objects*)))
   t)
 
 (defun validate-worker-read-registries ()

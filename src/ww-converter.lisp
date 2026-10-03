@@ -239,7 +239,11 @@
    - Assigns an integer code enabling database lookups for the new object
    - Creates type proposition (type-name object) in *static-idb*
    - Makes the object discoverable via type queries (e.g., (beam ?b))
-   - Ensures thread-safe registration in parallel search environments
+   - Serializes allocation of object codes with the integer lock
+   - Rejects registration while parallel worker read snapshots are published
+   Problems registering objects during search must declare
+   their object types, e.g. (ww-set *search-registers-dynamic-objects* (beam)).
+   Initialization-only registration before worker snapshot publication is allowed.
    Parameters:
    - object: The dynamically-created symbol (e.g., BEAM3)
    - type-name: The type it belongs to (e.g., BEAM)

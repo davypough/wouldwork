@@ -169,3 +169,18 @@ The earlier measured gains remain scoped to their reports. In particular, the
 roughly 62-66% four-worker reduction in repeated traversal work is not a measured
 whole-search gain from this generalized default implementation. No expensive
 Claustro, Corner, Rumin or Crelay solve is included in this closeout validation.
+
+## Search-time object registration
+
+Problems whose search actions or helpers call `register-dynamic-object` declare
+`(ww-set *search-registers-dynamic-objects* (beam))` in their specification, listing
+all object types registered during search. The error identifies these types. The
+declaration defaults to NIL on STAGE and survives REFRESH. Search entry rejects it when parallel
+DFS worker snapshots are enabled, before root-task generation. Use
+`(ww-set *threads* 0)` for these problems. Disabling snapshots is not a validated
+parallel workaround.
+
+Initialization-only registration (such as the coordinate-derived crossing pool) occurs
+before snapshot publication and does not require this declaration. The runtime write
+guard remains in place to catch undeclared registration. The integer allocation lock
+does not make new objects visible in already-published worker copies.

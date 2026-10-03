@@ -396,9 +396,6 @@
     (unless (validate-global-invariants nil *start-state*)
       (format t "~%Invariant validation failed on initial state.~%")
       (return-from dfs :invalid-start)))
-  (when (fboundp 'bounding-function?)
-    (setf *upper-bound*
-          (funcall (symbol-function 'bounding-function?) *start-state*)))
   (setf *hybrid-mode* (initialize-hybrid-mode))
   (reset-search-successor-pruners)
   (setf *open* 
@@ -465,6 +462,7 @@
     (initialize-search-progress-timing)
     (setf *inconsistent-states-dropped* 0)
     (setf *lower-bound-pruned* 0)
+    (setf *bounding-pruned* 0)
     (setf *min-steps-contributor-evaluations* 0)
     (setf *min-steps-contributor-prunes* 0)
     (initialize-min-steps-fallback-adaptation)
@@ -758,7 +756,7 @@
       (narrate "State at max depth" (node.state current-node) (node.depth current-node))
       (return-from df-bnb1 nil))
     (when (and *solution-paths*
-               (member *solution-type* '(min-length min-time min-value max-value))
+               (member *solution-type* '(min-length min-time min-value))
                (node-descendants-cannot-improve-p current-node))
       (narrate "Node pruned by incumbent bound"
                (node.state current-node)
@@ -917,10 +915,14 @@ different acceptable milestone state."
           (next-iteration))
         (when (search-successor-pruned-p current-node succ-state)
           (next-iteration))
-        (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value max-value)))
+        (when (and *solution-paths* (member *solution-type* '(min-length min-time min-value)))
           (unless (f-value-better succ-state succ-depth)
             (next-iteration)))  ;throw out state if can't better best solution so far
         (when (goal succ-state)
+          (when (and *solution-paths*
+                     (eql *solution-type* 'max-value)
+                     (not (f-value-better succ-state succ-depth)))
+            (next-iteration))  ;max-value prunes only goals that can't better best solution
           (let ((goal-node
                   (make-node :state succ-state
                              :depth succ-depth
@@ -1296,25 +1298,26 @@ different acceptable milestone state."
 (defun node-descendants-cannot-improve-p (current-node)
   "Whether no descendant of CURRENT-NODE can improve on the incumbent solution.
    Every descendant lies at least one action beyond CURRENT-NODE, so the depth- and
-   time-based objectives charge that action before comparing.  Value-based objectives
-   have no guaranteed per-action increment, so they test the node's own value -- the
-   same predicate PROCESS-SUCCESSORS already applied when this node was generated,
-   re-evaluated against a bound that may have improved while it sat on open.
+   time-based objectives charge that action before comparing.  MIN-VALUE tests the
+   node's own value -- the same predicate PROCESS-SUCCESSORS already applied when
+   this node was generated, re-evaluated against a bound that may have improved
+   while it sat on open.  This assumes value never decreases along a path (costs
+   accumulate, as in TSP).  MAX-VALUE is not pruned here: rewards normally grow
+   along a path, so a node's own value says nothing about its descendants; its
+   bounds come only from BOUNDING-FUNCTION?.
    Nodes on open are never themselves usable solutions: PROCESS-SUCCESSORS registers
    a goal before installing anything, so only descendants are at stake here."
   (declare (type node current-node))
   (let ((best-solution (first *solution-paths*))
         (state (node.state current-node)))
-    (case *solution-type*
+    (ecase *solution-type*
       (min-length
         (>= (1+ (node.depth current-node)) (solution.depth best-solution)))
       (min-time
         (>= (+ (problem-state.time state) *min-action-duration*)
             (solution.time best-solution)))
       (min-value
-        (>= (problem-state.value state) (solution.value best-solution)))
-      (max-value
-        (<= (problem-state.value state) (solution.value best-solution))))))
+        (>= (problem-state.value state) (solution.value best-solution))))))
 
 
 (defun update-open-if-succ-better (open-node succ-state)
@@ -1363,14 +1366,12 @@ different acceptable milestone state."
                 (narrate "State killed by bounding" (node.state current-node) (node.depth current-node))
                 #+:ww-debug (when (>= *debug* 3)
                               (format t "~&current-cost = ~F > *upper-bound* = ~F~%" current-cost *upper-bound*))
-                (bt:with-lock-held (*lock*)
-                  (format t "bounding a state...")
-                  (finish-output))
+                (increment-global *bounding-pruned* 1)
                 (return-from bounding-function 'kill-node))
              ((< current-upper *upper-bound*)
                 #+:ww-debug (when (>= *debug* 3)
                               (format t "~&Updating *upper-bound* from ~F to ~F~%" *upper-bound* current-upper))
-                (setf *upper-bound* current-upper))))))
+                (minimize-global *upper-bound* current-upper))))))
 
 
 (defun update-max-depth-explored (succ-depth)
@@ -1606,6 +1607,10 @@ different acceptable milestone state."
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P."
             *inconsistent-states-dropped*))
+  (when (> *bounding-pruned* 0)
+    (format t "~2%Bounding function pruned ~:D node~:P, ~,1F% of total states."
+            *bounding-pruned*
+            (* 100.0 (/ *bounding-pruned* *total-states-processed*))))
   (when (or (> *lower-bound-pruned* 0) (> *min-steps-contributor-evaluations* 0))
     (format t "~2%Min-steps-remaining pruned ~:D node~:P, ~,1F% of total states~@[, in ~:D bound evaluations~]."
             *lower-bound-pruned*
@@ -1921,6 +1926,10 @@ different acceptable milestone state."
                   *symmetry-pruning-count*
                   (symmetry-pruning-percentage)
                   *symmetry-check-count*))))
+    (when (> *bounding-pruned* 0)
+      (format t "~%bounding function pruned = ~:D (~,1F% of total states)"
+              *bounding-pruned*
+              (* 100.0 (/ *bounding-pruned* *total-states-processed*))))
     (when (or (> *lower-bound-pruned* 0) (> *min-steps-contributor-evaluations* 0))
       (format t "~%min-steps-remaining pruned = ~:D (~,1F% of total states)~@[ in ~:D bound evaluations~]"
               *lower-bound-pruned*

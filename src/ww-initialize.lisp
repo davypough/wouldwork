@@ -56,11 +56,6 @@
   (when (min-steps-remaining-available-p)
     (format t "~&Applying min-steps-remaining? to start state... = ~A~%"
               (min-steps-remaining-bound *start-state*)))
-  (when (fboundp 'bounding-function?)
-    (format t "~&Applying bounding function to start state...")
-    (multiple-value-setq (*cost* *upper*)
-                         (funcall (symbol-function 'bounding-function?) *start-state*))
-    (format t "done~%"))
   (when (and *happening-names* (eql *tree-or-graph* 'graph))
     (format t "~%ERROR: Graph search is incompatible with exogenous happenings, since states cannot be closed.~%"))
   (iter (for (key value) in-hashtable *db*)

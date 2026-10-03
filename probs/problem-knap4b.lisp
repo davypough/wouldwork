@@ -70,24 +70,9 @@
       (return-from compute-bounds? (values (- $cost) (- $upper)))))
 
 
-(defun successors-p (ints)
-  "Tests for a succession of integers."
-  (iter (for int in ints)
-        (for prev-item previous int)
-        (when prev-item
-          (always (= int (1+ prev-item))))))
-
-
 (define-query bounding-function? ()
   (do (bind (content-ids $knapsack-item-ids))
-      (if (successors-p $knapsack-item-ids)
-        (if (= *cost* *upper* 0)
-          (do (mv-assign (*cost* *upper*)
-                                   (compute-bounds? $knapsack-item-ids))
-              (values *cost* *upper*))
-          (values *cost* *upper*))
-        (do (setf *cost* 0 *upper* 0)
-            (compute-bounds? $knapsack-item-ids)))))
+      (compute-bounds? $knapsack-item-ids)))
 
 
 (define-action put
