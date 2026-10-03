@@ -1,14 +1,13 @@
-;;;; Filename: problem-knap19.lisp
+;;;; Filename: problem-knap30.lisp
 
-;;; Problem specification for a 19-item knapsack problem.
-;;; Same rules as problem-knap19.lisp, with the item data read by ordinary load-time
-;;; forms instead of read-time #. forms, and the bound computed in one query.
+;;; Problem specification for a 30-item knapsack problem.
+;;; Same rules as problem-knap19-1.lisp, with the data from data-knap30.lisp.
 
 
 (in-package :ww)  ;required
 
 
-(ww-set *problem-name* knap19)
+(ww-set *problem-name* knap30)
 
 (ww-set *problem-type* planning)
 
@@ -31,7 +30,7 @@
       (list capacity (sort items #'> :key (lambda (item) (/ (first item) (second item))))))))
 
 
-(defparameter *knapsack* (read-knapsack-data (in-src "data-knap19.lisp")))
+(defparameter *knapsack* (read-knapsack-data (in-src "data-knap30.lisp")))
 
 
 (define-types

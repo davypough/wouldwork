@@ -2,8 +2,9 @@
 
 > **Usage:** An optional aide, run on its own.  Attach this file with a problem spec that
 > already stages and whose rules you trust, and say what you want from the search.  The
-> assistant recommends a strategy and its settings, writes each one you agree to into the
-> spec, guides or (with approval) runs the searches, and says what each result means.
+> assistant recommends a strategy and its settings, writes each one you agree to into a copy
+> of the spec (the original is never changed), guides or (with approval) runs the searches,
+> and says what each result means.
 
 > **Status:** Source-checked 2026-10-02 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
 > `ww-searcher.lisp`, `ww-planner.lisp`, `ww-parallel.lisp`, `ww-parallel-infrastructure.lisp`,
@@ -16,6 +17,14 @@
 asks only: what is the most efficient way to search them?  If a probe exposes a modelling
 error, stop and fix the spec first.
 
+**When one search is not enough.**  If the probes show that no single search can finish (a
+large N, or a problem whose difficulty lies in reaching its milestones in the right order),
+offer the solving-advisor (`doc/constraint-led-solving/solving-advisor.md`) as the
+alternative.  It is an interactive, constraint-led dialogue: the user and assistant agree one
+subgoal at a time, check it against the problem's static constraints, realize it with a
+bounded search, and finally validate the whole chained path.  It was built for Talos problems,
+but its subgoal dialogue applies to any problem with milestones (Q16).
+
 ---
 
 ## 1. Process
@@ -23,44 +32,65 @@ error, stop and fix the spec first.
 1. **Read the spec** in full: types, actions, any happenings, the goal, the current `ww-set`
    values, and any search hooks already defined (`heuristic?`, `prune-state?`,
    `min-steps-remaining?`, `bounding-function?`, `encode-state`, enumerator declarations).
-2. **Ask the user** only what the spec cannot tell: the objective (any solution, several, every,
+   Note any construction that is unusual or more complex than it needs to be (for example,
+   read-time `#.` evaluation), and also the minor clutter that makes the spec harder to read:
+   commented-out debug prints, a query that only calls another, intermediate variables or
+   lists a simpler test makes unnecessary.  Where a plainer equivalent exists, propose it as a
+   refactoring (section 1.1), the minor ones together under CLEANUP (section 8).
+2. **Orient the user.**  The first response is a short summary in the puzzle's own terms,
+   with no setting names: what the problem asks, how large its search is, what the first
+   checks found, and the recommendation in a sentence.  The section-8 report follows as a
+   separate piece.
+3. **Ask the user** only what the spec cannot tell: the objective (any solution, several, every,
    or a best one, and best by what), the time available, the thread count of the machine, and
    whether a solution length or depth is already known.  One question at a time.
-3. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
+4. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
    *probe*.  Leave an answer *unknown* rather than guess; a probe may settle it.
-4. **Propose probes** (section 6) for answers that change the recommendation.  Probes are short
+5. **Propose probes** (section 6) for answers that change the recommendation.  Probes are short
    bounded searches, never a full solve (section 1.1 says who runs them).
-5. **Choose the strategy** (section 3), then **the settings** (section 4), checking the
+6. **Choose the strategy** (section 3), then **the settings** (section 4), checking the
    conflicts in section 5.
-6. **Report** in the form of section 8.  Give one recommendation, not a menu, plus the order in
+7. **Report** in the form of section 8.  Give one recommendation, not a menu, plus the order in
    which to escalate if it does not finish.  List larger interventions the probes point to
    (a re-encoding, a pruning invariant, an engine change) under FURTHER, as options for the
    user to take up later, not as steps of this run.
-7. **Apply what the user agrees to**, one setting or hook at a time, by editing the spec
-   (section 1.1).
-8. **Run the strategy**: short runs here with approval, deep runs on the user's machine,
+8. **Apply what the user agrees to**, one setting or hook at a time, by editing a copy of
+   the spec (section 1.1).
+9. **Run the strategy**: short runs here with approval, deep runs on the user's machine,
    multi-step strategies one step at a time (section 1.1).  Interpret each result with
    section 6.2 before the next step, and escalate only with the user's agreement.
 
 ### 1.1 Who does what
 
-**Editing the spec.**  When the user agrees to a setting, the assistant edits the active spec
-(the file in `probs/` or `test/` that was staged, never the generated `src/problem.lisp`):
+**Editing the spec.**  The advisor never changes the original spec.  The first change the user
+agrees to creates a copy beside it, named by extending the original's name
+(`problem-knap19.lisp` to `problem-knap19-1.lisp`), with `*problem-name*` changed to match
+(`knap19-1`); later agreed changes in the same run go into that copy.  A change that needs a
+separate variant of its own (relaxed, backward, re-encoded) takes the next number.  Never edit
+the generated `src/problem.lisp`.
 
 - State the change and its reason first; change only what was agreed.
 - A `ww-set` goes in the spec's `ww-set` block, replacing any existing value for that setting.
 - REPL-only settings (`*algorithm*`, `*threads*`, `*debug*`, `*probe*`) are never written
   to the spec; give the REPL form instead.
-- A hook query or macro action is shown in full and written once agreed.  A strategy needing
-  a different spec (relaxed, backward, re-encoded) gets a new file beside the original, named
-  by extending the original's name (`problem-triangle-xyz-1.lisp`); the original stays
-  unchanged.
+- A hook query or macro action is shown in full and written once agreed.
 - **Representation changes** (Q18, or a probe showing wasted states).  Implement directly when
   the new spec is a re-encoding of the same rules and goal: the same moves, only stored
   differently.  Check it by running the same probe on both specs: the reachable boards and goal
   states must correspond.  When the change alters what the model means (new rules, a changed
   goal, a different level of detail), write a short prompt for the spec-advisor instead,
   naming the finding and the proposed encoding, and resume here once that spec stages.
+- **Refactorings** (step 1: an unusual or needlessly complex construction).  When a plainer
+  form gives the same rules and goal, write it into the copy once the user agrees, after
+  checking that it stages and that a probe gives the same counts and best result as before.
+  Example: knap19 read its data with `#.` forms so that the values existed when the file was
+  read, but `define-types` evaluates `(compute ...)` and `define-init` evaluates backquoted
+  literals (`` `(capacity ,(first *knapsack*)) ``) when the file loads, so ordinary
+  `defun` and `defparameter` forms do the same job.  Minor clean-ups follow the same rule:
+  knap30's `compute-bounds?` built a list of the "missing" items to skip, and its caller
+  `bounding-function?` only passed it the contents; one query testing each item directly
+  (packed, or numbered above the largest packed item) gave identical counts on knap19 and
+  knap30.
 - Write files containing `$` whole, or with literal quoting, never through a
   regex-replacement edit.
 - After each edit give the REPL forms to apply it, e.g. `(stage <problem>)`.  Staging applies
@@ -111,7 +141,7 @@ of a result belong here.
 | Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (S7) |
 | Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | subgoaling (S8) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
-| Q18 | Do objects carry names the puzzle never uses (identical pegs, tokens), or is the same fact stored more than once (`loc>` and `contents>`, a list beside a count)? | spec | re-encoding (section 1.1): record only what matters (which positions are occupied).  Removes duplicate states at the source, which is cheaper and more complete than `*symmetry-pruning*` |
+| Q18 | Do objects carry names the puzzle never uses (identical pegs, tokens), is the same fact stored more than once (`loc>` and `contents>`, a list beside a count), or are there objects that static facts rule out of every action (an item heavier than the capacity, tried and rejected at every state)? | spec | re-encoding (section 1.1): record only what matters (which positions are occupied).  Removes duplicate states at the source, which is cheaper and more complete than `*symmetry-pruning*` |
 
 ---
 
@@ -129,7 +159,7 @@ heuristics, subgoals with any of them.
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; define `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**: a bound that overestimates, or a dead test that rejects a live state, silently discards solutions.  Symmetry checking has overhead and removes variants under `every` |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only: still complete depth-first search, not beam or A*; first solution need not be shortest.  Serial and parallel both use it; backtracking does not; overrides `*randomize-search*` |
 | S7 | **Macro actions** | Q15 shows recurring multi-move patterns | add combined actions before the base actions; find candidates with `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state.  Keep the base actions |
-| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  For Talos problems with gates and bottlenecks the constraint-led method (`doc/constraint-led-solving/`) is the worked-out form |
+| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor (`doc/constraint-led-solving/solving-advisor.md`) is the worked-out interactive form, built for Talos problems with gates and bottlenecks |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
 | S10 | **Bidirectional search** | Q12 yes, and depth is the obstacle | a backward spec searched to depth d2 with `every`; `encode-state` in it; `(get-state-codes)`; a forward search to d1 = d - d2 whose goal calls `(backward-path-exists state)` (see `problem-triangle-backward.lisp`) | A second spec to write and keep consistent; memory for the backward layer |
 | S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states can be generated from base facts | `define-base-relation` (plus optional `define-goal-filter`, `state-feasible?`); `(find-goal-states)`, `(find-predecessors)`, `(solve-meeting-point :depth-cutoff N :solution-type first)` (see the end of `problem-corner.lisp`) | Backward layers can explode; constrain base relations early |
@@ -189,7 +219,14 @@ Defined in the spec as `define-query` with these reserved names; the state is su
 | `heuristic?` | a number, lower = more promising | depth-first, serial and parallel | ordering only (S6) |
 | `prune-state?` | true to stop expanding the state | depth-first, serial and parallel | must be sound (S5) |
 | `min-steps-remaining?` | a lower bound on moves to the goal | depth-first, serial and parallel | consulted only with a depth cutoff, or after a solution under `min-length` or `first`; must never overestimate.  In parallel it runs at task splitting and in every worker, without the serial adaptive sampling |
-| `bounding-function?` | `(values cost upper)` for value optimization | depth-first, serial and parallel | see `problem-knap19.lisp` (S4).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
+| `bounding-function?` | `(values cost upper)` for value optimization, both in minimizing terms (a max-value problem returns both negated) | depth-first, serial and parallel | `cost` is an optimistic bound: never worse than the best value any completion of the state can reach.  `upper` is the value of one completion that can actually be reached; the smallest `upper` seen becomes the incumbent, and a node is pruned when its `cost` is worse than it.  An `upper` that cannot actually be reached prunes the true optimum.  States the search records as best never tighten the incumbent; only `upper` does.  See `problem-knap19.lisp` (S4).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
+
+**Ordered completions.**  A bound may ignore completions that the state can reach but that
+another order of the same moves also reaches, provided it depends only on the state and
+every solution can be built in some order in which no state's bound excludes it.  knap19's
+bound counts only items numbered above the largest item already packed: any packing built in
+ascending item order never has one of its own items excluded, so the optimum survives.  Test
+such a bound against an unpruned run (section 6.1).
 
 Under `*threads*` > 0 the hooks must be pure functions of the state: any global a hook reads and writes is shared by every worker.
 
@@ -218,6 +255,8 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
   task generation, all four optimization modes register only goals that improve the
   incumbent; enumeration modes still retain their requested goals
   (`test/problem-task-goal-incumbent.lisp`).
+- **The `bounding-function?` incumbent starts at 1,000,000.**  A min-value problem whose
+  `cost` at the start state exceeds that has the start state pruned and searches nothing.
 - **Parallel (`*threads*` > 0)**: `*auto-wait*` is an error (`ww-validator.lisp`); `all-paths`
   falls back to `every` with a note; problems that register objects during search must declare
   `(ww-set *search-registers-dynamic-objects* (beam))` (for example, the corner family's beam
@@ -265,6 +304,27 @@ lower bound, since paths through repeated states are cut.
 | Few goal states, deep in the space | A needle in a haystack | S5 dead-state pruning; S10 bidirectional; S6 if a distance measure exists |
 | None | No solution within the cutoff | raise the cutoff, or check the model |
 
+A value problem with no goal (every state is a candidate) has no goal states to count.  Its
+density is the number of states that reach the optimum, and what decides the cost is how
+much `bounding-function?` prunes.  Measure that with the same run twice, the second with the
+hook removed:
+
+```lisp
+(stage <problem>)
+(solve)
+(fmakunbound 'bounding-function?)
+(solve)
+```
+
+The ratio of **Program cycles** is the bound's pruning factor (knap19: 36,326 to 432,
+with the optimum reached by 1 state).  The unpruned run also tests the bound's soundness: its
+best value must equal the pruned run's.
+
+With `*threads*` > 0, **Program cycles** leaves out the states expanded while the search is
+split into tasks (the shallowest levels), and is 0 when the whole search finishes during the
+split.  knap19 unpruned at 16 threads: 36,172, plus the 154 states with 0 to 2 items, gives the
+serial 36,326.  For exact counts, compare serial runs (`(ww-set *threads* 0)`).
+
 ### 6.2 What a result means
 
 | Result | Means |
@@ -298,7 +358,7 @@ regime it lands in:
 | Within time and memory | the current settings |
 | Within memory, too slow | S2 parallel; S6 if solutions are plentiful; S5 pruning |
 | Exceeds memory | tree search with S5 pruning, or S10/S11 to split the depth; a leaner encoding (Q18) |
-| Exceeds both by orders of magnitude | S8 milestones, or a different formulation |
+| Exceeds both by orders of magnitude | S8 milestones through the solving-advisor's dialogue, or a different formulation |
 
 A heuristic (S6) only reorders the search.  It shortens a `first` search when solutions are
 plentiful, but when they are scarce or absent the search must cover most or all of the space
@@ -309,6 +369,13 @@ Say whether the density is likely to hold at the larger size; a solution count t
 relative to the space means `first` will slow down faster than the space grows.  A size step
 can also remove every solution (triangle-xyz-1: 4 goal states at N = 5, 7 at N = 6, none at
 N = 7); `first` then searches the whole space, and exhausting it is the answer.
+
+For a value problem with a bound, project from instances whose data resembles the target's,
+not from the item count alone: how the values relate to the weights decides how much the
+bound prunes.  Instances shaped like knap19 stay in the tens of expansions from 19 to 28
+items while their distinct states grow about 1.8 times per item; `data-knap30.lisp`, whose
+values nearly equal their weights, keeps the bound to a factor of 2 (13,053 program cycles
+unpruned, 6,577 pruned).
 
 When moves are simple enough, a short independent script that counts the reachable states
 (outside Wouldwork) checks both the projection and the encoding: its counts should equal
@@ -343,6 +410,9 @@ STRATEGY:     <primary>, with the reason in a sentence
 ESCALATION:   <next>, <next>, with what would trigger each
 SETTINGS:     a ww-set block, one reason per line; REPL-only settings shown separately
 SPEC HOOKS:   proposed queries or actions, each with its soundness argument
+CLEANUP:      minor rewrites that make the spec easier to read without changing the search,
+              each with what it removes; written together into the copy once agreed, and
+              checked by a probe giving the same counts
 PROBES:       commands still worth running, and what each would change
 DENSITY:      goal states found versus distinct states, and what it favours (section 6.1)
 SCALING:      growth per size step and the projected cost at the user's target size, with
