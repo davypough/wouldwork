@@ -6,8 +6,17 @@
 ;;;          +GERALD
 ;;;         = ROBERT
 
-;;; This approach implements the method of forward-checking for
-;;; constraint satisfaction problems (ref Russell & Norvig)
+;;; Variant of problem-donald.lisp (search-advisor run, 2026-10-03):
+;;; - csp: the columns are assigned in a fixed order, one per depth, so the
+;;;   6! orderings of the same assignment are no longer explored separately.
+;;; - The columns are defined right to left (units column first), so each carry
+;;;   is fixed by the column that produces it before the next column uses it.
+;;; - Forward checking: assigning a letter removes its digit from every other
+;;;   letter's remaining list, so each action draws only unused digits and the
+;;;   all-different test against earlier assignments is no longer needed.
+;;; - The goal tests the whole sum.  Forward checking can fix the last letter by
+;;;   elimination, so "every letter has one digit" no longer means "every column
+;;;   has been checked".
 
 
 (in-package :ww)  ;required
@@ -15,9 +24,9 @@
 
 (ww-set *problem-name* donald)
 
-(ww-set *problem-type* planning)
+(ww-set *problem-type* csp)
 
-(ww-set *solution-type* first)
+(ww-set *solution-type* every)
 
 (ww-set *tree-or-graph* tree)
 
@@ -33,105 +42,86 @@
 
 
 (define-query get-remaining (?var)
-  (and (bind (remaining ?var $digits))
-       $digits))
+  (do (bind (remaining ?var $digits))
+      $digits))
 
 
-(define-query consistent (?letter ?digit)
-  (or (remaining ?letter (list ?digit))  ;already assigned
-      (not (exists (?l letter)  ;no other letter has that assignment
-             (and (not (eql ?l ?letter))
-                  (bind (remaining ?l $digits))
-                  (alexandria:length= 1 $digits)
-                  (= (first $digits) ?digit))))))
+(define-query word-value (?word)
+  (ww-loop for $letter in ?word
+           for $value = (first (get-remaining $letter))
+             then (+ (* 10 $value) (first (get-remaining $letter)))
+           finally (return $value)))
 
 
-(define-action assign-column-1
-    1
-  (product ?D (get-remaining D) ?G (get-remaining G) ?R (get-remaining R) ?c0 (get-remaining c0) ?c1 (get-remaining c1))
-  (and (/= ?D ?G ?R)
-       (= (+ ?c1 ?D ?G) (+ ?R (* 10 ?c0)))
-       (consistent D ?D)
-       (consistent G ?G)
-       (consistent R ?R))
-  (?D ?G ?R)
-  (assert (remaining c1 (list ?c1))
-          (remaining D (list ?D))
-          (remaining G (list ?G))
-          (remaining R (list ?R))
-          (remaining c0 (list ?c0))))
-
-          
-(define-action assign-column-2
-    1
-  (product ?O (get-remaining O) ?E (get-remaining E) ?c1 (get-remaining c1) ?c2 (get-remaining c2))
-  (and (/= ?O ?E)
-       (= (+ ?c2 ?O ?E) (+ ?O (* 10 ?c1)))
-       (consistent O ?O)
-       (consistent E ?E))
-  (?O ?E ?O)
-  (assert (remaining c2 (list ?c2))
-          (remaining O (list ?O))
-          (remaining E (list ?E))
-          (remaining c1 (list ?c1))))
-
-
-(define-action assign-column-3
-    1
-  (product ?N (get-remaining N) ?R (get-remaining R) ?B (get-remaining B) ?c2 (get-remaining c2) ?c3 (get-remaining c3))
-  (and (/= ?N ?R ?B)
-       (= (+ ?c3 ?N ?R) (+ ?B (* 10 ?c2)))
-       (consistent N ?N)
-       (consistent R ?R)
-       (consistent B ?B))
-  (?N ?R ?B)
-  (assert (remaining c3 (list ?c3))
-          (remaining N (list ?N))
-          (remaining R (list ?R))
-          (remaining B (list ?B))
-          (remaining c2 (list ?c2))))
-
-
-(define-action assign-column-4
-    1
-  (product ?A (get-remaining A) ?E (get-remaining E) ?c3 (get-remaining c3) ?c4 (get-remaining c4))
-  (and (/= ?A ?E)
-       (= (+ ?c4 ?A ?A) (+ ?E (* 10 ?c3)))
-       (consistent A ?A)
-       (consistent E ?E))
-  (?A ?A ?E)
-  (assert (remaining c4 (list ?c4))
-          (remaining A (list ?A))
-          (remaining E (list ?E))
-          (remaining c3 (list ?c3))))
-
-
-(define-action assign-column-5
-    1
-  (product ?L (get-remaining L) ?R (get-remaining R) ?c4 (get-remaining c4) ?c5 (get-remaining c5))
-  (and (/= ?L ?R)
-       (= (+ ?c5 ?L ?L) (+ ?R (* 10 ?c4)))
-       (consistent L ?L)
-       (consistent R ?R))
-  (?L ?L ?R)
-  (assert (remaining c5 (list ?c5))
-          (remaining L (list ?L))
-          (remaining R (list ?R))
-          (remaining c4 (list ?c4))))
+(define-update assign-letter (?letter ?digit)
+  (doall (?l letter)
+    (do (bind (remaining ?l $digits))
+        (if (eql ?l ?letter)
+          (remaining ?l (list ?digit))
+          (remaining ?l (remove ?digit $digits))))))
 
 
 (define-action assign-column-6
     1
   (product ?D (get-remaining D) ?T (get-remaining T) ?c5 (get-remaining c5) ?c6 (get-remaining c6))
   (and (/= ?D ?T)
-       (= (+ ?c6 ?D ?D) (+ ?T (* 10 ?c5)))
-       (consistent D ?D)
-       (consistent T ?T))
+       (= (+ ?c6 ?D ?D) (+ ?T (* 10 ?c5))))
   (?D ?D ?T)
-  (assert (remaining c6 (list ?c6))
-          (remaining D (list ?D))
-          (remaining T (list ?T))
+  (assert (assign-letter D ?D)
+          (assign-letter T ?T)
           (remaining c5 (list ?c5))))
+
+
+(define-action assign-column-5
+    1
+  (product ?L (get-remaining L) ?R (get-remaining R) ?c4 (get-remaining c4) ?c5 (get-remaining c5))
+  (and (/= ?L ?R)
+       (= (+ ?c5 ?L ?L) (+ ?R (* 10 ?c4))))
+  (?L ?L ?R)
+  (assert (assign-letter L ?L)
+          (assign-letter R ?R)
+          (remaining c4 (list ?c4))))
+
+
+(define-action assign-column-4
+    1
+  (product ?A (get-remaining A) ?E (get-remaining E) ?c3 (get-remaining c3) ?c4 (get-remaining c4))
+  (and (/= ?A ?E)
+       (= (+ ?c4 ?A ?A) (+ ?E (* 10 ?c3))))
+  (?A ?A ?E)
+  (assert (assign-letter A ?A)
+          (assign-letter E ?E)
+          (remaining c3 (list ?c3))))
+
+
+(define-action assign-column-3
+    1
+  (product ?N (get-remaining N) ?R (get-remaining R) ?B (get-remaining B) ?c2 (get-remaining c2) ?c3 (get-remaining c3))
+  (and (/= ?N ?R ?B)
+       (= (+ ?c3 ?N ?R) (+ ?B (* 10 ?c2))))
+  (?N ?R ?B)
+  (assert (assign-letter N ?N)
+          (assign-letter B ?B)
+          (remaining c2 (list ?c2))))
+
+
+(define-action assign-column-2
+    1
+  (product ?O (get-remaining O) ?E (get-remaining E) ?c1 (get-remaining c1) ?c2 (get-remaining c2))
+  (and (/= ?O ?E)
+       (= (+ ?c2 ?O ?E) (+ ?O (* 10 ?c1))))
+  (?O ?E ?O)
+  (assert (assign-letter O ?O)
+          (remaining c1 (list ?c1))))
+
+
+(define-action assign-column-1
+    1
+  (product ?D (get-remaining D) ?G (get-remaining G) ?R (get-remaining R) ?c0 (get-remaining c0) ?c1 (get-remaining c1))
+  (and (/= ?D ?G ?R)
+       (= (+ ?c1 ?D ?G) (+ ?R (* 10 ?c0))))
+  (?D ?G ?R)
+  (assert (assign-letter G ?G)))
 
 
 (define-init
@@ -158,6 +148,5 @@
   (and (forall (?l letter)
          (and (bind (remaining ?l $digits))
               (alexandria:length= 1 $digits)))
-       (forall (?c carry)
-         (and (bind (remaining ?c $digits))
-              (alexandria:length= 1 $digits)))))
+       (= (+ (word-value '(D O N A L D)) (word-value '(G E R A L D)))
+          (word-value '(R O B E R T)))))

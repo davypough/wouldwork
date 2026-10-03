@@ -2,11 +2,13 @@
 
 > **Usage:** An optional aide, run on its own.  Attach this file with a problem spec that
 > already stages and whose rules you trust, and say what you want from the search.  The
-> assistant recommends a strategy and its settings, writes each one you agree to into a copy
-> of the spec (the original is never changed), guides or (with approval) runs the searches,
-> and says what each result means.
+> assistant works in three phases (section 1): an overview with the main findings; spec
+> upgrades for simplicity or efficiency, each written into a copy of the spec once you agree
+> (the original is never changed); and the global analysis (scaling, trade-offs, search
+> options) ending in the final report.  It guides or (with approval) runs the searches, and
+> says what each result means.
 
-> **Status:** Source-checked 2026-10-02 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
+> **Status:** Source-checked 2026-10-03 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
 > `ww-searcher.lisp`, `ww-planner.lisp`, `ww-parallel.lisp`, `ww-parallel-infrastructure.lisp`,
 > `ww-validator.lisp`, `ww-support.lisp` and the enumerator,
 > and against the *Wouldwork User Manual (26.8)*, Part 3.  Where they disagree the source wins;
@@ -29,43 +31,84 @@ but its subgoal dialogue applies to any problem with milestones (Q16).
 
 ## 1. Process
 
+The work runs in three phases, each ending at a point where the user approves, defers or
+redirects before the next begins.  Phase 2 comes before phase 3 because the global measurements
+(expansion, trade-offs, density) depend on the spec they are taken on: they are taken on the
+upgraded spec, not the original (donald: the original's 720 reorderings of one answer would
+have swamped every scaling figure).  Phase 3 may point back to phase 2 (a spec that generates
+its actions, finer actions); such a change is proposed, applied and re-measured as in phase 2,
+then phase 3 resumes.
+
+Number every finding (F1, F2, ...) and every recommendation (R1, R2, ...) throughout, and let
+each recommendation cite the findings it rests on; numbered items can be approved, deferred
+or argued one at a time, where a finding mentioned in passing is easily lost.  Numbering
+continues across phases.
+
+### Phase 1: overview and main findings
+
 1. **Read the spec** in full: types, actions, any happenings, the goal, the current `ww-set`
    values, and any search hooks already defined (`heuristic?`, `prune-state?`,
    `min-steps-remaining?`, `bounding-function?`, `encode-state`, enumerator declarations).
    Note any construction that is unusual or more complex than it needs to be (for example,
    read-time `#.` evaluation), and also the minor clutter that makes the spec harder to read:
    commented-out debug prints, a query that only calls another, intermediate variables or
-   lists a simpler test makes unnecessary.  Where a plainer equivalent exists, propose it as a
-   refactoring (section 1.1), the minor ones together under CLEANUP (section 8).
-2. **Orient the user.**  The first response is a short summary in the puzzle's own terms,
-   with no setting names: what the problem asks, how large its search is, what the first
-   checks found, and the recommendation in a sentence.  The section-8 report follows as a
-   separate piece.
-3. **Ask the user** only what the spec cannot tell: the objective (any solution, several, every,
-   or a best one, and best by what), the time available, the thread count of the machine, and
-   whether a solution length or depth is already known.  One question at a time.
-4. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
-   *probe*.  Leave an answer *unknown* rather than guess; a probe may settle it.
-5. **Propose probes** (section 6) for answers that change the recommendation.  Probes are short
-   bounded searches, never a full solve (section 1.1 says who runs them).
-6. **Choose the strategy** (section 3), then **the settings** (section 4), checking the
-   conflicts in section 5.
-7. **Report** in the form of section 8.  Give one recommendation, not a menu, plus the order in
-   which to escalate if it does not finish.  List larger interventions the probes point to
-   (a re-encoding, a pruning invariant, an engine change) under FURTHER, as options for the
-   user to take up later, not as steps of this run.
-8. **Apply what the user agrees to**, one setting or hook at a time, by editing a copy of
-   the spec (section 1.1).
-9. **Run the strategy**: short runs here with approval, deep runs on the user's machine,
-   multi-step strategies one step at a time (section 1.1).  Interpret each result with
-   section 6.2 before the next step, and escalate only with the user's agreement.
+   lists a simpler test makes unnecessary.  Check comments against the code (donald's header
+   claimed forward checking that the actions did not do).
+2. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
+   *probe*.  Leave an answer *unknown* rather than guess.
+3. **Run the first probes** (section 6.1): short bounded searches, never a full solve
+   (section 1.1 says who runs them), enough to measure the size of the search and the waste
+   the phase-2 changes would remove (donald: 165,978 expansions as written, 17,239 in graph
+   search, 1,441 in a fixed order).
+4. **Orient the user.**  A short summary in the puzzle's own terms, with no setting names:
+   what the problem asks, how large its search is, the main findings as numbered items, and
+   the recommendation in a sentence.  This is the phase-1 report (section 8).
+5. **Ask the user** only what the spec cannot tell: the objective (any solution, several,
+   every, or a best one, and best by what), the time available, the thread count of the
+   machine, whether a solution length or depth is already known, and whether larger members
+   of the family matter.  One question at a time.
+
+### Phase 2: spec upgrades for simplicity and efficiency
+
+6. **Propose the upgrades**, numbered, each with its reason and the findings behind it:
+   - choices that live in the spec: the strategy where it is a spec setting (`*problem-type*`
+     csp, `*tree-or-graph*`, `*solution-type*`, symmetry), and action order (section 3);
+   - representation changes (Q18) and refactorings of unusual constructions (section 1.1);
+   - search hooks (section 4.1), each with its soundness argument;
+   - minor clutter, together under CLEANUP.
+   Check the conflicts in section 5 first.
+7. **Apply what the user agrees to** in a copy of the spec (section 1.1), one change at a
+   time, and check each: the copy stages, and a probe gives the same answers (goal states,
+   best value) with the counts the change predicts.  An independent counting script
+   (section 6.3) that reproduces **Program cycles** on the upgraded spec is the strongest
+   check, and is reused in phase 3.
+8. **Report** the phase-2 changes (section 8): what changed, the before and after counts,
+   and the REPL forms to stage and test the copy.
+
+### Phase 3: scaling, trade-offs, search options and the final report
+
+9. **Measure on the upgraded spec**: the cost of each regime the user might want (section
+   3.2), solution density (section 6.1), the projection to a target size if one is named
+   (section 6.3), and always the expansion of the problem family (section 6.4).
+10. **Choose the run-time strategy and settings** (sections 3 and 4): threads and the other
+    REPL-only settings, the escalation order if the search does not finish, and the
+    multi-step strategies (S7 to S11) where the measurements call for them.
+11. **Final report** in the form of section 8.  Give one recommendation, not a menu, plus the
+    order in which to escalate.  List larger interventions the measurements point to (a
+    re-encoding, a generator for the family, a pruning invariant, an engine change) under
+    FURTHER, as options for the user to take up later, not as steps of this run.
+12. **Run the strategy**: short runs here with approval, deep runs on the user's machine,
+    multi-step strategies one step at a time (section 1.1).  Interpret each result with
+    section 6.2 before the next step, and escalate only with the user's agreement.
 
 ### 1.1 Who does what
 
 **Editing the spec.**  The advisor never changes the original spec.  The first change the user
 agrees to creates a copy beside it, named by extending the original's name
-(`problem-knap19.lisp` to `problem-knap19-1.lisp`), with `*problem-name*` changed to match
-(`knap19-1`); later agreed changes in the same run go into that copy.  A change that needs a
+(`problem-knap19.lisp` to `problem-knap19-1.lisp`), with `*problem-name*` and the `;;; Filename:` header line changed to match
+(`knap19-1`).  Staging reloads the file that the header names, so a copy that still carries
+the original's header silently stages the original (seen with a donald variant: every
+`(stage ...)` of the copy ran the original's actions, with no error); later agreed changes in the same run go into that copy.  A change that needs a
 separate variant of its own (relaxed, backward, re-encoded) takes the next number.  Never edit
 the generated `src/problem.lisp`.
 
@@ -80,7 +123,7 @@ the generated `src/problem.lisp`.
   states must correspond.  When the change alters what the model means (new rules, a changed
   goal, a different level of detail), write a short prompt for the spec-advisor instead,
   naming the finding and the proposed encoding, and resume here once that spec stages.
-- **Refactorings** (step 1: an unusual or needlessly complex construction).  When a plainer
+- **Refactorings** (phase 1, step 1: an unusual or needlessly complex construction).  When a plainer
   form gives the same rules and goal, write it into the copy once the user agrees, after
   checking that it stages and that a probe gives the same counts and best result as before.
   Example: knap19 read its data with `#.` forms so that the values existed when the file was
@@ -124,12 +167,12 @@ of a result belong here.
 
 | Id | Question | How settled | What it decides |
 |---|---|---|---|
-| Q1 | Is the answer a sequence of moves, or an assignment of values (each variable set once, order irrelevant)?  If an assignment, does the spec assign the variables in a fixed order, one per depth, or let any remaining choice be made at any step? | spec | `*problem-type*`; CSP strategy (S3) only for fixed-order assignment |
+| Q1 | Is the answer a sequence of moves, or an assignment of values (each variable set once, order irrelevant)?  If an assignment, does every solution use each action exactly once (one action per variable or group of variables), or does one action range over all the variables (knap19's `put`)? | spec | `*problem-type*`; CSP strategy (S3) when each action is used exactly once: csp itself imposes the fixed order (at depth n, while n is below the number of actions, only the nth defined action is tried; `generate-children` in `ww-planner.lisp`), whether or not the spec intends one |
 | Q2 | What is wanted: any one solution, N, every, every path, or a best one (fewest steps, least time, min/max value)? | user | `*solution-type*`; optimization (S4) |
 | Q3 | Are there happenings or patrollers? | spec: `define-happening`, `define-patroller` | tree search; `*auto-wait*`; no backtracking |
 | Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits |
 | Q5 | Does some quantity change by a fixed amount on every move (peg count, items placed), **and** does the goal fix its final value (one peg left, all N items placed)?  Both are needed: a knapsack places one item per move, but its goal does not fix how many | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2); an exact `*depth-cutoff*` only if moves can continue past that length, or for `min-steps-remaining?` |
-| Q6 | How large is the space?  Branching factor b and solution depth d; under graph search, the number of distinct states | spec, probe | whether brute force can finish (roughly under a billion).  b^d counts paths; when moves commute (any order of the same choices reaches the same state) graph search visits only the distinct states, which can be far fewer (knap19: 17^11 paths, 36,326 states) |
+| Q6 | How large is the space?  Branching factor b and solution depth d; under graph search, the number of distinct states | spec, probe | whether brute force can finish (roughly under a billion).  b^d counts paths; when moves commute (any order of the same choices reaches the same state) graph search visits only the distinct states, which can be far fewer (knap19: 17^11 paths, 36,326 states).  Count the work per expansion too: an action's `product` enumerates every combination of its parameters before the precondition rejects any, so an action with k free parameters over a domain of size m costs up to m^k tests per state (a 41-addend cryptarithm whose units column holds 9 letters: 31 s for 197,005 expansions, against 7 ms for DONALD's 424).  The remedy is finer actions, each fixing one or two variables |
 | Q7 | Are there objects of one type with identical static facts that the goal does not name, **and** do the actions take them as typed parameters (`?peg peg`)?  Objects supplied by a query (`?peg (get-remaining-pegs?)`) are not recognized, so no family is found | spec; staging lists the families | `*symmetry-pruning*`; if the names serve no purpose, Q18 instead |
 | Q8 | Is there a cheap measure of how close a state is to the goal? | spec, user | `heuristic?` (S6) |
 | Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (S5) |
@@ -154,7 +197,7 @@ heuristics, subgoals with any of them.
 |---|---|---|---|---|
 | S1 | **Brute force, iterative deepening** | Always first; and as the whole answer when b^d is modest | `first`, small `*depth-cutoff*`, raise it until a solution appears, then lower it to find the shortest | Exponential in depth |
 | S2 | **Parallel search** | The space is large and the search is depth-first | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with backtracking or auto-wait (errors), nor with problems that create objects during search (section 5); `all-paths` falls back to `every` |
-| S3 | **CSP with backtracking** | Q1 is an assignment | `*problem-type*` csp; `*algorithm*` backtracking at the REPL; `*depth-cutoff*` 0; order actions so the most constraining variables come first | Serial only; ignores every search hook (section 5) |
+| S3 | **CSP (fixed-order assignment)** | Q1 is an assignment with each action used exactly once | `*problem-type*` csp; `*depth-cutoff*` 0; define the actions in the order they should run: each action's inputs fixed by earlier actions (a carry chain runs from the units column), and the most constraining variables first.  `*algorithm*` backtracking (REPL) optionally; depth-first also respects the order.  Narrow the remaining domains as values are assigned (forward checking; `define-update` as in `problem-captjohn.lisp`) | Backtracking is serial only and ignores every search hook (section 5).  Action order matters: donald-1 right to left 424 expansions to prove, left to right 1,440.  With forward checking a variable can be fixed by elimination, so the goal must test the constraints themselves, not only that every variable has one value: donald-1's first draft, whose goal tested only that, reported 30 false solutions one column early |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); add `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`.  Pointless at fixed length (Q5) |
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; define `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**: a bound that overestimates, or a dead test that rejects a live state, silently discards solutions.  Symmetry checking has overhead and removes variants under `every` |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only: still complete depth-first search, not beam or A*; first solution need not be shortest.  Serial and parallel both use it; backtracking does not; overrides `*randomize-search*` |
@@ -171,8 +214,8 @@ Start at the first row that applies; the fallback column is the escalation order
 
 | Situation | Primary | Then |
 |---|---|---|
-| Assignment in fixed variable order (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first, since backtracking ignores bounds) |
-| Assignment by order-free actions (Q1; e.g. knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states | S5 bound; S2.  Not S3: tree search would explore every order of the same choices |
+| Assignment, each action used once (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first, since backtracking ignores bounds) |
+| Assignment by order-free actions (Q1; e.g. knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states | S5 bound; S2.  Not S3: csp fixes the action only while the depth is below the number of actions, so a single `put` is fixed at depth 0 alone and every later depth tries all orders, in tree search.  If the spec has one action per variable group but no order (the original donald), S3 rather than graph search: graph search closes the reordered states, but csp never generates them (donald, every solution: tree 165,978 expansions, graph 17,239, csp 1,441) |
 | Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S8 with time-tagged milestones |
 | b^d modest (Q6) | S1, then S4 if a best solution is wanted | S2 |
 | Fixed length (Q5) | S1 at the exact length with S5 dead-state pruning and symmetry | S10 (exhausting the remaining length proves a position dead); S7 |
@@ -180,6 +223,26 @@ Start at the first row that applies; the fallback column is the escalation order
 | Large, reversible, no distance | S2 | S10 if Q12; S7 |
 | Expensive derived state (Q14) | S9 | S11; S8 |
 | Too deep for one search, with milestones (Q16) | S8 | S10 or S11 for the last stretch |
+
+### 3.2 Search regimes and their trade-offs
+
+What the user wants decides what the search must do, and the costs can differ by orders of
+magnitude.  Report the regimes the user might want with their costs, measured where cheap
+(REGIMES in section 8), rather than choosing one silently.
+
+| Regime | Setting | Must cover | Cost and what decides it | The result means |
+|---|---|---|---|---|
+| Find one | `first` | until the first goal | depends on density and on ordering (S6, action order); falls steeply with many solutions | a valid answer; nothing about others |
+| Prove (no solution, or uniqueness) | `every`, or `first` run to exhaustion | the whole space, less what sound pruning removes | the size of the space; ordering does not help | with sound hooks, a proof (section 6.2) |
+| Every solution | `every`, `all-paths` | the whole space | as prove, plus memory for the solutions recorded | every goal state (every path with `all-paths`) |
+| Best | `min-length`, `min-value`, ... | until the bound is proved | as prove, less what the bound prunes (S4) | the optimum, if run to completion |
+
+The ratio of prove to find is itself a measurement: near 1 means solutions are scarce or
+found late, so a heuristic will not help; a large ratio means a `first` search is cheap but a
+proof is not.  Cryptarithms, measured with the donald-1 scheme: DONALD 225 to find and 424 to
+prove (1.9 times); a 41-addend puzzle 5,161 and 111,116 (21 times); random base-16 puzzles of
+two 8-letter addends 6,253 and 1,302,741 (about 200 times).  When the gap is small, prefer the
+proof, which also confirms the model has no unintended solutions.
 
 ---
 
@@ -381,6 +444,34 @@ When moves are simple enough, a short independent script that counts the reachab
 (outside Wouldwork) checks both the projection and the encoding: its counts should equal
 **Program cycles** at the sizes already run.
 
+### 6.4 Expanding the problem family
+
+Always analyse how the problem's family grows, even when the user names no target size.  A
+spec is usually one instance of a family (a board size, a puzzle of a given shape), and the
+settings that suit the instance can fail on its larger members.  Section 6.3 projects to one
+target size; this section asks which way of growing hurts first.
+
+1. **Name the dimensions** along which the family grows: for a cryptarithm, the base, the
+   number of distinct letters, the word length and the number of addends; for a board, its
+   side and the number of pieces.
+2. **Probe one dimension at a time**, the others fixed, at three or more steps, reporting
+   the median and the maximum over several instances where instances vary.
+3. **When the spec is written by hand for one instance**, generate the larger instances
+   with the independent counting script (section 6.3), after checking that it reproduces
+   **Program cycles** on the instance in hand.  Generated instances should be solvable and
+   resemble the target's data (random digits, then letters assigned, for cryptarithms).
+4. **Report the growth per step along each dimension**, the first dimension to break, and
+   its mitigation (the table in section 6.3); note any dimension along which the cost falls.
+
+Cryptarithms with the donald-1 scheme (csp, columns right to left, forward checking), median
+expansions to prove: word length 6, 10, 14 (base 10, two addends): 1,556, 1,304, 750; more
+columns add constraints, so length is harmless.  Addends 2, 3, 4, 6 (length 6): 1,556,
+2,070, 6,757, 16,044; per-expansion work grows too (Q6).  Base 10, 12, 14, 16 (length 8):
+1,036, 3,987, 39,485, 1,302,741, about 3.5 times per base step, while finding stays near
+6,000 to 12,000 from base 13 up.  The base breaks first; and since each new puzzle needs a
+hand-written column action per column, a family of any size calls for a spec that builds its
+actions from the words.
+
 ---
 
 ## 7. Corrections to the Manual (26.8)
@@ -402,25 +493,58 @@ Recorded here, not yet made in the Manual:
 
 ## 8. Report to the user
 
+The report comes in three pieces, one at the end of each phase, so that each can be approved
+before the next phase builds on it.  Numbering of findings and recommendations continues
+across the pieces.
+
+**Phase 1: overview** (the orientation, in the puzzle's own terms, no setting names)
+
 ```
 PROBLEM:      <name>, <spec path>
+SUMMARY:      what the problem asks and how large its search is, in a few sentences
+FINDINGS:     F1, F2, ...: one numbered line each, what was read or measured with the number
+              behind it, marked spec / user / probe
 PROFILE:      the answered questions that mattered, each marked spec / user / probe;
               unknowns listed
-STRATEGY:     <primary>, with the reason in a sentence
-ESCALATION:   <next>, <next>, with what would trigger each
-SETTINGS:     a ww-set block, one reason per line; REPL-only settings shown separately
-SPEC HOOKS:   proposed queries or actions, each with its soundness argument
-CLEANUP:      minor rewrites that make the spec easier to read without changing the search,
-              each with what it removes; written together into the copy once agreed, and
-              checked by a probe giving the same counts
-PROBES:       commands still worth running, and what each would change
+DIRECTION:    the recommendation in a sentence, and the question for the user
+```
+
+**Phase 2: spec upgrades** (proposed, then reported once applied)
+
+```
+UPGRADES:     U1, U2, ...: each change with its reason and the findings it rests on
+              (strategy settings that live in the spec, action order, re-encodings,
+              refactorings)
+SETTINGS:     the ww-set block of the copy, one reason per line
+SPEC HOOKS:   H1, H2, ...: proposed queries or actions, each with its soundness argument
+CLEANUP:      C1, C2, ...: minor rewrites that make the spec easier to read without changing
+              the search, each with what it removes; written together into the copy once
+              agreed, and checked by a probe giving the same counts
+CHECKS:       before and after counts for each applied change, the agreement of any
+              independent script, and the REPL forms to stage and test the copy
+```
+
+**Phase 3: final report**
+
+```
+STRATEGY:     <primary>, with the reason in a sentence, citing findings (F2, F4)
+ESCALATION:   E1, E2, ...: in order, with what would trigger each
+REPL:         REPL-only settings (*threads*, *algorithm*, ...), one reason each
+REGIMES:      the cost of each regime the user might want (find, prove, every, best),
+              measured where cheap, and the ratio between them (section 3.2)
 DENSITY:      goal states found versus distinct states, and what it favours (section 6.1)
 SCALING:      growth per size step and the projected cost at the user's target size, with
-              the mitigation for that regime (section 6.3)
+              the mitigation for that regime (section 6.3); "none named" if no target
+EXPANSION:    the family's size dimensions, the growth per step along each, and the first
+              to break, with its mitigation (section 6.4)
+PROBES:       P1, P2, ...: commands still worth running, and what each would change
 MEANING:      what a solution, an exhaustion, or a crash will prove under these settings
-FURTHER:      interventions beyond settings and hooks, for the user to pursue or not: a
-              re-encoding (Q18), a sound pruning invariant worth prototyping, an engine
-              change the measurements point to.  Each with its expected payoff, what it
-              would cost, and the measurement behind it; none is started without the
-              user's go-ahead
+FURTHER:      X1, X2, ...: interventions beyond settings and hooks, for the user to pursue
+              or not: a re-encoding (Q18), a generator for the family, a sound pruning
+              invariant worth prototyping, an engine change the measurements point to.
+              Each with its expected payoff, what it would cost, and the measurement behind
+              it; none is started without the user's go-ahead.  An item that is a spec
+              change can return to phase 2
+RECOMMEND:    R1, R2, ...: the actions proposed, in order, each citing the findings it
+              rests on
 ```
