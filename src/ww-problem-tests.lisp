@@ -16,22 +16,13 @@
     ;"problem-crossword5-11.lisp"  ;runs out of default memory
     ;"problem-crossword15-18.lisp"  ;runs out of default memory
     "problem-crossword13.lisp" "problem-array-path.lisp"
-    "problem-tiles0a-csp.lisp" "problem-tiles1a-heuristic.lisp"
-    "problem-tiles1e-heuristic.lisp"
-    ;"problem-tiles1b.lisp"  ;takes too long
-    ;"problem-tiles1c.lisp"  ;takes too long
-    ;"problem-tiles1d.lisp"  ;needs debugging
-    ;"problem-tiles2a.lisp"  ;takes too long
-    ;"problem-tiles2a-heuristic.lisp"  ;takes too long
-    ;"problem-tiles2b.lisp"  ;takes too long
-    ;"problem-tiles2c.lisp"  ;takes too long
-    ;"problem-tiles3a-heuristic.lisp"  ;takes too long
+    "problem-tiles0a-csp.lisp" "problem-tiles1a.lisp"
+    ;"problem-tiles0b.2-csp.lisp"  ;takes too long (about 110 min)
+    ;"problem-tiles1d.lisp"  ;same puzzle as tiles1a, bit-vector state
+    ;"problem-tiles3a-heuristic.lisp"  ;about 1 s
     ;"problem-tiles5a-heuristic.lisp"  ;takes too long
-    ;"problem-tiles5b-heuristic.lisp"  ;needs debugging
-    ;"problem-tiles7a-heuristic2.lisp"  ;takes too long
-    ;"problem-tiles7a-heuristic3.lisp"  ;takes too long
-    ;"problem-tiles0b-csp.lisp"  ;takes too long
-    ;"problem-tiles7a-heuristic.lisp"  ;takes too long
+    ;"problem-tiles6b-heuristic.lisp"  ;about 30 s
+    ;"problem-tiles7a-heuristic-1.lisp"  ;about 0.1 s (first milestone only)
     "problem-hanoi.lisp"
     ;"problem-triangle.lisp"  ;needs debugging
     ;"problem-triangle-backward.lisp"  ;takes too long
@@ -69,8 +60,6 @@
     "problem-array-path.lisp"           ;tree, min-length, no-solution case
     ;"problem-tiles0a-csp.lisp"         ;takes too long
     ;"problem-tiles1a.lisp"              ;graph->tree, min-length, list-coord state--takes too long with bt
-    ;"problem-tiles1a-heuristic.lisp"   ;heuristic unused by bt, redundant with tiles1a
-    ;"problem-tiles1e-heuristic.lisp"   ;same
     "problem-hanoi.lisp"                ;min-length, depth-cutoff 9 set in run-bt-test-problems
     "problem-triangle-xyz.lisp"         ;first, canonical triangle form
     ;"problem-triangle-xy.lisp"         ;redundant with triangle-xyz

@@ -58,13 +58,13 @@
                                                                   (+ (cdr tile-coord) ?d-col)))))
                       (return t))))
   (?tile $direction)
-  (do (assign $direction (cond ((= ?d-col 1) 'right)
-                               ((= ?d-row 1) 'down)
-                               ((= ?d-col -1) 'left)
-                               ((= ?d-row -1) 'up)
-                               (t (error "Incorrect direction"))))
-      (assert (loc ?tile $new-tile-coords)
-              (empty $new-empty-coords))))
+  (assert (assign $direction (cond ((= ?d-col 1) 'right)
+                                   ((= ?d-row 1) 'down)
+                                   ((= ?d-col -1) 'left)
+                                   ((= ?d-row -1) 'up)
+                                   (t (error "Incorrect direction"))))
+          (loc ?tile $new-tile-coords)
+          (empty $new-empty-coords)))
       
 
 (define-init

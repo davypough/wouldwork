@@ -56,7 +56,9 @@ and recommendation; the reasoning behind it is given when the user asks.
    read-time `#.` evaluation), and also the minor clutter that makes the spec harder to read:
    commented-out debug prints, a query that only calls another, intermediate variables or
    lists a simpler test makes unnecessary.  Check comments against the code (donald's header
-   claimed forward checking that the actions did not do).
+   claimed forward checking that the actions did not do).  A type that no parameter names may
+   still be in use: `$row` in a relation's signature means a value of type `row`
+   (tiles7a's `(loc tile $row $col)`), and staging fails if the type is removed.
 2. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
    *probe*.  Leave an answer *unknown* rather than guess.
 3. **Run the first probes** (section 6.1): short bounded searches, never a full solve
@@ -191,8 +193,8 @@ of a result belong here.
 | Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits.  When moves can be undone, routes of different lengths reach the same state, and graph search expands a state again each time a shorter route reaches it (section 6.1) |
 | Q5 | Does some quantity change by a fixed amount on every move (peg count, items placed), **and** does the goal fix its final value (one peg left, all N items placed)?  Both are needed: a knapsack places one item per move, but its goal does not fix how many | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2); an exact `*depth-cutoff*` only if moves can continue past that length, or for `min-steps-remaining?` |
 | Q6 | How large is the space?  Branching factor b and solution depth d; under graph search, the number of distinct states | spec, probe | whether brute force can finish (roughly under a billion).  b^d counts paths; when moves commute (any order of the same choices reaches the same state) graph search visits only the distinct states, which can be far fewer (knap19: 17^11 paths, 36,326 states).  Count the work per expansion too: an action's `product` enumerates every combination of its parameters before the precondition rejects any, so an action with k free parameters over a domain of size m costs up to m^k tests per state (a 41-addend cryptarithm whose units column holds 9 letters: 31 s for 197,005 expansions, against 7 ms for DONALD's 424).  The remedy is finer actions, each fixing one or two variables.  A parameter that the state already fixes (the support a disk sits on, an agent's location) should be read with `bind`, not enumerated and tested: hanoi's `move` took both supports as parameters, 880 combinations per state at 8 disks; binding the origin made it 5.4 times faster, and a peg-per-disk encoding 13 times |
-| Q7 | Are there objects of one type with identical static facts that the goal does not name, **and** do the actions take them as typed parameters (`?peg peg`)?  Objects supplied by a query (`?peg (get-remaining-pegs?)`) are not recognized, so no family is found | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (S5); if the names serve no purpose, Q18 instead |
-| Q8 | Is there a cheap measure of how close a state is to the goal? | spec, user | `heuristic?` (S6) |
+| Q7 | Are there objects of one type with identical static facts that the goal does not name, **and** do the actions take them as typed parameters (`?peg peg`)?  Objects supplied by a query (`?peg (get-remaining-pegs?)`) are not recognized, so no family is found.  Identical means the same rules (the same static facts: shape, moves, capacities), not the same appearance: tiles7a's 16 blue tiles share a colour, but only its five single squares share a shape | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (S5); if the names serve no purpose, Q18 instead, which is usually faster still |
+| Q8 | Is there a cheap measure of how close a state is to the goal?  If the spec already defines one, does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (S6), kept only if a timed probe shows it faster than no ordering; if it never overestimates, also try it as `min-steps-remaining?` (Q9), which can help where the ordering does not |
 | Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (S5) |
 | Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (S5) |
 | Q11 | For min/max-value, can an optimistic value of a partial state be computed cheaply? | spec, user | `bounding-function?` (S4) |
@@ -202,7 +204,7 @@ of a result belong here.
 | Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (S7) |
 | Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | subgoaling (S8) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
-| Q18 | Do objects carry names the puzzle never uses (identical pegs, tokens), is the same fact stored more than once (`loc>` and `contents>`, a list beside a count), or are there objects that static facts rule out of every action (an item heavier than the capacity, tried and rejected at every state)? | spec | re-encoding (section 1.1): record only what matters (which positions are occupied).  Removes duplicate states at the source, which is cheaper and more complete than `*symmetry-pruning*` |
+| Q18 | Do objects carry names the puzzle never uses (identical pegs, tokens), is the same fact stored more than once (`loc>` and `contents>`, a list beside a count), or are there objects that static facts rule out of every action (an item heavier than the capacity, tried and rejected at every state)? | spec | re-encoding (section 1.1): record only what matters (which positions are occupied).  Removes duplicate states at the source, which is cheaper and more complete than `*symmetry-pruning*`.  Merge only objects with the same rules (Q7): storing only colours is a different puzzle when same-coloured pieces differ in shape.  tiles7a-heuristic-1 stores its five identical squares as one sorted list of cells, moved by their own action whose parameter comes from a query: shortest solution 3,440 expansions in 0.1 s, against 3,649 in 0.4 s with symmetry pruning (both with a lower bound) |
 
 ---
 
@@ -218,7 +220,7 @@ heuristics, subgoals with any of them.
 | S3 | **CSP (fixed-order assignment)** | Q1 is an assignment with each action used exactly once | `*problem-type*` csp; `*depth-cutoff*` 0; define the actions in the order they should run: each action's inputs fixed by earlier actions (a carry chain runs from the units column), and the most constraining variables first.  `*algorithm*` backtracking (REPL) optionally; depth-first also respects the order.  Narrow the remaining domains as values are assigned (forward checking; `define-update` as in `problem-captjohn.lisp`) | Backtracking is serial only and ignores every search hook (section 5).  Action order matters: donald-1 right to left 424 expansions to prove, left to right 1,440.  With forward checking a variable can be fixed by elimination, so the goal must test the constraints themselves, not only that every variable has one value: donald-1's first draft, whose goal tested only that, reported 30 false solutions one column early |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); add `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`.  Pointless at fixed length (Q5).  When moves can be undone, `min-length` without a `*depth-cutoff*` first dives along a very long path and then shortens it a move or two at a time (hanoi, 7 disks: a first solution of 732 moves against an optimum of 127, then 239 improvements, 31.9 s; with the cutoff at 127, 4.5 s).  Set the cutoff to the known optimum, or to the length of a solution already found |
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; define `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**: a bound that overestimates, or a dead test that rejects a live state, silently discards solutions.  Symmetry checking has overhead and removes variants under `every`.  Time it as well as counting what it saves: in hanoi's peg encoding it cut expansions by 23% and made the run 4 times slower (8 disks, 3.2 s to 12.7 s) |
-| S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only: still complete depth-first search, not beam or A*; first solution need not be shortest.  Serial and parallel both use it; backtracking does not; overrides `*randomize-search*` |
+| S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only: still complete depth-first search, not beam or A*; first solution need not be shortest.  Serial and parallel both use it; backtracking does not; overrides `*randomize-search*`.  Time it against no ordering, for `first` and the optimizing search alike: tiles7a's distance of the yellow tile to its goal made `first` slower (40,412 expansions against 31,842) and `min-length` no faster, because the distance says little about clearing the way.  The same distance, which never overestimates, cut `min-length` from 49,767 expansions to 12,869 as a lower bound (Q9) |
 | S7 | **Macro actions** | Q15 shows recurring multi-move patterns | add combined actions before the base actions; find candidates with `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state.  Keep the base actions |
 | S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor (`doc/constraint-led-solving/solving-advisor.md`) is the worked-out interactive form, built for Talos problems with gates and bottlenecks |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
@@ -237,7 +239,7 @@ Start at the first row that applies; the fallback column is the escalation order
 | Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S8 with time-tagged milestones |
 | b^d modest (Q6) | S1, then S4 if a best solution is wanted | S2 |
 | Fixed length (Q5) | S1 at the exact length with S5 dead-state pruning and symmetry | S10 (exhausting the remaining length proves a position dead); S7 |
-| Large, reversible, with a distance measure (Q8) | S6, S2 | S5 lower bound for an optimal path; S8 at bottlenecks |
+| Large, reversible, with a distance measure (Q8) | S5 lower bound if the distance never overestimates and the shortest path is wanted; S6 only if a timed probe shows the ordering faster; S2 | S8 at bottlenecks |
 | Large, reversible, no distance | S2 | S10 if Q12; S7 |
 | Expensive derived state (Q14) | S9 | S11; S8 |
 | Too deep for one search, with milestones (Q16) | S8 | S10 or S11 for the last stretch |
@@ -317,9 +319,14 @@ sound, and it reduces the search to walking the solution (8 disks: 289,145 expan
 its result: it measures how fast Wouldwork replays a known answer, not how well it searches,
 and it rarely survives a change to the family (there is no such formula for 4 pegs).
 
-**Distance plus obligations.**  When tree search is forced (happenings, csp), repeated states
-cannot be closed, and a lower bound is the main way to cut detours: with the cutoff at or near
-the optimum, a move that does not reduce the bound uses up slack and is soon pruned.  Add the
+**Distance plus obligations.**  With a depth cutoff at or near the optimum, a lower bound cuts
+detours: a move that does not reduce the bound uses up slack and is soon pruned.  It applies to
+tree and graph search alike.  When tree search is forced (happenings, csp), repeated states
+cannot be closed, and the bound is the main remedy; under graph search it also prunes the
+detours by which a closed state is reached again and reopened.  tiles7a (graph search, cutoff
+22 = optimum): the yellow tile's distance to its goal alone cut `min-length` from 49,767
+expansions in 2.1 s to 12,869 in 0.3 s, and the search cut off at 21 proved 22 optimal in
+9,480.  Add the
 agent's distance to the goal along the static adjacency to one for each action every remaining
 solution must still take, counting an action only when it is provably required.  sentry-1:
 distance to area8, plus a jam of the sentry unless it is jammed or passed, plus a pickup of the
@@ -533,6 +540,17 @@ target size; this section asks which way of growing hurts first.
    resemble the target's data (random digits, then letters assigned, for cryptarithms).
 4. **Report the growth per step along each dimension**, the first dimension to break, and
    its mitigation (the table in section 6.3); note any dimension along which the cost falls.
+
+Two dimensions are easily overlooked.  **Goal distance:** when the board or layout is fixed,
+moving the goal grows the solution depth without a new instance; the counting script lists the
+distance to every candidate goal in one run.  tiles7a-heuristic-1 (goal cells 22, 40, 50 and 55
+moves away): 0.1 s, 4.1 s, 10 s, 14 s, while the reopenings per distinct state rose from about
+4 to 8.  **Mobility, not free space:** pieces that can move without ever affecting the goal
+multiply the space by their own arrangements.  In tiles7a, one added column of identical
+squares holding a single empty cell multiplied the distinct states within 22 moves 205 times
+(2,978 to 611,170; 0.1 s to 17 s), while turning squares into empty cells inside the original
+board shortened the solution and made the search cheaper.  Count what can move, not how much
+room there is.
 
 Cryptarithms with the donald-1 scheme (csp, columns right to left, forward checking), median
 expansions to prove: word length 6, 10, 14 (base 10, two addends): 1,556, 1,304, 750; more

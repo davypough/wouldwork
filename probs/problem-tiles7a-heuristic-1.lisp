@@ -1,12 +1,22 @@
-;;; Filename: problem-tiles7a-heuristic.lisp
+;;; Filename: problem-tiles7a-heuristic-1.lisp
 
 ;;; List problem specification for a blue/yellow tile shuffle in Islands of Insight.
-;;; Basic search using (row . col) for coordinates (fastest)
-;;; Uses pre/post move empty-coordinate templates for each tile.
+;;; Uses (row . col) coordinates and pre/post move empty-coordinate templates for each tile.
+;;; The five identical blue single squares are stored as one sorted list of cells.
+;;; The full puzzle brings Y to 0,0 through two milestones, solved as a chain
+;;; (each stage starts where the previous one ended; set the cutoff per stage):
+;;;   (stage tiles7a-heuristic-1)
+;;;   (solve)                                ;Y to 3,3: 22 moves
+;;;   (ww-set *depth-cutoff* 48)
+;;;   (solve-subgoal (loc Y 2 2))            ;48 moves, about 12 s
+;;;   (ww-set *depth-cutoff* 36)
+;;;   (solve-subgoal (loc Y 0 0))            ;36 moves, about 5 s
+;;; The goal and every subgoal must have the form (loc Y row col):
+;;; min-steps-remaining? reads its target cell from the installed goal.
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* tiles7a-heuristic)
+(ww-set *problem-name* tiles7a-heuristic-1)
 
 (ww-set *problem-type* planning)
 
@@ -16,13 +26,9 @@
 
 (ww-set *depth-cutoff* 22)
 
-(ww-set *progress-reporting-interval* 10000000)
-
-;(ww-set *branch* 0)
-
 
 (define-types
-  tile   (DELL LELL 2HOR 3HOR CANE LKEY RKEY SQ1 SQ2 SQ3 SQ4 SQ5 UTEE RTEE DTEE LTEE Y)
+  tile   (DELL LELL 2HOR 3HOR CANE LKEY RKEY UTEE RTEE DTEE LTEE Y)
   direction (right left down up)
   row (0 1 2 3 4 5 6 7)
   col (0 1 2 3 4 5 6 7))
@@ -30,28 +36,20 @@
 
 (define-dynamic-relations
   (loc tile $row $col)  ;ref location of a tile with row col coordinates
-  (emptys $list))  ;list of empty coordinates
+  (squares $list)  ;sorted coords of the five identical blue single squares
+  (emptys $list))  ;sorted list of empty coordinates
 
 
 (define-static-relations
-  (pre-post-emptys> tile direction $list $list)  ;pre & post move empty coords
-  (Y-goal $row $col))  ;coords of the goal location
+  (pre-post-emptys> tile direction $list $list))  ;pre & post move empty coords
 
 
-(define-query heuristic? ()
-  ;Get the manhattan distance from first coord of Y tile to the goal coord. Lower is better.
+(define-query min-steps-remaining? ()
+  ;Manhattan distance from the Y tile to the cell named by the installed goal
+  ;(loc Y row col); never overestimates, since a move shifts Y by at most one cell.
   (do (bind (loc Y $Y-row $Y-col))
-      (bind (Y-goal $Y-goal-row $Y-goal-col))
-      (+ (abs (- $Y-row $Y-goal-row))
-         (abs (- $Y-col $Y-goal-col)))))
-
-
-(defun sort-coords (coords)
-  ;Keeps coordinates lexicographically sorted.
-  (sort coords (lambda (a b)
-                 (or (< (car a) (car b))
-                     (and (= (car a) (car b))
-                          (< (cdr a) (cdr b)))))))
+      (+ (abs (- $Y-row (third *goal*)))
+         (abs (- $Y-col (fourth *goal*))))))
 
 
 (define-query movable (?real-pre-emptys)
@@ -60,40 +58,27 @@
       (every (lambda (coord)
                (member coord $emptys :test #'equal))
              ?real-pre-emptys)))
-      
+
+
+(define-query get-squares ()
+  (do (bind (squares $squares))
+      $squares))
+
+
+(defun sort-coords (coords)
+  ;Keeps coordinates lexicographically sorted. Sorts a copy: callers pass lists
+  ;from REMOVE, whose tails are shared with the parent state's database values.
+  (sort (copy-list coords) (lambda (a b)
+                             (or (< (car a) (car b))
+                                 (and (= (car a) (car b))
+                                      (< (cdr a) (cdr b)))))))
+
 
 (defun real-coords (row col coords)
   ;Translates relative coords to real coords.
   (mapcar (lambda (coord)
             (cons (+ row (car coord)) (+ col (cdr coord))))
           coords))
-
-
-(defun list-difference (list1 list2 &key (test #'eql))
-  "Subtracts elements in list2 from list1 respecting duplicates.
-   Use for short lists, O(n^2)."
-  (loop with new-list1 = list1
-        for elem2 in list2
-        do (setf new-list1 (remove elem2 new-list1 :test test :count 1))
-        finally (return new-list1)))
-
-
-(define-update check-emptys ()
-  (do (bind (emptys $emptys))
-      (unless (alexandria:setp $emptys :test #'equal)
-        (troubleshoot "In CHECK-EMPTYS, $emptys is not setp: ~A" $emptys))
-      (unless (alexandria:sequence-of-length-p $emptys 9)
-        (troubleshoot "In CHECK-EMPTYS, $emptys length is not 9: ~A" (length $emptys)))))
-
-
-(define-update check-tile-locs (?direction)
-  (do (bind (emptys $emptys))
-      (doall (?t tile)
-        (if (bind (loc ?t $r $c))
-          (when (member (cons $r $c) $emptys :test #'equal)
-            (ut::prt ?t ?direction)
-            (troubleshoot "tile loc is in $emptys: ~A ~A ~A" $r $c $emptys))
-          (troubleshoot "tile does not have a location: ~A" ?t)))))
 
 
 (define-action move
@@ -105,27 +90,34 @@
        (movable $real-pre-emptys))
   (?tile ?direction)
   (assert (bind (emptys $emptys))
-          (assign $new-emptys (copy-list $emptys))
           (assign $real-post-emptys (real-coords $row $col $post-emptys))
           (case ?direction
             (right (loc ?tile $row (1+ $col)))
             (left (loc ?tile $row (1- $col)))
             (down (loc ?tile (1+ $row) $col))
             (up (loc ?tile (1- $row) $col)))
-          (assign $new-emptys (list-difference $new-emptys $real-pre-emptys :test #'equal))
-          (assign $new-emptys (append $new-emptys $real-post-emptys))
-          (emptys (sort-coords $new-emptys))))
-          ;(finally (check-emptys))
-          ;(finally (check-tile-locs ?direction))))
+          (emptys (sort-coords (append (set-difference $emptys $real-pre-emptys :test #'equal)
+                                       $real-post-emptys)))))
+
+
+(define-action move-square
+  1
+  (?square (get-squares) ?direction direction)
+  (and (assign $target (case ?direction
+                         (right (cons (car ?square) (1+ (cdr ?square))))
+                         (left (cons (car ?square) (1- (cdr ?square))))
+                         (down (cons (1+ (car ?square)) (cdr ?square)))
+                         (up (cons (1- (car ?square)) (cdr ?square)))))
+       (movable (list $target)))
+  (?square ?direction)
+  (assert (bind (emptys $emptys))
+          (bind (squares $squares))
+          (squares (sort-coords (cons $target (remove ?square $squares :test #'equal))))
+          (emptys (sort-coords (cons ?square (remove $target $emptys :test #'equal))))))
 
 
 (define-init
   (loc Y 6 7)  ;uppermost leftmost reference coord for a tile
-  (loc SQ1 0 5)
-  (loc SQ2 3 3)
-  (loc SQ3 3 4)
-  (loc SQ4 4 3)
-  (loc SQ5 4 4)
   (loc 2HOR 0 3)
   (loc 3HOR 7 5)
   (loc CANE 1 1)
@@ -143,30 +135,10 @@
   (pre-post-emptys> Y down ((1 . 0)) ((0 . 0)))
   (pre-post-emptys> Y up ((-1 . 0)) ((0 . 0)))
 
-  (pre-post-emptys> SQ1 right ((0 . 1)) ((0 . 0)))
-  (pre-post-emptys> SQ1 left ((0 . -1)) ((0 . 0)))
-  (pre-post-emptys> SQ1 down ((1 . 0)) ((0 . 0)))
-  (pre-post-emptys> SQ1 up ((-1 . 0)) ((0 . 0)))
 
-  (pre-post-emptys> SQ2 right ((0 . 1)) ((0 . 0)))
-  (pre-post-emptys> SQ2 left ((0 . -1)) ((0 . 0)))
-  (pre-post-emptys> SQ2 down ((1 . 0)) ((0 . 0)))
-  (pre-post-emptys> SQ2 up ((-1 . 0)) ((0 . 0)))
 
-  (pre-post-emptys> SQ3 right ((0 . 1)) ((0 . 0)))
-  (pre-post-emptys> SQ3 left ((0 . -1)) ((0 . 0)))
-  (pre-post-emptys> SQ3 down ((1 . 0)) ((0 . 0)))
-  (pre-post-emptys> SQ3 up ((-1 . 0)) ((0 . 0)))
 
-  (pre-post-emptys> SQ4 right ((0 . 1)) ((0 . 0)))
-  (pre-post-emptys> SQ4 left ((0 . -1)) ((0 . 0)))
-  (pre-post-emptys> SQ4 down ((1 . 0)) ((0 . 0)))
-  (pre-post-emptys> SQ4 up ((-1 . 0)) ((0 . 0)))
 
-  (pre-post-emptys> SQ5 right ((0 . 1)) ((0 . 0)))
-  (pre-post-emptys> SQ5 left ((0 . -1)) ((0 . 0)))
-  (pre-post-emptys> SQ5 down ((1 . 0)) ((0 . 0)))
-  (pre-post-emptys> SQ5 up ((-1 . 0)) ((0 . 0)))
 
   (pre-post-emptys> 2HOR right ((0 . 2)) ((0 . 0)))
   (pre-post-emptys> 2HOR left ((0 . -1)) ((0 . 1)))
@@ -223,9 +195,9 @@
   (pre-post-emptys> RKEY down  ((2 . 2) (2 . 3) (3 . 0) (3 . 1)) ((0 . 0) (0 . 1) (1 . 2) (1 . 3)))
   (pre-post-emptys> RKEY up    ((-1 . 0) (-1 . 1) (0 . 2) (0 . 3)) ((1 . 2) (1 . 3) (2 . 0) (2 . 1)))
 
-  (emptys ((2 . 0) (3 . 0) (3 . 7) (4 . 0) (4 . 7) (5 . 7) (7 . 2) (7 . 3) (7 . 4)))
-  (Y-goal 3 3))
+  (squares ((0 . 5) (3 . 3) (3 . 4) (4 . 3) (4 . 4)))
+  (emptys ((2 . 0) (3 . 0) (3 . 7) (4 . 0) (4 . 7) (5 . 7) (7 . 2) (7 . 3) (7 . 4))))
 
 
-(define-goal
+(define-goal  ;first milestone; see the header for the full chain
   (loc Y 3 3))

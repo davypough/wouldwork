@@ -393,7 +393,11 @@
 
 
 (defun prescan-problem-function-names (forms)
-  (let ((defun-names nil))
+  "Registers the problem's query, update, and happening names.  Installs a placeholder
+   only for a problem DEFUN whose name appears in an earlier non-DEFUN form, since such
+   a form may be translated at load time before the real DEFUN loads."
+  (let ((referenced (make-hash-table :test #'eq))
+        (forward-names nil))
     (dolist (form forms)
       (when (and (consp form)
                  (symbolp (car form)))
@@ -405,9 +409,17 @@
           ((define-happening define-patroller)
             (pushnew (second form) *happening-names*))
           (defun
-            (pushnew (second form) defun-names)))))
-    (dolist (name defun-names)
+            (when (gethash (second form) referenced)
+              (pushnew (second form) forward-names)))))
+      (unless (and (consp form) (eq (car form) 'defun))
+        (dolist (item (alexandria:flatten form))
+          (when (symbolp item)
+            (setf (gethash item referenced) t)))))
+    (dolist (name forward-names)
       (unless (fboundp name)
+        (warn "Problem function ~A is used before its DEFUN in the problem file.~%  ~
+               Move the DEFUN above its first use to avoid the redefinition warning that follows."
+              name)
         (let ((stub-name name))
           (setf (fdefinition name)
                 (lambda (&rest args)
