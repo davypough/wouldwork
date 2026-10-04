@@ -284,6 +284,10 @@ it prints nothing and returns T."
          (action (find action-name *actions* :key #'action.name))
          (wait-duration nil))
     
+    ;; An auto-wait step has no action of its own: advance the happenings by its duration
+    (when (and (null action) (eql action-name 'wait) *happening-names*)
+      (return-from %apply-action-to-state
+        (replay-auto-wait state (first provided-args))))
     ;; Check if action exists
     (unless action
       (return-from %apply-action-to-state
@@ -385,6 +389,21 @@ it prints nothing and returns T."
           ;; No precondition passed at all
           (values nil nil :precondition-failure)))))
 
+
+
+(defun replay-auto-wait (state wait-duration)
+  "Replay an auto-wait step, recorded as (WAIT duration) in a problem with no wait action.
+   Advances the happenings by WAIT-DURATION through amend-happenings, which also checks
+   kill conditions and the constraint, as the search's auto-wait now does.
+   Returns (values new-state success-p failure-reason) like %apply-action-to-state."
+  (let ((act-state (copy-problem-state state)))
+    (setf (problem-state.name act-state) 'wait)
+    (setf (problem-state.instantiations act-state) (list wait-duration))
+    (setf (problem-state.time act-state) (+ (problem-state.time state) wait-duration))
+    (let ((net-state (amend-happenings state act-state)))
+      (if net-state
+        (values net-state t nil)
+        (values nil nil "Happening violation during auto-wait (kill condition or constraint)")))))
 
 (defun get-precondition-args (action state)
   "Get precondition argument combinations, handling dynamic vs static actions."

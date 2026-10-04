@@ -13,6 +13,8 @@
 
 (ww-set *tree-or-graph* tree)
 
+(ww-set *solution-type* min-length)
+
 (ww-set *depth-cutoff* 16)
 
 
@@ -26,16 +28,15 @@
   area      (area1 area2 area3 area4 area5 area6 area7
              area8)
   cargo     (either jammer box)
-  threat    (either gun sentry)
-  target    (either threat))
+  threat    (either gun sentry))
 
 
 (define-dynamic-relations
   (holding myself cargo)
-  (loc (either myself cargo target switch) $area)
+  (loc (either myself cargo threat switch) $area)
   (red switch)
   (green switch)
-  (jamming jammer target))
+  (jamming jammer threat))
 
 
 (define-static-relations
@@ -50,14 +51,10 @@
                (holding ?myself ?c))))
 
   
-(define-query passable? (?area1 ?area2)
-  (adjacent ?area1 ?area2))
-
-
 (define-query active? (?threat)
   (not (or (exists (?j jammer)
              (jamming ?j ?threat))
-           (forall (?s switch)
+           (exists (?s switch)
              (and (controls ?s ?threat)
                   (green ?s))))))
 
@@ -65,6 +62,26 @@
   (not (exists (?g gun)
          (and (watches ?g ?area)
               (active? ?g)))))
+
+
+(define-query min-steps-remaining? ()
+  ;; Lower bound on the moves still needed: the adjacency distance from me to area8,
+  ;; plus a jam of the sentry unless it is jammed or I am in area7 or area8,
+  ;; plus a pickup of the jammer if that jam is needed and I am not holding it.
+  ;; Sound: each move covers one adjacency, and the active sentry cannot be passed
+  ;; (sharing or swapping areas is forbidden).  The agent can never be beyond an active
+  ;; sentry: the jammer stays behind the sentry it jams, and picking it up puts the
+  ;; agent behind the sentry again.  Distances are specific to this map.
+  (do (bind (loc me $area))
+      (+ (case $area
+           (area8 0) (area7 1) (area6 2) (area5 3)
+           (area4 4) (area2 5) (area1 6) (area3 6))
+         (if (or (member $area '(area7 area8))
+                 (exists (?j jammer) (jamming ?j sentry1)))
+           0
+           (if (exists (?j jammer) (holding me ?j))
+             1
+             2)))))
 
 
 (define-happening sentry1
@@ -92,7 +109,7 @@
 
 (define-action jam
     1
-  (?target target ?area2 area ?jammer jammer ?area1 area)
+  (?target threat ?area2 area ?jammer jammer ?area1 area)
   (and (holding me ?jammer)
        (loc me ?area1)
        (loc ?target ?area2)
@@ -131,10 +148,8 @@
   (?cargo ?area)
   (assert (not (loc ?cargo ?area))
           (holding me ?cargo)
-          (exists (?t target)
-            (if (and (jammer ?cargo)
-                     (jamming ?cargo ?t))
-              (not (jamming ?cargo ?t))))))
+          (doall (?t threat)
+            (not (jamming ?cargo ?t)))))
 
 
 (define-action drop
@@ -159,7 +174,7 @@
     1
   ((?area1 ?area2) area)
   (and (loc me ?area1)
-       (passable? ?area1 ?area2)
+       (adjacent ?area1 ?area2)
        (safe? ?area2))
   (?area1 ?area2)
   (assert (loc me ?area2)))

@@ -4,9 +4,9 @@
 > already stages and whose rules you trust, and say what you want from the search.  The
 > assistant works in three phases (section 1): an overview with the main findings; spec
 > upgrades for simplicity or efficiency, each written into a copy of the spec once you agree
-> (the original is never changed); and the global analysis (scaling, trade-offs, search
-> options) ending in the final report.  It guides or (with approval) runs the searches, and
-> says what each result means.
+> (the original is never changed); and the results and estimates for the upgraded spec
+> (regime costs, density, scaling, expansion), from short runs.  It guides or (with approval)
+> runs the searches, and says what each result means.
 
 > **Status:** Source-checked 2026-10-03 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
 > `ww-searcher.lisp`, `ww-planner.lisp`, `ww-parallel.lisp`, `ww-parallel-infrastructure.lisp`,
@@ -39,10 +39,13 @@ have swamped every scaling figure).  Phase 3 may point back to phase 2 (a spec t
 its actions, finer actions); such a change is proposed, applied and re-measured as in phase 2,
 then phase 3 resumes.
 
-Number every finding (F1, F2, ...) and every recommendation (R1, R2, ...) throughout, and let
-each recommendation cite the findings it rests on; numbered items can be approved, deferred
-or argued one at a time, where a finding mentioned in passing is easily lost.  Numbering
-continues across phases.
+Give every finding and every recommendation its own item with a short descriptive name
+("Wait action cost", "Unused box"), never a code (F1, R1, H1), and let each recommendation
+name the findings it rests on; separate items can be approved, deferred or argued one at a
+time, where a finding mentioned in passing is easily lost.  In discussion with the user, name
+topics in words ("symmetric objects", "dead-state pruning"), not by the question and strategy
+ids of sections 2 and 3, which are this advisor's own index.  Keep each item to its result
+and recommendation; the reasoning behind it is given when the user asks.
 
 ### Phase 1: overview and main findings
 
@@ -61,7 +64,7 @@ continues across phases.
    the phase-2 changes would remove (donald: 165,978 expansions as written, 17,239 in graph
    search, 1,441 in a fixed order).
 4. **Orient the user.**  A short summary in the puzzle's own terms, with no setting names:
-   what the problem asks, how large its search is, the main findings as numbered items, and
+   what the problem asks, how large its search is, the main findings as named items, and
    the recommendation in a sentence.  This is the phase-1 report (section 8).
 5. **Ask the user** only what the spec cannot tell: the objective (any solution, several,
    every, or a best one, and best by what), the time available, the thread count of the
@@ -70,11 +73,14 @@ continues across phases.
 
 ### Phase 2: spec upgrades for simplicity and efficiency
 
-6. **Propose the upgrades**, numbered, each with its reason and the findings behind it:
+6. **Propose the upgrades**, each a named item with its reason and the findings behind it:
    - choices that live in the spec: the strategy where it is a spec setting (`*problem-type*`
      csp, `*tree-or-graph*`, `*solution-type*`, symmetry), and action order (section 3);
    - representation changes (Q18) and refactorings of unusual constructions (section 1.1);
    - search hooks (section 4.1), each with its soundness argument;
+   - with happenings, how time passes: the spec's `wait` action or `*auto-wait*`, never both
+     (section 5).  Time the same probe with each and keep the cheaper (sentry: the `wait`
+     action, about 6 times cheaper);
    - minor clutter, together under CLEANUP.
    Check the conflicts in section 5 first.
 7. **Apply what the user agrees to** in a copy of the spec (section 1.1), one change at a
@@ -85,21 +91,20 @@ continues across phases.
 8. **Report** the phase-2 changes (section 8): what changed, the before and after counts,
    and the REPL forms to stage and test the copy.
 
-### Phase 3: scaling, trade-offs, search options and the final report
+### Phase 3: results and estimates
 
-9. **Measure on the upgraded spec**: the cost of each regime the user might want (section
-   3.2), solution density (section 6.1), the projection to a target size if one is named
-   (section 6.3), and always the expansion of the problem family (section 6.4).
-10. **Choose the run-time strategy and settings** (sections 3 and 4): threads and the other
-    REPL-only settings, the escalation order if the search does not finish, and the
-    multi-step strategies (S7 to S11) where the measurements call for them.
-11. **Final report** in the form of section 8.  Give one recommendation, not a menu, plus the
-    order in which to escalate.  List larger interventions the measurements point to (a
+9. **Measure on the upgraded spec**, with short runs only (seconds to a few minutes; section
+   1.1): the cost of each regime the user might want (section 3.2), solution density (section
+   6.1), the growth per size step and a projection to a target size if one is named (section
+   6.3), and always the expansion of the problem family (section 6.4).  Rough estimates are
+   enough: two size steps, and a projection given as a range, good to about a factor of 2.
+10. **Report the results and estimates** in the form of section 8.  The recommendations were
+    settled in phases 1 and 2; phase 3 reports what the upgraded spec costs and how that cost
+    grows, not a new strategy.  List larger interventions the measurements point to (a
     re-encoding, a generator for the family, a pruning invariant, an engine change) under
-    FURTHER, as options for the user to take up later, not as steps of this run.
-12. **Run the strategy**: short runs here with approval, deep runs on the user's machine,
-    multi-step strategies one step at a time (section 1.1).  Interpret each result with
-    section 6.2 before the next step, and escalate only with the user's agreement.
+    FURTHER, as options for the user to take up later, not as steps of this run.  Deep runs,
+    and any run that would only sharpen an estimate, happen when the user asks for a
+    follow-up.
 
 ### 1.1 Who does what
 
@@ -161,7 +166,9 @@ the generated `src/problem.lisp`.
   schedule reports first after `*progress-first-report*` seconds (10) and doubles each gap,
   about 12 reports in 12 hours, serial or parallel.  A fixed interval in states, set in the
   spec, overrides it.  Never
-  start a long search unasked, and never raise the depth or thread count silently.
+  start a long search unasked, and never raise the depth or thread count silently.  Deep
+  runs happen only when the user asks for a follow-up; never ask for one only to make an
+  estimate more accurate.
 - **Multi-step strategies** (S7 macros, S8 subgoaling, S9 relaxation, S10 bidirectional, S11
   enumerator): guide one step at a time.  Give the forms for the step, wait for its result,
   check it, then give the next.  Keep the forms of each step so the run can be repeated.
@@ -239,7 +246,7 @@ Start at the first row that applies; the fallback column is the escalation order
 
 What the user wants decides what the search must do, and the costs can differ by orders of
 magnitude.  Report the regimes the user might want with their costs, measured where cheap
-(REGIMES in section 8), rather than choosing one silently.
+(RESULTS in section 8), rather than choosing one silently.
 
 | Regime | Setting | Must cover | Cost and what decides it | The result means |
 |---|---|---|---|---|
@@ -273,7 +280,7 @@ spec's own values; a saved `vals.lisp` otherwise overrides them on an ordinary l
 | `*threads*` **REPL** | 0 = serial, N (0) | any depth-first search (S2).  Changing it restages.  0 for backtracking, auto-wait, and problems that create objects during search |
 | `*randomize-search*` | t, nil (nil) | S12 only |
 | `*branch*` | n (0 = all) | S12 only |
-| `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed; try without first, since it enlarges the search.  Tree, serial, depth-first only |
+| `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
 | `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10); an integer N reports every N states, serial or parallel |
 | `*max-recorder-cycles*` | integer, nil (1) | Talos recorder: recordings allowed in one path |
@@ -310,6 +317,18 @@ sound, and it reduces the search to walking the solution (8 disks: 289,145 expan
 its result: it measures how fast Wouldwork replays a known answer, not how well it searches,
 and it rarely survives a change to the family (there is no such formula for 4 pegs).
 
+**Distance plus obligations.**  When tree search is forced (happenings, csp), repeated states
+cannot be closed, and a lower bound is the main way to cut detours: with the cutoff at or near
+the optimum, a move that does not reduce the bound uses up slack and is soon pruned.  Add the
+agent's distance to the goal along the static adjacency to one for each action every remaining
+solution must still take, counting an action only when it is provably required.  sentry-1:
+distance to area8, plus a jam of the sentry unless it is jammed or passed, plus a pickup of the
+jammer if it is not held; every solution at cutoff 16 fell from 733k expansions to 4,698, and
+at 18 from 4.65 million to 33,954, with the same paths and goal states.  Check such a bound
+with every-solution runs with and without it at two cutoffs, which must agree.  Its gain falls
+as the cutoff rises above the optimum.  When the family will grow, compute the distances from
+the adjacency relation rather than writing them by hand.
+
 Under `*threads*` > 0 the hooks must be pure functions of the state: any global a hook reads and writes is shared by every worker.
 
 ---
@@ -324,7 +343,17 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
 - **Happenings with graph search** are reported as an error: states cannot be closed when time
   matters.
 - **`heuristic?` with `*randomize-search*`**: randomization is ignored.
-- **`*auto-wait*`** needs tree, serial, depth-first.
+- **`*auto-wait*` or the spec's `wait` action: use one, not both.**  Both let time pass.  A
+  `wait` action is an ordinary successor at every state, lasting until the next event, and is
+  checked like any action.  `*auto-wait*` inserts a wait only when a state has no applicable
+  action, or after all its successors are exhausted, simulating the happenings until an
+  action applies; it checks kill conditions and `define-constraint` (the constraint check was
+  added 2026-10-04: before that, sentry's auto-wait returned a 12-move "plan" that waited into
+  the sentry's area, against a true optimum of 16).  With both, each wait is found twice
+  (sentry-1, every solution: 66 paths for 33, and 22 times the expansions).  Which is cheaper
+  depends on the problem; in sentry the spec's `wait` was about 6 times cheaper (every
+  solution at cutoff 16: 733k expansions against 4.59 million).  `*auto-wait*` needs tree,
+  serial, depth-first.
 - **Symmetry pruning with `every`** drops solutions that differ only by symmetric objects.
 - **Fixed length with `min-length`**: every solution has the same length, so the optimizing
   search only does extra work.
@@ -378,6 +407,13 @@ rate on a problem that calls `propagate-changes!` points to relaxation (Q14).  R
 probe with `*symmetry-pruning*` t to see whether symmetry pays for its overhead, and with
 `*threads*` N to see whether parallelism does.
 
+*Tree search (happenings, csp).*  Program cycles counts paths, not states, and there is no
+repeated-state percentage.  Probe by exhausting successive cutoffs: the ratio of Program
+cycles per level is the effective branching, the first cutoff that yields a solution bounds
+the optimum, and density is the goal states and paths found per cutoff.  Undone moves are
+re-expanded at every level, so a lower bound (section 4.1) or a dead-state prune is the main
+remedy.
+
 For macro candidates (Q15): solve a small version with `every`, then `(freq 2 3)`.
 
 **Solution density.**  Run `every` to exhaustion on the full problem if it finishes in
@@ -425,7 +461,9 @@ serial 36,326.  For exact counts, compare serial runs (`(ww-set *threads* 0)`).
 
 ### 6.3 Projecting to a larger problem
 
-When the user will scale the problem up (a larger board, more items, more steps), run the
+Projections are rough estimates from short runs, given as a range; an estimate good to a
+factor of 2 is enough, and a longer run to sharpen it waits for the user's request.  When the
+user will scale the problem up (a larger board, more items, more steps), run the
 same probe at two or three sizes a step apart and report the growth per step: the ratio of
 distinct states, and of elapsed time.  Project those ratios to the target size, and compare
 the projected states with memory and the projected time with what the user has.  Memory is
@@ -486,7 +524,8 @@ target size; this section asks which way of growing hurts first.
 1. **Name the dimensions** along which the family grows: for a cryptarithm, the base, the
    number of distinct letters, the word length and the number of addends; for a board, its
    side and the number of pieces.
-2. **Probe one dimension at a time**, the others fixed, at three or more steps, reporting
+2. **Probe one dimension at a time**, the others fixed, at three or more steps (short runs
+   only; stop a dimension once a step takes minutes, and project the rest), reporting
    the median and the maximum over several instances where instances vary.
 3. **When the spec is written by hand for one instance**, generate the larger instances
    with the independent counting script (section 6.3), after checking that it reproduces
@@ -532,57 +571,48 @@ Recorded here, not yet made in the Manual:
 ## 8. Report to the user
 
 The report comes in three pieces, one at the end of each phase, so that each can be approved
-before the next phase builds on it.  Numbering of findings and recommendations continues
-across the pieces.
+before the next phase builds on it.  Items carry descriptive names, not codes (section 1),
+and the field names below are the report's headings, written in plain words.
 
 **Phase 1: overview** (the orientation, in the puzzle's own terms, no setting names)
 
 ```
 PROBLEM:      <name>, <spec path>
 SUMMARY:      what the problem asks and how large its search is, in a few sentences
-FINDINGS:     F1, F2, ...: one numbered line each, what was read or measured with the number
-              behind it, marked spec / user / probe
-PROFILE:      the answered questions that mattered, each marked spec / user / probe;
-              unknowns listed
+FINDINGS:     one named line each, what was read or measured with the number behind it,
+              marked spec / user / probe
+PROFILE:      the answered questions that mattered, each named by what it profiles rather
+              than its Q number, then the answer, marked spec / user / probe
+              ("Repeated states: yes, moves can be undone (spec)"); unknowns listed
 DIRECTION:    the recommendation in a sentence, and the question for the user
 ```
 
 **Phase 2: spec upgrades** (proposed, then reported once applied)
 
 ```
-UPGRADES:     U1, U2, ...: each change with its reason and the findings it rests on
+UPGRADES:     each change, named, with its reason and the findings it rests on
               (strategy settings that live in the spec, action order, re-encodings,
               refactorings)
 SETTINGS:     the ww-set block of the copy, one reason per line
-SPEC HOOKS:   H1, H2, ...: proposed queries or actions, each with its soundness argument
-CLEANUP:      C1, C2, ...: minor rewrites that make the spec easier to read without changing
+SPEC HOOKS:   proposed queries or actions, each named, with its soundness argument
+CLEANUP:      minor rewrites, each named, that make the spec easier to read without changing
               the search, each with what it removes; written together into the copy once
               agreed, and checked by a probe giving the same counts
 CHECKS:       before and after counts for each applied change, the agreement of any
               independent script, and the REPL forms to stage and test the copy
 ```
 
-**Phase 3: final report**
+**Phase 3: results and estimates** (short runs only; rough estimates).  Present the results
+briefly, without the background: the user asks for the justification when needed.
 
 ```
-STRATEGY:     <primary>, with the reason in a sentence, citing findings (F2, F4)
-ESCALATION:   E1, E2, ...: in order, with what would trigger each
-REPL:         REPL-only settings (*threads*, *algorithm*, ...), one reason each
-REGIMES:      the cost of each regime the user might want (find, prove, every, best),
-              measured where cheap, and the ratio between them (section 3.2)
-DENSITY:      goal states found versus distinct states, and what it favours (section 6.1)
-SCALING:      growth per size step and the projected cost at the user's target size, with
-              the mitigation for that regime (section 6.3); "none named" if no target
-EXPANSION:    the family's size dimensions, the growth per step along each, and the first
-              to break, with its mitigation (section 6.4)
-PROBES:       P1, P2, ...: commands still worth running, and what each would change
-MEANING:      what a solution, an exhaustion, or a crash will prove under these settings
-FURTHER:      X1, X2, ...: interventions beyond settings and hooks, for the user to pursue
-              or not: a re-encoding (Q18), a generator for the family, a sound pruning
-              invariant worth prototyping, an engine change the measurements point to.
-              Each with its expected payoff, what it would cost, and the measurement behind
-              it; none is started without the user's go-ahead.  An item that is a spec
-              change can return to phase 2
-RECOMMEND:    R1, R2, ...: the actions proposed, in order, each citing the findings it
-              rests on
+RESULTS:      the shortest or best answer found, and the cost of each regime the user might
+              want (find, prove, every, best); how many distinct solutions exist (density,
+              section 6.1); whether threads are needed
+SCALING:      a small table: each way the problem grows, the cost growth per step, and an
+              estimate at larger sizes as a range; which way limits it
+MEANING:      one line: what a solution, or a search that runs out, proves
+FURTHER:      options beyond this run, each with a descriptive topic name, a plain-language
+              description of what it is and what it would gain, and a recommendation (do it,
+              do it only if ..., or leave it); none is started without the user's go-ahead
 ```

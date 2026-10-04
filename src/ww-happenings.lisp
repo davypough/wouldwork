@@ -218,8 +218,10 @@
                      (setf following-happening (apply-rebound following-happening)))
                    ;; Apply aftereffect if defined
                    (apply-aftereffect object sim-state))
-                 ;; Check kill condition - agent died during wait
-                 (when (kill-condition object sim-state)
+                 ;; Check kill condition and constraint - agent died during wait
+                 (when (or (kill-condition object sim-state)
+                           (and (boundp 'constraint-fn)
+                                (not (funcall (symbol-function 'constraint-fn) sim-state))))
                    (return-from simulation (values nil nil)))
                  ;; Update this object's entry in happenings list
                  (setf (problem-state.happenings sim-state)
@@ -359,8 +361,10 @@
                  ;; Apply aftereffect if defined
                  (apply-aftereffect object sim-state))
                
-               ;; Check kill condition - agent died during wait
-               (when (kill-condition object sim-state)
+               ;; Check kill condition and constraint - agent died during wait
+               (when (or (kill-condition object sim-state)
+                         (and (boundp 'constraint-fn)
+                              (not (funcall (symbol-function 'constraint-fn) sim-state))))
                  (return (values :killed nil nil)))
                
                ;; Update this object's entry in happenings list
@@ -408,7 +412,7 @@
     :name 'wait
     :instantiations (list wait-duration)
     :happenings (problem-state.happenings sim-state)
-    :time (problem-state.time sim-state)
+    :time (+ (problem-state.time state) wait-duration)  ; Keeps the state's time type (float)
     :value (problem-state.value state)  ; Preserve value from original state
     :heuristic 0.0
     :idb (problem-state.idb sim-state)
