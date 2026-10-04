@@ -575,7 +575,6 @@
     ;; Initialize infrastructure
     (reset-parallel-control-flags)
     (setf *parallel-search-active* t)
-    (setf *last-progress-time* (get-internal-real-time))
     
     ;; Initialize worker stats
     (initialize-worker-stats *threads*)

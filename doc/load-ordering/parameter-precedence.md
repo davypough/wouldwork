@@ -64,7 +64,7 @@ Position matters — `read-init-vals` indexes into it directly.
 | 3 | `*tree-or-graph*` | `graph` |
 | 4 | `*problem-type*` | `planning` |
 | 5 | `*solution-type*` | `first` |
-| 6 | `*progress-reporting-interval*` | `100000` |
+| 6 | `*progress-reporting-interval*` | `nil` (adaptive time schedule) |
 | 7 | `*randomize-search*` | `nil` |
 | 8 | `*branch*` | `0` |
 | 9 | `*probe*` | `nil` |
@@ -115,7 +115,7 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
-| `*depth-cutoff*`, `*progress-reporting-interval*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*`, `*recorder-prefix-pruning*` | yes | yes | `save-globals` + reprint |
+| `*depth-cutoff*`, `*progress-reporting-interval*`, `*progress-first-report*`, `*randomize-search*`, `*branch*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*`, `*recorder-prefix-pruning*` | yes | yes | `save-globals` + reprint |
 | `*worker-read-snapshots*` | yes | yes | assign + dedicated message; no persistence or reload |
 | `*max-connector-pairings*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; displayed only when beam-relay and connectors are present |
 | `*solution-type*` | yes | yes | save + reprint; warns if `backtracking` is paired with an optimizing type |

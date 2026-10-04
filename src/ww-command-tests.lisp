@@ -152,8 +152,12 @@ Enter (list-all-problems) for a complete list of problems."
   (assert (member :ww-debug *features*))
   (let ((vals-file (instance-vals-file (asdf:system-source-directory :wouldwork))))
     (with-open-file (in-file vals-file :direction :input)
-      (assert (equal (read in-file nil nil)
-                     '(blocks3 2 depth-first graph first 10 t 4 (put (C A) 3) 1))))
+      ;; The first 12 positions follow *persisted-problem-parameters* through *debug*;
+      ;; the rest (encoded goal, threads, recorder settings) are not set by this test.
+      (let ((saved (read in-file nil nil)))
+        (assert (= (length saved) (length *persisted-problem-parameters*)))
+        (assert (equal (subseq saved 0 12)
+                       '(blocks3 2 depth-first graph planning first 10 t 4 (put (C A) 3) nil 1)))))
     (delete-file vals-file))
   (solve)  ;solve with new parameters
   (format t "~%Resetting all parameters to defaults...")
@@ -181,6 +185,6 @@ Enter (list-all-problems) for a complete list of problems."
                  (goal-count (getf summary :goal-states)))
             (assert (= goal-count 113))))
       (when (and saved-problem (not (eq *problem-name* saved-problem)))
-        (stage saved-problem))))
+        (%stage (string-downcase (string saved-problem))))))  ;stage would quote the variable name
   (format t "COMMAND-TEST-5 completed successfully.~2%")
   t)

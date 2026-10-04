@@ -208,7 +208,23 @@
           *prior-time* now
           *prior-parallel-progress-time* now
           *prior-parallel-progress-states* 0
-          *prior-parallel-progress-cycles* 0)))
+          *prior-parallel-progress-cycles* 0
+          *progress-gap* (* *progress-first-report* internal-time-units-per-second)
+          *next-progress-time* (+ now *progress-gap*))))
+
+
+(defun progress-report-due-p (states-since-report)
+  "With a fixed *progress-reporting-interval*, true once STATES-SINCE-REPORT reaches it;
+   otherwise true once the adaptive schedule's next report time has passed."
+  (if *progress-reporting-interval*
+    (>= states-since-report *progress-reporting-interval*)
+    (>= (get-internal-real-time) *next-progress-time*)))
+
+
+(defun advance-progress-schedule ()
+  "After a report, double the adaptive gap and set the next report time from now."
+  (setf *progress-gap* (* 2 *progress-gap*)
+        *next-progress-time* (+ (get-internal-real-time) *progress-gap*)))
 
 
 (sb-ext:defglobal *closed* (make-hash-table :synchronized (> *threads* 0))  ;initialized in dfs
@@ -1554,13 +1570,16 @@ different acceptable milestone state."
 
 (defun summarize-search-results (condition)
   (declare (type symbol condition))
-  (format t "~2%In problem ~A, performed ~A~A search for ~A solution."
+  (format t "~2%In problem ~A, performed ~A~A search for ~A solution, ~A."
             *problem-name*
             (if *hybrid-mode* "hybrid " "")
             *tree-or-graph*
             (if (and (eql *solution-type* 'all-paths) (not *hybrid-mode*))
                 'every
-                *solution-type*))
+                *solution-type*)
+            (if (> *threads* 0)
+                (format nil "with ~D thread~:P" *threads*)
+                "serially"))
   (ecase condition
     (first
       (when *solution-paths*
@@ -1586,6 +1605,12 @@ different acceptable milestone state."
   (format t "~2%Depth cutoff = ~:D" *depth-cutoff*)
   (format t "~2%Maximum depth explored = ~:D" *max-depth-explored*)
   (format t "~2%Program cycles = ~:D" *program-cycles*)
+  (let* ((elapsed (/ (- (get-internal-real-time) *start-time*)
+                     internal-time-units-per-second))
+         (total-secs (round elapsed)))
+    (format t "~2%Elapsed time = ~Dh ~Dm ~Ds (~,1F sec)"
+            (floor total-secs 3600) (floor (mod total-secs 3600) 60) (mod total-secs 60)
+            elapsed))
   (format t "~2%Total states processed = ~:D" *total-states-processed*)
   (when (eql *tree-or-graph* 'graph)
     (format t "~2%Repeated states pruned = ~:D, ie, ~,1F percent"
@@ -1634,8 +1659,9 @@ different acceptable milestone state."
     (format t "~2%Successor policies pruned ~:D state~:P, ~,1F% of total states."
             *successor-policy-pruned*
             (* 100.0 (/ *successor-policy-pruned* *total-states-processed*))))
-  (unless (eql *problem-type* 'csp)
-    (format t "~2%Average branching factor = ~,1F~%" *average-branching-factor*))
+  (when (and (not (eql *problem-type* 'csp)) (> *program-cycles* 0))
+    ;; Computed from the final totals, since parallel workers never update *average-branching-factor*.
+    (format t "~2%Average branching factor = ~,1F~%" (compute-average-branching-factor)))
   (print-candidate-solution-validation-statistics)
   (let ((sym-stats (format-symmetry-statistics)))
     (when sym-stats
@@ -1864,14 +1890,12 @@ different acceptable milestone state."
    Progress, Optimization, Parallel - each gated by relevant search context
    (*problem-type*, *tree-or-graph*, *threads*, *solution-type*, etc.).
    Empty sections produce no output."
-  (when (<= (- *progress-reporting-interval*
-               (- *total-states-processed* *prior-total-states-processed*))
-            0)
+  (when (progress-report-due-p (- *total-states-processed* *prior-total-states-processed*))
     ;; ===== Execution =====
     (format t "~2%total states processed so far = ~:D" *total-states-processed*)
     (format t "~%current recent processing speed = ~:D states/sec"
             (round (/ (the fixnum (- *total-states-processed* *prior-total-states-processed*))
-                      (/ (- (get-internal-real-time) *prior-time*)
+                      (/ (max 1 (- (get-internal-real-time) *prior-time*))  ;a report within one clock tick
                          internal-time-units-per-second))))
     ;; ===== Search Space =====
     (unless (eql *problem-type* 'csp)
@@ -1998,7 +2022,8 @@ different acceptable milestone state."
     (finish-output)
     (setf *prior-time* (get-internal-real-time))
     (setf *prior-total-states-processed* *total-states-processed*)
-    (setf *prior-program-cycles* *program-cycles*)))
+    (setf *prior-program-cycles* *program-cycles*)
+    (advance-progress-schedule)))
 
 
 (defun format-best-solution-line (states-since)

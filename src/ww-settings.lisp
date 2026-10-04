@@ -139,7 +139,10 @@ must return unknown rather than :IMPOSSIBLE.")
   (when (and (member "beam-relay" *spliced-tech-names* :test #'string=)
              (gethash 'connector *types*))
     (format t "~&  *MAX-CONNECTOR-PAIRINGS* => ~D" *max-connector-pairings*))
-  (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D" *progress-reporting-interval*)
+  (if *progress-reporting-interval*
+    (format t "~&  *PROGRESS-REPORTING-INTERVAL* => ~:D states" *progress-reporting-interval*)
+    (format t "~&  *PROGRESS-REPORTING-INTERVAL* => adaptive (first after ~D sec, gaps doubling)"
+            *progress-first-report*))
   (format t "~&  *BRANCH* TO EXPLORE => ~A" (if (< *branch* 1) 'ALL *branch*))
   (format t "~&  HEURISTIC? => ~A" (when (fboundp 'heuristic?) 'YES))
   (format t "~&  EXOGENOUS HAPPENINGS => ~A" *happening-names*)
@@ -238,6 +241,12 @@ must return unknown rather than :IMPOSSIBLE.")
 
 (sb-ext:defglobal *prior-time* 0
   "Time since last progress printing (shared).")
+
+(sb-ext:defglobal *progress-gap* 0
+  "Internal time units until the next adaptive progress report; doubles after each report.")
+
+(sb-ext:defglobal *next-progress-time* 0
+  "Internal real time at which the next adaptive progress report is due.")
 
 (sb-ext:defglobal *best-states* nil
   "Holds the best states encountered during a graph search.")
@@ -655,8 +664,14 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *goal* nil
   "Holds the current user goal specification.")
 
-(defvar *progress-reporting-interval* 100000
-  "Print progress during search after each multiple n of states examined.")
+(defvar *progress-reporting-interval* nil
+  "NIL (default): report search progress on a time schedule, the first report after
+   *progress-first-report* seconds and each later gap twice the one before.
+   A positive integer N: report after every N states instead.")
+
+
+(defvar *progress-first-report* 10
+  "Seconds before the first progress report on the adaptive schedule.")
 
 (defvar *randomize-search* nil  ;
   "Set to t or nil.")
@@ -726,7 +741,8 @@ treat their arguments as read-only and be safe to call concurrently."
     (*tree-or-graph* . graph)
     (*problem-type* . planning)
     (*solution-type* . first)
-    (*progress-reporting-interval* . 100000)
+    (*progress-reporting-interval*)
+    (*progress-first-report* . 10)
     (*randomize-search*)
     (*branch* . 0)
     (*probe*)

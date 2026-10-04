@@ -109,8 +109,10 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
        (ww-set *tree-or-graph* <one of tree or graph>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)
-       (ww-set *progress-reporting-interval* <positive integer;
-                                              eg, 100000 (how often to report progress)>)
+       (ww-set *progress-reporting-interval* <nil (default: report on a time schedule whose gaps
+                                                   double) or a positive integer N (report
+                                                   every N states)>)
+       (ww-set *progress-first-report* <seconds before the first adaptive report; default 10>)
        (ww-set *randomize-search* <t (random depth-first search) or
                                    nil (standard depth-first search)>)
        (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or

@@ -197,7 +197,7 @@ them does not matter.
 (ww-set *tree-or-graph* <mode>)           ; tree or graph
 (ww-set *depth-cutoff* <integer>)         ; max search depth (0 = no limit)
 (ww-set *symmetry-pruning* <bool>)        ; t or nil
-(ww-set *progress-reporting-interval* <integer>)  ; e.g., 1000000
+(ww-set *progress-reporting-interval* <integer>)  ; omit for adaptive reports; N = every N states
 ```
 
 **Three parameters must NOT appear in a problem file. Each signals an error if it

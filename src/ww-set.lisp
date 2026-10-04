@@ -15,7 +15,7 @@
        (*worker-read-snapshots*
          (setf *worker-read-snapshots* ',val)
          (format t "~&Worker read snapshots: ~S (STAGE restores T)~%" ',val))
-       ((*depth-cutoff* *progress-reporting-interval* *randomize-search*
+       ((*depth-cutoff* *progress-reporting-interval* *progress-first-report* *randomize-search*
          *branch* *auto-wait* *tasks-per-thread* *min-tasks* *split-depth-max*
          *bound-refresh-interval* *donation-check-interval* *donation-threshold*
          *donation-fraction* *enable-work-donation* *max-recorder-cycles*

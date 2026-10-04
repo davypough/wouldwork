@@ -922,9 +922,12 @@
                        (error "Can't set *solution-type* to ~S. Must be one of~%~
                                first, every, all-paths, min-length, min-time, min-value, max-value,~%~
                                or a positive integer (to find that many solutions)." val)))
-    (*progress-reporting-interval* (unless (and (typep val 'fixnum) (> val 0))
+    (*progress-reporting-interval* (unless (or (null val) (and (typep val 'fixnum) (> val 0)))
                                      (error "Can't set *progress-reporting-interval* to ~S.
-                                             Must be an integer > 0." val)))
+                                             Must be nil (adaptive) or an integer > 0." val)))
+    (*progress-first-report* (unless (and (typep val 'fixnum) (> val 0))
+                               (error "Can't set *progress-first-report* to ~S.
+                                       Must be a number of seconds > 0." val)))
     (*branch* (unless (typep val 'fixnum)
                 (error "Can't set *branch* to ~S. Must be an integer
                         where n < 1 means search all branches." val)))

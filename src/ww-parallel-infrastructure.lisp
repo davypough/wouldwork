@@ -712,27 +712,28 @@
   (sb-thread:make-mutex :name "progress-lock")
   "Prevents interleaved progress output from multiple workers.")
 
-(defparameter *last-progress-time* 0
-  "Internal time of last progress report.")
-
-(defparameter *progress-interval-seconds* 60
-  "Minimum seconds between progress reports.")
-
-
 (defun maybe-report-parallel-progress (worker-id task-queue)
-  "Report progress if enough time has passed. Only one worker reports at a time."
+  "Report progress when due (progress-report-due-p). Only one worker reports at a time."
   (declare (type fixnum worker-id) (type task-queue task-queue))
-  (let ((now (get-internal-real-time)))
-    (when (> (- now *last-progress-time*)
-             (* *progress-interval-seconds* internal-time-units-per-second))
-      ;; Try to get lock without blocking
-      (when (sb-thread:grab-mutex *progress-lock* :waitp nil)
-        (unwind-protect
-            (when (> (- now *last-progress-time*)
-                     (* *progress-interval-seconds* internal-time-units-per-second))
-              (setf *last-progress-time* now)
-              (report-parallel-progress worker-id task-queue))
-          (sb-thread:release-mutex *progress-lock*))))))
+  (when (progress-report-due-p (parallel-states-since-report))
+    ;; Try to get lock without blocking
+    (when (sb-thread:grab-mutex *progress-lock* :waitp nil)
+      (unwind-protect
+          (when (progress-report-due-p (parallel-states-since-report))
+            (report-parallel-progress worker-id task-queue)
+            (advance-progress-schedule))
+        (sb-thread:release-mutex *progress-lock*)))))
+
+
+(defun parallel-states-since-report ()
+  "States processed across all workers since the last parallel progress report.
+   Summed only when a fixed *progress-reporting-interval* needs it."
+  (if *progress-reporting-interval*
+    (- (+ *total-states-processed*
+          (loop for stats across *worker-stats-vector*
+                sum (ws-states-processed stats)))
+       *prior-parallel-progress-states*)
+    0))
 
 
 (defun report-parallel-progress (worker-id task-queue)
@@ -852,7 +853,9 @@
   (format t "    *donation-threshold*         = ~D nodes~%" *donation-threshold*)
   (format t "    *donation-fraction*          = ~,2F~%" *donation-fraction*)
   (format t "~%  Progress Reporting:~%")
-  (format t "    *progress-interval-seconds*  = ~D sec~%" *progress-interval-seconds*)
+  (if *progress-reporting-interval*
+    (format t "    *progress-reporting-interval* = ~:D states~%" *progress-reporting-interval*)
+    (format t "    *progress-first-report*      = ~D sec, gaps doubling~%" *progress-first-report*))
   (terpri))
 
 
@@ -1219,6 +1222,6 @@
            *donation-check-interval* 100
            *donation-threshold* 8
            *donation-fraction* 0.5
-           *progress-interval-seconds* 2)
+           *progress-first-report* 2)
      (format t "~%Applied :debug preset (verbose, small scale)~%")))
   (display-parallel-parameters))
