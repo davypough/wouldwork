@@ -368,7 +368,7 @@
         
         ;; Best-state tracking for goalless problems
         (unless (boundp 'goal-fn)
-          (process-min-max-value succ-state))
+          (process-min-max-value succ-state worker-id))
         
         ;; === TREE SEARCH ===
         (when (eql *tree-or-graph* 'tree)

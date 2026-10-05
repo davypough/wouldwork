@@ -1,44 +1,45 @@
-;;;; Filename: problem-crossword15-18.lisp
+;;; Filename: problem-crossword15-18.lisp
 
-;;; Problem specification for 15x15 crossword, best filling
+;;; Problem specification for 15x15 crossword, best filling with a personal word list.
+;;; The search is too large to finish: run it for a fixed time with *randomize-search*, and
+;;; keep the best fill found.  (analyze) then fills the remaining slots from the dictionary,
+;;; and (repair) keeps as many of the best grid's listed words as the dictionary can complete.
+;;; Setting *search-completion-budget* after staging makes the search itself keep every grid
+;;; completable, so (analyze) succeeds on the best grid directly.
 
-;;; Requires hashtable instead of list for set representation in relations.
-;;; Adds trie structure for dictionary lookup.
-;;; *Adds bounding function.
-;;; Adds post-processing fill options with dictionary words
-;;; Adds post-processing select only compatible across/down dictionary words
-;;; Skip over words for *trie-ht* that are too short or too long + reverse words OK
-;;; *Adds heuristic more filled is closer to goal
-;;; *Pre-instantiation of equal length field & word
-;;; Representing words initially as strings rather than symbols, "LIZ" vs LIZ
-;;; Maintain used-fields and used-word-strings in database
-;;; Generate pre-instantiations dynamically from get-remaining-fields? and get-remaining-word-strings?
-;;; Fix crosscuts-compatible?
-;;; Generate fill actions one field at a time
-;;; Tree search
-;;; Fields organized progressively maximizing across/down intersections
-
-#|
-file        #states     states/sec      time    best
-
-11          40k         16              34      19           
-            80          807             84      19
-
-12          40          15              6       16
-            80          8754            11      16     
-
-13          40          14              7       16
-            80          9182            11      16
-
-14          40          5               837     24
-            80          25              2464    24
-
-15          40          11              769     24
-            80          45              1649    24
-
-16          40          27              544     25
-            80          47              1388    25
-|#
+;;; Design notes:
+;;; - One decision per step, in a fixed order.  Each step decides one slot, so every grid
+;;;   is reached by exactly one path.
+;;; - Most constrained first.  Slots are ordered so each meets letters already placed;
+;;;   conflicts then show up early, when they are cheap to undo.
+;;; - Skipping is a choice.  Leaving a slot for the dictionary is an explicit move, so no
+;;;   slot can block the search and no choice is generated twice.
+;;; - Look ahead.  A word is rejected at once if a crossing it changes can no longer become
+;;;   a dictionary word.  Each crossing is checked on its own, so a grid can still fail to
+;;;   complete where open slots conflict with each other.
+;;; - Completion as a separate solver.  Whether the open slots can all be filled together is
+;;;   a search of its own: slots keep the sets of words still possible, a choice in one slot
+;;;   narrows its crossings until nothing changes, the slot with fewest words is chosen next,
+;;;   and regions that share no open cell are solved apart.  It is exact but costs about a
+;;;   tenth of a second, so it either checks each placement (every grid completable, far
+;;;   fewer grids) or runs once after the search (many grids, listed words dropped to fit).
+;;; - Indexed dictionary.  The dictionary is stored as one set of words per length,
+;;;   position and letter; checking a pattern combines a few sets instead of walking a tree.
+;;; - Optimistic bound.  A cheap estimate of the best a state could still reach cuts off
+;;;   branches that cannot beat the best found so far; it must never underestimate.
+;;; - Lean state.  Small facts and counts, rather than tables copied at every step.
+;;; - Fixed-time runs.  The search is far too large to finish, so each run is given a time
+;;;   limit, and random word order lets repeated runs explore different parts of it.
+;;; - No goal.  A best-value search records its best states only when no goal is defined.
+;;;
+;;; Results (5-minute runs, 16 threads; listed words in a grid the dictionary completes):
+;;; - Checking every placement ((setf *search-completion-budget* 2000) and
+;;;   (setf *min-tasks* 32 *tasks-per-thread* 2) after (ww-set *threads* 16)): 18, 19 and 19
+;;;   words in three runs, about 50,000 program cycles each; (analyze) completed every best grid.
+;;; - No check, then (repair): 24 words placed, 17 kept, about 22 million program cycles.
+;;; - Grid size is the limit: each check fills the whole open grid, so states per minute fall
+;;;   about 50 times from a 23-slot grid to this 70-slot one.  Doubling the word list adds
+;;;   about one word.  Seed *random-state* before each run, or fresh sessions repeat a run.
 
 
 (in-package :ww)
@@ -52,11 +53,7 @@ file        #states     states/sec      time    best
 
 (ww-set *randomize-search* t)
 
-(ww-set *solution-type* max-value)  ;maximize number of used words
-
-(ww-set *progress-reporting-interval* 10000000)
-
-
+(ww-set *solution-type* max-value)  ;maximize number of placed words
 
 
 (defparameter *fields* '((1across 9) (1down 4) (15across 9) (2down 4) (3down 4)
@@ -70,17 +67,19 @@ file        #states     states/sec      time    best
  (18across 5) (21across 5) (14down 4) (35across 4) (40across 4) (44across 3) (36down 4) ))
 
 
-(defparameter *words* '(ADMIRAL ALAN ANN AQUABELLES AQUA ARCH ASA BELLES BILL BONNIE ATTIC ATTICFAN
- AUDREY AUNT AUNTAUDREY AUNTFRANK AUNTPAT AUNTPOLLY AVE AVENUE BEAR BEEHIVE BEES BETTY BIGBOB BLACK BOB BRER
- BRERBEAR BRERFOX BRERRABBIT BRISTOL BROWN BROWNS CANASTA CARDINALS CARL CAROL CAROLSUE CHRIS
- COOKIE COOKIES CROSS DAVE DEBBIE DEWART DOLLAR DUPLEX EDWARD ELAINE FALLS FAMILY FERGUSON FLORIDA FOOTE
- FOOTEAVE FOREST FORESTPARK FOX FRANK FRED FREDDIE GARDENS GEORGE GEORGIE GRACE GRACEAVE GRAMMY GROVES ICERINK INDIANA JAMIE
- JANSENS JEWELBOX JUNGLE KATHARINE KATHY KEY KIRKHAM LIZ LOCKWOOD LOUISE MAMA MAMAMARY MARCHILDEN MARY
- MARYPAYNE MEMA MISSREP MUM ORANGE
- PAMLICO PAT PAPAW PARK PERSIMMON PERSIMMONS PIANO PENOCHLE POLLY QUEENIE RABBIT RED REDCROSS
- REMUS REP RICHARD ROCKHILL SAINTLOUIS SCHOOL SCRABBLE SCRUGGS
- SHIRLEY SIESTA SIESTAKEY SISTER SKATING SKIPPY STEVE STEVEBROWN SUE SUGAR TENNESSEE TOM TOMMY TROUT UNCLE
- UNCLEBILL UNCLEREMUS UNITED UNITEDWAY WARNER WAY WEBSTER WICHITA WOLFE WOODLAND ZEROWESTE))
+(defparameter *words*  ;listed alphabetically
+  '(admiral alan ann aqua aquabelles arch asa attic atticfan audrey aunt auntaudrey
+    auntfrank auntpat auntpolly ave avenue bear beehive bees belles betty bigbob bill
+    black bob bonnie brer brerbear brerfox brerrabbit bristol brown browns canasta cardinals
+    carl carol carolsue chris cookie cookies cross dave debbie dewart dollar duplex
+    edward elaine falls family ferguson florida foote footeave forest forestpark fox frank
+    fred freddie gardens george georgie grace graceave grammy groves icerink indiana jamie
+    jansens jewelbox jungle katharine kathy key kirkham liz lockwood louise mama mamamary
+    marchilden mary marypayne mema missrep mum orange pamlico papaw park pat penochle
+    persimmon persimmons piano polly queenie rabbit red redcross remus rep richard rockhill
+    saintlouis school scrabble scruggs shirley siesta siestakey sister skating skippy steve stevebrown
+    sue sugar tennessee tom tommy trout uncle unclebill uncleremus united unitedway warner
+    way webster wichita wolfe woodland zeroweste))
 
 
 (defparameter *crosscuts*  ;intersecting fields
@@ -119,7 +118,7 @@ file        #states     states/sec      time    best
     (64across (50down 3 0 54down 2 1 55down 2 2 62down 1 3 43down 5 4 48down 4 5 57down 2 6 58down 2 7 59down 2 8))
     (65across (52down 3 0 27down 9 1 28down 9 2 38down 7 3 46down 5 4))
     (66across (50down 4 0 54down 3 1 55down 3 2 62down 2 3 43down 6 4 48down 5 5 57down 3 6 58down 3 7 59down 3 8))
-    (1down  (1across 0 0 15across 0 1 17across 0 2 18across 0 3))
+    (1down  (1across 0 0 15across 0 1 17across 0 2 19across 0 3))
     (2down  (1across 1 0 15across 1 1 17across 1 2 19across 1 3))
     (3down  (1across 2 0 15across 2 1 17across 2 2 19across 2 3))
     (4down  (1across 3 0 15across 3 1 17across 3 2 19across 3 3 22across 0 4 26across 3 5))
@@ -156,232 +155,495 @@ file        #states     states/sec      time    best
     (62down (61across 3 0 64across 3 1 66across 3 2))))
 
 
-(defparameter *crosscuts-ht*
-  (let ((ht (make-hash-table :test #'equal)))
-    (iter (for (field cuts) in *crosscuts*)
-          (loop for (cross-field cross-index index) on cuts by #'cdddr
-                do (setf (gethash (list field cross-field) ht)
-                         (list index cross-index))))
-    ht))
+(defun crossing-fields (field)
+  (loop for (cross-field) on (second (assoc field *crosscuts*)) by #'cdddr
+        collect cross-field))
 
 
-(defparameter *field-words-ht*  ;associates fields with all words of same length
-  (let ((ht (make-hash-table :test #'eq)))
-    (iter (for (field len) in *fields*)
-          (iter (for word in *words*)
-                (for word-string = (string word))
-                (when (= (length word-string) len)
-                  (push word-string (gethash field ht)))))
-    ht))
+(defun field-length (field)
+  (second (assoc field *fields*)))
 
 
-(defparameter *sorted-fields*
-  ;(sort (copy-list *fields*) #'> :key #'second))  ;longer fields first
-  (copy-list *fields*))
+(defun next-crossing-field (ordered remaining)
+  ;The remaining field crossing the most ordered fields, longer first on ties.
+  (let ((best nil) (best-key nil))
+    (dolist (field remaining best)
+      (let ((key (list (count-if (lambda (cross) (member cross ordered)) (crossing-fields field))
+                       (field-length field))))
+        (when (or (null best-key)
+                  (> (first key) (first best-key))
+                  (and (= (first key) (first best-key)) (> (second key) (second best-key))))
+          (setf best field best-key key))))))
 
 
-(defparameter *sorted-field-names*
-  (cons 'start (iter (for (field nil) in *sorted-fields*)
-                     (collect field))))
+(defun crossing-order ()
+  ;Fields ordered so each crosses as many earlier fields as possible, starting with the
+  ;field that has the most crossings.
+  (let* ((names (mapcar #'first *fields*))
+         (first-field (next-crossing-field names names))
+         (ordered (list first-field)))
+    (loop for remaining = (set-difference names ordered)
+          while remaining
+          do (setf ordered (append ordered (list (next-crossing-field ordered remaining)))))
+    ordered))
 
 
-(defparameter *next-field-ht*
-  (let ((ht (make-hash-table :test #'eq)))
-    (iter (for (field next-field) on *sorted-field-names* by #'cdr)
-          (setf (gethash field ht) next-field))
-    ht))
+(defparameter *field-names* (crossing-order))
 
 
-(defparameter *word-strings-ht*
-  (let ((ht (make-hash-table :test #'equal)))
-    (iter (for word-string in (mapcar #'string *words*))
-          (setf (gethash word-string ht) t))
-    ht))
+(defparameter *field-lengths* (remove-duplicates (mapcar #'second *fields*)))
 
 
-(defparameter *fields-ht*
-  (let ((ht (make-hash-table :test #'eq)))
-    (iter (for field in *sorted-field-names*)
-          (setf (gethash field ht) t))
-    ht))
+(defparameter *words-by-length*
+  (let ((ht (make-hash-table)))
+    (dolist (word *words* ht)
+      (push word (gethash (length (string word)) ht)))))
+
+
+(defparameter *search-completion-budget* nil
+  "Words a completion check may try before a placement is rejected; nil for no check.")
+
+
+(defparameter *listed-strings* (mapcar #'string *words*))
+
+
+(defparameter *field-numbers*
+  (let ((ht (make-hash-table)))
+    (loop for field in *field-names*
+          for n from 0
+          do (setf (gethash field ht) n))
+    ht)
+  "Field -> its index in a vector of field texts, in *field-names* order.")
+
 
 ;-------------- dictionary -----------------------
 
 
-(defparameter *trie-ht* (make-hash-table))
+(defparameter *dictionary* (make-hash-table)
+  "Length -> vector of the dictionary words of that length, each also reversed.")
 
 
-(defun trie-insert (trie word-string)
-  (let ((node trie))
-    (dotimes (i (length word-string) node)
-      (let ((c (char word-string i)))
-        (setf node (or (gethash c node)
-                       (setf (gethash c node) (make-hash-table))))))
-    ;; set :word-string key for last node
-    (setf (gethash :word-string node) t)))
+(defparameter *letter-sets* (make-hash-table :test #'equal)
+  "(length position char) -> bit-vector marking the words of that length with char at position.")
 
 
-(defun encode-dictionary (dictionary-file)
-  ;Read in dictionary word strings from a file and store codes in *trie-ht*.
-  (with-open-file (infile dictionary-file :direction :input :if-does-not-exist nil)
-    (when (not (streamp infile)) (error "File does not exist!"))
-    (let* ((word-strings (uiop:read-file-lines infile))
-           (field-lengths (mapcar #'second *fields*))
-           (max-field-length (reduce #'max field-lengths))
-           (min-field-length (reduce #'min field-lengths)))
-      (iter (for word-string in word-strings)
-            (when (<= min-field-length (length word-string) max-field-length)
-              (trie-insert *trie-ht* (reverse word-string))
-              (trie-insert *trie-ht* word-string))))))
+(defun read-dictionary (dictionary-file)
+  ;Collects the dictionary words of the field lengths, forwards and reversed, by length.
+  (let ((lengths (remove-duplicates (mapcar #'second *fields*)))
+        (by-length (make-hash-table)))
+    (dolist (word (uiop:read-file-lines dictionary-file))
+      (when (member (length word) lengths)
+        (push word (gethash (length word) by-length))
+        (push (reverse word) (gethash (length word) by-length))))
+    (maphash (lambda (len words)
+               (setf (gethash len *dictionary*) (coerce words 'vector)))
+             by-length)))
 
 
-(encode-dictionary (in-src "English-words-455K.txt"))  ;encodes words in the src directory
+(defun index-dictionary ()
+  ;Marks, for each length, position and letter, the words with that letter there.
+  (maphash (lambda (len words)
+             (dotimes (pos len)
+               (loop for word across words
+                     for index from 0
+                     do (setf (sbit (letter-set len pos (char word pos) (length words)) index) 1))))
+           *dictionary*))
 
 
-(defun trie-search (trie pattern)
-  ;Searches a trie of hts for the first word-string that matches a pattern.
-  (labels ((search-node (node pattern current-word-string index)
-             (if (= index (length pattern))
-                 ;; check if node represents a valid word-string
-                 (when (gethash :word-string node) current-word-string)
-                 (let ((chr (char pattern index)))
-                   (if (eql chr #\?)
-                     ;; wildcard character
-                     (loop for key being the hash-keys of node using (hash-value child-node)
-                        do (when (hash-table-p child-node)
-                             (let ((result (search-node  child-node pattern
-                                                         (progn (vector-push-extend key current-word-string) current-word-string)
-                                                         (1+ index))))
-                               (when result
-                                 (return result)))))
-                     ;; regular character
-                     (let ((child-node (gethash chr node)))
-                       (when child-node
-                         (search-node child-node pattern
-                                      (progn (vector-push-extend chr current-word-string) current-word-string)
-                                      (1+ index)))))))))
-    ;; start search at root node
-    (search-node trie pattern (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t) 0)))
+(defun letter-set (len pos chr size)
+  (let ((key (list len pos chr)))
+    (or (gethash key *letter-sets*)
+        (setf (gethash key *letter-sets*) (make-array size :element-type 'bit :initial-element 0)))))
 
 
-(defun trie-search-all (trie pattern)  ;used in post-processing
-  ;Searches a trie of hts for ALL word-strings that match a pattern.
-  (labels ((search-node (node pattern current-word-string index)
-             (if (= index (length pattern))
-                 ;; check if node represents a valid word-string
-                 (when (gethash :word-string node) (list current-word-string))
-                 (let ((chr (char pattern index)))
-                   (if (eql chr #\?)
-                     ;; wildcard character
-                     (loop for key being the hash-keys of node using (hash-value child-node)
-                        when (hash-table-p child-node)
-                        append (search-node child-node pattern
-                                            (concatenate 'string current-word-string
-                                                         (string key))
-                                            (1+ index)))
-                     ;; regular character
-                     (let ((child-node (gethash chr node)))
-                       (when child-node
-                         (search-node child-node pattern
-                                      (concatenate 'string current-word-string
-                                                   (string chr))
-                                      (1+ index)))))))))
-    ;; start search at root node
-    (search-node trie pattern "" 0)))
+(read-dictionary (in-src "English-words-455K.txt"))
+(index-dictionary)
 
 
-(defun dictionary-compatible ($new-cross-str)  ;eg, "A?R??" of length 5
-  "Tests if a string (with uppercase alphabetic and ? characters)
-   is compatible with any dictionary word-string in a hash-table."
-  (trie-search *trie-ht* $new-cross-str))
+(defparameter *letter-table*
+  (let ((ht (make-hash-table :test #'equal)))
+    (maphash (lambda (len words)
+               (declare (ignore words))
+               (dotimes (pos len)
+                 (setf (gethash (list len pos) ht)
+                       (coerce (loop for code from (char-code #\A) to (char-code #\Z)
+                                     collect (gethash (list len pos (code-char code)) *letter-sets*))
+                               'vector))))
+             *dictionary*)
+    ht)
+  "(length position) -> vector of the 26 letter bit-vectors, A first, nil for an absent letter.")
 
 
-(defun dictionary-compatible-all ($new-cross-str)  ;eg, "A?R??" of length 5
-  "For a pattern string (with uppercase alphabetic and ? characters)
-   returns all compatible dictionary word-strings in a hash-table."
-  (trie-search-all *trie-ht* $new-cross-str))
+(defparameter *present-masks*
+  (let ((ht (make-hash-table :test #'equal)))
+    (maphash (lambda (key letter-vectors)
+               (setf (gethash key ht)
+                     (loop for letter-vector across letter-vectors
+                           for c from 0
+                           when letter-vector sum (ash 1 c))))
+             *letter-table*)
+    ht)
+  "(length position) -> integer with bit c set for each letter present there.")
 
 
-;---------------- types ---------------------
+(defun matching-words (pattern)
+  ;Bit-vector of the dictionary words fitting a pattern of letters and ?s; nil if no letter
+  ;is fixed.
+  (let ((result nil)
+        (len (length pattern)))
+    (dotimes (pos len result)
+      (let ((chr (char pattern pos)))
+        (unless (char= chr #\?)
+          (let ((letter-set (gethash (list len pos chr) *letter-sets*)))
+            (unless letter-set
+              (return-from matching-words (make-array 0 :element-type 'bit)))
+            (setf result (if result
+                           (bit-and result letter-set result)
+                           (copy-seq letter-set)))))))))
+
+
+(defun dictionary-compatible (pattern)  ;eg, "A?R??" of length 5
+  "True if some dictionary word, forwards or reversed, fits the pattern."
+  (let ((matches (matching-words pattern)))
+    (if matches
+      (find 1 matches)
+      (gethash (length pattern) *dictionary*))))
+
+
+;-------------- dictionary completion -----------------------
+
+
+(defvar *completion-budget* 0
+  "Words still to try in the current completion search; bound afresh by each search.")
+
+
+(defun complete-grid (texts budget)
+  ;Fills every open field of texts (a vector of field texts by field number) with dictionary
+  ;words.  Returns :complete and the fills as a list of (field word), :impossible if no
+  ;completion exists, or :unknown if more than budget words were tried.
+  (let ((*completion-budget* budget)
+        (domains (initial-domains texts))
+        (links (open-links texts)))
+    (if (and (full-fields-valid texts)
+             (loop for domain across domains never (and domain (zerop (bit-count domain))))
+             (propagate domains links (open-numbers domains)))
+      (let ((solved (catch :out-of-budget (search-completion domains links (open-numbers domains)))))
+        (cond ((eq solved :unknown) :unknown)
+              (solved (values :complete
+                              (loop for domain across solved
+                                    for field in *field-names*
+                                    when domain
+                                      collect (list field (svref (gethash (field-length field) *dictionary*)
+                                                                 (position 1 domain))))))
+              (t :impossible)))
+      :impossible)))
+
+
+(defun search-completion (domains links fields)
+  ;Assigns the given open fields, one word at a time, propagating each.  Fields that share
+  ;no open cell are solved separately, so a failure in one never retries the others.
+  ;Returns the solved domains, or nil.
+  (let* ((unresolved (remove-if (lambda (n) (= (bit-count (svref domains n) 1) 1)) fields))
+         (components (components unresolved links)))
+    (cond ((null unresolved) domains)
+          ((rest components)
+           (dolist (component components domains)
+             (setf domains (search-completion domains links component))
+             (unless domains
+               (return nil))))
+          (t (assign-fewest domains links unresolved)))))
+
+
+(defun assign-fewest (domains links fields)
+  ;Tries each word of the field with the fewest words left, then solves the rest.
+  (let* ((field-number (first (sort (copy-list fields) #'< :key (lambda (n) (bit-count (svref domains n))))))
+         (domain (svref domains field-number)))
+    (loop for start = 0 then (1+ k)
+          for k = (position 1 domain :start start)
+          while k
+          do (when (<= (decf *completion-budget*) 0)
+               (throw :out-of-budget :unknown))
+             (let ((trial (map 'vector (lambda (d) (and d (copy-seq d))) domains)))
+               (fill (svref trial field-number) 0)
+               (setf (sbit (svref trial field-number) k) 1)
+               (when (propagate trial links (list field-number))
+                 (let ((solved (search-completion trial links fields)))
+                   (when solved
+                     (return solved))))))))
+
+
+(defun components (fields links)
+  ;The fields grouped into sets connected through open cells shared among them.
+  (let ((remaining (copy-list fields))
+        (groups nil))
+    (loop while remaining
+          do (let ((group nil)
+                   (frontier (list (pop remaining))))
+               (loop while frontier
+                     do (let ((n (pop frontier)))
+                          (push n group)
+                          (loop for (cross-number) in (svref links n)
+                                when (member cross-number remaining)
+                                  do (setf remaining (delete cross-number remaining))
+                                     (push cross-number frontier))))
+               (push group groups)))
+    groups))
+
+
+(defun propagate (domains links queue)
+  ;Removes from each open field the words whose letter at a crossing cell the crossing field
+  ;no longer allows, until nothing changes.  Starts from the field numbers in queue.  Returns
+  ;nil if some field is left with no word.
+  (loop while queue
+        do (let ((source (pop queue)))
+             (loop for (target index cross-index length cross-length) in (svref links source)
+                   for target-domain = (svref domains target)
+                   when (restrict target-domain cross-length cross-index
+                                  (letter-mask (svref domains source) length index))
+                     do (unless (find 1 target-domain)
+                          (return-from propagate nil))
+                        (unless (member target queue)
+                          (push target queue)))))
+  t)
+
+
+(defun initial-domains (texts)
+  ;A vector by field number: for each open field, a bit-vector of the dictionary words
+  ;fitting its text; nil for full fields.
+  (map 'vector (lambda (text)
+                 (when (find #\? text)
+                   (or (matching-words text)
+                       (make-array (length (gethash (length text) *dictionary*))
+                                   :element-type 'bit :initial-element 1))))
+       texts))
+
+
+(defun full-fields-valid (texts)
+  ;True if every full field holds a listed word or a dictionary word.
+  (loop for text across texts
+        always (or (find #\? text)
+                   (member text *listed-strings* :test #'string=)
+                   (dictionary-compatible text))))
+
+
+(defun open-links (texts)
+  ;A vector by field number: for each open field, (cross-number index cross-index length
+  ;cross-length) for each open cell it shares with a crossing field.  The lengths are the
+  ;two fields' word lengths.
+  (let ((links (make-array (length texts) :initial-element nil)))
+    (loop for field in *field-names*
+          for n from 0
+          for text = (svref texts n)
+          do (loop for (cross-field cross-index index) on (second (assoc field *crosscuts*)) by #'cdddr
+                   when (char= (char text index) #\?)
+                     do (push (list (gethash cross-field *field-numbers*) index cross-index
+                                    (length text) (field-length cross-field))
+                              (svref links n))))
+    links))
+
+
+(defun open-numbers (domains)
+  (loop for domain across domains
+        for n from 0
+        when domain collect n))
+
+
+(defun letter-mask (domain len pos)
+  ;Integer with bit c set when some word in domain, of words of length len, has letter c
+  ;(A = 0) at pos.  A domain of up to 1000 words is read word by word, stopping once every
+  ;letter present there is found; a larger one is tested letter by letter.
+  (if (<= (bit-count domain 1000) 1000)
+    (let ((words (gethash len *dictionary*))
+          (present (gethash (list len pos) *present-masks*))
+          (mask 0))
+      (loop for start = 0 then (1+ k)
+            for k = (position 1 domain :start start)
+            while (and k (/= mask present))
+            do (let ((code (- (char-code (char (svref words k) pos)) (char-code #\A))))
+                 (when (< -1 code 26)
+                   (setf mask (logior mask (ash 1 code))))))
+      mask)
+    (let ((letter-vectors (gethash (list len pos) *letter-table*))
+          (mask 0))
+      (dotimes (c 26 mask)
+        (let ((letter-vector (svref letter-vectors c)))
+          (when (and letter-vector (bits-intersect-p domain letter-vector))
+            (setf mask (logior mask (ash 1 c)))))))))
+
+
+(defun restrict (domain len pos mask)
+  ;Keeps in domain, of words of length len, only the words whose letter at pos is in mask:
+  ;by removing the other letters when few are excluded, else by keeping the allowed ones.
+  ;Returns true if any word was removed.
+  (let* ((key (list len pos))
+         (letter-vectors (gethash key *letter-table*))
+         (excluded (logandc2 (gethash key *present-masks*) mask))
+         (changed nil))
+    (cond ((zerop excluded))
+          ((<= (logcount excluded) (logcount mask))
+           (dotimes (c 26)
+             (when (and (logbitp c excluded) (bits-intersect-p domain (svref letter-vectors c)))
+               (bit-andc2 domain (svref letter-vectors c) domain)
+               (setf changed t))))
+          (t (let ((keep (make-array (length domain) :element-type 'bit :initial-element 0))
+                   (before (bit-count domain)))
+               (dotimes (c 26)
+                 (when (and (logbitp c mask) (svref letter-vectors c))
+                   (bit-ior keep (svref letter-vectors c) keep)))
+               (bit-and domain keep domain)
+               (setf changed (< (bit-count domain) before)))))
+    changed))
+
+
+(defun bits-intersect-p (a b)
+  (declare (simple-bit-vector a b) (optimize speed))
+  (loop for i of-type fixnum below (ceiling (length a) sb-vm:n-word-bits)
+        thereis (/= 0 (logand (sb-kernel:%vector-raw-bits a i) (sb-kernel:%vector-raw-bits b i)))))
+
+
+(defun bit-count (bits &optional (limit most-positive-fixnum))
+  ;The number of 1s in bits, or a number above limit once that is exceeded.
+  (declare (simple-bit-vector bits) (fixnum limit) (optimize speed))
+  (let ((sum 0))
+    (declare (fixnum sum))
+    (dotimes (i (ceiling (length bits) sb-vm:n-word-bits) sum)
+      (incf sum (logcount (sb-kernel:%vector-raw-bits bits i)))
+      (when (> sum limit)
+        (return sum)))))
+
+
+;---------------- types and relations ---------------------
 
 
 (define-types
-  field (compute *sorted-field-names*))
+  field (compute *field-names*)
+  word (compute *words*))
 
 
 (define-dynamic-relations
-  (current-field $field)
-  (used-word-strings-ht $hash-table)
-  (text field $string))
+  (text field $string)
+  (used word)
+  (open-fields $list)
+  (placed $fixnum))
 
 
 (define-static-relations
   (crosscuts field $list))
 
 
+;------------------------- queries -----------------------
+
+
 (define-query get-next-field? ()
-  (do (bind (current-field $current-field))
-      (list (gethash $current-field *next-field-ht*))))
+  (do (bind (open-fields $open))
+      (if $open
+        (list (first $open))
+        nil)))
 
 
-(define-query get-next-field-word-strings? ()
-  (do (bind (current-field $current-field))
-      (setf $next-field (gethash $current-field *next-field-ht*))
-      (setf $all-next-field-word-strings (gethash $next-field *field-words-ht*))
-      (bind (used-word-strings-ht $used-word-strings-ht))
-      (setf $used-word-strings (alexandria:hash-table-keys $used-word-strings-ht))
-      (set-difference $all-next-field-word-strings $used-word-strings)))
-
-
-;------------------------- action rule -----------------------
-
-
-(define-query word-compatible? (?word-string ?field)
+(define-query word-compatible? (?word ?field)
    (and (bind (text ?field $field-string))
-        ;(= (length ?word-string) (length $field-string))
+        (setf $word-string (string ?word))
+        (= (length $word-string) (length $field-string))
         (every (lambda (char1 char2)
                   (or (char= char1 char2)
                       (char= char2 #\?)))
-               ?word-string $field-string)))
+               $word-string $field-string)))
 
 
-(define-update update-crosscuts! (?field ?word-string)
-  (do (bind (crosscuts ?field $crosscuts))
-      (ww-loop for ($cross-field $cross-index $word-string-index) on $crosscuts by #'cdddr
-        do (bind (text $cross-field $cross-str))
-           (setf $cross-char (char $cross-str $cross-index))
-           (if (char= $cross-char #\?)
-             (do (setf $new-cross-str  ;replace one letter from word-string into cross-str
-                       (replace (copy-seq $cross-str) ?word-string
-                                :start1 $cross-index :start2 $word-string-index :end2 (1+ $word-string-index)))
-                 (text $cross-field $new-cross-str))))))
- 
+(define-query crosscuts-compatible? (?word ?field)
+  ;Every crossing whose letter the word changes must still match a dictionary word.
+  (and (bind (crosscuts ?field $crosscuts))
+       (ww-loop for ($cross-field $cross-index $word-index) on $crosscuts by #'cdddr
+         always (do (bind (text $cross-field $cross-str))
+                    (or (char= (char $cross-str $cross-index) (char (string ?word) $word-index))
+                        (dictionary-compatible
+                          (replace (copy-seq $cross-str) (string ?word)
+                                   :start1 $cross-index :start2 $word-index :end2 (1+ $word-index))))))))
+
+
+(define-query get-field-texts? ()
+  ;A fresh vector of the field texts, by field number.
+  (do (setf $texts (make-array (length *field-names*)))
+      (ww-loop for $field in *field-names*
+               for $n from 0
+        do (bind (text $field $text))
+           (setf (svref $texts $n) $text))
+      $texts))
+
+
+(define-query completable? (?word ?field)
+  ;True if the grid with the word placed can be completed from the dictionary within
+  ;*search-completion-budget* tries.
+  (eq (complete-grid (place-word (string ?word) ?field (get-field-texts?))
+                     *search-completion-budget*)
+      :complete))
+
+
+(define-query bounding-function? ()
+  ;(values cost upper), negated for max-value.  Each open field can still get at most one
+  ;word, and each length no more words than remain unused at that length; leaving every open
+  ;field to the dictionary keeps the words already placed.
+  (do (bind (placed $placed))
+      (bind (open-fields $open))
+      (setf $possible 0)
+      (ww-loop for $len in *field-lengths*
+        do (setf $possible
+                 (+ $possible
+                    (min (count $len $open :key #'field-length)
+                         (ww-loop for $word in (gethash $len *words-by-length*)
+                                  count (not (used $word)))))))
+      (values (- (+ $placed $possible)) (- $placed))))
+
+
+;------------------------ actions ----------------------------
+
+
+(define-update update-crosscut! (?cross-field ?cross-index ?word-index ?word-string)
+  (do (bind (text ?cross-field $cross-str))
+      (text ?cross-field (replace (copy-seq $cross-str) ?word-string
+                                  :start1 ?cross-index :start2 ?word-index :end2 (1+ ?word-index)))))
+
 
 (define-action fill
     1
-    (?field (get-next-field?) ?word-string (get-next-field-word-strings?))
-    (always-true)  ;(word-compatible? ?word-string ?field)
-    (?field ?word-string)
-    (assert (bind (used-word-strings-ht $used-word-strings-ht))
-            (setf $new-used-word-strings-ht (alexandria:copy-hash-table $used-word-strings-ht))
-            (if (word-compatible? ?word-string ?field)
-              (do 
-                 (text ?field ?word-string)  ;fills in a word given cross letters compatible
-                 (update-crosscuts! ?field ?word-string)  ;update ? in cross fields
-                 (setf (gethash ?word-string $new-used-word-strings-ht) t)))
-            (used-word-strings-ht $new-used-word-strings-ht)
-            (current-field ?field)
-            ;(setf $objective-value (iter (for (word nil) in-hashtable $new-used-word-strings-ht)
-            ;                             (sum (length word))))))
-            (setf $objective-value (hash-table-count $new-used-word-strings-ht))))
+    (?field (get-next-field?) ?word word)
+    (and (not (used ?word))
+         (word-compatible? ?word ?field)
+         (crosscuts-compatible? ?word ?field)
+         (or (null *search-completion-budget*)
+             (completable? ?word ?field)))
+    (?field ?word)
+    (assert (setf $word-string (string ?word))
+            (text ?field $word-string)
+            (used ?word)
+            (bind (crosscuts ?field $crosscuts))
+            (ww-loop for ($cross-field $cross-index $word-index) on $crosscuts by #'cdddr
+              do (update-crosscut! $cross-field $cross-index $word-index $word-string))
+            (bind (open-fields $open))
+            (open-fields (rest $open))
+            (bind (placed $placed))
+            (placed (1+ $placed))
+            (assign $objective-value (1+ $placed))))
 
-     
+
+(define-action skip  ;leave the field for the dictionary
+    1
+    (?field (get-next-field?))
+    (always-true)
+    (?field)
+    (assert (bind (open-fields $open))
+            (open-fields (rest $open))
+            (bind (placed $placed))
+            (assign $objective-value $placed)))
+
+
 ;------------------ initializations ----------------
 
 
 (define-init
-  (current-field start)
-  (used-word-strings-ht #.(make-hash-table :test #'equal)))
+  `(open-fields ,*field-names*)
+  (placed 0))
 
 
 (define-init-action initialize-crosscuts&text
@@ -391,123 +653,65 @@ file        #states     states/sec      time    best
   ()
   (assert (ww-loop for ($field $field-cuts) in *crosscuts*
             do (crosscuts $field $field-cuts))
-          (ww-loop for ($field $field-length) in *sorted-fields*
+          (ww-loop for ($field $field-length) in *fields*
             do (text $field (make-string $field-length :initial-element #\?)))))
 
 
-(define-goal  ;just find the best (max-value) of all states
-  nil)
-
-;-------------- pre-processing -----------------
-
-
-(defun rewrite-dictionary (dictionary-file)
-  ;Omit words with strange characters from dictionary
-  (with-open-file (infile dictionary-file :direction :input :if-does-not-exist nil)
-    (when (not (streamp infile)) (error "File does not exist!"))
-    (with-open-file (outfile (concatenate 'string "new-" dictionary-file)
-                             :direction :output :if-exists :supersede)
-      (let ((word-strings (uiop:read-file-lines infile)))
-        (iter (for word-string in word-strings)
-              (when (every (lambda (chr) (find chr "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-                           word-string)
-                (format outfile "~A~%" word-string)))))))
+;no goal: find the best (max-value) of all states
 
 
 ;------------- post-processing ----------------
 
 
-(define-query get-used-word-strings-ht? ()  ;for a state
-  (do (bind (used-word-strings-ht $used-word-strings-ht))
-      $used-word-strings-ht))
-
-
-(define-query get-num-dictionary-words? ()  ;for a state
-  (ww-loop for $field in (cdr *sorted-field-names*)
-    do (bind (text $field $word-string))
-    count (dictionary-compatible $word-string)))  
-
-
 (defun cull-best-states ()
-  (let* ((top-state (first *best-states*))
-         (top-value (problem-state.value top-state))
-         (top-states (remove-if (lambda (state) (< (problem-state.value state) top-value))
-                                *best-states*))
-         (unique-top-states (remove-duplicates top-states :key #'get-used-word-strings-ht? :test #'equalp))
-         (states&word-counts (loop for state in unique-top-states
-                                   for word-count = (get-num-dictionary-words? state)
-                                   collect (list word-count state)))
-         (max-count (apply #'max (mapcar #'first states&word-counts)))
-         (max-word-count-states (remove-if (lambda (pair) (< (first pair) max-count)) 
-                                           states&word-counts)))
-    (iter (for item in max-word-count-states)
-          (print item))
-    nil))
-   
-
-#|
-(defun corresponding-char-lists (word-list1 index1 word-list2 index2)
-  ;Returns words in word-list1 that are compatible with the words in word-list2
-  (let ((char-list2 (mapcar #'(lambda (word) (char word index2)) word-list2)))
-    (remove-if-not #'(lambda (word) (member (char word index1) char-list2)) word-list1)))
+  (remove-duplicates *best-states* :from-end t :test #'equalp :key #'problem-state.idb))
 
 
-(define-query collect-matches? ()
-  (ww-loop for $field in *sorted-field-names*
-    with $final-matches = nil
-    do (bind (crosscuts $field $crosscuts))
-       (bind (text $field $text))
-       (if (full-word $text)
-         (push (list $field (coerce $text 'list)) $final-matches)
-         (ww-loop for $chr across $text
-           with $corresponding = (dictionary-compatible-all $text)  ;progressively reduce list of field matches
-           for ($cross-field $cross-index $index) on $crosscuts by #'cdddr
-             when (char= $chr #\?)
-               do (bind (text $cross-field $cross-text))
-                  (setf $cross-matches (dictionary-compatible-all $cross-text))
-                  (setf $corresponding (corresponding-char-lists $corresponding $index $cross-matches $cross-index))
-           finally (push (cons $field $corresponding) $final-matches)))
-    finally (return $final-matches)))
+(defun analyze (&optional (budget 100000))
+  ;Completes the best grid from the dictionary: the fills as (field word), or :impossible,
+  ;or :unknown if more than budget words were tried.
+  (multiple-value-bind (status fills) (complete-grid (get-field-texts? (first *best-states*)) budget)
+    (if (eq status :complete) fills status)))
 
 
-(defun fillin (state)  ;finish filling in puzzle with dictionary words
-  (let ((matches (sort (collect-matches? state) #'< :key #'length)))
-    (mapcar (lambda (match)
-              (cond ((= (length match) 1) match)
-                    ((listp (second match)) (list (first match) (coerce (second match) 'string)))
-                    ((stringp (second match)) match)
-                    (t (error "Unknown items in match = ~A" match))))
-            matches)))
+(defun repair (&optional (budget 20000))
+  ;Rebuilds the best grid from its listed words, in search order, keeping each word only if
+  ;the dictionary can still complete the grid.  Returns the listed words kept and the
+  ;dictionary fills, each as (field word).
+  (let ((kept nil)
+        (fills nil))
+    (dolist (placement (listed-placements (get-field-texts? (first *best-states*))))
+      (multiple-value-bind (status trial-fills) (complete-grid (grid-texts (cons placement kept)) budget)
+        (when (eq status :complete)
+          (push placement kept)
+          (setf fills trial-fills))))
+    (values (reverse kept) (or fills (nth-value 1 (complete-grid (grid-texts nil) budget))))))
 
 
-(defun compatible-words (option1 option2)
-  ;Determines if two field+word optional fillings are compatible.
-  (destructuring-bind (field1 word1) option1
-    (destructuring-bind (field2 word2) option2
-      (destructuring-bind (index1 index2) (gethash (list field1 field2) *crosscuts-ht* '(-1 -1))
-        (or (= index1 -1)
-            (char= (schar word1 index1) (schar word2 index2)))))))
+(defun listed-placements (texts)
+  ;The fields holding listed words, as (field word).
+  (loop for text across texts
+        for field in *field-names*
+        when (member text *listed-strings* :test #'string=)
+          collect (list field text)))
 
 
-(defun feasible-solutions (field-sets)
-  (let ((memo (make-hash-table :test 'equal)))
-    (labels ((collector (field-sets current-collection)
-               (if (null field-sets)
-                 (list current-collection)
-                 (let ((current-set (car field-sets)))
-                   (loop for word in (cdr current-set)
-                         for field+word = (list (car current-set) word)
-                         when (every #'identity
-                                     (mapcar (lambda (x)
-                                               (or (gethash (list field+word x) memo)
-                                                   (setf (gethash (list field+word x) memo)
-                                                         (compatible-words field+word x))))
-                                             current-collection))
-                         nconc (collector (cdr field-sets) 
-                                          (cons field+word current-collection)))))))
-      (collector field-sets nil))))
+(defun grid-texts (placements)
+  ;A vector of field texts by field number, with only the given (field word) placements.
+  (let ((texts (map 'vector (lambda (field) (make-string (field-length field) :initial-element #\?))
+                    *field-names*)))
+    (loop for (field word) in placements
+          do (setf texts (place-word word field texts)))
+    texts))
 
 
-(defun analyze ()
-  (feasible-solutions (fillin (first *best-states*))))
-|#
+(defun place-word (word field texts)
+  ;A copy of texts with word written into field and its crossing cells.
+  (let ((new (copy-seq texts)))
+    (setf (svref new (gethash field *field-numbers*)) word)
+    (loop for (cross-field cross-index index) on (second (assoc field *crosscuts*)) by #'cdddr
+          for cross-number = (gethash cross-field *field-numbers*)
+          do (setf (svref new cross-number)
+                   (replace (copy-seq (svref new cross-number)) word
+                            :start1 cross-index :start2 index :end2 (1+ index))))
+    new))

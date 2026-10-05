@@ -1278,21 +1278,26 @@ different acceptable milestone state."
     (funcall (symbol-function 'goal-fn) state)))
 
 
-(defun process-min-max-value (succ-state)
-  "Determines if succ-state value is an improvement, and if so updates *best-states*."
+(defun process-min-max-value (succ-state &optional worker-id)
+  "Update *best-states* on improvement, reporting the zero-based worker ID.
+   Without a worker ID, report the coordinator in parallel search or serial search."
   (let ((current-value (problem-state.value succ-state))
         (best-value (problem-state.value (first *best-states*))))
     (ecase *solution-type*
       (max-value (when (> current-value best-value)
                    (bt:with-lock-held (*lock*)
-                     (format t "~%Higher value state found: ~A in thread ~D~%"
-                             (problem-state.value succ-state) (lparallel:kernel-worker-index))
+                     (format t "~%Higher value state found: ~A in ~A~%"
+                             (problem-state.value succ-state)
+                             (if worker-id (format nil "worker ~D" worker-id)
+                                 (if (> *threads* 0) "coordinator" "serial search")))
                      (finish-output))
                    (push-global succ-state *best-states*)))
       (min-value (when (< current-value best-value)
                    (bt:with-lock-held (*lock*)
-                     (format t "~%Lower value state found: ~A in thread ~D~%"
-                             (problem-state.value succ-state) (lparallel:kernel-worker-index))
+                     (format t "~%Lower value state found: ~A in ~A~%"
+                             (problem-state.value succ-state)
+                             (if worker-id (format nil "worker ~D" worker-id)
+                                 (if (> *threads* 0) "coordinator" "serial search")))
                      (finish-output))
                    (push-global succ-state *best-states*))))))
 

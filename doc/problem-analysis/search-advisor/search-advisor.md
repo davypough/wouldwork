@@ -2,7 +2,8 @@
 
 > **Usage:** An optional aide, run on its own.  Attach this file with a problem spec that
 > already stages and whose rules you trust, and say what you want from the search.  The
-> assistant works in three phases (section 1): an overview with the main findings; spec
+> assistant works in four phases (section 1): a profile read from the spec alone, with
+> questions for the user; an overview with the main findings, from first probes; spec
 > upgrades for simplicity or efficiency, each written into a copy of the spec once you agree
 > (the original is never changed); and the results and estimates for the upgraded spec
 > (regime costs, density, scaling, expansion), from short runs.  It guides or (with approval)
@@ -31,8 +32,11 @@ but its subgoal dialogue applies to any problem with milestones (Q16).
 
 ## 1. Process
 
-The work runs in three phases, each ending at a point where the user approves, defers or
-redirects before the next begins.  Phase 2 comes before phase 3 because the global measurements
+The work runs in four phases, numbered 0 to 3, each ending at a point where the user
+approves, defers or redirects before the next begins.  Phase 0 only reads and reasons, so the
+user gets a first answer within minutes and can settle the objective before any probe is
+spent (crossword13: a phase 1 that included building, staging and probing took nearly half an
+hour before the user saw anything).  Phase 2 comes before phase 3 because the global measurements
 (expansion, trade-offs, density) depend on the spec they are taken on: they are taken on the
 upgraded spec, not the original (donald: the original's 720 reorderings of one answer would
 have swamped every scaling figure).  Phase 3 may point back to phase 2 (a spec that generates
@@ -47,7 +51,9 @@ topics in words ("symmetric objects", "dead-state pruning"), not by the question
 ids of sections 2 and 3, which are this advisor's own index.  Keep each item to its result
 and recommendation; the reasoning behind it is given when the user asks.
 
-### Phase 1: overview and main findings
+### Phase 0: profile and questions
+
+No build, no staging and no runs: read, reason, and ask.
 
 1. **Read the spec** in full: types, actions, any happenings, the goal, the current `ww-set`
    values, and any search hooks already defined (`heuristic?`, `prune-state?`,
@@ -56,26 +62,45 @@ and recommendation; the reasoning behind it is given when the user asks.
    read-time `#.` evaluation), and also the minor clutter that makes the spec harder to read:
    commented-out debug prints, a query that only calls another, intermediate variables or
    lists a simpler test makes unnecessary.  Check comments against the code (donald's header
-   claimed forward checking that the actions did not do).  A type that no parameter names may
+   claimed forward checking that the actions did not do).  Check data that records a relation
+   from both sides for entries with no mirror: crossword15-18 listed one crossing from one
+   slot only, and crossword13 two, so placing a word wrote a letter its crossing never saw.
+   A few lines that look up each entry's mirror find them.  A type that no parameter names may
    still be in use: `$row` in a relation's signature means a value of type `row`
    (tiles7a's `(loc tile $row $col)`), and staging fails if the type is removed.
 2. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
-   *probe*.  Leave an answer *unknown* rather than guess.
-3. **Run the first probes** (section 6.1): short bounded searches, never a full solve
-   (section 1.1 says who runs them), enough to measure the size of the search and the waste
-   the phase-2 changes would remove (donald: 165,978 expansions as written, 17,239 in graph
-   search, 1,441 in a fixed order).
-4. **Orient the user.**  A short summary in the puzzle's own terms, with no setting names:
-   what the problem asks, how large its search is, the main findings as named items, and
-   the recommendation in a sentence.  This is the phase-1 report (section 8).
-5. **Ask the user** only what the spec cannot tell: the objective (any solution, several,
+   *probe*.  Leave an answer *unknown* rather than guess; questions only a probe can settle
+   wait for phase 1.
+3. **Summarize the problem** in its own terms, with no setting names: what it asks, and the
+   size readable from the spec (objects, actions, moves available at the start, solution
+   length if fixed).
+4. **Ask the user** only what the spec cannot tell: the objective (any solution, several,
    every, or a best one, and best by what), the time available, the thread count of the
    machine, whether a solution length or depth is already known, and whether larger members
-   of the family matter.  One question at a time.
+   of the family matter.  Ask them together, as a numbered list the user can answer in one
+   reply.  This is the phase-0 report (section 8).
+
+### Phase 1: first probes and main findings
+
+5. **Run the first probes** (section 6.1): short bounded searches, never a full solve
+   (section 1.1 says who runs them), enough to measure the size of the search and the waste
+   the phase-2 changes would remove, aimed by the user's answers in phase 0 (donald: 165,978
+   program cycles as written, 17,239 in graph search, 1,441 in a fixed order).  A `first`
+   search that finishes almost at once is rerun in random order before it is trusted
+   (answer-ordered data, section 6.1).
+6. **Report the main findings** as named items, each with the number behind it, and the
+   recommendation in a sentence.  This is the phase-1 report (section 8).
 
 ### Phase 2: spec upgrades for simplicity and efficiency
 
-6. **Propose the upgrades**, each a named item with its reason and the findings behind it:
+7. **Propose the upgrades** as one numbered list of specific changes, each of which the user
+   can accept or reject on its own.  Each item has a short descriptive name, then a few plain
+   sentences in the puzzle's terms: what changes, why (the finding and the number behind it),
+   and a recommendation (accept, or accept only if ...).  Do not group items under category
+   headings or mix in settings that stay unchanged (crossword13: a report grouped as upgrades,
+   settings, hooks and cleanup left the user unsure which lines were proposals).  Where a
+   recommendation touches the problem type or a setting the user may ask about (csp, tree
+   search), say in a sentence before the list why it is or is not changed.  The items cover:
    - choices that live in the spec: the strategy where it is a spec setting (`*problem-type*`
      csp, `*tree-or-graph*`, `*solution-type*`, symmetry), and action order (section 3);
    - representation changes (Q18) and refactorings of unusual constructions (section 1.1);
@@ -83,25 +108,33 @@ and recommendation; the reasoning behind it is given when the user asks.
    - with happenings, how time passes: the spec's `wait` action or `*auto-wait*`, never both
      (section 5).  Time the same probe with each and keep the cheaper (sentry: the `wait`
      action, about 6 times cheaper);
-   - minor clutter, together under CLEANUP.
-   Check the conflicts in section 5 first.
-7. **Apply what the user agrees to** in a copy of the spec (section 1.1), one change at a
-   time, and check each: the copy stages, and a probe gives the same answers (goal states,
-   best value) with the counts the change predicts.  An independent counting script
-   (section 6.3) that reproduces **Program cycles** on the upgraded spec (or, when moves can be
-   undone, its distinct states and optimum) is the strongest check, and is reused in phase 3.
-8. **Report** the phase-2 changes (section 8): what changed, the before and after counts,
+   - minor clutter, one item per clean-up.
+   End with the changes considered and not recommended, each with its reason.  Check the
+   conflicts in section 5 first.  Try the recommended items on a draft copy in the
+   assistant's own environment where it is quick, and give the measured counts with the list.
+8. **Apply what the user agrees to** in a copy of the spec with its design notes (section
+   1.1), one change at a time, and check each: the copy stages, and a probe gives the same
+   answers (goal states, best value) with the counts the change predicts.  An independent
+   counting script (section 6.3) that reproduces **Program cycles** on the upgraded spec (or,
+   when moves can be undone, its distinct states and optimum) is the strongest check, and is
+   reused in phase 3.  Test from a clean load (reset `src/problem.lisp` as in `CLAUDE.md`):
+   functions left by the previously staged problem can hide a missing definition
+   (crossword5-11-1 lost `full-word`, which only its post-processing uses, and passed every
+   run until loaded fresh).  Then deliver exactly the file tested, and compare checksums: a
+   delivery made just after an edit can carry the previous version (seen twice with
+   crossword5-11-1); deliver again until they match.
+9. **Report** the phase-2 changes (section 8): what changed, the before and after counts,
    and the REPL forms to stage and test the copy.
 
 ### Phase 3: results and estimates
 
-9. **Measure on the upgraded spec**, with short runs only (seconds to a few minutes; section
+10. **Measure on the upgraded spec**, with short runs only (seconds to a few minutes; section
    1.1): the cost of each regime the user might want (section 3.2), solution density (section
    6.1), the growth per size step and a projection to a target size if one is named (section
    6.3), and always the expansion of the problem family (section 6.4).  Rough estimates are
    enough: two size steps, and a projection given as a range, good to about a factor of 2.
-10. **Report the results and estimates** in the form of section 8.  The recommendations were
-    settled in phases 1 and 2; phase 3 reports what the upgraded spec costs and how that cost
+11. **Report the results and estimates** in the form of section 8.  The recommendations were
+    settled in phase 2; phase 3 reports what the upgraded spec costs and how that cost
     grows, not a new strategy.  List larger interventions the measurements point to (a
     re-encoding, a generator for the family, a pruning invariant, an engine change) under
     FURTHER, as options for the user to take up later, not as steps of this run.  Deep runs,
@@ -112,21 +145,20 @@ and recommendation; the reasoning behind it is given when the user asks.
 
 **Editing the spec.**  The advisor never changes the original spec.  The first change the user
 agrees to creates a copy beside it, named by extending the original's name
-(`problem-knap19.lisp` to `problem-knap19-1.lisp`), with `*problem-name*` and the `;;; Filename:` header line changed to match
-(`knap19-1`).  Staging reloads the file that the header names, so a copy that still carries
-the original's header silently stages the original (seen with a donald variant: every
-`(stage ...)` of the copy ran the original's actions, with no error).  The header is read only
-when the file's first line begins exactly `;;; Filename:` (three semicolons;
-`snapshot-source-file` in `ww-preliminaries.lisp`), and only during the reload that follows
-`(stage ...)`, once `vals.lisp` has been deleted.  Any other first line, such as the original
-hanoi spec's `;;;; Filename:`, is ignored, and the copy stages as itself (tested both ways:
-a stale four-semicolon header staged the copy, a stale three-semicolon header the original).
-Normalize such a header to three semicolons in the copy, so that a later recovery reload
-finds the right source.  Later agreed changes in the same run go into that copy.  A change that needs a
-separate variant of its own (relaxed, backward, re-encoded) takes the next number.  Never edit
-the generated `src/problem.lisp`.
+(`problem-knap19.lisp` to `problem-knap19-1.lisp`), with `*problem-name*` changed to match
+(`knap19-1`) and the first line set to `;;; Filename: problem-knap19-1.lisp`, with exactly
+three semicolons.  Staging reloads the file that line names, so a copy that keeps the
+original's line silently stages the original (seen with a donald variant).  Later agreed
+changes in the same run go into that copy.  A change that needs a separate variant of its own
+(relaxed, backward, re-encoded) takes the next number.  Never edit the generated
+`src/problem.lisp`.
 
 - State the change and its reason first; change only what was agreed.
+- Open the copy with a short *Design notes* comment block below its header, written for the
+  user: the high-level design concepts and trade-offs the spec relies on (one decision per
+  step in a fixed order, most constrained first, an optimistic bound, a lean state), each in
+  a line or two of general terms rather than problem-specific details or counts
+  (`problem-crossword5-11-1.lisp`).
 - A `ww-set` goes in the spec's `ww-set` block, replacing any existing value for that setting.
 - REPL-only settings (`*algorithm*`, `*threads*`, `*debug*`, `*probe*`) are never written
   to the spec; give the REPL form instead.
@@ -137,7 +169,7 @@ the generated `src/problem.lisp`.
   states must correspond.  When the change alters what the model means (new rules, a changed
   goal, a different level of detail), write a short prompt for the spec-advisor instead,
   naming the finding and the proposed encoding, and resume here once that spec stages.
-- **Refactorings** (phase 1, step 1: an unusual or needlessly complex construction).  When a plainer
+- **Refactorings** (phase 0, step 1: an unusual or needlessly complex construction).  When a plainer
   form gives the same rules and goal, write it into the copy once the user agrees, after
   checking that it stages and that a probe gives the same counts and best result as before.
   Example: knap19 read its data with `#.` forms so that the values existed when the file was
@@ -156,45 +188,36 @@ the generated `src/problem.lisp`.
 
 **Running searches.**
 
-- **Short runs** (probes, `validate-solution`, shallow searches taking seconds): the
-  assistant may run these itself with approval, in its own environment or on the user's
-  machine.  Report the measured numbers, not expectations.  Staging on the user's machine
-  overwrites their `src/problem.lisp` and `vals.lisp`: say so first.
+- **Short runs** (probes of about a minute or less, `validate-solution`): the assistant runs
+  these itself in its own environment, set up at the start of phase 1 (never in phase 0;
+  `CLAUDE.md`, *Running Wouldwork in a Claude cloud session*).  Report the measured numbers,
+  not expectations.  Anything longer runs at the user's REPL.
 - **Deep runs** (full solves, parallel searches, backward searches to the memory limit,
-  enumerator layers, `every` searches feeding `freq`): run on the user's own hardware, at
-  their REPL, where the threads and memory are.  The assistant supplies the exact forms and
-  what to paste back, and runs one itself only with explicit approval for that run.  A spec
-  copy written for a deep run leaves `*progress-reporting-interval*` unset: the default
-  schedule reports first after `*progress-first-report*` seconds (10) and doubles each gap,
-  about 12 reports in 12 hours, serial or parallel.  A fixed interval in states, set in the
-  spec, overrides it.  Never
-  start a long search unasked, and never raise the depth or thread count silently.  Deep
-  runs happen only when the user asks for a follow-up; never ask for one only to make an
-  estimate more accurate.
+  enumerator layers, `every` searches feeding `freq`): only when the user asks for one (step
+  11), at the user's REPL, where the threads and memory are.  The assistant supplies the exact
+  forms and what to paste back, and never raises the depth or thread count silently.  A spec
+  copy written for a deep run leaves `*progress-reporting-interval*` unset (section 4).
 - **Multi-step strategies** (S7 macros, S8 subgoaling, S9 relaxation, S10 bidirectional, S11
   enumerator): guide one step at a time.  Give the forms for the step, wait for its result,
   check it, then give the next.  Keep the forms of each step so the run can be repeated.
-
-Always validate on a small version of the problem first with plain brute force (Manual,
-*Brute-Force Search*).  Every other strategy rests on the same depth-first search.
 
 ---
 
 ## 2. Questions that decide something
 
 Only questions whose answers change a strategy, a setting, a spec addition, or the meaning
-of a result belong here.
+of a result belong here.  The notes below the table give the details and measured examples.
 
 | Id | Question | How settled | What it decides |
 |---|---|---|---|
-| Q1 | Is the answer a sequence of moves, or an assignment of values (each variable set once, order irrelevant)?  If an assignment, does every solution use each action exactly once (one action per variable or group of variables), or does one action range over all the variables (knap19's `put`)? | spec | `*problem-type*`; CSP strategy (S3) when each action is used exactly once: csp itself imposes the fixed order (at depth n, while n is below the number of actions, only the nth defined action is tried; `generate-children` in `ww-planner.lisp`), whether or not the spec intends one |
+| Q1 | Is the answer a sequence of moves, or an assignment (each variable set once, order irrelevant)?  If an assignment, is there one action per variable, or one action over all of them? (note 1) | spec | `*problem-type*`; the assignment cases of section 3.1 |
 | Q2 | What is wanted: any one solution, N, every, every path, or a best one (fewest steps, least time, min/max value)? | user | `*solution-type*`; optimization (S4) |
 | Q3 | Are there happenings or patrollers? | spec: `define-happening`, `define-patroller` | tree search; `*auto-wait*`; no backtracking |
-| Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits.  When moves can be undone, routes of different lengths reach the same state, and graph search expands a state again each time a shorter route reaches it (section 6.1) |
-| Q5 | Does some quantity change by a fixed amount on every move (peg count, items placed), **and** does the goal fix its final value (one peg left, all N items placed)?  Both are needed: a knapsack places one item per move, but its goal does not fix how many | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2); an exact `*depth-cutoff*` only if moves can continue past that length, or for `min-steps-remaining?` |
-| Q6 | How large is the space?  Branching factor b and solution depth d; under graph search, the number of distinct states | spec, probe | whether brute force can finish (roughly under a billion).  b^d counts paths; when moves commute (any order of the same choices reaches the same state) graph search visits only the distinct states, which can be far fewer (knap19: 17^11 paths, 36,326 states).  Count the work per expansion too: an action's `product` enumerates every combination of its parameters before the precondition rejects any, so an action with k free parameters over a domain of size m costs up to m^k tests per state (a 41-addend cryptarithm whose units column holds 9 letters: 31 s for 197,005 expansions, against 7 ms for DONALD's 424).  The remedy is finer actions, each fixing one or two variables.  A parameter that the state already fixes (the support a disk sits on, an agent's location) should be read with `bind`, not enumerated and tested: hanoi's `move` took both supports as parameters, 880 combinations per state at 8 disks; binding the origin made it 5.4 times faster, and a peg-per-disk encoding 13 times |
-| Q7 | Are there objects of one type with identical static facts that the goal does not name, **and** do the actions take them as typed parameters (`?peg peg`)?  Objects supplied by a query (`?peg (get-remaining-pegs?)`) are not recognized, so no family is found.  Identical means the same rules (the same static facts: shape, moves, capacities), not the same appearance: tiles7a's 16 blue tiles share a colour, but only its five single squares share a shape | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (S5); if the names serve no purpose, Q18 instead, which is usually faster still |
-| Q8 | Is there a cheap measure of how close a state is to the goal?  If the spec already defines one, does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (S6), kept only if a timed probe shows it faster than no ordering; if it never overestimates, also try it as `min-steps-remaining?` (Q9), which can help where the ordering does not |
+| Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? (note 2) | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits |
+| Q5 | Does some quantity change by a fixed amount on every move, **and** does the goal fix its final value? (note 3) | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2) |
+| Q6 | How large is the space, and how much work does each expansion cost? (note 4) | spec, probe | whether brute force can finish (roughly under a billion program cycles); finer actions, or `bind` for parameters the state fixes |
+| Q7 | Are there interchangeable objects: one type, identical static facts, not named by the goal, and taken by the actions as typed parameters (`?peg peg`)? (note 5) | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (S5); Q18 instead if the names serve no purpose |
+| Q8 | Is there a cheap measure of how close a state is to the goal, and does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (S6), kept only if a timed probe shows it faster; if it never overestimates, also try it as `min-steps-remaining?` (Q9) |
 | Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (S5) |
 | Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (S5) |
 | Q11 | For min/max-value, can an optimistic value of a partial state be computed cheaply? | spec, user | `bounding-function?` (S4) |
@@ -204,29 +227,104 @@ of a result belong here.
 | Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (S7) |
 | Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | subgoaling (S8) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
-| Q18 | Do objects carry names the puzzle never uses (identical pegs, tokens), is the same fact stored more than once (`loc>` and `contents>`, a list beside a count), or are there objects that static facts rule out of every action (an item heavier than the capacity, tried and rejected at every state)? | spec | re-encoding (section 1.1): record only what matters (which positions are occupied).  Removes duplicate states at the source, which is cheaper and more complete than `*symmetry-pruning*`.  Merge only objects with the same rules (Q7): storing only colours is a different puzzle when same-coloured pieces differ in shape.  tiles7a-heuristic-1 stores its five identical squares as one sorted list of cells, moved by their own action whose parameter comes from a query: shortest solution 3,440 expansions in 0.1 s, against 3,649 in 0.4 s with symmetry pruning (both with a lower bound) |
+| Q18 | Do objects carry names the puzzle never uses, is the same fact stored more than once, or are some objects ruled out of every action by static facts? (note 6) | spec | re-encoding (section 1.1): record only what matters |
+
+1. **Assignments.**  csp fixes the order by depth: at depth n, while n is below the number of
+   actions, only the nth defined action is tried (`generate-children` in `ww-planner.lisp`),
+   whether or not the spec intends an order.  So csp orders a spec with one action per
+   variable (or group of variables), but gives no order to one action over all the variables
+   (knap19's `put`, crossword13's `fill`).
+2. **Undoable moves.**  Routes of different lengths reach the same state, and graph search
+   expands a state again each time a shorter route reaches it (section 6.1).
+3. **Fixed length.**  Examples: one peg left, all N items placed.  Both conditions are needed:
+   a knapsack places one item per move, but its goal does not fix how many.  Set an exact
+   `*depth-cutoff*` only if moves can continue past that length, or for
+   `min-steps-remaining?`.
+4. **Size and work per expansion.**  b^d counts paths; when moves commute (any order of the
+   same choices reaches the same state) graph search visits only the distinct states, which
+   can be far fewer (knap19: 17^11 paths, 36,326 states).  An action's `product` enumerates
+   every combination of its parameters before the precondition rejects any, so k free
+   parameters over a domain of size m cost up to m^k tests per state (a 41-addend cryptarithm
+   whose units column holds 9 letters: 31 s for 197,005 program cycles, against 7 ms for
+   DONALD's 424).  The remedy is finer actions, each fixing one or two variables.  A parameter
+   that the state already fixes (the support a disk sits on, an agent's location) should be
+   read with `bind`, not enumerated and tested: hanoi's `move` took both supports as
+   parameters, 880 combinations per state at 8 disks; binding the origin made it 5.4 times
+   faster, and a peg-per-disk encoding 13 times.
+5. **Interchangeable objects.**  Objects supplied by a query (`?peg (get-remaining-pegs?)`)
+   are not recognized, so no family is found.  Identical means the same rules (the same static
+   facts: shape, moves, capacities), not the same appearance: tiles7a's 16 blue tiles share a
+   colour, but only its five single squares share a shape.
+6. **Re-encoding.**  Examples: identical pegs or tokens; `loc>` beside `contents>`, or a list
+   beside a count; an item heavier than the capacity, tried and rejected at every state.
+   Re-encoding removes duplicate states at the source, which is cheaper and more complete than
+   `*symmetry-pruning*`.  Merge only objects with the same rules (Q7): storing only colours is a
+   different puzzle when same-coloured pieces differ in shape.  tiles7a-heuristic-1 stores its
+   five identical squares as one sorted list of cells, moved by their own action whose
+   parameter comes from a query: shortest solution 3,440 program cycles in 0.1 s, against 3,649
+   in 0.4 s with symmetry pruning (both with a lower bound).
 
 ---
 
 ## 3. Strategies
 
 Listed roughly from cheapest to most effort.  Most combine: parallel with pruning, macros with
-heuristics, subgoals with any of them.
+heuristics, subgoals with any of them.  The notes below the table give the details.
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
-| S1 | **Brute force, iterative deepening** | Always first; and as the whole answer when b^d is modest | `first`, small `*depth-cutoff*`, raise it until a solution appears, then lower it to find the shortest | Exponential in depth |
-| S2 | **Parallel search** | The space is large and the search is depth-first | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with backtracking or auto-wait (errors), nor with problems that create objects during search (section 5); `all-paths` falls back to `every` |
-| S3 | **CSP (fixed-order assignment)** | Q1 is an assignment with each action used exactly once | `*problem-type*` csp; `*depth-cutoff*` 0; define the actions in the order they should run: each action's inputs fixed by earlier actions (a carry chain runs from the units column), and the most constraining variables first.  `*algorithm*` backtracking (REPL) optionally; depth-first also respects the order.  Narrow the remaining domains as values are assigned (forward checking; `define-update` as in `problem-captjohn.lisp`) | Backtracking is serial only and ignores every search hook (section 5).  Action order matters: donald-1 right to left 424 expansions to prove, left to right 1,440.  With forward checking a variable can be fixed by elimination, so the goal must test the constraints themselves, not only that every variable has one value: donald-1's first draft, whose goal tested only that, reported 30 false solutions one column early |
-| S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); add `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`.  Pointless at fixed length (Q5).  When moves can be undone, `min-length` without a `*depth-cutoff*` first dives along a very long path and then shortens it a move or two at a time (hanoi, 7 disks: a first solution of 732 moves against an optimum of 127, then 239 improvements, 31.9 s; with the cutoff at 127, 4.5 s).  Set the cutoff to the known optimum, or to the length of a solution already found |
-| S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; define `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**: a bound that overestimates, or a dead test that rejects a live state, silently discards solutions.  Symmetry checking has overhead and removes variants under `every`.  Time it as well as counting what it saves: in hanoi's peg encoding it cut expansions by 23% and made the run 4 times slower (8 disks, 3.2 s to 12.7 s) |
-| S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only: still complete depth-first search, not beam or A*; first solution need not be shortest.  Serial and parallel both use it; backtracking does not; overrides `*randomize-search*`.  Time it against no ordering, for `first` and the optimizing search alike: tiles7a's distance of the yellow tile to its goal made `first` slower (40,412 expansions against 31,842) and `min-length` no faster, because the distance says little about clearing the way.  The same distance, which never overestimates, cut `min-length` from 49,767 expansions to 12,869 as a lower bound (Q9).  The same ordering can help on one board and hurt on another: `problem-triangle-xyz-heuristic.lisp` at N = 7 took 2,766 program cycles against 4,107 without it on one starting board, and 3,024 against 1,117 on another |
-| S7 | **Macro actions** | Q15 shows recurring multi-move patterns | add combined actions before the base actions; find candidates with `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state.  Keep the base actions.  A saving at one size can reverse at the next: in `problem-triangle-xyz-macros.lisp` double jumps took 11 program cycles against 108 at N = 5, but 1,138 against 350 at N = 6, although the plan was shorter both times |
-| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor (`doc/constraint-led-solving/solving-advisor.md`) is the worked-out interactive form, built for Talos problems with gates and bottlenecks |
+| S1 | **Brute force, iterative deepening** | Always first; the whole answer when b^d is modest | `first`, small `*depth-cutoff*`, raised until a solution appears, then lowered to find the shortest | Exponential in depth |
+| S2 | **Parallel search** | The space is large and the search is depth-first | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with backtracking, auto-wait, or objects created during search (section 5) |
+| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and ignores every search hook (section 5); the order matters; with forward checking the goal must test the constraints (note 1) |
+| S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
+| S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
+| S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
+| S7 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
+| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor is the worked-out interactive form |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
-| S10 | **Bidirectional search** | Q12 yes, and depth is the obstacle | a backward spec searched to depth d2 with `every`; `encode-state` in it; `(get-state-codes)`; a forward search to d1 = d - d2 whose goal calls `(backward-path-exists state)` (see `problem-triangle-xyz-backward.lisp`, whose header gives the procedure, and its partner `problem-triangle-xyz-forward.lisp`) | A second spec to write and keep consistent; memory for the backward layer.  Both specs need an identical `encode-state`.  Staging the forward spec keeps the backward boards; staging the backward spec clears them.  The reported plan is the forward path followed by the reversed backward path, renumbered to follow on; replay it with `validate-action-sequence`.  Triangle at N = 6, split 12 + 7: the backward search collected 16,253 boards in 8,865 program cycles, and the forward search met one in about 20 |
+| S10 | **Bidirectional search** | Q12 yes, and depth is the obstacle | a backward spec searched with `every`, then a forward search whose goal calls `(backward-path-exists state)` (note 6) | A second spec to write and keep consistent; memory for the backward layer (note 6) |
 | S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states can be generated from base facts | `define-base-relation` (plus optional `define-goal-filter`, `state-feasible?`); `(find-goal-states)`, `(find-predecessors)`, `(solve-meeting-point :depth-cutoff N :solution-type first)` (see the end of `problem-corner.lisp`) | Backward layers can explode; constrain base relations early |
 | S12 | **Randomized and branch-restricted runs** | Exploring a huge space for any solution, or splitting work by hand | `*randomize-search*` t (repeat runs); `*branch*` n explores only the nth first move | A failed run proves nothing.  Ignored when `heuristic?` is defined |
+
+1. **CSP.**  Define the actions so that each one's inputs are fixed by earlier actions (a
+   carry chain runs from the units column), with the most constraining variables first.
+   `*algorithm*` backtracking (REPL) is optional; depth-first also respects the order.  Narrow
+   the remaining domains as values are assigned (forward checking; `define-update` as in
+   `problem-captjohn.lisp`).  Order matters: donald-1 right to left took 424 program cycles to
+   prove, left to right 1,440.  With forward checking a variable can be fixed by elimination,
+   so the goal must test the constraints themselves, not only that every variable has one
+   value: donald-1's first draft, whose goal tested only that, reported 30 false solutions one
+   column early.
+2. **Optimization.**  When moves can be undone, `min-length` without a `*depth-cutoff*` first
+   dives along a very long path and then shortens it a move or two at a time (hanoi, 7 disks: a
+   first solution of 732 moves against an optimum of 127, then 239 improvements, 31.9 s; with
+   the cutoff at 127, 4.5 s).  Set the cutoff to the known optimum, or to the length of a
+   solution already found.
+3. **Pruning.**  A bound that overestimates, or a dead test that rejects a live state,
+   silently discards solutions.  Symmetry pruning removes variants under `every` and has
+   overhead: in hanoi's peg encoding it cut program cycles by 23% and made the run 4 times
+   slower (8 disks, 3.2 s to 12.7 s).
+4. **Heuristic.**  Still complete depth-first search, not beam or A*; the first solution need
+   not be shortest.  Serial and parallel search use it; backtracking does not; it overrides
+   `*randomize-search*`.  Time it for `first` and the optimizing search alike: tiles7a's
+   distance of the yellow tile to its goal made `first` slower (40,412 program cycles against
+   31,842) and `min-length` no faster, because the distance says little about clearing the
+   way; the same distance, which never overestimates, cut `min-length` from 49,767 to 12,869
+   as a lower bound (Q9).  The same ordering can help on one board and hurt on another:
+   `problem-triangle-xyz-heuristic.lisp` at N = 7 took 2,766 program cycles against 4,107
+   without it on one starting board, and 3,024 against 1,117 on another.
+5. **Macros.**  In `problem-triangle-xyz-macros.lisp` double jumps took 11 program cycles
+   against 108 at N = 5, but 1,138 against 350 at N = 6, although the plan was shorter both
+   times.
+6. **Bidirectional.**  Search the backward spec to depth d2 with `every`, with
+   `encode-state` defined; collect its boards with `(get-state-codes)`; then search forward to
+   d1 = d - d2.  `problem-triangle-xyz-backward.lisp` gives the procedure in its header, with
+   its partner `problem-triangle-xyz-forward.lisp`.  Both specs need an identical
+   `encode-state`.  Staging the forward spec keeps the backward boards; staging the backward
+   spec clears them.  The reported plan is the forward path followed by the reversed backward
+   path, renumbered to follow on; replay it with `validate-action-sequence`.  Triangle at
+   N = 6, split 12 + 7: the backward search collected 16,253 boards in 8,865 program cycles,
+   and the forward search met one in about 20.
 
 ### 3.1 Choosing
 
@@ -234,8 +332,9 @@ Start at the first row that applies; the fallback column is the escalation order
 
 | Situation | Primary | Then |
 |---|---|---|
-| Assignment, each action used once (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first, since backtracking ignores bounds) |
-| Assignment by order-free actions (Q1; e.g. knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states | S5 bound; S2.  Not S3: csp fixes the action only while the depth is below the number of actions, so a single `put` is fixed at depth 0 alone and every later depth tries all orders, in tree search.  If the spec has one action per variable group but no order (the original donald), S3 rather than graph search: graph search closes the reordered states, but csp never generates them (donald, every solution: tree 165,978 expansions, graph 17,239, csp 1,441) |
+| Assignment, one action per variable (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first, since backtracking ignores bounds) |
+| Assignment, one action, every variable set (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first; tree search (note 1) | S5 dead-state pruning (an open variable with no value left); a completion check when some variables are left for a later fill (note 3) |
+| Assignment, one action choosing a subset (knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states (note 2) | S5 bound; S2 |
 | Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S8 with time-tagged milestones |
 | b^d modest (Q6) | S1, then S4 if a best solution is wanted | S2 |
 | Fixed length (Q5) | S1 at the exact length with S5 dead-state pruning and symmetry | S10 (exhausting the remaining length proves a position dead); S7 |
@@ -243,6 +342,32 @@ Start at the first row that applies; the fallback column is the escalation order
 | Large, reversible, no distance | S2 | S10 if Q12; S7 |
 | Expensive derived state (Q14) | S9 | S11; S8 |
 | Too deep for one search, with milestones (Q16) | S8 | S10 or S11 for the last stretch |
+
+1. **Ordered open list.**  Each fill removes its variable from the list, and the goal is the
+   empty list.  Each state is then reached by one path, so graph search's table would only
+   cost memory.  crossword13: 2.8 million paths by depth 3 when any open slot could be filled,
+   22 to 25 program cycles with the slots taken along the crossings; filling all the acrosses
+   first (which never cross each other) checks nothing for 11 steps, and did not finish in 5
+   minutes.
+2. **Not S3.**  csp fixes the action only while the depth is below the number of actions, so a
+   single `put` is fixed at depth 0 alone and every later depth tries all orders, in tree
+   search.  If the spec has one action per variable group but no order (the original donald),
+   use S3 rather than graph search: graph search closes the reordered states, but csp never
+   generates them (donald, every solution: tree 165,978 program cycles, graph 17,239, csp
+   1,441).
+3. **Variables left for a later fill.**  When the search sets only some variables and leaves
+   the rest to be filled afterwards (crossword15-18: listed words placed, other slots left for
+   the dictionary), checking each crossing on its own does not ensure the open variables can
+   be filled together.  crossword15-18's best grids had no completion; five early placements
+   had already ruled one out, and a check that also tested each open slot against its
+   crossings' remaining letters still found none (and cost 15 times the program cycles).
+   Whether the rest can be filled is a search of its own: a completion solver (bit-vector
+   domains, propagation to a fixpoint, fewest values first, regions sharing no open variable
+   solved apart) decides it, here in about 0.1 s.  Run it on every placement and every
+   recorded state is completable, at far fewer states (5 minutes at 16 threads: 48,000 to
+   54,000 program cycles against 22 million, and 18, 19, 19 listed words); or search as
+   before and afterwards drop words from the best state until it completes (24 placed, 17
+   kept).  Checking every placement did better and leaves no repair step.
 
 ### 3.2 Search regimes and their trade-offs
 
@@ -284,13 +409,17 @@ spec's own values; a saved `vals.lisp` otherwise overrides them on an ordinary l
 | `*branch*` | n (0 = all) | S12 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
-| `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10); an integer N reports every N states, serial or parallel |
+| `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10): about 12 reports in 12 hours, serial or parallel; an integer N reports every N states |
 | `*max-recorder-cycles*` | integer, nil (1) | Talos recorder: recordings allowed in one path |
 | `*recorder-prefix-pruning*` | t, nil (nil) | Talos recorder: also reject open recordings that can no longer replay |
 | `*max-connector-pairings*` | integer, nil (nil: beam-relay's default) | Talos connectors |
 
 Leave the parallel tuning settings (`*split-depth-max*`, `*tasks-per-thread*`, `*min-tasks*`,
 `*num-closed-shards*`, work donation) at their defaults unless a measurement says otherwise.
+One that does: when each expansion is slow, the serial split into at least `*min-tasks*`
+(256) tasks can use the whole run (crossword15-18-2 with a 0.1 s completion check per
+placement: the split took all of a 40 s run at 2 threads, and 3.4 s with `*min-tasks*` 8).
+Set the two after `(ww-set *threads* N)`, e.g. `(setf *min-tasks* 32 *tasks-per-thread* 2)`.
 `*debug*` and `*probe*` are diagnostic, REPL-only, and not search choices.
 
 ### 4.1 Search hooks
@@ -314,7 +443,7 @@ such a bound against an unpruned run (section 6.1).
 **Exact bounds.**  For a family with a known closed-form solution, `min-steps-remaining?` can
 return the exact distance to the goal (hanoi with 3 pegs, largest disk first: a disk off its
 target adds 2^k, k the number of smaller disks, and the third peg becomes their target).  It is
-sound, and it reduces the search to walking the solution (8 disks: 289,145 expansions to 382;
+sound, and it reduces the search to walking the solution (8 disks: 289,145 program cycles to 382;
 16 disks in 4.8 s).  Report such a bound as a benchmark beside the search's own reach, not as
 its result: it measures how fast Wouldwork replays a known answer, not how well it searches,
 and it rarely survives a change to the family (there is no such formula for 4 pegs).
@@ -325,12 +454,12 @@ tree and graph search alike.  When tree search is forced (happenings, csp), repe
 cannot be closed, and the bound is the main remedy; under graph search it also prunes the
 detours by which a closed state is reached again and reopened.  tiles7a (graph search, cutoff
 22 = optimum): the yellow tile's distance to its goal alone cut `min-length` from 49,767
-expansions in 2.1 s to 12,869 in 0.3 s, and the search cut off at 21 proved 22 optimal in
+program cycles in 2.1 s to 12,869 in 0.3 s, and the search cut off at 21 proved 22 optimal in
 9,480.  Add the
 agent's distance to the goal along the static adjacency to one for each action every remaining
 solution must still take, counting an action only when it is provably required.  sentry-1:
 distance to area8, plus a jam of the sentry unless it is jammed or passed, plus a pickup of the
-jammer if it is not held; every solution at cutoff 16 fell from 733k expansions to 4,698, and
+jammer if it is not held; every solution at cutoff 16 fell from 733k program cycles to 4,698, and
 at 18 from 4.65 million to 33,954, with the same paths and goal states.  Check such a bound
 with every-solution runs with and without it at two cutoffs, which must agree.  Its gain falls
 as the cutoff rises above the optimum.  When the family will grow, compute the distances from
@@ -357,9 +486,9 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
   action applies; it checks kill conditions and `define-constraint` (the constraint check was
   added 2026-10-04: before that, sentry's auto-wait returned a 12-move "plan" that waited into
   the sentry's area, against a true optimum of 16).  With both, each wait is found twice
-  (sentry-1, every solution: 66 paths for 33, and 22 times the expansions).  Which is cheaper
+  (sentry-1, every solution: 66 paths for 33, and 22 times the program cycles).  Which is cheaper
   depends on the problem; in sentry the spec's `wait` was about 6 times cheaper (every
-  solution at cutoff 16: 733k expansions against 4.59 million).  `*auto-wait*` needs tree,
+  solution at cutoff 16: 733k program cycles against 4.59 million).  `*auto-wait*` needs tree,
   serial, depth-first.
 - **Symmetry pruning with `every`** drops solutions that differ only by symmetric objects.
 - **Fixed length with `min-length`**: every solution has the same length, so the optimizing
@@ -373,17 +502,17 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
   task generation, all four optimization modes register only goals that improve the
   incumbent; enumeration modes still retain their requested goals
   (`test/problem-task-goal-incumbent.lisp`).
+- **A value search with no goal must not define one.**  Best states are recorded only when no
+  goal is defined (`process-min-max-value` in `ww-searcher.lisp`), so `(define-goal nil)`
+  records nothing: crossword15-18 reported "No solutions found" after 2.5 million states in
+  60 s, and 35 words placed with the line removed.  Leave `define-goal` out.
 - **The `bounding-function?` incumbent starts at 1,000,000.**  A min-value problem whose
   `cost` at the start state exceeds that has the start state pruned and searches nothing.
-- **Parallel (`*threads*` > 0)**: `*auto-wait*` is an error (`ww-validator.lisp`); `all-paths`
-  falls back to `every` with a note; problems that register objects during search must declare
-  `(ww-set *search-registers-dynamic-objects* (beam))` (for example, the corner family's beam
-  objects). With worker snapshots enabled, this combination is rejected at search entry,
-  before task generation; use `(ww-set *threads* 0)` for serial execution. Registration
-  during initialization, before snapshots are published, is allowed and does not require
-  the declaration. Disabling snapshots is not a validated parallel workaround for these
-  problems. `*debug*` above 1 is reset to 1; symmetry statistics are approximate.  `heuristic?`, `prune-state?`,
-  `min-steps-remaining?`, `bounding-function?`, `*randomize-search*` and `*branch*` all apply.
+- **Parallel (`*threads*` > 0)**: `*auto-wait*` is an error; `all-paths` falls back to
+  `every`; a problem that creates objects during search (the corner family's beams) declares
+  `(ww-set *search-registers-dynamic-objects* (beam))` and runs serially (see
+  `problem-corner.lisp`); `*debug*` above 1 is reset to 1; symmetry statistics are
+  approximate.  All search hooks, `*randomize-search*` and `*branch*` apply.
 
 ---
 
@@ -401,9 +530,13 @@ and Q14.  Run it on the full problem with a goal it will not reach that early (o
 (solve)
 ```
 
+**Program cycles** counts the states expanded, and is the work count this advisor uses
+throughout (older notes say "expansions").  **Total states processed** counts the states
+generated, so it grows with the branching factor.
+
 Read from the summary: **Total states processed** and how it grows between depths (effective
-branching, so b^d for the needed depth); under graph search, **Program cycles** counts the states expanded.  That equals the distinct
-states only when every route to a state has the same length (moves that commute, as in knap19).
+branching, so b^d for the needed depth); under graph search, **Program cycles** equals the
+distinct states only when every route to a state has the same length (moves that commute, as in knap19).
 When moves can be undone, a closed state reached again by a shorter route is reopened and
 expanded again (`better-than-closed` in `ww-searcher.lisp`, under `first`, `every` and
 `min-length` alike), so Program cycles can far exceed the distinct states (hanoi, `every` to
@@ -421,7 +554,31 @@ the optimum, and density is the goal states and paths found per cutoff.  Undone 
 re-expanded at every level, so a lower bound (section 4.1) or a dead-state prune is the main
 remedy.
 
+**Time-limited probes.**  When neither a depth cutoff nor exhaustion ends a probe within
+seconds (a value search too large to finish), end it on time instead, never with a states
+limit: after staging, define a temporary `prune-state?` that stops expanding every state once
+a deadline passes, and the search unwinds and reports its best.
+
+```lisp
+(defvar *deadline* (+ (get-internal-real-time) (* 60 internal-time-units-per-second)))
+(defun prune-state? (state) (declare (ignore state)) (> (get-internal-real-time) *deadline*))
+```
+
+Reset `*deadline*` before each run and `(fmakunbound 'prune-state?)` afterwards; it only
+reads a global, so it is safe under threads.  A spec that defines its own `prune-state?`
+needs the deadline test added to it instead.  Before each repeated run with
+`*randomize-search*`, seed the random state, `(setf *random-state* (make-random-state t))`:
+SBCL starts every session with the same one, so runs in fresh sessions would repeat each
+other.
+
 For macro candidates (Q15): solve a small version with `every`, then `(freq 2 3)`.
+
+**Answer-ordered data.**  A `first` search that finishes almost at once may only be following
+the order of the spec's data.  crossword13 listed each word in the position of its slot, so
+the first word tried always fitted: 22 program cycles, while a run with `*randomize-search*` t
+had passed 2.7 million states unsolved after 150 s.  Before reporting a fast find, repeat it
+with `*randomize-search*` t (or the data shuffled), and recommend a neutral order, such as
+alphabetical, for the copy.
 
 **Solution density.**  Run `every` to exhaustion on the full problem if it finishes in
 seconds, otherwise on a small version.  Compare the number of distinct goal states with
@@ -504,7 +661,7 @@ N = 7); `first` then searches the whole space, and exhausting it is the answer.
 
 For a value problem with a bound, project from instances whose data resembles the target's,
 not from the item count alone: how the values relate to the weights decides how much the
-bound prunes.  Instances shaped like knap19 stay in the tens of expansions from 19 to 28
+bound prunes.  Instances shaped like knap19 stay in the tens of program cycles from 19 to 28
 items while their distinct states grow about 1.8 times per item; `data-knap30.lisp`, whose
 values nearly equal their weights, keeps the bound to a factor of 2 (13,053 program cycles
 unpruned, 6,577 pruned).
@@ -519,7 +676,7 @@ When moves are simple enough, a short independent script that counts the reachab
 (outside Wouldwork) checks both the projection and the encoding: its counts should equal
 **Program cycles** at the sizes already run when moves commute.  When moves can be undone, it
 gives the distinct states and the optimum instead, and Program cycles exceeds it by the
-reopenings (hanoi at 8 disks, cutoff 255: 254,368 expansions for 6,561 boards).
+reopenings (hanoi at 8 disks, cutoff 255: 254,368 program cycles for 6,561 boards).
 
 ### 6.4 Expanding the problem family
 
@@ -553,7 +710,7 @@ board shortened the solution and made the search cheaper.  Count what can move, 
 room there is.
 
 Cryptarithms with the donald-1 scheme (csp, columns right to left, forward checking), median
-expansions to prove: word length 6, 10, 14 (base 10, two addends): 1,556, 1,304, 750; more
+program cycles to prove: word length 6, 10, 14 (base 10, two addends): 1,556, 1,304, 750; more
 columns add constraints, so length is harmless.  Addends 2, 3, 4, 6 (length 6): 1,556,
 2,070, 6,757, 16,044; per-expansion work grows too (Q6).  Base 10, 12, 14, 16 (length 8):
 1,036, 3,987, 39,485, 1,302,741, about 3.5 times per base step, while finding stays near
@@ -589,36 +746,45 @@ Recorded here, not yet made in the Manual:
 
 ## 8. Report to the user
 
-The report comes in three pieces, one at the end of each phase, so that each can be approved
+The report comes in four pieces, one at the end of each phase, so that each can be approved
 before the next phase builds on it.  Items carry descriptive names, not codes (section 1),
 and the field names below are the report's headings, written in plain words.
 
-**Phase 1: overview** (the orientation, in the puzzle's own terms, no setting names)
+**Phase 0: profile** (in the puzzle's own terms, no setting names; nothing run)
 
 ```
 PROBLEM:      <name>, <spec path>
-SUMMARY:      what the problem asks and how large its search is, in a few sentences
-FINDINGS:     one named line each, what was read or measured with the number behind it,
-              marked spec / user / probe
+SUMMARY:      what the problem asks and its size as read from the spec, in a few sentences
 PROFILE:      the answered questions that mattered, each named by what it profiles rather
-              than its Q number, then the answer, marked spec / user / probe
-              ("Repeated states: yes, moves can be undone (spec)"); unknowns listed
-DIRECTION:    the recommendation in a sentence, and the question for the user
+              than its Q number, then the answer, marked spec / user
+              ("Repeated states: yes, moves can be undone (spec)"); unknowns listed, with
+              the probe that will settle them
+QUESTIONS:    what only the user can say (objective, time, machine, known lengths, larger
+              members of the family), as one numbered list
 ```
 
-**Phase 2: spec upgrades** (proposed, then reported once applied)
+**Phase 1: overview** (first probes; the puzzle's own terms, no setting names)
 
 ```
-UPGRADES:     each change, named, with its reason and the findings it rests on
-              (strategy settings that live in the spec, action order, re-encodings,
-              refactorings)
-SETTINGS:     the ww-set block of the copy, one reason per line
-SPEC HOOKS:   proposed queries or actions, each named, with its soundness argument
-CLEANUP:      minor rewrites, each named, that make the spec easier to read without changing
-              the search, each with what it removes; written together into the copy once
-              agreed, and checked by a probe giving the same counts
-CHECKS:       before and after counts for each applied change, the agreement of any
-              independent script, and the REPL forms to stage and test the copy
+FINDINGS:     one named line each, what was read or measured with the number behind it,
+              marked spec / probe
+DIRECTION:    the recommendation in a sentence
+```
+
+**Phase 2: recommendations** (proposed, accepted or rejected one by one, then reported once
+applied)
+
+```
+RECOMMENDATIONS:  numbered items, each one specific change: a short descriptive name, then a
+                  few plain sentences saying what changes, why (the finding and the number
+                  behind it), and a recommendation (accept, or accept only if ...).  Settings,
+                  action order, re-encodings, hooks (with their soundness argument),
+                  refactorings and each minor clean-up are all items of this one list
+NOT RECOMMENDED:  changes considered and declined, each with its reason
+DRAFT RESULTS:    counts measured on a draft copy with the recommended items, against the
+                  original
+CHECKS:           once applied: before and after counts, the agreement of any independent
+                  script, and the REPL forms to stage and test the copy
 ```
 
 **Phase 3: results and estimates** (short runs only; rough estimates).  Present the results
