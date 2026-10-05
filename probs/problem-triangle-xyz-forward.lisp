@@ -1,36 +1,46 @@
-;;; Filename: problem-triangle-xyz-1.lisp
+;;; Filename: problem-triangle-xyz-forward.lisp
 
-;;; Occupancy version of problem-triangle-xyz.
-;;; Pegs are indistinguishable, so the state records only which positions
-;;; are occupied.  Every (from, direction) -> (over, to) jump line is
-;;; computed once at initialization as a static fact, so a single jump
-;;; action replaces the six directional actions and their arithmetic.
+;;; Forward half of a bidirectional search on the N=6 triangle, using the
+;;; occupancy model of problem-triangle-xyz.lisp.  Partner spec:
+;;; problem-triangle-xyz-backward.lisp, which must be solved first and its
+;;; boards encoded with (get-state-codes); see its header for the procedure.
+;;; The goal is a board with *meet-peg-count* pegs that the backward search
+;;; also reached.  The reported solution is the forward path followed by the
+;;; reversed backward path.
+
+;;; Lesson (measured 2026-10-04, N=6, 16 threads): with the backward boards
+;;; tabulated, the forward search stops at its first depth-12 board that matches
+;;; one -- about 20 program cycles -- and the combined 19-jump plan replays
+;;; legally with validate-action-sequence.
 
 ;;; Positions have coordinates (x,y,z) measured from the triangle's
 ;;; right diagonal (/), left diagonal (\) and bottom (__), with x+y+z = N+2.
-;;;         11
-;;;       12  21
-;;;     13  22  31
-;;;   14  23  32  41
-;;; 15  24  33  42  51
+;;;           11
+;;;         12  21
+;;;       13  22  31
+;;;     14  23  32  41
+;;;   15  24  33  42  51
+;;; 16  25  34  43  52  61
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* triangle-xyz-1)
+(ww-set *problem-name* triangle-xyz-forward)
 
 (ww-set *problem-type* planning)
 
 (ww-set *solution-type* first)
 
+(ww-set *depth-cutoff* 12)  ;forward depth; backward depth is 19 - 12 = 7
 
-(defparameter *N* 5)  ;the number of pegs on a side
+
+(defparameter *N* 6)  ;the number of pegs on a side
 
 (defparameter *size* (/ (* *N* (1+ *N*)) 2))  ;total number of positions
 
 (defparameter *init-holes* `((1 1 ,*N*)))  ;coordinates of the initial holes
 
-(defparameter *final-peg-count* 1)  ;number of pegs to be left at the end
+(defparameter *meet-peg-count* 8)  ;pegs on the boards where the two searches meet
 
 (defparameter *directions*  ;direction name and (dx dy dz) step
   '((ld 0 1 -1) (ru 0 -1 1) (rd 1 0 -1) (lu -1 0 1) (rh 1 -1 0) (lh -1 1 0)))
@@ -89,5 +99,20 @@
     (update *db* `(peg-count ,(- *size* (length *init-holes*))))))
 
 
-(define-goal  ;only one peg left
-  `(peg-count ,*final-peg-count*))
+(define-goal  ;a meeting board that the backward search also reached
+  `(and (peg-count ,*meet-peg-count*)
+        (backward-path-exists state)))
+
+
+;;;;;;;;;;;;;;;;;;;; Encoding Meeting Boards ;;;;;;;;;;;;;;;;;
+
+
+(defun encode-state (propositions)
+  "Encodes a board as an integer with one bit per occupied position.
+   Identical in problem-triangle-xyz-backward.lisp, so both searches agree."
+  (let ((positions (gethash 'position *types*))
+        (int 0))
+    (loop for prop in propositions
+          when (eql (first prop) 'occupied)
+            do (setf int (dpb 1 (byte 1 (position (second prop) positions)) int)))
+    int))

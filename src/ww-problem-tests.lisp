@@ -9,7 +9,7 @@
 
 ;Any additions to this list requires rebuilding test/test-solutions.lisp
 ;in the run-test-problems function below.
-(defvar *test-problem-files*
+(defparameter *test-problem-files*
   '("problem-blocks3.lisp" "problem-blocks3a.lisp" "problem-blocks4.lisp" "problem-boxes.lisp"
     "problem-jugs2.lisp" "problem-jugs4.lisp" "problem-queens4.lisp" "problem-queens8.lisp"
     "problem-captjohn.lisp" "problem-quern.lisp" "problem-graveyard.lisp" "problem-sentry.lisp"
@@ -25,9 +25,9 @@
     ;"problem-tiles7a-heuristic-1.lisp"  ;about 0.1 s (first milestone only)
     "problem-hanoi.lisp"
     ;"problem-triangle.lisp"  ;needs debugging
-    ;"problem-triangle-backward.lisp"  ;takes too long
-    "problem-triangle-xy.lisp" "problem-triangle-xyz.lisp" "problem-triangle-heuristic.lisp"
-    "problem-triangle-macros.lisp" "problem-triangle-macros-one.lisp" "problem-triangle-xyz-one.lisp"
+    "problem-triangle-xyz.lisp" "problem-triangle-xyz-heuristic.lisp"
+    "problem-triangle-xyz-macros.lisp"
+    ;"problem-triangle-xyz-backward.lisp"  ;takes too long (backward half of a bidirectional pair)
     "problem-tsp.lisp"
     "problem-u2.lisp" "problem-donald.lisp" "problem-knap4a.lisp" "problem-knap4b.lisp"
     ;"problem-crater.lisp"  ;needs debugging
@@ -43,7 +43,7 @@
 ;and re-running (test-bt) to rebuild it.
 ;One representative chosen per problem class to avoid redundancy.
 ;hanoi and donald have no native depth-cutoff; overrides set in run-bt-test-problems.
-(defvar *test-bt-problem-files*
+(defparameter *test-bt-problem-files*
   '("problem-blocks3.lisp"              ;tree, every, non-fluent assertions
     "problem-blocks3a.lisp"             ;graph->tree, every, fluent bind
     ;"problem-blocks4.lisp"             ;redundant with blocks3
@@ -62,10 +62,8 @@
     ;"problem-tiles1a.lisp"              ;graph->tree, min-length, list-coord state--takes too long with bt
     "problem-hanoi.lisp"                ;min-length, depth-cutoff 9 set in run-bt-test-problems
     "problem-triangle-xyz.lisp"         ;first, canonical triangle form
-    ;"problem-triangle-xy.lisp"         ;redundant with triangle-xyz
-    "problem-triangle-macros.lisp"      ;tree, first, multiple asserts per action
-    ;"problem-triangle-macros-one.lisp" ;redundant with triangle-macros
-    ;"problem-triangle-xyz-one.lisp"    ;redundant with triangle-xyz
+    "problem-triangle-xyz-macros.lisp"  ;first, macro action alongside its base action
+    ;"problem-triangle-xyz-backward.lisp" ;takes too long with bt tree search
     ;"problem-tsp.lisp"                 ;min-value solution type not supported by bt
     "problem-u2.lisp"                   ;min-length, time-constrained preconditions
     "problem-donald.lisp"               ;tree, first, depth-cutoff 6 set in run-bt-test-problems

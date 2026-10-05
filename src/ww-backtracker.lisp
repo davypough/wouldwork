@@ -425,10 +425,11 @@
                      :value (problem-state.value *backtrack-state*)
                      :path solution-path
                      :goal (copy-problem-state *backtrack-state*))))
-    (format t "~%New path to goal found at depth = ~:D" solution-depth)
-    (when (eql *solution-type* 'min-time)
-      (format t "Time = ~:A~%" (solution.time solution)))
-    (finish-output)
+    (when (report-solution-found-p)
+      (format t "~%New path to goal found at depth = ~:D" solution-depth)
+      (when (eql *solution-type* 'min-time)
+        (format t "Time = ~:A~%" (solution.time solution)))
+      (finish-output))
     (push solution *solution-paths*)
     (when (not (member (problem-state.idb (solution.goal solution)) *unique-solution-states* 
                        :key (lambda (soln) (problem-state.idb (solution.goal soln)))

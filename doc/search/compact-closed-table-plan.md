@@ -6,7 +6,7 @@
 ## Why
 
 Graph search keeps one closed-table entry per distinct state.  Measured on
-`problem-triangle-xyz-1` at N = 6 (291,694 states, parallel, `every`): the closed table held
+`problem-triangle-xyz` at N = 6 (291,694 states, parallel, `every`): the closed table held
 **672 bytes per state**.  At N = 7 the 40.6 million reachable states need about 27 GB and
 overran the 25 GB SBCL heap, although a board is only 28 occupied-or-empty positions.
 
@@ -55,7 +55,7 @@ Check again for other readers before Phase 1 (`grep -n "closed" src/*.lisp`).
   the closed table's retained bytes and bytes per entry (full GC, `sb-kernel:dynamic-usage`,
   drop `*closed*` / `*closed-shards*`, GC, measure again).
 - Record baselines (bytes/entry, program cycles, elapsed time; serial and 16 threads) for:
-  `triangle-xyz-1` (N = 6), `knap19`, a blocks problem, one Talos problem with many facts, and
+  `triangle-xyz` (N = 6), `knap19`, a blocks problem, one Talos problem with many facts, and
   one problem with `*symmetry-pruning*` t in graph mode.
 - Exit: table of baselines in this file.
 
@@ -90,7 +90,7 @@ Check again for other readers before Phase 1 (`grep -n "closed" src/*.lisp`).
 ### Phase 5 — Validation and docs
 - Full test suite; every `probs/` graph-search problem that solved before still gives the same
   solutions, serial and 16 threads.
-- `triangle-xyz-1` at N = 7: should now fit the heap and prove no single-peg finish from a
+- `triangle-xyz` at N = 7: should now fit the heap and prove no single-peg finish from a
   corner hole (40,600,768 states, per an independent count).
 - Update `doc/problem-analysis/search-advisor/search-advisor.md` section 6.3 with the new
   bytes per state.

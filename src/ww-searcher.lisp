@@ -1528,11 +1528,24 @@ different acceptable milestone state."
             (= (hash-table-count *state-codes*) 0))
       nominal-path
       (append nominal-path
-              (reverse
+              (continue-backward-path
                 (gethash
                   (funcall (symbol-function 'encode-state)
                            (list-database (problem-state.idb goal-state)))
-                  *state-codes*))))))
+                  *state-codes*)
+                (problem-state.time goal-state))))))
+
+
+(defun continue-backward-path (backward-path goal-time)
+  "Reverses BACKWARD-PATH, the (time move) entries of a backward search, so it
+   continues a forward path ending at GOAL-TIME.  Each reversed move ends at
+   GOAL-TIME plus the backward final time minus the time of the backward move
+   preceding it, which preserves move durations."
+  (let ((final-time (first (first (last backward-path))))
+        (prior-times (cons 0.0 (mapcar #'first (butlast backward-path)))))
+    (loop for (nil move) in (reverse backward-path)
+          for prior-time in (reverse prior-times)
+          collect (list (+ goal-time (- final-time prior-time)) move))))
 
 
 (defun enumerate-paths-to-node (node)
@@ -1777,32 +1790,27 @@ different acceptable milestone state."
   (declare (type node goal-node))
   (let* ((goal-state (node.state goal-node))
          (state-depth (node.depth goal-node))
-         (solution
-           (make-solution
-             :depth state-depth
-             :time (problem-state.time goal-state)
-             :value (problem-state.value goal-state)
-             :path (candidate-path-to-goal-node goal-node)
-             :goal goal-state)))
-    (let ((ctrl-str (if (zerop state-depth)
-                        "Start state satisfies goal; recorded zero-action solution at depth = ~:D"
-                        "New path to goal found at depth = ~:D")))
-      (cond ((> *threads* 0)
-             #+:ww-debug (when (>= *debug* 1)
-                           (lprt))
-             (bt:with-lock-held (*lock*)
-               (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-                 (format t (concatenate 'string "~&" ctrl-str
-                                        "~%Objective value = ~:A~2%")
-                          state-depth (solution.value solution))
-                 (format t (concatenate 'string "~&" ctrl-str "~%") state-depth))
-               (finish-output)))
-            (t (format t (concatenate 'string "~%" ctrl-str) state-depth)
-             (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
-               (format t " Objective value = ~:A~%" (solution.value solution)))
-             (when (eql *solution-type* 'min-time)
-               (format t "Time = ~:A~%" (solution.time solution)))
-             (finish-output))))
+         (solution (make-search-solution (candidate-path-to-goal-node goal-node) goal-state)))
+    (when (report-solution-found-p)
+      (let ((ctrl-str (if (zerop state-depth)
+                          "Start state satisfies goal; recorded zero-action solution at depth = ~:D"
+                          "New path to goal found at depth = ~:D")))
+        (cond ((> *threads* 0)
+               #+:ww-debug (when (>= *debug* 1)
+                             (lprt))
+               (bt:with-lock-held (*lock*)
+                 (if (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
+                   (format t (concatenate 'string "~&" ctrl-str
+                                          "~%Objective value = ~:A~2%")
+                            state-depth (solution.value solution))
+                   (format t (concatenate 'string "~&" ctrl-str "~%") state-depth))
+                 (finish-output)))
+              (t (format t (concatenate 'string "~%" ctrl-str) state-depth)
+               (when (or (eql *solution-type* 'min-value) (eql *solution-type* 'max-value))
+                 (format t " Objective value = ~:A~%" (solution.value solution)))
+               (when (eql *solution-type* 'min-time)
+                 (format t "Time = ~:A~%" (solution.time solution)))
+               (finish-output)))))
     (when (eql *algorithm* 'depth-first)
       (narrate "Solution found ***" goal-state state-depth))
     (push-global solution *solution-paths*)
@@ -1822,6 +1830,29 @@ different acceptable milestone state."
                        (substitute solution existing *unique-solution-states*))))
               (t
                (push-global solution *unique-solution-states*)))))))
+
+
+(defun make-search-solution (path goal-state)
+  "Makes the solution record for PATH ending at GOAL-STATE.  Depth and time are
+   taken from PATH itself, so the backward tail of a bidirectional path counts."
+  (declare (type list path) (type problem-state goal-state))
+  (make-solution
+    :depth (length path)
+    :time (if path
+            (first (car (last path)))
+            (problem-state.time goal-state))
+    :value (problem-state.value goal-state)
+    :path path
+    :goal goal-state))
+
+
+(defun report-solution-found-p ()
+  "True when a newly found solution should be announced: the first one, each
+   new best of an optimizing search, or every one when *debug* >= 1.  Call
+   before the new solution is pushed onto *solution-paths*."
+  (or (null *solution-paths*)
+      (member *solution-type* '(min-length min-time min-value max-value))
+      (>= *debug* 1)))
 
 
 (defun printout-solution (soln)

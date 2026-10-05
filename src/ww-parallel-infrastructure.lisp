@@ -648,8 +648,9 @@
 ;;; SOLUTION REGISTRATION (Thread-Safe)
 ;;; ============================================================
 
-(defun register-parallel-solution (current-node goal-state worker-id)
+(defun register-parallel-solution (current-node goal-state path worker-id)
   "Thread-safe solution registration during parallel search.
+   PATH is the complete candidate path from candidate-path-to-goal-node.
    Pushes onto *solution-paths* under *best-solution-lock*; deduplication of
    *unique-solution-states* is deferred to finalize-parallel-search-results.
    Per-solution console output is gated to *solution-type* = first or
@@ -657,16 +658,10 @@
    solutions are found."
   (declare (type node current-node)
            (type problem-state goal-state)
+           (type list path)
            (type fixnum worker-id))
   (let* ((state-depth (1+ (node.depth current-node)))
-         (solution
-           (make-solution
-            :depth state-depth
-            :time (problem-state.time goal-state)
-            :value (problem-state.value goal-state)
-            :path (append (record-solution-path current-node)
-                          (list (record-move goal-state)))
-            :goal goal-state)))
+         (solution (make-search-solution path goal-state)))
     ;; Thread-safe push onto *solution-paths*. The in-search *unique-solution-states*
     ;; maintenance was an O(N^2) scan under this lock and produced a result
     ;; that finalize-parallel-search-results discards and rebuilds; removed.

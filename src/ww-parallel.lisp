@@ -353,14 +353,16 @@
              ;; Keep nominal goals expandable in case later actions repair the plan.
              (unless *solution-validators*
                (return-from process-one)))
-            ((candidate-solution-valid-p
-               (append (record-solution-path current-node)
-                       (list (record-move succ-state)))
-               succ-state)
-             (register-parallel-solution current-node succ-state worker-id)
-             (when (solution-count-reached-p)
-               (return-from worker-process-successors-phase1 'first-found))
-             (return-from process-one)))
+            (t
+             (let ((candidate-path (candidate-path-to-goal-node
+                                     (make-node :state succ-state
+                                                :depth succ-depth
+                                                :parent current-node))))
+               (when (candidate-solution-valid-p candidate-path succ-state)
+                 (register-parallel-solution current-node succ-state candidate-path worker-id)
+                 (when (solution-count-reached-p)
+                   (return-from worker-process-successors-phase1 'first-found))
+                 (return-from process-one)))))
           ;; A rejected nominal goal falls through to ordinary successor handling.
           )
         

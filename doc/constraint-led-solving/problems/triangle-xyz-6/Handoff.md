@@ -1,6 +1,7 @@
 # triangle-xyz-6 — Handoff (constraint-method pilot, outside the talos records)
 Updated 2026-10-01.  Status: CLOSED -- solved and validated (19 actions, last peg at 41).
 Problem spec: probs/problem-triangle-xyz-6.lisp (copy of triangle-xyz with *N* 6; triangle-xyz stays N=5 for the regression tests).
+Spec deleted 2026-10-04 (triangle problems consolidated); triangle-xyz is now the occupancy model, whose actions differ from Actions.lisp.  To replay, restore the spec from git: git show 0f16a51:probs/problem-triangle-xyz-6.lisp
 Corresponding diagram: the board comment in the spec header (no separate drawing).
 Maximum search depth: 4, set 2026-10-01.
 ## Next step       None.  Closed 2026-10-01; findings in the Briefing's Pilot findings.

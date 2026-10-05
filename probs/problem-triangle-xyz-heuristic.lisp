@@ -1,35 +1,36 @@
-;;; Filename: problem-triangle-xyz.lisp
+;;; Filename: problem-triangle-xyz-heuristic.lisp
 
-;;; Occupancy version of problem-triangle-xyz.
-;;; Pegs are indistinguishable, so the state records only which positions
-;;; are occupied.  Every (from, direction) -> (over, to) jump line is
-;;; computed once at initialization as a static fact, so a single jump
-;;; action replaces the six directional actions and their arithmetic.
-
-;;; Lesson (measured 2026-10-04, N=5, every solution, graph search): naming the
-;;; pegs, as earlier versions did, makes boards that differ only in which peg is
-;;; where into separate states -- 14,311 program cycles against 3,012 here, and
-;;; 13 "unique" solutions against 4.  Leave out any identity the goal ignores.
+;;; problem-triangle-xyz with a heuristic? search ordering, at N = 6.
+;;; The heuristic compares the pegs with the holes inside the smallest
+;;; x, y, z ranges that enclose all the pegs: a board whose pegs are
+;;; packed together, with few holes among them, is explored first.
+;;; Each position's coordinates are kept as a static fact for it.
+;;; Lesson (measured 2026-10-04, first solution, program cycles with/without it):
+;;; N=6 holes 11 12 13 22: 306/350 292/98 284/358 32/119;  N=7 holes 12 13 23:
+;;; 3024/1117 2766/4107 16124/8569.  A heuristic only reorders the moves, and a
+;;; plausible one can help on some boards and hurt on others.  Time any heuristic
+;;; against none, on several starting boards, before relying on it.
 
 ;;; Positions have coordinates (x,y,z) measured from the triangle's
 ;;; right diagonal (/), left diagonal (\) and bottom (__), with x+y+z = N+2.
-;;;         11
-;;;       12  21
-;;;     13  22  31
-;;;   14  23  32  41
-;;; 15  24  33  42  51
+;;;           11
+;;;         12  21
+;;;       13  22  31
+;;;     14  23  32  41
+;;;   15  24  33  42  51
+;;; 16  25  34  43  52  61
 
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* triangle-xyz)
+(ww-set *problem-name* triangle-xyz-heuristic)
 
 (ww-set *problem-type* planning)
 
 (ww-set *solution-type* first)
 
 
-(defparameter *N* 5)  ;the number of pegs on a side
+(defparameter *N* 6)  ;the number of pegs on a side
 
 (defparameter *size* (/ (* *N* (1+ *N*)) 2))  ;total number of positions
 
@@ -54,7 +55,33 @@
 
 
 (define-static-relations
-    (jump-line> position direction $position $position))  ;over and to positions
+    (jump-line> position direction $position $position)  ;over and to positions
+    (coords> position $fixnum $fixnum $fixnum))          ;x, y, z of a position
+
+
+(define-query heuristic? ()
+  ;Lower is explored first: |pegs - enclosed holes - 1|
+  (do (bind (peg-count $peg-count))
+      (assign $x-min 100) (assign $y-min 100) (assign $z-min 100)
+      (assign $x-max 0) (assign $y-max 0) (assign $z-max 0)
+      (doall (?pos position)
+        (if (occupied ?pos)
+          (do (bind (coords> ?pos $x $y $z))
+              (assign $x-min (min $x-min $x))
+              (assign $y-min (min $y-min $y))
+              (assign $z-min (min $z-min $z))
+              (assign $x-max (max $x-max $x))
+              (assign $y-max (max $y-max $y))
+              (assign $z-max (max $z-max $z)))))
+      (assign $enclosed-hole-count 0)
+      (doall (?pos position)
+        (if (not (occupied ?pos))
+          (do (bind (coords> ?pos $x $y $z))
+              (if (and (<= $x-min $x $x-max)
+                       (<= $y-min $y $y-max)
+                       (<= $z-min $z $z-max))
+                (assign $enclosed-hole-count (1+ $enclosed-hole-count))))))
+      (abs (- $peg-count $enclosed-hole-count 1))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,6 +109,7 @@
                    for z = (- (1+ *N*) x) then (1- z)
                    for pos = (intern (format nil "P~D~D" x y))
                    do (setf (gethash (list x y z) coords->pos) pos)
+                      (update *static-db* `(coords> ,pos ,x ,y ,z))
                       (unless (member (list x y z) *init-holes* :test #'equal)
                         (update *db* `(occupied ,pos)))))
     (loop for from-coords being the hash-keys of coords->pos using (hash-value from)

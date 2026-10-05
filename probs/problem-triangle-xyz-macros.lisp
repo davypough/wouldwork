@@ -1,15 +1,15 @@
-;;; Filename: problem-triangle-xyz.lisp
+;;; Filename: problem-triangle-xyz-macros.lisp
 
-;;; Occupancy version of problem-triangle-xyz.
-;;; Pegs are indistinguishable, so the state records only which positions
-;;; are occupied.  Every (from, direction) -> (over, to) jump line is
-;;; computed once at initialization as a static fact, so a single jump
-;;; action replaces the six directional actions and their arithmetic.
-
-;;; Lesson (measured 2026-10-04, N=5, every solution, graph search): naming the
-;;; pegs, as earlier versions did, makes boards that differ only in which peg is
-;;; where into separate states -- 14,311 program cycles against 3,012 here, and
-;;; 13 "unique" solutions against 4.  Leave out any identity the goal ignores.
+;;; problem-triangle-xyz with a macro action added before the single jump.
+;;; A double jump is two jumps along one line:  A B _ C  ->  _ C _ _
+;;; A jumps over B into the gap, then C jumps back over A into B's old spot.
+;;; So the start and far end are emptied, and the over position stays filled.
+;;; Its (from, direction) -> (over, gap, far) lines are computed once at
+;;; initialization, like the single jump lines.
+;;; Lesson (measured 2026-10-04, first solution, program cycles / steps, macros vs
+;;; plain triangle-xyz): N=5 11/10 vs 108/13;  N=6 1138/15 vs 350/19.  Macros shortened
+;;; the plan both times, but they add moves to try at every state, and the N=5 saving
+;;; reversed at N=6.  Time them against the base actions at the size you need.
 
 ;;; Positions have coordinates (x,y,z) measured from the triangle's
 ;;; right diagonal (/), left diagonal (\) and bottom (__), with x+y+z = N+2.
@@ -22,7 +22,7 @@
 
 (in-package :ww)  ;required
 
-(ww-set *problem-name* triangle-xyz)
+(ww-set *problem-name* triangle-xyz-macros)
 
 (ww-set *problem-type* planning)
 
@@ -54,10 +54,26 @@
 
 
 (define-static-relations
-    (jump-line> position direction $position $position))  ;over and to positions
+    (jump-line> position direction $position $position)               ;over and to positions
+    (double-jump-line> position direction $position $position $position))  ;over, gap, far
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-action double-jump
+  1
+  (?from position ?dir direction)
+  (and (occupied ?from)
+       (bind (double-jump-line> ?from ?dir $over $gap $far))
+       (occupied $over)
+       (not (occupied $gap))
+       (occupied $far)
+       (bind (peg-count $peg-count)))
+  (?from $far)
+  (assert (not (occupied ?from))
+          (not (occupied $far))
+          (peg-count (- $peg-count 2))))
 
 
 (define-action jump
@@ -86,11 +102,14 @@
                         (update *db* `(occupied ,pos)))))
     (loop for from-coords being the hash-keys of coords->pos using (hash-value from)
           do (loop for (dir dx dy dz) in *directions*
-                   for over = (gethash (mapcar #'+ from-coords (list dx dy dz)) coords->pos)
-                   for to = (gethash (mapcar #'+ from-coords (list (* 2 dx) (* 2 dy) (* 2 dz)))
-                                     coords->pos)
-                   when to
-                     do (update *static-db* `(jump-line> ,from ,dir ,over ,to))))
+                   for line = (loop for k from 1 to 3
+                                    collect (gethash (mapcar #'+ from-coords
+                                                             (list (* k dx) (* k dy) (* k dz)))
+                                                     coords->pos))
+                   when (second line)
+                     do (update *static-db* `(jump-line> ,from ,dir ,(first line) ,(second line)))
+                   when (third line)
+                     do (update *static-db* `(double-jump-line> ,from ,dir ,@line))))
     (update *db* `(peg-count ,(- *size* (length *init-holes*))))))
 
 
