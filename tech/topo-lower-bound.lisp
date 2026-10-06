@@ -19,9 +19,14 @@
 ;;;   - a domain with blower drives gets one-action relocation fallbacks;
 ;;;   - delete effects are absent, as the relaxed heuristics require.
 ;;; A companion finite-domain bound keeps one current location per agent while routing the
-;;; supported cargo-location goals.  Its movement, manipulation, and recorder-session costs
-;;; are disjoint; tray riders, propagating relocators, unsupported goals, and happenings are
-;;; omitted rather than overestimated.
+;;; supported cargo-location goals; an ON goal whose support has a fixed position routes as
+;;; the occupant's location goal at that position.  Its movement, manipulation, and
+;;; recorder-session costs are disjoint; tray riders, unsupported goals, and happenings are
+;;; omitted rather than overestimated.  A fixed floor blower's stream joins its source and
+;;; destination as a gate-free route; a leg ending at either costs no MOVE, and cargo goals
+;;; and plates there are omitted, since one action on the stream may relocate several
+;;; occupants.  Other propagating relocators (gears, wall and angled blowers) still disable
+;;; the routed tasks.
 ;;; Search registers that inexpensive finite-domain term as its automatic contributor.  A
 ;;; problem may separately define MIN-STEPS-REMAINING? as an aggregate fallback; serial
 ;;; depth-first search then samples an unproductive fallback after its technical warmup and
@@ -102,6 +107,10 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
 
 
 (defparameter *topo-resource-routes* nil)
+
+
+(defparameter *topo-resource-lift-locations* nil
+  "Source and destination locations of every fixed floor blower's stream.")
 
 
 (defparameter *topo-resource-recording-sides* nil
@@ -277,8 +286,8 @@ in linear time."
   "Cache the HAS-POSITION facts that staging fixes for the whole search.
 
 Placements are the only static propositions the relaxed fact set carries, and only the
-LM-cut placement operators read them; the finite-resource term reads HAS-LOCATION, HOLDING
-and ON alone.  STAGE recreates *STATIC-IDB* and reloads this file, so the DEFPARAMETER above
+LM-cut placement operators read them; the finite-resource term reads them only to place ON
+goals and plates.  STAGE recreates *STATIC-IDB* and reloads this file, so the DEFPARAMETER above
 invalidates the cache exactly as *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
   (unless *topo-relaxed-static-positions-built-p*
     (setf *topo-relaxed-static-positions*
@@ -349,11 +358,28 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
 
 
 (define-problem-helper topo-relaxed-propagating-relocator-p ()
-  "Whether installed apparatus may move physical occupants as an action consequence."
+  "Whether installed apparatus may move occupants in ways the routed tasks do not model.
+A fixed floor blower is modelled by TOPO-RELAXED-FLOOR-LIFTS; a fan on floor-gears has no
+fixed source, and wall and angled blowers push sideways, so they still disable the tasks."
   (some (lambda (type)
           (topo-relaxed-type-instances type))
-        '(floor-gears wall-gears angled-gears
-          floor-blower wall-blower angled-blower)))
+        '(floor-gears wall-gears angled-gears wall-blower angled-blower)))
+
+
+(define-problem-helper topo-relaxed-floor-lifts ()
+  "The (source destination) pair of each fixed floor blower, read from static facts.
+A blowing stream launches an occupant at its source to its destination, and a stopping one
+drops it back, so each pair is a gate-free relaxed route in both directions."
+  (let ((statics (topo-relaxed-static-propositions)))
+    (loop for blower in (topo-relaxed-type-instances 'floor-blower)
+          collect (list (third (find-if (lambda (fact)
+                                          (and (eq (first fact) 'has-position)
+                                               (eq (second fact) blower)))
+                                        statics))
+                        (third (find-if (lambda (fact)
+                                          (and (eq (first fact) 'aimed-at)
+                                               (eq (second fact) blower)))
+                                        statics))))))
 
 
 (define-problem-helper topo-relaxed-gate-clause (clause)
@@ -427,6 +453,10 @@ way *TOPO-RESOURCE-STATIC-CONTEXT-BUILT-P* does."
         (topo-relaxed-add-route-family routes from to family)
         (when (eq relation 'traverse-via)
           (topo-relaxed-add-route-family routes to from family))))
+    (dolist (lift (topo-relaxed-floor-lifts))
+      (destructuring-bind (source destination) lift
+        (topo-relaxed-add-route-family routes source destination (list nil))
+        (topo-relaxed-add-route-family routes destination source (list nil))))
     ;; A non-topological model may still include this technology.  Fully connecting it is
     ;; the safe relaxation: an omitted concrete movement schema can never be overestimated.
     (when (null records)
@@ -592,7 +622,8 @@ twice."
     (goal facts locations reaches)
   (let ((object (second goal))
         (target (third goal)))
-    (unless (topo-resource-tray-supported-p object facts)
+    (unless (or (topo-resource-tray-supported-p object facts)
+                (member target *topo-resource-lift-locations* :test #'eq))
       (let* ((holder (topo-resource-object-holder object facts))
              (object-location (topo-resource-object-location object facts))
              (holder-location
@@ -691,12 +722,25 @@ reloads this file, so the DEFPARAMETER above invalidates the cache exactly as
     (remove-duplicates
       (remove nil
         (loop for goal in goals
-              when (and (consp goal) (eq (first goal) 'has-location))
+              for location-goal = (topo-resource-location-goal goal facts)
+              when location-goal
                 collect
                   (topo-resource-location-task
-                    goal facts locations reaches)))
+                    location-goal facts locations reaches)))
       :key #'topo-resource-task.object
       :test #'eq)))
+
+
+(define-problem-helper topo-resource-location-goal (goal facts)
+  "GOAL as a HAS-LOCATION goal: itself, or an ON goal at its support's fixed position.
+Standing or resting on the support implies being at its location, and the placement costs
+the same one PUT, so the translation never asks more than the ON goal does."
+  (case (first goal)
+    (has-location goal)
+    (on (let ((position (topo-resource-object-position (third goal) facts)))
+          (when position
+            (list 'has-location (second goal) position))))
+    (otherwise nil)))
 
 
 (define-problem-helper topo-resource-ensure-static-context ()
@@ -707,6 +751,8 @@ reloads this file, so the DEFPARAMETER above invalidates the cache exactly as
             (topo-relaxed-reach-clauses *topo-resource-locations*)
           *topo-resource-routes*
             (topo-relaxed-route-families *topo-resource-locations*)
+          *topo-resource-lift-locations*
+            (remove-duplicates (reduce #'append (topo-relaxed-floor-lifts)))
           *topo-resource-static-context-built-p* t))
   (values *topo-resource-locations*
           *topo-resource-reaches*
@@ -723,8 +769,11 @@ reloads this file, so the DEFPARAMETER above invalidates the cache exactly as
 (define-problem-helper topo-resource-move-cost (from to routes)
   ;; A missing static route may become available through a capability this partial model
   ;; omits.  Charge zero rather than treating that uncertainty as an impossible task.
+  ;; A stream launch or drop lands an occupant without a MOVE, and one action on the stream
+  ;; may land several, so a leg ending at a lift location is not charged.
   (if (or (eq from to)
-          (null (gethash (list from to) routes)))
+          (null (gethash (list from to) routes))
+          (member to *topo-resource-lift-locations* :test #'eq))
     0
     1))
 
@@ -948,19 +997,26 @@ cost nothing.  The structural test is last because it is the only expensive one.
 
 
 (define-problem-helper topo-resource-plate-cost (plate facts targets)
-  "One PUT onto PLATE, plus one PICKUP unless some agent already holds cargo.
+  "One PUT onto PLATE, plus one PICKUP unless some agent already holds cargo or another body
+could press it by stepping on.
 
 The manipulation component charges each task one PUT that lands its object at the task
 target, so a plate standing anywhere else needs a different PUT.  The PICKUP preceding it is
 likewise followed by the plate PUT rather than by a goal PUT, so it too is distinct.  Where
 the plate does stand at a task target the two may coincide and nothing is charged.  A held
 object suppresses the pickup charge for every plate at once, which understates rather than
-risks the count."
+risks the count.  With a second agent (a recording ghost counts) one step can press the plate,
+so only one action is charged; the agent whose route the gate blocks cannot hold it open
+itself.  A plate at a lift location may be pressed by a stream drop and costs nothing."
   (let ((position (topo-resource-object-position plate facts)))
     (if (or (null position)
-            (member position targets :test #'eq))
+            (member position targets :test #'eq)
+            (member position *topo-resource-lift-locations* :test #'eq))
       0
-      (if (topo-resource-holding-type-p facts 'cargo) 1 2))))
+      (if (or (topo-resource-holding-type-p facts 'cargo)
+              (rest (topo-relaxed-type-instances 'agent)))
+        1
+        2))))
 
 
 (define-problem-helper topo-resource-object-position (object facts)

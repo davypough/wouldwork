@@ -17,11 +17,12 @@
 ;;; permitted cycle.  The report reconstructs every cycle and its local metrics from the
 ;;; accepted path while retaining complete-solution totals.
 ;;;
-;;; Recorder cycle chaining remains an explicitly guided convenience.  Each SOLVE-SUBGOAL
-;;; is capped at and required to consume exactly one additional cycle, and the following
-;;; SOLVE does the same for the final cycle.  The configured maximum limits the complete
-;;; guided history.  Its retained history is locally optimized per search and makes no
-;;; global claim.
+;;; Recorder cycle chaining remains an explicitly guided convenience.  A SOLVE-SUBGOAL
+;;; checkpoint is not a cycle boundary: each search may continue through an open cycle,
+;;; close it, or start another, as the planner's ordinary recorder actions decide, and the
+;;; following SOLVE completes the guided history the same way.  The configured maximum
+;;; limits the complete guided history.  Its retained history is locally optimized per
+;;; search and makes no global claim.
 ;;;
 ;;; The component order preserves the established propagation seed:
 ;;; ordinary receiver state, recording switch and plate state, recording receiver state,

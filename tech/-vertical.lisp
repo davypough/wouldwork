@@ -154,6 +154,43 @@
           (fixed-base ?object))))))
 
 
+(defun vertical-axis-p (object)
+  "Return true when OBJECT's height raises its top above its base.  Kept a Lisp function
+   rather than inlined into TOP so the axis keyword never reaches the query translator."
+  (eq (third (vertical-type-entry object)) :vertical))
+
+
+(defun vertical-type-entry (object)
+  "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS BASE-DEFAULT) entry from *VERTICAL-TYPE-CONSTANTS*.
+   The table's types are disjoint leaves, so the first match is the only match.  An
+   object outside the table has no place in the vertical model, which is an authoring
+   error rather than a zero height -- saying so here is what keeps a mistargeted caller
+   from silently reading NIL.  Memoized; see *VERTICAL-TYPE-CACHE*."
+  (multiple-value-bind (cached present) (gethash object *vertical-type-cache*)
+    (if present
+      cached
+      (setf (gethash object *vertical-type-cache*)
+            (or (find-if (lambda (entry)
+                           (member object (gethash (first entry) *types*)))
+                         *vertical-type-constants*)
+                (error "~%No vertical type constants are defined for ~S.~%~
+                        Every object reaching BASE, TOP, or OBJECT-HEIGHT must belong to ~
+                        one of the leaf types in *VERTICAL-TYPE-CONSTANTS*."
+                       object))))))
+
+
+(defun location-elevation-value (state location)
+  "Return LOCATION's level, computing it once per location for this problem instance.
+   LOCATION-LEVEL is called through SYMBOL-FUNCTION because it is an overridable seam: the
+   definition that must run is whichever technology installed last, not the one visible when
+   this file compiled.  Memoized; see *LOCATION-ELEVATION-CACHE*."
+  (multiple-value-bind (cached present) (gethash location *location-elevation-cache*)
+    (if present
+      cached
+      (setf (gethash location *location-elevation-cache*)
+            (funcall (symbol-function 'location-level) state location)))))
+
+
 (define-query fixed-base (?object vertical-object)
   ;; The authored level of an object that rests on nothing.  A location carries its level
   ;; as LOCATION-COORDS>'s third coordinate, a wall-mounted fixture as APPARATUS-COORDS>'s,
@@ -209,42 +246,6 @@
     $height
     (second (vertical-type-entry ?object))))
 
-
-(defun vertical-axis-p (object)
-  "Return true when OBJECT's height raises its top above its base.  Kept a Lisp function
-   rather than inlined into TOP so the axis keyword never reaches the query translator."
-  (eq (third (vertical-type-entry object)) :vertical))
-
-
-(defun vertical-type-entry (object)
-  "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS BASE-DEFAULT) entry from *VERTICAL-TYPE-CONSTANTS*.
-   The table's types are disjoint leaves, so the first match is the only match.  An
-   object outside the table has no place in the vertical model, which is an authoring
-   error rather than a zero height -- saying so here is what keeps a mistargeted caller
-   from silently reading NIL.  Memoized; see *VERTICAL-TYPE-CACHE*."
-  (multiple-value-bind (cached present) (gethash object *vertical-type-cache*)
-    (if present
-      cached
-      (setf (gethash object *vertical-type-cache*)
-            (or (find-if (lambda (entry)
-                           (member object (gethash (first entry) *types*)))
-                         *vertical-type-constants*)
-                (error "~%No vertical type constants are defined for ~S.~%~
-                        Every object reaching BASE, TOP, or OBJECT-HEIGHT must belong to ~
-                        one of the leaf types in *VERTICAL-TYPE-CONSTANTS*."
-                       object))))))
-
-
-(defun location-elevation-value (state location)
-  "Return LOCATION's level, computing it once per location for this problem instance.
-   LOCATION-LEVEL is called through SYMBOL-FUNCTION because it is an overridable seam: the
-   definition that must run is whichever technology installed last, not the one visible when
-   this file compiled.  Memoized; see *LOCATION-ELEVATION-CACHE*."
-  (multiple-value-bind (cached present) (gethash location *location-elevation-cache*)
-    (if present
-      cached
-      (setf (gethash location *location-elevation-cache*)
-            (funcall (symbol-function 'location-level) state location)))))
 
 ;; Each worker owns the lazy technology caches it can populate.
 (register-worker-read-memo '*vertical-type-cache* :empty-table)

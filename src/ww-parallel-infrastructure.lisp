@@ -660,6 +660,11 @@
            (type problem-state goal-state)
            (type list path)
            (type fixnum worker-id))
+  (when (eql *solution-type* 'count)
+    (when (count-accepted-goal)
+      (setf *count-example* (make-search-solution path goal-state)))
+    (ws-inc-solutions (get-worker-stats worker-id))
+    (return-from register-parallel-solution nil))
   (let* ((state-depth (1+ (node.depth current-node)))
          (solution (make-search-solution path goal-state)))
     ;; Thread-safe push onto *solution-paths*. The in-search *unique-solution-states*

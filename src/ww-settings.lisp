@@ -184,7 +184,10 @@ must return unknown rather than :IMPOSSIBLE.")
   "Division marker for debugging printout convenience.")
 
 (sb-ext:defglobal *solution-count* 0
-  "Holds the total number of solutions found following search.")
+  "Accepted goal encounters in COUNT mode.")
+
+(sb-ext:defglobal *count-example* nil
+  "One accepted solution retained for the COUNT summary; NIL before any is found.")
 
 (sb-ext:defglobal *num-idle-threads* 0
   "Holds the number of currently idle threads (shared).")
@@ -653,7 +656,8 @@ treat their arguments as read-only and be safe to call concurrently."
 
 (defvar *solution-type* 'first
   "Specify whether to search for first, min-length, min-time, every solution,
-   or a positive integer N to find exactly N solutions.")
+   count accepted goals retaining one example, or a positive integer N
+   to find exactly N solutions. COUNT does not deduplicate goal states.")
 
 (defvar *tree-or-graph* 'graph  ;
   "Whether there are repeated states (graph) or not (tree); try both.")

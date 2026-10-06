@@ -472,6 +472,7 @@
     (setf *unique-solution-states* nil)
     (setf *best-states* (list *start-state*))
     (setf *solution-count* 0)
+    (setf *count-example* nil)
     (reset-candidate-solution-validation-statistics)
     (setf *upper-bound* 1000000)
     (setf *search-tree* nil)
@@ -1345,7 +1346,7 @@ different acceptable milestone state."
   "Determines if f-value of successor is better than open state, and updates it."
   (let ((open-state (node.state open-node)))
     (ecase *solution-type*
-      ((min-length first every all-paths)
+      ((min-length first every count all-paths)
          nil)  ;in depth first search succ depth is never better than open
       (min-time
          (when (< (problem-state.time succ-state) (problem-state.time open-state))
@@ -1366,7 +1367,7 @@ different acceptable milestone state."
         (closed-time (third closed-values))
         (closed-value (fourth closed-values)))
     (case *solution-type*
-      ((first every all-paths min-length)
+      ((first every count all-paths min-length)
        (< succ-depth closed-depth))
       (min-time
        (< (problem-state.time succ-state) closed-time))
@@ -1607,6 +1608,8 @@ different acceptable milestone state."
             (format t "~2%Search ended with first solution found."))))
     (exhausted
       (format t "~2%~A search process completed normally." *algorithm*)
+      (when (eql *solution-type* 'count)
+        (format t "~2%Counting finished within the search limits and pruning rules; at most one example retained."))
       (when (eql *solution-type* 'every)
         (cond (*hybrid-mode*
                (format t "~2%Hybrid mode enumerated all paths to goal states at depth ~D."
@@ -1687,8 +1690,11 @@ different acceptable milestone state."
   (format t "~%Start state:~%~A" (list-database (problem-state.idb *start-state*)))
   (format t "~2%Goal:~%~A~2%" (when (boundp 'goal-fn)
                                 (get 'goal-fn :form)))  ;(symbol-value 'goal-fn)
-  (when (and (eql *solution-type* 'count)) (> *solution-count* 0)
-    (format t "~%Total solution paths found = ~:D ~2%" *solution-count*))
+  (when (eql *solution-type* 'count)
+    (format t "~%Total accepted goals counted = ~:D ~2%" *solution-count*)
+    (when *count-example*
+      (format t "~%One accepted solution (not necessarily shortest or best):~%")
+      (print-count-example *count-example*)))
   (when *solution-paths*  ;ie, recorded solution paths
     (let* ((shallowest-depth (reduce #'min *solution-paths* :key #'solution.depth))
            (shallowest-depth-solution (find shallowest-depth *solution-paths* :key #'solution.depth))
@@ -1790,9 +1796,33 @@ different acceptable milestone state."
             finally (terpri)))))
 
  
+(defun print-count-example (solution)
+  "Print the retained path and final state directly, without replaying the actions."
+  (format t "~&Number of steps = ~D~%" (solution.depth solution))
+  (dolist (step (solution.path solution))
+    (format t "~S~%" step))
+  (format t "~&Goal state:~%")
+  (print-problem-state (solution.goal solution)))
+
+
+(defun count-accepted-goal ()
+  "Count a validated goal; return true only to the caller claiming the first example.
+   The lock makes this claim exclusive across workers; integer addition permits bignums."
+  (= 1 (if (> *threads* 0)
+           (bt:with-lock-held (*lock*)
+             (incf *solution-count*))
+           (incf *solution-count*))))
+
+
 (defun register-solution (goal-node)
   "Records the path ending at GOAL-NODE as a solution."
   (declare (type node goal-node))
+  (when (eql *solution-type* 'count)
+    (when (count-accepted-goal)
+      (setf *count-example*
+            (make-search-solution (candidate-path-to-goal-node goal-node)
+                                  (node.state goal-node))))
+    (return-from register-solution nil))
   (let* ((goal-state (node.state goal-node))
          (state-depth (node.depth goal-node))
          (solution (make-search-solution (candidate-path-to-goal-node goal-node) goal-state)))
@@ -2022,6 +2052,8 @@ different acceptable milestone state."
                              (length *rem-init-successors*)))
               *num-init-successors*))
     ;; ===== Optimization =====
+    (when (eql *solution-type* 'count)
+      (format t "~%accepted goals counted = ~:D" *solution-count*))
     (when (or *hybrid-goals* *solution-paths*)
       (format-best-solution-line (- *total-states-processed* *last-improvement-states*))
       (when (and (member *solution-type* '(min-value max-value))

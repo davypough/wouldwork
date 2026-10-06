@@ -103,8 +103,8 @@
     (format t "~%Note: With backtracking, suggest setting *depth-cutoff* > 0 to avoid possible dive to infinite depth.~%"))
   ;; Symmetry pruning warnings
   (when *symmetry-pruning*
-    (when (eql *solution-type* 'every)
-      (format t "~%Note: *symmetry-pruning* is enabled with *solution-type* = EVERY.")
+    (when (member *solution-type* '(every count))
+      (format t "~%Note: *symmetry-pruning* is enabled with *solution-type* = ~A." *solution-type*)
       (format t "~%      Solutions differing only by symmetric objects will be pruned.~%"))
     (when (> *threads* 0)
       (format t "~%Note: Symmetry pruning statistics may be approximate in parallel mode.~%")))

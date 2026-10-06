@@ -123,6 +123,18 @@
    each distinct clause is classified once per staged problem.")
 
 
+(defun traversal-clause-marker-kinds (clause)
+  "The registered kinds, in preference order, whose marker types some member of CLAUSE
+   belongs to.  WALK registers no markers, so it never appears here."
+  (loop for kind in *traversal-kind-preference*
+        for entry = (assoc kind *traversal-kinds*)
+        when (and entry
+                  (some (lambda (item)
+                          (init-member-of-any-type-p item (third entry)))
+                        clause))
+          collect kind))
+
+
 (define-problem-helper traversal-clause-profile (clause)
   "CLAUSE's (KIND MEANS): KIND by its marker types, WALK when it names none; MEANS the
    clause without its static separators, in the clause's own order.  A clause mixing two
@@ -139,18 +151,6 @@
                     (remove-if (lambda (item)
                                  (init-member-of-any-type-p item statics))
                                clause)))))))
-
-
-(defun traversal-clause-marker-kinds (clause)
-  "The registered kinds, in preference order, whose marker types some member of CLAUSE
-   belongs to.  WALK registers no markers, so it never appears here."
-  (loop for kind in *traversal-kind-preference*
-        for entry = (assoc kind *traversal-kinds*)
-        when (and entry
-                  (some (lambda (item)
-                          (init-member-of-any-type-p item (third entry)))
-                        clause))
-          collect kind))
 
 
 (define-problem-helper traversal-clause-segment-kind (state source destination clause)

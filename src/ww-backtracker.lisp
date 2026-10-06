@@ -418,6 +418,11 @@
 
 (defun register-solution-bt (level &optional (solution-path (reconstruct-solution-path)))
   "Register a solution found via backtracking using the choice stack"
+  (when (eql *solution-type* 'count)
+    (when (count-accepted-goal)
+      (setf *count-example*
+            (make-search-solution solution-path (copy-problem-state *backtrack-state*))))
+    (return-from register-solution-bt nil))
   (let* ((solution-depth (length *choice-stack*))
          (solution (make-solution
                      :depth solution-depth

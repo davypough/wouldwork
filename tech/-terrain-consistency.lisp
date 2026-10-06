@@ -90,6 +90,16 @@
    and are gathered separately from AIMED-AT rather than from this list.")
 
 
+(defun terrain-arrangement-invariant-complaints (arrangement edges spans levels)
+  "Complaints where an edge's authored vertical span contradicts its determinate step, or
+   where an authored traversal clause names an edge that does not stand between its two
+   locations.  Both are safe for every walking model and therefore run during coordinate
+   initialization."
+  (append (terrain-edge-complaints arrangement edges spans
+                                   (terrain-zone-levels arrangement levels))
+          (terrain-edge-fit-complaints arrangement edges)))
+
+
 (define-query terrain-complaints (?arrangement)
   ;; Overrides -walkability-coordinates' empty seam.  The walking initializer enforces the
   ;; geometric invariant only; TEST-TOPO separately calls the connectivity-policy entry
@@ -131,16 +141,6 @@
    initialization calls the invariant subset, while TEST-TOPO calls the policy subset."
   (append (terrain-arrangement-invariant-complaints arrangement edges spans levels)
           (terrain-arrangement-policy-complaints arrangement edges levels)))
-
-
-(defun terrain-arrangement-invariant-complaints (arrangement edges spans levels)
-  "Complaints where an edge's authored vertical span contradicts its determinate step, or
-   where an authored traversal clause names an edge that does not stand between its two
-   locations.  Both are safe for every walking model and therefore run during coordinate
-   initialization."
-  (append (terrain-edge-complaints arrangement edges spans
-                                   (terrain-zone-levels arrangement levels))
-          (terrain-edge-fit-complaints arrangement edges)))
 
 
 (defun terrain-arrangement-policy-complaints (arrangement edges levels)

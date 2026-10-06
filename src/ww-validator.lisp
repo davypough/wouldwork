@@ -917,10 +917,10 @@
                               Must be either planning or csp (ie, constraint satisfaction problem)." val)))
     (*algorithm* (unless (member val '(depth-first backtracking))
                    (error "Can't set *algorithm* to ~S. Must be either depth-first or backtracking." val)))
-    (*solution-type* (unless (or (member val '(first every all-paths min-length min-time min-value max-value))
+    (*solution-type* (unless (or (member val '(first every count all-paths min-length min-time min-value max-value))
                                  (and (typep val 'fixnum) (> val 0)))
                        (error "Can't set *solution-type* to ~S. Must be one of~%~
-                               first, every, all-paths, min-length, min-time, min-value, max-value,~%~
+                               first, every, count, all-paths, min-length, min-time, min-value, max-value,~%~
                                or a positive integer (to find that many solutions)." val)))
     (*progress-reporting-interval* (unless (or (null val) (and (typep val 'fixnum) (> val 0)))
                                      (error "Can't set *progress-reporting-interval* to ~S.

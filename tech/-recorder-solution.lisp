@@ -338,9 +338,7 @@ state with RECORDING-IN-PROGRESS supplies one legacy implicit open cycle."
   (let* ((cycles-used
            (funcall (symbol-function 'recorder-cycle-count) start-state))
          (open-cycle
-           (when (member '(recording-in-progress)
-                         (database start-state)
-                         :test #'equal)
+           (when (funcall (symbol-function 'recorder-recording-open) start-state)
              (make-recorder-path-cycle
                :number (max 1 cycles-used)
                :setup nil
@@ -617,9 +615,7 @@ an event, so this conservative test retains it."
 
 (defun recorder-normalized-boundary-p (state)
   "Whether STATE is a ghost-free boundary at which cycle dominance applies."
-  (and (not (member '(recording-in-progress)
-                    (database state)
-                    :test #'equal))
+  (and (not (funcall (symbol-function 'recorder-recording-open) state))
        (funcall (symbol-function 'recorder-closed-ghost-free) state)))
 
 

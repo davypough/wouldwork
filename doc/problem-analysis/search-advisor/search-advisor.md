@@ -160,8 +160,11 @@ changes in the same run go into that copy.  A change that needs a separate varia
   a line or two of general terms rather than problem-specific details or counts
   (`problem-crossword5-11-1.lisp`).
 - A `ww-set` goes in the spec's `ww-set` block, replacing any existing value for that setting.
-- REPL-only settings (`*algorithm*`, `*threads*`, `*debug*`, `*probe*`) are never written
-  to the spec; give the REPL form instead.
+- REPL-only settings (`*algorithm*`, `*debug*`, `*probe*`) are never written
+  to the spec; give the REPL form instead. `*threads*` may be declared in the
+  spec when the user wants a machine-specific default; otherwise set it at the REPL.
+  Never declare it in a spec meant for chained `(solve-subgoal <goal>)`, which errors
+  unless `*threads*` is 0.
 - A hook query or macro action is shown in full and written once agreed.
 - **Representation changes** (Q18, or a probe showing wasted states).  Implement directly when
   the new spec is a re-encoding of the same rules and goal: the same moves, only stored
@@ -183,11 +186,17 @@ changes in the same run go into that copy.  A change that needs a separate varia
 - Write files containing `$` whole, or with literal quoting, never through a
   regex-replacement edit.
 - After each edit give the REPL forms to apply it, e.g. `(stage <problem>)`.  Staging applies
-  the spec's own settings; `(refresh)` does not, and a saved `vals.lisp` overrides them on an
-  ordinary load.
+  the spec's own settings.  `(refresh)` does not, and neither does a plain
+  `(ql:quickload :wouldwork)`: it re-copies the edited spec into `src/problem.lisp`, but the
+  `vals.lisp` saved at the last staging then overrides every setting in it (measured with
+  `*depth-cutoff*` and `*threads*`).  Restage after every spec edit.
 
 **Running searches.**
 
+- **REPL examples.** Assume the user has already loaded Wouldwork and entered the
+  `ww` package. Omit `(asdf:load-system :wouldwork)` and `(in-package :ww)` from
+  the supplied forms. Use `(solve)`, not `(time (solve))`: `solve` already times
+  the search. If an engine change requires a reload, mention that in prose.
 - **Short runs** (probes of about a minute or less, `validate-solution`): the assistant runs
   these itself in its own environment, set up at the start of phase 1 (never in phase 0;
   `CLAUDE.md`, *Running Wouldwork in a Claude cloud session*).  Report the measured numbers,
@@ -280,7 +289,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
 | S7 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
-| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` serially, or the two-argument checkpoint form (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor is the worked-out interactive form |
+| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` (chained, serial only: it errors unless `*threads*` is 0), or the two-argument checkpoint form `(solve-subgoal <start> <goal>)` (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor is the worked-out interactive form (note 7) |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
 | S10 | **Bidirectional search** | Q12 yes, and depth is the obstacle | a backward spec searched with `every`, then a forward search whose goal calls `(backward-path-exists state)` (note 6) | A second spec to write and keep consistent; memory for the backward layer (note 6) |
 | S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states can be generated from base facts | `define-base-relation` (plus optional `define-goal-filter`, `state-feasible?`); `(find-goal-states)`, `(find-predecessors)`, `(solve-meeting-point :depth-cutoff N :solution-type first)` (see the end of `problem-corner.lisp`) | Backward layers can explode; constrain base relations early |
@@ -325,6 +334,17 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
    path, renumbered to follow on; replay it with `validate-action-sequence`.  Triangle at
    N = 6, split 12 + 7: the backward search collected 16,253 boards in 8,865 program cycles,
    and the forward search met one in about 20.
+7. **Subgoaling.**  Choose milestones as resting states the next step needs, and measure each
+   with `solve-subgoal`.  crelay-topo (2026-10-06, two recorder cycles in 28 moves against a
+   hand plan's 31): (a) Name the precondition the next step needs, not its end product:
+   "agent1 at location6" (inside the alcove) took 10 moves and the search found the means
+   itself, while "box1 at location7" (the box out of the alcove) straight after leg 1 found
+   nothing in 10 minutes.  (b) Size each leg to about 10 moves for `first`, 6 to 9 for
+   `min-length`; cost grew about 2.6 times per move.  (c) Use the final resting state, not a
+   waypoint: a leg that set the box down was followed by one that picked it up again, 2
+   wasted moves.  (d) Add `(recorder-cycle-ended)` only where a cycle should close; legs may
+   run inside one cycle.  (e) When a leg stalls, split it at its hard precondition rather
+   than raising the cutoff.
 
 ### 3.1 Choosing
 
@@ -404,7 +424,7 @@ spec's own values; a saved `vals.lisp` otherwise overrides them on an ordinary l
 | `*tree-or-graph*` | tree, graph (graph) | graph when states repeat (Q4: repeated-state percentage high); tree when they rarely do, with happenings, or for better parallel speedup |
 | `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (S4) |
 | `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports the groups found, and suggests turning it off if none |
-| `*threads*` **REPL** | 0 = serial, N (0) | any depth-first search (S2).  Changing it restages.  0 for backtracking, auto-wait, and problems that create objects during search |
+| `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for backtracking, auto-wait, and problems that create objects during search |
 | `*randomize-search*` | t, nil (nil) | S12 only |
 | `*branch*` | n (0 = all) | S12 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
@@ -464,6 +484,16 @@ at 18 from 4.65 million to 33,954, with the same paths and goal states.  Check s
 with every-solution runs with and without it at two cutoffs, which must agree.  Its gain falls
 as the cutoff rises above the optimum.  When the family will grow, compute the distances from
 the adjacency relation rather than writing them by hand.
+
+**Generic topology bound.**  A problem that includes `topo-lower-bound` gets an automatic
+finite-resource contributor, with no `min-steps-remaining?` of its own and consulted under the
+same conditions.  To run without it, stage, then `(setf *min-steps-remaining-contributors*
+nil)`; `min-length` must give the same lengths with and without it.  Fixes from crelay-topo
+(2026-10-06): a fixed floor blower no longer disables it (its stream is a gate-free route, and
+a leg ending at a lift location costs no move); an ON goal on a support with a fixed position
+routes as a location goal; a plate press costs 1 when a second agent (a recording ghost counts)
+exists.  Gears, wall and angled blowers still disable it.  Its route relaxation ignores height,
+so it read 1 for a leg needing a raised launch point that took 10 moves.
 
 Under `*threads*` > 0 the hooks must be pure functions of the state: any global a hook reads and writes is shared by every worker.
 

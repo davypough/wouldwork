@@ -671,6 +671,8 @@
    Buckets handle hash collisions via equalp fallback (vanishingly rare).
    When duplicate goal states are found, retains the better solution
    per solution-better-p."
+  (when (eql *solution-type* 'count)
+    (return-from finalize-parallel-search-results nil))
   (let ((seen (make-hash-table :test #'eql :size (max 1024 (length *solution-paths*)))))
     (dolist (solution *solution-paths*)
       (let* ((goal-state (solution.goal solution))

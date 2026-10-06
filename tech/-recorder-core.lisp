@@ -41,7 +41,7 @@
 ;;;   generator: derive-recording-copy-literals (asterisk-named ghosts -> recording-copy>)
 ;;;   queries  : live-recording-object, ghost-recording-object, same-recording-side,
 ;;;              recording-shadow-view-object;
-;;;              recorder-cycle-count;
+;;;              recorder-cycle-count, recorder-recording-open;
 ;;;              overrides recording-shadow-object, recording-shadow-object-present,
 ;;;              object-manipulation-allowed, support-use-allowed,
 ;;;              support-occupancy-conflict-p, and connector-pairing-allowed
@@ -172,6 +172,11 @@
   (if (bind (recorder-cycles-used $count))
     $count
     (if (recording-in-progress) 1 0)))
+
+
+(define-query recorder-recording-open ()
+  ;; One hashed lookup for Lisp-side callers, which otherwise list and sort the database.
+  (recording-in-progress))
 
 
 (define-query recording-shadow-object (?object)

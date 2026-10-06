@@ -94,7 +94,7 @@
 
 (defun recorder-state-recording-open-p (state)
   "Whether STATE is inside an active recorder cycle."
-  (member '(recording-in-progress) (database state) :test #'equal))
+  (funcall (symbol-function 'recorder-recording-open) state))
 
 
 (defun recorder-state-cycle-count (state)
