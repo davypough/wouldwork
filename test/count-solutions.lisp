@@ -46,10 +46,29 @@
   (check-count-run 8 :validator t)
   (check-count-run 9 :early t))
 
+(defun check-count-test-outcomes ()
+  "Exercise ordinary and mutation test outcomes with and without counted goals."
+  (setf *count-test-early-goal* nil
+        *solution-validators* nil
+        *depth-cutoff* 0
+        *expected-min-length* nil)
+  (let ((*standard-output* (make-broadcast-stream)))
+    (setf *count-test-goal-depth* 5)
+    (assert (talos-problem-failed-p 'count-goals))
+    (assert (zerop *solution-count*))
+    (assert (mutation-outcome-detected-p 'count-goals 'unreachable-goal))
+    (setf *count-test-goal-depth* 4)
+    (assert (not (talos-problem-failed-p 'count-goals)))
+    (assert (= 16 *solution-count*))
+    (assert (null *solution-paths*))
+    (assert (not (mutation-outcome-detected-p 'count-goals 'unchanged-goal))))
+  (format t "~&COUNT TEST OUTCOMES PASSED~%"))
+
 (defun test-count-solutions ()
   (stage count-goals)
   (ww-set *threads* 0)
   (check-count-cases)
+  (check-count-test-outcomes)
   (ww-set *solution-type* every)
   (setf *count-test-early-goal* nil)
   (let ((*standard-output* (make-broadcast-stream))) (solve))

@@ -283,10 +283,17 @@
       t)))
 
 
+(defun test-solution-found-p ()
+  "Recognize counted goals as well as retained solution paths."
+  (if (eq *solution-type* 'count)
+      (plusp *solution-count*)
+      (not (null *solution-paths*))))
+
+
 (defun mutation-outcome-detected-p (problem-name mutation-name)
   "Classify the completed mutated search as detected or surviving."
   (cond
-    ((not *solution-paths*)
+    ((not (test-solution-found-p))
       (format t "~%Mutation detected: no solution found.~%")
       t)
     ((and *expected-min-length*
@@ -309,7 +316,7 @@
         (run-test-claims)
         (ww-solve)
         (cond
-          ((not *solution-paths*)
+          ((not (test-solution-found-p))
             (format t "~%Talos test ~A completed without a solution.~%"
                     problem-name)
             t)

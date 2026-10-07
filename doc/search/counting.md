@@ -29,6 +29,10 @@ Regression check: load `test/count-solutions.lisp` and call
 mixed task/worker goals, backtracking, validators, zero goals, cutoff, start goals,
 counter/example reset, unchanged EVERY recording, empty solution lists, and a
 valid retained example (including validator acceptance and the zero-action case).
+It also checks ordinary and mutation test outcomes for zero and positive counts.
+`test-talos` treats a positive accepted-goal count as success in COUNT mode;
+zero counted goals fails the ordinary test and detects a mutation. Other modes
+continue to use retained solution paths to determine whether a solution exists.
 
 For the unmodified N=13 queens spec, with Wouldwork already loaded and the REPL
 in the `ww` package (`solve` includes timing):
