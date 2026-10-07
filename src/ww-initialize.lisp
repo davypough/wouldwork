@@ -84,16 +84,9 @@
     (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))  ;unchanged
   (when (and (eq *algorithm* 'backtracking) *happening-names*)
     (error "~%ERROR: Backtracking is incompatible with exogenous happenings; happenings are not integrated into the backtracking search infrastructure.~%"))
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'heuristic?))
-    (format t "~%Note: heuristic? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
-  (when (and (eq *algorithm* 'backtracking) (fboundp 'bounding-function?))
-    (format t "~%Note: bounding-function? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
-  (when (and (eq *algorithm* 'backtracking)
-             (min-steps-remaining-available-p))
-    (format t "~%Note: min-steps-remaining? is defined but is not consulted by the backtracking algorithm; it will be ignored.~%"))
   (when (and (eq *algorithm* 'backtracking)
              (member *solution-type* '(min-length min-time min-value max-value)))
-    (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" *solution-type*))
+    (format t "~%Note: Backtracking with *solution-type* ~A uses user bounding-function? and move lower bounds, but has no automatic objective-bound pruning.~%" *solution-type*))
   (when (and (eq *algorithm* 'backtracking) (eq *problem-type* 'planning))  ;unchanged
     (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))  ;unchanged
   (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))

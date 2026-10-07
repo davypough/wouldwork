@@ -27,6 +27,8 @@
 ;;; and plates there are omitted, since one action on the stream may relocate several
 ;;; occupants.  Other propagating relocators (gears, wall and angled blowers) still disable
 ;;; the routed tasks.
+;;; An elevation component charges one MOVE when a forced agent's every first leg needs a raised
+;;; launch that no grounded no-raise route avoids (see TOPO-RESOURCE-ELEVATION-COST).
 ;;; Search registers that inexpensive finite-domain term as its automatic contributor.  A
 ;;; problem may separately define MIN-STEPS-REMAINING? as an aggregate fallback; serial
 ;;; depth-first search then samples an unproductive fallback after its technical warmup and
@@ -113,6 +115,14 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
   "Source and destination locations of every fixed floor blower's stream.")
 
 
+(defparameter *topo-resource-flat-reach* nil
+  "(FROM TO) keys joined by grounded traversal needing no raised launch, gates assumed open.")
+
+
+(defparameter *topo-resource-flat-reach-built-p* nil
+  "Whether *TOPO-RESOURCE-FLAT-REACH* is compiled for the staged problem.")
+
+
 (defparameter *topo-resource-recording-sides* nil
   "Cached live/ghost classification of the staged problem's mapped mobile objects.")
 
@@ -178,6 +188,7 @@ One preserves eager evaluation; values above one enable adaptive sampling.")
   (routing-cost 0 :type (integer 0 *))
   (barrier-cost 0 :type (integer 0 *))
   (session-cost 0 :type (integer 0 *))
+  (elevation-cost 0 :type (integer 0 *))
   (total 0 :type (integer 0 *)))
 
 
@@ -1019,6 +1030,146 @@ itself.  A plate at a lift location may be pressed by a stream drop and costs no
         2))))
 
 
+(define-problem-helper topo-resource-elevation-cost (tasks facts routes flat)
+  "One extra MOVE for each agent whose first leg must climb to a raised launch point.
+
+An agent standing on the ground at a location that is not a lift location leaves the region
+reachable by grounded no-raise routes (FLAT) only by a transition MOVE onto a support or a MOVE
+onto a stream source, and its final MOVE into a location outside that region is a further MOVE.
+The routing component charges that leg one MOVE, so one more is admissible.  It falls before
+the agent's first arrival at that location, so no later routed leg counts it; it is neither a
+manipulation nor a session action; and it is never a barrier-charged plate press, because a
+steppable's top is at floor level and a plate at a lift location costs nothing.  Distinct
+agents take distinct MOVEs, so the agent charges are summed."
+  (loop for (agent . location) in (topo-resource-located-agents facts)
+        sum (topo-resource-agent-elevation-cost
+              agent location tasks facts routes flat)))
+
+
+(define-problem-helper topo-resource-agent-elevation-cost
+    (agent location tasks facts routes flat)
+  "1 when AGENT is a grounded live agent away from any lift location, some task forces it to
+leave LOCATION, and every first leg any eligible task offers it needs a raised launch; else 0.
+A ghost's moves are replayed, and a supported or lifted agent may already be raised."
+  (if (and (not (eq (gethash agent (topo-resource-recording-sides)) :ghost))
+           (null (topo-resource-object-support agent facts))
+           (not (member location *topo-resource-lift-locations* :test #'eq))
+           (some (lambda (task)
+                   (topo-resource-task-forces-departure-p agent location task facts))
+                 tasks)
+           (every (lambda (task)
+                    (or (not (topo-resource-agent-eligible-p agent task))
+                        (topo-resource-task-departures-raised-p
+                          location task routes flat)))
+                  tasks))
+    1
+    0))
+
+
+(define-problem-helper topo-resource-task-forces-departure-p (agent location task facts)
+  "Whether AGENT is TASK's only located eligible server and TASK has no option that both
+picks up and finishes at LOCATION, so serving it takes AGENT somewhere else."
+  (and (topo-resource-agent-eligible-p agent task)
+       (every (lambda (entry)
+                (or (eq (car entry) agent)
+                    (not (topo-resource-agent-eligible-p (car entry) task))))
+              (topo-resource-located-agents facts))
+       (not (and (member location (topo-resource-task.pickup-locations task) :test #'eq)
+                 (member location (topo-resource-task.finish-locations task) :test #'eq)))))
+
+
+(define-problem-helper topo-resource-task-departures-raised-p (location task routes flat)
+  "Whether every first location TASK can take an agent to from LOCATION -- a pickup, or a
+finish when the pickup is LOCATION itself -- is a raised leg.  An option picking up and
+finishing at LOCATION offers no departure and is skipped."
+  (every (lambda (pickup)
+           (if (eq pickup location)
+             (every (lambda (finish)
+                      (or (eq finish location)
+                          (topo-resource-raised-leg-p location finish routes flat)))
+                    (topo-resource-task.finish-locations task))
+             (topo-resource-raised-leg-p location pickup routes flat)))
+         (topo-resource-task.pickup-locations task)))
+
+
+(define-problem-helper topo-resource-raised-leg-p (from to routes flat)
+  "Whether the routing charges FROM -> TO one MOVE (a route exists and TO is no lift
+location) while no grounded no-raise route joins them."
+  (and (gethash (list from to) routes)
+       (not (member to *topo-resource-lift-locations* :test #'eq))
+       (not (gethash (list from to) flat))))
+
+
+(define-problem-helper topo-resource-ensure-flat-reach (state)
+  "Compile the no-raise reachability once per stage.  Levels and wall tops are static, so
+any STATE reads them alike."
+  (unless *topo-resource-flat-reach-built-p*
+    (setf *topo-resource-flat-reach*
+            (topo-resource-flat-reach state (topo-resource-ensure-static-context))
+          *topo-resource-flat-reach-built-p* t))
+  *topo-resource-flat-reach*)
+
+
+(define-problem-helper topo-resource-flat-reach (state locations)
+  "Transitive closure of the traversal arcs some clause of which needs no raised launch.
+Stream lifts are left out: they act only at lift locations, which the elevation component
+excludes as starting points.  With no traversal records every pair is joined, as in
+TOPO-RELAXED-ROUTE-FAMILIES, so nothing is charged."
+  (let ((arcs (make-hash-table :test #'eq))
+        (reach (make-hash-table :test #'equal))
+        (records
+          (remove-if-not #'topo-relaxed-traversal-record-p
+                         (topo-relaxed-static-propositions))))
+    (dolist (record records)
+      (destructuring-bind (relation from family to) record
+        (when (topo-resource-flat-family-p state from to family)
+          (pushnew to (gethash from arcs) :test #'eq))
+        (when (and (eq relation 'traverse-via)
+                   (topo-resource-flat-family-p state to from family))
+          (pushnew from (gethash to arcs) :test #'eq))))
+    (dolist (source locations)
+      (let ((frontier (list source)))
+        (setf (gethash (list source source) reach) t)
+        (loop while frontier
+              do (dolist (next (gethash (pop frontier) arcs))
+                   (unless (gethash (list source next) reach)
+                     (setf (gethash (list source next) reach) t)
+                     (push next frontier))))))
+    (when (null records)
+      (dolist (from locations)
+        (dolist (to locations)
+          (setf (gethash (list from to) reach) t))))
+    reach))
+
+
+(define-problem-helper topo-resource-flat-family-p (state from to family)
+  "Whether some clause of FAMILY (NIL is one empty clause) crosses FROM -> TO from the floor."
+  (some (lambda (clause)
+          (zerop (topo-resource-clause-raise state from to clause)))
+        (or family (list nil))))
+
+
+(define-problem-helper topo-resource-clause-raise (state source destination clause)
+  "Launch height above SOURCE's floor a grounded crossing of CLAUSE needs.  Only a jump has
+one: the higher of the landing level and every wall top, less *VERTICAL-REACH-LIMIT*, above
+the floor, as JUMP-ELEVATION-REACHABLE and JUMP-PATH-CLEAR test it.  Gates and screens are
+taken as passable, as everywhere in the relaxation; stairs, ladders and walks impose no limit."
+  (if (eq (funcall (symbol-function 'traversal-clause-segment-kind)
+                   state source destination clause)
+          'jump)
+    (let ((walls (remove-if-not
+                   (lambda (item) (topo-relaxed-object-of-type-p item 'wall))
+                   (second (funcall (symbol-function 'traversal-clause-profile) clause)))))
+      (max 0 (- (reduce #'max
+                        (mapcar (lambda (wall) (funcall (symbol-function 'top) state wall))
+                                walls)
+                        :initial-value (funcall (symbol-function 'location-elevation)
+                                                state destination))
+                (symbol-value '*vertical-reach-limit*)
+                (funcall (symbol-function 'location-elevation) state source))))
+    0))
+
+
 (define-problem-helper topo-resource-object-position (object facts)
   (third
     (find object facts
@@ -1058,10 +1209,12 @@ itself.  A plate at a lift location may be pressed by a stream drop and costs no
 
 (define-problem-helper topo-finite-resource-bound-components-from-facts
     (state goal facts)
-  "Return manipulation, routing, barrier, and session costs plus their goals and tasks."
+  "Return manipulation, routing, barrier, session, and elevation costs plus their goals and
+tasks."
   (multiple-value-bind (locations reaches routes)
       (topo-resource-ensure-static-context)
-    (let* ((goals (topo-relaxed-goal-facts state goal))
+    (let* ((flat (topo-resource-ensure-flat-reach state))
+           (goals (topo-relaxed-goal-facts state goal))
            (tasks
              (topo-resource-location-tasks
                goals facts locations reaches))
@@ -1074,25 +1227,27 @@ itself.  A plate at a lift location may be pressed by a stream drop and costs no
            (barrier-cost
              (topo-resource-barrier-cost tasks facts routes))
            (session-cost
-             (topo-resource-session-cost goals facts)))
-      (values manipulation-cost routing-cost barrier-cost session-cost
+             (topo-resource-session-cost goals facts))
+           (elevation-cost
+             (topo-resource-elevation-cost tasks facts routes flat)))
+      (values manipulation-cost routing-cost barrier-cost session-cost elevation-cost
               goals tasks))))
 
 
 (define-problem-helper topo-finite-resource-bound-from-facts
     (state goal facts)
   (multiple-value-bind
-      (manipulation-cost routing-cost barrier-cost session-cost goals tasks)
+      (manipulation-cost routing-cost barrier-cost session-cost elevation-cost goals tasks)
       (topo-finite-resource-bound-components-from-facts state goal facts)
     (declare (ignore goals tasks))
-    (+ manipulation-cost routing-cost barrier-cost session-cost)))
+    (+ manipulation-cost routing-cost barrier-cost session-cost elevation-cost)))
 
 
 (define-problem-helper topo-finite-resource-bound-analysis-from-facts
     (state goal facts)
   "Return the component record corresponding exactly to the numeric resource bound."
   (multiple-value-bind
-      (manipulation-cost routing-cost barrier-cost session-cost goals tasks)
+      (manipulation-cost routing-cost barrier-cost session-cost elevation-cost goals tasks)
       (topo-finite-resource-bound-components-from-facts state goal facts)
     (make-topo-resource-bound-analysis
       :goals goals
@@ -1101,7 +1256,9 @@ itself.  A plate at a lift location may be pressed by a stream drop and costs no
       :routing-cost routing-cost
       :barrier-cost barrier-cost
       :session-cost session-cost
-      :total (+ manipulation-cost routing-cost barrier-cost session-cost))))
+      :elevation-cost elevation-cost
+      :total (+ manipulation-cost routing-cost barrier-cost session-cost
+                elevation-cost))))
 
 
 (define-problem-helper analyze-topo-finite-resource-bound (state goal)
@@ -1118,12 +1275,13 @@ itself.  A plate at a lift location may be pressed by a stream drop and costs no
   (let ((analysis (analyze-topo-finite-resource-bound state goal)))
     (format stream
             "~&Finite-resource total = ~:D: manipulation ~:D, routing ~:D, barrier ~:D, ~
-             session ~:D.~%"
+             session ~:D, elevation ~:D.~%"
             (topo-resource-bound-analysis.total analysis)
             (topo-resource-bound-analysis.manipulation-cost analysis)
             (topo-resource-bound-analysis.routing-cost analysis)
             (topo-resource-bound-analysis.barrier-cost analysis)
-            (topo-resource-bound-analysis.session-cost analysis))
+            (topo-resource-bound-analysis.session-cost analysis)
+            (topo-resource-bound-analysis.elevation-cost analysis))
     (dolist (task (topo-resource-bound-analysis.tasks analysis))
       (format stream
               "  ~S: agent ~S, eligible ~S, pickup ~S, finish ~S, manipulation ~:D.~%"
@@ -2103,6 +2261,8 @@ finite-resource bound.  Without such a budget, abstain."
 (register-worker-read-memo '*topo-resource-locations* :nil)
 (register-worker-read-memo '*topo-resource-reaches* :nil)
 (register-worker-read-memo '*topo-resource-routes* :nil)
+(register-worker-read-memo '*topo-resource-flat-reach* :nil)
+(register-worker-read-memo '*topo-resource-flat-reach-built-p* :nil)
 (register-worker-read-memo '*topo-resource-recording-sides* :nil)
 (register-worker-read-memo '*topo-resource-recording-sides-built-p* :nil)
 (register-worker-read-memo '*topo-resource-side-agents* :nil)

@@ -24,6 +24,12 @@ Enabled by default on STAGE. Serial searches use canonical reads without copying
 (defparameter *min-steps-pruning-enabled* t
   "Technical switch for disabling all lower-bound pruning during comparative runs.")
 
+(defvar *min-steps-fallback-warmup* 512
+  "Nonpruning aggregate evaluations before switching to sampled evaluation.")
+
+(defvar *min-steps-fallback-sample-interval* 64
+  "Aggregate sampling interval after warmup; 1 keeps evaluation eager.")
+
 
 (defparameter *min-steps-remaining-contributors* nil
   "Cost-ordered admissible bounds tested before MIN-STEPS-REMAINING?.

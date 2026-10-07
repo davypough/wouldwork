@@ -284,7 +284,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 |---|---|---|---|---|
 | S1 | **Brute force, iterative deepening** | Always first; the whole answer when b^d is modest | `first`, small `*depth-cutoff*`, raised until a solution appears, then lowered to find the shortest | Exponential in depth |
 | S2 | **Parallel search** | The space is large and the search is depth-first | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with backtracking, auto-wait, or objects created during search (section 5) |
-| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and ignores every search hook (section 5); the order matters; with forward checking the goal must test the constraints (note 1) |
+| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and supports `prune-state?` and move lower bounds (see section 5 for unsupported hooks); the order matters; with forward checking the goal must test the constraints (note 1) |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
@@ -314,7 +314,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
    overhead: in hanoi's peg encoding it cut program cycles by 23% and made the run 4 times
    slower (8 disks, 3.2 s to 12.7 s).
 4. **Heuristic.**  Still complete depth-first search, not beam or A*; the first solution need
-   not be shortest.  Serial and parallel search use it; backtracking does not; it overrides
+   not be shortest.  Serial depth-first, parallel depth-first, and backtracking use it; it overrides
    `*randomize-search*`.  Time it for `first` and the optimizing search alike: tiles7a's
    distance of the yellow tile to its goal made `first` slower (40,412 program cycles against
    31,842) and `min-length` no faster, because the distance says little about clearing the
@@ -352,7 +352,7 @@ Start at the first row that applies; the fallback column is the escalation order
 
 | Situation | Primary | Then |
 |---|---|---|
-| Assignment, one action per variable (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first, since backtracking ignores bounds) |
+| Assignment, one action per variable (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first provides automatic objective bounds; backtracking supports user bounds) |
 | Assignment, one action, every variable set (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first; tree search (note 1) | S5 dead-state pruning (an open variable with no value left); a completion check when some variables are left for a later fill (note 3) |
 | Assignment, one action choosing a subset (knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states (note 2) | S5 bound; S2 |
 | Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S8 with time-tagged milestones |
@@ -448,10 +448,15 @@ Defined in the spec as `define-query` with these reserved names; the state is su
 
 | Hook | Returns | Used by | Notes |
 |---|---|---|---|
-| `heuristic?` | a number, lower = more promising | depth-first, serial and parallel | ordering only (S6) |
-| `prune-state?` | true to stop expanding the state | depth-first, serial and parallel | must be sound (S5) |
-| `min-steps-remaining?` | a lower bound on moves to the goal | depth-first, serial and parallel | consulted only with a depth cutoff, or after a solution under `min-length` or `first`; must never overestimate.  In parallel it runs at task splitting and in every worker, without the serial adaptive sampling |
-| `bounding-function?` | `(values cost upper)` for value optimization, both in minimizing terms (a max-value problem returns both negated) | depth-first, serial and parallel | `cost` is an optimistic bound: never worse than the best value any completion of the state can reach.  `upper` is the value of one completion that can actually be reached; the smallest `upper` seen becomes the incumbent, and a node is pruned when its `cost` is worse than it.  An `upper` that cannot actually be reached prunes the true optimum.  States the search records as best never tighten the incumbent; only `upper` does.  See `problem-knap19.lisp` (S4).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
+| `heuristic?` | a number, lower = more promising | depth-first, serial and parallel; backtracking | ordering only (S6). Backtracking scores all sibling choices on a temporary state copy, then explores lowest first; ties retain generation order. Without a heuristic it retains streaming generation |
+| `prune-state?` | true to stop expanding the state | depth-first, serial and parallel; backtracking | must be sound (S5); stops descendants, not acceptance of an already reached goal |
+| `min-steps-remaining?` | a lower bound on moves to the goal | depth-first, serial and parallel; backtracking | consulted only with a depth cutoff, or after a solution under `min-length` or `first`; must never overestimate. Backtracking uses the same registered contributors, aggregate fallback, serial adaptive sampling, and pruning counters. In parallel it runs at task splitting and in every worker, without the serial adaptive sampling |
+| `bounding-function?` | `(values cost upper)` for value optimization, both in minimizing terms (a max-value problem returns both negated) | depth-first, serial and parallel; backtracking | `cost` is an optimistic bound: never worse than the best value any completion of the state can reach.  `upper` is the value of one completion that can actually be reached; the smallest `upper` seen becomes the incumbent, and a node is pruned when its `cost` is worse than it.  An `upper` that cannot actually be reached prunes the true optimum.  States the search records as best never tighten the incumbent; only `upper` does.  See `problem-knap19.lisp` (S4).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
+
+Global invariants (`define-invariant`) are also checked during parallel root-task
+generation, before a successor can become a task or an accepted goal, as well as
+in workers. A failed invariant signals the existing diagnostic; continuing from
+that diagnostic discards the successor in both paths.
 
 **Ordered completions.**  A bound may ignore completions that the state can reach but that
 another order of the same moves also reaches, provided it depends only on the state and
@@ -502,9 +507,14 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
 ## 5. Conflicts and automatic adjustments (from `ww-initialize.lisp`)
 
 - **Backtracking** forces tree search; is an error with `*threads*` > 0 or with happenings; and
-  ignores `heuristic?`, `prune-state?`, `min-steps-remaining?` and `bounding-function?`.  With an
-  optimizing solution type it enumerates without pruning.  With planning and no depth cutoff it
+  supports `prune-state?`, move lower bounds, and `bounding-function?` before generating
+  choices, including at the initial state. `heuristic?` orders choices across actions and parameter combinations.
+  Move lower bounds can prune against a depth cutoff or an existing `min-length`
+  solution. User bounds share the depth-first incumbent and counters; automatic objective-bound pruning
+  remains unsupported. With planning and no depth cutoff it
   may dive without limit.
+  Reached goals must pass solution validators and the active goal-chain candidate
+  rejector; a rejected goal remains searchable for an acceptable descendant.
 - **csp** forces tree search, whatever `*tree-or-graph*` says.
 - **Happenings with graph search** are reported as an error: states cannot be closed when time
   matters.

@@ -15,8 +15,8 @@ The current `problem-queensN-csp-1.lisp` uses Wouldwork's `prune-state?` hook:
 `expand` invokes the hook before generating successors. Both serial depth-first
 search and parallel root-task/worker expansion use that entry point. The first
 queen's state is still generated; its entire descendant branch is rejected.
-Backtracking ignores this hook, but the completed-board canonical check still
-gives the correct class count, without this early-pruning benefit.
+Backtracking also invokes this hook before generating choices, so it receives
+the same early-pruning benefit. The completed-board canonical check remains necessary.
 
 Soundness: reflecting a board left-to-right changes its first column c to N+1-c.
 If c is in the right half, that reflected board is lexicographically smaller.

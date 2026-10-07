@@ -17,6 +17,9 @@
   forward-sig     ; Order-insensitive signature of forward-update
   inverse-sig     ; Order-insensitive signature of inverse-update
   level           ; Depth in the search tree
+  (value 0)       ; Objective value returned by this effect
+  (heuristic 0)   ; Cached score when choices are ordered
+  parent-metadata ; Name, time, value, heuristic and arguments restored by undo
   pre-applied-p)  ; T when effect already applied to *backtrack-state*
 
 
@@ -127,86 +130,135 @@
   ;; Step 1: Enforce depth cutoff
   (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
     (return-from backtrack nil))
+
+  ;; Match EXPAND: prune descendants, not a goal already accepted by the caller.
+  ;; This also checks the initial state before generating any choices.
+  (when (and (fboundp 'prune-state?)
+             (funcall (symbol-function 'prune-state?) *backtrack-state*))
+    (return-from backtrack nil))
+
+  (when (and (min-steps-remaining-available-p)
+             (min-steps-remaining-prunes-node-p *backtrack-state* level))
+    (increment-global *lower-bound-pruned* 1)
+    (return-from backtrack nil))
+
+  (when (eql (bound-search-state *backtrack-state* level) 'kill-node)
+    (return-from backtrack nil))
   
   ;; Step 2: Update search statistics
   (update-statistics level)
   
-  ;; Step 3: CSP-aware action selection and processing
-  (let ((found-a-solution nil)
-        ;; CSP RESTRICTION: Select actions based on problem type and level
-        (actions (if (and (eql *problem-type* 'csp) (< level (length *actions*)))
-                     (list (nth level *actions*))  ; CSP: single action per level
-                     *actions*)))                   ; Planning: all actions
-    
-    (dolist (action actions)
-      (let ((parameter-combinations (if (action.dynamic action)
-                                      ;; Dynamic case: compute combinations from current state
-                                      (eval-instantiated-spec (action.precondition-type-inst action) 
-                                                              *backtrack-state*)
-                                      ;; Static case: use pre-computed combinations
-                                      (action.precondition-args action)))
-            (precondition-fn (action.pre-defun-name action)))
-        ;; Filter symmetric instantiations if symmetry pruning enabled
-        (when *symmetry-pruning*
-          (setf parameter-combinations 
-                (filter-symmetric-instantiations action parameter-combinations *backtrack-state*)))
-        ;; Process each parameter combination individually against current state
-        (dolist (param-combo parameter-combinations)
-          (let ((precondition-result (apply precondition-fn *backtrack-state* param-combo)))
-            (when precondition-result  ; Only process if preconditions satisfied
-              (let ((choices-from-combination 
-                      (generate-choices-for-single-combination-bt action param-combo
-                                                                  precondition-result level)))
-                ;; Process each choice generated from this parameter combination
-                ;; (Multiple choices possible due to multiple assert statements in an action)
-                (dolist (choice choices-from-combination)
-                  (if (detect-path-cycle choice)
-                      ;; If this choice was already applied during generation, restore now.
-                      (when (choice.pre-applied-p choice)
-                        (apply-update-inverse-bt (choice.inverse-update choice)))
-                      (when (register-choice-bt choice action level)
-                        (unwind-protect
-                          (cond
-                            ;; Filter inconsistent states (parallels depth-first filtering in generate-children)
-                            ((bt-choice-inconsistent-p choice)
-                             (increment-global *inconsistent-states-dropped* 1))
-                            ((search-prefix-pruned-p
-                               *backtrack-state*
-                               (lambda (move)
-                                 (declare (ignore move))
-                                 (list (reconstruct-solution-path)))))
-                            ;; Solution found at current level - register and handle continuation
-                             ((is-complete-solution)
-                              (let ((candidate-path (reconstruct-solution-path)))
-                                (if (candidate-solution-valid-p
-                                      candidate-path *backtrack-state*)
-                                  (progn
-                                    (register-solution-bt (1+ level) candidate-path)
-                                    (narrate-bt
-                                      "Solution found ***"
-                                      (first *choice-stack*) (1+ level))
-                                    (when (> *debug* 0)
-                                      (finish-output))
-                                    (setf found-a-solution t)
-                                    (when (solution-count-reached-p)
-                                      (return-from backtrack t)))
-                                  ;; The state goal is only a rejected prefix.  Later
-                                  ;; actions may make the complete path valid.
-                                  (let ((deeper-result (backtrack (1+ level))))
-                                    (when deeper-result
-                                      (setf found-a-solution t)
-                                      (when (solution-count-reached-p)
-                                        (return-from backtrack t)))))))
-                            ;; No solution yet - continue recursive exploration
-                            (t
-                             (let ((deeper-result (backtrack (1+ level))))
-                               (when deeper-result
-                                 (setf found-a-solution t)
-                                 (when (solution-count-reached-p)
-                                   (return-from backtrack t))))))
-                          (undo-choice-bt choice action level)))))))))))
+  (let ((found-a-solution nil))
+    (visit-backtracking-choices
+      level
+      (lambda (choice action)
+        (when (explore-choice-bt choice action level)
+          (setf found-a-solution t))
+        (and found-a-solution (solution-count-reached-p))))
     found-a-solution))
 
+
+(defun backtracking-actions (level)
+  "Preserve fixed action order for CSP levels."
+  (if (and (eql *problem-type* 'csp) (< level (length *actions*)))
+      (list (nth level *actions*))
+      *actions*))
+
+
+(defun visit-generated-choices-bt (level visitor)
+  "Visit choices in generation order; stop when VISITOR returns true."
+  (dolist (action (backtracking-actions level))
+    (let ((combinations (if (action.dynamic action)
+                            (eval-instantiated-spec
+                              (action.precondition-type-inst action) *backtrack-state*)
+                            (action.precondition-args action))))
+      (when *symmetry-pruning*
+        (setf combinations
+              (filter-symmetric-instantiations action combinations *backtrack-state*)))
+      (dolist (combination combinations)
+        (let ((precondition-result
+                (apply (action.pre-defun-name action) *backtrack-state* combination)))
+          (when precondition-result
+            (dolist (choice (generate-choices-for-single-combination-bt
+                              action combination precondition-result level))
+              (when (funcall visitor choice action)
+                (return-from visit-generated-choices-bt t)))))))))
+
+
+(defun visit-backtracking-choices (level visitor)
+  "Use heuristic order only when a heuristic is defined; otherwise stream choices."
+  (if (fboundp 'heuristic?)
+      (dolist (entry (ordered-choices-bt level))
+        (when (funcall visitor (second entry) (third entry))
+          (return t)))
+      (visit-generated-choices-bt level visitor)))
+
+
+(defun ordered-choices-bt (level)
+  "Score all choices on a disposable working copy; retain only updates and scores."
+  (let ((*backtrack-state* (copy-problem-state *backtrack-state*))
+        (scored nil))
+    (visit-generated-choices-bt
+      level
+      (lambda (choice action)
+        (let ((score (score-choice-bt choice action level)))
+          (when score
+            (push (list score choice action) scored)))
+        nil))
+    (stable-sort (nreverse scored) #'< :key #'first)))
+
+
+(defun score-choice-bt (choice action level)
+  "Evaluate a valid successor and undo it, including when the heuristic signals."
+  (when (detect-path-cycle choice)
+    (when (choice.pre-applied-p choice)
+      (apply-update-inverse-bt (choice.inverse-update choice)))
+    (return-from score-choice-bt nil))
+  (when (register-choice-bt choice action level nil)
+    (unwind-protect
+        (if (bt-choice-inconsistent-p choice)
+            (progn (increment-global *inconsistent-states-dropped* 1) nil)
+            (let ((score (funcall (symbol-function 'heuristic?) *backtrack-state*)))
+              (check-type score real)
+              (setf (choice.heuristic choice) score)
+              score))
+      (undo-choice-bt choice action level nil)
+      (setf (choice.pre-applied-p choice) nil))))
+
+
+(defun explore-choice-bt (choice action level)
+  "Explore one successor, restoring the working state on every exit."
+  (when (detect-path-cycle choice)
+    (when (choice.pre-applied-p choice)
+      (apply-update-inverse-bt (choice.inverse-update choice)))
+    (return-from explore-choice-bt nil))
+  (when (register-choice-bt choice action level)
+    (unwind-protect
+        (cond
+          ((bt-choice-inconsistent-p choice)
+           (increment-global *inconsistent-states-dropped* 1)
+           nil)
+          ((search-prefix-pruned-p
+             *backtrack-state*
+             (lambda (move)
+               (declare (ignore move))
+               (list (reconstruct-solution-path))))
+           nil)
+          ((accept-goal-bt level) t)
+          (t (backtrack (1+ level))))
+      (undo-choice-bt choice action level))))
+
+
+(defun accept-goal-bt (level)
+  "Register an acceptable goal; rejected goals remain eligible for expansion."
+  (when (is-complete-solution)
+    (let ((path (reconstruct-solution-path)))
+      (when (and (candidate-solution-valid-p path *backtrack-state*)
+                 (not (goal-chain-candidate-rejected-p path *backtrack-state*)))
+        (register-solution-bt (1+ level) path)
+        (narrate-bt "Solution found ***" (first *choice-stack*) (1+ level))
+        (when (> *debug* 0) (finish-output))
+        t))))
 
 (defun generate-choices-for-single-combination-bt (action param-combo precondition-result level)
   "Generate choices by executing effect with incremental updates to *backtrack-state*.
@@ -241,6 +293,7 @@
                                                    :inverse-sig (and cycle-check-p
                                                                      (update-set-signature inverse-ops))
                                                    :level level
+                                                   :value (update.value updated-db)
                                                    :pre-applied-p single-update-p)))
                      (push new-choice choices)
                      ;; For multiple updates, restore immediately so each choice is explored from
@@ -258,32 +311,42 @@
                                                  :forward-sig nil
                                                  :inverse-sig nil
                                                  :level level
+                                                 :value (update.value updated-db)
                                                  :pre-applied-p nil)))
                    (push new-choice choices))))))))
       ;; Return choices in forward execution order
       (nreverse choices))))
 
 
-(defun register-choice-bt (choice action level)
+(defun register-choice-bt (choice action level &optional (report-p t))
   "Register a choice by applying its forward operations to *backtrack-state*."
     
   #+:ww-debug
-  (when (>= *debug* 3)
+  (when (and report-p (>= *debug* 3))
     (format t "~%Current state: ~A~%" (list-database (problem-state.idb *backtrack-state*))))
 
   ;; Step 1: Apply forward operations unless already applied during generation
   (unless (choice.pre-applied-p choice)
     (apply-update-forward-bt (choice.forward-update choice)))
 
-  ;; Step 2: Name and time update
+  ;; Step 2: Install successor metadata and retain the exact parent values.
+  (setf (choice.parent-metadata choice)
+        (list (problem-state.name *backtrack-state*)
+              (problem-state.time *backtrack-state*)
+              (problem-state.value *backtrack-state*)
+              (problem-state.heuristic *backtrack-state*)
+              (problem-state.instantiations *backtrack-state*)))
   (setf (problem-state.name *backtrack-state*) (action.name action))
+  (setf (problem-state.value *backtrack-state*) (choice.value choice)
+        (problem-state.heuristic *backtrack-state*) (choice.heuristic choice)
+        (problem-state.instantiations *backtrack-state*) (rest (choice.act choice)))
   (incf (problem-state.time *backtrack-state*) (action.duration action))
 
   ;; Step 3: Global invariants
   (when *global-invariants*
     (unless (validate-global-invariants nil *backtrack-state*)
       (apply-update-inverse-bt (choice.inverse-update choice))
-      (decf (problem-state.time *backtrack-state*) (action.duration action))
+      (restore-choice-metadata-bt choice)
       (error "Global invariant violation in successor state from action ~A"
              (format-action-for-display (choice.act choice)))))
 
@@ -291,33 +354,40 @@
   (when (and (fboundp 'constraint-fn)
              (not (funcall (symbol-function 'constraint-fn) *backtrack-state*)))
     (apply-update-inverse-bt (choice.inverse-update choice))
-    (decf (problem-state.time *backtrack-state*) (action.duration action))
+    (restore-choice-metadata-bt choice)
     (return-from register-choice-bt nil))
 
   ;; Step 5: Choice stack
   (push choice *choice-stack*)
 
   ;; Step 6: Debug output
-  (narrate-bt "" choice (1+ level))
+  (when report-p (narrate-bt "" choice (1+ level)))
 
   t)
 
 
-(defun undo-choice-bt (choice action level)
+(defun restore-choice-metadata-bt (choice)
+  "Restore the exact metadata saved before registering CHOICE."
+  (destructuring-bind (name time value heuristic instantiations) (choice.parent-metadata choice)
+    (setf (problem-state.name *backtrack-state*) name
+          (problem-state.time *backtrack-state*) time
+          (problem-state.value *backtrack-state*) value
+          (problem-state.heuristic *backtrack-state*) heuristic
+          (problem-state.instantiations *backtrack-state*) instantiations)))
+
+
+(defun undo-choice-bt (choice action level &optional (report-p t))
   "Undo a choice from the current state with time reversal and stack management"
+  (declare (ignore action))
 
   ;; Inverse state update
   (apply-update-inverse-bt (choice.inverse-update choice))
 
   ;; Reverse name & time
-  (setf (problem-state.name *backtrack-state*) 
-        (if (cdr *choice-stack*)
-          (first (choice.act (second *choice-stack*)))  ; Previous action name
-          'start))
-  (decf (problem-state.time *backtrack-state*) (action.duration action))
+  (restore-choice-metadata-bt choice)
 
   ;; Debug
-  (narrate-bt "Backtracking to" choice level)
+  (when report-p (narrate-bt "Backtracking to" choice level))
 
   ;; Stack handling
   (pop *choice-stack*)

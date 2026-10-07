@@ -79,6 +79,10 @@
                   (when (state-is-inconsistent succ-state)
                     (incf *inconsistent-states-dropped*)
                     (return-from process-succ))
+                  ;; Match worker validation before accepting goals or frontier tasks.
+                  (when *global-invariants*
+                    (unless (validate-global-invariants node succ-state)
+                      (return-from process-succ)))
                   (when (successor-search-prefix-pruned-p node succ-state)
                     (return-from process-succ))
                   (when (search-successor-pruned-p node succ-state)

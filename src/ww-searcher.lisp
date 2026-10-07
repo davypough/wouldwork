@@ -1380,16 +1380,21 @@ different acceptable milestone state."
 
 (defun bounding-function (current-node)
   "Applies the bounding function, if there is one."
+  (bound-search-state (node.state current-node) (node.depth current-node)))
+
+
+(defun bound-search-state (state depth)
+  "Apply the shared user bound to a state before expanding its descendants."
   (when (fboundp 'bounding-function?)
-    (ut::mvb (current-cost current-upper) (funcall (symbol-function 'bounding-function?) (node.state current-node))
+    (ut::mvb (current-cost current-upper) (funcall (symbol-function 'bounding-function?) state)
        #+:ww-debug (when (>= *debug* 3)
                      (format t "~&Cost bound = ~A, Upper bound = ~A~%" current-cost current-upper))
        (cond ((> current-cost *upper-bound*)
-                (narrate "State killed by bounding" (node.state current-node) (node.depth current-node))
+                (narrate "State killed by bounding" state depth)
                 #+:ww-debug (when (>= *debug* 3)
                               (format t "~&current-cost = ~F > *upper-bound* = ~F~%" current-cost *upper-bound*))
                 (increment-global *bounding-pruned* 1)
-                (return-from bounding-function 'kill-node))
+                (return-from bound-search-state 'kill-node))
              ((< current-upper *upper-bound*)
                 #+:ww-debug (when (>= *debug* 3)
                               (format t "~&Updating *upper-bound* from ~F to ~F~%" *upper-bound* current-upper))

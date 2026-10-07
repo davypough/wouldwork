@@ -27,7 +27,7 @@
        (*solution-type*
          (when (and (eq *algorithm* 'backtracking)
                     (member ',val '(min-length min-time min-value max-value)))
-           (format t "~%Note: *solution-type* ~A requires optimality pruning, which the backtracking algorithm does not perform; all solutions will be enumerated without pruning.~%" ',val))
+           (format t "~%Note: Backtracking with *solution-type* ~A uses user bounding-function? and move lower bounds, but has no automatic objective-bound pruning.~%" ',val))
          (setf ,param ',val)
          (unless *ww-loading*
            (save-globals)
