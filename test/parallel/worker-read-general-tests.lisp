@@ -63,7 +63,7 @@
   (when (zerop *threads*)
     (assert (null (worker-read-snapshots-active-p))))
   (ww-set *threads* 2)
-  (load "src/ww-worker-read-snapshot-tests.lisp")
+  (load (asdf:system-relative-pathname :wouldwork "test/parallel/worker-read-snapshot-tests.lisp"))
   (worker-general-copy-check)
   (when expand-p (worker-general-expansion-check))
   (format t "~&GENERAL STAGE/COPY PASS ~A memos=~D~%" path (length *worker-read-memo-symbols*))

@@ -92,5 +92,5 @@ Check again for other readers before Phase 1 (`grep -n "closed" src/*.lisp`).
   solutions, serial and 16 threads.
 - `triangle-xyz` at N = 7: should now fit the heap and prove no single-peg finish from a
   corner hole (40,600,768 states, per an independent count).
-- Update `doc/problem-analysis/search-advisor/search-advisor.md` section 6.3 with the new
+- Update `doc/search-advisor.md` section 6.3 with the new
   bytes per state.

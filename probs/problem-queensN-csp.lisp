@@ -2,6 +2,7 @@
 ;;; Design notes
 ;;; Assign rows in a fixed order so each board has one construction path.
 ;;; Track occupied columns and both diagonal families with three integer bit masks.
+;;; The mask tuple is directed: its three fields have distinct roles.
 ;;; Keep row assignments for the symmetry check and the printed example.
 ;;; Count accepted boards, retaining only one example path and goal state.
 ;;; Optionally accept only the smallest board in each rotation/reflection class.
@@ -28,7 +29,7 @@
   column    (compute (loop for j from 1 to *N* collect j)))
 
 (define-dynamic-relations
-  (occupied $integer $integer $integer)
+  (occupied> $integer $integer $integer)
   (assigned queen-row $column)
   (next-row $fixnum))
 
@@ -37,19 +38,19 @@
   (?col column)
   (and (bind (next-row $current-row))
        (<= $current-row *N*)
-       (bind (occupied $columns $sum-diagonals $difference-diagonals))
+       (bind (occupied> $columns $sum-diagonals $difference-diagonals))
        (not (logbitp (1- ?col) $columns))
        (not (logbitp (- (+ $current-row ?col) 2) $sum-diagonals))
        (not (logbitp (+ (- $current-row ?col) (1- *N*)) $difference-diagonals)))
   (?col)
   (assert (assigned $current-row ?col)
-          (occupied (logior $columns (ash 1 (1- ?col)))
-                    (logior $sum-diagonals (ash 1 (- (+ $current-row ?col) 2)))
-                    (logior $difference-diagonals
-                            (ash 1 (+ (- $current-row ?col) (1- *N*)))))
+          (occupied> (logior $columns (ash 1 (1- ?col)))
+                     (logior $sum-diagonals (ash 1 (- (+ $current-row ?col) 2)))
+                     (logior $difference-diagonals
+                             (ash 1 (+ (- $current-row ?col) (1- *N*)))))
           (next-row (1+ $current-row))))
 
-(define-init (next-row 1) (occupied 0 0 0))
+(define-init (next-row 1) (occupied> 0 0 0))
 
 (defun queens-empty-future-row-p (next-row columns sum-diagonals difference-diagonals size)
   "True when a future row has no legal column under the current assignments."
@@ -69,7 +70,7 @@
            (bind (assigned 1 $first-column))
            (> $first-column (ceiling *N* 2)))
       (and (bind (next-row $row))
-           (bind (occupied $columns $sum-diagonals $difference-diagonals))
+           (bind (occupied> $columns $sum-diagonals $difference-diagonals))
            (queens-empty-future-row-p $row $columns $sum-diagonals
                                      $difference-diagonals *N*))))
 

@@ -12,8 +12,9 @@
 (defstruct (choice (:conc-name choice.))
   "Represents a choice point in backtracking search"
   act             ; (action-name arg1 arg2 ...)
-  forward-update  ; The update structure that applies this choice
-  inverse-update  ; The update structure that undoes this choice
+  forward-update  ; Forward literals or a successor IDB snapshot
+  inverse-update  ; IMMEDIATE planning cycle literals or a parent IDB snapshot
+  undo-frame      ; Actual writes for this application only; NIL after rollback
   forward-sig     ; Order-insensitive signature of forward-update
   inverse-sig     ; Order-insensitive signature of inverse-update
   level           ; Depth in the search tree
@@ -30,22 +31,91 @@
 (defparameter *choice-stack* nil
   "Stack of choices made during backtracking search; path back to start state.")
 
+(defvar *bt-path-fingerprints* nil
+  "Nearest-first ancestor (hash . entry-count) pairs; never includes the candidate.")
+
+(defun validate-bt-path-mode ()
+  "Reject known configurations whose future is not represented by the IDB alone."
+  (check-problem-parameter '*bt-cycle-check* *bt-cycle-check*)
+  (when (eq *bt-cycle-check* 'path)
+    (dolist (requirement '((*algorithm* . backtracking) (*problem-type* . planning)
+                           (*tree-or-graph* . tree) (*threads* . 0)))
+      (unless (eql (symbol-value (car requirement)) (cdr requirement))
+        (error "BT PATH cycle checking requires ~S = ~S, got ~S."
+               (car requirement) (cdr requirement) (symbol-value (car requirement)))))
+    (dolist (parameter '(*solution-validators* *search-prefix-validators*
+                         *goal-chain-candidate-rejector* *goal-chain-session*
+                         *goal-chaining-policy* *final-goal* *happening-names*
+                         *auto-wait* *recorder-prefix-pruning*))
+      (when (symbol-value parameter)
+        (error "BT PATH cycle checking does not support active ~S." parameter)))
+    (when (or (gethash 'recorder *types*)
+              (member "recorder" *spliced-tech-names* :test #'string=))
+      (error "BT PATH cycle checking does not support recorder history."))))
+
+(defun bt-path-fingerprint (db)
+  (cons (compute-idb-hash db) (hash-table-count db)))
+
+(defun bt-scratch-parent (scratch choice)
+  "Restore one transition into SCRATCH without consuming or mutating live undo data."
+  (let ((frame (choice.undo-frame choice)))
+    (cond
+      (frame
+       (loop for entry = (bt-undo-frame.head frame) then (bt-undo-entry.previous entry)
+             while entry do
+         (when (bt-undo-entry.secondary-db entry)
+           (error "BT PATH ancestor has static undo records for ~S." (choice.act choice)))
+         (if (bt-undo-entry.present-p entry)
+             (setf (gethash (bt-undo-entry.key entry) scratch) (bt-undo-entry.old-value entry))
+             (remhash (bt-undo-entry.key entry) scratch)))
+       scratch)
+      ((hash-table-p (choice.forward-update choice))
+       (copy-idb (choice.inverse-update choice)))
+      (t (error "Missing BT PATH ancestor undo records for ~S." (choice.act choice))))))
+
+(defun bt-on-current-path-p (fingerprint)
+  "Use fingerprints only to select exact, scratch-only ancestor comparisons."
+  (when (member fingerprint *bt-path-fingerprints* :test #'equal)
+    (unless (= (length *choice-stack*) (length *bt-path-fingerprints*))
+      (error "BT PATH ancestor fingerprints and choice stack are misaligned."))
+    (let* ((candidate (problem-state.idb *backtrack-state*))
+           (scratch (copy-idb candidate)))
+      (loop for ancestor in *bt-path-fingerprints*
+            for choice in *choice-stack* do
+        (setf scratch (bt-scratch-parent scratch choice))
+        (when (and (equal fingerprint ancestor) (equalp candidate scratch))
+          (return t))))))
+
+(defun descend-choice-bt (level)
+  "Check a registered, unaccepted candidate before descending, after goal handling."
+  (if (eq *bt-cycle-check* 'immediate)
+      (backtrack (1+ level))
+      (let ((fingerprint (bt-path-fingerprint (problem-state.idb *backtrack-state*))))
+        (if (bt-on-current-path-p fingerprint)
+            (progn (increment-global *repeated-states*)
+                   (finalize-duplicate-depth (1+ level))
+                   nil)
+            (backtrack (1+ level) fingerprint)))))
+
 
 (defun cycle-check-enabled-bt ()
   "Enable immediate inverse-cycle detection only for planning problems."
-  (not (eql *problem-type* 'csp)))
+  (and (eq *bt-cycle-check* 'immediate) (not (eql *problem-type* 'csp))))
 
 
 (defun update-set-signature (ops)
   "Build an order-insensitive signature for OPS, ignoring duplicates.
    Used as a cheap prefilter before exact set-equality checks."
-  (let ((seen (make-hash-table :test #'equal))
+  ;; Eight is an initial small-list cutoff, not a measured optimum.
+  ;; Longer lists retain hash-based duplicate detection rather than quadratic scans.
+  (let ((seen (when (nthcdr 8 ops) (make-hash-table :test #'equal)))
         (unique-count 0)
         (xor-hash 0)
         (sum-hash 0))
-    (dolist (op ops)
-      (unless (gethash op seen)
-        (setf (gethash op seen) t)
+    (loop for tail on ops
+          for op = (car tail) do
+      (unless (if seen (gethash op seen) (member op (cdr tail) :test #'equal))
+        (when seen (setf (gethash op seen) t))
         (incf unique-count)
         (let ((h (sxhash op)))
           (setf xor-hash (logxor xor-hash h))
@@ -69,27 +139,46 @@
    UPDATE may be a forward-op list or a hash-table idb snapshot."
   (etypecase update
     (list
-     (when update
-       (revise (problem-state.idb *backtrack-state*) update)))
+     (dolist (literal update)
+       (let* ((proposition (if (eq (car literal) 'not) (second literal) literal))
+              (db (if (gethash (car proposition) *relations*)
+                      (problem-state.idb *backtrack-state*) *static-db*)))
+         (update db literal))))
     (hash-table
      (setf (problem-state.idb *backtrack-state*) (copy-idb update))))
   (invalidate-problem-state-hash *backtrack-state*))
 
 
-(defun apply-update-inverse-bt (update)
-  "Undo UPDATE from *backtrack-state*.
-   UPDATE may be an inverse-op list or a hash-table idb snapshot."
-  (etypecase update
-    (list
-     (when update
-       (revise (problem-state.idb *backtrack-state*) update)))
-    (hash-table
-     (setf (problem-state.idb *backtrack-state*) (copy-idb update))))
-  (invalidate-problem-state-hash *backtrack-state*))
+(defun restore-choice-database-bt (choice)
+  "Restore actual writes, or the parent snapshot for a snapshot choice."
+  (cond ((choice.undo-frame choice)
+         (restore-bt-undo (choice.undo-frame choice))
+         (setf (choice.undo-frame choice) nil))
+        ((hash-table-p (choice.forward-update choice))
+         (setf (problem-state.idb *backtrack-state*)
+               (copy-idb (choice.inverse-update choice))))
+        (t (error "Missing backtracking undo records for ~S" (choice.act choice))))
+  (invalidate-problem-state-hash *backtrack-state*)
+  (setf (choice.pre-applied-p choice) nil))
+
+(defun apply-choice-database-bt (choice)
+  "Capture fresh undo records whenever a literal choice is reapplied."
+  (if (hash-table-p (choice.forward-update choice))
+      (apply-update-forward-bt (choice.forward-update choice))
+      (let* ((frame (begin-bt-undo (problem-state.idb *backtrack-state*)))
+             (*bt-undo-frame* frame)
+             (complete nil))
+        (unwind-protect
+            (progn (apply-update-forward-bt (choice.forward-update choice))
+                   (setf (choice.undo-frame choice) frame complete t))
+          (unless complete
+            (restore-bt-undo frame)
+            (invalidate-problem-state-hash *backtrack-state*))))))
 
 
 (defun search-backtracking ()
   "Runs backtracking after DFS has initialized shared search state."
+  (validate-bt-path-mode)
   ;; Initialize backtracking-specific state infrastructure
   (setf *backtrack-state* (copy-problem-state *start-state*))
   (setf *choice-stack* nil)
@@ -106,7 +195,9 @@
                            (2 (list (list-database (problem-state.idb *backtrack-state*))))))
                       *search-tree*))
   ;; Initiate recursive backtracking search
-  (backtrack 0)
+  (let ((*bt-path-fingerprints* nil)
+        (*bt-path-search-active* (eq *bt-cycle-check* 'path)))
+    (backtrack 0))
   ;; Compute final statistics
   (setf *average-branching-factor* (if (> *program-cycles* 0)
                                      (coerce (/ (1- *total-states-processed*) *program-cycles*)
@@ -124,7 +215,7 @@
   (print-search-progress))
 
 
-(defun backtrack (level)
+(defun backtrack (level &optional fingerprint)
   "Recursive backtracking search over new states from assert clauses."
   
   ;; Step 1: Enforce depth cutoff
@@ -148,7 +239,12 @@
   ;; Step 2: Update search statistics
   (update-statistics level)
   
-  (let ((found-a-solution nil))
+  (let ((found-a-solution nil)
+        (*bt-path-fingerprints*
+          (if (eq *bt-cycle-check* 'path)
+              (cons (or fingerprint (bt-path-fingerprint (problem-state.idb *backtrack-state*)))
+                    *bt-path-fingerprints*)
+              *bt-path-fingerprints*)))
     (visit-backtracking-choices
       level
       (lambda (choice action)
@@ -212,7 +308,7 @@
   "Evaluate a valid successor and undo it, including when the heuristic signals."
   (when (detect-path-cycle choice)
     (when (choice.pre-applied-p choice)
-      (apply-update-inverse-bt (choice.inverse-update choice)))
+      (restore-choice-database-bt choice))
     (return-from score-choice-bt nil))
   (when (register-choice-bt choice action level nil)
     (unwind-protect
@@ -230,7 +326,7 @@
   "Explore one successor, restoring the working state on every exit."
   (when (detect-path-cycle choice)
     (when (choice.pre-applied-p choice)
-      (apply-update-inverse-bt (choice.inverse-update choice)))
+      (restore-choice-database-bt choice))
     (return-from explore-choice-bt nil))
   (when (register-choice-bt choice action level)
     (unwind-protect
@@ -245,7 +341,7 @@
                (list (reconstruct-solution-path))))
            nil)
           ((accept-goal-bt level) t)
-          (t (backtrack (1+ level))))
+          (t (descend-choice-bt level)))
       (undo-choice-bt choice action level))))
 
 
@@ -261,64 +357,67 @@
         t))))
 
 (defun generate-choices-for-single-combination-bt (action param-combo precondition-result level)
-  "Generate choices by executing effect with incremental updates to *backtrack-state*.
-   Effect modifies state, then changes are undone. Returns choices with forward/inverse ops."
-  
-  (let ((effect-fn (action.eff-defun-name action))
-        (choices '()))
-    ;; Execute effect function - MODIFIES *backtrack-state* incrementally
-    (let ((pre-idb (copy-idb (problem-state.idb *backtrack-state*)))
-          (updated-dbs 
-            (if (eql precondition-result t)
-                (funcall effect-fn *backtrack-state*)
-                (apply effect-fn *backtrack-state* precondition-result))))
-      ;; Process each updated-db into separate choice structure.
-      ;; Fast path: if only one update exists, keep it applied and avoid undo/reapply.
-      (let ((single-update-p (and (consp updated-dbs) (null (cdr updated-dbs))))
-            (cycle-check-p (cycle-check-enabled-bt)))
-        (dolist (updated-db updated-dbs)
-          (let ((change-lists (update.changes updated-db)))
-            (when change-lists
-              (typecase change-lists
-                (list
-                 (destructuring-bind (forward-ops inverse-ops) change-lists
-                   (let* ((combined-act (cons (action.name action)
-                                              (copy-tree
-                                               (update.instantiations updated-db))))
-                          (new-choice (make-choice :act combined-act
-                                                   :forward-update forward-ops
-                                                   :inverse-update inverse-ops
-                                                   :forward-sig (and cycle-check-p
-                                                                     (update-set-signature forward-ops))
-                                                   :inverse-sig (and cycle-check-p
-                                                                     (update-set-signature inverse-ops))
-                                                   :level level
-                                                   :value (update.value updated-db)
-                                                   :pre-applied-p single-update-p)))
-                     (push new-choice choices)
-                     ;; For multiple updates, restore immediately so each choice is explored from
-                     ;; the same base state. For single update, defer restore to undo-choice-bt.
-                     (unless single-update-p
-                       (apply-update-inverse-bt inverse-ops)))))
-                (hash-table
-                 ;; Snapshot-style update: register by replacing idb; inverse restores pre-idb.
-                 (let* ((combined-act (cons (action.name action)
-                                            (copy-tree
-                                             (update.instantiations updated-db))))
-                        (new-choice (make-choice :act combined-act
-                                                 :forward-update change-lists
-                                                 :inverse-update pre-idb
-                                                 :forward-sig nil
-                                                 :inverse-sig nil
-                                                 :level level
-                                                 :value (update.value updated-db)
-                                                 :pre-applied-p nil)))
-                   (push new-choice choices))))))))
-      ;; Return choices in forward execution order
-      (nreverse choices))))
+  "Capture all effect writes; retain the trail only for a pre-applied choice."
+  (declare (ignore param-combo))
+  (let* ((pre-idb (problem-state.idb *backtrack-state*))
+         (frame (begin-bt-undo pre-idb))
+         (*bt-undo-frame* frame)
+         (retained nil))
+    (unwind-protect
+        (let* ((effect-fn (action.eff-defun-name action))
+               (updates (if (eql precondition-result t)
+                            (funcall effect-fn *backtrack-state*)
+                            (apply effect-fn *backtrack-state* precondition-result)))
+               (choices (build-choices-bt action updates pre-idb level)))
+          (when (and (= (length choices) 1) (choice.pre-applied-p (first choices)))
+            (setf (choice.undo-frame (first choices)) frame retained t))
+          choices)
+      (unless retained
+        (restore-bt-undo frame)
+        (invalidate-problem-state-hash *backtrack-state*)))))
 
+(defun choice-from-update-bt (action update pre-idb level single-p)
+  "Keep literal cycle data separate from physical restoration data."
+  (let* ((changes (update.changes update))
+         (incremental-p (listp changes))
+         (forward (if incremental-p (first changes) changes))
+         (cycle-p (and incremental-p (cycle-check-enabled-bt)))
+         (inverse (if incremental-p
+                      (unless (eq *bt-cycle-check* 'path) (second changes))
+                      pre-idb)))
+    (when changes
+      (make-choice :act (cons (action.name action) (copy-tree (update.instantiations update)))
+                   :forward-update forward :inverse-update inverse
+                   :forward-sig (and cycle-p (update-set-signature forward))
+                   :inverse-sig (and cycle-p (update-set-signature inverse))
+                   :level level :value (update.value update)
+                   :pre-applied-p (and incremental-p single-p)))))
+
+(defun build-choices-bt (action updates pre-idb level)
+  "Preserve effect-result order; the caller restores the complete generation trail."
+  (let ((single-p (and (consp updates) (null (cdr updates)))))
+    (loop for update in updates
+          for choice = (choice-from-update-bt action update pre-idb level single-p)
+          when choice collect choice)))
 
 (defun register-choice-bt (choice action level &optional (report-p t))
+  "Restore both partial application and metadata if registration rejects or signals."
+  (let ((registered nil)
+        (old-stack *choice-stack*))
+    (setf (choice.parent-metadata choice)
+          (list (problem-state.name *backtrack-state*) (problem-state.time *backtrack-state*)
+                (problem-state.value *backtrack-state*) (problem-state.heuristic *backtrack-state*)
+                (problem-state.instantiations *backtrack-state*)))
+    (unwind-protect
+        (setf registered (register-applied-choice-bt choice action level report-p))
+      (unless registered
+        (when (or (choice.undo-frame choice) (choice.pre-applied-p choice)
+                  (hash-table-p (choice.forward-update choice)))
+          (restore-choice-database-bt choice))
+        (restore-choice-metadata-bt choice)
+        (setf *choice-stack* old-stack)))))
+
+(defun register-applied-choice-bt (choice action level report-p)
   "Register a choice by applying its forward operations to *backtrack-state*."
     
   #+:ww-debug
@@ -327,15 +426,9 @@
 
   ;; Step 1: Apply forward operations unless already applied during generation
   (unless (choice.pre-applied-p choice)
-    (apply-update-forward-bt (choice.forward-update choice)))
+    (apply-choice-database-bt choice))
 
-  ;; Step 2: Install successor metadata and retain the exact parent values.
-  (setf (choice.parent-metadata choice)
-        (list (problem-state.name *backtrack-state*)
-              (problem-state.time *backtrack-state*)
-              (problem-state.value *backtrack-state*)
-              (problem-state.heuristic *backtrack-state*)
-              (problem-state.instantiations *backtrack-state*)))
+  ;; Step 2: The registration wrapper has retained the parent metadata.
   (setf (problem-state.name *backtrack-state*) (action.name action))
   (setf (problem-state.value *backtrack-state*) (choice.value choice)
         (problem-state.heuristic *backtrack-state*) (choice.heuristic choice)
@@ -345,17 +438,13 @@
   ;; Step 3: Global invariants
   (when *global-invariants*
     (unless (validate-global-invariants nil *backtrack-state*)
-      (apply-update-inverse-bt (choice.inverse-update choice))
-      (restore-choice-metadata-bt choice)
       (error "Global invariant violation in successor state from action ~A"
              (format-action-for-display (choice.act choice)))))
 
   ;; Step 4: Constraint
   (when (and (fboundp 'constraint-fn)
              (not (funcall (symbol-function 'constraint-fn) *backtrack-state*)))
-    (apply-update-inverse-bt (choice.inverse-update choice))
-    (restore-choice-metadata-bt choice)
-    (return-from register-choice-bt nil))
+    (return-from register-applied-choice-bt nil))
 
   ;; Step 5: Choice stack
   (push choice *choice-stack*)
@@ -381,7 +470,7 @@
   (declare (ignore action))
 
   ;; Inverse state update
-  (apply-update-inverse-bt (choice.inverse-update choice))
+  (restore-choice-database-bt choice)
 
   ;; Reverse name & time
   (restore-choice-metadata-bt choice)
@@ -455,7 +544,10 @@
                                 (format-action-for-display (choice.act choice)))
                         (format t "Depth: ~A~%" depth)
                         (format t "Forward Update: ~A~%" (choice.forward-update choice))
-                        (format t "Inverse Update: ~A~%" (choice.inverse-update choice)))
+                        (if (and (eq *bt-cycle-check* 'path)
+                                 (listp (choice.forward-update choice)))
+                            (format t "Inverse cycle literals: omitted in PATH mode~%")
+                            (format t "Inverse Update: ~A~%" (choice.inverse-update choice))))
                       (unless choice
                         (format t "Choice: <nil>~%"))
                       (format t "Successor State IDB: ~A~%" (list-database (problem-state.idb *backtrack-state*)))

@@ -9,7 +9,7 @@ PURPOSE
 -------
 A schema gap is a question about problem structure the static profile
 failed to ask, found by surprise (M5), stated domain-generally rather than
-as a patch for one problem.  solving-advisor.md, Subgoal dialogue step 5,
+as a patch for one problem.  doc/solving-advisor.md, Subgoal dialogue step 5,
 files new gaps and complex development needs here.  Recording a need is not
 implementation approval; agree new work with D separately.
 
@@ -103,7 +103,7 @@ NOTE -- Continuation prerequisites (rumin-topo, 2026-10-01)
 -----------------------------------------------------------
 Which prerequisites of the intended next subgoal, or already-known later
 dependencies, does a proposed endpoint preserve or lose?  Resolved as
-procedure: solving-advisor.md, Subgoal dialogue step 2 (look ahead; preserve,
+procedure: doc/solving-advisor.md, Subgoal dialogue step 2 (look ahead; preserve,
 replace, restore when relied on, or deliberately abandon).  BT can expose a
 support loss for one supplied event.  Automatic derivation of continuation
 prerequisites is not implemented or authorized.

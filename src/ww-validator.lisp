@@ -899,6 +899,9 @@
 
 (defun check-problem-parameter (param val)
   (case param
+    (*bt-cycle-check*
+     (unless (member val '(immediate path))
+       (error "Can't set *bt-cycle-check* to ~S. Must be IMMEDIATE or PATH." val)))
     (*worker-read-snapshots* (check-type val boolean))
     (*search-registers-dynamic-objects*
      (unless (and (listp val) (every #'symbolp val))

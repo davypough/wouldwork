@@ -343,14 +343,23 @@
 
 (defun problem-source-file (filename)
   "Resolve FILENAME (eg, \"problem-blocks3.lisp\") in the standard problem folders
-   below the Wouldwork root -- probs/ first, then test/, then test/talos/ -- or NIL
-   if absent from all three.  Deliberately independent of ww-interface's user-extensible
-   *problem-folder-paths*, since this runs during the reload-time eval-when
-   before ww-interface loads."
+   below the Wouldwork root -- probs/ first, then test/ and each folder directly below
+   it, per TEST-FOLDER-PATHS -- or NIL if absent from all of them.  Deliberately
+   independent of ww-interface's user-extensible *problem-folder-paths*, since this
+   runs during the reload-time eval-when before ww-interface loads."
   (let ((root (asdf:system-source-directory :wouldwork)))
-    (or (probe-file (merge-pathnames filename (merge-pathnames "probs/" root)))
-        (probe-file (merge-pathnames filename (merge-pathnames "test/" root)))
-        (probe-file (merge-pathnames filename (merge-pathnames "test/talos/" root))))))
+    (some (lambda (folder)
+            (probe-file (merge-pathnames filename folder)))
+          (cons (merge-pathnames "probs/" root) (test-folder-paths root)))))
+
+
+(defun test-folder-paths (root)
+  "Return test/ below ROOT followed by every folder directly below it, alphabetically.
+   Test problems may live in any of these category folders (talos/, engine/, search/, ...),
+   so a newly added category folder is found without further edits."
+  (let ((test-folder (merge-pathnames "test/" root)))
+    (cons test-folder
+          (sort (directory (merge-pathnames "*/" test-folder)) #'string-lessp :key #'namestring))))
 
 
 (defun instance-problem-file (root)

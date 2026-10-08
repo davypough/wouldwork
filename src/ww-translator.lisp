@@ -237,7 +237,7 @@
                (update-bt ,db ,(translate-list form flag))     ; ← changed: use db
              ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
              (push forward forward-list)
-             (push inverse inverse-list))
+             (when inverse (push inverse inverse-list)))
            ;; No active incremental-update context (eg, standalone propagation update):
            ;; apply directly without logging forward/inverse operations.
            (update ,db ,(translate-list form flag)))            ; ← changed: use db
@@ -262,7 +262,7 @@
                (update-bt ,db (list 'not ,(translate-list (second form) flag)))  ; ← changed: use db
              ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
              (push forward forward-list)
-             (push inverse inverse-list))
+             (when inverse (push inverse inverse-list)))
            ;; No active incremental-update context (eg, standalone propagation update):
            ;; apply directly without logging forward/inverse operations.
            (update ,db (list 'not ,(translate-list (second form) flag))))       ; ← changed: use db

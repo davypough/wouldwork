@@ -17,6 +17,7 @@ Enabled by default on STAGE. Serial searches use canonical reads without copying
 
 
 (declaim (special *recorder-prefix-pruning*
+                  *bt-cycle-check*
                   *min-steps-fallback-warmup*
                   *min-steps-fallback-sample-interval*))
 
@@ -135,6 +136,8 @@ must return unknown rather than :IMPOSSIBLE.")
   (ut::prt *problem-name* *problem-type* *algorithm* *tree-or-graph* *solution-type*
            *depth-cutoff* 
            *threads* *randomize-search* *debug* *probe* *goal* *symmetry-pruning*)
+  (when (eq *algorithm* 'backtracking)
+    (format t "~&  *BT-CYCLE-CHECK* => ~A" *bt-cycle-check*))
   (when *happening-names*
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
@@ -660,6 +663,13 @@ treat their arguments as read-only and be safe to call concurrently."
    depth-first: Traditional DFS with state copying (current behavior)
    backtracking: DFS with single state and undo operations (memory efficient)")
 
+(defvar *bt-cycle-check* 'immediate
+  "BT cycle policy: IMMEDIATE inverse operations, or opt-in PATH IDB equality.
+   PATH assumes future planning behavior is determined by the dynamic database.")
+
+(defvar *bt-path-search-active* nil
+  "Dynamically true during path-mode BT, including heuristic scoring.")
+
 (defvar *solution-type* 'first
   "Specify whether to search for first, min-length, min-time, every solution,
    count accepted goals retaining one example, or a positive integer N
@@ -748,6 +758,7 @@ treat their arguments as read-only and be safe to call concurrently."
   '((*problem-name* . unspecified)
     (*depth-cutoff* . 0)
     (*algorithm* . depth-first)
+    (*bt-cycle-check* . immediate)
     (*tree-or-graph* . graph)
     (*problem-type* . planning)
     (*solution-type* . first)
@@ -782,7 +793,7 @@ treat their arguments as read-only and be safe to call concurrently."
   '(*problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
     *solution-type* *progress-reporting-interval* *randomize-search* *branch*
     *probe* *symmetry-pruning* *debug* *goal* *threads*
-    *max-recorder-cycles* *recorder-prefix-pruning*)
+    *max-recorder-cycles* *recorder-prefix-pruning* *bt-cycle-check*)
   "Problem parameters saved in VALS.LISP, in positional file order.")
 
 
@@ -996,6 +1007,9 @@ treat their arguments as read-only and be safe to call concurrently."
   "Dynamically true while an init-action effect constructs the initial world state.
    Stateful propagation may use this to establish its physical baseline without
    interpreting already-authored initial facts as transitions that happen during search.")
+
+(defvar *bt-undo-frame* nil
+  "Active backtracking write capture, or NIL outside effect application.")
 
 (defvar *idb-hash-acc* nil
   "When non-nil during effect application, holds the running XOR hash of the integer

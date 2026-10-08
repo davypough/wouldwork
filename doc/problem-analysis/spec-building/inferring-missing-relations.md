@@ -5,11 +5,18 @@ problem and the modeled behavior, and assess whether a missing relation explains
 Talos procedure below is a specialized omission investigation, not a general assumption that a
 difficult or apparently unsolvable spec needs more relations.
 
-**Where this fits.** [spec-advisor.md](spec-advisor.md) introduces this procedure when comparison
+**Where this fits.** [spec-advisor.md](../../spec-advisor.md) introduces this procedure when comparison
 with user intent reveals a discrepancy. Use [working-reference-builder.md](working-reference-builder.md)
 to explain the current model first. Its intent comparison supplies requirements and open questions;
 its world-mode section supplies state-dependent evidence, with reachability claims qualified by
 their actual verification. Consult current technology sources for the mechanics involved.
+
+Record results in `doc/problems/<problem-name>/Analysis.txt`, with a linked text artifact
+only if detailed evidence warrants one. Return the discrepancy, tested explanations,
+evidence and limits, proposed correction, and affected dependencies through the specification
+advisor to the [consultant](../../consultant.md). Reopen affected conclusions after a
+correction and preserve unrelated evidence. Investigating an omission does not authorize
+editing the spec or launching a search.
 
 ## Before diagnosing an omission
 

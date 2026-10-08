@@ -187,6 +187,12 @@
   (ieffect-lambda nil :type list))
 
 
+(defstruct (bt-undo-entry (:conc-name bt-undo-entry.))
+  key old-value present-p previous secondary-db)
+
+(defstruct (bt-undo-frame (:conc-name bt-undo-frame.))
+  db head propagated-changed symmetry-touched)
+
 (defstruct (update (:conc-name update.))
   "Db updates resulting from a successful action instantiation."
   (changes nil :type (or hash-table list))

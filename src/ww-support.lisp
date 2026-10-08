@@ -200,7 +200,7 @@
                        proposition))))
     (if int-db
       (add-int-prop-key db key value)
-      (setf (gethash key db) value))
+      (fold-store key value db nil))
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement))
@@ -212,7 +212,7 @@
                        complement))))
         (if int-db
           (del-int-prop-key db complement-key)
-          (remhash complement-key db))))))
+          (fold-remove complement-key db nil))))))
 
 
 (defun del-prop (proposition db int-db)
@@ -227,7 +227,7 @@
                        proposition))))
     (if int-db
       (del-int-prop-key db key)
-      (remhash key db))
+      (fold-remove key db nil))
     (when (gethash (car proposition) *complements*)
       (let* ((complement (get-complement-prop proposition))
              (complement-indices (get-prop-fluent-indices complement)))
@@ -246,7 +246,7 @@
                       t)))
             (if int-db
               (add-int-prop-key db complement-key complement-value)
-              (setf (gethash complement-key db) complement-value))))))))
+              (fold-store complement-key complement-value db nil))))))))
 
 
 (defun note-add-change (db key new-value)
@@ -296,6 +296,37 @@
       (symmetry-object-in-tree-p value)))
 
 
+(defun begin-bt-undo (db)
+  (make-bt-undo-frame :db db
+                      :propagated-changed *propagated-state-changed*
+                      :symmetry-touched *symmetry-idb-touched-p*))
+
+(defun record-bt-undo (db key old present)
+  "Capture the actual entry before mutation, after relation expansion."
+  (when (and *bt-undo-frame*
+             (or (eq db (bt-undo-frame.db *bt-undo-frame*)) (eq db *static-db*)))
+    (setf (bt-undo-frame.head *bt-undo-frame*)
+            (make-bt-undo-entry :key key :old-value old :present-p present
+                               :previous (bt-undo-frame.head *bt-undo-frame*)
+                               :secondary-db (unless (eq db (bt-undo-frame.db *bt-undo-frame*)) db)))))
+
+(defun restore-bt-undo (frame)
+  "Consume one application trail without recording rollback into a parent scope."
+  (let ((*bt-undo-frame* nil))
+    (loop for entry = (bt-undo-frame.head frame) while entry
+          for db = (or (bt-undo-entry.secondary-db entry) (bt-undo-frame.db frame))
+          for integer-p = (eq (hash-table-test db) 'eql) do
+      (if (bt-undo-entry.present-p entry)
+          (fold-store (bt-undo-entry.key entry) (bt-undo-entry.old-value entry) db integer-p)
+          (fold-remove (bt-undo-entry.key entry) db integer-p))
+      (setf (bt-undo-frame.head frame) (bt-undo-entry.previous entry)))
+    (setf *propagated-state-changed* (bt-undo-frame.propagated-changed frame)
+          *symmetry-idb-touched-p* (bt-undo-frame.symmetry-touched frame))))
+
+(defun reject-bt-path-static-write (db key)
+  (when (and *bt-path-search-active* (or (eq db *static-db*) (eq db *static-idb*)))
+    (error "BT PATH cycle checking does not support static database writes (key ~S)." key)))
+
 (defun fold-store (key value db int-db)
   "Store VALUE at KEY while maintaining the active standard or split hash accumulator.
    Standard mode folds every changed entry into *IDB-HASH-ACC*. Split mode folds fixed
@@ -304,8 +335,10 @@
    changed. An idempotent re-store leaves every accumulator unchanged."
   (declare (type hash-table db))
   (reject-worker-static-write db)
-  (when int-db
-    (multiple-value-bind (old present) (gethash key db)
+  (reject-bt-path-static-write db key)
+  (multiple-value-bind (old present) (gethash key db)
+    (when *bt-undo-frame* (record-bt-undo db key old present))
+    (when int-db
       (unless (and present (equal old value))
         (cond
           ((and *fixed-idb-hash-acc* *symmetry-idb-acc*)
@@ -327,8 +360,8 @@
              (setf *idb-hash-acc*
                    (logxor *idb-hash-acc* (deep-sxhash (cons key old)))))
            (setf *idb-hash-acc*
-                 (logxor *idb-hash-acc* (deep-sxhash (cons key value))))))))
-  (setf (gethash key db) value)))
+                 (logxor *idb-hash-acc* (deep-sxhash (cons key value)))))))))
+  (setf (gethash key db) value))
 
 
 (defun fold-remove (key db int-db)
@@ -339,8 +372,10 @@
    accumulator unchanged."
   (declare (type hash-table db))
   (reject-worker-static-write db)
-  (when int-db
-    (multiple-value-bind (old present) (gethash key db)
+  (reject-bt-path-static-write db key)
+  (multiple-value-bind (old present) (gethash key db)
+    (when (and *bt-undo-frame* present) (record-bt-undo db key old present))
+    (when int-db
       (when present
         (cond
           ((and *fixed-idb-hash-acc* *symmetry-idb-acc*)
@@ -496,9 +531,14 @@
 (defun update-bt (db literal)
   "For backtracking, single add or delete from db.
    Returns the update proposition as first value.
-   For fluent updates, returns the previous literal as second value.
-   Unlike UPDATE, this also returns the inverse literal needed for undo."
+   Returns an inverse literal as second value, except in a trailed CSP or PATH
+   update. Physical undo records restore those writes; IMMEDIATE planning still
+   needs inverse literals for its cycle check. Standalone calls retain inverses."
   (declare (type hash-table db))
+  ;; Neither CSP nor PATH uses inverse-literal cycle checking.
+  (when (and *bt-undo-frame*
+             (or (eql *problem-type* 'csp) (eq *bt-cycle-check* 'path)))
+    (return-from update-bt (values (update db literal) nil)))
   (when *print-updates*
     (ut::prt literal))
   (if (eql (car literal) 'not)

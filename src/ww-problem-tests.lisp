@@ -196,7 +196,7 @@
 
 
 (defvar *expected-min-length* nil
-  "Test-only.  When a test/problem-*.lisp file sets this (plain SETF, not WW-SET --
+  "Test-only.  When a test problem file sets this (plain SETF, not WW-SET --
    it is test metadata, not a search-control parameter, and must not be persisted to
    vals.lisp), TEST-TALOS requires the solved plan to have exactly this length under
    min-length search.  NIL performs no check.")
@@ -336,7 +336,7 @@
 
 
 (defun test-talos ()
-  "Stage and solve every problem file in the test and test/talos directories.
+  "Stage and solve every problem file in test/ and in every folder directly below it.
    Registered characterization claims run after staging and before search.  An
    attributed claim failure, no solution, or wrong solved length is recorded and
    the run continues; a genuine Lisp error still halts the run immediately, as it
@@ -345,10 +345,8 @@
    make its problem fail.  A final summary lists every failed problem and every
    surviving mutant."
   (let ((problem-files
-          (sort (append (directory (merge-pathnames "problem-*.lisp"
-                                                    (get-test-folder-path)))
-                        (directory (merge-pathnames "problem-*.lisp"
-                                                    (get-talos-test-folder-path))))
+          (sort (loop for folder in (test-folder-paths (asdf:system-source-directory :wouldwork))
+                      append (directory (merge-pathnames "problem-*.lisp" folder)))
                 #'string-lessp
                 :key #'file-namestring))
         failed-problems
@@ -754,7 +752,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-engine-start-is-goal-test.lisp")
+        (%stage "test/engine/problem-engine-start-is-goal-test.lisp")
         (run-start-is-goal-case 'depth-first 'graph 0 'first 1 :terminal t)
         (run-start-is-goal-case 'depth-first 'graph 0 'min-length 1 :terminal t)
         (run-start-is-goal-case 'depth-first 'graph 0 'min-time 1 :terminal t)
@@ -806,7 +804,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-engine-init-check-test.lisp")
+        (%stage "test/engine/problem-engine-init-check-test.lisp")
         (check-init-check-test
           (equal *init-checks*
                  '(first-init-check
@@ -912,7 +910,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-engine-test-claim-test.lisp")
+        (%stage "test/engine/problem-engine-test-claim-test.lisp")
         (check-characterization-test
           (equal *test-claims* '(engine-test-claim-contract))
           "Test claims were registered in the wrong order: ~S"
@@ -987,7 +985,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-engine-derived-relation-test.lisp")
+        (%stage "test/engine/problem-engine-derived-relation-test.lisp")
         (check-derived-relation-test
           (and (= (hash-table-count *derived-relations*) 1)
                (gethash 'computed-marker *derived-relations*))
@@ -1123,7 +1121,7 @@
   (cleanup-test-files)
   (unwind-protect
       (progn
-        (%stage "test/problem-engine-solution-validator-test.lisp")
+        (%stage "test/engine/problem-engine-solution-validator-test.lisp")
         (reset-candidate-solution-validation-statistics)
         (let ((empty-report
                 (with-output-to-string (stream)

@@ -42,7 +42,7 @@ accepted goals also avoids some candidate-path construction and counter updates.
 
 ## Validation and measurements, 2026-10-06
 
-The independent list-based enumerator in `test/queens-symmetry.lisp` generated all
+The independent list-based enumerator in `test/search/queens-symmetry.lisp` generated all
 1,225 valid boards for N=1 through N=10. Independently constructed coordinate
 rotations and reflections verified exactly one accepted image per class. Total
 and class counts matched [OEIS A000170](https://oeis.org/A000170) and
@@ -88,15 +88,16 @@ These measurements preceded the addition of one retained example to COUNT.
 To rerun the independent checks after staging the copy:
 
 ```lisp
-(load "test/queens-symmetry.lisp")
+(load "test/search/queens-symmetry.lisp")
 (test-queens-symmetry)
 ```
 
 ## Occupied-set representation, 2026-10-06
 
 The approved next change replaced the per-row remaining lists and scans of earlier
-queens with `(occupied columns sum-diagonals difference-diagonals)`. These are
-integer bit masks. For one-based row r and column c, their bit positions are c-1,
+queens with `(occupied> columns sum-diagonals difference-diagonals)`. The directed
+relation keeps these three integer masks from being treated as symmetric. For
+one-based row r and column c, their bit positions are c-1,
 r+c-2, and r-c+N-1, respectively. A move is legal exactly when all three bits are
 clear; placing its queen sets them. Row assignments remain for symmetry and the
 printed example. The initialization action and obsolete list/conflict helpers

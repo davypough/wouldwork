@@ -1,22 +1,24 @@
 # Wouldwork Specification Advisor
 
-> **Usage:** Attach this file when starting a new problem specification session.
-> Provide a preliminary description of your problem in the prompt.
+> **Usage:** Use this specialist procedure through [consultant.md](consultant.md)
+> to characterize a problem, draft its specification, or review model fidelity.
+> If invoked directly, establish the consultant's objective, approval scope, and
+> shared analysis record first; a preliminary description or existing spec is enough to begin.
 
 > **Status:** This file tracks the current Talos `tech/` vocabulary. If it disagrees with
 > the *Wouldwork User Manual* on a technology-based specification, verify the detail against
 > `tech/README.html` and the current technology source.
 
-**Companion documents.** Use this advisor as the user's entry point for writing and reviewing
-a spec. [working-reference-builder.md](working-reference-builder.md) makes the model's behavior
+**Companion documents.** The consultant selects this procedure for writing and reviewing
+a spec. [working-reference-builder.md](problem-analysis/spec-building/working-reference-builder.md) makes the model's behavior
 readable so the user can compare it with their intent.
-[inferring-missing-relations.md](inferring-missing-relations.md) helps investigate a discrepancy,
+[inferring-missing-relations.md](problem-analysis/spec-building/inferring-missing-relations.md) helps investigate a discrepancy,
 including a suspected omission; it does not assume every difficult problem needs another relation.
 The advisor introduces each companion when useful; the user need not invoke them separately.
 Both contain Talos-specific detail: adapt their review questions to other problems without
 importing Talos mechanics. For the technology library,
 `tech/README.html`; for relation signatures, `tech/Talos Technology  Summary.txt`; for
-what the engine does at load time, [loading and initialization](../../load-ordering/loading-and-initialization.md).
+what the engine does at load time, [loading and initialization](load-ordering/loading-and-initialization.md).
 
 
 ---
@@ -24,9 +26,22 @@ what the engine does at load time, [loading and initialization](../../load-order
 ## Section 0: Process Guide
 
 ### Startup
-The user provides a preliminary problem description and attaches this template.
-The assistant reads the DSL reference (Section 1) and the template structure (Section 2),
-then begins the structured interview.
+Read the selected question, objective, relevant record entries, current artifacts, and
+authorization limits. Reuse established requirements after checking their sources and
+premises; do not restart an interview for a resumed problem. Use Section 2 to organize
+relevant characterization, and consult the DSL reference (Section 1) when mapping it
+to an implementation. Read AGENTS.md and ignore CLAUDE.md.
+
+Record results in `doc/problems/<problem-name>/Analysis.txt` even for a short review.
+Use the consultant's topic lifecycle and evidence conventions; do not maintain another
+agenda. Keep detailed working-reference evidence in a linked text artifact only when
+needed. Return when the selected question is answered, needs approval, or requires
+another procedure, without requiring all the phases below.
+
+The return includes clarified requirements, relevant characterization, implementation
+mapping, discrepancies, evidence and its scope, unresolved issues, affected dependencies,
+and the recommended next action. A correction reopens affected conclusions through the
+consultant; unaffected evidence and replayable progress remain available.
 
 ### Review against the user's intent
 
@@ -57,10 +72,14 @@ standing spots, so proposing an additional location is legitimate when supported
 Do not add equipment or change barriers to manufacture a solution. A user-confirmed correction
 to an incorrectly transcribed given must be distinguished from changing the given itself.
 
-### Step 1 — Establish the problem family, before anything else
+### Characterize first, then choose the authoring approach
 
-This fork determines the entire shape of the specification. Settle it first; do not
-begin the interview proper until it is decided.
+First describe the problem in its own terms: objects and properties, initial conditions,
+possible changes, derived effects, restrictions, and success criteria. Clarify consequential
+uncertainty before committing to classification or representation. Keep intended rules,
+source behavior, deductions, and hypotheses separate. Unknown or irrelevant features do
+not need invented answers. Once the relevant features support a choice, use the approaches
+below and record why the choice fits. Reopen it if those features change.
 
 **Path A — a new Talos Principle problem.**
 Build it on the `tech/` technology library. These files implement a *topological*
@@ -81,7 +100,7 @@ example — which predate the technology library and are not written against it.
 not retrofit `tech/` onto a legacy spec as part of a new problem session; treat the
 two approaches as separate.
 
-On Path B, resolve one more question before the interview:
+On Path B, choose the engine specialization from the established behavior:
 
 **Planning or CSP?** Set via `(ww-set *problem-type* planning)` or `csp`.
 
@@ -93,15 +112,17 @@ On Path B, resolve one more question before the interview:
   `backtracking` + `tree`, and leave `*depth-cutoff*` at 0, since search must reach
   a depth equal to the number of rules.
 
-A CSP can be expressed as a planning problem, but the CSP specialization prunes far
-more aggressively and matters greatly at scale. Ask which the user's problem is;
-"find an arrangement satisfying constraints" indicates CSP, "find a sequence of steps"
-indicates planning.
+A CSP can be expressed as a planning problem. Assignment structure and ordering determine
+whether Wouldwork's CSP specialization fits; the desired output alone is not enough.
+Explain the choice from the characterization rather than asking the user to choose an
+engine label. Use the [search advisor](search-advisor.md) for consequential strategy
+questions, retaining provisional choices until their prerequisites are established.
 
 ### Interview Strategy
 1. **One question at a time.** Wait for user's answer before proceeding.
-2. **Build the template incrementally.** After each answer, present the updated
-   template so the user can catch misunderstandings early.
+2. **Update the shared record incrementally.** Present the changed understanding and
+   consequential open questions so the user can catch misunderstandings; do not repeat
+   an entire template after every answer.
 3. **Question ordering — most consequential ambiguities first:**
    - Mechanics / rules (what happens when actions execute)
    - Derived effects and chaining (does action X trigger Y automatically?)
@@ -112,23 +133,27 @@ indicates planning.
 4. **Conditional branches:** Skip questions that don't apply. If the user
    describes a pure combinatorial problem, skip physics/propagation questions.
    If there are no derived effects, skip cascade questions.
-5. **On Path A, ask which technologies apply, not how they work.** The mechanics are
-   already specified in `tech/`. The interview's job is to identify which technologies
-   the puzzle needs and what the problem must supply to them — leaf types, geometry,
-   initial facts — not to re-elicit beam or gate behavior.
+5. **On Path A, reuse established technology semantics.** Explain consequential mechanics
+   and confirm that they match intended behavior. Identify the required technologies and
+   their inputs without re-eliciting already confirmed rules. A library implementation
+   is not authority to replace a different intended rule.
 6. **Don't ask about representation early.** Capture the user's conceptual
    model first. Representation decisions belong in the Implementation Notes
-   phase after the template is complete.
+   phase after sufficient characterization for the decision is established.
 7. **Infer where possible.** If the user's description unambiguously answers
    a question, note the inference in the template rather than asking.
 
-### Post-Interview Phases
-1. **Template review:** Present the final template for user confirmation.
+### Procedures after characterization
+Select only the procedures needed for the current topic, subject to the consultant's
+approval boundaries. These are not a mandatory sequence for every consultation.
+
+1. **Characterization review:** Present the relevant understanding and open issues for confirmation.
 2. **Implementation notes:** Discuss representation strategy, performance
    considerations, and how the problem maps to Wouldwork constructs.
    On Path A, this is where the technology selection is finalized against
    `tech/README.html`'s integration checklist.
-3. **Spec drafting:** Write the `.lisp` file using the DSL reference below.
+3. **Spec drafting:** Propose the concrete edit, then write the authorized `.lisp` changes
+   using the DSL reference below. Present each incremental result for review.
 4. **Explain the modeled problem:** Use the reference builder to summarize the draft's rules,
    objects, initial conditions, capabilities, and goal in plain language. After staging, incorporate
    inspected derived facts. Label unstaged predictions as predictions. Map each important user
@@ -154,8 +179,8 @@ indicates planning.
 ### 1.1 File Structure
 
 Every problem spec is a `.lisp` file in the **`probs/`** directory. Test problems
-exercising a single technology go in **`test/`**. Wouldwork resolves a problem name
-by searching `probs/` first, then `test/`.
+exercising a single technology go in **`test/talos/`**. Wouldwork resolves a problem name
+by searching `probs/` first, then `test/` and each category folder directly below it.
 
 **Do not write a spec in `src/`.** `src/problem.lisp` is a *generated* file — staging
 any problem overwrites it. It is the spliced snapshot the engine compiles, not a
@@ -648,36 +673,39 @@ skips them, preserving whatever you set at the REPL.
 
 ## Section 2: Problem Description Template
 
-Fill in progressively during the interview. Mark sections `(pending)` until answered.
+Use the relevant fields within Analysis.txt's problem-understanding section, not as a
+second record. Keep sources and certainty alongside claims. Mark unanswered questions
+`unknown`; omit irrelevant detail or mark it `not applicable`. Classification follows
+characterization; search settings are decisions, not problem requirements.
 
 ```
-0. PROBLEM FAMILY:
-   - Path A (new Talos, tech/-based) or Path B (hand-authored): (pending)
-   - If Path A, technologies required: (pending)
-   - If Path B, planning or csp: (pending)
+0. OBJECTIVE AND SUCCESS CRITERIA:
+   - Reference the shared objective and authority section.
 
-1. DOMAIN STRUCTURE:
-   - (pending)
+1. DOMAIN STRUCTURE AND INITIAL CONDITIONS:
+   - (unknown)
 
 2. OBJECT TYPES & PROPERTIES:
-   - (pending)
+   - (unknown)
 
 3. ACTIONS:
-   - (pending)
+   - (unknown)
 
 4. DERIVED EFFECTS:
-   - (pending)
+   - (unknown)
 
 5. ACTION CONSTRAINTS:
-   - (pending)
+   - (unknown)
 
 6. GOAL:
-   - (pending)
+   - (unknown)
 
-7. SEARCH PARAMETERS:
-   - (pending)
+7. CLASSIFICATION AND AUTHORING APPROACH: (after sufficient characterization)
+   - Path A (new Talos, tech/-based) or Path B (hand-authored), with justification
+   - Applicable technologies; planning or csp where relevant
 
 8. IMPLEMENTATION NOTES: (deferred to spec drafting phase)
    - Representation strategy
    - Performance considerations
+   - Search decisions or questions to return to the consultant
 ```

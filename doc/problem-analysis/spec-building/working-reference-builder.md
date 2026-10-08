@@ -5,12 +5,18 @@ it with what they intend. Collect scattered facts into one working reference, bu
 plain-language behavior and concrete allowed/forbidden examples rather than requiring the user
 to inspect Lisp tables. Tables provide supporting evidence.
 
-**Where this fits.** [spec-advisor.md](spec-advisor.md) introduces this procedure during drafting
+**Where this fits.** [spec-advisor.md](../../spec-advisor.md) introduces this procedure during drafting
 and after staging. It supports soundness, completeness, and consistency review, not just later
 solution analysis. If a mismatch appears, use [inferring-missing-relations.md](inferring-missing-relations.md)
 to investigate it. These capability sections are Talos-oriented; for other problems use the same
 intent-versus-model comparison with the relevant rules and entities. Consult current technology
 sources and `tech/Talos Technology  Summary.txt` for relation semantics.
+
+Return the selected findings and their evidence, scope, unresolved issues, and affected
+dependencies to the [consultant](../../consultant.md) through the specification advisor.
+Use `doc/problems/<problem-name>/Analysis.txt` even for a short review. If the detailed
+reference needs its own artifact, use `Working-Reference.txt` in that directory and link
+it from Analysis.txt. Maintain one agenda and reuse unaffected current evidence.
 
 > **Status:** Sections 1–3 were rewritten against the current `tech/` relation vocabulary. The previous version used retired area/interface relations (`in-area`, `interface`, `traversable>`, `in-los-group`, `reachable-via`) and an older LOS representation. The current system reuses `los-via` as one unified symmetric endpoint relation. Discipline rule 4 and Section 8 were revised: geometry is spec fact in coordinate-derived problems and is no longer quarantined by default.
 
@@ -50,11 +56,13 @@ Legacy specs may be mixed: `problem-corner.lisp` asserts segment lists *and* han
 6. **Words, not symbols, in legends.** Use tokens like `clear` / `(occluders…)` / `none`. Bare symbols (—, ·) render inconsistently and invite transcription drift.
 7. **Do not invent modeled facts.** Omit irrelevant mechanics, but retain an intended capability that is absent from the spec as an explicit possible omission. Absence from the implementation is not a reason to erase a user requirement.
 8. **Present for intent review before relying on it.** Explain representative behavior and ask whether it matches the intended problem. Separate the user's confirmation of a rule from evidence that the implementation obeys it; a transcription check alone does not establish fidelity.
-9. **Regenerate per problem.** Never reuse a stale reference; rebuild from the current file.
+9. **Check currency before reuse.** Read current sources and compare revisions and premises.
+   Refresh affected sections after changes; preserve unaffected evidence. Rebuild the
+   reference when its dependency scope cannot be established. Never reuse stale conclusions.
 
 ---
 
-## Output: the markdown working reference
+## Output: the working reference text artifact
 
 Open with a **header block**: source filename; authoring path (coordinate-derived or hand-authored); the technologies included, if any; the `ww-set` config (`*problem-type*`, `*solution-type*`, `*tree-or-graph*`, `*depth-cutoff*`); and any **type members declared in `define-types` but absent from every init relation** — candidates for review, not automatically missing pieces to place.
 

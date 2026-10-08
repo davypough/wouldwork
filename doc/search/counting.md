@@ -24,7 +24,7 @@ closed-state pruning can also suppress routes. Use this mode for distinct-board
 counts when the model gives each board exactly one construction path, as in
 fixed-row-order queens. A cutoff or interrupted run is not a complete count.
 
-Regression check: load `test/count-solutions.lisp` and call
+Regression check: load `test/search/count-solutions.lisp` and call
 `(ww::test-count-solutions)`. It checks serial, parallel task generation, workers,
 mixed task/worker goals, backtracking, validators, zero goals, cutoff, start goals,
 counter/example reset, unchanged EVERY recording, empty solution lists, and a

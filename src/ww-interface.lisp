@@ -82,8 +82,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
 
 (get-probs-folder-path)
    -- the location where all problem specification files should appear
-      (test problems live in the test folder, per (get-test-folder-path),
-       and Talos test problems in its talos subfolder, per (get-talos-test-folder-path))
+      (test problems live in category subfolders of the test folder, per (get-test-folder-path),
+       with Talos test problems in its talos subfolder, per (get-talos-test-folder-path))
 
 (profile)
    -- employs a basic profiler on the currently staged problem,
@@ -107,6 +107,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                        to find exactly N solutions;
                                        all-paths requires depth-first + graph + depth-cutoff>0>)
        (ww-set *tree-or-graph* <one of tree or graph>)
+       (ww-set *bt-cycle-check* <immediate (default) or path (state-based serial BT)>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)
        (ww-set *progress-reporting-interval* <nil (default: report on a time schedule whose gaps
@@ -217,6 +218,7 @@ is staged again.
   (format t "~&*problem-name* ~A~% 
                *depth-cutoff* ~A~%
                *algorithm* ~A~%
+               *bt-cycle-check* ~A~%
                *tree-or-graph* ~A~%
                *problem-type* ~A~%
                *solution-type* ~A~%
@@ -228,7 +230,7 @@ is staged again.
                *max-recorder-cycles* ~A~%
                *recorder-prefix-pruning* ~A~%
                *debug* ~A~2%"
-            *problem-name* *depth-cutoff* *algorithm* *tree-or-graph* *problem-type*
+            *problem-name* *depth-cutoff* *algorithm* *bt-cycle-check* *tree-or-graph* *problem-type*
             *solution-type* *progress-reporting-interval* *randomize-search* *branch* 
             *probe* *symmetry-pruning* *max-recorder-cycles* *recorder-prefix-pruning*
             *debug*))
@@ -352,13 +354,13 @@ is staged again.
 ;; -------------------- problem.lisp file handling ------------------------ ;;
 
 
-(defparameter *problem-folder-paths* (list (get-probs-folder-path) (get-test-folder-path)
-                                           (get-talos-test-folder-path))
+(defparameter *problem-folder-paths* (cons (get-probs-folder-path)
+                                           (test-folder-paths (asdf:system-source-directory :wouldwork)))
 "This variable holds all folder pathnames which can hold problems in this system.
    The user cann add custom folder pathnames to this folder using the function
    `add-problem-folder` and remove by `remove-problem-folder`.
-   The Package directory's `probs`, `test` and `test/talos` folders, however, are always present
-   at startup.")
+   The Package directory's `probs` and `test` folders, and every folder directly below `test`,
+   however, are always present at startup.")
 
 
 (defun add-problem-folder (folder-path)
@@ -495,6 +497,7 @@ is staged again.
 (defun solve ()
   "Solve the current problem, or finish an active goal chain through its policy."
   (reject-worker-read-write 'solve)
+  (validate-bt-path-mode)
   (cond
     ((null *final-goal*)
      (ww-solve))

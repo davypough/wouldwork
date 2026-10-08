@@ -1,7 +1,7 @@
 ;;; Filename: constraint-profile.lisp
 
 ;;; Static constraint profile extractors for the constraint-led analysis method
-;;; (doc/constraint-led-solving/solving-advisor.md).  The profile is a pure
+;;; (doc/solving-advisor.md).  The profile is a pure
 ;;; function of a staged problem and optional supplied state: it reads engine databases and
 ;;; reports the invariant structure a hand analysis would otherwise rederive one session
 ;;; at a time.

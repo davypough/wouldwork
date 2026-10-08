@@ -2131,6 +2131,7 @@ different acceptable milestone state."
 (defun ww-solve ()
   "Runs a branch & bound search on the problem specification."
   (reject-worker-read-write 'ww-solve)
+  (validate-bt-path-mode)
   (validate-worker-read-snapshot-mode)
   ;; A prior result stops being a continuation candidate as soon as another search starts.
   ;; Clear here rather than relying on DFS, whose initial-invariant failure exits before

@@ -458,10 +458,12 @@ When there are no accepted actions or no checkpoint, state that explicitly.
 
 ## Directory and development history
 
-The current root is `doc/constraint-led-solving/`. This file is the solving
-entry point; `Extractor-Specifications.md` describes diagnostics and
-`Schema-Gaps.txt` records uncovered needs. Problem records are in `problems/`,
-and the triangle pilot is in `constraint-pilot/`.
+The solving entry point is now `doc/solving-advisor.md`. Supporting material remains
+under `doc/constraint-led-solving/`: `Extractor-Specifications.md` describes diagnostics,
+`Schema-Gaps.txt` records uncovered needs, existing problem records are in its
+`problems/`, and the triangle pilot is in its `constraint-pilot/`.
+The consultant's new analysis records use `doc/problems/<problem-name>/Analysis.txt`;
+see [consultant.md](consultant.md). Existing evidence has not been moved.
 
 Development is complete through T46. The implementation plans (the final copy
 `archive/Implementation-Plan-2026-10-02.md`, with its board, maintenance
@@ -471,9 +473,11 @@ no active work queue.
 
 Path migration (2026-10-02): historical paths in verbatim quotations and
 dated schema-gap entries are preserved. To locate moved files,
-map `doc/constraint-method/` to this root, `doc/problems/` to its `problems/`,
-and `doc/constraint-pilot/` to its `constraint-pilot/`. The former
-`Problem-Solving-Guide.md` is now `solving-advisor.md`; the former active
+map historical `doc/constraint-method/` to `doc/constraint-led-solving/`, historical
+`doc/problems/` to `doc/constraint-led-solving/problems/`, and historical
+`doc/constraint-pilot/` to `doc/constraint-led-solving/constraint-pilot/`. This dated
+mapping does not apply to new consultant records in `doc/problems/`. The former
+`Problem-Solving-Guide.md` is now `doc/solving-advisor.md`; the former active
 `Constraint-Implementation-Plan.md` became the final plan copy named above.
 Earlier removals and the `archive/` and `evidence/` removals still apply. These mappings
 do not restore deleted files or make historical scripts runnable. The former

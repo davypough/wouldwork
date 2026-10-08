@@ -1,29 +1,39 @@
 # Wouldwork Search Advisor
 
-> **Usage:** An optional aide, run on its own.  Attach this file with a problem spec that
-> already stages and whose rules you trust, and say what you want from the search.  The
-> assistant works in four phases (section 1): a profile read from the spec alone, with
-> questions for the user; an overview with the main findings, from first probes; spec
-> upgrades for simplicity or efficiency, each written into a copy of the spec once you agree
-> (the original is never changed); and the results and estimates for the upgraded spec
-> (regime costs, density, scaling, expansion), from short runs.  It guides or (with approval)
-> runs the searches, and says what each result means.
+> **Usage:** Use this specialist procedure through [consultant.md](consultant.md)
+> for a search decision on a characterized problem. Select only the relevant profiling,
+> probing, improvement, or estimation procedures. If invoked directly, establish the
+> consultant's objective, approval scope, and shared record first. Source-only advice
+> needs no run; proposed experiments and edits require their own authorization.
 
 > **Status:** Source-checked 2026-10-03 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
 > `ww-searcher.lisp`, `ww-planner.lisp`, `ww-parallel.lisp`, `ww-parallel-infrastructure.lisp`,
 > `ww-validator.lisp`, `ww-support.lisp` and the enumerator,
 > and against the *Wouldwork User Manual (26.8)*, Part 3.  Where they disagree the source wins;
-> the disagreements are listed in section 7.
+> the disagreements are listed in section 7. Process and evidence guidance integrated
+> with the consultant on 2026-10-07; this was not a fresh audit of every technical claim.
 
-**Scope.**  This advisor does not check whether the spec is a faithful model of the puzzle
-(that is the spec-advisor's job) and does not run a solve.  It assumes the rules are right and
-asks only: what is the most efficient way to search them?  If a probe exposes a modelling
-error, stop and fix the spec first.
+**Scope.** Choose an efficient search approach for the user's objective, with explicit
+assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
+Read the current model and fidelity evidence; a spec that stages is not thereby faithful.
+Conditional analysis is useful, but resolve consequential model uncertainty before relying
+on its results. A probe exposing a discrepancy returns it to the consultant as a specification
+topic; pause dependent work and preserve unaffected evidence. This procedure does not
+authorize a full solve.
 
-**When one search is not enough.**  If the probes show that no single search can finish (a
-large N, or a problem whose difficulty lies in reaching its milestones in the right order),
-offer the solving-advisor (`doc/constraint-led-solving/solving-advisor.md`) as the
-alternative.  It is an interactive, constraint-led dialogue: the user and assistant agree one
+**Entry and return.** Read the selected question, objective, relevant record entries,
+current artifacts, and approval limits. Reuse current evidence instead of repeating
+completed phases. Write findings to `doc/problems/<problem-name>/Analysis.txt` for short
+and sustained work alike; link a separate text evidence artifact only when detail warrants
+it. Return the conclusion, evidence and scope, assumptions, unresolved issues, affected
+dependencies, and recommended next action. Stop when the question is answered, needs
+approval, or needs another procedure. Use the consultant's invalidation rules after changes.
+
+**When one search appears impractical.** If evidence suggests one search is unlikely to
+finish within the available budget, return a milestone-strategy topic to the consultant
+with its supporting estimates and uncertainty. A short probe is not proof that no single
+search can finish. The [solving advisor](solving-advisor.md) supplies a constraint-led
+dialogue: the user and assistant agree one
 subgoal at a time, check it against the problem's static constraints, realize it with a
 bounded search, and finally validate the whole chained path.  It was built for Talos problems,
 but its subgoal dialogue applies to any problem with milestones (Q16).
@@ -32,16 +42,16 @@ but its subgoal dialogue applies to any problem with milestones (Q16).
 
 ## 1. Process
 
-The work runs in four phases, numbered 0 to 3, each ending at a point where the user
-approves, defers or redirects before the next begins.  Phase 0 only reads and reasons, so the
-user gets a first answer within minutes and can settle the objective before any probe is
-spent (crossword13: a phase 1 that included building, staging and probing took nearly half an
-hour before the user saw anything).  Phase 2 comes before phase 3 because the global measurements
-(expansion, trade-offs, density) depend on the spec they are taken on: they are taken on the
-upgraded spec, not the original (donald: the original's 720 reorderings of one answer would
-have swamped every scaling figure).  Phase 3 may point back to phase 2 (a spec that generates
-its actions, finer actions); such a change is proposed, applied and re-measured as in phase 2,
-then phase 3 resumes.
+The four phases, numbered 0 to 3, are selectable procedures, not a required pipeline.
+The consultant chooses the next consequential question and its dependencies. Phase 0
+reads and reasons without staging or running; it can be the whole requested consultation.
+Use probes only for unresolved decisions, upgrades only when justified, and estimates
+only when they affect the objective. Skip irrelevant work and defer nonblocking unknowns.
+Record results before returning for approval, redirection, or completion.
+
+Measurements belong to a named model revision. If an approved phase-2 change affects a
+phase-3 estimate, remeasure the affected evidence before using it. Measurements can also
+reopen strategy or modeling questions; do not force a return to a predetermined phase.
 
 Give every finding and every recommendation its own item with a short descriptive name
 ("Wait action cost", "Unused box"), never a code (F1, R1, H1), and let each recommendation
@@ -68,26 +78,26 @@ No build, no staging and no runs: read, reason, and ask.
    A few lines that look up each entry's mirror find them.  A type that no parameter names may
    still be in use: `$row` in a relation's signature means a value of type `row`
    (tiles7a's `(loc tile $row $col)`), and staging fails if the type is removed.
-2. **Answer the questions in section 2** from the spec, marking each answer *spec*, *user* or
-   *probe*.  Leave an answer *unknown* rather than guess; questions only a probe can settle
-   wait for phase 1.
+2. **Select the relevant questions in section 2**, reusing established answers. Mark their
+   source *spec*, *user* or *probe*, separately from whether the claim is confirmed,
+   provisional, or unknown. A user hypothesis is not a requirement. Questions needing
+   experiments become proposed topics rather than an automatic probe schedule.
 3. **Summarize the problem** in its own terms, with no setting names: what it asks, and the
    size readable from the spec (objects, actions, moves available at the start, solution
    length if fixed).
-4. **Ask the user** only what the spec cannot tell: the objective (any solution, several,
-   every, or a best one, and best by what), the time available, the thread count of the
-   machine, whether a solution length or depth is already known, and whether larger members
-   of the family matter.  Ask them together, as a numbered list the user can answer in one
-   reply.  This is the phase-0 report (section 8).
+4. **Ask the user** only for missing information that affects the selected decision:
+   objective, available time, known depth or length, or a relevant scaling target.
+   Reuse the shared objective and local execution preferences; do not ask them again.
+   Group related questions when helpful. This is the phase-0 report (section 8).
 
 ### Phase 1: first probes and main findings
 
-5. **Run the first probes** (section 6.1): short bounded searches, never a full solve
-   (section 1.1 says who runs them), enough to measure the size of the search and the waste
-   the phase-2 changes would remove, aimed by the user's answers in phase 0 (donald: 165,978
-   program cycles as written, 17,239 in graph search, 1,441 in a fixed order).  A `first`
-   search that finishes almost at once is rerun in random order before it is trusted
-   (answer-ordered data, section 6.1).
+5. **Propose and run authorized probes** (section 6.1) to answer specific uncertainties.
+   State the model revision, start, settings, limits, stop condition, and interpretation
+   of possible results. Use short bounded searches, not an unapproved full solve
+   (section 1.1). A fast `first` result may justify a solution candidate; it does not
+   establish typical performance. Propose a randomized comparison only if sensitivity
+   to ordering matters to the current decision (answer-ordered data, section 6.1).
 6. **Report the main findings** as named items, each with the number behind it, and the
    recommendation in a sentence.  This is the phase-1 report (section 8).
 
@@ -110,15 +120,16 @@ No build, no staging and no runs: read, reason, and ask.
      action, about 6 times cheaper);
    - minor clutter, one item per clean-up.
    End with the changes considered and not recommended, each with its reason.  Check the
-   conflicts in section 5 first.  Try the recommended items on a draft copy in the
-   assistant's own environment where it is quick, and give the measured counts with the list.
+   conflicts in section 5 first. Draft-copy experiments are edits and tests too: perform
+   them only within explicit approval, and distinguish predicted from measured gains.
 8. **Apply what the user agrees to** in a copy of the spec with its design notes (section
    1.1), one change at a time, and check each: the copy stages, and a probe gives the same
-   answers (goal states, best value) with the counts the change predicts.  An independent
-   counting script (section 6.3) that reproduces **Program cycles** on the upgraded spec (or,
-   when moves can be undone, its distinct states and optimum) is the strongest check, and is
-   reused in phase 3.  Test from a clean load (reset `src/problem.lisp` as in `CLAUDE.md`):
-   functions left by the previously staged problem can hide a missing definition
+   answers appropriate to the change (goal states, best value), and report observed counts.
+   Equal counts alone do not establish equivalent behavior or fidelity. An independent
+   counting script (section 6.3) can provide additional scoped evidence when justified;
+   reuse it if later measurements need it. For a clean-load check, use a fresh SBCL
+   process following AGENTS.md, load Wouldwork, and stage the tested copy.
+   Functions left by the previously staged problem can hide a missing definition
    (crossword5-11-1 lost `full-word`, which only its post-processing uses, and passed every
    run until loaded fresh).  Then deliver exactly the file tested, and compare checksums: a
    delivery made just after an edit can carry the previous version (seen twice with
@@ -128,14 +139,14 @@ No build, no staging and no runs: read, reason, and ask.
 
 ### Phase 3: results and estimates
 
-10. **Measure on the upgraded spec**, with short runs only (seconds to a few minutes; section
-   1.1): the cost of each regime the user might want (section 3.2), solution density (section
-   6.1), the growth per size step and a projection to a target size if one is named (section
-   6.3), and always the expansion of the problem family (section 6.4).  Rough estimates are
-   enough: two size steps, and a projection given as a range, good to about a factor of 2.
-11. **Report the results and estimates** in the form of section 8.  The recommendations were
-    settled in phase 2; phase 3 reports what the upgraded spec costs and how that cost
-    grows, not a new strategy.  List larger interventions the measurements point to (a
+10. **Measure only what the decision needs**, on the current approved spec revision,
+   using bounded authorized runs (section 1.1). Possible measurements include relevant
+   regime costs (section 3.2), density (section 6.1), target-size projections (section 6.3),
+   and family growth (section 6.4). Omit those unrelated to the objective. Give estimates
+   as ranges with assumptions; do not promise a precision the evidence cannot support.
+11. **Report the results and estimates** using relevant parts of section 8. If evidence
+    changes the strategy's justification, return the affected topic to the consultant.
+    List larger interventions the measurements point to (a
     re-encoding, a generator for the family, a pruning invariant, an engine change) under
     FURTHER, as options for the user to take up later, not as steps of this run.  Deep runs,
     and any run that would only sharpen an estimate, happen when the user asks for a
@@ -166,12 +177,15 @@ changes in the same run go into that copy.  A change that needs a separate varia
   Never declare it in a spec meant for chained `(solve-subgoal <goal>)`, which errors
   unless `*threads*` is 0.
 - A hook query or macro action is shown in full and written once agreed.
-- **Representation changes** (Q18, or a probe showing wasted states).  Implement directly when
+- **Representation changes** (Q18, or a probe showing wasted states). Propose an edit when
   the new spec is a re-encoding of the same rules and goal: the same moves, only stored
   differently.  Check it by running the same probe on both specs: the reachable boards and goal
-  states must correspond.  When the change alters what the model means (new rules, a changed
-  goal, a different level of detail), write a short prompt for the spec-advisor instead,
-  naming the finding and the proposed encoding, and resume here once that spec stages.
+  states must correspond within the tested scope. Explain the correspondence beyond
+  sampled cases before making a general equivalence claim. Implement only after approval.
+  When meaning changes (new rules, a changed goal, a different level of detail), return a
+  specification topic to the consultant with the finding, proposed encoding, and affected
+  assumptions. Resume dependent analysis when the relevant fidelity questions are resolved;
+  successful staging alone is insufficient.
 - **Refactorings** (phase 0, step 1: an unusual or needlessly complex construction).  When a plainer
   form gives the same rules and goal, write it into the copy once the user agrees, after
   checking that it stages and that a probe gives the same counts and best result as before.
@@ -197,13 +211,18 @@ changes in the same run go into that copy.  A change that needs a separate varia
   `ww` package. Omit `(asdf:load-system :wouldwork)` and `(in-package :ww)` from
   the supplied forms. Use `(solve)`, not `(time (solve))`: `solve` already times
   the search. If an engine change requires a reload, mention that in prose.
-- **Short runs** (probes of about a minute or less, `validate-solution`): the assistant runs
-  these itself in its own environment, set up at the start of phase 1 (never in phase 0;
-  `CLAUDE.md`, *Running Wouldwork in a Claude cloud session*).  Report the measured numbers,
-  not expectations.  Anything longer runs at the user's REPL.
-- **Deep runs** (full solves, parallel searches, backward searches to the memory limit,
+- **Short runs** (bounded probes or validation): follow AGENTS.md and the consultant's
+  approved test scope. The assistant may run authorized small checks locally; identify
+  who runs each test and preserve the user's existing REPL. Report measured evidence,
+  not expectations. Review and planning phases do not implicitly authorize runs.
+- **Local defaults.** Use `*threads*` = 16 for compatible local searches, including probes.
+  Thread initialization and initial root-task generation are serial; include startup
+  cost in timing interpretations. Use 0 where required (backtracking, auto-wait, declared
+  dynamic-object registration, serial goal chaining) or for explicitly justified serial
+  measurements. Record the exception. This preference does not change engine defaults.
+- **Deep runs** (substantial full solves, backward searches to the memory limit,
   enumerator layers, `every` searches feeding `freq`): only when the user asks for one (step
-  11), at the user's REPL, where the threads and memory are.  The assistant supplies the exact
+  11) or an explicitly approved run plan, normally at the user's REPL. The assistant supplies the exact
   forms and what to paste back, and never raises the depth or thread count silently.  A spec
   copy written for a deep run leaves `*progress-reporting-interval*` unset (section 4).
 - **Multi-step strategies** (S7 macros, S8 subgoaling, S9 relaxation, S10 bidirectional, S11
@@ -282,7 +301,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
-| S1 | **Brute force, iterative deepening** | Always first; the whole answer when b^d is modest | `first`, small `*depth-cutoff*`, raised until a solution appears, then lowered to find the shortest | Exponential in depth |
+| S1 | **Brute force, iterative deepening** | A useful baseline when its cost fits the objective and budget | `first` at approved cutoffs; propose further depths only when needed; test shortest length only if requested | Exponential in depth |
 | S2 | **Parallel search** | The space is large and the search is depth-first | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with backtracking, auto-wait, or objects created during search (section 5) |
 | S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and supports `prune-state?` and move lower bounds (see section 5 for unsupported hooks); the order matters; with forward checking the goal must test the constraints (note 1) |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
@@ -398,7 +417,7 @@ magnitude.  Report the regimes the user might want with their costs, measured wh
 | Regime | Setting | Must cover | Cost and what decides it | The result means |
 |---|---|---|---|---|
 | Find one | `first` | until the first goal | depends on density and on ordering (S6, action order); falls steeply with many solutions | a valid answer; nothing about others |
-| Prove (no solution, or uniqueness) | `every`, or `first` run to exhaustion | the whole space, less what sound pruning removes | the size of the space; ordering does not help | with sound hooks, a proof (section 6.2) |
+| Prove (no solution, or uniqueness) | `first` exhausted without a goal for absence; exhaustive enumeration for uniqueness | the relevant model space, less what justified pruning removes | the size of the space; ordering does not reduce exhaustive coverage | a scoped model claim, subject to coverage and the chosen equivalence of solutions (section 6.2) |
 | Every solution | `every`, `all-paths` | the whole space | as prove, plus memory for the solutions recorded | every goal state (every path with `all-paths`) |
 | Best | `min-length`, `min-value`, ... | until the bound is proved | as prove, less what the bound prunes (S4) | the optimum, if run to completion |
 
@@ -406,8 +425,10 @@ The ratio of prove to find is itself a measurement: near 1 means solutions are s
 found late, so a heuristic will not help; a large ratio means a `first` search is cheap but a
 proof is not.  Cryptarithms, measured with the donald-1 scheme: DONALD 225 to find and 424 to
 prove (1.9 times); a 41-addend puzzle 5,161 and 111,116 (21 times); random base-16 puzzles of
-two 8-letter addends 6,253 and 1,302,741 (about 200 times).  When the gap is small, prefer the
-proof, which also confirms the model has no unintended solutions.
+two 8-letter addends 6,253 and 1,302,741 (about 200 times). When the gap is small and the
+objective benefits from exhaustive evidence, propose that additional work within its budget.
+Exhaustion does not confirm that the model has no unintended solutions: that requires
+comparison with intended rules, independently of search coverage.
 
 ---
 
@@ -415,6 +436,8 @@ proof, which also confirms the model has no unintended solutions.
 
 Set in the spec with `ww-set`, except where marked REPL.  `(stage <problem>)` applies the
 spec's own values; a saved `vals.lisp` otherwise overrides them on an ordinary load.
+The table lists engine defaults. The consultation's local search preference is 16 threads
+where compatible, applied after staging; see section 1.1 for exceptions and serial startup.
 
 | Setting | Values (default) | Choose |
 |---|---|---|
@@ -538,10 +561,10 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
   path (costs accumulate, as in `problem-tsp.lisp`); a min-value problem whose value can fall
   needs a different solution type or a `bounding-function?`.  `max-value` prunes only goals
   that fail to beat the best solution; its other bounds come from `bounding-function?`, since
-  rewards normally grow along a path (`test/problem-max-value-goal.lisp`). During parallel
+  rewards normally grow along a path (`test/search/problem-max-value-goal.lisp`). During parallel
   task generation, all four optimization modes register only goals that improve the
   incumbent; enumeration modes still retain their requested goals
-  (`test/problem-task-goal-incumbent.lisp`).
+  (`test/search/problem-task-goal-incumbent.lisp`).
 - **A value search with no goal must not define one.**  Best states are recorded only when no
   goal is defined (`process-min-max-value` in `ww-searcher.lisp`), so `(define-goal nil)`
   records nothing: crossword15-18 reported "No solutions found" after 2.5 million states in
@@ -560,12 +583,16 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
 
 ### 6.1 Probes
 
-A probe is a bounded exhaustive search at a shallow depth, whose statistics answer Q4, Q6
-and Q14.  Run it on the full problem with a goal it will not reach that early (or temporarily
-`(ww-set *solution-type* every)`), at two or three depths a step or two apart:
+A probe is a bounded experiment addressing a named uncertainty, such as Q4, Q6, or Q14.
+Use shallow exhaustive searches when coverage statistics are needed. All examples below
+are candidate procedures, not a mandatory battery or authorization to run. Select cutoffs
+and other limits beforehand; record the actual termination and restore temporary settings
+or hooks afterward. For an approved coverage probe, use a goal not reached at that depth
+or temporarily select `every`. For a compatible local search, the basic form is:
 
 ```lisp
 (stage <problem>)
+(ww-set *threads* 16)
 (ww-set *depth-cutoff* 6)
 (solve)
 ```
@@ -583,9 +610,9 @@ expanded again (`better-than-closed` in `ww-searcher.lisp`, under `first`, `ever
 exhaustion: 68 for 27 boards at 3 disks, 358,827 for 2,187 at 7); take the distinct count from
 an independent script (section 6.3); **Repeated states pruned … percent** (high favours
 graph search); **Average branching factor**; and elapsed time, giving states per second.  A low
-rate on a problem that calls `propagate-changes!` points to relaxation (Q14).  Run the same
-probe with `*symmetry-pruning*` t to see whether symmetry pays for its overhead, and with
-`*threads*` N to see whether parallelism does.
+rate on a problem that calls `propagate-changes!` motivates investigation of propagation
+cost (Q14). Propose symmetry or thread-count comparisons only when they could change
+the decision. Include serial startup in elapsed-time comparisons.
 
 *Tree search (happenings, csp).*  Program cycles counts paths, not states, and there is no
 repeated-state percentage.  Probe by exhausting successive cutoffs: the ratio of Program
@@ -594,17 +621,20 @@ the optimum, and density is the goal states and paths found per cutoff.  Undone 
 re-expanded at every level, so a lower bound (section 4.1) or a dead-state prune is the main
 remedy.
 
-**Time-limited probes.**  When neither a depth cutoff nor exhaustion ends a probe within
-seconds (a value search too large to finish), end it on time instead, never with a states
-limit: after staging, define a temporary `prune-state?` that stops expanding every state once
-a deadline passes, and the search unwinds and reports its best.
+**Time-limited probes.** If depth alone may be expensive, agree a time bound before running.
+One possible mechanism is a temporary `prune-state?` that stops further expansion after
+a deadline; the search then unwinds and reports any candidates found. This is cooperative
+stopping, not a hard wall-clock limit: initialization, an in-progress expansion, and
+unwinding can take additional time. A deadline-pruned run is truncated, even if its summary
+looks exhausted; it establishes no exhaustive bound or optimum.
 
 ```lisp
 (defvar *deadline* (+ (get-internal-real-time) (* 60 internal-time-units-per-second)))
 (defun prune-state? (state) (declare (ignore state)) (> (get-internal-real-time) *deadline*))
 ```
 
-Reset `*deadline*` before each run and `(fmakunbound 'prune-state?)` afterwards; it only
+Reset `*deadline*` before each run and restore the original hook afterwards (use
+`fmakunbound` only if there was no original hook); the deadline test only
 reads a global, so it is safe under threads.  A spec that defines its own `prune-state?`
 needs the deadline test added to it instead.  Before each repeated run with
 `*randomize-search*`, seed the random state, `(setf *random-state* (make-random-state t))`:
@@ -616,9 +646,9 @@ For macro candidates (Q15): solve a small version with `every`, then `(freq 2 3)
 **Answer-ordered data.**  A `first` search that finishes almost at once may only be following
 the order of the spec's data.  crossword13 listed each word in the position of its slot, so
 the first word tried always fitted: 22 program cycles, while a run with `*randomize-search*` t
-had passed 2.7 million states unsolved after 150 s.  Before reporting a fast find, repeat it
-with `*randomize-search*` t (or the data shuffled), and recommend a neutral order, such as
-alphabetical, for the copy.
+had passed 2.7 million states unsolved after 150 s. Report the fast find with its actual
+ordering. If a claim about typical performance matters, propose a bounded randomized
+or shuffled comparison. A solution-only objective need not investigate typical speed.
 
 **Solution density.**  Run `every` to exhaustion on the full problem if it finishes in
 seconds, otherwise on a small version.  Compare the number of distinct goal states with
@@ -629,7 +659,7 @@ lower bound, since paths through repeated states are cut.
 |---|---|---|
 | Many goal states, found by many workers | Solutions are plentiful | `first`; S12 randomized runs; no heuristic needed |
 | Few goal states, deep in the space | A needle in a haystack | S5 dead-state pruning; S10 bidirectional; S6 if a distance measure exists |
-| None | No solution within the cutoff | raise the cutoff, or check the model |
+| None after complete bounded coverage | No accepted solution within that model and cutoff, subject to sound pruning | Reconsider the strategy or propose a justified model check or changed bound |
 
 A value problem with no goal (every state is a candidate) has no goal states to count.  Its
 density is the number of states that reach the optimum, and what decides the cost is how
@@ -638,6 +668,7 @@ hook removed:
 
 ```lisp
 (stage <problem>)
+(ww-set *threads* 16) ; compatible local searches; approve limits for both runs
 (solve)
 (fmakunbound 'bounding-function?)
 (solve)
@@ -645,7 +676,9 @@ hook removed:
 
 The ratio of **Program cycles** is the bound's pruning factor (knap19: 36,326 to 432,
 with the optimum reached by 1 state).  The unpruned run also tests the bound's soundness: its
-best value must equal the pruned run's.
+best value must equal the pruned run's when both establish the optimum in the same scope.
+Agreement on tested instances is scoped evidence, not a general proof of bound soundness.
+Restore the hook after the comparison.
 
 With `*threads*` > 0, **Program cycles** leaves out the states expanded while the search is
 split into tasks (the shallowest levels), and is 0 when the whole search finishes during the
@@ -656,12 +689,18 @@ serial 36,326.  For exact counts, compare serial runs (`(ww-set *threads* 0)`).
 
 | Result | Means |
 |---|---|
-| Solution found | A valid path under the model; shortest only with `min-length` run to completion |
-| Exhausted, fixed-length problem, cutoff = remaining length | **Proof**: no solution from that state |
-| Exhausted, otherwise | No solution within the cutoff; a longer one may exist |
-| Exhausted with a hook pruning | Only as reliable as the hook is sound |
-| Exhausted with `*branch*` or a relaxed spec | Says nothing about the full problem |
-| Out of memory or interrupted | Neither a bound nor a result |
+| Solution found | A candidate under the searched model; validate the full path, actual goal, and applicable validators before a final solution claim |
+| Exhausted with no accepted goal, fixed remaining solution length covered | No solution from that start under that model, if all relevant choices were covered and pruning was sound |
+| Exhausted with no accepted goal, depth bounded otherwise | No solution in the covered model scope; a longer one may exist |
+| Exhausted entire reachable model space with no accepted goal | No model solution, provided coverage and pruning justify that conclusion |
+| Exhausted with pruning, symmetry, or other restrictions | Scope the claim to the justified coverage and equivalence; unsupported pruning cannot establish absence or optimality |
+| Exhausted with `*branch*` or a relaxed spec | A result about that restricted or altered search; transfer to the original problem requires a separate argument |
+| Out of memory, interrupted, or deadline-pruned | No new exhaustive bound; preserve candidates already found and any independently established evidence |
+
+Record the starting state, model revision, settings, cutoff, termination, and validation
+scope with the result. Optimality requires a completed search or other valid argument
+covering all better possibilities. Search exhaustion and replay do not themselves establish
+fidelity to intended rules. A failed bounded search is not an omission diagnosis.
 
 ### 6.3 Projecting to a larger problem
 
@@ -720,10 +759,10 @@ reopenings (hanoi at 8 disks, cutoff 255: 254,368 program cycles for 6,561 board
 
 ### 6.4 Expanding the problem family
 
-Always analyse how the problem's family grows, even when the user names no target size.  A
-spec is usually one instance of a family (a board size, a puzzle of a given shape), and the
-settings that suit the instance can fail on its larger members.  Section 6.3 projects to one
-target size; this section asks which way of growing hurts first.
+Analyse family growth when scaling is part of the objective or could change a consequential
+decision. Otherwise skip it or record a deferred topic with a trigger. Settings that suit
+one instance can fail on larger members; section 6.3 projects to a target size, while this
+procedure asks which relevant growth dimension is likely to become limiting first.
 
 1. **Name the dimensions** along which the family grows: for a cryptarithm, the base, the
    number of distinct letters, the word length and the number of addends; for a board, its
@@ -786,9 +825,11 @@ Recorded here, not yet made in the Manual:
 
 ## 8. Report to the user
 
-The report comes in four pieces, one at the end of each phase, so that each can be approved
-before the next phase builds on it.  Items carry descriptive names, not codes (section 1),
-and the field names below are the report's headings, written in plain words.
+Use only the report fields needed for the selected procedure and objective. They summarize
+findings in Analysis.txt, not four mandatory reports or a second record. Include supporting
+evidence, scope, uncertainties, affected dependencies, and the recommended next action.
+State what was not run when relevant. Pause at the applicable approval boundary; omit
+irrelevant measurements rather than performing work to fill a report field.
 
 **Phase 0: profile** (in the puzzle's own terms, no setting names; nothing run)
 
@@ -798,7 +839,7 @@ SUMMARY:      what the problem asks and its size as read from the spec, in a few
 PROFILE:      the answered questions that mattered, each named by what it profiles rather
               than its Q number, then the answer, marked spec / user
               ("Repeated states: yes, moves can be undone (spec)"); unknowns listed, with
-              the probe that will settle them
+              a proposed clarification or check if resolving them matters
 QUESTIONS:    what only the user can say (objective, time, machine, known lengths, larger
               members of the family), as one numbered list
 ```
@@ -821,8 +862,7 @@ RECOMMENDATIONS:  numbered items, each one specific change: a short descriptive 
                   action order, re-encodings, hooks (with their soundness argument),
                   refactorings and each minor clean-up are all items of this one list
 NOT RECOMMENDED:  changes considered and declined, each with its reason
-DRAFT RESULTS:    counts measured on a draft copy with the recommended items, against the
-                  original
+DRAFT RESULTS:    results of authorized draft experiments, with scope; otherwise not run
 CHECKS:           once applied: before and after counts, the agreement of any independent
                   script, and the REPL forms to stage and test the copy
 ```
