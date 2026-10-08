@@ -8,7 +8,7 @@ Maximum search depth: 4, set 2026-10-01.
 ## State           Actions.lisp: SG1-SG5, 19 actions, validated from the start against the goal; Validation.txt written.  Static facts derived by hand/script (Briefing, Hints).
 ## Checkpoints     None.
 ## Restore         (stage triangle-xyz-6), then in a separate form
-                   (load (merge-pathnames "doc/constraint-led-solving/constraint-pilot/triangle-xyz-6/Actions.lisp" (asdf:system-source-directory :wouldwork)))
+                   (load (merge-pathnames "doc/problems/triangle-xyz-6/Actions.lisp" (asdf:system-source-directory :wouldwork)))
 ## Open items      Whether to fold any findings into the talos method documents is D's decision.
                    Pilot scope: run the Problem-Solving Guide by hand on a non-talos problem without tech/ extractors.
-                   The Guide, Implementation Plan, Schema-Gaps and doc/constraint-led-solving/problems/ are not touched by this pilot.
+                   The Guide, Implementation Plan, Schema-Gaps and doc/problems/ are not touched by this pilot.

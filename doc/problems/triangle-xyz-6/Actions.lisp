@@ -61,7 +61,7 @@
            (action-sequence-validation-goal-satisfied-p *accepted-validation*)
            *accepted-validators-p*)
   (with-open-file (*standard-output*
-                   (merge-pathnames "doc/constraint-led-solving/constraint-pilot/triangle-xyz-6/Validation.txt"
+                   (merge-pathnames "doc/problems/triangle-xyz-6/Validation.txt"
                                     (asdf:system-source-directory :wouldwork))
                    :direction :output :if-exists :supersede)
     (format t ";;; triangle-xyz-6 -- complete validated solution, ~D actions.~%" (length *accepted-actions*))

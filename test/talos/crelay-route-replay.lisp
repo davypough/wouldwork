@@ -119,7 +119,7 @@
   "Read crelay-topo's accepted actions from its Actions.lisp without evaluating that file."
   (with-open-file
       (stream (asdf:system-relative-pathname
-                :wouldwork "doc/constraint-led-solving/problems/crelay-topo/Actions.lisp"))
+                :wouldwork "doc/problems/crelay-topo/Actions.lisp"))
     (loop for form = (read stream nil stream)
           until (eq form stream)
           when (and (consp form)

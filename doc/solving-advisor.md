@@ -37,7 +37,7 @@ D runs substantial searches in the existing Wouldwork REPL on lumpy, package WW.
 Gather the problem-spec path, optional corresponding diagram path or explicit
 "none", and D's non-negative maximum search depth. Check supplied files are
 accessible; ask about missing inputs rather than guessing. Record them in
-`doc/constraint-led-solving/problems/<problem>/Handoff.md`. Preserve a resumed problem's current state.
+`doc/problems/<problem>/Handoff.md`. Preserve a resumed problem's current state.
 D may choose to proceed without a missing diagram. Raise spec/diagram mismatches with D; do not silently change the spec.
 
 ## Spec-diagram check — Confirm the problem is well-defined
@@ -102,7 +102,7 @@ FINAL and TEMPORARY services, access per region and retrieval sites. A cycle is 
                        (asdf:system-source-directory :wouldwork)))
 (report-static-constraint-profile)
 (write-static-constraint-profile
-  (merge-pathnames "doc/constraint-led-solving/problems/<problem>/Constraint-Static-Profile.txt"
+  (merge-pathnames "doc/problems/<problem>/Constraint-Static-Profile.txt"
                    (asdf:system-source-directory :wouldwork)))
 ```
 
@@ -353,7 +353,7 @@ or with literal quoting, avoiding replacement-string substitution. Hash with
 
 ## Records and templates
 
-`doc/constraint-led-solving/problems/<problem>/` is flat (no subdirectories) and holds only the files
+`doc/problems/<problem>/` is flat (no subdirectories) and holds only the files
 below, under exactly these names; only the diagram's name and type vary.
 Superseded material is deleted; git history is its archive. State lives in the
 Handoff; the Briefing's log retains provenance and results. The method-level
@@ -425,7 +425,7 @@ form; a form that stages and loads together can see the previous problem's GOAL-
            (action-sequence-validation-goal-satisfied-p *accepted-validation*)
            *accepted-validators-p*)
   (with-open-file (*standard-output*
-                   (merge-pathnames "doc/constraint-led-solving/problems/<problem>/Validation.txt"
+                   (merge-pathnames "doc/problems/<problem>/Validation.txt"
                                     (asdf:system-source-directory :wouldwork))
                    :direction :output :if-exists :supersede)
     (format t ";;; <problem> -- complete validated solution, ~D actions.~%" (length *accepted-actions*))
@@ -460,10 +460,9 @@ When there are no accepted actions or no checkpoint, state that explicitly.
 
 The solving entry point is now `doc/solving-advisor.md`. Supporting material remains
 under `doc/constraint-led-solving/`: `Extractor-Specifications.md` describes diagnostics,
-`Schema-Gaps.txt` records uncovered needs, existing problem records are in its
-`problems/`, and the triangle pilot is in its `constraint-pilot/`.
-The consultant's new analysis records use `doc/problems/<problem-name>/Analysis.txt`;
-see [consultant.md](consultant.md). Existing evidence has not been moved.
+and `Schema-Gaps.txt` records uncovered needs. Problem records, including the triangle
+pilot (`triangle-xyz-6`), are in `doc/problems/<problem-name>/`, alongside the
+consultant's analysis records (`Analysis.txt`; see [consultant.md](consultant.md)).
 
 Development is complete through T46. The implementation plans (the final copy
 `archive/Implementation-Plan-2026-10-02.md`, with its board, maintenance
@@ -473,10 +472,11 @@ no active work queue.
 
 Path migration (2026-10-02): historical paths in verbatim quotations and
 dated schema-gap entries are preserved. To locate moved files,
-map historical `doc/constraint-method/` to `doc/constraint-led-solving/`, historical
-`doc/problems/` to `doc/constraint-led-solving/problems/`, and historical
-`doc/constraint-pilot/` to `doc/constraint-led-solving/constraint-pilot/`. This dated
-mapping does not apply to new consultant records in `doc/problems/`. The former
+map historical `doc/constraint-method/` to `doc/constraint-led-solving/`. Problem records
+moved from `doc/problems/` to `doc/constraint-led-solving/problems/` on 2026-10-02 and back
+to `doc/problems/` on 2026-10-08, so historical paths of either form map to `doc/problems/`.
+The triangle pilot, historically in `doc/constraint-pilot/` and then
+`doc/constraint-led-solving/constraint-pilot/`, is now `doc/problems/triangle-xyz-6/`. The former
 `Problem-Solving-Guide.md` is now `doc/solving-advisor.md`; the former active
 `Constraint-Implementation-Plan.md` became the final plan copy named above.
 Earlier removals and the `archive/` and `evidence/` removals still apply. These mappings

@@ -1,9 +1,9 @@
 # rumin-topo — Briefing
 
-Profile: doc/constraint-led-solving/problems/rumin-topo/Constraint-Static-Profile.txt (generated 2026-09-30 after the wall13 change;
+Profile: doc/problems/rumin-topo/Constraint-Static-Profile.txt (generated 2026-09-30 after the wall13 change;
 SHA-256 cafdb1bdf6bef6a0968785bf33364e92a9db7184a03b2c216574b3897a294033).
 Maximum search depth: 10.
-Diagram: doc/constraint-led-solving/problems/rumin-topo/diagram.png (read through the device link).
+Diagram: doc/problems/rumin-topo/diagram.png (read through the device link).
 
 Restarted from scratch 2026-09-30; earlier analysis is in git history and is not used.
 
@@ -148,7 +148,7 @@ ghost connector only to ghosts (CONNECTOR-PAIRING-ALLOWED). STOP needs no live/g
 
 SG1 evidence
 - Commands: (stage rumin-topo), then in a separate form
-  (load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp" (asdf:system-source-directory :wouldwork))).
+  (load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp" (asdf:system-source-directory :wouldwork))).
 - Sequence (7): start-recorder; agent1* walks location3 -> location2 and picks up tray1*; agent1
   walks to location2, climbs staircase1 to location4, walks to location13, picks up connector1
   (clearing its own pairing; connector1* keeps the forked one), walks back to location4, and
@@ -181,7 +181,7 @@ reach. The staircase clauses permit carrying; no ghost or connector is moved.
 Current MOVE and PICKUP-TRAY effect templates were read; the existing script
 preflights all 10 forms against staged actions before replay.
 Commands: (stage rumin-topo), then separately
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork))).
 Expected: success T, goal-checked T, goal-satisfied NIL; agent1 at location1
 holding live tray1 (also located at location1), receiver1 active, both connectors
@@ -218,7 +218,7 @@ PICKUP-BOX effect templates were checked in tech/tray.lisp and tech/box.lisp.
 The existing staged-action preflight checks all forms before replay.
 
 Command (unchanged Rumin-Topo still staged):
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 16 actions, success T, goal-checked T, goal-satisfied NIL; live agent1
 at location1 holding box1, tray1 on plate1 at location6, plate1 depressed,
@@ -260,7 +260,7 @@ tech/tray.lisp and tech/beam-relay.lisp effect templates. The all-form preflight
 remains before replay. This is a hand-derived replay, not an 11-deep search.
 
 Command while the unchanged problem remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 27 actions, success T, goal-checked T, goal-satisfied NIL; agent1 at
 location8 holding connector2, box1 on ground at location8, tray1 on plate2 at
@@ -302,7 +302,7 @@ receiver1 active, ordinary gates1/4 open and gates2/3 closed, recording gate2
 open, cycle 1 open. Goal-satisfied remains NIL. NEEDS full candidate replay.
 
 Command, unchanged problem still staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected report: 28 actions, success T, goal-checked T, goal-satisfied NIL.
 No search is involved. Current candidate is unvalidated; only its first 10
@@ -363,7 +363,7 @@ MOVE's previously validated staircase and walk witnesses are retained.
 All-form staged-action preflight remains enabled. No Lisp or search run by A.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 37 actions, success T, goal-checked T, goal-satisfied NIL. Agent1 at
 location4 empty-handed; box1 at location2 supporting connector1; connector2 at
@@ -406,7 +406,7 @@ progress. validate-recorder-solution is not used here because it also requires
 the final puzzle goal. No solver, goal override or source change is involved.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 40 actions, success T, goal-checked T, goal-satisfied NIL, and
 Completed recorder cycle: valid=T diagnostic=NIL. Live endpoint preserved:
@@ -505,7 +505,7 @@ Effect templates read for START, PICKUP/PUT-CONNECTOR and box actions; existing
 all-form preflight checks against staged actions before replay.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 49 actions, success T, goal-checked T, goal-satisfied NIL; agent1 and
 box1 at location8, live connector1 unpaired at location4, live connector2 at
@@ -535,7 +535,7 @@ connector1 is accessible at location4, ghost blue retains gate1 throughout.
 No ghost resource is moved; plate3 weight alone does not open gate5 without red.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 54 actions, success T, goal-checked T, goal-satisfied NIL. Agent1 at
 location12 empty-handed; tray1 on plate3, tray1* on plate2, both plates physically
@@ -565,7 +565,7 @@ future access to location9 will need the box step and a new plate2 keeper.
 Existing preflight plus separate completed-cycle check remain enabled.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 62 actions, success T, goal-checked T, goal-satisfied NIL; completed
 recorder cycle valid T, diagnostic NIL. Agent1 empty-handed at location4;
@@ -611,7 +611,7 @@ relay setup and the red switch are not included or approved by this step.
 Existing staged-action preflight remains enabled; no search run.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 71 actions, success T, goal-checked T, goal-satisfied NIL. Agent1 and
 box1 at location8; live connector1 unpaired at location4, live connector2 at
@@ -657,7 +657,7 @@ Pickup of live connector2 removes its old receiver1 link but leaves the copied
 source/receiver chain untouched. Preflight remains enabled before replay.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 81 actions, success T, goal-checked T, goal-satisfied NIL. Agent1 at
 location9 empty-handed; connector1 on plate2 paired to connector1* and connector2;
@@ -701,7 +701,7 @@ bridge removal is explicitly repaired; ghost receiver relay is left unconnected
 to the source. Full staged-action preflight remains before integrated replay.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 86 actions, success T, goal-checked T, goal-satisfied NIL. Connector1*,
 connector1 and connector2 red; receiver2 active; receiver1 inactive and connector2*
@@ -744,7 +744,7 @@ other barrier lies on them. Ghost tray1* remains on plate3. Pickup/placement
 effect templates rechecked; all-form staged preflight remains enabled.
 
 Command while unchanged Rumin-Topo remains staged:
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Expected: 95 actions, success T, goal-checked T, goal-satisfied NIL. Agent1 at
 location14 ON box1, empty-handed; box1 at location14; tray1 on ground at
@@ -782,7 +782,7 @@ including isolated recordings and final open cycle. Validation.txt is written
 only on successful goal-checked replay plus acceptance by all validators.
 
 Final closure commands: (stage rumin-topo), then separately
-(load (merge-pathnames "doc/constraint-led-solving/problems/rumin-topo/Actions.lisp"
+(load (merge-pathnames "doc/problems/rumin-topo/Actions.lisp"
                        (asdf:system-source-directory :wouldwork)))
 Fresh staging is requested here for final closure per the guide, not as a
 requirement for routine prefix replays. No search or thread setting needed.

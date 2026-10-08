@@ -131,7 +131,7 @@
            (action-sequence-validation-goal-satisfied-p *accepted-validation*)
            *accepted-validators-p*)
   (with-open-file (*standard-output*
-                   (merge-pathnames "doc/constraint-led-solving/problems/crelay-topo/Validation.txt"
+                   (merge-pathnames "doc/problems/crelay-topo/Validation.txt"
                                     (asdf:system-source-directory :wouldwork))
                    :direction :output :if-exists :supersede)
     (format t ";;; crelay-topo -- complete validated solution, ~D actions.~%" (length *accepted-actions*))
