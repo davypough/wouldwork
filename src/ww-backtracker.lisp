@@ -62,7 +62,7 @@
   (check-problem-parameter '*bt-cycle-check* *bt-cycle-check*)
   (when *bt-cycle-check*
     (dolist (requirement '((*algorithm* . backtracking) (*problem-type* . planning)
-                           (*tree-or-graph* . tree) (*threads* . 0)))
+                           (*tree-or-graph* . tree)))
       (unless (eql (symbol-value (car requirement)) (cdr requirement))
         (error "BT PATH cycle checking requires ~S = ~S, got ~S."
                (car requirement) (cdr requirement) (symbol-value (car requirement)))))

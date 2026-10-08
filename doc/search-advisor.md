@@ -302,7 +302,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
 | S1 | **Brute force, iterative deepening** | A useful baseline when its cost fits the objective and budget | `first` at approved cutoffs; propose further depths only when needed; test shortest length only if requested | Exponential in depth |
-| S2 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with PATH-mode backtracking (`*bt-cycle-check*`), auto-wait, or objects created during search (section 5) |
+| S2 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with auto-wait or objects created during search (section 5) |
 | S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and supports `prune-state?` and move lower bounds (see section 5 for unsupported hooks); the order matters; with forward checking the goal must test the constraints (note 1) |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
@@ -447,7 +447,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*tree-or-graph*` | tree, graph (graph) | graph when states repeat (Q4: repeated-state percentage high); tree when they rarely do, with happenings, or for better parallel speedup |
 | `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (S4) |
 | `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports the groups found, and suggests turning it off if none |
-| `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for PATH-mode backtracking (`*bt-cycle-check*`), auto-wait, and problems that create objects during search |
+| `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for auto-wait and problems that create objects during search |
 | `*randomize-search*` | t, nil (nil) | S12 only |
 | `*branch*` | n (0 = all) | S12 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |

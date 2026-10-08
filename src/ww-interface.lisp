@@ -107,7 +107,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                        to find exactly N solutions;
                                        all-paths requires depth-first + graph + depth-cutoff>0>)
        (ww-set *tree-or-graph* <one of tree or graph>)
-       (ww-set *bt-cycle-check* <nil (default, immediate inverse checking) or t (full-path checking, serial BT)>)
+       (ww-set *bt-cycle-check* <nil (default, immediate inverse checking) or t (full-path checking)>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)
        (ww-set *progress-reporting-interval* <nil (default: report on a time schedule whose gaps

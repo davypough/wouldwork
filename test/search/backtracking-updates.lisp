@@ -435,10 +435,10 @@
 
 (defun test-bt-path-mode-errors ()
   (let ((*bt-cycle-check* t) (*algorithm* 'backtracking) (*problem-type* 'planning)
-        (*tree-or-graph* 'tree) (*threads* 0))
+        (*tree-or-graph* 'tree))
     (validate-bt-path-mode)
     (dolist (setting '((*algorithm* . depth-first) (*problem-type* . csp)
-                       (*tree-or-graph* . graph) (*threads* . 1) (*solution-validators* . (test))
+                       (*tree-or-graph* . graph) (*solution-validators* . (test))
                        (*search-prefix-validators* . (test)) (*goal-chain-candidate-rejector* . test)
                        (*goal-chain-session* . test) (*goal-chaining-policy* . test)
                        (*final-goal* . test) (*happening-names* . (test))
