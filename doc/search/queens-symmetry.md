@@ -4,7 +4,7 @@ The current version also prunes right-half first placements in class mode using
 `prune-state?`; see [queens-reflection.md](queens-reflection.md). The leaf-only
 measurements below describe the preceding version.
 
-`probs/problem-queensN-csp-1.lisp` is the working copy of the original queens
+`probs/problem-queensN-1.lisp` is the working copy of the original queens
 spec. It defaults to N=13 and COUNT. The original spec is unchanged. The row
 order and placement constraints remain the same; the current copy uses three
 occupied-set bit masks instead of repeated remaining-column lists.
@@ -70,7 +70,7 @@ These measurements preceded the addition of one retained example to COUNT.
 ## User REPL comparison
 
 ```lisp
-(stage queensN-csp-1)
+(stage queensN-1)
 (ww-set *threads* 16)
 (setf *queens-count-classes* t)
 (solve)

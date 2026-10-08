@@ -1,4 +1,4 @@
-;;; Filename: problem-tiles0b.2-csp.lisp
+;;; Filename: problem-tiles0b.2.lisp
 
 ;;; Shifting Mosaic from Islands of Insight (most NW corner island)
 ;;; Large tiles - REVISED: MRV, fail-fast, area consistency, symmetry breaking, no sorting
@@ -75,7 +75,7 @@
           *tile-shapes*))
 
 
-(ww-set *problem-name* tiles0b.2-csp)
+(ww-set *problem-name* tiles0b.2)
 (ww-set *problem-type* csp)
 (ww-set *solution-type* first)
 (ww-set *tree-or-graph* tree)

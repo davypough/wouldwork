@@ -12,9 +12,9 @@
 ;;;   D - domino:     2 cells, marker at one end
 ;;;   E - monomino:   just the marker
 ;;; Pieces rotate freely in 90-degree steps (0/90/180/270), never mirrored.
-;;; Shape/rotation geometry stays plain Lisp (as in problem-tiles0a/b-csp.lisp);
+;;; Shape/rotation geometry stays plain Lisp (as in problem-tiles0a/b.lisp);
 ;;; placement enumeration and the 6 constraints are expressed as wouldwork
-;;; queries over the piece type, in the style of problem-queensN-csp.lisp.
+;;; queries over the piece type, in the style of problem-queensN.lisp.
 
 
 (in-package :ww)  ;required

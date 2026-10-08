@@ -1,4 +1,4 @@
-;;; Load after test/search/queens-symmetry.lisp and staging queensN-csp.
+;;; Load after test/search/queens-symmetry.lisp and staging queensN.
 (in-package :ww)
 
 (defun queens-test-empty-future-row-p (placed size)

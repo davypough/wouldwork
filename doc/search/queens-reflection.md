@@ -2,7 +2,7 @@
 
 ## Built-in pruning hook
 
-The current `problem-queensN-csp-1.lisp` uses Wouldwork's `prune-state?` hook:
+The current `problem-queensN-1.lisp` uses Wouldwork's `prune-state?` hook:
 
 ```lisp
 (define-query prune-state? ()
@@ -64,7 +64,7 @@ the recommended overnight target, with a better margin than before.
 User validation at the restored N=13 default:
 
 ```lisp
-(stage queensN-csp-1) ; selects 16 threads
+(stage queensN-1) ; selects 16 threads
 (solve)              ; expected 9233 classes
 ```
 

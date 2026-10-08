@@ -55,7 +55,7 @@ No N=15 all-board timing was taken in this experiment.
 class counting enabled by default. No engine changes were made. User validation:
 
 ```lisp
-(stage queensN-csp-1)
+(stage queensN-1)
 (solve)                          ; expected 9233
 (setf *queens-count-classes* nil)
 (solve)                          ; expected 73712

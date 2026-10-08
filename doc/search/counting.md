@@ -38,7 +38,7 @@ For the unmodified N=13 queens spec, with Wouldwork already loaded and the REPL
 in the `ww` package (`solve` includes timing):
 
 ```lisp
-(stage queensN-csp)
+(stage queensN)
 (ww-set *threads* 16)
 (ww-set *solution-type* count)
 (solve)

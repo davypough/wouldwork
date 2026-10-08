@@ -1,4 +1,4 @@
-;;; Load after staging queensN-csp, then (test-queens-symmetry).
+;;; Load after staging queensN, then (test-queens-symmetry).
 ;;; Independent queen enumeration and coordinate rotations check the spec helpers.
 (in-package :ww)
 

@@ -16,8 +16,8 @@
     ;"problem-crossword5-11.lisp"  ;runs out of default memory
     ;"problem-crossword15-18.lisp"  ;runs out of default memory
     "problem-crossword13.lisp" "problem-array-path.lisp"
-    "problem-tiles0a-csp.lisp" "problem-tiles1a.lisp"
-    ;"problem-tiles0b.2-csp.lisp"  ;takes too long (about 110 min)
+    "problem-tiles0a.lisp" "problem-tiles1a.lisp"
+    ;"problem-tiles0b.2.lisp"  ;takes too long (about 110 min)
     ;"problem-tiles1d.lisp"  ;same puzzle as tiles1a, bit-vector state
     ;"problem-tiles3a-heuristic.lisp"  ;about 1 s
     ;"problem-tiles5a-heuristic.lisp"  ;takes too long
@@ -58,7 +58,7 @@
     ;"problem-sentry.lisp"              ;has define-happening, incompatible with bt
     "problem-crossword13.lisp"          ;tree, first, string state, nested updates
     "problem-array-path.lisp"           ;tree, min-length, no-solution case
-    ;"problem-tiles0a-csp.lisp"         ;takes too long
+    ;"problem-tiles0a.lisp"         ;takes too long
     ;"problem-tiles1a.lisp"              ;graph->tree, min-length, list-coord state--takes too long with bt
     "problem-hanoi.lisp"                ;min-length, depth-cutoff 9 set in run-bt-test-problems
     "problem-triangle-xyz.lisp"         ;first, canonical triangle form

@@ -1,4 +1,4 @@
-;;; Filename: problem-queensN-csp.lisp
+;;; Filename: problem-queensN.lisp
 ;;; Design notes
 ;;; Assign rows in a fixed order so each board has one construction path.
 ;;; Track occupied columns and both diagonal families with three integer bit masks.
@@ -18,7 +18,7 @@
   "T counts rotation/reflection classes; NIL counts all boards.
    Set after staging and changing threads. Never change during a search.")
 
-(ww-set *problem-name* queensN-csp)
+(ww-set *problem-name* queensN)
 (ww-set *problem-type* csp)
 (ww-set *solution-type* count)
 (ww-set *tree-or-graph* tree)

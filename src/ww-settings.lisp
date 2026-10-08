@@ -825,7 +825,7 @@ treat their arguments as read-only and be safe to call concurrently."
    Pre-allocated to 256 (well above any realistic type count)
    with rehash-threshold 1.0 so the table never resizes.
    Not :synchronized - lock-free reads on the worker hot path
-   (precondition expansion reads here ~59M times/run in queensN-csp profile).")
+   (precondition expansion reads here ~59M times/run in queensN profile).")
 
 (sb-ext:defglobal *type-signatures* (make-hash-table :test #'eq :size 256 :rehash-threshold 1.0)
   "Maps each type name to its resolved instance list, as most recently installed by
@@ -860,7 +860,7 @@ treat their arguments as read-only and be safe to call concurrently."
    Pre-allocated to 64 (well above any realistic symmetric-relation count)
    with rehash-threshold 1.0 so the table never resizes.
    Not :synchronized - lock-free reads on the worker hot path
-   (add-proposition calls gethash here ~70M times/run in queensN-csp profile).")
+   (add-proposition calls gethash here ~70M times/run in queensN profile).")
 
 (sb-ext:defglobal *complements*
   (make-hash-table :test #'eq :size 128 :rehash-threshold 1.0)
@@ -869,7 +869,7 @@ treat their arguments as read-only and be safe to call concurrently."
    Pre-allocated to 128 (well above any realistic complement count)
    with rehash-threshold 1.0 so the table never resizes.
    Not :synchronized - lock-free reads on the worker hot path
-   (add-prop calls gethash here ~70M times/run in queensN-csp profile).")
+   (add-prop calls gethash here ~70M times/run in queensN profile).")
 
 (sb-ext:defglobal *fluent-relation-indices* (make-hash-table :test #'eq)
   "List of fluent argument indices for a relation.")
@@ -893,7 +893,7 @@ treat their arguments as read-only and be safe to call concurrently."
    in convert-to-integer/register-dynamic-object) with rehash-threshold
    1.0 so the table never resizes during search. Not :synchronized -
    reads on the worker hot path (convert-fluentless-prop-to-integer,
-   ~12M calls/run in queensN-csp profile) are lock-free; the rare
+   ~12M calls/run in queensN profile) are lock-free; the rare
    write path is already serialized by *integer-lock*.")
 
 (sb-ext:defglobal *integer-constants* (make-hash-table :synchronized (> *threads* 0))

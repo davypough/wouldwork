@@ -5,7 +5,7 @@ This report records the version before early reflection pruning. See
 and its measurements; the timings and projection below are the earlier baseline.
 
 Measured 2026-10-06 on the occupied-set version of
-`probs/problem-queensN-csp-1.lisp`, with COUNT retaining one example, depth-first
+`probs/problem-queensN-1.lisp`, with COUNT retaining one example, depth-first
 tree search, 16 threads, SBCL 2.6.9, and a 4 GiB heap. The source was restored
 byte-for-byte to N=13 afterwards (SHA256
 `D11AC484E818B8916A5E0C4C39CF25642AC179C65639229DF2F6FDC612857756`).

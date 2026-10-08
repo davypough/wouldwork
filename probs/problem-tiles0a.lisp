@@ -1,4 +1,4 @@
-;;; Filename: problem-tiles0a-csp.lisp
+;;; Filename: problem-tiles0a.lisp
 
 ;;; Related to Shifting Mosaic from Islands of Insight (most NW corner island)
 ;;; Pack tiles in a 5x5 array with no leftover spaces
@@ -6,7 +6,7 @@
 
 (in-package :ww)
 
-(ww-set *problem-name* tiles0a-csp)
+(ww-set *problem-name* tiles0a)
 
 (ww-set *problem-type* csp)
 

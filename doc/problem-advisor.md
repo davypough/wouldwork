@@ -240,7 +240,7 @@ The B/S/A labels above describe support, independently of evidence. The engine m
 
 **Consequences and support:** B: object symmetry detection, instantiation filtering, and graph canonical symmetry hashing. S: problem-specific spatial canonicalization and counting conventions. Current detection considers static row symmetries and explicit transition, goal, and happening object references. This does not establish that arbitrary helper logic or user answer identity is invariant. Spatial rotations/reflections are separate from object interchangeability.
 
-**Evidence and assumptions:** [ww-symmetry.lisp](../src/ww-symmetry.lisp): `detect-symmetry-groups`, `filter-symmetric-instantiations`, `use-canonical-symmetry-p`; [problem-queensN-csp.lisp](../probs/problem-queensN-csp.lisp): `queens-canonical-board-p`, `*queens-count-classes*`. The queens example has its own optional board-class rule. **Proposed check:** swap a candidate pair in a rule, goal, and answer; for rotations, separately test the intended class convention. Reopen F01 if labels become significant.
+**Evidence and assumptions:** [ww-symmetry.lisp](../src/ww-symmetry.lisp): `detect-symmetry-groups`, `filter-symmetric-instantiations`, `use-canonical-symmetry-p`; [problem-queensN.lisp](../probs/problem-queensN.lisp): `queens-canonical-board-p`, `*queens-count-classes*`. The queens example has its own optional board-class rule. **Proposed check:** swap a candidate pair in a rule, goal, and answer; for rotations, separately test the intended class convention. Reopen F01 if labels become significant.
 
 ### F09 — What can already rule out a choice?
 
@@ -322,7 +322,7 @@ This is a source-based assessment of the information the advisor needs, not a de
 
 ### Queens: construction, answer identity, and growth
 
-**Source:** [problem-queensN-csp.lisp](../probs/problem-queensN-csp.lisp), type declarations, `assign-queen-to-col`, `prune-state?`, `queens-canonical-board-p`, and the goal.
+**Source:** [problem-queensN.lisp](../probs/problem-queensN.lisp), type declarations, `assign-queen-to-col`, `prune-state?`, `queens-canonical-board-p`, and the goal.
 
 **Available information:** Board size is parameterized by `*N*` (currently 13). Each action assigns the next row to a column that is unoccupied and conflicts with neither diagonal family. The state includes assignments, the next row, and three occupancy masks. A completed board passes the optional rotation/reflection representative test. The file selects COUNT and 16 threads, with class counting currently enabled. Future-row impossibility pruning and the conditional first-row symmetry prune are explicit.
 

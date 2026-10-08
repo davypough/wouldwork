@@ -152,7 +152,7 @@ recording these results.
 - `test/search/count-solutions.lisp` is relevant to accepted-goal accounting.
 - `queens4` provides an unchanged equal-work smoke benchmark; repeated batches
   are preferable to changing its normal problem definition.
-- `probs/problem-queensN-csp.lisp` is a promising scalable workload with fixed
+- `probs/problem-queensN.lisp` is a promising scalable workload with fixed
   row order, bit masks, forward pruning, and optional symmetry-class counting.
   Its current defaults are N=13 and 16 threads: do not run those defaults for
   this investigation. Propose an explicitly small serial variant first.
@@ -170,7 +170,7 @@ fixtures; keep longer benchmarks explicitly invoked and bounded.
 ## Second investigation: N=11 CSP profile
 
 Approved investigation only: no additional engine or authoritative problem
-changes. Used external copies of `problem-queensN-csp.lisp` with N=11, zero
+changes. Used external copies of `problem-queensN.lisp` with N=11, zero
 workers, COUNT/tree/CSP, depth cutoff 11, and class counting disabled. The forward
 pruning hook remained unchanged. Each solve was capped at 10 seconds; none of
 the executed solves timed out. Both algorithms completed the full board depth.
@@ -263,14 +263,14 @@ one removal. DFS also incurs mask permutation expansion, but does not undo.
 
 Source pointers: `install-dynamic-relations` in `src/ww-installer.lisp`,
 `add-proposition` and `generate-proposition-permutations` in `src/ww-support.lisp`,
-and the occupied declaration and uses in `probs/problem-queensN-csp.lisp`.
+and the occupied declaration and uses in `probs/problem-queensN.lisp`.
 The targeted write profile and single-write audit emitted
 `BT-WRITE-PROFILE-COMPLETE` and `BT-WRITE-AUDIT-COMPLETE` respectively.
 
 ### Directed-relation correction — approved and implemented
 
 Renamed this ordered relation to `occupied>` at its five declaration/use sites
-in `problem-queensN-csp.lisp`, and updated `doc/search/queens-symmetry.md`.
+in `problem-queensN.lisp`, and updated `doc/search/queens-symmetry.md`.
 Dependency checking found no direct references in the existing queens test
 scripts requiring edits. The N=11 board count and search-work counts remained
 unchanged in the bounded comparison below. This makes the intended roles explicit and removes
