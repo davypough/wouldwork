@@ -315,7 +315,7 @@
       (assert (null *bt-path-search-active*)))))
 
 (defun bt-path-test-run (edges expected-goals expected-repeats &key heuristic
-                          (goal 'g) snapshot (mode 'path) (solution-type 'count) failure)
+                          (goal 'g) snapshot (mode t) (solution-type 'count) failure)
   (let* ((*bt-cycle-check* mode) (*algorithm* 'backtracking) (*problem-type* 'planning)
          (*tree-or-graph* 'tree) (*threads* 0) (*solution-type* solution-type)
          (*depth-cutoff* 5) (*debug* 0) (*probe* nil) (*bt-path-test-goal* goal)
@@ -358,7 +358,7 @@
 (defun test-bt-path-search ()
   (dolist (heuristic '(nil t))
     (bt-path-test-run '((a b) (b c) (c a)) 0 1 :heuristic heuristic)
-    (bt-path-test-run '((a b) (b c) (c a)) 0 0 :heuristic heuristic :mode 'immediate)
+    (bt-path-test-run '((a b) (b c) (c a)) 0 0 :heuristic heuristic :mode nil)
     (bt-path-test-run '((a b) (b c) (c d) (d b)) 0 1 :heuristic heuristic)
     (bt-path-test-run '((a a)) 0 1 :heuristic heuristic)
     (bt-path-test-run '((a b) (a c) (b d) (c d) (d g)) 2 0 :heuristic heuristic)
@@ -434,7 +434,7 @@
       (assert (equalp static-before *static-db*)))))
 
 (defun test-bt-path-mode-errors ()
-  (let ((*bt-cycle-check* 'path) (*algorithm* 'backtracking) (*problem-type* 'planning)
+  (let ((*bt-cycle-check* t) (*algorithm* 'backtracking) (*problem-type* 'planning)
         (*tree-or-graph* 'tree) (*threads* 0))
     (validate-bt-path-mode)
     (dolist (setting '((*algorithm* . depth-first) (*problem-type* . csp)
@@ -461,20 +461,29 @@
   (format t "~&BACKTRACKING-PATH-MODE-CHECKS-PASSED~%"))
 
 (defun test-bt-path-parameters ()
-  (assert (eq *bt-cycle-check* 'immediate))
-  (assert (eq 'immediate (car (last (normalize-persisted-problem-parameters
+  (assert (null *bt-cycle-check*))
+  (assert (null (car (last (normalize-persisted-problem-parameters
                                     (butlast *default-parameters*))))))
-  (let ((caught nil))
-    (handler-case (check-problem-parameter '*bt-cycle-check* 'invalid)
-      (error () (setf caught t)))
-    (assert caught))
-  (ww-set *bt-cycle-check* path)
+  (dolist (value '(immediate path invalid 1))
+    (let ((caught nil))
+      (handler-case (check-problem-parameter '*bt-cycle-check* value)
+        (error () (setf caught t)))
+      (assert caught)))
+  (dolist (value '(nil t))
+    (check-problem-parameter '*bt-cycle-check* value)
+    (dolist (algorithm '(depth-first backtracking))
+      (let* ((*algorithm* algorithm) (*bt-cycle-check* value)
+             (display (with-output-to-string (*standard-output*)
+                        (display-current-parameters))))
+        (assert (eq (not (null (search "*BT-CYCLE-CHECK*" display)))
+                    (eq algorithm 'backtracking))))))
+  (ww-set *bt-cycle-check* t)
   (refresh)
-  (assert (eq *bt-cycle-check* 'path))
+  (assert *bt-cycle-check*)
   (read-globals)
-  (assert (eq *bt-cycle-check* 'path))
+  (assert *bt-cycle-check*)
   (stage backtracking-heuristic)
-  (assert (eq *bt-cycle-check* 'immediate))
+  (assert (null *bt-cycle-check*))
   (format t "~&BACKTRACKING-PATH-PARAMETER-CHECKS-PASSED~%"))
 
 (defun test-backtracking-path ()
@@ -495,7 +504,7 @@
         (progn
           (setf (symbol-function 'update-set-signature)
                 (lambda (ops) (incf calls) (funcall original ops)))
-          (dolist (mode '(immediate path immediate))
+          (dolist (mode '(nil t nil))
             (eval `(ww-set *bt-cycle-check* ,mode))
             (setf calls 0)
             (assert (eq effect (symbol-function (action.eff-defun-name action))))
@@ -506,7 +515,7 @@
                   (progn
                     (assert (choice.forward-update choice))
                     (assert (choice.undo-frame choice))
-                    (if (eq mode 'path)
+                    (if mode
                         (progn (assert (zerop calls))
                                (assert (null (choice.inverse-update choice)))
                                (assert (null (choice.forward-sig choice)))
@@ -522,7 +531,7 @@
 
 (defun test-bt-update-inverse-contract (literal old-literal)
   "Check standalone inverses and trailed omission against the same mutation."
-  (dolist (mode '(immediate path))
+  (dolist (mode '(nil t))
     (dolist (trailed '(nil t))
       (let* ((*bt-cycle-check* mode) (*problem-type* 'planning)
              (db (make-hash-table)) (*bt-undo-frame* nil))
@@ -533,7 +542,7 @@
           (unwind-protect
               (multiple-value-bind (forward inverse) (update-bt db literal)
                 (assert (equal literal forward))
-                (if (and trailed (eq mode 'path))
+                (if (and trailed mode)
                     (assert (null inverse))
                     (assert (equal inverse
                                    (if (eq (first literal) 'not) (second literal)
@@ -553,7 +562,7 @@
           (test-bt-update-inverse-contract '(ready 2) '(ready 1))
           (test-bt-update-inverse-contract '(ready 2) nil))
       (setf *fluent-relation-indices* saved)))
-  (let ((*bt-cycle-check* 'path))
+  (let ((*bt-cycle-check* t))
     (test-backtracking-snapshot-generation nil)
     (test-backtracking-snapshot-generation t)
     (test-bt-effect-error-restoration)

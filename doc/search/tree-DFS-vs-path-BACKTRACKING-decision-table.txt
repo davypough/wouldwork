@@ -1,0 +1,191 @@
+WOULDWORK: SERIAL TREE DFS vs PATH BACKTRACKING
+Date: 2026-10-08
+
+PURPOSE AND SCOPE
+
+Choose between serial depth-first tree search and serial backtracking with
+*bt-cycle-check* = T (full-path checking). Neither keeps a closed table. Both check ancestors to
+avoid cycles; neither eliminates duplicates across separate branches.
+Both handle accepted goals before ordinary ancestor rejection.
+
+DFS retains separate states. PATH backtracking modifies one working state and
+keeps choices, forward updates, undo records and ancestor fingerprints. When a
+fingerprint matches, PATH copies the candidate into scratch storage and undoes
+transitions there to verify exact ancestor equality. Fingerprints alone never
+justify rejection. Backtracking is not constant-memory: trails and pending choices
+still occupy space, and snapshot effects retain whole databases.
+
+DECISION TABLE
+
+The preferences below are structural expectations, not benchmark conclusions.
+Use the measured examples below only within their stated bounds.
+
+Favored means a candidate to try first, not a demonstrated speed advantage.
+BT below always means PATH backtracking. "Neither" means that feature alone
+provides no preference. Each contrasting case has its own row.
+
+Feature / case                     | Favored                | Reason / qualification
+-----------------------------------+------------------------+-------------------------------------
+Large state, few writes per action | BT                     | Compact undo can avoid retaining
+                                   |                        | many large state copies.
+Small state                        | DFS (weak tendency)    | Copying is cheap; BT's bookkeeping
+                                   |                        | has less opportunity to pay off.
+-----------------------------------+------------------------+-------------------------------------
+Many physical writes per action    | DFS (conditional)      | Large undo trails may cost more
+                                   |                        | than copying; depends on state size.
+Few physical writes per action     | BT (conditional)       | Small trails help most when the
+                                   |                        | unchanged part of the state is large.
+-----------------------------------+------------------------+-------------------------------------
+Deep paths with large states       | BT (memory)            | Incremental undo can reduce retained
+                                   |                        | data; pending choices still cost space.
+Shallow paths with small states    | DFS (weak tendency)    | Retaining states is less costly;
+                                   |                        | no automatic runtime advantage.
+-----------------------------------+------------------------+-------------------------------------
+Incremental effects                | BT (conditional)       | Favors compact undo when changes
+                                   |                        | are small relative to the state.
+Complete database snapshots        | DFS (weak tendency)    | BT retains snapshot copying costs,
+                                   |                        | reducing its main advantage.
+-----------------------------------+------------------------+-------------------------------------
+Frequent ancestor matches          | DFS (checking cost)    | Ancestor states are already retained;
+                                   |                        | BT reconstructs them in scratch space.
+Rare ancestor matches              | Neither alone          | BT rarely reconstructs, but still
+                                   |                        | computes and scans fingerprints.
+-----------------------------------+------------------------+-------------------------------------
+Longer cycles                      | Neither (pruning)      | Both reject ancestor repetitions;
+                                   |                        | checking costs can differ as above.
+Monotonic progress                 | Neither (pruning)      | Neither gains from ancestor checking.
+                                   |                        | Compare state-management costs instead.
+-----------------------------------+------------------------+-------------------------------------
+Many converging branches           | Neither                | Both revisit states across branches;
+                                   |                        | consider graph DFS instead.
+Mostly distinct branch states      | Neither alone          | Lack of a closed table hurts less,
+                                   |                        | but does not distinguish these two.
+-----------------------------------+------------------------+-------------------------------------
+Cheap domain reasoning             | Depends                | State copying, undo and checking
+                                   |                        | costs decide; use the rows above.
+Expensive domain reasoning         | Neither alone          | Domain work may dominate and mask
+                                   |                        | state-management differences.
+-----------------------------------+------------------------+-------------------------------------
+History-dependent behavior         | Neither automatically  | PATH rejects known unsupported cases;
+                                   |                        | DFS also needs a pruning-validity review.
+Future determined by stored IDB    | Neither (eligibility)  | Supports IDB-based cycle checking;
+                                   |                        | other PATH restrictions still apply.
+
+COMPATIBILITY COMES FIRST
+
+Current PATH validation requires BACKTRACKING, PLANNING, TREE, and *threads* = 0.
+It rejects active solution/prefix validators, goal-chain candidate rejection,
+goal-chain sessions/policy, final-goal, happenings, automatic waiting, recorder
+prefix pruning, and recorder types/technology. Static writes during PATH search
+are guarded as well. These are eligibility limits, not speed comparisons.
+Serial tree DFS is not automatically safe for arbitrary history-dependent models
+merely because PATH rejects them: its ancestor test also compares IDBs.
+
+CSP backtracking is outside this table: current PATH mode does not accept CSP.
+Do not use a queens/CSP or assignment-tree result as evidence for PATH speed.
+
+PREFERRED REPRESENTATIVES AND RECORDED MEASUREMENTS
+
+These are preferred comparison examples, not established algorithm winners.
+The available paired PATH/DFS evidence is the 2026-10-07 Blocks3/Hanoi run.
+It predates the subsequent omission of incremental inverse literals/signatures
+from PATH. No fresh search was run to prepare this document.
+
+Common setup: SBCL 2.6.9; 4096 MB dynamic space; serial PLANNING/TREE/COUNT;
+deterministic order; debug 0; no probe or heuristic. Five timed solves per case,
+full GC before each solve. Medians include WW-SOLVE initialization and suppressed
+reporting, exclude staging/compilation and explicit pre-run GC. Separate
+instrumented COUNT runs supplied work counts. All timed runs reported zero GC.
+
+1. TREE DFS REPRESENTATIVE: BLOCKS3, CUTOFF 6
+
+   Why this example: a small reversible planning state (three ON facts), where
+   retaining full states is inexpensive and exact cycle checks are common.
+
+   Measure                         Tree DFS        PATH backtracking
+   ------------------------------  --------------  -----------------
+   Median elapsed time             0.206 ms        0.228 ms
+   Median allocated bytes          229,264         294,800
+   Effect calls                    50              50
+   Precondition calls              378             378
+   Accepted goals                  4               4
+   Reported repeat rejections      26              26
+
+   Observed direction: DFS used about 9.6% less median time and 22.2% fewer
+   allocated bytes than PATH in this run, with equal measured search work.
+   PATH performed 58 scratch transition restorations.
+   Preference: use Blocks3 as the small-state DFS comparison example, not as
+   proof that DFS is generally faster or that this ranking survives PATH updates.
+
+2. PATH BACKTRACKING REPRESENTATIVE: THREE-DISK HANOI, CUTOFF 8
+
+   Why this example: each move replaces one disk-location fluent, providing a
+   clear incremental-update example with reversible moves and ancestor cycles.
+
+   Measure                         Tree DFS        PATH backtracking
+   ------------------------------  --------------  -----------------
+   Median elapsed time             0.639 ms        0.629 ms
+   Median allocated bytes          850,928         884,160
+   Effect calls                    415             412
+   Precondition calls              1,251           1,242
+   Accepted goals                  5               5
+   Reported repeat rejections      189             189
+
+   Observed direction: PATH's median time was about 1.6% lower, but allocation
+   was about 3.9% higher. DFS's extra 3 effects and 9 preconditions came from
+   its cutoff truncation probe. PATH performed 502 scratch restorations.
+   Preference: Hanoi is the available PATH comparison example, provisionally;
+   these results do NOT establish a reliable performance advantage for PATH.
+   Its tiny state also does not demonstrate the predicted large-state benefit.
+
+EVIDENCE LIMITS
+
+All these solves were sub-millisecond. Allocation varied substantially between
+samples despite stable work counts. The original report explicitly treats the
+medians as descriptive, not reliable steady-state speedup or allocation estimates.
+Allocated bytes are cumulative allocation, NOT peak retained memory.
+
+Independent enumeration verified exact solution-path sets for PATH and DFS:
+4 for Blocks3 and 5 for Hanoi at the stated bounds. Every retained path was
+replayed successfully. Backtracking restoration and unchanged static tables were
+checked. These checks provide stronger evidence than the small timing differences.
+
+Native state/cycle/cutoff counters differ between implementations. BT's NIL
+truncation flag is not evidence of an exhaustive search past the chosen cutoff.
+Use effects, preconditions, accepted paths/goals and exact bounds for comparisons.
+
+The later triangle-xyz PATH optimization measured 1.640655 -> 1.441080 seconds
+and 1,166,221,184 -> 902,382,912 allocated bytes at N=5/cutoff 10, with equal
+work. This was PATH-before versus PATH-after, with NO paired DFS run. It cannot
+establish a current PATH-versus-DFS winner or update the two tables above.
+
+PRACTICAL DECISION
+
+First establish PATH eligibility and whether IDB-based cycle pruning is valid.
+Then favor a PATH trial for large states with small incremental updates and
+memory pressure; favor a DFS trial for small states and frequent exact ancestor
+comparisons. Heavy cross-branch convergence calls for considering graph DFS.
+
+For a firm performance recommendation, the next step is a separately approved,
+bounded comparison on current source, including a real large-state/small-update
+planning workload. Keep action order, cutoff, goal mode and cycle policy aligned;
+record elapsed time, allocation and search work, and measure retained memory
+separately if memory is the deciding factor. Do not infer PATH results from
+IMMEDIATE backtracking or CSP benchmarks.
+
+SOURCES (repository-relative paths)
+
+doc/search/backtracking-performance-investigation.md
+  "Current-mode Blocks3 and Hanoi comparison (2026-10-07)": paired results,
+  raw samples, independent path validation, cutoff accounting and limitations.
+  "Subsequent incremental cycle-data omission" and following comparison:
+  later PATH optimization and its separate before/after measurements.
+doc/search/backtracking-path-cycle-design.md
+  PATH contract, supported configurations and subsequent implementation changes.
+src/ww-searcher.lisp
+  PROCESS-SUCCESSORS and ON-CURRENT-PATH: planning/tree ancestor checking.
+src/ww-backtracker.lisp
+  VALIDATE-BT-PATH-MODE, BT-ON-CURRENT-PATH-P, BT-SCRATCH-PARENT,
+  DESCEND-CHOICE-BT and choice application/restoration: PATH mechanics.
+probs/problem-blocks3.lisp and probs/problem-hanoi.lisp
+  Representative models. Benchmark overrides differ from file defaults.

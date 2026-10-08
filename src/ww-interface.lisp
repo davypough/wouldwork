@@ -107,7 +107,7 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                        to find exactly N solutions;
                                        all-paths requires depth-first + graph + depth-cutoff>0>)
        (ww-set *tree-or-graph* <one of tree or graph>)
-       (ww-set *bt-cycle-check* <immediate (default) or path (state-based serial BT)>)
+       (ww-set *bt-cycle-check* <nil (default, immediate inverse checking) or t (full-path checking, serial BT)>)
        (ww-set *depth-cutoff* <positive integer (search to specified depth) or
                                                  0 (no depth limit)>)
        (ww-set *progress-reporting-interval* <nil (default: report on a time schedule whose gaps
@@ -301,19 +301,9 @@ is staged again.
       *globals-file*)))
 
 
-(defun retired-recorder-settings-p (params)
-  "Whether PARAMS ends in the former recorder audit/pruning positions."
-  (and (= (length params) 17)
-       (member (nth 15 params) '(nil t))
-       (member (nth 16 params) '(nil t))))
-
-
 (defun migrate-retired-recorder-settings (params)
   "Remove retired recorder settings while preserving a saved cycle maximum."
   (cond
-    ((retired-recorder-settings-p params)
-      (append (subseq params 0 14)
-              (nthcdr 14 *default-parameters*)))
     ((and (>= (length params) 16)
           (member (nth 14 params) '(nil t))
           (typep (nth 15 params) '(integer 1 *)))

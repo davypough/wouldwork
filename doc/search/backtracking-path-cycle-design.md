@@ -15,12 +15,22 @@ literals and signatures in PATH passed focused checks and the user's fresh
 PATH time by 12.2% and allocation by 22.6% with identical work and restoration.
 See the performance investigation. IMMEDIATE remains the default.
 
+Parameter update (2026-10-08): `*bt-cycle-check*` now accepts only `nil` and `t`.
+`nil` (default) retains immediate inverse-cycle checking; `t` enables full-path
+checking with the existing serial, state-based planning restrictions. Historical
+IMMEDIATE/PATH labels below describe these behaviors, respectively.
+The obsolete 17-value recorder-layout migration was removed because it collides
+with the current boolean parameter layout. Focused update/restoration, path-search,
+and parameter checks passed. Run the parameter check last because it restages
+the problem: `test-backtracking-updates`, `test-backtracking-path`, then
+`test-bt-path-parameters`. The full `(test-bt)` rerun remains for the user.
+
 ## Recommendation and scope
 
 Add an opt-in path-cycle mode for serial planning BT. Preserve the existing
 immediate-inverse mode as the default until correctness and workload measurements
 justify any default change. Parameter: `*bt-cycle-check*`, with values
-`immediate` and `path`, selected through WW-SET. This is a pruning policy change,
+`nil` (immediate inverse checking) and `t` (full-path checking), selected through WW-SET. This is a pruning policy change,
 not an implementation-only optimization: solution path counts can change.
 
 The first path mode targets ordinary state-based planning, such as Blocks3 and
@@ -284,13 +294,13 @@ log, and caches were removed. Unrelated working-tree changes were preserved.
 To select the new mode after staging an eligible problem and selecting BT:
 
 ```lisp
-(ww-set *bt-cycle-check* path)
+(ww-set *bt-cycle-check* t)
 ```
 
 To return to the existing behavior:
 
 ```lisp
-(ww-set *bt-cycle-check* immediate)
+(ww-set *bt-cycle-check* nil)
 ```
 
 Enabling PATH asserts that IDB equality is an appropriate repetition criterion

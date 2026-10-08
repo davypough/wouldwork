@@ -663,8 +663,8 @@ treat their arguments as read-only and be safe to call concurrently."
    depth-first: Traditional DFS with state copying (current behavior)
    backtracking: DFS with single state and undo operations (memory efficient)")
 
-(defvar *bt-cycle-check* 'immediate
-  "BT cycle policy: IMMEDIATE inverse operations, or opt-in PATH IDB equality.
+(defvar *bt-cycle-check* nil
+  "Enable full-path BT cycle checking with T; NIL (default) retains immediate inverse checking.
    PATH assumes future planning behavior is determined by the dynamic database.")
 
 (defvar *bt-path-search-active* nil
@@ -758,7 +758,7 @@ treat their arguments as read-only and be safe to call concurrently."
   '((*problem-name* . unspecified)
     (*depth-cutoff* . 0)
     (*algorithm* . depth-first)
-    (*bt-cycle-check* . immediate)
+    (*bt-cycle-check*)
     (*tree-or-graph* . graph)
     (*problem-type* . planning)
     (*solution-type* . first)

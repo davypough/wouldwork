@@ -537,7 +537,7 @@
   (declare (type hash-table db))
   ;; Neither CSP nor PATH uses inverse-literal cycle checking.
   (when (and *bt-undo-frame*
-             (or (eql *problem-type* 'csp) (eq *bt-cycle-check* 'path)))
+             (or (eql *problem-type* 'csp) *bt-cycle-check*))
     (return-from update-bt (values (update db literal) nil)))
   (when *print-updates*
     (ut::prt literal))

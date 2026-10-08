@@ -37,7 +37,7 @@
 (defun validate-bt-path-mode ()
   "Reject known configurations whose future is not represented by the IDB alone."
   (check-problem-parameter '*bt-cycle-check* *bt-cycle-check*)
-  (when (eq *bt-cycle-check* 'path)
+  (when *bt-cycle-check*
     (dolist (requirement '((*algorithm* . backtracking) (*problem-type* . planning)
                            (*tree-or-graph* . tree) (*threads* . 0)))
       (unless (eql (symbol-value (car requirement)) (cdr requirement))
@@ -88,7 +88,7 @@
 
 (defun descend-choice-bt (level)
   "Check a registered, unaccepted candidate before descending, after goal handling."
-  (if (eq *bt-cycle-check* 'immediate)
+  (if (null *bt-cycle-check*)
       (backtrack (1+ level))
       (let ((fingerprint (bt-path-fingerprint (problem-state.idb *backtrack-state*))))
         (if (bt-on-current-path-p fingerprint)
@@ -100,7 +100,7 @@
 
 (defun cycle-check-enabled-bt ()
   "Enable immediate inverse-cycle detection only for planning problems."
-  (and (eq *bt-cycle-check* 'immediate) (not (eql *problem-type* 'csp))))
+  (and (null *bt-cycle-check*) (not (eql *problem-type* 'csp))))
 
 
 (defun update-set-signature (ops)
@@ -196,7 +196,7 @@
                       *search-tree*))
   ;; Initiate recursive backtracking search
   (let ((*bt-path-fingerprints* nil)
-        (*bt-path-search-active* (eq *bt-cycle-check* 'path)))
+        (*bt-path-search-active* *bt-cycle-check*))
     (backtrack 0))
   ;; Compute final statistics
   (setf *average-branching-factor* (if (> *program-cycles* 0)
@@ -241,7 +241,7 @@
   
   (let ((found-a-solution nil)
         (*bt-path-fingerprints*
-          (if (eq *bt-cycle-check* 'path)
+          (if *bt-cycle-check*
               (cons (or fingerprint (bt-path-fingerprint (problem-state.idb *backtrack-state*)))
                     *bt-path-fingerprints*)
               *bt-path-fingerprints*)))
@@ -383,7 +383,7 @@
          (forward (if incremental-p (first changes) changes))
          (cycle-p (and incremental-p (cycle-check-enabled-bt)))
          (inverse (if incremental-p
-                      (unless (eq *bt-cycle-check* 'path) (second changes))
+                      (unless *bt-cycle-check* (second changes))
                       pre-idb)))
     (when changes
       (make-choice :act (cons (action.name action) (copy-tree (update.instantiations update)))
@@ -544,7 +544,7 @@
                                 (format-action-for-display (choice.act choice)))
                         (format t "Depth: ~A~%" depth)
                         (format t "Forward Update: ~A~%" (choice.forward-update choice))
-                        (if (and (eq *bt-cycle-check* 'path)
+                        (if (and *bt-cycle-check*
                                  (listp (choice.forward-update choice)))
                             (format t "Inverse cycle literals: omitted in PATH mode~%")
                             (format t "Inverse Update: ~A~%" (choice.inverse-update choice))))
