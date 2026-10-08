@@ -501,14 +501,14 @@
                     (or (solution-count-reached-p)
                         (member *solution-type* '(min-length min-time))))
         (if (> *threads* 0)
-          (if (eql *algorithm* 'backtracking)
-            (error "Parallel processing not supported with backtracking algorithm")
-            (progn
-              (process-partitioned-parallel)
-              (finalize-parallel-search-results)
-              (display-parallel-timing)
-              (display-worker-stats)
-              (display-closed-shard-stats)))
+          (progn
+            (ecase *algorithm*
+              (depth-first (process-partitioned-parallel))
+              (backtracking (process-partitioned-parallel-bt)))
+            (finalize-parallel-search-results)
+            (display-parallel-timing)
+            (display-worker-stats)
+            (display-closed-shard-stats))
           (ecase *algorithm*
             (depth-first (search-serial))
             (backtracking (search-backtracking))))))

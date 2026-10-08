@@ -258,8 +258,8 @@ apparatus is needed. Even this short consultation leaves a text analysis artifac
 precedence, deadlines, and the requested objective. Uncertain preemption rules block
 representation: clarify them first. Route to model review, then propose a bounded
 comparison of two justified assignment orders. For a compatible local search, use
-16 threads and account for serial startup; if backtracking is selected, record its
-serial requirement. If the user corrects capacity, reopen dependent feasibility and
+16 threads and account for serial startup; if PATH-mode backtracking is selected, record
+its serial requirement. If the user corrects capacity, reopen dependent feasibility and
 pruning conclusions, retain unaffected precedence evidence, and qualify old timings.
 Record each result in the problem's Analysis.txt, separating detailed measurements
 only if useful. A feasible schedule at budget expiry is progress, not an optimality

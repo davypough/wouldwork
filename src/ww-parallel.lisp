@@ -449,7 +449,9 @@
 (defun parallel-worker (worker-id task-queue)
   "Main worker loop: fetch tasks and perform local DFS.
    May also receive donated work from other workers.
-   Returns when no more tasks available."
+   Returns when no more tasks available. Once the search stops, remaining tasks are
+   popped without being searched: every worker must keep returning to the queue,
+   because TQ-POP-BLOCKING releases waiting workers only when all of them are waiting."
   (declare (type fixnum worker-id)
            (type task-queue task-queue))
   
@@ -470,19 +472,15 @@
                   nil)))
       
       (loop
-        ;; Check for shutdown
-        (when (or *shutdown-requested* *first-solution-found*)
-          (return))
-        
         ;; Get next task (blocking)
         (let ((task-node (tq-pop-blocking task-queue)))
           (unless task-node
             ;; Queue exhausted and done
             (return))
-          
-          ;; Perform local DFS from this task (may donate work back)
-          (worker-local-dfs task-node worker-id stats task-queue)
-          (incf tasks-completed))))
+          ;; Perform local DFS from this task (may donate work back), unless stopped
+          (unless (or *shutdown-requested* *first-solution-found*)
+            (worker-local-dfs task-node worker-id stats task-queue)
+            (incf tasks-completed)))))
     
     ;; Worker finished - report summary if debug level high enough
     (when (>= *debug* 1)

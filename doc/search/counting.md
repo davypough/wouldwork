@@ -11,8 +11,8 @@ before undoing it; other drivers retain the existing state. Parallel callers
 claim the first example under the same lock as the counter, so only one saves it.
 Candidate paths can still be constructed for the existing validation pipeline.
 
-Supported drivers are serial depth-first, serial backtracking, and parallel
-depth-first, including goals found at the start or during root-task generation.
+Supported drivers are serial and parallel depth-first and serial and parallel
+backtracking, including goals found at the start or during root-task generation.
 Workers increment the shared integer under a lock. Candidate solution validators
 run before counting, just as they do before recording an ordinary solution.
 

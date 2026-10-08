@@ -77,8 +77,6 @@
     (format t "~%Note: Currently set to run parallel threads. Resetting *debug* to 1.~%"))
   (when (eq *problem-name* 'unspecified)
     (format t "~%Note: Please specify the problem name in the problem specification file with (ww-set *problem-name* <n>).~%"))
-  (when (and (eq *algorithm* 'backtracking) (> *threads* 0))
-    (error "~%Note: Backtracking is not compatible with parallel processing.~%"))
   (when (and (eq *algorithm* 'backtracking) (eq *tree-or-graph* 'graph))  ;unchanged
     (setf *tree-or-graph* 'tree)  ;unchanged
     (format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))  ;unchanged

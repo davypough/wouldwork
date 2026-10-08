@@ -929,10 +929,6 @@
     (when (< *bound-refresh-interval* 100)
       (push "  - *bound-refresh-interval* < 100 may add overhead" issues))
     
-    ;; Check algorithm compatibility
-    (when (and (> *threads* 0) (eql *algorithm* 'backtracking))
-      (push "  - Backtracking algorithm not supported in parallel mode" issues))
-    
     ;; Report results
     (if issues
         (progn

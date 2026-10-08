@@ -26,7 +26,7 @@
   names)
 
 (defun worker-read-snapshots-active-p ()
-  (and *worker-read-snapshots* (plusp *threads*) (eq *algorithm* 'depth-first)))
+  (and *worker-read-snapshots* (plusp *threads*) (member *algorithm* '(depth-first backtracking))))
 
 (declaim (inline worker-object-code))
 (defun worker-object-code (object)

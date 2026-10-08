@@ -34,6 +34,29 @@
 (defvar *bt-path-fingerprints* nil
   "Nearest-first ancestor (hash . entry-count) pairs; never includes the candidate.")
 
+
+(defvar *bt-worker* nil
+  "The running parallel backtracking worker (a BT-WORKER), or NIL in serial search
+   and in task generation.")
+
+
+(defvar *bt-forced-prefix* nil
+  "Simple vector of choice ordinals a parallel worker replays from the root, or NIL.
+   At level L below its length, only the choice at ordinal (svref prefix L) is explored.")
+
+
+(defvar *bt-split-depth* nil
+  "Level at which parallel task generation records a task instead of descending, or NIL.")
+
+
+(defvar *bt-ordinal-path* nil
+  "Nearest-first ordinals of the choices on the current path; maintained only during
+   parallel task generation.")
+
+
+(defvar *bt-collected-tasks* nil
+  "Ordinal-prefix tasks recorded by the current task-generation pass, newest first.")
+
 (defun validate-bt-path-mode ()
   "Reject known configurations whose future is not represented by the IDB alone."
   (check-problem-parameter '*bt-cycle-check* *bt-cycle-check*)
@@ -198,16 +221,22 @@
   (let ((*bt-path-fingerprints* nil)
         (*bt-path-search-active* *bt-cycle-check*))
     (backtrack 0))
-  ;; Compute final statistics
-  (setf *average-branching-factor* (if (> *program-cycles* 0)
-                                     (coerce (/ (1- *total-states-processed*) *program-cycles*)
-                                             'single-float)
-                                     0.0))
+  (set-bt-average-branching-factor)
   t)
 
 
+(defun set-bt-average-branching-factor ()
+  "Compute the final average branching factor of a serial or parallel backtracking search."
+  (setf *average-branching-factor* (if (> *program-cycles* 0)
+                                     (coerce (/ (1- *total-states-processed*) *program-cycles*)
+                                             'single-float)
+                                     0.0)))
+
+
 (defun update-statistics (level)
-  "Update search statistics."
+  "Update search statistics; a parallel worker counts into its own worker stats."
+  (when *bt-worker*
+    (return-from update-statistics (record-bt-worker-node level)))
   (increment-global *program-cycles* 1)
   (increment-global *total-states-processed* 1)
   (when (> (1+ level) *max-depth-explored*)
@@ -220,6 +249,10 @@
   
   ;; Step 1: Enforce depth cutoff
   (when (and (> *depth-cutoff* 0) (>= level *depth-cutoff*))
+    (return-from backtrack nil))
+
+  ;; A parallel worker stops when another worker's result or a failure ends the search.
+  (when (bt-worker-stop-p)
     (return-from backtrack nil))
 
   ;; Match EXPAND: prune descendants, not a goal already accepted by the caller.
@@ -235,10 +268,15 @@
 
   (when (eql (bound-search-state *backtrack-state* level) 'kill-node)
     (return-from backtrack nil))
-  
+
+  ;; Parallel task generation records the path here instead of descending.
+  (when (eql level *bt-split-depth*)
+    (push (coerce (reverse *bt-ordinal-path*) 'simple-vector) *bt-collected-tasks*)
+    (return-from backtrack nil))
+
   ;; Step 2: Update search statistics
   (update-statistics level)
-  
+
   (let ((found-a-solution nil)
         (*bt-path-fingerprints*
           (if *bt-cycle-check*
@@ -250,7 +288,8 @@
       (lambda (choice action)
         (when (explore-choice-bt choice action level)
           (setf found-a-solution t))
-        (and found-a-solution (solution-count-reached-p))))
+        (or (and found-a-solution (solution-count-reached-p))
+            (bt-worker-stop-p))))
     found-a-solution))
 
 
@@ -282,12 +321,50 @@
 
 
 (defun visit-backtracking-choices (level visitor)
-  "Use heuristic order only when a heuristic is defined; otherwise stream choices."
+  "Visit the choices at LEVEL in search order; stop when VISITOR returns true.
+   A parallel worker replaying its task prefix explores only the forced choice there;
+   task generation tracks each choice's ordinal. Both count the same visitor calls."
+  (let ((forced (when (and *bt-forced-prefix* (< level (length *bt-forced-prefix*)))
+                  (svref *bt-forced-prefix* level))))
+    (cond (forced
+           (unless (visit-choices-in-order-bt level (forced-choice-visitor-bt forced visitor))
+             (error "Parallel backtracking replay found no choice ~D at level ~D." forced level)))
+          (*bt-split-depth*
+           (visit-choices-in-order-bt level (ordinal-recording-visitor-bt visitor)))
+          (t (visit-choices-in-order-bt level visitor)))))
+
+
+(defun visit-choices-in-order-bt (level visitor)
+  "Use heuristic order only when a heuristic is defined; otherwise stream choices.
+   Returns T when VISITOR stopped the visit."
   (if (fboundp 'heuristic?)
       (dolist (entry (ordered-choices-bt level))
         (when (funcall visitor (second entry) (third entry))
           (return t)))
       (visit-generated-choices-bt level visitor)))
+
+
+(defun forced-choice-visitor-bt (forced visitor)
+  "Pass only the choice at ordinal FORCED to VISITOR, then stop the visit.
+   A skipped choice applied during generation is restored, as EXPLORE-CHOICE-BT does."
+  (let ((ordinal -1))
+    (lambda (choice action)
+      (incf ordinal)
+      (cond ((= ordinal forced)
+             (funcall visitor choice action)
+             t)
+            (t (when (choice.pre-applied-p choice)
+                 (restore-choice-database-bt choice))
+               nil)))))
+
+
+(defun ordinal-recording-visitor-bt (visitor)
+  "Extend *BT-ORDINAL-PATH* with each choice's ordinal while VISITOR explores it."
+  (let ((ordinal -1))
+    (lambda (choice action)
+      (incf ordinal)
+      (let ((*bt-ordinal-path* (cons ordinal *bt-ordinal-path*)))
+        (funcall visitor choice action)))))
 
 
 (defun ordered-choices-bt (level)
@@ -585,23 +662,34 @@
       (setf *count-example*
             (make-search-solution solution-path (copy-problem-state *backtrack-state*))))
     (return-from register-solution-bt nil))
-  (let* ((solution-depth (length *choice-stack*))
-         (solution (make-solution
-                     :depth solution-depth
-                     :time (problem-state.time *backtrack-state*)
-                     :value (problem-state.value *backtrack-state*)
-                     :path solution-path
-                     :goal (copy-problem-state *backtrack-state*))))
-    (when (report-solution-found-p)
-      (format t "~%New path to goal found at depth = ~:D" solution-depth)
-      (when (eql *solution-type* 'min-time)
-        (format t "Time = ~:A~%" (solution.time solution)))
-      (finish-output))
-    (push solution *solution-paths*)
-    (when (not (member (problem-state.idb (solution.goal solution)) *unique-solution-states* 
-                       :key (lambda (soln) (problem-state.idb (solution.goal soln)))
-                       :test #'equalp))
-      (push solution *unique-solution-states*))))
+  (let ((solution (make-solution
+                    :depth (length *choice-stack*)
+                    :time (problem-state.time *backtrack-state*)
+                    :value (problem-state.value *backtrack-state*)
+                    :path solution-path
+                    :goal (copy-problem-state *backtrack-state*))))
+    (if *bt-worker*
+        (register-parallel-solution-bt solution)
+        (progn (when (report-solution-found-p)
+                 (report-solution-bt solution))
+               (record-solution-bt solution)))))
+
+
+(defun report-solution-bt (solution)
+  "Announce a newly registered backtracking solution."
+  (format t "~%New path to goal found at depth = ~:D" (solution.depth solution))
+  (when (eql *solution-type* 'min-time)
+    (format t "Time = ~:A~%" (solution.time solution)))
+  (finish-output))
+
+
+(defun record-solution-bt (solution)
+  "Add SOLUTION to the solution lists, keeping one entry per goal database."
+  (push solution *solution-paths*)
+  (when (not (member (problem-state.idb (solution.goal solution)) *unique-solution-states*
+                     :key (lambda (soln) (problem-state.idb (solution.goal soln)))
+                     :test #'equalp))
+    (push solution *unique-solution-states*)))
 
 
 (defun detect-path-cycle (new-choice)

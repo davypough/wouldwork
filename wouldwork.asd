@@ -136,6 +136,7 @@
                              (:file "ww-backtracker")
                              (:file "ww-parallel-infrastructure")
 		                     (:file "ww-parallel")
+		                     (:file "ww-parallel-backtracker")
 		                     (:file "ww-initialize"))))
   :build-operation "program-op"
   :build-pathname "wouldwork"
