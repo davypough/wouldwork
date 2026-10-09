@@ -1,0 +1,117 @@
+BOXES -- WITHDRAWN SPEC-ADVISOR STEP (HISTORICAL RECORD)
+Updated: 2026-10-09
+
+CURRENT STATUS / USER CORRECTION
+The user clarified that problem analysis must not produce a specification.
+The assistant's interpretation of the handoff as permission to draft was too
+broad. probs/problem-boxes-advisor.lisp has been removed at the user's request.
+No staging or search occurred, and the existing boxes spec remains unread.
+This record is retained only as history; its drafting authority, draft links,
+and REPL next-step statements below are superseded. problem-analysis.txt is
+the current record. All analysis remains uncommitted. The next authorized work
+is a planning prompt for reviewing/upgrading spec-advisor.md, not spec writing.
+
+HISTORICAL CONTENT (SUPERSEDED WHERE NOTED ABOVE)
+
+OBJECTIVE AND AUTHORITY
+The user authorized the spec-advisor handoff to produce an independent result
+before comparing their existing boxes specification. That existing specification
+has not been opened. This file owns the current continuation agenda; the frozen
+problem-analysis-2026-10-09-before-spec.txt owns the agreed analysis input.
+The readable consolidated analysis remains problem-analysis.txt; reuse it rather
+than restarting intake. The original accumulated dialogue record is retained in
+problem-analysis-2026-10-09-history.txt.
+
+Authorized work: independent drafting, source/reference review, and focused
+validation appropriate to this increment. Comparison with the existing boxes
+spec, replay, benchmark/search, and further implementation remain separate steps.
+No original specification has been overwritten or staged.
+
+PROBLEM UNDERSTANDING AND IMPLEMENTATION
+Draft: ../../../probs/problem-boxes-advisor.lisp
+Problem name for staging: boxes-advisor.
+Classification: Path B, hand-authored planning. No additional Talos mechanics or
+technology imports are needed for the agreed abstract area/box/plate rules.
+
+Representation decision: retain explicit names for the two supplied boxes and
+use a fluent location for each movable object. A box is on an area's ground,
+on a plate, or carried by ME. Agent location is an area. This preserves readable
+instructions and physical object inventory. Conceptual counts/symmetry remain
+valid alternatives for scaled cases; the draft does not claim to implement them.
+There is no box ordering restriction; either box can be moved when locally legal.
+
+Requirement-to-draft mapping (static inspection, not executed behavior):
+- Given inventory: define-types includes ME, both boxes, all four areas, three
+  plates, and three gates. Union types do not introduce new physical objects.
+- Given topology/wiring: joins, plate-in, controls in define-init match the
+  diagram. Gate endpoint lookup handles either travel direction.
+- Initial state: ME and box1 in area1; box2 in area2. No box on a plate.
+- One-box carrying capacity: empty-hands? is required by both pickup actions.
+- Locality: pickups and plate placements check the agent's current area;
+  ground placement uses that area. Gate crossing checks actual endpoints.
+- Plate capacity: put-plate requires not occupied?.
+- Immediate gate behavior: gate-open? derives openness from a box on its
+  controlling plate. No independent gate flag can remain incorrectly open.
+- Pickup moves box location to ME; placement replaces that location with the
+  destination. Functional location replacement preserves one location per box.
+- Crossing changes only ME's area. The held box remains located at ME; the
+  supporting box remains on its plate. No boxes are created or removed.
+- Action costs: five action schemas, each with cost 1 and one transition.
+- Useless plate visits: no agent plate-step actions, per the agreed proof.
+- Goal/objective: agent in area4; MIN-LENGTH, one optimum sufficient.
+
+Small-instance settings: planning/tree, MIN-LENGTH, depth cutoff 10, symmetry
+off, threads 16. Cutoff belongs only to this proven ten-action instance.
+Algorithm is deliberately absent from the spec because the DSL forbids that
+setting in problem files; select depth-first at the REPL after staging if needed.
+Settings are not scalability measurements. Large-case duplicate-cost handling,
+symmetry, admissible bounds, and tuning remain search-advisor topics.
+
+TOPICS
+Independent specification -- established as a draft.
+Evidence: authored only from the saved analysis plus generic DSL and Hanoi syntax
+reference. Existing boxes source/dependencies and generated active problem were
+not read. No generated files were changed by staging.
+
+Static fidelity review -- established within inspection scope.
+Checks: initial graph and plate-side locations, derived gate status, local
+preconditions, carrying/occupancy capacities, transition costs, and action effects
+reviewed against the acceptance criteria. No runtime claim follows from this.
+
+Reader and structural validation -- established.
+SBCL invoked with no user/system initialization to avoid loading an existing
+active problem. It read all forms and checked five unit-cost define-action forms
+with six components and single-expression query bodies. Result:
+READER CHECK PASSED.
+The initial temporary checker had a missing closing parenthesis; it was corrected
+and rerun successfully. No draft changes were needed for that checker fault.
+Temporary checker file was outside the project and has been removed.
+This does not run the Wouldwork translator, stage the spec, or execute actions.
+
+Engine staging and behavior -- open; next REPL increment.
+Proposed first check: (stage boxes-advisor), then ensure depth-first if needed
+using (ww-set *algorithm* depth-first). Inspect successful staging before replay
+or search. A later focused validation should check empty-hands pickup, local
+placement, occupied-plate rejection, closed-gate rejection, carrying through an
+open gate, and immediate closure after recovering its supporting box.
+
+Existing-spec comparison -- deferred at user's explicit request.
+Trigger: user has seen this independent result and authorizes comparison.
+Keep findings separate from the immutable pre-specification analysis snapshot.
+
+Scaling/performance -- deferred to search advisor after model validation.
+Preserve unit-action objective and all reduction proofs. No benchmark run.
+
+DOCUMENT CLEANUP
+Removed doc/problem-advisor-plan-2026-10-08.md (historical plan).
+Removed doc/problem-advisor-development-2026-10-08.md (historical sample review);
+its untracked status and deletion were announced before removal.
+Retained doc/problem-advisor-reference.md: active capability index used by the
+operational advisor. Removed obsolete links from doc/problem-advisor.md.
+No other advisor files were changed in this handoff increment.
+
+OUTCOMES AND CONTINUATION
+Independent draft delivered; reader/static checks passed. Runtime validation and
+comparison remain undone. The historical analysis snapshot is unchanged.
+Recommended next step: user stages boxes-advisor at the REPL and reports the
+result. Then perform the next approved fidelity/replay or comparison step.

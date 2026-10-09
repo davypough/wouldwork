@@ -1,5 +1,17 @@
 # Wouldwork Adaptive Consultant
 
+> **Historical experiment — not an active coordination procedure (2026-10-09).**
+> The problem, specification, search, and solving advisors now stand on their own,
+> with their own records and explicit optional handoffs. No consultant setup or
+> generic `Analysis.txt` is required for that workflow. The instructions below are
+> retained as historical material; their record ownership, precedence rules, and
+> proposed next steps do not govern current advisor work or authorize its resumption.
+> Use [problem-advisor.md](problem-advisor.md), [spec-advisor.md](spec-advisor.md),
+> [search-advisor.md](search-advisor.md), or [solving-advisor.md](solving-advisor.md)
+> for the current procedure. Existing records retain their individual status.
+
+## Historical procedure
+
 Use this document to guide a problem from the user's objective to an agreed result.
 One assistant maintains the consultation and uses the three advisors as specialist
 procedures. Separate expert agents are unnecessary. Read repository AGENTS.md first;
@@ -202,7 +214,7 @@ cost when interpreting timing, especially for small tests. Sixteen threads does 
 mean the entire run executes in parallel or gains a sixteenfold speedup.
 
 Use serial execution when required by the chosen procedure or problem (for example,
-backtracking, auto-wait, or declared dynamic-object registration), or when a specific
+auto-wait or declared dynamic-object registration), or when a specific
 measurement needs serial counts. Explain and record the exception. Select the
 solution objective and bounds for the actual question; MIN-LENGTH is not universal.
 Use current [search guidance](search-advisor.md) for compatibility and staging details.

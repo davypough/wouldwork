@@ -1,9 +1,8 @@
 # Wouldwork Search Advisor
 
-> **Usage:** Use this specialist procedure through [consultant.md](consultant.md)
-> for a search decision on a characterized problem. Select only the relevant profiling,
-> probing, improvement, or estimation procedures. If invoked directly, establish the
-> consultant's objective, approval scope, and shared record first. Source-only advice
+> **Usage:** Invoke this standalone procedure for a search decision on a characterized
+> problem. Select only the relevant profiling, probing, improvement, or estimation
+> procedures. Reuse the supplied objective, analyses, and approval scope. Source-only advice
 > needs no run; proposed experiments and edits require their own authorization.
 
 > **Status:** Source-checked 2026-10-03 against `src/ww-settings.lisp`, `ww-initialize.lisp`,
@@ -11,26 +10,37 @@
 > `ww-validator.lisp`, `ww-support.lisp` and the enumerator,
 > and against the *Wouldwork User Manual (26.8)*, Part 3.  Where they disagree the source wins;
 > the disagreements are listed in section 7. Process and evidence guidance integrated
-> with the consultant on 2026-10-07; this was not a fresh audit of every technical claim.
+> with the consultant experiment on 2026-10-07, superseded by standalone record and
+> handoff guidance on 2026-10-09. Neither was a fresh audit of every technical claim.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
 Read the current model and fidelity evidence; a spec that stages is not thereby faithful.
 Conditional analysis is useful, but resolve consequential model uncertainty before relying
-on its results. A probe exposing a discrepancy returns it to the consultant as a specification
-topic; pause dependent work and preserve unaffected evidence. This procedure does not
+on its results. A probe exposing a discrepancy returns it to the user as a specification
+topic for the spec advisor; pause dependent work and preserve unaffected evidence. This procedure does not
 authorize a full solve.
 
 **Entry and return.** Read the selected question, objective, relevant record entries,
 current artifacts, and approval limits. Reuse current evidence instead of repeating
-completed phases. Write findings to `doc/problems/<problem-name>/Analysis.txt` for short
-and sustained work alike; link a separate text evidence artifact only when detail warrants
-it. Return the conclusion, evidence and scope, assumptions, unresolved issues, affected
+completed phases. Read the supplied `problem-analysis.txt`, current `spec-analysis-`
+record, and specification handoff when available. Preserve their objective, reduction
+premises, growth dimensions, and validation limits. The spec advisor implements and
+checks suitable enhancements; this advisor measures, compares, and tunes them.
+Write findings to `doc/problems/<problem-name>/search-analysis-current.txt` for short
+and sustained work alike, or reuse the identified active `search-analysis-` record.
+Use that prefix for supporting evidence and handoff documents. Link upstream records
+rather than duplicating requirements. Older `Analysis.txt` records retain their own
+status; do not resume withdrawn work or migrate unrelated records automatically.
+Return the conclusion, evidence and scope, assumptions, unresolved issues, affected
 dependencies, and recommended next action. Stop when the question is answered, needs
-approval, or needs another procedure. Use the consultant's invalidation rules after changes.
+approval, or needs another procedure. After a correction, record the superseded premise,
+reopen affected conclusions and checks, and preserve independent evidence. Obtain the
+user's agreement before relying on changed requirements or objectives. No consultant
+or shared coordination record is required.
 
 **When one search appears impractical.** If evidence suggests one search is unlikely to
-finish within the available budget, return a milestone-strategy topic to the consultant
+finish within the available budget, propose an optional solving-advisor handoff to the user
 with its supporting estimates and uncertainty. A short probe is not proof that no single
 search can finish. The [solving advisor](solving-advisor.md) supplies a constraint-led
 dialogue: the user and assistant agree one
@@ -43,7 +53,7 @@ but its subgoal dialogue applies to any problem with milestones (Q16).
 ## 1. Process
 
 The four phases, numbered 0 to 3, are selectable procedures, not a required pipeline.
-The consultant chooses the next consequential question and its dependencies. Phase 0
+The user and advisor choose the next consequential question and its dependencies. Phase 0
 reads and reasons without staging or running; it can be the whole requested consultation.
 Use probes only for unresolved decisions, upgrades only when justified, and estimates
 only when they affect the objective. Skip irrelevant work and defer nonblocking unknowns.
@@ -87,7 +97,7 @@ No build, no staging and no runs: read, reason, and ask.
    length if fixed).
 4. **Ask the user** only for missing information that affects the selected decision:
    objective, available time, known depth or length, or a relevant scaling target.
-   Reuse the shared objective and local execution preferences; do not ask them again.
+   Reuse the agreed objective and local execution preferences; do not ask them again.
    Group related questions when helpful. This is the phase-0 report (section 8).
 
 ### Phase 1: first probes and main findings
@@ -145,7 +155,8 @@ No build, no staging and no runs: read, reason, and ask.
    and family growth (section 6.4). Omit those unrelated to the objective. Give estimates
    as ranges with assumptions; do not promise a precision the evidence cannot support.
 11. **Report the results and estimates** using relevant parts of section 8. If evidence
-    changes the strategy's justification, return the affected topic to the consultant.
+    changes the strategy's justification, review the affected topic with the user and
+    refer semantic or fidelity changes to the problem or spec advisor as appropriate.
     List larger interventions the measurements point to (a
     re-encoding, a generator for the family, a pruning invariant, an engine change) under
     FURTHER, as options for the user to take up later, not as steps of this run.  Deep runs,
@@ -183,7 +194,7 @@ changes in the same run go into that copy.  A change that needs a separate varia
   states must correspond within the tested scope. Explain the correspondence beyond
   sampled cases before making a general equivalence claim. Implement only after approval.
   When meaning changes (new rules, a changed goal, a different level of detail), return a
-  specification topic to the consultant with the finding, proposed encoding, and affected
+  specification topic to the user for the spec advisor, with the finding, proposed encoding, and affected
   assumptions. Resume dependent analysis when the relevant fidelity questions are resolved;
   successful staging alone is insufficient.
 - **Refactorings** (phase 0, step 1: an unusual or needlessly complex construction).  When a plainer
@@ -211,15 +222,19 @@ changes in the same run go into that copy.  A change that needs a separate varia
   `ww` package. Omit `(asdf:load-system :wouldwork)` and `(in-package :ww)` from
   the supplied forms. Use `(solve)`, not `(time (solve))`: `solve` already times
   the search. If an engine change requires a reload, mention that in prose.
-- **Short runs** (bounded probes or validation): follow AGENTS.md and the consultant's
+- **Short runs** (bounded probes or validation): follow AGENTS.md and the user's
   approved test scope. The assistant may run authorized small checks locally; identify
   who runs each test and preserve the user's existing REPL. Report measured evidence,
   not expectations. Review and planning phases do not implicitly authorize runs.
 - **Local defaults.** Use `*threads*` = 16 for compatible local searches, including probes.
   Thread initialization and initial root-task generation are serial; include startup
-  cost in timing interpretations. Use 0 where required (backtracking, auto-wait, declared
+  cost in timing interpretations. Use 0 where required (auto-wait, declared
   dynamic-object registration, serial goal chaining) or for explicitly justified serial
   measurements. Record the exception. This preference does not change engine defaults.
+  Backtracking is not inherently serial: `dfs` in `src/ww-searcher.lisp` dispatches
+  to `process-partitioned-parallel-bt` when threads are enabled (source checked
+  2026-10-09, not a runtime test). Verify the selected features and helper state against
+  current source; consult the [capability reference](problem-advisor-reference.md).
 - **Deep runs** (substantial full solves, backward searches to the memory limit,
   enumerator layers, `every` searches feeding `freq`): only when the user asks for one (step
   11) or an explicitly approved run plan, normally at the user's REPL. The assistant supplies the exact
@@ -826,7 +841,7 @@ Recorded here, not yet made in the Manual:
 ## 8. Report to the user
 
 Use only the report fields needed for the selected procedure and objective. They summarize
-findings in Analysis.txt, not four mandatory reports or a second record. Include supporting
+findings in the active `search-analysis-` record, not four mandatory reports or a second record. Include supporting
 evidence, scope, uncertainties, affected dependencies, and the recommended next action.
 State what was not run when relevant. Pause at the applicable approval boundary; omit
 irrelevant measurements rather than performing work to fill a report field.

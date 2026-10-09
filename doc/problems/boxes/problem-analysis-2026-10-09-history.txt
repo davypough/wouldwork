@@ -1,0 +1,510 @@
+PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
+  boxes / initial intake / 2026-10-08
+  Sources: user's description, attached boxes-problem-diagram.png, and dialogue.
+  Diagram supplied at D:/Users Data/Dave/Desktop/boxes-problem-diagram.png.
+  Record: doc/problems/boxes/problem-analysis.txt.
+  Authorized: problem-advisor consultation and its problem-record storage.
+  No specification reading, authoring, engine changes, replay, or search run.
+
+AGREED PROBLEM DESCRIPTION
+  User confirmed this description in dialogue:
+  The agent and box1 start in area1; box2 starts in area2.
+  Boxes can be picked up, carried through open gates, and placed on plates
+  or the ground. Each plate controls its same-numbered gate. Removing a
+  box from its plate closes that gate immediately.
+  Later clarification: the agent can also open a gate by standing on its
+  plate. Stepping off closes the gate immediately. At most one thing can
+  occupy a plate at a time: the agent or one box.
+  Gate1 connects area1 and area2; gate2 connects area1 and area3;
+  gate3 connects area3 and area4. The objective is to reach area4.
+  Diagram: plates1 and 2 are in area1; plate3 is in area3.
+  Subsequent clarification: the agent can move freely within an area.
+  Subsequent clarification: the agent can carry only one box at a time.
+  This is within Wouldwork's scope of situations and legal choices.
+
+USER OBJECTIVE AND ANSWER IDENTITY
+  Confirmed objective: reach area4 with the fewest actions.
+  User accepted one action per pickup, placement, gate crossing, or step
+  onto/off a plate. Other walking within an area is uncounted.
+  Confirmed: returning one shortest path is sufficient; ties need not be
+  enumerated.
+  Earlier working interpretation of any satisfactory route is superseded.
+  User agreed with the small-instance analysis so far and requested continued
+  analysis of dramatic growth in areas, connections, boxes, and gates.
+  Clarified scope: advisor identifies and analyzes potential growth of each
+  relevant existing dimension without adding features. Exact target sizes
+  are not prerequisites for this structural analysis.
+
+INTENDED RULES AND EXAMPLES
+  Given: one agent, two boxes, three plates, three gates, diagram layout.
+  Confirmed: a carried box can pass through an open gate while another
+  box remains on its controlling plate.
+  Confirmed: removing a box or stepping off a plate closes its gate
+  immediately. A plate can hold at most one thing at a time.
+  Deduction: standing on a plate occupied by a placed box, placing a second
+  box on an occupied plate, and placing a box on the plate where the agent
+  remains standing violate the occupancy limit.
+  Confirmed: movement within each area is unrestricted.
+  Confirmed: carrying capacity is one box; pickup requires empty hands.
+  Confirmed: the agent can activate a plate by standing on it.
+  Confirmed: all boxes are interchangeable (same relevant abilities and
+  action costs; names identify physical boxes in instructions only).
+  Confirmed: each area's ground can hold any number of boxes without
+  blocking agent movement. Exact ground positions and ground capacity do
+  not constrain legal choices.
+  Confirmed 2026-10-09: every controlling plate is in one of the two areas
+  joined by its gate, including expanded instances under these rules.
+  The proposed route respects the carrying limit and does not require
+  agent activation of a plate.
+
+CURRENT IMPLEMENTATION
+  Problem specification unread. Generic engine source observations appear
+  under WOULDWORK MAPPING; they do not establish problem fidelity.
+
+STRUCTURE AND GROWTH
+  Revised candidate representation: the agent's area, which plate (if any)
+  the agent stands on, and each box's placement (ground, plate, or carried).
+  Agent plate occupancy must be included when deriving gate openness.
+  The accepted counting rule makes ordinary within-area walking uncounted.
+  Retaining area and standing-on-plate status therefore preserves the counted
+  movement distinctions; exact walking coordinates are unnecessary under
+  the described rules. Plate entry and exit remain explicit actions.
+  Ground placement must name its area; plate placement must name its plate.
+  Moves and box placements can be reversed, so exploration can revisit
+  situations. A finite area/placement model with repeated-situation checking
+  is a candidate terminating search design, not yet finalized.
+  For A areas, P plates, and B labelled boxes, a loose configuration bound
+  for the full representation is (A+P)*(A+P+1)^B, before capacity and
+  consistency checks. For this instance that is 7*8^2 = 448. This is a
+  combinatorial bound, not a measured state count or performance prediction.
+  More boxes multiply placements; more gates/plates couple access and box
+  availability. The user has now requested scaling analysis; generalized
+  design is in scope, while measurements still need separate authorization.
+  Scaling agenda, to develop from the user's intended instance family:
+  - Area/connection growth: longer chains increase necessary path length;
+    branching and loops introduce alternate routes and repeated arrangements.
+    Connectivity alone does not determine difficulty: plate placement and
+    control dependencies can make a short route require distant box moves.
+  - Box growth: many placements and transport orders multiply configurations.
+    Interchangeable-box reduction is a candidate only if all box properties,
+    rules, costs, and requested answer distinctions permit exchanging labels.
+  - Gate/plate growth: simultaneous box commitments and reusable boxes couple
+    route choice to future access. A milestone must preserve enough resources
+    for continuation; independent local optimizations need not be globally best.
+  - Candidate lower bound: shortest gate-crossing distance to the goal with
+    all gates treated as open, under unchanged unit crossing costs. Every real
+    route has at least that many crossings; ignoring box operations weakens
+    this bound but does not overestimate. Stronger box-delivery bounds require
+    proof against reuse and alternative routes; do not double-count actions.
+  - Candidate duplicate sharing: retain the cheapest arrival at a complete
+    arrangement. This could reduce repeated work compared with ancestor-only
+    checking, at additional memory cost; engine cost handling needs an audit
+    before choosing it for the scaled design.
+  These are conditional design candidates, not measured recommendations.
+  Box symmetry now has a confirmed semantic premise. Exchanging box labels
+  preserves legality, goal, and costs. Proposed scaled representation uses
+  ground-box counts by area, occupied/unoccupied plates, and carrying status
+  as an equivalence key, alongside agent area/plate status as applicable.
+  Keep named boxes in a representative path so executable instructions can
+  be recovered. Do not require boxes to remain in their original areas.
+  Two paths reaching equivalent arrangements may be merged for one optimum
+  only with cost-aware duplicate handling: a cheaper arrival must not be lost.
+  Symmetry removes label permutations, not the distinct spatial allocations.
+  It therefore mitigates box growth without eliminating combinatorial growth.
+  Unlimited ground capacity now confirms that loose-box counts by area
+  suffice: any one local loose box offers the same pickup choice and cost.
+  Generate one such choice per area occupied by the agent, not one branch
+  for every named box there. Named identities can be selected consistently
+  when reconstructing the representative path.
+  With k boxes on plates and c carried (c is 0 or 1), the remaining B-k-c
+  boxes have binomial(B-k-c+A-1, A-1) distributions over A ground areas.
+  Occupied plate subsets remain distinct; box identities on those plates do
+  not. This count assumes fixed finite A and B and is not a reachable-state
+  count. It explains why removing label permutations still leaves growth
+  in allocations as areas and boxes increase together.
+  Proposed search requirement for larger connected layouts: compare complete
+  equivalent arrangements with their best known action count; preserve a
+  cheaper later arrival. Ancestor checks alone cannot merge alternate routes
+  reaching the same arrangement. This trades memory for less repeated work;
+  memory-limited alternatives belong in the search-advisor evaluation.
+  Proposed baseline estimate: distance from the agent's area to the goal in
+  the area graph with every gate open. It never exceeds actual remaining
+  actions, but ignores necessary box work. Search advisor should assess its
+  usefulness before implementing stronger bounds; simply summing independent
+  gate-opening estimates can double-count shared box moves.
+  Local-control consequence: to place or recover a gate's box, the agent
+  must reach the endpoint area containing its plate. Removing the box closes
+  that edge immediately. Mark plate-side endpoints in the static layout;
+  an undirected connectivity graph alone loses this resource-access detail.
+  Proposed static checks: find goal reachability with all gates open; if
+  disconnected even then, no legal route exists. Bridges in that relaxed
+  graph can identify mandatory gate crossings between start and goal.
+  Non-bridge gates must not be declared mandatory merely because they lie
+  on one promising route. Mandatory crossings do not imply permanently
+  dedicated boxes: return paths and alternative connections can permit reuse.
+  Safe estimate baseline remains relaxed crossing distance; stronger resource
+  bounds must account for already occupied plates, carried boxes, deliveries,
+  recovery, and alternative routes before being used to eliminate choices.
+  User-proposed decomposition, 2026-10-09: maze navigation with gated edges
+  coupled to reusable-resource management through boxes on plates.
+  Assessment: useful reasoning decomposition, not independent subproblems.
+  Fixed layer: area adjacency and the plate-side endpoint of each gate.
+  Changing access layer: edges currently enabled by plate occupancy.
+  Resource layer: loose-box distribution, committed boxes, and carried box.
+  A box is committed, not consumed, when placed on a plate; recovery requires
+  access to its area and closes the corresponding gate. Resource location
+  therefore matters as much as total supply. Navigation changes which
+  resources can be reached; resource placements change navigation options.
+  The combined search state must retain both layers. Solving the shortest
+  geometric route first and arranging boxes afterward need not be optimal
+  or feasible: a detour can access useful boxes or avoid costly gate openings.
+  Safe relaxation examples:
+  - Open every gate and minimize crossings: lower bound on remaining actions.
+  - Ignore travel/access restrictions but retain necessary pickup/placement
+    obligations: a resource-handling relaxation may provide another bound,
+    once formulated without assuming optional gates are mandatory.
+  Combining bounds: max(h1,h2) is safe when each individually bounds total
+  remaining cost. Adding is safe only with a disjoint-cost or other proof.
+  In particular, a crossing-only lower bound plus a separately justified
+  pickup/placement-only lower bound can be added because action classes are
+  disjoint. Box-delivery estimates that include crossings can overlap the
+  navigation bound and must not be blindly added to it.
+  Possible decomposition by regions/bottlenecks must preserve interface
+  information: entry/exit, available and committed boxes, gate status, and
+  accumulated cost. One locally cheapest region solution may discard a
+  globally better continuation; retain relevant alternatives or explicitly
+  discuss that tradeoff. Concrete algorithms and measured benefit remain
+  follow-on search-advisor work; no independent-solvability claim is made.
+  Scaling recommendation status: conceptual state equivalence, cost-aware
+  reuse of arrangements, local action generation, and the relaxed distance
+  estimate are justified under confirmed rules. Actual representation and
+  search settings, stronger bounds, memory budgets, and measured effectiveness
+  remain downstream obligations, not established speed or capacity claims.
+  The ten-action cutoff and plate-step omission are scoped to the supplied
+  instance and must not be transferred to a larger family without new proofs.
+
+JUSTIFIED DESIGN
+  Proposed route, deduced from the agreed description:
+  1. Put box1 on plate1, opening gate1.
+  2. Enter area2, pick up box2, and carry it back to area1.
+  3. Put box2 on plate2, opening gate2.
+  4. Pick up box1 from plate1; gate1 closes.
+  5. Carry box1 through gate2 into area3 and put it on plate3.
+  6. Pass through gate3 into area4.
+  Rationale: gate1 is no longer needed after box2 is retrieved, so box1
+  becomes available for plate3 while box2 maintains access through gate2.
+  The user has confirmed free movement inside each depicted area.
+  User has agreed with the analysis so far, including this route and the
+  small-instance search simplification; scaling analysis continues.
+  Carrying representation: empty hands or one identified box. Picking up
+  another box while already carrying one is forbidden. Putting a carried
+  box down frees the hands. The proposed route meets this confirmed limit.
+  The six numbered route instructions combine multiple actions; six is not
+  a path length. Under the now accepted counting rule, the route is:
+  1. Pick up box1.
+  2. Place box1 on plate1.
+  3. Cross gate1 into area2.
+  4. Pick up box2.
+  5. Cross gate1 back into area1 carrying box2.
+  6. Place box2 on plate2.
+  7. Pick up box1 from plate1.
+  8. Cross gate2 into area3 carrying box1.
+  9. Place box1 on plate3.
+  10. Cross gate3 into area4.
+  Minimum-action argument (deduction from intended rules, not a search):
+  The agent cannot keep a gate open by standing on its plate while crossing
+  it: leaving the separate plate closes the gate immediately. Gate2 needs
+  a box left on plate2 while another box is brought to plate3. Thus box2
+  must be retrieved through gate1, requiring entry and return plus crossings
+  of gates2 and 3: at least four crossings. All three plates must receive a
+  box, requiring at least three placements. Boxes start on the ground and
+  each placement consumes a carried box, requiring at least three pickups.
+  These disjoint action counts total at least ten. The exhibited route
+  attains ten, establishing optimality under the agreed diagram and rules.
+  This argument excludes remote pickup/placement across walls or gates,
+  consistent with the described local pickup/carry/place operations.
+  Search design proposal: unit-cost transitions, MIN-LENGTH objective, and
+  state-based cycle checking. One optimal path is sufficient, confirmed.
+  Representation revision: retain the agent's standing-on-plate status.
+  Premise: user confirmed that agent occupancy opens its gate.
+  Alternative: omit agent activation from a restricted route-finding model;
+  this needs a coverage argument and must not be presented as the full rules.
+  Recommendation: represent the confirmed ability explicitly, with area and
+  standing-on-plate status sufficient for the agreed counted movements.
+  Gate rule: open exactly while its plate is occupied by the agent or a
+  placed box; otherwise closed. No independent gate memory is required.
+  Plate occupancy limit must be checked for stepping onto a plate and
+  placing a box. The proposed route uses only initially empty target plates
+  and requires no agent/box sharing of a plate.
+  Proposed instance-specific reduction: omit stepping onto/off plates from
+  the search choices. The ten-action lower bound already requires ten
+  pickup/placement/crossing actions; any plate step adds an action and
+  cannot improve or tie the exhibited optimum. Thus at least one optimum
+  survives. This does not remove the ability from the intended rules.
+  For this reduced optimization model, agent area alone is sufficient.
+  Alternative: model plate steps explicitly with agent plate occupancy;
+  useful for a full simulator but unnecessary for the requested optimum.
+  Reconsider this reduction if layout, goal, action costs, or mechanisms
+  change. User has agreed to this reduction for the supplied instance.
+  Generate local pickups with empty hands, placements of the held box on
+  local ground or an empty local plate, and crossings of an open adjacent
+  gate. One transition is one counted action. Gate status is derived.
+  Propose depth-first planning/tree MIN-LENGTH with ancestor cycle checks;
+  no symmetry or custom heuristic/bound is needed. A repeated complete
+  arrangement has the same future, and deleting its positive-cost cycle
+  improves the path, so cycle exclusion preserves an optimum.
+  Alternative: graph duplicate sharing may save work but is unnecessary
+  for this small bounded case and adds duplicate-cost handling to audit.
+  A depth cutoff of 10 covers all improving paths and the known witness;
+  its justification depends on this witness and the accepted action model.
+
+WOULDWORK MAPPING
+  Source inspection dated 2026-10-08; no runtime verification:
+  B: src/ww-searcher.lisp, process-successors, increments depth once per
+  successor transition. S: encode exactly one counted action per transition.
+  B: f-value-better compares depth for MIN-LENGTH; strict improvement does
+  not preserve all ties. node-descendants-cannot-improve-p uses depth plus
+  one against incumbent depth. S: agree tie requirements and full coverage.
+  B: on-current-path compares ancestor databases; process-successors uses
+  this in planning/tree mode. S: encode all future-relevant information.
+  A positive-cost cycle can be removed without worsening a shortest path
+  when the same complete state has the same legal future.
+  B: src/ww-parallel.lisp, process-partitioned-parallel-body, includes
+  MIN-LENGTH and generates root tasks before worker processing. This is
+  only a partial compatibility review; hooks and settings remain to check.
+  Additional source checks, 2026-10-08:
+  B/S: src/ww-planner.lisp, generate-children, invokes action preconditions
+  and effects; get-new-states constructs successors. The spec supplies
+  locality, capacity, plate occupancy, gate queries, and goal area4.
+  B: src/ww-searcher.lisp, solution-count-reached-p, does not stop MIN-LENGTH
+  merely upon finding a goal. dfs dispatches depth-first parallel search
+  when threads > 0. Termination/optimality still depends on coverage and
+  no interrupted run being mistaken for completion.
+  B: src/ww-worker-read-snapshots.lisp, validate-worker-read-snapshot-mode,
+  rejects search-time dynamic-object registration with active snapshots.
+  Proposed spec uses only the fixed supplied objects, state-local updates,
+  and pure queries; no dynamic registration, happenings, auto-wait, history
+  validators, goal chains, or shared mutable helper data are required.
+  Under those proposed conditions, no parallel incompatibility was found
+  in the inspected paths. Actual spec compliance is not yet inspected.
+  A: no engine augmentation identified for this design.
+  Box-symmetry source check, 2026-10-08: src/ww-symmetry.lisp,
+  detect-symmetry-groups considers static row families and fixed references
+  from goals/transitions/happenings. use-canonical-symmetry-p requires enabled
+  pruning, detected families, and graph mode. filter-symmetric-instantiations
+  uses a separate tree-mode strategy. B: graph canonicalization is a candidate
+  existing mechanism. S: spec advisor must check that its encoding detects the
+  intended box family; search advisor must check minimum-cost duplicate handling
+  and named-path reconstruction. No existing boxes spec was inspected and no
+  symmetry effectiveness or correctness measurement was performed.
+
+INITIAL SETTINGS AND DEFERRED MEASUREMENTS
+  Proposed semantic settings: planning, MIN-LENGTH, one counted action per
+  transition. Proposed execution: depth-first/tree with ancestor cycle
+  checking and depth cutoff 10 justified above; no custom pruning/symmetry.
+  Proposed compatible local baseline: (ww-set *threads* 16), subject to
+  the spec obligations in the mapping. This is not authorization to run.
+  For this tiny case startup and serial root-task generation may dominate;
+  worker memory, repeated prefix work, synchronization, and balance can
+  outweigh useful parallel work. No speedup or timing claim is made.
+  Measurements are deferred; serial execution is a possible later comparison
+  if performance becomes a question. No measurements have been run.
+
+EVIDENCE
+  Intended rules: user description and explicit dialogue confirmations.
+  Layout: supplied diagram, with connections confirmed by the user.
+  Deduction: proposed route above; free within-area movement now confirmed.
+  Source behavior: limited generic engine inspection in WOULDWORK MAPPING.
+  Deduction: ten-action witness and matching lower bound above.
+  No problem-source inspection, load, replay, or measured search evidence.
+
+OPEN ISSUES AND CAPABILITY GAPS
+  Resolved: movement within an area is free.
+  Resolved: carrying capacity is one box.
+  Resolved: the agent can activate a plate by standing on it.
+  Resolved: stepping off closes the gate immediately; each plate has
+  capacity for one occupant, so combined placed-box/agent occupancy is
+  forbidden.
+  Resolved: the user wants the path with the fewest actions.
+  Resolved: each pickup, placement, crossing, or step onto/off a plate costs
+  one action; ordinary within-area walking is uncounted.
+  Resolved: one shortest path is enough.
+  Whether the agent can stand on a plate while carrying a box has not been
+  explicitly established. Irrelevant to the proposed reduced optimum search:
+  every plate step makes a path exceed the established lower bound. A full
+  simulation spec would need that rule clarified if it includes this choice.
+  Resolved: user agrees with the small-instance analysis so far.
+  Advisor-owned work: analyze growth of boxes, plate/gate pairs, areas, and
+  connections under unchanged rules; do not require the user to supply the
+  dimension list or a target benchmark size first.
+  Exact sizes would refine later resource budgets, not block this analysis.
+  Pending discussion: responsibility split with the follow-on spec advisor.
+  Source mapping supports a proposed implementation, not an existing spec.
+  Resolved: all boxes are interchangeable. Recommend box-permutation
+  equivalence for scaled search, with cost and path obligations above.
+  Resolved: unlimited nonblocking ground storage in each area.
+  Resolved 2026-10-09: plates are always in a gate endpoint area.
+  Pending: user agreement with the expanded scaling recommendations.
+  Full-model standing-while-carrying semantics remain unspecified; they do
+  not affect the small-instance optimum proof. Do not silently generalize
+  its plate-step reduction to all larger layouts or claim a complete full
+  simulator specification. Revisit if the scaled action model needs it.
+
+VALIDATION PLAN
+  Small-instance route/design and reduction agreed so far.
+  Proposed fidelity cases for later work: swapping box identities preserves
+  minimum action count; multiple loose boxes offer equivalent pickups; two
+  different-length paths to the same arrangement retain the cheaper prefix;
+  crossing a gate does not move its supporting box; recovering that box
+  immediately removes that gate connection.
+  For scaling, first characterize the intended family; later propose bounded
+  comparisons varying box count, area count, connection density, and control
+  dependency structure separately. Measure generated work and memory as well
+  as elapsed time, and preserve optimality/coverage across compared variants.
+  Later validation must distinguish finding a path from proving minimum
+  action count; compare paths using the agreed action units.
+  Later validation should reject pickup while already carrying a box.
+  Check immediate closure on stepping off and reject a second plate
+  occupant, including an agent stepping onto a plate holding a box.
+  For later authorized implementation review, check that removal closes a
+  gate and that a carried box can cross a gate held open by another box.
+  Replay/search would need separate authorization and bounded scope.
+  Proposed later bounded check: this instance only, depth cutoff 10, exact
+  proposed settings recorded, expected witness length 10. Record completion
+  status, returned actions, processed states, and elapsed time. A shorter
+  result signals a rule/action-model discrepancy; no result signals a model
+  or execution discrepancy. Do not deepen or retry automatically.
+
+AGREEMENT AND HANDOFF
+  User agreed to the problem description and the name boxes.
+  User agrees with analysis so far; the small-instance conclusions stand.
+  The user explicitly requested continued scaling analysis, so this is not
+  final handoff or approval for specification comparison/authoring.
+  Responsibility division accepted so far. Scaling dimensions now analyzed
+  under fixed rules, with box symmetry, unlimited ground storage, and local
+  plate control confirmed. Next step: agree the expanded recommendations,
+  then preserve the pre-comparison snapshot before any authorized handoff.
+  Ten-action optimality remains a small-instance deduction.
+  Responsibility split agreed so far in dialogue; advisor documents have
+  not yet been changed to implement this integration:
+  Problem advisor owns problem meaning, action costs, sufficient conceptual
+  state, growth drivers, justified search requirements, proposed reductions
+  and their proof obligations, and source-grounded capability feasibility.
+  It should recommend concrete approaches with conditions, not merely list
+  possible optimizations. Example: identical boxes may share a canonical
+  state identity only when label exchange preserves legality, cost, and goal;
+  recovered paths must still name available physical boxes consistently.
+  Spec advisor owns Lisp representation, action/query definitions, choice of
+  suitable supported hooks, and checks that the code meets those obligations.
+  It may adjust implementation details; changed semantics, failed reduction
+  premises, or missing capabilities return to analysis rather than being
+  silently substituted. Benchmark tuning remains separately authorized work.
+  Neither advisor may infer measured scalability from a structural argument.
+  User notes the existing downstream chain: spec advisor can hand off to
+  search advisor, which can in turn hand off to solving advisor.
+  Current-document check: doc/spec-advisor.md refers consequential strategy
+  questions to search-advisor.md. That advisor owns efficient search choices,
+  selective probes/improvements/estimates, and can refer an impractical
+  whole-search case to solving-advisor.md for constraint-led milestones.
+  Existing search-advisor coordination uses consultant.md; these are optional,
+  dependency-aware referrals, not mandatory sequential phases.
+  Refined boundary: problem advisor states structural search requirements,
+  proof obligations, and justified provisional recommendations. Spec advisor
+  implements faithful rules and hooks. Search advisor evaluates concrete
+  strategy/settings, bounds, symmetry, and measured tradeoffs for that spec.
+  Solving advisor develops and validates an approved milestone strategy when
+  needed. Downstream evidence can reopen upstream assumptions or design.
+  Preserve the one-globally-shortest-path objective across every handoff:
+  shortest segments through chosen milestones do not establish a globally
+  shortest whole route. A milestone restriction requires an optimum-preserving
+  argument, or explicit user agreement to change the objective.
+  User clarification: preserving requirements is preferred, but tradeoffs
+  may be acceptable. Advisors should propose concrete alternatives when
+  warranted, stating the benefit, lost guarantee, supporting evidence, and
+  scope. No specific relaxation has yet been accepted; the boxes objective
+  remains one globally shortest path. Resource tradeoffs that preserve the
+  objective are distinct from accepting an unproved or approximate solution.
+  Integration gap: current records differ (problem-analysis.txt, Analysis.txt,
+  and Handoff.md). Future authorized integration should reuse the agreed
+  analysis and link evidence rather than repeat intake or create conflicting
+  authorities. No migration or advisor invocation is authorized by this note.
+
+  Scaling requirements to develop under the unchanged puzzle rules:
+  Boxes: interchangeability is confirmed; reduce label permutations while
+  preserving one-box carrying and one-occupant plate capacities. Unlimited
+  nonblocking ground capacity permits loose-box counts by area.
+  Plate/gate pairs: derive gate status from its one controlling plate;
+  analyze box commitments and access dependencies without introducing new
+  multi-plate controllers, remote actions, or changed carrying capacity.
+  Areas: preserve area-based locations with uncounted internal walking;
+  use relaxed crossing distances as candidate optimistic remaining costs.
+  Connections: generate moves only along actual incident open gates;
+  loops motivate cost-aware duplicate sharing rather than ancestor-only
+  checking. More connections can also shorten routes; density alone does
+  not imply more difficult search.
+  Interactions: compare box supply with gate commitments and box recovery;
+  do not assume each gate needs a permanently dedicated box or that a
+  locally shortest segment yields a globally shortest plan.
+  Memory is a tradeoff: duplicate sharing and cached distances save repeated
+  computation but consume storage. Larger-case algorithm choice and bound
+  strength remain design work; performance claims require measurements.
+  Preserve a dated pre-comparison snapshot when the expanded analysis is
+  agreed or blocked; no specification comparison is authorized now.
+
+DIALOGUE EVALUATION
+  No selected specification or problem-specific dependencies have been read
+  during this consultation. Analysis derives from the user's description.
+  User feedback: advisor should ask about dramatic scaling of areas,
+  connections, boxes, and gates, because that determines whether heuristics,
+  symmetry, and other mitigations are needed. Prior dialogue prematurely
+  treated scaling as outside scope without asking about intended growth.
+  Proposed advisor improvement: before final handoff, establish the intended
+  family and target scale, then connect its growth drivers to conditional
+  mitigations and proof/measurement obligations. Do not demand a fixed full
+  scaling questionnaire for every problem. No advisor file has been edited.
+  Dialogue observation: action-count semantics became consequential only
+  after the user requested shortest paths. Earlier route instructions were
+  grouped instructions, not action counts; the record now distinguishes them.
+  Further user correction: identify scaling dimensions as advisor work and
+  consider expansions without new features. Requiring a user-selected target
+  family before giving that analysis was too restrictive. The earlier
+  target-scale proposal is superseded to that extent. Responsibility split
+  with the spec advisor was subsequently accepted so far; advisor documents
+  remain unchanged. User reminded the advisor of the existing search-advisor
+  and solving-advisor downstream handoffs; responsibilities above are refined
+  to preserve those roles and the original optimality requirement.
+  Further feedback: requirements preservation is a preference, not a ban on
+  discussing tradeoffs. Propose justified relaxations for user choice when
+  needed; do not silently relax requirements or demand hypothetical advance
+  approval of every possible tradeoff.
+
+CORRECTIONS
+  2026-10-08: the tentative area-only agent representation is superseded
+  for a model of all confirmed abilities. The user established that standing
+  on a plate opens a gate. Reopened: agent-location representation, complete
+  gate-opening rule, and movement updates. Retained: free movement within
+  areas, carrying capacity, layout, and proposed box-only route.
+  Earlier box-removal closure originally left combined occupancy unresolved.
+  Subsequent user clarification resolves this: plate capacity is one, so
+  combined placed-box/agent occupancy is forbidden. Stepping off closes
+  the gate immediately. Gate rules and plate-entry legality updated;
+  proposed route retained.
+  2026-10-08: user clarified the objective as fewest actions, superseding
+  the provisional any-route interpretation. Reopened: action granularity,
+  cost-preserving location abstraction, search selection, duplicate handling,
+  and stopping rules. Retained: intended legality rules and candidate route.
+  Accepted action-counting rule resolves the cost-unit question. The earlier
+  candidate-only status is superseded by the ten-action witness and matching
+  lower-bound deduction, not by a runtime result. Exact walking coordinates
+  remain unnecessary while plate occupancy remains explicit.
+  One-optimum requirement confirmed. Proposed reduction now omits agent
+  plate steps for this instance using the matching lower bound; this
+  supersedes the recommendation to include every ability in the optimization
+  search, while retaining all confirmed abilities in the intended rules.
+  Scope correction: prior restriction to the fixed instance was not a user
+  requirement. The user requested scaling analysis. Reopened: family scope,
+  search method, duplicate policy, symmetry/heuristic needs, and resource
+  bounds for larger instances. Small-instance conclusions remain intact.
+  Scaling clarification: retain rules and mechanics; expand quantities and
+  connectivity already present. Advisor must identify those dimensions.
+  Exact counts are optional refinements, not a blocker for structural design.

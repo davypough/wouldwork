@@ -34,6 +34,13 @@ D runs substantial searches in the existing Wouldwork REPL on lumpy, package WW.
 
 ## Intake — Record the inputs
 
+This is a standalone procedure. Reuse supplied problem, specification, and search
+analyses and their handoffs; no consultant setup or repeated problem interview is
+required. Preserve the agreed objective, reductions, evidence limits, and current
+authorization. Ask only for missing inputs that affect this phase. A handoff does
+not itself authorize searches. Return consequential rule or objective changes to
+the relevant analysis for the user's agreement, preserving prior evidence.
+
 Gather the problem-spec path, optional corresponding diagram path or explicit
 "none", and D's non-negative maximum search depth. Check supplied files are
 accessible; ask about missing inputs rather than guessing. Record them in
@@ -353,9 +360,12 @@ or with literal quoting, avoiding replacement-string substitution. Hash with
 
 ## Records and templates
 
-`doc/problems/<problem>/` is flat (no subdirectories) and holds only the files
-below, under exactly these names; only the diagram's name and type vary.
-Superseded material is deleted; git history is its archive. State lives in the
+`doc/problems/<problem>/` is flat (no subdirectories). The solving artifacts below
+use these names and coexist with upstream `problem-analysis.txt`, `problem-analysis-`,
+`spec-analysis-`, and `search-analysis-` records. Preserve analysis snapshots and
+historical evidence; do not delete them merely because a later phase begins.
+`Briefing.md` owns the solving analysis and log; `Handoff.md` links upstream records
+and owns current solving progress, not the original requirements. State lives in the
 Handoff; the Briefing's log retains provenance and results. The method-level
 `evidence/` folder (dated check scripts and run records, citing the pre-2026-09-30
 layout) was removed 2026-10-02; it is in git history, and its check scripts run
@@ -462,7 +472,8 @@ The solving entry point is now `doc/solving-advisor.md`. Supporting material rem
 under `doc/constraint-led-solving/`: `Extractor-Specifications.md` describes diagnostics,
 and `Schema-Gaps.txt` records uncovered needs. Problem records, including the triangle
 pilot (`triangle-xyz-6`), are in `doc/problems/<problem-name>/`, alongside the
-consultant's analysis records (`Analysis.txt`; see [consultant.md](consultant.md)).
+standalone problem, specification, and search analysis records. Older `Analysis.txt`
+files retain their recorded status; they are not required coordination records.
 
 Development is complete through T46. The implementation plans (the final copy
 `archive/Implementation-Plan-2026-10-02.md`, with its board, maintenance
