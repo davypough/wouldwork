@@ -164,6 +164,8 @@
                    (reset-parameters)  ; RESET PARAMETERS BEFORE EACH TEST
                    (uiop:delete-file-if-exists (instance-vals-file (asdf:system-source-directory :wouldwork)))
                    (load-problem problem-name)
+                   (when (eq *algorithm* 'backtracking)
+                     (error "Test problem ~A sets *algorithm* to backtracking; (test) runs only with default settings." problem-name))
                    (incf problems-processed)
                    (ww-solve)
                    (let ((solution-data (collect-solution-data)))
@@ -191,7 +193,7 @@
 
 
 (defun test ()
-  "Run standard test suite using depth-first search."
+  "Run standard test suite with default settings (depth-first search)."
   (run-test-problems))
 
 
@@ -362,6 +364,8 @@
             (print-test-header problem-name "TALOS")
             (setf *expected-min-length* nil)
             (%stage problem-path)
+            (when (eq *algorithm* 'backtracking)
+              (error "Talos test problem ~A sets *algorithm* to backtracking; (test-talos) never uses backtracking." problem-name))
             (dolist (mutation *test-mutations*)
               (push (list problem-path (test-mutation-name mutation))
                     mutation-schedule))

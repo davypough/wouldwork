@@ -62,18 +62,20 @@
          (save-globals)
          (with-silenced-compilation
            (asdf:load-system :wouldwork :force t)))
-       (*algorithm*  ;need to recompile current problem for new translations
-         (when *ww-loading*
-           (error "Please remove (ww-set *algorithm* ~S) from the current problem specification file.
-                   Instead, enter it at the REPL after loading/staging)." ',val))
-         (unless *ww-loading*  ;ignore (ww-set *algorithm* ...) in problem specification
-           (setf ,param ',val)
-           (when (and (eq ',val 'backtracking) (eq *tree-or-graph* 'graph))
-             (setf *tree-or-graph* 'tree))
-             ;(format t "~2%Note: setting *tree-or-graph* to tree (graph not compatible with backtracking).~%"))
-           (save-globals)
-           (with-silenced-compilation
-             (asdf:load-system :wouldwork :force t))))
+       (*algorithm*  ;translation depends on it, so a REPL change recompiles the current problem
+         (if *ww-loading*
+           ;; A problem file's setting applies only on a fresh stage, before vals.lisp exists.
+           ;; On a later reload vals.lisp has already restored the saved value, which the
+           ;; problem's actions are about to be translated with, so the saved value stands.
+           (unless (probe-file *globals-file*)
+             (setf ,param ',val))
+           (progn
+             (setf ,param ',val)
+             (when (and (eq ',val 'backtracking) (eq *tree-or-graph* 'graph))
+               (setf *tree-or-graph* 'tree))
+             (save-globals)
+             (with-silenced-compilation
+               (asdf:load-system :wouldwork :force t)))))
        (*probe*
          (when *ww-loading*
            (error "Please remove (ww-set *probe* ~S) from the current problem specification file.
