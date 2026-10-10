@@ -47,8 +47,7 @@
         (return tasks))
       
       ;; Expand one level: each frontier node produces successors
-      (let ((next-frontier nil)
-            (states-this-level 0))
+      (let ((next-frontier nil))
         (dolist (node frontier)
           (block expand-node
             ;; Check depth cutoff
@@ -67,11 +66,17 @@
             
             ;; Expand node
             (let ((succ-states (expand node)))
-              (incf states-this-level (length succ-states))
+              ;; Account immediately, including exits on a requested solution count.
+              (incf *program-cycles*)
+              (incf *total-states-processed* (length succ-states))
               
               (when (null succ-states)
                 ;; No successors: terminal node, not a useful task
+                (update-max-depth-explored (node.depth node))
+                (finalize-dead-end-depth (node.depth node))
                 (return-from expand-node))
+
+              (update-max-depth-explored (1+ (node.depth node)))
               
               ;; Process each successor
               (dolist (succ-state succ-states)
@@ -128,6 +133,8 @@
                   (when (eql *tree-or-graph* 'tree)
                     (when (and (eql *problem-type* 'planning)
                                (on-current-path succ-state node))
+                      (incf *repeated-states*)
+                      (finalize-duplicate-depth (1+ (node.depth node)))
                       (return-from process-succ)))
                   
                   ;; Graph search: check/update closed (serial, no lock needed)
@@ -141,6 +148,7 @@
                         (closed-entry
                          (incf *repeated-states*)
                          (unless (better-than-closed closed-entry succ-state succ-depth)
+                           (finalize-duplicate-depth succ-depth)
                            (return-from process-succ))
                          ;; Better path - remove old entry
                          (closed-bucket-remove succ-state succ-depth shard))                  ; was (remhash key shard)
@@ -158,9 +166,6 @@
                                                 (list (cons node (record-move succ-state)))
                                                 node))))
                     (push succ-node next-frontier)))))))
-        
-        ;; Update globals for states processed during task generation
-        (incf *total-states-processed* states-this-level)
         
         ;; Move to next level
         (setf frontier (nreverse next-frontier))

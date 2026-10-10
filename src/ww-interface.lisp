@@ -429,7 +429,8 @@ is staged again.
 
 
 (defun load-problem (problem-name-str)
-  "Stage a named or project-relative problem file, then reload Wouldwork."
+  "Stage a named or project-relative problem file, then reload Wouldwork.
+   Returns T once the problem is loaded, NIL if it could not be staged."
   (reject-worker-read-write 'load-problem)
   (when (ensure-problem-staged problem-name-str)
     (let ((mode (current-generated-read-mode)))
@@ -437,7 +438,8 @@ is staged again.
       ;; A problem can declare its own worker count. Rebuild outside the
       ;; first ASDF operation if that declaration changed compilation mode.
       (unless (eq mode (current-generated-read-mode))
-        (asdf:load-system :wouldwork :force t)))))
+        (asdf:load-system :wouldwork :force t))
+      t)))
 
 
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp

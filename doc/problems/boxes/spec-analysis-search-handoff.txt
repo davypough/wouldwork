@@ -1,0 +1,109 @@
+BOXES -- OPTIONAL SEARCH-ADVISOR HANDOFF
+Revision: 2026-10-09
+Status: Specification complete for the agreed scope; ready for optional search-advisor work.
+Preparing this handoff does not invoke the search advisor or authorize experiments.
+
+AUTHORITATIVE RECORDS
+Requirements: problem-analysis.txt
+Preserved pre-spec agreement: problem-analysis-2026-10-09-before-spec.txt
+Current implementation/evidence/next action: spec-analysis-current.txt
+Preserved detailed authoring evidence: spec-analysis-2026-10-09-before-consolidation.txt
+Specification: ../../../probs/problem-boxes-advisor.lisp
+Passive checked artifacts: spec-analysis-index-checks.lisp, spec-analysis-bound-checks.lisp,
+spec-analysis-graph-checks.lisp
+Keep requirements in their existing record; do not establish a competing work agenda.
+
+DELIVERED MODEL AND IDENTIFIER
+Independent Path B specification, no include-tech or boxes-specific dependencies.
+Indexed counts model with static all-open crossing bound, 37 forms/11 queries,
+three unit actions, three initialization actions.
+Current source SHA256:
+1F55F779EA10E18C3826B05F5936E4E686D0C306506F9DB2EDC376DD5C08CC5C
+Executable forms are unchanged since the user's passing checks and solve; only
+status comments changed afterward. Existing boxes spec/dependencies remain unread.
+
+OBJECTIVE AND REPRESENTATION
+One globally shortest unit-action path, tied answers interchangeable.
+Goal: (agent-area agent1 area4), with no final carrying/box-placement restriction.
+Anonymous instructions identify ground area, plate, gate and carried box.
+Changing state: agent area, every area's loose count, occupied plates, carrying bit.
+Preserve given box objects/provenance, all four areas, three plates/gates and wiring.
+Current authored input is ground-start; initially occupied plates/held boxes would
+need an explicit initialization-format review rather than changing the mechanics.
+
+R1 omits agent plate visits under lone-agent/immediate-closure/free-local-movement
+premises; R2 removes interchangeable box labels using counts/occupancy; R3 justifies
+positive-cycle removal and requires cheaper-arrival preservation in graph sharing.
+No spatial symmetry, fixed box order or permanent one-box-per-gate commitment.
+
+IMPLEMENTED ENHANCEMENTS
+- Combined pickup/place actions share common tests and emit complete independent
+  ASSERT alternatives. Copy cost remains per legal successor.
+- Static local plate/gate lists and bijective controller index remove repeated
+  domain scans; setup/storage O(areas + plates + gates), local candidate iteration.
+- Static all-open crossing bounds from goal, supplied values (2 3 1 0). A disconnected
+  area explicitly has numeric lower bound zero. Two reads per hook evaluation,
+  setup O(areas + gates), extra persistent storage O(areas).
+- MIN-STEPS-REMAINING? is enabled; no ordering heuristic was added.
+Admissibility, count conservation and reduction premises are in the current record.
+
+ACTUAL ENVIRONMENT, SETTINGS AND VALIDATION
+User's existing Windows SBCL 2.6.9 / WW REPL.
+Latest stage and solve confirmed to finish without errors/warnings:
+DEPTH-FIRST / GRAPH / MIN-LENGTH; 16 threads; depth cutoff 0.
+Source settings: randomization/symmetry NIL; no heuristic or happenings. Bound checks
+passed with pruning enabled and no other bound contributors.
+These are observations/settings for this instance, not general performance advice.
+
+BOXES-INDEX-CHECKS-PASSED: 4 areas, 3 controllers, 4 fixtures, 9 successors.
+BOXES-BOUND-CHECKS-PASSED: bounds (2 3 1 0), 4 handling fixtures,
+6 engine boundary cases (5 evaluations, 2 prunes).
+BOXES-GRAPH-CHECKS-PASSED: 8 cases, serial and worker successor paths.
+Actual bounded solve: same ten-action solution, 3 bound evaluations / 3 prunes.
+Fixture counters are restored and separate from solve counters.
+The basic revision's full ten-action path was inspected against intended rules;
+its minimum matches an independent witness/lower-bound deduction.
+Basic-only metrics: 64 processed states, 32 repeats, 0.004 seconds real time,
+10,411,616 bytes consed. No equivalent final-revision timing/work report supplied.
+These tiny-run figures cannot establish speedup, scaling or worker participation.
+No assistant model execution, full-path replay or benchmark occurred.
+
+Reproduction after a separately authorized execution scope:
+(stage boxes-advisor)
+(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-index-checks.lisp")
+(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-bound-checks.lisp")
+(check-boxes-bound-model)
+(solve)
+The prior execution was one supplied-instance regression per enhancement; the
+handoff does not authorize repeating it or expanding size/runtime.
+
+FINAL GRAPH ACCEPTANCE CHECK -- PASSED
+Source review shows strict smaller-depth CLOSED reopening in the serial, root and
+worker paths. The user ran the approved passive checker and reported the eight-case
+pass marker. Cheaper 1 versus 3 arrivals were retained, equal/worse arrivals dropped,
+and PLATE1/PLATE2 allocations preserved independently. Four cases exercised each
+of the serial and worker successor functions directly using isolated/restored
+search bookkeeping. Depth/time values were controlled fixtures; no longer-route
+replay, solver or real concurrent launch was included. Details are in the current
+record. This closes the remaining agreed acceptance obligation. No repeat solve
+or additional acceptance check is pending.
+
+GROWTH AND NEXT OPTIONAL PERFORMANCE QUESTION
+Scale boxes, areas, plate/gate pairs and connections under the same single-agent
+mechanics. Topology and reusable-box commitments interact; a geometric route alone
+need not be feasible or optimal.
+A useful first search-advisor question is whether the cheap
+crossing bound reduces enough expanded/copied work to offset its evaluation cost
+as transport distance and topology size grow. Agree representative sizes, settings,
+time/memory limits and measurements before creating/running any probe.
+Candidate measurements: elapsed time, allocation, processed/repeated states, bound
+evaluations/prunes, final path length, worker participation and graph memory.
+Keep serial startup/root costs separate from worker work; vary connectivity and
+box counts separately before studying their interaction. No size limit or speedup
+has been established. The 16-thread setting is an execution baseline.
+
+Other deferred questions: static-index/snapshot overhead, counts versus sparse
+named storage when areas outnumber boxes, cost-aware graph memory, ordering scores,
+actual concurrent reopening behavior, and cyclic/disconnected runtime coverage.
+Performance owner is the optional search advisor. Fidelity defects return upstream.
+No new mechanics, box-name reconstruction or loss of global optimality is authorized.

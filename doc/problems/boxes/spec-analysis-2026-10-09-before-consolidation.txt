@@ -1,0 +1,956 @@
+BOXES -- ACTIVE SPECIFICATION ANALYSIS
+Revision: 2026-10-09, second all-open crossing-bound enhancement checked by the user
+Status: Both enhancement increments checked; ten-action minimum retained; final review/consolidation pending.
+Specification: ../../../probs/problem-boxes-advisor.lisp (topology indexes and static crossing bound).
+Passive checks: spec-analysis-index-checks.lisp (load after staging, then call explicitly).
+Bound checks: spec-analysis-bound-checks.lisp (load after the index checks; call explicitly).
+
+INPUT AND AUTHORITY
+Current requirements: problem-analysis.txt, revision 2026-10-09, including the
+agreed anonymous-output clarification from this spec-advisor consultation.
+Preserved input: problem-analysis-2026-10-09-before-spec.txt (unchanged).
+Historical withdrawn work: spec-analysis-withdrawn-2026-10-09.txt (unchanged).
+Current corrections and standalone advisor responsibilities govern. The withdrawn
+draft is not a starting implementation or current authorization.
+
+The user approved independent section-by-section specification building,
+interactive enhancement selection, relevant generic engine-source reading, and
+static review. Pause for user review after each section. Staging, executed
+fidelity checks, replay, search, benchmarks, engine changes, existing-spec
+comparison are not included. The later request to mention action combination in
+spec-advisor.md and "proceed" authorized the focused efficiency documentation
+addition as well as writing the agreed combined actions. No other advisor-document
+revision or engine change is included. Preserve the
+existing user REPL. No existing boxes spec or problem-specific dependency was read.
+The latest user "proceed" accepts the recommended staging-only check at the user's
+REPL. This extends execution scope to translation and initialization of the current
+basic model; fidelity probes, replay, solving and benchmarks remain outside it.
+The subsequent request to run SOLVE first extends the scope to a small operational
+search check of this supplied basic instance at the user's REPL. It changes the
+check order; separate fixture checks, full-path replay, a selected enhancement's
+execution checks, benchmarks and existing-spec comparison are not thereby authorized.
+The earlier "Approved" selects the first topology-index increment and its bundled
+user-run staging, focused action/index checks and one supplied-instance solve
+regression. Operator remains the user in the existing REPL. No assistant-run model
+execution, full-path replay, benchmark, engine edit or bound increment is included.
+The latest "approved" selects the proposed second all-open crossing-bound increment,
+including writing it, assistant reader/source checks, user-run staging/value/engine
+boundary checks, and one supplied-instance solve regression. The operator remains
+the user in the existing REPL; no assistant-run model, replay, benchmark, new folder,
+engine edit, ordering hook or existing-spec comparison is included.
+
+The user subsequently accepted anonymous source/destination instructions and
+the recommended counts representation. This changes output naming, not puzzle
+legality, given data, costs, reductions, or the globally shortest-path objective.
+The corresponding clarification is recorded in problem-analysis.txt; no input
+snapshot or history was rewritten.
+
+CURRENT REPRESENTATION AND SETTINGS
+Path B: hand-authored planning without include-tech; no added Talos mechanics.
+Changing state will contain:
+- Agent's area.
+- Loose-box count on the ground in each area, including zero.
+- Which plates hold a box.
+- Whether the agent carries a box.
+Derive gate openness from its controlling plate; keep no independent gate memory.
+Conservation: total loose counts + occupied plates + carried-box indicator equals
+the number of given boxes. Enforce nonnegative counts, capacity one for carrying
+and each plate, local manipulation, and actual incident open-gate crossings.
+Each accepted transition will be exactly one counted action.
+
+Preserve the given box objects and initial data as provenance. Individual box
+identities are absent from changing state and anonymous instructions. Ground
+pickup identifies an area; plate pickup identifies its plate; placement identifies
+its destination. A carried box is referred to as the carried box. One ground
+pickup choice suffices for any positive local count. No name decoder is required.
+
+Written settings:
+- problem-name BOXES-ADVISOR; problem-type PLANNING; solution-type MIN-LENGTH.
+- GRAPH for cost-aware duplicate sharing.
+- symmetry-pruning NIL: counts already remove box-label distinctions; no spatial
+  equivalence is assumed for different areas, plates, or gates.
+- depth-cutoff 0: no instance-specific limit embedded in the general rules.
+- threads 16: supplied basic solve completed under this configured setting;
+  worker DFS execution and parallel speedup remain unverified. The report is
+  consistent with completion during serial root generation.
+- randomize-search NIL for deterministic serial choice order; parallel scheduling
+  still need not return the same tied optimum.
+User staging reports DEPTH-FIRST and the declared settings. Subsequent approved
+checks should retain and record these settings. A cutoff of 10 is eligible only for the supplied
+instance under its witness proof. No run is authorized by these declarations.
+
+SECTION STATUS AND REQUIREMENT MAPPING
+1. Representation/settings: counts and anonymous output accepted; settings and
+   representation comments written. User said "Proceed" after section review.
+2. Given types, static/dynamic relations: proposal accepted by the user's
+   "proceed"; declarations written and reviewed. User requested gate-separates
+   in place of gate-ends and said to proceed; the rename was applied.
+   Model-specific initialization checks are written and passed in reported staging.
+3. Queries/actions, locality, capacities, unit costs and anonymous traces:
+   combined-action proposal accepted; nine queries and three actions written.
+   User reviewed query checks/iteration and said to proceed. Ordinary readers
+   were simplified. The basic local discovery used typed DOALL; the current indexed
+   revision replaces discovery scans with static BINDs and adds controlling-plate,
+   for ten queries in that revision. The bound increment adds MIN-STEPS-REMAINING?
+   as the eleventh query. All three action definitions remain unchanged.
+4. Supplied initial state, validation and goal: user said "Proceed"; implemented.
+   Reader/static checks passed; user reports staging complete after two corrections.
+   User solve displayed the expected initial counts and ten-action path; its
+   displayed transitions preserve capacities and the total of two boxes.
+   Subsequent focused checks cover four allowed/forbidden/boundary fixtures;
+   worker operation remains unverified.
+5. First enhancement: topology lists and bijective controller lookup written;
+   source checks and user-run focused checks pass; solve still reports minimum ten.
+6. Second enhancement: static all-open remaining-crossing bound written, enabled
+   through MIN-STEPS-REMAINING?; reader/source and user-run bound/boundary checks pass.
+   User reports the same ten-action solution, with three solve-time bound evaluations
+   and three prunes. Final whole-model review, consolidation and handoff pending.
+
+Reuse problem-analysis sections 2-4 and 9 as the requirements account.
+R1 omits agent plate visits/state while retaining that intended physical ability
+upstream. R2 is realized structurally by counts/occupancy; generated transitions
+and equivalence still require correctness checks. R3 requires shorter-arrival
+handling in graph sharing. Preserve box recovery and distinct spatial allocations.
+The user-reported completed search returned ten actions, matching the upstream
+witness and independent lower bound. That supplies instance-level operational
+and optimum evidence, with the source/trace/check limits recorded below.
+
+ENHANCEMENT AGENDA -- SELECT DETAILS INTERACTIVELY
+Counts and one local ground pickup choice address box-label growth within the
+basic model. Cost-aware graph sharing addresses route convergence. Generate
+crossings from actual incident gates. Propose precomputed all-gates-open
+crossing distances as an admissible remaining-action bound and ordering estimate.
+No additional box symmetry layer is needed for the selected representation.
+Each mechanism needs correctness and engine-integration checks; no speedup is
+assumed. Stronger resource bounds require a justified formula before adoption.
+Topology, box distributions, and commitments still cause combinatorial growth.
+
+SOURCE OBSERVATIONS -- STATIC EVIDENCE ONLY
+../../../src/ww-searcher.lisp:
+closed-key excludes depth outside hybrid mode. closed-bucket-find verifies
+state equality; better-than-closed compares smaller depth for MIN-LENGTH.
+process-successors reopens the entry and creates a fresh concrete node.
+The open check uses concrete equality; update-open-if-succ-better relies on the
+depth-first invariant for MIN-LENGTH rather than updating depth. Coverage and
+shorter-arrival behavior remain obligations for executed checks.
+record-solution-path follows concrete parents and captures record-move output.
+
+../../../src/ww-parallel.lisp:
+Root generation and worker successor handling use better-than-closed; improved
+arrivals receive fresh concrete nodes. Worker check/update uses a shard lock.
+Root generation is serial. No runtime parallel compatibility or optimality
+claim follows from this inspection.
+
+../../../src/ww-planner.lisp: record-move copies action instantiations.
+../../../src/ww-searcher.lisp: remaining-step pruning requires a nonnegative
+admissible bound and compares depth plus bound with cutoff/incumbent depth.
+../../../src/ww-parallel.lisp: root and worker paths invoke remaining-step pruning.
+
+HISTORY -- SUPERSEDED NAMED-BOX PROPOSAL
+The initial proposal stored each box's site and used canonical symmetry graph
+keys, favoring directly named output. The user asked about anonymous instructions
+and scaled efficiency, then accepted that format and the recommended counts
+alternative. Named reconstruction was needed only for a named-output requirement.
+
+Focused symmetry source review found that graph instantiation filtering passes
+all candidates through; duplicate handling merges canonical equivalents later.
+A named spec can also generate representative pickups explicitly. Correct named
+canonical keys and counts represent the same distinct physical arrangements;
+counts avoid box-name canonicalization and make single local pickups natural.
+Memory savings depend on the relative box, area, and plate counts. These are
+structural predictions, not measured speedups. The original conditional
+symmetry-detection and named-path checks are superseded for the counts model.
+
+REFERENCE DISCREPANCY -- ALGORITHM PASSAGE UNCHANGED
+spec-advisor.md Section 1.2 says algorithm in a problem file signals an error.
+Current ../../../src/ww-set.lisp accepts it on a fresh stage without a globals
+file, then preserves saved settings on subsequent reload. The explicit eventual
+REPL setting avoids relying on that discrepancy. Debug/probe are rejected during
+loading. This algorithm passage was not changed by the efficiency addition.
+
+CHECKS, EVIDENCE AND LIMITATIONS
+Performed: analysis/snapshot review, focused generic source review, and static
+inspection of settings, declarations, queries, and actions. Tracked diff whitespace check
+passed; explicit whitespace scans of the four scoped untracked files found no matches.
+User reports successful staging and a normally completed GRAPH/MIN-LENGTH solve
+with 16 threads and actual cutoff 0, returning the predicted ten-action path.
+Displayed initial counts and all path states were reviewed for locality, unit
+costs, capacities and conservation. That basic run preceded the indexed fixture
+checks reported below. No full-path replay or benchmark. Settings, types, relation declarations, queries,
+the conservation check query, actions, raw-data checks, initialization, and goal
+are written. The additional bound and its user-run checks now pass within their
+specified scope; the supplied solve reports three bound evaluations and three prunes.
+The subsequent indexed revision and passive check file pass reader/source checks.
+The user reports BOXES-INDEX-CHECKS-PASSED for four fixtures/nine successors and
+a solver result of ten minimum actions. The fully displayed path and performance
+figures above belong to the earlier basic revision; no new full trace, settings,
+work counts or timing were supplied for the indexed run. Topology indexing has
+scoped runtime correctness evidence; its larger-family performance is unmeasured.
+No new directory was created. The external reader helper was removed after its
+check; no temporary file remains. Snapshot and history unchanged.
+No problem-meaning blocker identified; implementation/evidence remain incomplete.
+
+SECOND SECTION -- OBJECTS AND RELATIONS ACCEPTED AND WRITTEN
+Given types: agent (agent1), area (area1 area2 area3 area4), box (box1 box2),
+plate (plate1 plate2 plate3), gate (gate1 gate2 gate3). Agent1 names the existing
+lone agent; it does not add an agent. No new equipment or geometric locations.
+
+Dynamic declarations written:
+- (agent-area agent $area): one current area for the agent.
+- (loose-boxes area $fixnum): one nonnegative integral ground count per area.
+  Explicit zeros give a uniform representation; a missing count is an error,
+  not another spelling of zero. Initial counts will be derived from initial data.
+- (occupied plate): a box occupies the plate; absence means empty.
+- (carrying agent): the agent carries one box; absence means empty hands.
+Binary occupancy/carrying represent capacity one structurally. Action preconditions
+must still reject placing onto an occupied plate and picking up with full hands.
+Mark loose-boxes as derived initial state so DEFINE-INIT authors source box areas,
+not a duplicate manually counted arrangement. It remains mutable during search.
+
+Static declarations written:
+- (gate-separates gate $area $area): both endpoints of a bidirectional gate.
+- (plate-area plate $area): where its plate is accessible.
+- (controls $plate $gate :bijective): supplied one-to-one controller wiring,
+  with the engine's forward and inverse static indexes. Raw facts are unchanged.
+- (initial-box-area box $area): each given box's supplied initial ground area,
+  retained as source data, not search-time box identity.
+- (area-plates area $list), (area-gates area $list): computed static adjacency
+  lists, including empty lists, in declared plate/gate order.
+The destination is expressed directly in DEFINE-GOAL as area4; no target relation.
+Gate query/movement recognizes either endpoint explicitly. No authored duplicate
+inverse wiring or stored open/closed relation is needed.
+
+Initialization section will supply the given tuples: gate1 areas1/2, gate2
+areas1/3, gate3 areas3/4; plates1/2 area1, plate3 area3; plateN controls gateN;
+box1 area1, box2 area2; agent area1; destination area4. Count derivation yields
+1,1,0,0 by area; no occupied plates or carrying fact. No facts authored yet.
+
+Checks to implement with the relevant query/initialization sections:
+- Exactly one agent area and one integral nonnegative count per declared area.
+- Total loose counts + occupied-plate count + carrying indicator = given boxes.
+- Each gate has two distinct declared endpoints and exactly one controller;
+  each plate has one area and one controlled gate, with its area an endpoint.
+- Each given box has one supplied initial area; the goal names agent1 and area4.
+Derive the total number of boxes from the box type rather than duplicating it.
+Specification inconsistencies should surface as errors naming the relation and
+affected object or type; no silent defaults or invented data. Conservation and
+schema checks are meaningful correctness checks, not repair logic.
+
+Generic source review: ww-installer.lisp supports the proposed types, fluent
+relations, derived initial declarations, DEFINE-INIT-CHECK, and DEFINE-INVARIANT.
+ww-planner.lisp applies init-action derivation to the initial database. This is
+source evidence only; translator/runtime checks remain pending.
+No invariant/query/initialization code is included in this declaration increment.
+
+THIRD SECTION -- QUERIES AND ACTIONS PROPOSAL
+The original five-action split below is retained as proposal history; the
+accepted combined-action implementation following it supersedes the rule split.
+Read-only queries retrieve the agent area and local ground count, identify
+local plates and incident gates, derive gate openness from its occupied controlling
+plate, and find the other endpoint of gate-separates. The initial proposal put
+named missing-data errors in ordinary readers; query review superseded that
+placement. Completeness and malformed wiring belong to initialization validation,
+with object/type-specific errors there; readers rely on that established contract.
+
+One conservation/arrangement query will support initialization and focused checks:
+nonnegative integral ground counts for every area, a valid agent area, and total
+ground counts + occupied plates + carrying indicator = total given boxes.
+Do not add a full-state conservation scan to every search successor by default.
+Each action preserves conservation by moving exactly one box between categories;
+check the actual implementation with allowed/forbidden/invariant cases later.
+
+Five actions, each cost one and one ASSERT successor:
+- pickup-ground: empty hands and positive local count; decrement that count and
+  assert carrying. Capture the source area in the trace. No box parameter.
+- pickup-plate: empty hands and an occupied local plate; retract occupied and
+  assert carrying. Capture plate/source area; the associated gate immediately
+  becomes closed because its open query no longer finds occupation.
+- place-ground: carrying; increment the current area's count and retract carrying.
+- place-plate: carrying and an empty local plate; assert occupied and retract
+  carrying. The associated gate immediately becomes open by the same query.
+- cross-gate: an incident open gate; replace agent-area with the other endpoint.
+  Keep carrying, all ground counts, and all plate occupations unchanged. Capture
+  gate, departure area, and destination area in the trace.
+Locality is based on current area and plate-area. Do not generate ground-box names,
+remote handling, plate visits, implicit compound actions, or restrictions on box
+recovery. Crossings work in both directions; ordinary internal walking is free.
+Anonymous traces identify pickup sources and placement destinations explicitly.
+
+Generate local plate and incident gate choices through read-only query domains
+where the verified header contract supports them. These select exactly local
+objects, preserving all legal choices. No helper mutates shared data. Static
+adjacency indexing may be added in the enhancement section if justified.
+Use simple direct ASSERT effects; no separate update functions or propagation
+driver are necessary for these five transfers and queried gate status.
+
+Acceptance mapping: full hands, empty ground, empty-source plate, occupied target
+plate, remote plate, and closed/nonincident gate must reject the relevant action.
+Recovery closes its gate; crossings leave the supporting box in place and preserve
+a carried box. The five transfer equations conserve the total at unit cost.
+No query/action implementation, staging, fidelity check, or replay was performed
+in this proposal increment. Rename and proposal records received static review.
+
+COMBINED-ACTION REVIEW -- SOURCE EVIDENCE AND REVISED PROPOSAL
+The user asked whether ground/plate pickup and ground/plate placement could each
+be combined, and explicitly requested inspection of ww-translator.lisp. No
+action implementation, translation execution, or benchmark was requested or run.
+
+Source reviewed:
+- ww-installer.lisp create-action/build-precondition-lambda construct separate
+  precondition and effect Lisp functions; passing precondition results can carry
+  current area/count values into the effect without rebinding them per alternative.
+- ww-planner.lisp generate-children loops over each action and its candidate
+  parameter instantiations, collects successful pre-results, then invokes effects.
+- ww-translator.lisp translate-conditional emits ordinary Lisp IF for unresolved
+  runtime conditions; translate-doall emits iteration (a DOLIST for a static
+  single-variable domain, or runtime query-domain evaluation/iteration).
+- ww-translator.lisp translate-assert emits a copy of the input state, locally
+  shadows STATE with the copy for that assertion, and pushes an independent
+  update. Sequential ASSERT calls outside one another therefore produce alternative
+  successors from the same parent, not a sequence of compound physical actions.
+- ww-planner.lisp creates a separate action state per update, retaining that
+  action's duration and the captured description of each independent alternative.
+
+Revised recommendation: three definitions, pickup, place, and cross-gate.
+Use one agent header instantiation for pickup/place. Check common carrying status
+and retrieve area/count once, then generate applicable ground and local-plate
+alternatives inside the effect. Each alternative has its own ASSERT and trace.
+For pickup, ground pickup is one successor if the count is positive, and every
+occupied local plate is a separate successor. Place emits the ground alternative
+and each empty local plate alternative. Preserve all choices when both ground
+and plate operations are legal; do not use an exclusive ground-versus-plate IF.
+Each emitted successor is exactly one pickup or placement at cost one.
+
+Combining action names with a union source/destination HEADER alone would still
+call a precondition for every candidate, while adding a type branch; savings are
+not implied simply by reducing the number of action declarations. Effect-level
+alternative generation instead shares common checks and argument/result plumbing.
+It still iterates local plates, allocates one update/copy per legal successor, and
+searches the same physical arrangements. More efficient expansion is a structural
+prediction, not a measured improvement, and does not remove combinatorial growth.
+The revision retains all earlier locality/capacity/conservation/gate acceptance
+cases. This recommendation was subsequently accepted and implemented as below.
+
+THIRD SECTION IMPLEMENTATION AND STATIC CHECKS
+Written nine queries: current-area, ground-count, plate-location, local-plates,
+opposite-area, incident-gates, gate-open?, given-box-count, box-arrangement-valid?.
+Written three unit-cost actions: pickup, place, cross-gate.
+All action headers enumerate only the given agent. Shared conditions and local
+lists are computed once. WW-LOOP iterates the evaluated local list in each effect;
+each legal alternative has its own ASSERT. Description variables are assigned
+inside the assertion capturing them, preserving source/destination-specific traces.
+Common preconditions need not perform an extra existential availability scan;
+when no choice is legal the effect emits no update and therefore no successor.
+No combined pickup/place step or exclusive ground-versus-plate choice is introduced.
+Gate openness is queried, so plate recovery changes it without propagation.
+
+Local-plate and incident-gate discovery currently scan the declared static objects;
+gate-open? scans plates for the controlling occupied plate. Efficient fixed
+adjacency/controller lookup remains an enhancement candidate, alongside the
+relaxed crossing bound. No shared data is mutated by these discovery queries.
+The arrangement check is callable for initialization/focused checks and is not
+registered as a full-state scan on every successor.
+
+Added focused action-combination guidance to ../../spec-advisor.md, step 4 and
+Section 1.9: share common tests, generate complete independent alternatives,
+preserve choices/costs/traces, and distinguish structural savings from speedups.
+The note explicitly scopes incoming-state-copy semantics to depth-first.
+
+Assistant-run static reader check: SBCL 2.6.9, --no-sysinit --no-userinit,
+fresh process, read every source form without evaluating the specification.
+Observed: READER CHECK PASSED: 25 forms; actions (PICKUP PLACE CROSS-GATE).
+The reader helper was created outside the project in the system temporary
+directory and removed immediately afterward. No new directory was created.
+Source/static review covered every alternative's guards, complete writes, unchanged
+crossing resources, and description binding sites. Whitespace checks passed.
+These checks establish read syntax and scoped source observations only: no
+Wouldwork translation, staging, executed fidelity, replay, or search occurred.
+
+QUERY REVIEW -- 2026-10-09
+The user asked about per-call errors and typed DOALL in local-plates/incident-gates,
+then said to proceed. Source inspection shows BIND already uses a presence-tested
+database lookup. An explicit error alternative adds no lookup and formats a
+message only on failure, but repeats a completeness contract that setup can check
+once. Simplified current-area, ground-count, plate-location and opposite-area to
+ordinary BIND/read logic. Keep named errors in initialization and the focused
+box-arrangement-valid? check. Do not silently install defaults or skip bad input.
+Before any model execution, initialization MUST implement the completeness checks;
+the simplified opposite-area NIL result is meaningful only with validated endpoints.
+
+Changed local-plates and incident-gates to typed DOALL with PUSH and NREVERSE over
+fresh query-owned lists. The static single-variable domain translates to a DOLIST
+over a literal object list, avoiding the old per-call GET HASH type lookup. This
+does not allocate a Cartesian product. PUSH/NREVERSE adds a reversal of the local
+result list compared with LOOP COLLECT; relative performance is unmeasured, not
+claimed better. Both scan all declared plates/gates; indexed adjacency remains
+the consequential larger-family improvement to consider. Order is preserved.
+The action WW-LOOPs still iterate their already evaluated local candidate lists.
+Fresh SBCL reader check of this revision again passed: 25 forms; actions PICKUP,
+PLACE, CROSS-GATE. No model forms were evaluated. External temporary helper removed.
+
+FOURTH SECTION -- INITIALIZATION, VALIDATION AND GOAL ACCEPTED AND WRITTEN
+Authored these supplied raw facts in DEFINE-INIT:
+- Agent1 starts in area1, empty-handed; no OCCUPIED or CARRYING facts.
+- Box1 initial-box-area area1; box2 initial-box-area area2.
+- Gate-separates gate1 area1 area2; gate2 area1 area3; gate3 area3 area4.
+- Plate-area plate1 area1; plate2 area1; plate3 area3.
+- Controls plate1 gate1; plate2 gate2; plate3 gate3.
+The goal directly tests (agent-area agent1 area4); no destination fact is authored.
+Do not author derived LOOSE-BOXES facts or independent gate status.
+
+Validate raw input before installation: exactly one declared agent with one valid
+initial area; one valid initial area per box; complete plate locations and gate
+endpoints; distinct endpoints; exactly one controller per gate and one controlled
+gate per plate; plate locality at an endpoint; no authored
+occupied/carrying state conflicting with this supplied ground-start input format.
+Used DEFINE-INIT-CHECK for these model-specific source-data checks. Engine checks
+already reject contradictory literals, duplicate fluent keys and authored derived
+facts; do not duplicate their storage-level logic or add repair/default behavior.
+
+One initialization-only action groups all writes in a single ASSERT: seed
+each area's ground count with zero, then visit each given box once and increment
+its supplied area's count. It does not generate alternative starts or count as a
+solution action. Invoke box-arrangement-valid? after the counts have been derived.
+Expected area counts 1,1,0,0; all plates empty; hands empty; queried gates closed.
+This is an initialization prediction, not executed evidence.
+
+Goal: (agent-area agent1 area4), a direct fluent test. Nothing
+requires empty hands or any final plate/ground arrangement. Preserve the objective
+as one globally shortest path; the given ten-action witness remains a deduction.
+Once this basic model is coherent, review its complete requirement mapping before
+the separate enhancement section. Staging/fidelity checks require their own agreed
+execution scope; finishing this code does not authorize search.
+
+STAGING-TIME VALIDATION REVIEW AND IMPLEMENTATION
+The user asked whether these checks can run in DEFINE-INIT-ACTION or ordinary
+staging validation, then said to proceed. Current files are ww-validator.lisp and
+ww-init-validator.lisp (not ww-validation.lisp). Source review distinguishes:
+- ww-installer.lisp install-init calls check-proposition and validate-init-literals
+  before asserting any raw fact. The latter runs registered DEFINE-INIT-CHECKs.
+- ww-validator.lisp check-proposition checks declared relations/argument types;
+  ww-init-validator.lisp handles storage-key conflicts and authored derived facts.
+  These do not infer required coverage or the model's one-to-one plate/gate rules.
+- ww-initialize.lisp init invokes init-action updates during staging after database
+  conversion; a DEFINE-INIT-ACTION can therefore validate derived state once before
+  search. No automatic conservation theorem is supplied by generic validation.
+
+Wrote three small DEFINE-INIT-CHECK-HELPERs for required facts, area membership,
+and gate/controller topology. Their lifecycle is registered for restaging cleanup.
+Wrote boxes-initial-layout as a DEFINE-INIT-CHECK before DEFINE-INIT: checks one
+agent and complete initial placements, plate locations, two distinct gate endpoints,
+one-to-one controls, plate endpoint locality, and the ground-start format.
+It uses engine init-check errors naming the source relation/object rather than
+repairing input. Engine type/storage validation remains in charge of its own rules.
+
+Wrote initialize-box-counts with no enumerated header type that could skip it.
+Its one ASSERT seeds every area, counts each declared box once from source data,
+and calls box-arrangement-valid? on the derived state. No conservation scan is
+registered on search successors. Goal tests whether agent1 is in area4
+without imposing extra carrying or placement restrictions.
+
+Fresh SBCL 2.6.9 reader-only check (--no-sysinit --no-userinit) passed: 32 forms;
+actions (PICKUP PLACE CROSS-GATE). No model form was evaluated. The temporary
+helper outside the project was removed. Static requirement/source review and
+whitespace checks passed. No staging, model translation, executed validation,
+replay, search, or benchmark was performed.
+Basic source mapping is now coherent: given objects/layout -> types/raw facts;
+capacities/local transfers -> counts, occupancy and three unit-cost actions;
+immediate closure -> gate-open?; conservation -> initialization derivation/check;
+R1/R2 -> omitted plate visits/counts; R3/shorter arrivals -> graph handling requiring
+executed checks; success -> (agent-area agent1 area4).
+
+DIRECT-GOAL REVIEW -- 2026-10-09
+The user questioned storing the target and the unnecessary existential, then said
+to proceed. Removed the GOAL-AREA declaration, initial fact and cardinality check;
+replaced the existential goal with (agent-area agent1 area4). This preserves the
+agreed single-agent destination and imposes no final box/carrying conditions.
+Static target data would let instances change the target without editing the goal
+formula. It was not changing state: ww-translator.lisp get-database-reference routes
+static facts to *static-db*, while ww-structures.lisp %copy-problem-state copies
+IDB/HIDB and the symmetry slice, not *static-db*. Removing this static fact therefore
+does not reduce successor state copying. The direct goal removes iteration and a
+static lookup; its performance benefit is unmeasured. Engine goal translation
+validates the named relation and objects; no replacement raw target check is needed.
+Reader-only check of this direct-goal revision passed in SBCL 2.6.9: 32 forms,
+actions PICKUP, PLACE, CROSS-GATE. No source forms were evaluated. Tracked diff
+whitespace check and explicit scans of the untracked files passed. The external
+temporary reader helper was removed; no new directory was created. Model staging
+and all other executed checks remain pending the user's REPL result.
+
+SOLVE CHECK PROPOSAL -- COMPLETED WITH ACTUAL CUTOFF 0
+Provide (ww-set *depth-cutoff* 10), then (solve), for the existing user REPL.
+Retain reported DEPTH-FIRST, GRAPH, MIN-LENGTH, threads 16, randomize NIL,
+symmetry NIL, no heuristic, no bounding function and no min-steps-remaining hook.
+The ten-action witness/lower-bound deduction in problem-analysis.txt section 5
+justifies this instance-specific cutoff. The source file remains cutoff 0; this
+is a REPL check setting, not a general family rule. Operator: user.
+Question: do compiled action expansion and search run without obvious errors,
+and does the supplied instance return the predicted ten-action minimum?
+Stop on an error or the bounded search's return; no deeper run or automatic retry.
+Receive full errors or the returned path/length, work/time report and completion
+status. Inspect discrepancies before claiming successful operation or optimality.
+This run exercises visited transitions and integration; it does not cover every
+forbidden action or establish complete model fidelity. A passing result guides
+the subsequent focused checks and enhancement review. The user supplied a normal
+completion and ten-action path; the report's actual cutoff is 0, not the proposed
+10. See the result below; do not label this a cutoff-10 test or rerun it merely
+to match the proposed setting.
+
+EARLIER BROAD FIDELITY PROPOSAL -- SUPERSEDED BY THE APPROVED FOUR FIXTURES
+Prepare focused user-run fidelity checks on the staged basic model, using copies
+of the start state and a small fixed set of count-conserving fixture states.
+Inspect initial counts 1,1,0,0, empty hands/plates, closed gates and false goal.
+Exercise the compiled actions without starting a solver or replaying a full path:
+- Initial pickup; full-hands rejection; empty-ground rejection; exactly one ground
+  pickup choice even with both given boxes loose in one area.
+- All ground/local-plate placement alternatives; occupied-plate rejection;
+  local/remote pickup and placement; multiple simultaneous legal plate choices.
+- Closed and nonincident-gate rejection; bidirectional open crossing; supporting
+  box retained and carrying preserved; plate recovery closes its gate immediately.
+- Complete independent ASSERT alternatives, anonymous source/destination traces,
+  unit duration, unchanged parent and conservation for every generated successor;
+  goal recognizes the specified agent area without extra placement restrictions.
+Operator: user, existing REPL; current staged revision and reported settings.
+Stop on first failed check or successful completion of the fixed cases; no solver,
+full-path replay, benchmark, restaging or automatic scope expansion.
+This earlier broad proposal was not executed as a separate increment. The later
+basic solve covers the displayed allowed path; the latest approval selects the
+four complementary fixtures in spec-analysis-index-checks.lisp, alongside index
+comparison and regression solve. That selected execution is authorized but pending.
+The relaxed bound, cost-aware graph integration evidence, final consolidation and
+handoff remain pending. The implementation/check entry below gives current scope.
+
+USER STAGING FAILURE AND INITIALIZATION CORRECTION -- 2026-10-09
+Operator: user, existing REPL; (stage boxes-advisor), direct-goal revision.
+Reported installation and ordinary function compilation reached INITIALIZE-BOX-COUNTS.
+Initialization then failed with TYPE-ERROR: NIL is not NUMBER, TWO-ARG-+ NIL 1.
+The backtrace places the error in the init-action effect lambda called by
+DO-INIT-ACTION-UPDATES. This is a failed staging attempt; no completed initial
+arrangement, passed conservation check, fidelity result, replay or search is claimed.
+
+Source diagnosis: ww-initialize.lisp runs do-integer-conversion before init actions.
+ww-planner.lisp do-init-action-updates compiles init-action effect-lambda with plain
+COMPILE, without SUBST-INT-CODE. ww-translator.lisp translate-bind therefore leaves
+the dynamic count read as GETHASH of a symbolic list key in problem-state.idb.
+ww-support.lisp add-proposition detects the EQL integer database and writes an
+integer key. The first DOALL seeds counts correctly, but the following unconverted
+BIND cannot find them and leaves the initial-count variable NIL. Symbolic BIND
+of INITIAL-BOX-AREA still reads the supplied static *static-db* correctly.
+This mixed initialization compilation contract is a source observation; the
+reported error agrees with it. The later init-delta application is never reached.
+
+Correction within approved basic-model authoring: reuse the existing compiled
+GROUND-COUNT query inside the count increment, removing the dynamic BIND and its
+unnecessary variable. Ordinary queries were already compiled through integer
+conversion, and query calls receive the ASSERT's copied effect STATE. Consequently
+each box reads the current count after earlier writes in the same ASSERT. Preserve
+the single initialization result, counts for every area, source-box provenance and
+final conservation check. No engine change or new search scope is introduced.
+Expected restaging result remains counts 1,1,0,0 and successful initialization;
+the corrected revision has not yet been staged. Next operator remains the user.
+Assistant reader-only check of the correction passed in SBCL 2.6.9: 32 forms,
+actions PICKUP, PLACE, CROSS-GATE; no model form evaluated. Tracked diff whitespace
+check and explicit scans of both untracked files passed. The external temporary
+reader helper was removed. These checks do not establish successful restaging.
+
+USER RESTAGING FAILURE AND CONSERVATION-CALL CORRECTION -- 2026-10-09
+The user reported SIMPLE-PROGRAM-ERROR: invalid number of arguments: 0, at
+(GIVEN-BOX-COUNT). Its generated query lambda correctly requires the implicit STATE.
+The reported failure is consistent with reaching the conservation-total comparison
+after the count-lookup correction. No completed staging or independently observed
+count values are claimed from this abbreviated report.
+
+Source diagnosis: ww-translator.lisp translate-function-call inserts STATE when
+it visits a query call. translate-lisp-form traverses supported Lisp forms and
+ordinary function-call arguments, but leaves unsupported macros intact. UNLESS
+is such a macro, so both GIVEN-BOX-COUNT calls previously nested under it retained
+zero arguments. The failing comparison and its error branch both need correction.
+
+Within the approved spec-authoring scope, compute the expected total once in a
+SETQ before the scan. translate-set-form visits its value expression and inserts
+the query's implicit STATE argument. The UNLESS comparison and diagnostic now use
+only that local expected-total value, with no nested Wouldwork query calls.
+Reviewed other query calls in this specification: calls are in supported SETQ,
+IF, ASSIGN, WW-LOOP or ordinary function argument positions; remaining opaque
+UNLESS/INCF/PUSH forms contain no Wouldwork query calls. Raw init-check helpers
+are ordinary Lisp and do not require DSL query-call translation.
+No engine changes or expanded execution scope. User-run staging-only check remains
+the next step; the latest debugger lists ABORT as restart 9. Expected initialized
+counts remain 1,1,0,0 with conservation satisfied; successful staging is unverified.
+Assistant-run reader/static audit passed in SBCL 2.6.9: 32 forms and actions
+PICKUP, PLACE, CROSS-GATE. The audit inspected query/action/init-action bodies for
+query calls nested in opaque UNLESS, WHEN, INCF, DECF, PUSH, POP, DOLIST, DOTIMES
+and LOOP forms; none remain. Source forms were read, not evaluated. Tracked diff
+whitespace and explicit untracked-file scans passed. External temporary helper
+removed; no new directory. This is scoped source evidence, not a staging pass.
+
+USER-REPORTED STAGING SUCCESS -- 2026-10-09
+The user supplied "Staging complete" and the parameter report for BOXES-ADVISOR,
+after the count-lookup and conservation-call corrections. Reported settings:
+PLANNING, DEPTH-FIRST, GRAPH, MIN-LENGTH, cutoff 0, threads 16, randomize NIL,
+debug 0, probe NIL, symmetry pruning NIL, branch ALL, adaptive progress reports.
+Reported goal: (AGENT-AREA AGENT1 AREA4). HEURISTIC?, BOUNDING FUNCTION?,
+MIN STEPS REMAINING? and exogenous happenings are NIL.
+This establishes user-reported successful installation, compilation and staging
+initialization of the basic model. Its raw checks and final arrangement query
+completed without a reported error. Exact per-area counts and gate query results
+were not displayed and remain to be inspected under the next check scope.
+No action fidelity, replay, shorter-arrival handling, solver result, optimality,
+parallel search operation or performance claim follows from this staging report.
+Earlier failure/pending statements in the dated review blocks remain history;
+this success and the current status/next-step sections supersede their status.
+
+USER-REPORTED BASIC SOLVE -- 2026-10-09
+Operator: user, existing REPL, current corrected BOXES-ADVISOR basic model.
+Reported GRAPH, MIN-LENGTH, DEPTH-FIRST, 16 threads; process completed normally.
+Actual depth cutoff 0. The earlier recommendation was 10; no evidence explains
+whether that setting was omitted or changed, and no conclusion depends on guessing.
+One solution path recorded, one unique; reported minimum path length 10.
+Total states processed 64; repeated states pruned 32 (50%). Engine elapsed time
+rounds to 0.0 sec. SBCL reports 0.004 sec real time, zero measured CPU time,
+13,183,382 processor cycles and 10,411,616 bytes consed. One operational sample,
+not a speedup/scalability benchmark or allocation comparison.
+
+Returned anonymous path matches the upstream witness:
+1. Pickup from ground in area1.
+2. Place on plate1 in area1.
+3. Cross gate1, area1 -> area2.
+4. Pickup from ground in area2.
+5. Cross gate1, area2 -> area1, carrying.
+6. Place on plate2 in area1.
+7. Pickup from plate1 in area1.
+8. Cross gate2, area1 -> area3, carrying.
+9. Place on plate3 in area3.
+10. Cross gate3, area3 -> area4.
+
+Static review of the user's displayed path states, not a separate executed replay:
+Step  Agent area  Ground counts by area1..4  Carrying  Occupied plates
+0     area1       1 1 0 0                  no        none
+1     area1       0 1 0 0                  yes       none
+2     area1       0 1 0 0                  no        plate1
+3     area2       0 1 0 0                  no        plate1
+4     area2       0 0 0 0                  yes       plate1
+5     area1       0 0 0 0                  yes       plate1
+6     area1       0 0 0 0                  no        plate1 plate2
+7     area1       0 0 0 0                  yes       plate2
+8     area3       0 0 0 0                  yes       plate2
+9     area3       0 0 0 0                  no        plate2 plate3
+10    area4       0 0 0 0                  no        plate2 plate3
+Every displayed arrangement contains two boxes, nonnegative ground counts and
+capacity-one hands/plates. Every step costs one. Crossings preserve supporting
+boxes and carrying; step 7 removes plate1 occupancy. The latter entails gate1
+closure under the model's wiring/query, but no separate gate-open? call is shown.
+Final agent area4 satisfies the direct goal. The ten-action result attains the
+independent lower bound; no shorter intended path exists under its premises.
+This does not independently test every forbidden action, all generated ASSERT
+alternatives, count-two pile collapse, cheaper-arrival reopening or worker DFS.
+
+REPORTING LIMITATION -- SOURCE REVIEW, NO ENGINE CHANGE
+The report shows maximum depth 0 and program cycles 0 despite the ten-action path.
+ww-searcher.lisp initializes these counters to zero. ww-parallel.lisp
+generate-root-tasks counts generated successors in *total-states-processed* and
+duplicate arrivals in *repeated-states*, but does not update global max depth or
+program cycles. process-partitioned-parallel-body can return when the root frontier
+is exhausted, before starting workers and aggregating their stats. Worker expansion
+normally increments ws-program-cycles and ws-max-depth; aggregation merges these.
+The user's counters are consistent with serial root-task completion, a reporting
+coverage gap rather than evidence that no depth was explored. The omitted startup
+log/phase metrics do not independently establish worker launch or execution.
+Record the printed zeros, not corrected/invented values. Parallel worker operation
+and meaningful depth/cycle accounting remain unverified; an engine reporting fix
+requires its own authorized scope. No engine file was changed or test run added.
+
+FIRST ADDITIONAL ENHANCEMENT PROPOSAL -- ACCEPTED BY THE USER
+Recommend fixed topology indexes: local plates by area, incident gates by area,
+and controlling plate by gate. Build once from validated supplied facts during
+staging; keep the derived lookup data static/shared. Existing discovery queries
+then avoid repeated whole-domain scans, and gate-open? reads its single controller.
+This addresses growth in areas, plates, gates and connections; it changes no
+objects, wiring, action choices, costs, traces or dynamic state-copy contents.
+Extra staged storage/derivation has a cost; speedup is a structural hypothesis,
+not measured evidence from this tiny instance.
+
+Proposed next increment bundles writing the indexes with user-run staging,
+lookup-versus-original-topology checks for every declared area/gate, a small set
+of focused generated-successor checks, and one supplied-instance solve regression
+at the current settings. The user approved this increment. At proposal time no
+additional solve or fidelity fixture had been run. Focus the successor checks on what the existing
+path does not show: full-hands/occupied-target rejection, remote handling and
+nonincident open gates, complete independent placement alternatives, and one
+ground pickup choice with both given boxes in the same area. Check conserved
+counts, unchanged parent states, unit costs and anonymous descriptions there.
+Keep the relaxed all-gates-open remaining-step bound for the following enhancement
+discussion, with its admissibility and integration checks. Final consolidation
+and optional handoff remain incomplete; the basic solve does not finish the spec.
+
+FIRST ENHANCEMENT IMPLEMENTATION -- 2026-10-09
+Written in problem-boxes-advisor.lisp:
+- AREA-PLATES and AREA-GATES are static list-valued relations. Their queries are
+  single indexed reads; actions iterate only the returned local candidates.
+- CONTROLS is now declared ($plate $gate :bijective), retaining all three supplied
+  raw controls facts. The agreed one-to-one wiring justifies both index directions.
+  CONTROLLING-PLATE uses (bind (controls $plate ?gate)), which translate-bind selects
+  as the gate-keyed CONTROLS2 lookup. GATE-OPEN? tests occupation of that sole plate.
+  No separate derived gate-controller fact or plate scan is necessary.
+- INITIALIZE-TOPOLOGY-INDEXES has no header type and one ASSERT. Seed empty lists
+  for every area; visit each declared plate and cons it into its supplied area;
+  visit each gate and cons it into both endpoints; reverse lists once into declared
+  object order. Validated endpoints are distinct, so no duplicate incident entry.
+  Initialization takes O(areas + plates + gates), including all list reversals.
+  Static storage is O(areas + plates + gates); gate incidence stores two references.
+- Its BINDs and writes all use symbolic static tables, matching the plain-compiled
+  init-action contract. It runs before the unchanged box-count initialization.
+  The engine's final conversion publishes the new static facts to *static-idb*;
+  no compiled query consumes those new adjacency facts during init actions.
+- No new dynamic fact, equipment, action, cost or goal. Input objects/raw facts,
+  capacities and anonymous trace fields remain unchanged. All three action source
+  forms are untouched. Search does not mutate the returned lists.
+
+Correctness: each declared plate enters exactly its supplied area list; every
+gate enters precisely its two validated endpoint lists; reversal restores the
+original discovery order. Bijective wiring retains exactly the supplied pairs
+and one controlling occupied plate opens exactly its own gate. This preserves
+all local choices and endpoint/carrying behavior while removing repeated global
+scans. Constant lookup plus local iteration is a structural improvement; no
+measured speedup or scalable performance result is claimed. Initialization/storage
+cost and worker snapshot copies of static lists remain performance questions.
+DEFINE-DERIVED-RELATIONS is restricted to dynamic relations; these static lists
+are computed by the init action rather than registered as dynamic derived state.
+Source review of worker-read-copy-value accepts finite lists/symbols/NIL; worker
+execution with these indexes is still not runtime-verified by the basic solve.
+
+Prepared passive spec-analysis-index-checks.lisp, no top-level test execution.
+Load after staging to resolve current generated query symbols. The explicit
+CHECK-BOXES-INDEXED-MODEL call reads the authored DEFINE-INIT from this independent
+spec, compares every area's indexed lists/order and every gate's controller with
+those raw facts, and requires static entries even for empty local lists. It checks
+the supplied initial arrangement, closed gates/false goal and five dynamic entries
+(one agent area plus four counts), so index data does not enter state-copy contents.
+
+Four count-conserving copied-state fixtures have explicit expected choice/state
+tables, rather than deriving expected effects from action code:
+1. Carrying in area1, empty plates: exactly ground/plate1/plate2 placement, no pickup.
+2. Carrying with plate1 occupied: ground/plate2 placement and carrying gate1 crossing;
+   no occupied-target placement or pickup, supporting plate1 box remains in place.
+3. Empty hands in area1, plates2/3 occupied: only pickup plate2 and cross gate2;
+   empty ground/empty-hands placement, remote plate3 and nonincident gate3 rejected.
+   Plate2 recovery closes gate2 while leaving gate3 open.
+4. Both given boxes loose in area1: exactly one ground pickup choice, count 2 -> 1.
+Expected total nine generated successors. For each: exact anonymous trace and
+arrangement, unit duration, conservation, gate status from source wiring, distinct
+successor database, unchanged parent and unchanged static indexes. No full-path
+replay or solver is called by the check function. Fail immediately on a discrepancy.
+
+Assistant static checks, SBCL 2.6.9 --no-sysinit --no-userinit: read 34 spec forms,
+16 passive-check file forms, ten queries. Confirmed given types, all twelve raw
+initial facts, direct goal and three unit actions. Audit found no query calls in
+inspected opaque macros, and the check file contains only IN-PACKAGE/DEFUN forms.
+No model/check source form was evaluated, so no runtime success is claimed.
+Tracked diff whitespace and explicit untracked-file scans passed. Reader helper
+was outside the project and removed; no new directory or engine change.
+
+APPROVED USER REPL CHECK PLAN -- RESULTS NOW REPORTED BELOW
+1. (stage boxes-advisor), current indexed revision: expect normal initialization.
+2. Load spec-analysis-index-checks.lisp after staging, then call
+   (check-boxes-indexed-model). Expect BOXES-INDEX-CHECKS-PASSED with 4 areas,
+   3 controllers, 4 fixtures and 9 successors; function returns T.
+3. If staging/checks pass, (solve) once. Expected ten-action minimum, configured
+   DEPTH-FIRST/GRAPH/MIN-LENGTH, threads 16, cutoff 0, no heuristic or bound.
+Stop on an error/check failure or the solve's normal return; receive output and
+actual settings/length/work/time. Do not automatically repeat or expand this scope.
+Current execution status: user reports the focused checks pass and the minimum
+solution length remains ten. The relaxed remaining-step bound is the next
+enhancement for separate interactive review.
+
+FIRST ENHANCEMENT USER RESULTS -- 2026-10-09
+Operator: user, existing REPL, current indexed BOXES-ADVISOR revision.
+Supplied output:
+  (check-boxes-indexed-model)
+  BOXES-INDEX-CHECKS-PASSED: 4 areas, 3 controllers, 4 fixtures, 9 successors.
+  Number of steps in a minimum path length solution = 10
+The pass marker establishes execution of the prepared source-topology comparisons
+and four copied-state fixture checks, including all nine expected successors,
+their effects, unit costs, conservation, gate status, parent preservation and
+distinct successor databases. The solver line supplies a minimum-length regression
+result for this instance. No new settings report, trace, counters or timing was
+provided; do not reuse the basic run's performance figures as indexed measurements.
+This evidence does not establish all family cases, worker execution, performance
+improvement, or full-path replay. First index increment is checked within its
+approved scope; no further solve is currently needed for that increment.
+
+SECOND ENHANCEMENT PROPOSAL -- ACCEPTED BY THE USER
+Recommend a static all-gates-open remaining-crossing lower bound. Compute shortest
+unweighted area distances backwards from the existing literal goal area4, using
+the validated incident-gate lists. Treat every gate as open, regardless of plate
+occupation or boxes. Expected supplied distances: area1 2, area2 3, area3 1,
+area4 0. Store the per-area numeric bound statically, leaving the direct goal and
+copied changing-state contents unchanged.
+
+For an area in the goal's topology component, each legal completion must cross
+at least this many gates. Pickups and placements add nonnegative action counts;
+gate restrictions cannot shorten a route available when all gates are open.
+The formula is therefore admissible for the agreed unit-action family. For areas
+outside that component, explicitly use zero as a conservative numeric lower bound;
+disconnection makes completion impossible but need not invalidate a specification.
+This disposition does not add reachability pruning or assume a connected family.
+
+Use DEFINE-QUERY MIN-STEPS-REMAINING? with the existing engine contract. Current
+ww-searcher.lisp requires a nonnegative real value; at a positive cutoff it prunes
+when depth + bound exceeds the cutoff, and for MIN-LENGTH with an incumbent it
+prunes when that sum is at least the incumbent depth. The all-open relaxation
+thus preserves a globally shortest solution. A state whose bound is zero may
+receive no extra pruning. At cutoff zero, this bound begins to help after an
+incumbent exists. Do not promise a reduction in the tiny supplied run.
+
+Build time O(areas + gates) with breadth-first traversal, static storage O(areas),
+and constant-time lookup after the current-area read at each bound evaluation.
+This addresses wasted deep exploration as topology grows, with extra setup/storage
+and per-evaluation overhead. Larger-family benefit remains a performance question.
+No ordering hook is included in this proposed increment.
+
+Proposed bundle, operator user in existing REPL: write the static bound/initialization
+and query; assistant reader/source checks; user staging; focused value checks for
+all four areas, independence from box arrangement, goal zero, retained/pruned
+cutoff and incumbent boundary cases through the engine hook; one supplied-instance
+solve regression expected to retain minimum ten. Record actual hook evaluation
+evidence separately from direct query values. No assistant-run model, replay,
+benchmark, new directory, engine edit or existing-spec comparison is included.
+The user subsequently approved this second increment. The following implementation
+and check plan record its current execution status.
+
+SECOND ENHANCEMENT IMPLEMENTATION -- 2026-10-09
+Written in problem-boxes-advisor.lisp:
+- Static AREA-CROSSING-BOUND stores one nonnegative integer per declared area.
+- BOXES-ALL-OPEN-DISTANCES is a short ordinary Lisp helper, defined before the new
+  init action is installed. It visits breadth-first layers from the supplied goal
+  area4, marks each discovery immediately, and returns a transient distance map.
+  Presence checks distinguish the reached goal's distance zero from disconnection.
+  Cycles, self-revisits and duplicate neighbors cannot queue an area twice.
+- INITIALIZE-CROSSING-BOUNDS seeds a temporary area-neighbor map, visits each gate
+  once to add both validated endpoints, calls the helper, then writes every area's
+  static bound. This endpoint pass is a simpler construction than rescanning the
+  incidence lists; it produces the same all-open adjacency without search-time data.
+  An absent distance explicitly writes zero for a goal-disconnected component.
+  No assumptions about all areas being connected, and no reachability pruning.
+- Init order is topology indexes, crossing bounds, then box counts. New init reads
+  use symbolic static BINDs and ordinary Lisp data; no compiled query reads the new
+  facts before final integer conversion. The engine evaluates the bound on the start
+  state after that conversion; expected staging message value is 2.
+- MIN-STEPS-REMAINING? performs BINDs for the actual agent area and that area's static
+  bound, returning its number. No per-call traversal or repeated layout validation.
+  All given objects, twelve authored initial facts, dynamic relation declarations,
+  three action forms/costs and direct goal are preserved. No goal-area state fact.
+  The goal datum area4 appears in the derivation and direct goal; change both if
+  authoring a different goal instance. No heuristic/order hook or engine edit.
+
+Correctness argument: first discovery in a breadth-first layer gives the shortest
+all-open crossing distance. Any intended completion projects to a route in that
+graph and has at least that many unit gate crossings. Extra handling and gate
+restrictions cannot lower its action count. Zero is a valid numeric lower bound
+for disconnected areas, whose completion is impossible. The implemented formula
+therefore preserves a minimum solution under the current pruning contract.
+Each area is queued at most once; endpoints are traversed at most twice per gate.
+Staging O(areas + gates), temporary storage O(areas + gates), additional persistent
+static storage O(areas), and two constant-time indexed reads per hook evaluation.
+No new changing-state entries; no measured runtime or scaling saving is claimed.
+
+Passive spec-analysis-bound-checks.lisp defines functions without running them.
+Its explicit CHECK-BOXES-BOUND-MODEL first repeats the existing index/action checks,
+then checks all four independent expected bounds (2 3 1 0), static entries, goal
+zero, four alternative carrying/plate/pile arrangements, and state preservation.
+Six engine-hook cases exercise MIN-STEPS-REMAINING-PRUNES-NODE-P:
+1. No cutoff/incumbent: retain, with no bound evaluation.
+2. At cutoff: retain (depth 0 + bound 2 = cutoff 2).
+3. Beyond cutoff: prune (depth 1 + bound 2 > cutoff 2).
+4. Goal at cutoff: retain (depth 2 + bound 0 = cutoff 2).
+5. Can improve incumbent: retain (depth 7 + bound 2 < incumbent 10).
+6. Ties incumbent: prune (depth 8 + bound 2 = incumbent 10).
+Require five actual aggregate-hook evaluations and two prunes, separately from
+direct query results. Test cutoffs/adaptation mode use ordinary local specials;
+the SBCL DEFGLOBAL solution list and two hook counters are saved and restored
+under UNWIND-PROTECT, including on an error. No synthetic solution is retained.
+Require the standalone MIN-LENGTH configuration and enabled pruning; report an
+unexpected registered contributor instead of silently masking it.
+
+Assistant reader/source checks, SBCL 2.6.9 --no-sysinit --no-userinit: 37 spec forms,
+16 index-check forms, 6 bound-check forms, 11 queries. Independent expected input,
+dynamic declarations, direct goal and all three full action forms match. DSL macro
+audit passes, and both check files contain only IN-PACKAGE/DEFUN forms. Model and
+check forms were read as data, not evaluated. A binding audit also confirms that
+the three engine DEFGLOBALs used by the checks are not shadowed with LET/LET*.
+At this assistant verification point runtime status was pending; subsequent user
+results are recorded below.
+The first preservation check could not read a temporary baseline from a prior
+sandbox call. The successful replacement used independent source expectations
+and a single-call reader helper; this was a check-setup failure, not a model error.
+External temporary helpers were removed; no project folder or engine edit.
+Goal-disconnected/cyclic larger topologies and worker execution are not runtime
+tested by this supplied-instance check plan; proof/source coverage and performance
+questions remain distinct from the connected four-area runtime results below.
+
+APPROVED USER REPL BOUND CHECK PLAN -- RESULTS NOW REPORTED BELOW
+1. (stage boxes-advisor). Expect normal init and start remaining-step bound 2.
+2. Load spec-analysis-index-checks.lisp, then spec-analysis-bound-checks.lisp,
+   after staging to resolve the current generated queries.
+3. (check-boxes-bound-model). Expect the existing index pass marker followed by
+   BOXES-BOUND-CHECKS-PASSED: bounds (2 3 1 0), 4 handling fixtures,
+   6 engine boundary cases (5 evaluations, 2 prunes), then T.
+4. If checks pass, (solve) once at current DEPTH-FIRST/GRAPH/MIN-LENGTH,
+   threads 16, cutoff 0, bound enabled, no ordering heuristic. Expected minimum ten.
+5. Report the solve's actual *min-steps-fallback-evaluations* and
+   *min-steps-fallback-unique-prunes*, separately from the restored fixture counters.
+Stop on an error/check failure or normal solve return; no repeat/expanded run.
+Current execution status: implemented and user-reported checks pass. The supplied
+regression retains ten actions and reports actual bound evaluations/prunes.
+
+SECOND ENHANCEMENT USER RESULTS -- 2026-10-09
+Operator: user, existing REPL, current indexed/bounded BOXES-ADVISOR revision.
+Supplied solve-counter output:
+  (list :bound-evaluations *min-steps-fallback-evaluations*
+        :bound-prunes *min-steps-fallback-unique-prunes*)
+  (:BOUND-EVALUATIONS 3 :BOUND-PRUNES 3)
+User reports: "Same 10 action solution."
+Supplied subsequent focused-check output:
+  (check-boxes-bound-model)
+  BOXES-INDEX-CHECKS-PASSED: 4 areas, 3 controllers, 4 fixtures, 9 successors.
+  BOXES-BOUND-CHECKS-PASSED: bounds (2 3 1 0), 4 handling fixtures,
+  6 engine boundary cases (5 evaluations, 2 prunes).
+
+The focused pass markers establish the four per-area bound values, independence
+from the four handling arrangements, goal zero, unchanged states, and all six
+engine-hook boundary cases, as well as the repeated index/action checks. The
+fixture's five evaluations/two prunes are isolated and its global counters and
+solution list are restored; they are not the solve measurements. The user's solve
+counters show three actual aggregate-bound evaluations, each returning a pruning
+decision, while the same ten-action solution is retained. This provides actual
+search-hook exercise evidence beyond direct value/helper checks.
+
+No new full staging transcript, parameter report, solver stop-reason output,
+path listing, total-work counts or timing was provided. The prior detailed basic
+staging/settings and ten-action path remain earlier evidence; do not represent
+their performance figures as measurements of the bounded revision. No speedup,
+larger-instance scaling result or worker execution is established by these counters.
+The second enhancement is checked within its approved scope. No further run is
+needed for that increment solely to repeat the passing results.
+
+NEXT PROPOSED SCOPE -- FINAL CONSOLIDATION AND REVIEW
+Recommend the final whole-model review under spec-advisor.md steps 5 and 6:
+- Consolidate this active record into a current requirement-to-implementation and
+  evidence account, retaining earlier proposals/failures as clearly marked history.
+- Review objects/data, all three actions, costs, capacities, conservation, goal,
+  anonymous output, reductions and both additional enhancements together.
+- Resolve or explicitly classify remaining acceptance gaps. In particular, current
+  cost-aware GRAPH behavior is source-reviewed and the supplied optimum is retained,
+  but a cheaper-later-arrival reopening case has not been separately exercised.
+  Complete final warning-free staging/settings/stop-reason evidence is also absent
+  from the supplied excerpts. Final review must address these before asserting full
+  readiness; do not silently treat a required correctness check as performance work.
+- Prepare a concise spec-analysis-search-handoff.txt linking requirements, tested
+  revision, checks/limits, growth dimensions, and deferred performance questions.
+  Preparing this record does not start the optional search-advisor phase.
+No new search, replay, benchmark, engine edit or existing-spec comparison is proposed
+by this documentation/review scope. Any additional acceptance check identified by
+the review needs a concrete scoped proposal and approval; reuse valid passing
+evidence instead of repeating independent checks. Final consolidation/handoff is
+awaiting the user's next section approval. Overall specification completion has
+not yet been declared.

@@ -152,7 +152,8 @@
 
 
 (define-query visible? (?area1 ?area2)
-  (or (visible0 ?area1 ?area2)  ;directly visible
+  (or (eql ?area1 ?area2)  ;same area
+      (visible0 ?area1 ?area2)  ;directly visible
       (exists (?gate gate)
         (and (visible1 ?area1 ?gate ?area2)
              (not (active ?gate))))
@@ -672,14 +673,11 @@
   
   ;visibility is a los from an area to an area 
   ;potentially containing a movable target or terminus
-  (visible0 area1 area1)  ;same area
   (visible1 area1 gate1 area2)
   (visible0 area1 area3)  ;thru window
   (visible2 area1 gate1 gate2 area3)
   (visible1 area1 gate2 area2)  ;thru window
-  (visible0 area2 area2)
   (visible1 area2 gate2 area3)
-  (visible0 area3 area3)
 )
 
 

@@ -138,7 +138,8 @@
 (defun check-init-general-consistency (literals)
   "Check initialization invariants owned by the planning engine."
   (check-init-duplicate-fluent-keys literals)
-  (check-init-no-derived-facts literals))
+  (check-init-no-derived-facts literals)
+  (check-init-symmetric-self-pairs literals))
 
 
 (defun init-literal-proposition (literal)
@@ -211,6 +212,43 @@
                 Literal: ~S~%~
                 Relation ~S is derived during initialization; remove it from DEFINE-INIT."
                literal relation)))))
+
+
+(defun check-init-symmetric-self-pairs (literals)
+  "Reject a fact pairing an object with itself in a symmetric relation's
+   interchangeable key positions, eg (separates gate1 area1 area1)."
+  (dolist (literal (remove-if-not #'positive-init-literal-p literals))
+    (let* ((proposition (init-literal-proposition literal))
+           (groups (symmetric-key-position-groups (car proposition)))
+           (group (find-if (lambda (group)
+                             (symmetric-group-repeats-object-p proposition group))
+                           groups)))
+      (when group
+        (error "~%DEFINE-INIT pairs an object with itself in a symmetric relation.~%~
+                Literal: ~S~%~
+                Argument positions ~{~D~^, ~} of ~S are interchangeable and must name ~
+                different objects."
+               literal group (car proposition))))))
+
+
+(defun symmetric-key-position-groups (relation)
+  "Return RELATION's groups of interchangeable non-fluent argument positions, one-based,
+   omitting any group left with fewer than two positions."
+  (let ((fluent-indices (init-relation-fluent-indices relation)))
+    (loop for indexes in (gethash relation *symmetrics*)
+          for positions = (remove-if (lambda (position)
+                                       (member position fluent-indices))
+                                     (mapcar #'1+ indexes))
+          when (rest positions)
+            collect positions)))
+
+
+(defun symmetric-group-repeats-object-p (proposition positions)
+  "Return true when two of the POSITIONS in PROPOSITION hold the same object."
+  (let ((objects (mapcar (lambda (position)
+                           (nth position proposition))
+                         positions)))
+    (not (alexandria:setp objects :test #'equal))))
 
 
 (defun init-literal-map (relation literals key-index value-index)

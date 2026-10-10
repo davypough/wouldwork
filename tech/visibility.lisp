@@ -133,16 +133,13 @@
 
 
 (define-init-check-helper check-init-los-structure (literals)
-  "Reject sightlines with no span and malformed intervening-occluder lists.  Repeating an
-   occluder changes nothing, while naming either endpoint as intervening confuses an anchor
-   with something between the anchors and can make a beam block itself."
+  "Reject malformed intervening-occluder lists.  Repeating an occluder changes nothing,
+   while naming either endpoint as intervening confuses an anchor with something between
+   the anchors and can make a beam block itself.  A sightline with the same near and far
+   endpoint is rejected earlier by the engine's symmetric self-pair check."
   (dolist (literal (positive-init-literals-with-relation 'los-via literals))
     (destructuring-bind (near occluders far)
         (rest (init-literal-proposition literal))
-      (when (eql near far)
-        (fail-init-check literal
-          "LOS-VIA has the same near and far endpoint: ~S.  A sightline must span two distinct endpoints."
-          near))
       (when (/= (length occluders)
                 (length (remove-duplicates occluders :test #'eql)))
         (fail-init-check literal

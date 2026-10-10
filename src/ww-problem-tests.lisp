@@ -1044,6 +1044,81 @@
     (stage blocks3)))
 
 
+;;; SYMMETRIC SELF-PAIR TEST ;;;
+
+
+(defparameter *symmetric-self-pair-test-literals*
+  '((pair-at area1)
+    (pair-separates gate1 area1 area2)
+    (pair-route> area1 area1)
+    (pair-span area1 2 2))
+  "The complete DEFINE-INIT literals of the symmetric self-pair test problem.")
+
+
+(defun check-symmetric-self-pair-test (condition control &rest arguments)
+  "Signal a focused symmetric self-pair test failure unless CONDITION is true."
+  (unless condition
+    (error "~A" (apply #'format nil control arguments)))
+  t)
+
+
+(defun capture-symmetric-self-pair-test-condition (function)
+  "Call FUNCTION and return any signaled error."
+  (handler-case
+      (progn
+        (funcall function)
+        nil)
+    (error (condition)
+      condition)))
+
+
+(defun check-symmetric-self-pair-rejection (function expected-texts description)
+  "Require FUNCTION to signal an error whose report contains every EXPECTED-TEXTS item."
+  (let* ((condition (capture-symmetric-self-pair-test-condition function))
+         (report (and condition (princ-to-string condition))))
+    (check-symmetric-self-pair-test
+      (and report
+           (every (lambda (text) (search text report)) expected-texts))
+      "~A was not rejected as expected: ~S"
+      description report)))
+
+
+(defun test-symmetric-self-pairs ()
+  "Verify symmetric self-pair rejection, its directed and fluent exemptions, and
+   rejection of unknown relation annotations."
+  (cleanup-test-files)
+  (unwind-protect
+      (progn
+        (%stage "test/engine/problem-engine-symmetric-self-pair-test.lisp")
+        (check-symmetric-self-pair-test
+          (null (capture-symmetric-self-pair-test-condition
+                  (lambda ()
+                    (validate-init-literals *symmetric-self-pair-test-literals*))))
+          "A directed or fluent repeated argument was rejected.")
+        (check-symmetric-self-pair-rejection
+          (lambda ()
+            (validate-init-literals
+              (cons '(pair-separates gate1 area2 area2) *symmetric-self-pair-test-literals*)))
+          '("pairs an object with itself" "PAIR-SEPARATES" "2, 3")
+          "A symmetric self-pair")
+        (check-symmetric-self-pair-test
+          (null (capture-symmetric-self-pair-test-condition
+                  (lambda ()
+                    (validate-init-literals
+                      (cons '(not (pair-separates gate1 area2 area2))
+                            *symmetric-self-pair-test-literals*)))))
+          "A negated symmetric self-pair was rejected.")
+        (check-symmetric-self-pair-rejection
+          (lambda ()
+            (register-relation-signature '(bad-marker pair-area :required) *static-relations* nil))
+          '("Unknown relation annotation")
+          "An unknown annotation")
+        (format t "~2&All symmetric self-pair cases passed.~%")
+        t)
+    (cleanup-test-files)
+    (stage blocks3)))
+
+
 ;;; CANDIDATE SOLUTION VALIDATOR TEST ;;;
 
 

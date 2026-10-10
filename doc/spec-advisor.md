@@ -159,6 +159,26 @@ accepted in the analysis. A reduced model need not first implement the discarded
 actions. Keep the identified larger problem family in view: avoid hard-coding an
 instance-specific cutoff, object count, or solution into general rules.
 
+#### Design priorities
+
+Apply these in order; an earlier priority wins when two conflict.
+
+1. **Scalable representation.** Choose what the state records so that it stays
+   compact and efficient for much larger instances of the identified family, even
+   when a more literal description of the given instance would be simpler to read.
+2. **Combined actions.** Combine related actions that share tests or lookups,
+   within reason, generating each legal alternative in its own `assert`
+   (Section 1.9). Keep separate actions where combining would obscure the rules
+   without saving repeated work.
+3. **Simplicity.** Within those choices, keep the specification as small and plain
+   as possible: no defensive checks (see *Leave validation of the given data to the
+   engine*), no query that merely wraps a single lookup, and no `ww-set` that
+   restates a default. Record the reasons for such decisions in the spec analysis,
+   not in the file.
+4. **Wouldwork idioms.** Express logic with Wouldwork statements (`exists`,
+   `forall`, `doall`, `if`, `bind`, queries and updates) rather than equivalent
+   Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step.
+
 The discussion order follows dependencies and the user's comments; the finished
 file follows Section 1.1's organization. A useful default agenda is:
 
@@ -232,6 +252,30 @@ Preserve given objects, apparatus, wiring, geometry, colors, and heights. Locati
 standing spots, so proposing an additional location is legitimate when supported by the geometry.
 Do not add equipment or change barriers to manufacture a solution. A user-confirmed correction
 to an incorrectly transcribed given must be distinguished from changing the given itself.
+
+#### Leave validation of the given data to the engine
+
+A mistyped given must not silently change the answer, but guarding against one is the
+engine's job, not the specification's:
+
+- **Add no representation assumptions that need their own guard.** Each assumption a
+  representation makes about the given data (only one agent, every box starting on the
+  ground, a conserved count) needs a check that the data satisfies it, while a direct
+  representation of the given objects needs none. Prefer the direct representation unless
+  an agreed enhancement justifies the assumption; then record the assumption with its
+  guard. This applies equally to the enhancements in step 4.
+- **Rely on the engine's checks, not hand-written ones.** The engine already rejects
+  wrong types, two values for one key (including either side of a `:bijective` relation),
+  authored derived facts, and an object paired with itself in a symmetric relation.
+  Do not write `define-init-check` or its helpers on Path B; on Path A, the included
+  technologies supply their own checks.
+
+Which starting facts each object needs is part of the problem's meaning, not a
+consistency rule: a carried box has no location, and an empty peg holds nothing. A
+forgotten fact usually shows up only as no solution, and occasionally as a longer one.
+So during section review, confirm with the user that every object has the starting
+facts its role requires. Raise any rule linking several relations, such as a plate lying
+in one of its gate's areas, in the same review rather than adding a check.
 
 #### Choose the authoring approach from the agreed analysis
 
@@ -324,6 +368,11 @@ compact representations, efficient choice generation, or maintained summaries.
 Select what fits the analyzed problem; do not add a hook simply to fill a checklist.
 If no additional mechanism is justified, discuss that conclusion with the user and
 record the agreed disposition rather than silently omitting this step.
+
+Actions are normally combined already in the basic model (design priority 2).
+Preserve every legal choice, its cost, and its captured description; fewer action
+definitions do not mean fewer physical steps. Distinguish reduced repeated work
+from a measured speedup.
 
 #### Preserve the requested answers
 
@@ -603,6 +652,9 @@ them does not matter.
 (ww-set *progress-reporting-interval* <integer>)  ; omit for adaptive reports; N = every N states
 ```
 
+Write only the settings the problem needs at a non-default value (`*problem-name*`
+is always required). A setting left at its default is omitted, not restated.
+
 **Three parameters must NOT appear in a problem file. Each signals an error if it
 does:**
 
@@ -688,6 +740,18 @@ Relations that never change. Asserted in `define-init` and stored separately.
   (controls receiver gate)
   (max-row $fixnum))
 ```
+
+#### Symmetric and bijective relations
+
+A relation with two or more arguments of the same type (eg, `(separates gate area area)`)
+is symmetric: asserting one order also asserts the other. Suffix the name with `>` to make
+it directional. In `define-init`, the interchangeable non-fluent positions of a symmetric
+relation must name different objects; `(separates gate1 area1 area1)` is an error.
+
+A trailing `:bijective` keyword declares a one-to-one pairing of two fluent arguments, eg
+`(controls $plate $gate :bijective)`. Either side can be looked up from the other, and
+`define-init` may not pair one object with two partners. Any other trailing keyword is an
+error.
 
 
 ### 1.5 Technology Includes (`include-tech`) — Path A
@@ -901,6 +965,17 @@ State modifications. The effect body starts in `pre` context and shifts to
 - **`setq` in effects**: `(setq $place 'ground)` captures values for the
   description-variables trace.
 
+**Combining related actions.** A pickup action can share its empty-hands check,
+then generate separate ground and plate alternatives inside its effect. In
+depth-first translation, each separate `assert` copies the incoming state and
+emits one successor; these are alternative single actions, not a sequence of
+pickups. Keep each alternative's complete writes in its own block and establish
+its description values there. Generate both ground and plate choices when both
+are legal; an exclusive branch would lose choices. Merely combining parameter
+types still checks each header instantiation and does not ensure a saving. Each
+legal successor still incurs its own state copy. Check legality, costs, traces,
+and integration before claiming readiness; measure before claiming a speedup.
+
 #### Description Variables
 
 A list of variables whose values are captured for the solution trace:
@@ -954,8 +1029,9 @@ Asserts the initial state — both dynamic and static relations:
 - `(not (...))` retracts a relation (rarely needed in init).
 
 `install-init` validates the complete raw literal set before asserting any of it. The engine
-rejects storage-level contradictions such as duplicate fluent keys and authored derived facts;
-each included technology registers its own semantic checks for the relations it owns.
+rejects wrong argument types, duplicate fluent keys, authored derived facts, and symmetric
+self-pairs (Section 1.4); each included technology registers its own semantic checks for
+the relations it owns.
 These checks can diagnose specification failures during staging; they do not detect
 every semantic error or establish fidelity to the intended problem. A standalone
 problem that includes no technologies does not inherit Talos-specific rules.

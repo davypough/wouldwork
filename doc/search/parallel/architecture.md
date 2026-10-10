@@ -71,3 +71,32 @@ The main orchestration is in [ww-parallel.lisp](/D:/quicklisp/local-projects/wou
 These operations are implemented in [worker-local-dfs](/D:/quicklisp/local-projects/wouldwork/src/ww-parallel.lisp:171) and [work donation](/D:/quicklisp/local-projects/wouldwork/src/ww-parallel-infrastructure.lisp:198).
 
 **The important distinction is that depth-first describes each worker’s local exploration.** The whole search has several branches advancing simultaneously, following an initial level-by-level split. Donation can also reorder pending work. Consequently, parallel execution does not preserve serial DFS’s overall visitation order, and its first solution need not be the same solution—or the shortest one.
+
+**3. Search statistics**
+
+Parallel DFS totals include both initial task generation and worker exploration.
+Small problems can finish entirely during task generation; in that case no
+workers start, but their preparation still contributes to the search totals.
+
+- **Program cycles** count expanded nodes, including expansions with no successors.
+  They are separate from the hardware processor cycles shown by SBCL's timing output.
+- **Total states processed** count the start state plus generated successors,
+  including successors subsequently rejected or pruned. These are recorded before
+  goal handling, so finding a requested first solution does not lose that expansion's counts.
+- **Maximum depth explored** includes generated successors even when they are pruned.
+  It can therefore exceed the minimum solution length.
+- **Dead-end and duplicate depths** include terminations during task generation.
+  A better arrival that reopens a graph state contributes to the repeat count but
+  does not terminate as a duplicate.
+- **Average branching factor** is generated successors divided by program cycles.
+  It is printed when at least one node was expanded.
+
+Task generation proceeds level by level, so it contributes no DFS backtrack
+distances. Elapsed seconds in the solution summary are printed to one decimal
+place; a short search can display `0.0` seconds.
+
+Focused statistics checks are in `test/search/parallel-statistics-checks.lisp`.
+After loading Wouldwork, load that file and call
+`(ww::test-parallel-statistics)` in an isolated test instance. The checks cover
+completion during task generation, a split that reaches workers, terminal
+nodes, an early first solution, and per-run reset.

@@ -114,14 +114,14 @@
     (validate-init-literals
       '((not (los-via clear-left (clear-left clear-left) clear-left)))
       :checks '(visibility-init-check)))
+  ;; A sightline with no span is an engine-level symmetric self-pair.
   (expect-condition
     (lambda ()
       (validate-init-literals
         '((los-via clear-left () clear-left))
         :checks '(visibility-init-check)))
-    'init-check-failure
-    :containing "same near and far endpoint"
-    :check 'visibility-init-check)
+    'error
+    :containing "pairs an object with itself")
   (expect-condition
     (lambda ()
       (validate-init-literals

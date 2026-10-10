@@ -161,15 +161,21 @@
     (t spec)))
 
 
-(defun bijective-relation-p (relation)
-  "Detects if a relation specification contains the :bijective annotation.
-   Returns two values:
-   1. The relation with :bijective removed (or unchanged if not present)
-   2. T if :bijective was present, NIL otherwise."
-  (let ((last-element (car (last relation))))
-    (if (eql last-element :bijective)
-        (values (butlast relation) t)
-        (values relation nil))))
+(defun split-relation-annotations (raw-relation)
+  "Separates a relation specification from its trailing annotation keywords.
+   Returns two values: the relation without annotations, and the list of annotations.
+   The only recognized annotation is :bijective."
+  (let* ((annotations (loop for item in (reverse raw-relation)
+                            while (keywordp item)
+                            collect item))
+         (relation (butlast raw-relation (length annotations))))
+    (dolist (annotation annotations)
+      (unless (member annotation '(:bijective))
+        (error "Unknown relation annotation ~S in ~S; expected :BIJECTIVE."
+               annotation raw-relation)))
+    (unless (alexandria:setp annotations)
+      (error "Repeated relation annotation in ~S." raw-relation))
+    (values relation annotations)))
 
 
 (defun create-bijective-indices (relation relation-table)
@@ -242,35 +248,21 @@
              (car relation) (car relation)))))
 
 
-(defun register-dynamic-relation-signature (raw-relation)
-  (multiple-value-bind (relation bijectivep)
-      (bijective-relation-p raw-relation)
+(defun register-relation-signature (raw-relation table empty-value)
+  "Installs RAW-RELATION's signature and annotations in TABLE (*relations* or
+   *static-relations*).  EMPTY-VALUE is the signature stored for a nullary relation."
+  (multiple-value-bind (relation annotations)
+      (split-relation-annotations raw-relation)
     (check-relation relation)
-    (let ((new-signature (relation-signature-value relation t)))
-      (check-relation-signature-consistency relation *relations* new-signature bijectivep)
+    (let ((bijectivep (and (member :bijective annotations) t))
+          (new-signature (relation-signature-value relation empty-value)))
+      (check-relation-signature-consistency relation table new-signature bijectivep)
       (if bijectivep
         (progn
           (check-bijective-relation relation)
-          (create-bijective-indices relation *relations*))
+          (create-bijective-indices relation table))
         (progn
-          (setf (gethash (car relation) *relations*) new-signature)
-          (ut::if-it (relation-signature-fluent-indices relation)
-            (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))))))
-
-
-(defun register-static-relation-signature (raw-relation)
-  (multiple-value-bind (relation bijectivep)
-      (bijective-relation-p raw-relation)
-    (check-relation relation)
-    (let ((new-signature (relation-signature-value relation nil)))
-      (check-relation-signature-consistency
-        relation *static-relations* new-signature bijectivep)
-      (if bijectivep
-        (progn
-          (check-bijective-relation relation)
-          (create-bijective-indices relation *static-relations*))
-        (progn
-          (setf (gethash (car relation) *static-relations*) new-signature)
+          (setf (gethash (car relation) table) new-signature)
           (ut::if-it (relation-signature-fluent-indices relation)
             (setf (gethash (car relation) *fluent-relation-indices*) ut::it)))))))
 
@@ -316,7 +308,7 @@
   (reject-worker-read-write 'install-dynamic-relations)
   (format t "~&Installing dynamic relations...")
   (iter (for raw-relation in relations)
-        (register-dynamic-relation-signature raw-relation)
+        (register-relation-signature raw-relation *relations* t)
         (finally (maphash (lambda (key val)  ;install implied unary relations
                             (declare (ignore val))
                             (setf (gethash key *static-relations*) '(something)))
@@ -358,7 +350,7 @@
   (reject-worker-read-write 'install-static-relations)
   (format t "~&Installing static relations...")
   (iter (for raw-relation in relations)
-        (register-static-relation-signature raw-relation)
+        (register-relation-signature raw-relation *static-relations* nil)
         (finally (maphash #'(lambda (key val)  ;install implied unary relations
                               (declare (ignore val))
                               (setf (gethash key *static-relations*) '(everything)))
@@ -453,10 +445,10 @@
       (case (car form)
         (define-dynamic-relations
           (dolist (relation (cdr form))
-            (register-dynamic-relation-signature relation)))
+            (register-relation-signature relation *relations* t)))
         (define-static-relations
           (dolist (relation (cdr form))
-            (register-static-relation-signature relation)))
+            (register-relation-signature relation *static-relations* nil)))
         (define-complementary-relations
           (register-complementary-relation-signatures (cdr form)))))))
 

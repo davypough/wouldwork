@@ -2,6 +2,29 @@ BOXES — CONSOLIDATED PROBLEM ANALYSIS
 Revision: 2026-10-09
 Status: Analysis complete and ready for the spec advisor within the scope below.
 
+Spec-advisor continuation, 2026-10-09: the user subsequently approved independent,
+section-by-section specification building and static generic-source review.
+The active implementation record is spec-analysis-current.txt. Comparison with
+the existing spec and executed checks were outside that initial authoring approval;
+later execution scopes and results are recorded in the active spec analysis.
+The user accepted anonymous box instructions and the counts/occupancy alternative:
+ground pickup identifies its area, plate pickup identifies its plate, and placement
+identifies its destination. Physical box-name reconstruction is unnecessary for
+this output. Legality, costs, given objects, and the shortest-path objective remain
+unchanged. The analysis-completion and withdrawn-work statements below describe
+their earlier scopes, not this later approval. The original snapshot is unchanged.
+
+Current spec-advisor result, 2026-10-09: the independent specification, topology
+indexes and all-open crossing bound are implemented. User-run focused checks pass,
+and the supplied solve retains ten actions. The user confirms clean final staging
+and solving under DEPTH-FIRST/GRAPH/MIN-LENGTH, 16 threads, cutoff 0. The complete
+spec review and consolidated evidence are in spec-analysis-current.txt. The user
+also reports BOXES-GRAPH-CHECKS-PASSED: 8 cases, serial and worker successor paths.
+This closes the remaining agreed acceptance check; the specification is complete
+for its agreed scope and spec-analysis-search-handoff.txt is ready. Next-advisor
+experiments require their own scoped approval. Larger-instance performance and
+actual concurrent reopening remain unmeasured. Existing-spec comparison is deferred.
+
 Scope correction, 2026-10-09: the user clarified that this phase remains problem
 analysis and must not create a specification. The prematurely authored draft
 was removed. This file remains the current requirements analysis. The withdrawn
@@ -83,9 +106,10 @@ Sufficient conceptual state for the reduced search:
 - Whether the agent carries a box.
 
 Conserve the total number of boxes. Derive gate openness from occupied plates;
-there is no persistent gate memory. Box names may be retained in the executable
-representation and representative path, but must not create semantically distinct
-search arrangements. No elapsed time, route history, or exact walking coordinates
+there is no persistent gate memory. Anonymous instructions are accepted, so box
+names need not occur in changing state or the returned path. If names are retained,
+they must remain consistent and must not create semantically distinct search
+arrangements. No elapsed time, route history, or exact walking coordinates
 are needed under these rules. Accumulated action count is a path cost, not a new
 physical arrangement; duplicate handling must preserve a cheaper arrival.
 
@@ -96,8 +120,9 @@ choice suffices for identical loose boxes in the same area. Do not impose a fixe
 box order or prohibit box recovery.
 
 Alternative: retain named box locations throughout and use canonical state keys
-for equivalence. The spec advisor selects the concrete representation; either
-choice must support consistent named instructions for the returned path.
+for equivalence. The subsequent spec-advisor consultation selected counts and
+occupancy with anonymous source/destination instructions. Physical-name
+reconstruction is required only if named output is requested later.
 
 4. JUSTIFIED REDUCTIONS AND TERMINATION
 
@@ -122,8 +147,10 @@ adding more objects and connections under the same rules does not invalidate it.
 
 R2 — Ignore permutations of interchangeable box identities.
 Exchanging labels preserves legality, goals, and costs. Equivalent arrangements
-may share search work. Retain a representative path that names real boxes
-consistently. This removes label permutations, not different spatial allocations.
+may share search work. Retain an executable representative path with unambiguous
+pickup sources and placement destinations; physical box names are optional under
+the agreed output clarification. This removes label permutations, not different
+spatial allocations.
 Do not assume distinct areas or gates are interchangeable without a separate proof.
 
 R3 — Remove positive-cost cycles in complete arrangements.
