@@ -1,3 +1,15 @@
+Revision 2026-10-10 (later): the user's review replaced ground counts, occupancy
+and carrying flags with named boxes (loc, holding, bijective on) plus engine
+symmetry pruning; box-arrangement-valid? and initialize-box-counts were removed.
+Topology indexes and the crossing bound are retained. Counts-model evidence
+below is historical.
+
+Revision 2026-10-10: six single-lookup wrapper queries were removed from the
+specification and replaced by direct BINDs (5 queries remain); the supplied
+instance still solves. The three spec-analysis-*-checks.lisp scripts depended
+on those queries and were deleted; their recorded results remain historical
+evidence for the 2026-10-09 revision.
+
 BOXES -- OPTIONAL SEARCH-ADVISOR HANDOFF
 Revision: 2026-10-09
 Status: Specification complete for the agreed scope; ready for optional search-advisor work.
@@ -9,8 +21,7 @@ Preserved pre-spec agreement: problem-analysis-2026-10-09-before-spec.txt
 Current implementation/evidence/next action: spec-analysis-current.txt
 Preserved detailed authoring evidence: spec-analysis-2026-10-09-before-consolidation.txt
 Specification: ../../../probs/problem-boxes-advisor.lisp
-Passive checked artifacts: spec-analysis-index-checks.lisp, spec-analysis-bound-checks.lisp,
-spec-analysis-graph-checks.lisp
+Passive checked artifacts: none; the three check scripts were deleted 2026-10-10.
 Keep requirements in their existing record; do not establish a competing work agenda.
 
 DELIVERED MODEL AND IDENTIFIER
@@ -70,9 +81,6 @@ No assistant model execution, full-path replay or benchmark occurred.
 
 Reproduction after a separately authorized execution scope:
 (stage boxes-advisor)
-(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-index-checks.lisp")
-(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-bound-checks.lisp")
-(check-boxes-bound-model)
 (solve)
 The prior execution was one supplied-instance regression per enhancement; the
 handoff does not authorize repeating it or expanding size/runtime.

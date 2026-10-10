@@ -1,9 +1,27 @@
+Revision 2026-10-10 (later): the user's review replaced ground counts, occupancy
+and carrying flags with named boxes (loc, holding, bijective on) plus engine
+symmetry pruning; box-arrangement-valid? and initialize-box-counts were removed.
+Topology indexes and the crossing bound are retained. Counts-model evidence
+below is historical.
+
+Revision 2026-10-10: six single-lookup wrapper queries were removed from the
+specification and replaced by direct BINDs (5 queries remain); the supplied
+instance still solves. The three spec-analysis-*-checks.lisp scripts depended
+on those queries and were deleted; their recorded results remain historical
+evidence for the 2026-10-09 revision.
+
 BOXES -- CURRENT SPECIFICATION ANALYSIS
 Revision: 2026-10-09, consolidated after the user's final-review approval
 Status: Specification complete for the agreed scope; optional search-advisor handoff ready.
 Specification: ../../../probs/problem-boxes-advisor.lisp
 Handoff: spec-analysis-search-handoff.txt
 History: spec-analysis-2026-10-09-before-consolidation.txt
+
+REVISION 2026-10-10 -- UNRELIED-ON DEFAULT SETTINGS REMOVED
+(ww-set *symmetry-pruning* nil) and (ww-set *randomize-search* nil) restated
+defaults the spec does not rely on and were deleted. Counts and
+occupancy already remove box-label permutations, so symmetry pruning stays off;
+(stage boxes-advisor) resets managed defaults before applying the file's settings.
 
 REVISION 2026-10-10 -- INIT CHECKS REMOVED
 Following the spec-advisor's revised principle (validation of given data is the
@@ -249,7 +267,7 @@ ready for the optional search-advisor phase; the coverage and performance limits
 below remain explicit and do not imply general-family exhaustive verification.
 
 Final GRAPH check: approved and executed; passing result supplied by the user.
-Artifact: spec-analysis-graph-checks.lisp. Question: does GRAPH MIN-LENGTH preserve
+Artifact: spec-analysis-graph-checks.lisp (deleted 2026-10-10). Question: does GRAPH MIN-LENGTH preserve
 cheaper arrivals to the same complete arrangement, discard equal/worse arrivals,
 and retain different plate allocations? Model revision/settings are those above;
 operator is the user in the already staged, idle REPL.
@@ -278,10 +296,7 @@ The stopping condition was first discrepancy or the fixed eight-case pass; the
 run reached the pass marker. No restage, index/bound rerun or repeat solve occurred.
 
 Executed user command: (check-boxes-graph-model).
-Reproduction commands, requiring a separately agreed repeat scope:
-(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-index-checks.lisp")
-(load "D:/quicklisp/local-projects/wouldwork/doc/problems/boxes/spec-analysis-graph-checks.lisp")
-(check-boxes-graph-model)
+Reproduction: no longer available; the check scripts were deleted 2026-10-10.
 Observed: BOXES-GRAPH-CHECKS-PASSED: 8 cases, serial and worker successor paths.
 Disposition: acceptance status and optional handoff updated; no repeat run needed.
 

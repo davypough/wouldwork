@@ -6,15 +6,20 @@
 > The specification should include justified enhancements for larger problems of
 > the same general type identified by that analysis.
 >
-> **Entry:** Invoke this standalone procedure directly. Reuse the established objective and authorization
-> scope. Receiving an analysis or discussing its handoff does not authorize drafting,
-> reading an existing specification, staging, or running a problem.
+> **Entry:** Invoke this standalone procedure directly. Reuse the established objective
+> and authorization scope. Receiving an analysis or discussing its handoff does not
+> authorize drafting, reading an existing specification, staging, or running a problem.
 
-> **Status:** Six-step interactive authoring workflow revised 2026-10-09. Document
-> consistency and links were reviewed; the revised workflow has not yet been exercised
-> in a problem consultation. This file tracks the current Talos `tech/` vocabulary. If it disagrees with
-> the *Wouldwork User Manual* on a technology-based specification, verify the detail against
-> `tech/README.html` and the current technology source.
+> **Status:** Reorganized 2026-10-10 into a workflow (Part 1), design guidance (Part 2),
+> evidence and record rules (Part 3), and a DSL reference (Part 4). The reorganized
+> document has not yet been exercised in a problem consultation. This file tracks the
+> current Talos `tech/` vocabulary. If it disagrees with the *Wouldwork User Manual* on a
+> technology-based specification, verify the detail against `tech/README.html` and the
+> current technology source.
+
+**How to use this document.** Follow Part 1 step by step. Part 2 (Sections 2.x) governs
+every design decision made along the way, Part 3 (Sections 3.x) governs every check and
+record, and Part 4 (Sections 4.x) is the reference for writing the forms themselves.
 
 **Companion documents.** [working-reference-builder.md](problem-analysis/spec-building/working-reference-builder.md) makes the model's behavior
 readable so the user can compare it with their intent.
@@ -29,12 +34,11 @@ what the engine does at load time, [loading and initialization](load-ordering/lo
 
 ---
 
-## Section 0: Process Guide
+## Part 1: Workflow
 
-### 1. Read and confirm the incoming analysis
+### Step 1. Read and confirm the incoming analysis
 
-Read AGENTS.md and ignore CLAUDE.md. When the analysis paths have not already been
-supplied, begin with exactly:
+Read AGENTS.md. When the analysis paths have not already been supplied, begin with exactly:
 
 > Welcome to the Wouldwork Specification Advisor. Please share the path to your problem analysis files (as prepared by the Wouldwork Problem Advisor).
 
@@ -47,45 +51,38 @@ An informal description first needs the problem advisor's agreed analysis.
 Review the agreed problem, objective and answer identity, given data, justified
 reductions and their premises, growth dimensions, capability evidence, corrections,
 and implementation acceptance criteria. Distinguish requirements from provisional
-settings and optional implementation choices. Summarize only what is needed to
-confirm the implementation starting point; do not repeat the problem interview.
-Ask only about gaps or conflicts that could change implementation or fidelity.
+settings and optional implementation choices. Current agreed corrections govern;
+the snapshot records the earlier agreement rather than overriding them. A withdrawn
+drafting step or historical next-action entry is not current authorization.
 
-Preserve the original snapshot. Current agreed corrections govern subsequent work;
-the snapshot records the earlier agreement rather than overriding those corrections.
-Keep intended behavior, source observations, deductions, and executed evidence
-distinct. A withdrawn drafting step or historical next-action entry is not current
-authorization. Do not read an existing problem specification or its problem-specific
-dependencies while comparison remains deferred.
+Summarize only what is needed to confirm the implementation starting point, and ask
+only about gaps or conflicts that could change implementation or fidelity; do not
+repeat the problem interview. Do not read an existing specification of the problem,
+or its problem-specific dependencies, while comparison remains deferred.
 
-Finish this step by stating what is ready for implementation planning, any blockers,
-and the requested next scope. Readiness does not itself authorize specification
-creation or execution. For resumed work, reuse the previously approved scope and
-review only changed premises or unresolved matters. Consult the DSL reference
-(Section 1) when mapping the agreed analysis to an implementation; use Section 2
-only for relevant information not already established in the incoming analysis.
+Finish by stating what is ready for implementation planning, any blockers, and the
+requested next scope. Readiness does not itself authorize writing or execution. For
+resumed work, reuse the previously approved scope and review only changed premises
+or unresolved matters.
 
-### 2. Agree the specification-building scope
+### Step 2. Agree the specification-building scope
 
-Before writing a specification, present a concrete scope based on the incoming
-analysis and obtain approval for work not already authorized. Identify:
+Before writing a specification, present a concrete scope and obtain approval for
+work not already authorized. Identify:
 
 - The analysis revision, objective, given instance, and larger problem family to
   preserve, including agreed reductions and their premises.
-- The intended specification path and whether the work creates a new specification
-  or revises an explicitly selected existing one. State any proposed source or
+- The specification path, and whether the work creates a new specification or
+  revises an explicitly selected existing one. State any proposed source or
   dependency reading; preserve deferred comparison boundaries.
-- The section-by-section work: establish the basic model first, then implement and
-  check justified enhancements for the identified growth dimensions. Select the
-  particular enhancements interactively as their prerequisites become clear.
-- The active `spec-analysis-` record and expected deliverables: specification,
-  explanation and requirement mapping, check results and limitations, and a handoff
+- The section agenda (step 3) and a first view of the enhancements (step 4); the
+  particular enhancements are selected interactively as their prerequisites become clear.
+- The active `spec-analysis-` record (Section 3.2) and expected deliverables:
+  specification, requirement mapping, check results and limitations, and a handoff
   for the optional search-advisor phase.
-- Which incremental checks are included, who runs them, and their limits. Distinguish
-  static review, staging, executed fidelity checks, enhancement checks, and a bounded
-  final run. A solution is not required for that final run.
+- Which checks are included, who runs them, and their limits (Section 3.1).
 
-Keep the activities below distinct when stating or interpreting approval:
+Keep these activities distinct when stating or interpreting approval:
 
 | Activity | Scope of authorization |
 |---|---|
@@ -98,89 +95,30 @@ Keep the activities below distinct when stating or interpreting approval:
 | Run a bounded smoke check | Attempt search on the named instance with agreed settings and stopping limits to check operation; need not reach a solution and is not a performance benchmark. |
 | Search substantially, benchmark, or tune | Requires its own approved plan; performance investigation normally belongs to the search advisor. |
 
-An approved scope may explicitly bundle drafting, incremental staging and checks,
-and the final bounded run. Reuse that approval rather than asking again for each
-covered action. Still present each section for the user's comments before proceeding
-to the next; approval of the overall work does not bypass the interactive review.
-If execution was not included, propose the relevant checks and wait for approval.
-Preserve the user's existing REPL and identify whether checks are assistant-run or
+An approved scope may bundle drafting, incremental staging and checks, and the final
+bounded run. Reuse that approval rather than asking again for each covered action,
+but still present each section for the user's comments before proceeding. If
+execution was not included, propose the relevant checks and wait for approval.
+Preserve the user's existing REPL, and say whether each check is assistant-run or
 provided for the user to run.
 
-Each executed check needs a question, model revision, relevant starting state and
-settings, expected observations, operator, and applicable stopping limits. Choose
-small checks that answer the correctness question; test an incomplete section only
-when its prerequisites make the result meaningful. Record untested sections explicitly.
-Do not silently deepen, repeat, or expand a run beyond its approved scope.
-
 Return consequential changes in rules, objective, answer identity, or reduction
-premises to the problem analysis for agreement before relying on them. Explain any
-proposed tradeoff and the guarantee it loses. Routine implementation choices within
-the approved scope need explanation where useful, not a separate approval each time.
-Record the approval and its limits in the active spec analysis. If a blocker remains,
-name the affected work and continue only with authorized independent sections.
+premises to the problem analysis for agreement before relying on them, explaining
+any tradeoff and the guarantee it loses. Routine implementation choices within the
+approved scope need explanation where useful, not separate approval. Record the
+approval and its limits in the active spec analysis. If a blocker remains, name the
+affected work and continue only with authorized independent sections.
 
-#### Specification analysis records
+### Step 3. Build the basic model, section by section
 
-Store the spec advisor's analysis in the same `doc/problems/<problem-name>/`
-directory as the problem advisor's records. Use the `spec-analysis-` prefix for
-spec-advisor records, for example `spec-analysis-current.txt` for the active record
-and `spec-analysis-YYYY-MM-DD-before-revision.txt` for a preserved snapshot.
-Use the same prefix for supporting analysis documents, with a descriptive suffix.
-Reuse the existing active record; do not create a new record for each exchange.
-Identify the active record explicitly when linking it from another advisor's documents.
-
-Record implementation decisions, section review status, user corrections, checks
-and their results, unresolved issues, and the next authorized step. Link the incoming
-`problem-analysis.txt` and its preserved snapshots rather than duplicating their
-agreed requirements. Return consequential changes to those requirements for agreement;
-do not silently establish different rules in the specification analysis. Preserve
-the original problem-analysis snapshot unchanged.
-
-Do not use the generic `Analysis.txt` for new spec-advisor analysis. Existing records
-retain their provenance and status; this naming convention does not authorize renaming
-them or resuming withdrawn work. This advisor owns its implementation agenda and
-evidence; no consultant or shared coordination record is required. Link upstream
-requirements and downstream findings without copying their authority. Keep detailed evidence in a linked
-`spec-analysis-` artifact only when needed. Return when the selected question is
-answered, needs approval, or requires another procedure, without requiring all the
-phases below.
-
-The return includes clarified requirements, relevant characterization, implementation
-mapping, discrepancies, evidence and its scope, unresolved issues, affected dependencies,
-and the recommended next action. A correction reopens affected conclusions in the
-linked records with the user's agreement; unaffected evidence
-and replayable progress remain available.
-
-### 3. Build the basics interactively, section by section
-
-Use the agreed analysis to propose a short section agenda. Build the basic model
-before adding advanced search enhancements, while preserving reductions already
+Build the basic model before adding advanced search enhancements, applying the
+design priorities (Section 2.1) from the start and preserving reductions already
 accepted in the analysis. A reduced model need not first implement the discarded
 actions. Keep the identified larger problem family in view: avoid hard-coding an
 instance-specific cutoff, object count, or solution into general rules.
 
-#### Design priorities
-
-Apply these in order; an earlier priority wins when two conflict.
-
-1. **Scalable representation.** Choose what the state records so that it stays
-   compact and efficient for much larger instances of the identified family, even
-   when a more literal description of the given instance would be simpler to read.
-2. **Combined actions.** Combine related actions that share tests or lookups,
-   within reason, generating each legal alternative in its own `assert`
-   (Section 1.9). Keep separate actions where combining would obscure the rules
-   without saving repeated work.
-3. **Simplicity.** Within those choices, keep the specification as small and plain
-   as possible: no defensive checks (see *Leave validation of the given data to the
-   engine*), no query that merely wraps a single lookup, and no `ww-set` that
-   restates a default. Record the reasons for such decisions in the spec analysis,
-   not in the file.
-4. **Wouldwork idioms.** Express logic with Wouldwork statements (`exists`,
-   `forall`, `doall`, `if`, `bind`, queries and updates) rather than equivalent
-   Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step.
-
-The discussion order follows dependencies and the user's comments; the finished
-file follows Section 1.1's organization. A useful default agenda is:
+Propose a short section agenda. The discussion order follows dependencies and the
+user's comments; the finished file follows Section 4.1's organization. A useful default:
 
 | Section to discuss | Decisions to explain and review |
 |---|---|
@@ -191,122 +129,208 @@ file follows Section 1.1's organization. A useful default agenda is:
 | Initial state and initialization | How supplied data becomes the starting state; which facts are authored and which are derived. |
 | Goal and basic model review | How the intended answer is recognized; whether all required behavior and accepted reductions are accounted for. |
 
-Combine small dependent sections or split a complex section when that helps review.
-Discuss the goal and initial state early whenever they constrain representation;
-the agenda is not a requirement to postpone those decisions.
+Combine small dependent sections or split a complex one when that helps review.
+Discuss the goal and initial state early whenever they constrain representation.
 
 For each section:
 
 1. Link the relevant agreed requirements and explain the proposed representation
-   or rules in the user's terms. Show consequential alternatives only when they
-   affect fidelity, clarity, or the identified growth requirements.
-2. Resolve implementation questions with the user, then write the section within
-   the approved scope. Present what was written and how it satisfies the requirements.
-3. Perform covered incremental checks when the prerequisites exist, or provide the
-   checks for the user to run. Record expected and observed behavior separately.
-   Do not add fictitious rules or a placeholder goal merely to make an incomplete
-   specification stage; defer the check until a meaningful executable unit exists.
+   or rules in the user's terms (Part 2). Show alternatives only when they affect
+   fidelity, clarity, or the identified growth requirements.
+2. Resolve implementation questions with the user, one focused question at a time,
+   saying which decision each affects. Then write the section and present how it
+   satisfies the requirements.
+3. Perform covered checks once the section forms a meaningful executable unit, or
+   provide them for the user to run (Section 3.1). Do not add fictitious rules or a
+   placeholder goal merely to make an incomplete specification stage.
 4. Incorporate the user's comments, revisit affected earlier sections, and update
-   the active spec analysis with decisions, evidence, unresolved issues, and checks
-   still pending. Present corrections before applying them as required by the scope.
-5. Pause for the user's review before proceeding to the next section. Reuse already
-   granted implementation and test approval; a section review is an opportunity to
-   adjust the model, not a repeated request for the same authorization.
+   the active spec analysis.
+5. Pause for the user's review before the next section. A section review is an
+   opportunity to adjust the model, not a repeated request for granted authorization.
 
-Finish the basics with a coherent requirement-to-implementation account and the
-status of the applicable checks. Name any blockers before moving to enhancements;
-do not mistake completion of the basic model for completion of the specification.
+Accept corrections at any point and reopen affected sections without discarding
+independent evidence. Finish the basics with a requirement-to-implementation account
+and the status of its checks, and name any blockers before moving on. Completing the
+basic model does not complete the specification.
 
-#### Review against the user's intent
+### Step 4. Add and exercise enhancements for larger instances
 
-The objective is a faithful model, not merely a specification that loads or finds a solution.
-Keep the user's intended rules and the implemented rules distinct until they have been compared.
-Use these questions throughout the interview and review:
+Implement suitable, justified enhancements for the growth dimensions identified by
+the problem advisor, even when the given instance can be solved without them. Do not
+leave them merely as recommendations for the search advisor, or disable them solely
+because the given instance is small. Reductions already integrated into the basic
+model need not be implemented twice.
 
-| Check | Plain-language question | Useful evidence |
-|---|---|---|
-| Soundness | Does the model allow any action or outcome the intended problem forbids? | An example that should be rejected, with its conditions and modeled result |
-| Completeness | Does it preserve the requested answers and relevant behavior, accounting for every agreed reduction? | Requirement-to-spec mapping, allowed examples, and reduction premises and coverage arguments |
-| Consistency | Do the declarations, initial state, derived rules, and requirements agree? | Initialization checks, invariant checks, and examination of conflicting cases |
-| Clarity | Do the user and advisor mean the same thing by each rule? | Concrete examples, boundary cases, and explicit unresolved questions |
+Propose a short enhancement agenda. For each candidate, explain the growth problem it
+addresses, its prerequisites, the intended benefit, its cost or complexity, and its
+correctness obligation (Section 2.7). Select what fits the analyzed problem; do not add a
+hook simply to fill a checklist. If no additional mechanism is justified, discuss that
+conclusion with the user and record the agreed disposition.
 
-These are model-fidelity checks, not claims about search completeness or optimality. A few
-passing examples provide scoped evidence, not a proof over every possible state. Successful
-loading establishes only that the implemented checks passed; replay establishes behavior under
-the model, not independently that the model matches the intended puzzle.
+Work through one enhancement at a time, using the step 3 cycle: explain the mechanism
+and its correctness argument, implement it within the approved scope, exercise it
+(Section 3.1), and recheck affected basic-model behavior. Keep the general rule separate
+from instance data so larger instances do not require changing its meaning. Where
+enhancements interact, check the combination for conflicting assumptions.
 
-During section review, use the reference builder's categories as an internal checklist.
-For each important rule, explain what is allowed, what is forbidden, and what changes afterward.
-Ask one focused question at a time where intent is unclear. Reuse established technology semantics,
-but explain consequential behavior so the user can confirm that the chosen technology fits.
-Record requirements as confirmed, provisional, contradicted, or unresolved, with their source.
+For each enhancement, record in the active spec analysis:
 
-Keep intended abilities distinct from the transitions retained in a reduced search
-model. An agreed proof may justify omitting an ability without changing the original
-problem. Preserve that proof's premises and objective scope; do not ask about details
-that affect only omitted behavior unless a changed premise makes them relevant.
-Conceptual interchangeability does not by itself verify engine symmetry or a compact
-encoding; retain any obligations for consistent object names in returned instructions.
+- The growth dimension addressed, implementation location, premises, and correctness
+  argument, linked to the incoming analysis where already established.
+- Whether it is implemented and enabled in the intended configuration.
+- What checks actually exercised it, their settings and results, and what remains
+  untested, distinguishing helper checks from execution through the engine.
+- Any unresolved correctness or integration issue, its consequence, and the next action.
+- Performance questions for the search advisor: overhead on small instances, tuning
+  choices, and behavior as the identified dimensions grow.
 
-Preserve given objects, apparatus, wiring, geometry, colors, and heights. Locations are candidate
-standing spots, so proposing an additional location is legitimate when supported by the geometry.
-Do not add equipment or change barriers to manufacture a solution. A user-confirmed correction
-to an incorrectly transcribed given must be distinguished from changing the given itself.
+An exercised enhancement may be ready while its scaling benefit remains unmeasured;
+measuring it belongs to the search advisor. An unexercised or failing enhancement is
+not ready merely because the basic specification runs. Do not silently drop an agreed
+enhancement; resolve it or agree an explicit change of scope with the user.
 
-#### Leave validation of the given data to the engine
+### Step 5. Final review, acceptance, and handoff
 
-A mistyped given must not silently change the answer, but guarding against one is the
-engine's job, not the specification's:
+**Review the complete specification.** Trace each consequential requirement to its
+implementation, or to an agreed reduction with its premises and coverage argument.
+Check the initial state, given objects and data, legal actions and effects, invariants,
+goal, answer identity, and cost units together, and confirm that enhancements preserve
+the objective. Explain the complete model in plain language, including intentional
+omissions and limitations. Repeat checks affected by later changes; do not repeat
+independent checks to fill a checklist. Classify remaining issues as correctness or
+execution blockers, irrelevant under the accepted design, or deferred performance
+questions with an owner. An unresolved rule, failed invariant, or unverified required
+enhancement cannot be relabeled as performance tuning. Consolidate the spec analysis
+(Section 3.2).
 
-- **Add no representation assumptions that need their own guard.** Each assumption a
-  representation makes about the given data (only one agent, every box starting on the
-  ground, a conserved count) needs a check that the data satisfies it, while a direct
-  representation of the given objects needs none. Prefer the direct representation unless
-  an agreed enhancement justifies the assumption; then record the assumption with its
-  guard. This applies equally to the enhancements in step 4.
-- **Rely on the engine's checks, not hand-written ones.** The engine already rejects
-  wrong types, two values for one key (including either side of a `:bijective` relation),
-  authored derived facts, and an object paired with itself in a symmetric relation.
-  Do not write `define-init-check` or its helpers on Path B; on Path A, the included
-  technologies supply their own checks.
+**Stage and run the final revision.** Use the exact final revision. Stage it and
+require completion without errors or warnings; inspect the output, since the absence of
+a debugger interruption alone is insufficient. Investigate diagnostics rather than
+suppressing them. If one originates in the environment, a dependency, or the engine,
+record that and propose any needed work separately; do not claim warning-free
+acceptance while it remains unresolved. Make sure the check does not rely on
+definitions left by a previously staged problem, using a fresh process when necessary
+without disturbing the user's REPL. Restage after any change to the tested specification.
 
-Which starting facts each object needs is part of the problem's meaning, not a
-consistency rule: a carried box has no location, and an empty peg holds nothing. A
-forgotten fact usually shows up only as no solution, and occasionally as a longer one.
-So during section review, confirm with the user that every object has the starting
-facts its role requires. Raise any rule linking several relations, such as a plate lying
-in one of its gate's areas, in the same review rather than adding a check.
+Then run a bounded operational check on the supplied instance with the agreed
+enhancements enabled. State the objective, settings, stopping condition, resource
+limits, and operator beforehand, reusing approval when already covered; a depth cutoff
+does not also bound elapsed time or memory. Record the stop reason and enough output to
+show that search entered its intended execution path and ran without errors. Reaching
+a solution is not required, but a crash, resource failure, or interruption before
+meaningful execution is not a pass. Never silently deepen or continue a run to obtain
+a solution.
 
-#### Choose the authoring approach from the agreed analysis
+**Acceptance.** The specification is ready for the optional search-advisor phase when:
+
+1. The complete model and its requirement mapping are reviewed with the user, with
+   no unresolved consequential interpretation or known fidelity defect.
+2. Agreed reductions and enhancements are implemented with their premises recorded;
+   applicable correctness and integration checks pass within their stated scope.
+3. The final revision stages without errors or warnings.
+4. The approved bounded run executes without errors, with its stop reason and evidence
+   recorded. It may finish without a solution.
+5. The current spec analysis names the delivered revision, checks, limitations, and
+   deferred questions to carry into the handoff. No pending blocker is hidden by a
+   general statement that the specification works.
+
+Finding a solution, proving optimality, benchmarking, and demonstrating scalability are
+not acceptance requirements. If checks are awaiting authorization or user execution,
+report the specific missing evidence; do not mark completion on the strength of
+proposed tests. When the evidence supports it, use a concise completion message such as:
+
+> Specification complete for [agreed scope]. [Specification path and revision] stages
+> without errors or warnings and passed [bounded run and stop condition]. The agreed
+> enhancements passed [scoped checks]. [Solution found / no solution established].
+> Remaining unverified: [larger-instance performance and other limitations]. The
+> spec analysis and optional search-advisor handoff are at [paths].
+
+Otherwise state "Specification incomplete" or "Specification complete only for [agreed
+partial scope]", identify what remains, and propose the next scope.
+
+**Prepare the search-advisor handoff.** Write a concise handoff for the
+[search advisor](search-advisor.md), for example `spec-analysis-search-handoff.txt`,
+linked from the active spec analysis. It summarizes readiness and points to detailed
+evidence; it is not a second requirements record or a competing work agenda.
+
+| Handoff content | What the next advisor needs |
+|---|---|
+| Scope and status | Complete, partial, or blocked; the covered problem family; proposed next question; what work is and is not authorized. |
+| Requirements and provenance | Current problem analysis, preserved pre-specification snapshot, current spec analysis, and any agreed corrections. |
+| Delivered model | Specification path and identifiable tested revision; relevant dependencies and environment; staging instructions and actual test settings. |
+| Objective and representation | Answer identity, cost units, goal, sufficient state, action granularity, and the mapping to the agreed requirements. |
+| Reductions and enhancements | Implemented mechanisms, enabled configuration, correctness arguments and premises, interaction constraints, and exercise evidence. |
+| Validation | Final staging outcome, fidelity and integration checks, bounded run result and stop reason, and any separately authorized replay or solution evidence. |
+| Growth and open performance questions | The identified size dimensions and interactions; predicted costs or benefits distinguished from measurements; candidate tuning or comparison questions. |
+| Remaining issues | Blockers or limitations, evidence still missing, deferred work with an owner, and conditions that would reopen earlier conclusions. |
+
+Distinguish settings required by the objective from provisional search choices, and
+give the actual tested configuration rather than assuming that defaults or saved
+settings match it. Do not infer a general size limit or a speedup from the bounded
+check. Propose a concrete first search-advisor question; preparing the handoff does not
+invoke that phase or authorize benchmarks or a full solve. If downstream work exposes a
+fidelity gap or invalidates a premise, return the affected issue for agreement and
+correction, then refresh dependent evidence and the handoff.
+
+The search advisor may later recommend the optional solving advisor when a
+constraint-led milestone approach is justified. Carry the original objective into that
+discussion: shortest milestone segments do not establish a globally shortest path, and
+any loss of guarantee needs explicit agreement. A later `Handoff.md` records solving
+progress and links these analysis records rather than replacing them.
+
+Report the specification, spec analysis, and handoff paths with the completion status,
+then stop for the user's review and authorization of the optional next phase.
+
+
+---
+
+## Part 2: Design Guidance
+
+### 2.1 Design priorities
+
+Apply these in order; an earlier priority wins when two conflict.
+
+1. **Scalable representation.** Choose what the state records so that it stays
+   compact and efficient for much larger instances of the identified family, even
+   when a more literal description of the given instance would be simpler to read.
+2. **Combined actions.** Combine related actions that share tests or lookups,
+   within reason, generating each legal alternative in its own `assert`
+   (Section 4.9). Keep separate actions where combining would obscure the rules
+   without saving repeated work.
+3. **Simplicity.** Within those choices, keep the specification as small and plain
+   as possible: no defensive checks (Section 2.5), no query that merely wraps a single
+   lookup, and no `ww-set` for a default the spec does not rely on. Record the reasons for such
+   decisions in the spec analysis, not in the file.
+4. **Wouldwork idioms.** Express logic with Wouldwork statements (`exists`,
+   `forall`, `doall`, `if`, `bind`, queries and updates) rather than equivalent
+   Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step.
+
+### 2.2 Choose the authoring approach
 
 Reuse the problem advisor's characterization of objects, initial conditions, changes,
 derived effects, restrictions, and success criteria. Clarify only consequential gaps
-before committing to a representation. Keep intended rules, source behavior, deductions,
-and hypotheses separate. Use the approaches below when supported by those features,
-record why the choice fits, and reopen it only when relevant premises change.
+before committing to a representation. Record why the chosen approach fits, and
+reopen it only when relevant premises change.
 
 **Path A — a new Talos Principle problem.**
 Build it on the `tech/` technology library. These files implement a *topological*
 representation of Talos mechanics — beams, connectors, gates, walkability,
 visibility, elevation — as reusable roles that splice into the spec via
-`include-tech` (Section 1.5). A new Talos problem should be assembled from the
+`include-tech` (Section 4.5). A new Talos problem should be assembled from the
 existing technologies rather than hand-authoring the mechanics, so that behavior
-stays consistent across problems and fixes propagate.
-
-Read `tech/README.html` before drafting. It is authoritative for the technology
-library: the role system, the tier picture, the file inventory, hard vs. soft
-dependencies, and the integration checklist.
+stays consistent across problems and fixes propagate. Read `tech/README.html` before
+drafting; it is authoritative for the role system, the tier picture, the file
+inventory, hard vs. soft dependencies, and the integration checklist. Explain
+consequential technology semantics and confirm that they fit the agreed rules;
+library behavior is not authority to replace intended behavior.
 
 **Path B — everything else.**
 Hand-authored specifications with no `include-tech`. This includes all non-Talos
 problems *and* the legacy Talos specs — `problem-corner.lisp` is the reference
 example — which predate the technology library and are not written against it. Do
-not retrofit `tech/` onto a legacy spec as part of a new problem session; treat the
-two approaches as separate.
+not retrofit `tech/` onto a legacy spec as part of a new problem session.
 
-On Path B, choose the engine specialization from the established behavior:
-
-**Planning or CSP?** Set via `(ww-set *problem-type* planning)` or `csp`.
+On Path B, choose planning or CSP via `(ww-set *problem-type* planning)` or `csp`:
 
 - *Planning* — actions represent changes to the problem state; the solution is a
   sequence of steps. Usually paired with `depth-first` + `graph`.
@@ -322,63 +346,133 @@ Explain the choice from the characterization rather than asking the user to choo
 engine label. Use the [search advisor](search-advisor.md) for consequential strategy
 questions, retaining provisional choices until their prerequisites are established.
 
-#### Adapt the dialogue and investigate discrepancies
+### 2.3 Representation
 
-Ask one focused question at a time, explaining which implementation or fidelity
-decision it affects. There is no fixed question count or repeated intake questionnaire.
-Use supplied answers and clearly label deductions; do not guess consequential intent.
-Skip irrelevant features and stop questioning an issue once its possible answers no
-longer change the design. Accept corrections at any point and reopen affected sections
-without discarding independent evidence.
+**What is given and what is ours to choose.** Preserve given objects, apparatus,
+wiring, geometry, colors, and heights. Do not add equipment or change barriers to
+manufacture a solution. Locations are candidate standing spots, so proposing an
+additional location is legitimate when supported by the geometry. A user-confirmed
+correction to an incorrectly transcribed given must be distinguished from changing
+the given itself.
 
-On Path A, explain consequential technology semantics and confirm that they fit the
-agreed rules. Finalize technology selection against `tech/README.html`'s integration
-checklist within the authorized reading scope. Library behavior is not authority to
-replace intended behavior.
+**Record only what matters.** The changing state needs only what affects legal
+futures, the goal, and cost. Derive anything that follows from other facts, such as
+a gate's openness from its plate's occupancy, with a query or derived relation
+rather than storing it separately.
+
+**Static, dynamic, and derived facts.** Facts that never change belong in static
+relations, which are not copied with each search state; dynamic relations hold only
+what actions change. Facts computed once from the given data belong in a
+`define-init-action` or a derived relation, not in hand-authored `define-init` facts.
+
+**Fluent or plain relations.** A relation with exactly one value per key — an
+object's location, a count — takes `$` fluent arguments and is read with `bind`;
+asserting a new value replaces the old one. A relation that is simply true or false
+of its objects takes no fluents (Section 4.4).
+
+**Interchangeable objects.** When objects of one type obey the same rules and are not
+named by the goal, consider recording counts or occupancy rather than names. That
+removes label permutations more cheaply than symmetry pruning, while distinct spatial
+allocations remain distinct. Conceptual interchangeability does not by itself verify
+an engine symmetry setting or a compact encoding; retain any obligation for
+consistent object names in returned instructions.
+
+**Local choices.** When an action would otherwise test every object in the problem to
+find the few relevant ones, consider static per-location lists built once at
+initialization, so the action considers only local candidates.
+
+**Reductions.** Keep intended abilities distinct from the transitions retained in a
+reduced search model. An agreed proof may justify omitting an ability without changing
+the original problem; preserve its premises and objective scope, and do not ask about
+details that affect only omitted behavior unless a changed premise makes them relevant.
+
+### 2.4 Actions
+
+Each generated transition represents exactly one counted action, with its cost and an
+understandable description. Generate only the choices the agreed rules permit, and
+every one of them.
+
+Combine related actions (priority 2) by placing the shared tests and lookups in the
+precondition and emitting each alternative from its own `assert` in the effect
+(Section 4.9). Generate every legal alternative; an exclusive branch would lose
+choices. Use `if` within an effect to cover variant cases of one action rather than
+writing near-duplicate actions. Fewer action definitions do not mean fewer physical
+steps: preserve every legal choice, its cost, and its captured description, and
+distinguish reduced repeated work from a measured speedup.
+
+### 2.5 What not to write
+
+A mistyped given must not silently change the answer, but guarding against one is the
+engine's job, not the specification's:
+
+- **Add no representation assumptions that need their own guard.** Each assumption a
+  representation makes about the given data (only one agent, every box starting on the
+  ground, a conserved count) needs a check that the data satisfies it, while a direct
+  representation of the given objects needs none. Prefer the direct representation unless
+  an agreed enhancement justifies the assumption; then record the assumption with its
+  guard.
+- **Rely on the engine's checks, not hand-written ones.** The engine already rejects
+  wrong types, two values for one key (including either side of a `:bijective` relation),
+  authored derived facts, and an object paired with itself in a symmetric relation.
+  Do not write `define-init-check` or its helpers on Path B; on Path A, the included
+  technologies supply their own checks.
+- **No lookup wrappers.** A `bind` both tests that a fact exists and sets its `$`
+  variables for the statements that follow, so write the `bind` where the value is
+  needed: `(bind (agent-area ?agent $area))` in a precondition, not
+  `(assign $area (current-area ?agent))` with a query that only performs that `bind`.
+  A query earns its place by holding real logic, by being an engine hook called by
+  name (such as `min-steps-remaining?`), or by reading dynamic facts for an init action
+  (Section 4.11).
+- **No restated defaults.** Do not write a `ww-set` for a default value the spec does
+  not rely on (Section 4.2).
+
+Which starting facts each object needs is part of the problem's meaning, not a
+consistency rule: a carried box has no location, and an empty peg holds nothing. A
+forgotten fact usually shows up only as no solution, and occasionally as a longer one.
+So during section review, confirm with the user that every object has the starting
+facts its role requires. Raise any rule linking several relations, such as a plate lying
+in one of its gate's areas, in the same review rather than adding a check.
+
+### 2.6 Fidelity to the user's intent
+
+The objective is a faithful model, not merely a specification that loads or finds a
+solution. Keep the user's intended rules and the implemented rules distinct until they
+have been compared, and use these questions throughout the interview and review:
+
+| Check | Plain-language question | Useful evidence |
+|---|---|---|
+| Soundness | Does the model allow any action or outcome the intended problem forbids? | An example that should be rejected, with its conditions and modeled result |
+| Completeness | Does it preserve the requested answers and relevant behavior, accounting for every agreed reduction? | Requirement-to-spec mapping, allowed examples, and reduction premises and coverage arguments |
+| Consistency | Do the declarations, initial state, derived rules, and requirements agree? | Initialization checks, invariant checks, and examination of conflicting cases |
+| Clarity | Do the user and advisor mean the same thing by each rule? | Concrete examples, boundary cases, and explicit unresolved questions |
+
+For each important rule, explain what is allowed, what is forbidden, and what changes
+afterward, using the reference builder's categories as an internal checklist. Use
+supplied answers and clearly label deductions; do not guess consequential intent. Skip
+irrelevant features and stop questioning an issue once its possible answers no longer
+change the design. Record requirements as confirmed, provisional, contradicted, or
+unresolved, with their source.
 
 Use the reference builder when useful to explain the modeled rules, objects, initial
 conditions, and goal. After authorized staging, incorporate inspected derived facts;
 label unstaged predictions as predictions. Map important requirements to their
 implementation and identify omissions, extra behavior, and uncertainty.
 
-Use focused allowed, forbidden, boundary, and invariant checks rather than requiring
-a full solve to review fidelity. When a discrepancy appears, use the missing-relations
-companion where appropriate. Consider extra permissions, wrong conditions, initialization
-or loading faults, misunderstood rules, and intentional reductions as well as missing
-relations. A failed search alone does not diagnose an omission. Present intended and
-observed behavior, evidence, and the proposed correction before implementing it.
-Refresh affected explanations and repeat relevant approved checks after correction.
-Keep separately authorized complete-path replay distinct from fidelity and solvability
-claims.
+**Investigating a discrepancy.** Use focused allowed, forbidden, boundary, and invariant
+checks rather than a full solve. Consider extra permissions, wrong conditions,
+initialization or loading faults, misunderstood rules, and intentional reductions as
+well as missing relations; use the missing-relations companion where appropriate. A
+failed search alone does not diagnose an omission. Present intended and observed
+behavior, evidence, and the proposed correction before implementing it, then refresh
+affected explanations and repeat the relevant approved checks.
 
-### 4. Implement and exercise enhancements for larger instances
+### 2.7 Enhancements that preserve the requested answers
 
-After the basic model is coherent, work through enhancements for the larger problem
-family identified by the problem advisor. Implement suitable, justified enhancements
-even when the given instance can be solved without them. Do not leave them merely
-as recommendations for the search advisor or disable them solely because the given
-instance is small. Preserve reductions already integrated into the basic model;
-this step does not require implementing them twice.
-
-Use the incoming growth analysis to propose a short enhancement agenda. For each
-candidate, explain the growth problem it addresses, its prerequisites, the intended
-benefit, its cost or complexity, and the correctness obligation. Candidates can
-include ordering heuristics, sound pruning or bounds, interchangeable-object handling,
-compact representations, efficient choice generation, or maintained summaries.
-Select what fits the analyzed problem; do not add a hook simply to fill a checklist.
-If no additional mechanism is justified, discuss that conclusion with the user and
-record the agreed disposition rather than silently omitting this step.
-
-Actions are normally combined already in the basic model (design priority 2).
-Preserve every legal choice, its cost, and its captured description; fewer action
-definitions do not mean fewer physical steps. Distinguish reduced repeated work
-from a measured speedup.
-
-#### Preserve the requested answers
-
-Distinguish mechanisms that only order exploration from mechanisms that remove
-choices or merge states. Explain why each restriction preserves the requested
-answers, costs, and coverage under the agreed premises. In particular:
+Candidates include ordering heuristics, sound pruning or bounds, interchangeable-object
+handling, compact representations, efficient choice generation, and maintained
+summaries. Distinguish mechanisms that only order exploration from mechanisms that
+remove choices or merge states, and explain why each restriction preserves the
+requested answers, costs, and coverage under the agreed premises:
 
 - A pruning rule needs an impossibility or dominance argument; a plausible ranking
   score is not enough. A bound used to eliminate candidates needs the appropriate
@@ -398,8 +492,7 @@ answers, costs, and coverage under the agreed premises. In particular:
 
 Preserve the scope of each argument: a proof for the supplied instance is not
 automatically valid for the growing family. Do not use a known solution as a general
-rule or silently change the objective to make an enhancement applicable. Return
-consequential semantic changes to the analysis for agreement.
+rule or silently change the objective to make an enhancement applicable.
 
 Consult the problem advisor's [capability reference](problem-advisor-reference.md) selectively and verify consequential
 hook and compatibility assumptions against current source within the authorized scope.
@@ -407,203 +500,129 @@ Documented availability is not proof that a particular formula or encoding is co
 Investigate an uncertain capability before relying on it; engine changes require their
 own proposal and approval.
 
-#### Implement, check, and review one enhancement at a time
 
-Follow the section-review cycle from step 3. Explain the proposed mechanism and its
-correctness argument, incorporate the user's comments, implement it within the approved
-scope, and perform the covered checks before proceeding. Recheck affected basic-model
-behavior. Keep the general rule separate from instance data so larger instances of the
-agreed type do not require changing its meaning.
+---
 
-Exercise each selected enhancement, rather than treating successful staging as evidence
-that it ran. Use the supplied instance where it reaches the relevant behavior. Otherwise
-propose focused legal states, boundary cases, or a small instance of the same family
-under an approved check scope. Do not invent new mechanics or silently create a benchmark
-problem. If the needed check is outside the current scope, request its authorization
-and leave the enhancement's readiness explicitly unresolved until checked.
+## Part 3: Evidence and Records
 
-Useful evidence depends on the mechanism: an ordering hook returns usable priorities;
-a pruning rule retains an allowed case and rejects a case justified by its argument;
-a bound agrees with independently understood tiny completions; a symmetry mechanism
-merges the intended equivalents while preserving meaningful distinctions; a maintained
-summary agrees with direct calculation after relevant updates. Verify integration with
-the intended execution path as well as any direct helper checks. A direct function call
-does not show that search invokes the hook.
+### 3.1 Checks and what they establish
 
-Use bounded checks to establish correctness and operation, not to require a solution or
-demonstrate a speedup. Passing sampled cases supplies scoped evidence alongside the
-correctness argument, not a general proof. Where enhancements interact, check the
-combination for conflicting assumptions and unintended behavior before declaring it ready.
+Each executed check needs a question, model revision, relevant starting state and
+settings, expected observations, operator, and applicable stopping limits. Choose small
+checks that answer the correctness question, record expected and observed behavior
+separately, and record untested sections explicitly.
 
-#### Record readiness and remaining performance questions
+Keep these kinds of evidence distinct; no one of them establishes the others:
+reviewed source, deduction, staging, fidelity checks, enhancement exercise, replay,
+and search results.
 
-For each enhancement, record in the active `spec-analysis-` document:
+- Successful loading establishes only that the implemented checks passed.
+- Fidelity checks are about the model, not search completeness or optimality. A few
+  passing examples provide scoped evidence, not a proof over every possible state.
+- Replay establishes behavior under the model, not that the model matches the
+  intended puzzle.
+- An enhancement is exercised only when search actually invokes it. A direct helper
+  call does not show that search does, and successful staging does not show that an
+  enhancement ran.
 
-- The growth dimension addressed, implementation location, premises, and correctness
-  argument, linked to the incoming analysis where already established.
-- Whether it is implemented and enabled in the intended configuration.
-- What checks actually exercised it, their settings and results, and what remains
-  untested. Distinguish helper checks from execution through the engine.
-- Any unresolved correctness or integration issue, its consequence, and the next action.
-- Performance questions for the search advisor, including possible overhead on small
-  instances, tuning choices, and behavior as the identified dimensions grow.
+Useful enhancement evidence depends on the mechanism: an ordering hook returns usable
+priorities; a pruning rule retains an allowed case and rejects a case justified by its
+argument; a bound agrees with independently understood tiny completions; a symmetry
+mechanism merges the intended equivalents while preserving meaningful distinctions; a
+maintained summary agrees with direct calculation after relevant updates. Use the
+supplied instance where it reaches the relevant behavior; otherwise propose focused
+legal states, boundary cases, or a small instance of the same family under an approved
+scope. Do not invent new mechanics or silently create a benchmark problem. Bounded
+checks establish correctness and operation, not a speedup.
 
-The spec advisor owns implementing and checking these enhancements. The optional search
-advisor phase measures their usefulness, compares strategies, tunes settings, and studies
-larger instances. An exercised enhancement may be operationally ready while its scaling
-benefit remains unmeasured. An unexercised or failing enhancement is not ready merely
-because the basic specification runs. Do not silently drop an agreed enhancement or
-claim full readiness; resolve it or agree an explicit change of scope with the user.
+Use only supported limits appropriate to the selected mode. Record the environment and
+relevant settings. Historical evidence remains available with its model revision and
+limits, but must not be presented as current after changes.
 
-### 5. Consolidate and check the complete specification
+### 3.2 Specification analysis records
 
-Review the whole specification after the section dialogue and enhancement checks.
-Consolidate the active `spec-analysis-` record into one current account of the model,
-implementation decisions, evidence, and unresolved matters. Preserve superseded claims
-and useful evidence in clearly marked history or linked records; leave the incoming
-problem-analysis snapshot unchanged. Do not leave obsolete questions marked pending
-when subsequent agreement has resolved them.
+Store the spec advisor's records in the same `doc/problems/<problem-name>/`
+directory as the problem advisor's, with the `spec-analysis-` prefix: for example
+`spec-analysis-current.txt` for the active record,
+`spec-analysis-YYYY-MM-DD-before-revision.txt` for a preserved snapshot, and the same
+prefix with a descriptive suffix for supporting documents. Reuse the existing active
+record rather than creating one per exchange, and identify it explicitly when linking
+it from another advisor's documents. Do not use the generic `Analysis.txt`; existing
+records keep their provenance and are not renamed by this convention.
 
-#### Review fidelity and consistency
+Record implementation decisions, section review status, user corrections, checks and
+their results, unresolved issues, and the next authorized step. Link the incoming
+`problem-analysis.txt` and its preserved snapshots rather than duplicating their
+agreed requirements, and leave the original snapshot unchanged. Return consequential
+changes to those requirements for agreement; do not silently establish different rules
+in the spec analysis. This advisor owns its implementation agenda and evidence; no
+consultant or shared coordination record is required.
 
-Trace each consequential requirement to its implementation or to an agreed reduction
-with its premises and coverage argument. Check the initial state, given objects and
-data, legal actions and effects, invariants, goal, answer identity, and cost units
-together. Confirm that sections agree with one another and that enhancements preserve
-the objective and identified problem family. Explain the complete model in plain
-language, including intentional omissions and limitations.
+At final review, consolidate the active record into one current account of the model,
+decisions, evidence, and unresolved matters. Preserve superseded claims and useful
+evidence in clearly marked history or linked records, and do not leave obsolete
+questions marked pending. A correction reopens affected conclusions in the linked
+records with the user's agreement; unaffected evidence remains available.
 
-Review the allowed, forbidden, boundary, and enhancement checks already performed.
-Repeat affected checks after relevant changes; do not repeat independent checks just
-to fill a checklist. Distinguish reviewed source, deductions, actual staging, executed
-checks, replay, and search results. No one of these establishes all the others.
+### 3.3 Specification analysis template
 
-Classify remaining issues as correctness or execution blockers, irrelevant under the
-accepted design, or deferred performance questions with an owner. An unresolved rule,
-failed invariant, or unverified required enhancement cannot be relabeled as performance
-tuning. Resolve blockers or explicitly report a partial result; continue independent
-work only within the approved scope.
+Use the relevant fields within the active `spec-analysis-` record, linking established
+requirements in the problem advisor's analysis rather than repeating intake or creating
+a second requirements account. Keep sources and certainty alongside claims. Omit
+irrelevant fields; keep consequential unknowns explicit. Update it throughout the
+workflow.
 
-#### Stage and run the final revision
+```
+PROBLEM / REVISION / AUTHORIZED SCOPE:
+   - Active spec-analysis path; specification path and revision.
+   - Approved edits, source reading, checks, operator, and limits.
 
-Use the exact final specification revision for acceptance checks. Within the approved
-scope, stage it and require completion without errors or warnings. Inspect the output;
-the absence of a debugger interruption alone is insufficient. Investigate diagnostics
-rather than suppressing them to obtain a clean result. If a diagnostic originates in
-the environment, a dependency, or the engine, record that distinction and propose any
-needed work separately; do not claim warning-free acceptance while it remains unresolved.
+INPUT ANALYSIS AND OBJECTIVE:
+   - Current problem-analysis path and preserved snapshot path.
+   - Links to agreed rules, objective, answer identity, reductions, and growth analysis.
+   - Consequential corrections and their agreement status.
 
-Ensure the check does not rely on definitions left by a previously staged problem.
-Use a fresh process when necessary to establish that, without disturbing the user's
-existing REPL. Record the environment and relevant settings. Restage after changes
-affecting the tested specification; do not present results from an earlier revision
-as evidence for the final one.
+REPRESENTATION AND AUTHORING APPROACH:
+   - Sufficient state; objects; static, dynamic, and derived relations.
+   - Path A or B and applicable technologies, with rationale.
+   - Semantic settings versus provisional execution choices.
 
-Run a bounded operational check on the supplied instance with the agreed enhancements
-enabled. State the objective, settings, stopping condition, applicable resource limits,
-and operator before execution, reusing approval when already covered. Use supported
-limits appropriate to the selected mode; do not assume a depth cutoff also bounds
-elapsed time or memory. Review the observed stop reason and retain enough output to
-show that search entered its intended execution path and ran without errors.
+SECTION REVIEW AND REQUIREMENT MAPPING:
+   - Requirement or reduction -> implementation location and explanation.
+   - Section proposed / written / reviewed; user comments and their disposition.
+   - Allowed, forbidden, boundary, and invariant checks; pending prerequisites.
 
-Reaching a solution is not required. Normal completion within the chosen scope or a
-planned controlled stop may provide the operational evidence, with the covered work
-and limitations stated. A crash, resource failure, or interruption before meaningful
-execution is not a passing check. Never silently deepen or continue a run to obtain
-a solution. This check establishes observed operation within its scope, not absence
-of all runtime defects, global optimality, or larger-instance performance. Required
-enhancement exercise evidence from step 4 remains necessary even if this run does
-not trigger every relevant case.
+ENHANCEMENTS FOR THE LARGER FAMILY:
+   - Growth issue -> mechanism, implementation location, premises, correctness argument.
+   - Enabled configuration; helper and engine-integration exercise evidence.
+   - Interactions, unresolved issues, and deferred performance questions.
 
-#### Acceptance and completion status
+CHECKS AND EVIDENCE:
+   - Question, tested revision, starting state, settings, operator, and limits.
+   - Expected versus observed result; stop reason; evidence location and limitations.
+   - Distinguish source review, deduction, staging, fidelity checks, replay, and search.
 
-The specification is ready for the optional search-advisor phase when:
+READINESS AND OPEN ISSUES:
+   - Final consolidation and user review status.
+   - Warning-free staging and bounded error-free run: passed / failed / not run.
+   - Required enhancement checks; blockers versus deferred work, with owners.
+   - What is ready and what remains unverified; no solution required for completion.
 
-1. The complete model and its requirement mapping are reviewed with the user, with
-   no unresolved consequential interpretation or known fidelity defect.
-2. Agreed reductions and enhancements are implemented with their premises recorded;
-   applicable correctness and integration checks pass within their stated scope.
-3. The final revision stages without errors or warnings.
-4. The approved bounded run executes without errors, with its stop reason and evidence
-   recorded. It may finish without a solution.
-5. The current spec analysis names the delivered revision, checks, limitations, and
-   deferred questions to carry into the handoff. No pending blocker is hidden by a
-   general statement that the specification works.
+HANDOFF AND NEXT STEP:
+   - spec-analysis-search-handoff.txt or the selected spec-analysis- handoff path.
+   - Proposed search-advisor question and authorization status.
 
-If checks are awaiting authorization or user execution, report that status and the
-specific missing evidence; do not mark completion on the strength of proposed tests.
-Report an unresolved blocker or agreed partial scope explicitly. Finding a solution,
-proving optimality, benchmarking, and demonstrating scalability are not acceptance
-requirements for this phase.
-
-After the handoff is prepared, use a concise completion message such as:
-
-> Specification complete for [agreed scope]. [Specification path and revision] stages
-> without errors or warnings and passed [bounded run and stop condition]. The agreed
-> enhancements passed [scoped checks]. [Solution found / no solution established].
-> Remaining unverified: [larger-instance performance and other limitations]. The
-> spec analysis and optional search-advisor handoff are at [paths].
-
-Use this wording only when supported by the actual evidence; otherwise state
-"Specification incomplete" or "Specification complete only for [agreed partial scope]"
-and identify what remains. Propose the next scope and wait for authorization.
-
-### 6. Prepare the optional search-advisor handoff
-
-Prepare a concise handoff for the [search advisor](search-advisor.md) after the final
-review. Store it alongside the other problem records using the `spec-analysis-`
-prefix, for example `spec-analysis-search-handoff.txt`. Link it from the active spec
-analysis. The handoff summarizes readiness and points to detailed evidence; it does
-not become a second authoritative requirements record or a competing work agenda.
-
-Include the following, using links rather than copying detailed analysis:
-
-| Handoff content | What the next advisor needs |
-|---|---|
-| Scope and status | Complete, partial, or blocked; the covered problem family; proposed next question; what work is and is not authorized. |
-| Requirements and provenance | Current problem analysis, preserved pre-specification snapshot, current spec analysis, and any agreed corrections. |
-| Delivered model | Specification path and identifiable tested revision; relevant dependencies and environment; staging instructions and actual test settings. |
-| Objective and representation | Answer identity, cost units, goal, sufficient state, action granularity, and the mapping to the agreed requirements. |
-| Reductions and enhancements | Implemented mechanisms, enabled configuration, correctness arguments and premises, interaction constraints, and exercise evidence. |
-| Validation | Final staging outcome, fidelity and integration checks, bounded run result and stop reason, and any separately authorized replay or solution evidence. |
-| Growth and open performance questions | The identified size dimensions and interactions; predicted costs or benefits distinguished from measurements; candidate tuning or comparison questions. |
-| Remaining issues | Blockers or limitations, evidence still missing, deferred work with an owner, and conditions that would reopen earlier conclusions. |
-
-Distinguish settings required by the objective from provisional search choices. Give
-the actual tested configuration rather than assuming that defaults or saved settings
-match it. State compatibility conditions and any unverified capability assumptions.
-Do not infer a general size limit or a speedup from the bounded operational check.
-
-The next optional phase investigates search behavior: measuring enhancement overhead
-and benefit, comparing strategies, tuning settings, and examining larger instances of
-the agreed family. Propose a concrete first question with its evidence needs; leave
-execution limits and any new experiments for the authorized search plan. Preparing
-the handoff does not invoke that phase, authorize benchmarks, or authorize a full solve.
-
-Preserve the user's objective, reductions, corrections, and useful evidence across the
-handoff. No repeated problem interview is needed. If downstream work exposes a fidelity
-gap or invalidates a premise, return the affected issue for agreement and correction,
-then refresh dependent evidence and the handoff. Historical evidence remains available
-with its model revision and limits; it must not be represented as current after changes.
-
-The search advisor may subsequently recommend the optional solving advisor when a
-constraint-led milestone approach is justified. Carry the original objective and
-resource/continuation obligations into that discussion. Shortest milestone segments
-do not establish a globally shortest path; any loss of guarantee needs explicit
-agreement. Reserve a later `Handoff.md` for solving progress, accepted actions, and
-checkpoints; it should link these analysis records rather than replace or delete them.
-
-Report the specification, active spec analysis, and handoff paths with the completion
-status from step 5. A partial or blocked handoff must name the independent scope it
-supports and the missing evidence; it is not a declaration of full readiness. Stop
-for the user's review and authorization of the optional next phase.
+CORRECTIONS AND HISTORY:
+   - Superseded conclusion, reason, affected decisions, retained evidence.
+   - Links to preserved records; leave the original problem-analysis snapshot intact.
+```
 
 
 ---
 
-## Section 1: Wouldwork DSL Reference
+## Part 4: Wouldwork DSL Reference
 
-### 1.1 File Structure
+### 4.1 File Structure
 
 Every problem spec is a `.lisp` file in the **`probs/`** directory. Test problems
 exercising a single technology go in **`test/talos/`**. Wouldwork resolves a problem name
@@ -633,13 +652,13 @@ Sections appear in this canonical order:
 14. `define-goal` (goal condition)
 
 Only one of these orderings is a hard requirement rather than a convention:
-**`define-types` must precede every `include-tech` directive.** Section 1.5 explains
+**`define-types` must precede every `include-tech` directive.** Section 4.5 explains
 why, and why violating it fails silently. The rest is house style — forward references
 among queries and updates are resolved by a pre-scan pass, so definition order among
 them does not matter.
 
 
-### 1.2 Problem Parameters (`ww-set`)
+### 4.2 Problem Parameters (`ww-set`)
 
 ```lisp
 (ww-set *problem-name* <symbol>)          ; e.g., match3a
@@ -652,8 +671,10 @@ them does not matter.
 (ww-set *progress-reporting-interval* <integer>)  ; omit for adaptive reports; N = every N states
 ```
 
-Write only the settings the problem needs at a non-default value (`*problem-name*`
-is always required). A setting left at its default is omitted, not restated.
+Write every setting the specification relies on, even when its value is the default,
+so the file states the intended configuration (`*problem-name*` is always required).
+Omit a setting the specification does not depend on; `(stage ...)` resets it to its
+default.
 
 **Three parameters must NOT appear in a problem file. Each signals an error if it
 does:**
@@ -674,7 +695,7 @@ Note also that on an ordinary load, a saved `vals.lisp` overrides the problem fi
 See `doc/load-ordering/parameter-precedence.md`.
 
 
-### 1.3 Type System (`define-types`)
+### 4.3 Type System (`define-types`)
 
 Defines object types and their instances (ground atoms).
 
@@ -690,10 +711,10 @@ Defines object types and their instances (ground atoms).
 - Numeric instances are permitted: `row (0 1 2 3)`.
 - `(compute <form>)` can generate instances programmatically.
 - A type declared with an empty instance list — `beam ()` — is legal, and is the
-  pattern for populations that only exist at runtime. See Section 1.9.
+  pattern for populations that only exist at runtime. See Section 4.10.
 
 
-### 1.4 Relations
+### 4.4 Relations
 
 #### Dynamic Relations (`define-dynamic-relations`)
 
@@ -754,7 +775,7 @@ A trailing `:bijective` keyword declares a one-to-one pairing of two fluent argu
 error.
 
 
-### 1.5 Technology Includes (`include-tech`) — Path A
+### 4.5 Technology Includes (`include-tech`) — Path A
 
 New Talos Principle problems assemble their mechanics from the `tech/` library rather
 than hand-authoring them:
@@ -795,7 +816,7 @@ checklist. `doc/load-ordering/loading-and-initialization.md` covers splicing and
 failure modes in engine terms (Stage 2, and Traps 1–3).
 
 
-### 1.6 Variable Conventions
+### 4.6 Variable Conventions
 
 | Prefix | Meaning | Scope |
 |--------|---------|-------|
@@ -809,7 +830,7 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
   query/update formal parameters.
 
 
-### 1.7 Query Functions (`define-query`)
+### 4.7 Query Functions (`define-query`)
 
 Read-only functions that examine state. Cannot modify the database.
 
@@ -872,7 +893,7 @@ Here `?location` and `?object` are planning objects. The two elevations are
 computed numeric values, so they deliberately have no Wouldwork object type.
 
 
-### 1.8 Update Functions (`define-update`)
+### 4.8 Update Functions (`define-update`)
 
 Functions that modify the database (assert/retract relations).
 
@@ -907,7 +928,7 @@ automatically from the splice order of the included technologies; author one onl
 the problem needs to override that.
 
 
-### 1.9 Actions (`define-action`)
+### 4.9 Actions (`define-action`)
 
 The primary search operators. Each action has 6 components:
 
@@ -964,6 +985,9 @@ State modifications. The effect body starts in `pre` context and shifts to
   (e.g., inside `doall`), each generating a separate successor state.
 - **`setq` in effects**: `(setq $place 'ground)` captures values for the
   description-variables trace.
+- **`if` in effects**: `(if <test> <then> <else>)` tests the state being updated and
+  selects which statements to assert, so one action can cover several variant cases
+  without near-duplicate action definitions.
 
 **Combining related actions.** A pickup action can share its empty-hands check,
 then generate separate ground and plate alternatives inside its effect. In
@@ -984,7 +1008,7 @@ A list of variables whose values are captured for the solution trace:
 ```
 
 
-### 1.10 Iteration and Quantification
+### 4.10 Iteration and Quantification
 
 | Form | Context | Meaning |
 |------|---------|---------|
@@ -1003,12 +1027,16 @@ A list of variables whose values are captured for the solution trace:
   evaluated at runtime against state instead. The query form is the only way to
   iterate a population that isn't known when the file loads; declare the type empty
   (`beam ()`) and publish the pool through a relation.
+- **Query-domain arguments are not evaluated.** The query receives its argument forms
+  literally, so `(doall (?p (local-plates $area)) ...)` passes the symbol `$AREA`,
+  not its value. Use a query domain only with no arguments or constant ones; to
+  iterate a list that depends on a bound variable, bind the list first and use `ww-loop`.
 - **Performance note:** For dynamic query types, nested `doall`s with a guard
   are more efficient than `(doall (combination (?a ?b) (dynamic-query)) ...)`
   because `combination`/`standard` perform runtime product/dedup on every call.
 
 
-### 1.11 Initialization (`define-init`)
+### 4.11 Initialization (`define-init`)
 
 Asserts the initial state — both dynamic and static relations:
 
@@ -1030,20 +1058,23 @@ Asserts the initial state — both dynamic and static relations:
 
 `install-init` validates the complete raw literal set before asserting any of it. The engine
 rejects wrong argument types, duplicate fluent keys, authored derived facts, and symmetric
-self-pairs (Section 1.4); each included technology registers its own semantic checks for
+self-pairs (Section 4.4); each included technology registers its own semantic checks for
 the relations it owns.
 These checks can diagnose specification failures during staging; they do not detect
 every semantic error or establish fidelity to the intended problem. A standalone
 problem that includes no technologies does not inherit Talos-specific rules.
 
 `define-init-action` runs a derivation once during initialization — computing static
-facts from raw geometry, for instance. Two cautions: init-actions fire in file/splice
-order, *not* by the numeric duration argument; and an init-action is **silently
-skipped** if any of its parameter types has no instances. See
+facts from raw geometry, for instance. Three cautions: init-actions fire in file/splice
+order, *not* by the numeric duration argument; an init-action is **silently
+skipped** if any of its parameter types has no instances; and an init-action is
+compiled without integer keys, so a direct `bind` or test of a *dynamic* relation in
+its body finds nothing. Read dynamic facts there through a query, which is compiled
+normally; static relations can be read directly. See
 `doc/load-ordering/loading-and-initialization.md`, Traps 4–6.
 
 
-### 1.12 Goal (`define-goal`)
+### 4.12 Goal (`define-goal`)
 
 A boolean expression evaluated in `pre` context:
 
@@ -1061,7 +1092,7 @@ A boolean expression evaluated in `pre` context:
 - Goal is evaluated against each candidate state during search.
 
 
-### 1.13 Key Patterns
+### 4.13 Key Patterns
 
 #### Functional Relations (single value per key)
 When a relation like `(cell row col $fixnum)` has typed keys and a fluent value,
@@ -1101,7 +1132,7 @@ Functions defined with `defun`/`defparameter` at top level are available
 globally (they are standard CL, not translated by the DSL).
 
 
-### 1.14 Running
+### 4.14 Running
 
 These are reference commands, not an instruction to execute every command or an
 authorization to stage or solve. Use only the operations covered by the agreed scope.
@@ -1124,59 +1155,3 @@ no zero-argument `(run)`; use `(solve)` to solve what is already staged.
 
 `(stage X)` applies the problem file's own `ww-set` settings. `(refresh)` deliberately
 skips them, preserving whatever you set at the REPL.
-
-
----
-
-## Section 2: Specification Analysis Template
-
-Use the relevant fields within the active `spec-analysis-` record, linking established
-requirements in the problem advisor's analysis rather than repeating intake or creating
-a second requirements account. Keep sources and certainty alongside claims. Omit
-irrelevant fields; keep consequential unknowns explicit. This is an implementation
-record, not another problem interview. Update it throughout the six-step workflow.
-
-```
-PROBLEM / REVISION / AUTHORIZED SCOPE:
-   - Active spec-analysis path; specification path and revision.
-   - Approved edits, source reading, checks, operator, and limits.
-
-INPUT ANALYSIS AND OBJECTIVE:
-   - Current problem-analysis path and preserved snapshot path.
-   - Links to agreed rules, objective, answer identity, reductions, and growth analysis.
-   - Consequential corrections and their agreement status.
-
-REPRESENTATION AND AUTHORING APPROACH:
-   - Sufficient state; objects; static, dynamic, and derived relations.
-   - Path A or B and applicable technologies, with rationale.
-   - Semantic settings versus provisional execution choices.
-
-SECTION REVIEW AND REQUIREMENT MAPPING:
-   - Requirement or reduction -> implementation location and explanation.
-   - Section proposed / written / reviewed; user comments and their disposition.
-   - Allowed, forbidden, boundary, and invariant checks; pending prerequisites.
-
-ENHANCEMENTS FOR THE LARGER FAMILY:
-   - Growth issue -> mechanism, implementation location, premises, correctness argument.
-   - Enabled configuration; helper and engine-integration exercise evidence.
-   - Interactions, unresolved issues, and deferred performance questions.
-
-CHECKS AND EVIDENCE:
-   - Question, tested revision, starting state, settings, operator, and limits.
-   - Expected versus observed result; stop reason; evidence location and limitations.
-   - Distinguish source review, deduction, staging, fidelity checks, replay, and search.
-
-READINESS AND OPEN ISSUES:
-   - Final consolidation and user review status.
-   - Warning-free staging and bounded error-free run: passed / failed / not run.
-   - Required enhancement checks; blockers versus deferred work, with owners.
-   - What is ready and what remains unverified; no solution required for completion.
-
-HANDOFF AND NEXT STEP:
-   - spec-analysis-search-handoff.txt or the selected spec-analysis- handoff path.
-   - Proposed search-advisor question and authorization status.
-
-CORRECTIONS AND HISTORY:
-   - Superseded conclusion, reason, affected decisions, retained evidence.
-   - Links to preserved records; leave the original problem-analysis snapshot intact.
-```
