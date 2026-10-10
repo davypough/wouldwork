@@ -161,6 +161,14 @@ leave them merely as recommendations for the search advisor, or disable them sol
 because the given instance is small. Reductions already integrated into the basic
 model need not be implemented twice.
 
+Search-guidance hooks are the exception. For a remaining-steps bound
+(`min-steps-remaining?`) or an ordering heuristic, write only a simple, sound
+placeholder in a single query that reads facts already present, with no setup
+actions or helpers, and that the given instance exercises; for example, the steps
+the goal visibly still requires from the current state. Record the design of a stronger bound or heuristic as a
+search-advisor question: its value depends on measured pruning against its cost,
+which the spec advisor cannot establish.
+
 Propose a short enhancement agenda. For each candidate, explain the growth problem it
 addresses, its prerequisites, the intended benefit, its cost or complexity, and its
 correctness obligation (Section 2.7). Select what fits the analyzed problem; do not add a
@@ -306,6 +314,14 @@ Apply these in order; an earlier priority wins when two conflict.
    Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step. A
    quantifier can range over a list held in a `$` variable (Section 4.10), so a loop
    over a state-dependent list needs no `ww-loop`.
+
+**Comments.** Write comments for the user, in the problem's own terms. Open the file
+with a short description of the problem and a few design notes stating the main
+representation choices in general terms. Above a form, add one or two plain lines
+only where its purpose is not obvious from its name and code; leave self-explanatory
+forms and settings uncommented. Keep engine mechanics, justifications, reduction
+labels, check results and revision history out of the file; they belong in the spec
+analysis. Separate top-level forms with two blank lines.
 
 ### 2.2 Choose the authoring approach
 

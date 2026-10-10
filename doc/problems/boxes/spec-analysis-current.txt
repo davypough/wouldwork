@@ -38,8 +38,8 @@ Gate openness is derived from its controlling plate's occupancy (GATE-OPEN?);
 no gate state is stored.
 
 Static facts: gate endpoints, plate areas, the one-to-one plate/gate wiring,
-and three facts derived at initialization -- each area's plate list, each
-area's gate list, and each area's all-open crossing distance to area4.
+and two facts derived at initialization -- each area's plate list and each
+area's gate list.
 
 Requirement -> implementation:
 - Empty hands to pick up; carry at most one -> PICKUP requires no HOLDING fact;
@@ -73,11 +73,15 @@ Requirement -> implementation:
   alternatives; CROSS-GATE emits every open local gate.
 - Local lists: AREA-PLATES and AREA-GATES are built once by
   INITIALIZE-TOPOLOGY-INDEXES, so actions consider only local candidates.
-- Crossing bound: INITIALIZE-CROSSING-BOUNDS computes each area's all-open
-  crossing distance to area4 (supplied values area1 2, area2 3, area3 1,
-  area4 0; zero for disconnected areas). MIN-STEPS-REMAINING? returns it as a
-  lower bound on remaining actions. The goal area appears in both the bound
-  derivation and DEFINE-GOAL; change both together.
+- Remaining-steps bound: MIN-STEPS-REMAINING? is a placeholder computed by one
+  query from facts already present: crossings still needed (0 in area4, 1 from
+  an area next to it, otherwise 2), plus one placement, and one pickup if the
+  agent's hands are empty, when every gate into area4 is closed. Sound because
+  the final crossing needs an open gate into area4, which needs a box placed on
+  its plate. Start-state value 4 (true optimum 10). The earlier all-open crossing-distance bound (an init action plus
+  a plain-Lisp breadth-first helper) was removed 2026-10-10 as unmeasured
+  complexity; designing a stronger bound is a search-advisor question. The goal
+  area appears in both this query and DEFINE-GOAL; change both together.
 - Symmetry pruning: on for this problem. Whether its overhead pays off on
   larger instances is untested and belongs to the search advisor.
 
@@ -92,13 +96,16 @@ Requirement -> implementation:
   warnings and still returns the ten-action optimum.
 - Settings in the file: planning, MIN-LENGTH, GRAPH, symmetry pruning on,
   depth cutoff 0, 16 threads.
-- The bound derivation and topology indexes are unchanged in logic since their
-  passing checks under the counts model; those checks (now deleted scripts) are
-  historical and were not rerun on this revision.
+- The topology indexes are unchanged in logic since their passing checks
+  under the counts model; those checks (now deleted scripts) are historical
+  and were not rerun on this revision.
+- 2026-10-10: crossing-distance bound replaced by the one-query placeholder.
+  User-reported: stages without warnings, start-state bound 4, ten-action
+  optimum returned.
 - User-reported staging output (2026-10-10): one symmetry family, BOX1/BOX2
   as interchangeable rows of type BOX; AGENT1 and AREA4 excluded as goal-
-  referenced; global (closed-list) strategy. MIN-STEPS-REMAINING? gives 2 at
-  the start state, matching area1's crossing bound.
+  referenced; global (closed-list) strategy. (The start-state bound of 2
+  reported then came from the since-removed crossing-distance bound.)
 - Not yet recorded for this revision: state/time counts and bound
   evaluation/prune counters.
 

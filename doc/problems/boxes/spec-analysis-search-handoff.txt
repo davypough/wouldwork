@@ -13,9 +13,10 @@ before-consolidation.txt and git history (commit ec7b9ab and earlier).
 DELIVERED MODEL
 Path B specification, no include-tech. Named boxes: (loc object $area),
 (holding agent $box), bijective (on $box $plate). Gate openness derived from
-plate occupancy. Three unit actions (PICKUP, PLACE, CROSS-GATE); two
-initialization actions build per-area plate/gate lists and all-open crossing
-distances to the goal. MIN-STEPS-REMAINING? supplies the crossing lower bound.
+plate occupancy. Three unit actions (PICKUP, PLACE, CROSS-GATE); one
+initialization action builds per-area plate/gate lists. MIN-STEPS-REMAINING?
+is a placeholder bound: 0, 1 or 2 crossings by adjacency to area4, plus the
+placement and pickup needed when every gate into area4 is closed.
 
 OBJECTIVE
 One globally shortest unit-action path; goal (loc agent1 area4). The no-plate-
@@ -30,8 +31,9 @@ Reproduction: (stage boxes-advisor) then (solve).
 
 OPEN PERFORMANCE QUESTIONS (search advisor; each needs its own approved plan)
 - Does symmetry pruning save more work than it costs as box counts grow?
-- Does the crossing bound save enough work to offset its evaluation cost as
-  transport distance and topology grow?
+- Design a useful MIN-STEPS-REMAINING? bound (for example all-open crossing
+  distance to the goal, plus unavoidable pickups and placements) and measure
+  whether its pruning outweighs its cost as topology and box counts grow.
 - Graph memory, 16-thread benefit, and behavior of cyclic or disconnected layouts.
 Vary box counts and connectivity separately before studying their interaction.
 No size limit or speedup has been established. Fidelity defects return to the
