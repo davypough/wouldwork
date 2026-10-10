@@ -371,11 +371,18 @@ asserting a new value replaces the old one. A relation that is simply true or fa
 of its objects takes no fluents (Section 4.4).
 
 **Interchangeable objects.** When objects of one type obey the same rules and are not
-named by the goal, consider recording counts or occupancy rather than names. That
-removes label permutations more cheaply than symmetry pruning, while distinct spatial
-allocations remain distinct. Conceptual interchangeability does not by itself verify
-an engine symmetry setting or a compact encoding; retain any obligation for
-consistent object names in returned instructions.
+named by the goal, keep them as named objects and enable symmetry pruning
+(`(ww-set *symmetry-pruning* t)`), which merges arrangements that differ only by those
+names. This is the direct representation (Section 2.5): it needs no conservation
+guard, solutions name the actual objects, and the engine finds the interchangeable
+group itself from types, static facts and goal references. At staging, confirm that
+the engine reports the intended group; an object named in the goal or given its own
+static facts is left out of it. Record counts or occupancy instead only when the
+objects are anonymous in the problem itself and numerous enough that their names
+would dominate the state, such as many identical units piled in one place. That is
+an agreed enhancement whose conservation assumption is recorded with its guard, and
+whether it beats symmetry pruning is a question for the search advisor. Either way,
+distinct spatial allocations remain distinct.
 
 **Local choices.** When an action would otherwise test every object in the problem to
 find the few relevant ones, consider static per-location lists built once at
@@ -392,10 +399,21 @@ Each generated transition represents exactly one counted action, with its cost a
 understandable description. Generate only the choices the agreed rules permit, and
 every one of them.
 
-Combine related actions (priority 2) by placing the shared tests and lookups in the
-precondition and emitting each alternative from its own `assert` in the effect
-(Section 4.9). Generate every legal alternative; an exclusive branch would lose
-choices. Use `if` within an effect to cover variant cases of one action rather than
+Combine related actions (priority 2) by emitting each alternative from its own
+`assert` in the effect (Section 4.9). Divide the tests by what they decide:
+
+- **Precondition:** only the conditions that block every alternative, plus the
+  lookups those conditions need. With none, the precondition is `(always-true)`.
+- **Effect:** each alternative's own conditions, placed with that alternative's
+  `assert` (for example, a plate's emptiness test inside the loop over plates).
+- **Lookups:** a `bind` that always succeeds and is used only by the effect goes in
+  the effect, just before its first use. The precondition runs for every parameter
+  combination and the effect only for those that pass, so the effect is never the
+  costlier place. Keep a `bind` in the precondition when its failure must block the
+  action, or when its `$` variable appears in the action's description list (the
+  engine requires those to be set in the precondition or inside the `assert`).
+
+Generate every legal alternative; an exclusive branch would lose choices. Use `if` within an effect to cover variant cases of one action rather than
 writing near-duplicate actions. Fewer action definitions do not mean fewer physical
 steps: preserve every legal choice, its cost, and its captured description, and
 distinguish reduced repeated work from a measured speedup.
@@ -418,7 +436,7 @@ engine's job, not the specification's:
   technologies supply their own checks.
 - **No lookup wrappers.** A `bind` both tests that a fact exists and sets its `$`
   variables for the statements that follow, so write the `bind` where the value is
-  needed: `(bind (agent-area ?agent $area))` in a precondition, not
+  first needed: `(bind (agent-area ?agent $area))`, not
   `(assign $area (current-area ?agent))` with a query that only performs that `bind`.
   A query earns its place by holding real logic, by being an engine hook called by
   name (such as `min-steps-remaining?`), or by reading dynamic facts for an init action
@@ -478,8 +496,9 @@ requested answers, costs, and coverage under the agreed premises:
   score is not enough. A bound used to eliminate candidates needs the appropriate
   optimistic guarantee and must fit the selected engine hook's actual contract.
 - Interchangeable objects must preserve legality, goals, costs, and answer identity.
-  Check the concrete encoding or symmetry mechanism and any named-path reconstruction;
-  the conceptual interchangeability argument alone does not verify implementation.
+  With symmetry pruning, confirm the reported symmetry group at staging; with a counts
+  encoding, check conservation and how instructions identify the objects. The
+  conceptual interchangeability argument alone does not verify the implementation.
 - Duplicate sharing must preserve relevant futures and the required cost comparison,
   including cheaper later arrivals where applicable. Do not assume a chosen search
   mode supplies that behavior without checking its current contract.

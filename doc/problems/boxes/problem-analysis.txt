@@ -7,23 +7,18 @@ section-by-section specification building and static generic-source review.
 The active implementation record is spec-analysis-current.txt. Comparison with
 the existing spec and executed checks were outside that initial authoring approval;
 later execution scopes and results are recorded in the active spec analysis.
-The user accepted anonymous box instructions and the counts/occupancy alternative:
-ground pickup identifies its area, plate pickup identifies its plate, and placement
-identifies its destination. Physical box-name reconstruction is unnecessary for
-this output. Legality, costs, given objects, and the shortest-path objective remain
+Representation, 2026-10-10: the user replaced the earlier counts/occupancy
+representation with named boxes plus engine symmetry pruning (the named-box
+alternative in section 3), so solutions now name actual boxes. Legality, costs, given objects, and the shortest-path objective remain
 unchanged. The analysis-completion and withdrawn-work statements below describe
 their earlier scopes, not this later approval. The original snapshot is unchanged.
 
-Current spec-advisor result, 2026-10-09: the independent specification, topology
-indexes and all-open crossing bound are implemented. User-run focused checks pass,
-and the supplied solve retains ten actions. The user confirms clean final staging
-and solving under DEPTH-FIRST/GRAPH/MIN-LENGTH, 16 threads, cutoff 0. The complete
-spec review and consolidated evidence are in spec-analysis-current.txt. The user
-also reports BOXES-GRAPH-CHECKS-PASSED: 8 cases, serial and worker successor paths.
-This closes the remaining agreed acceptance check; the specification is complete
-for its agreed scope and spec-analysis-search-handoff.txt is ready. Next-advisor
-experiments require their own scoped approval. Larger-instance performance and
-actual concurrent reopening remain unmeasured. Existing-spec comparison is deferred.
+Current spec-advisor result, 2026-10-10: the specification (named boxes, symmetry
+pruning, topology indexes and all-open crossing bound) is complete for its agreed
+scope and returns the ten-action optimum; see spec-analysis-current.txt and
+spec-analysis-search-handoff.txt. Larger-instance performance is unmeasured.
+Comparison with the user's earlier probs/problem-boxes.lisp is now under way as
+a review of the spec advisor.
 
 Scope correction, 2026-10-09: the user clarified that this phase remains problem
 analysis and must not create a specification. The prematurely authored draft
@@ -120,9 +115,9 @@ choice suffices for identical loose boxes in the same area. Do not impose a fixe
 box order or prohibit box recovery.
 
 Alternative: retain named box locations throughout and use canonical state keys
-for equivalence. The subsequent spec-advisor consultation selected counts and
-occupancy with anonymous source/destination instructions. Physical-name
-reconstruction is required only if named output is requested later.
+for equivalence. The spec advisor first implemented counts and occupancy with
+anonymous instructions; on 2026-10-10 the user switched to this named-box
+alternative, using the engine's symmetry pruning for equivalence.
 
 4. JUSTIFIED REDUCTIONS AND TERMINATION
 

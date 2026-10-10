@@ -93,13 +93,15 @@
               (not (on ?box $plate)))))
 
 ;;; Ground placement and every empty local plate are independent alternatives.
+;;; The precondition tests only what blocks every placement; the plate list is
+;;; fetched in the effect, where each plate's own emptiness test also sits.
 (define-action place 1
   (?agent agent)
   (and (bind (holding ?agent $box))
-       (bind (loc ?agent $area))
-       (bind (area-plates $area $plates)))
+       (bind (loc ?agent $area)))
   (?agent $box "on" $site "in" $area)
   (do
+    (bind (area-plates $area $plates))
     (assert (setq $site 'ground)
             (loc $box $area)
             (not (holding ?agent $box)))
@@ -111,16 +113,18 @@
                           (not (holding ?agent $box))))))
 
 ;;; Cross an open incident gate in either direction, carrying any held box.
+;;; Each gate's open test belongs to that gate's crossing, so it sits in the loop.
 (define-action cross-gate 1
   (?agent agent)
-  (and (bind (loc ?agent $area))
-       (bind (area-gates $area $gates)))
+  (bind (loc ?agent $area))
   (?agent "through" $via "from" $area "to" $to)
-  (ww-loop for $gate in $gates
-           when (gate-open? $gate)
-             do (assert (setq $via $gate)
-                        (setq $to (opposite-area $gate $area))
-                        (loc ?agent $to))))
+  (do
+    (bind (area-gates $area $gates))
+    (ww-loop for $gate in $gates
+             when (gate-open? $gate)
+               do (assert (setq $via $gate)
+                          (setq $to (opposite-area $gate $area))
+                          (loc ?agent $to)))))
 
 (define-init
   (loc agent1 area1)
@@ -136,11 +140,8 @@
   (controls plate2 gate2)
   (controls plate3 gate3))
 
-;;; Build adjacency in linear passes. These BINDs use symbolic static keys,
-;;; matching the static writes in the plain-compiled initialization action.
-;;; Explicit empty lists cover isolated areas. Reverse into declared object order.
-;;; The engine converts these facts to static integer keys after init actions.
-;;; No query reads the newly built lists before that conversion.
+;;; Derives each area's plates and gates once, for efficiency: actions then
+;;; consider only the local ones rather than every plate and gate.
 (define-init-action initialize-topology-indexes 0
   ()
   (always-true)
