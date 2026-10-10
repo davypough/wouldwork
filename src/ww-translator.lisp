@@ -449,8 +449,10 @@
                   (t 't))))))))
 
 
-(defun static-single-quantifier-domain (vars types)
-  "Return VAR and static DOMAIN for a one-variable quantifier, if it is simple."
+(defun single-quantifier-domain (vars types)
+  "Return VAR and the form computing its DOMAIN for a one-variable quantifier, if simple.
+   The domain form is the $variable itself for a $variable domain, a quoted instance
+   list for a declared type, or NIL when that type is statically empty."
   (when (and (consp vars)
              (null (cdr vars))
              (consp types)
@@ -458,11 +460,44 @@
              (consp (rest types))
              (null (cddr types)))
     (let ((type (second types)))
-      (multiple-value-bind (domain present-p) (gethash type *types*)
-        (when present-p
-          (values (first vars)
-                  (if (equal domain '(nil)) nil domain)
-                  t))))))
+      (if ($varp type)
+        (values (first vars) type t)
+        (multiple-value-bind (domain present-p) (gethash type *types*)
+          (when present-p
+            (values (first vars)
+                    (unless (or (null domain) (equal domain '(nil)))
+                      `',domain)
+                    t)))))))
+
+
+(defun dynamic-quantifier-domain-p (pre-param-types)
+  "Return true when PRE-PARAM-TYPES includes a query or $variable domain, so the
+   quantifier's instantiations can only be computed at run time."
+  (or (intersection (alexandria:flatten pre-param-types) *query-names*)
+      (some #'$varp (flatten-param-types pre-param-types))))
+
+
+(defun quantifier-collection-form (type-inst dynamic static-collection)
+  "Form producing a quantifier's transposed instantiation collection.  A static domain
+   uses the precomputed STATIC-COLLECTION.  A DYNAMIC domain is evaluated in the current
+   state: a query domain from the quoted TYPE-INST, whose query arguments are passed as
+   written, and a $variable domain from TYPE-INST rebuilt with each variable's value."
+  (cond ((not dynamic)
+         `',static-collection)
+        ((some #'$varp (flatten-param-types type-inst))
+         `(ut::transpose (eval-instantiated-spec ,(runtime-type-inst-form type-inst) state)))
+        (t
+         `(ut::transpose (eval-instantiated-spec ',type-inst state)))))
+
+
+(defun runtime-type-inst-form (type-inst)
+  "Form rebuilding TYPE-INST at run time with each $variable domain replaced by its value."
+  `(list ,@(mapcar (lambda (item)
+                     (cond (($varp item) item)
+                           ((and (consp item) (member (first item) *parameter-headers*))
+                            (runtime-type-inst-form item))
+                           (t `',item)))
+                   type-inst)))
 
 
 (defun empty-quantifier-collection-p (collection)
@@ -483,19 +518,16 @@
               (setf parameters (cons 'standard parameters)))
             (multiple-value-bind (pre-param-?vars pre-param-types)
                 (dissect-pre-params parameters)
-              (let* ((queries (intersection (alexandria:flatten pre-param-types)
-                                             *query-names*))
+              (let* ((dynamic (dynamic-quantifier-domain-p pre-param-types))
                      (type-inst (instantiate-type-spec pre-param-types))
                      (static-collection
-                       (unless queries
+                       (unless dynamic
                          (ut::transpose (eval-instantiated-spec type-inst)))))
-                (multiple-value-bind (var domain static-single-p)
-                    (and (null queries)
-                         (static-single-quantifier-domain pre-param-?vars
-                                                          pre-param-types))
+                (multiple-value-bind (var domain single-p)
+                    (single-quantifier-domain pre-param-?vars pre-param-types)
                   (declare (ignore var))
-                  (when (or (and static-single-p (null domain))
-                            (and (null queries)
+                  (when (or (and single-p (null domain))
+                            (and (null dynamic)
                                  (empty-quantifier-collection-p static-collection)))
                     (if (member (first form) '(forsome exists exist))
                       :false
@@ -740,36 +772,34 @@ predicates stay unknown because their argument may or may not be an instance."
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((*var-type-env* (append (mapcar #'cons (alexandria:flatten pre-param-?vars) (flatten-param-types pre-param-types)) *var-type-env*)))
-        (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+        (let* ((dynamic (dynamic-quantifier-domain-p pre-param-types))
                (type-inst (instantiate-type-spec pre-param-types))
-               (static-collection (unless queries
-                                    (ut::transpose (eval-instantiated-spec type-inst)))))
-          (multiple-value-bind (var domain static-single-p)
-              (and (null queries)
-                   (static-single-quantifier-domain pre-param-?vars pre-param-types))
+               (static-collection (unless dynamic
+                                    (ut::transpose (eval-instantiated-spec type-inst))))
+               (collection-form (quantifier-collection-form type-inst dynamic static-collection)))
+          (multiple-value-bind (var domain single-p)
+              (single-quantifier-domain pre-param-?vars pre-param-types)
             (cond
-              ((and static-single-p (null domain))
+              ((and single-p (null domain))
                (translate-empty-static-quantifier body flag nil))
-              (static-single-p
+              (single-p
                (ecase flag
                  (pre
                   (let ((*within-quantifier* t))
-                    `(loop for ,var in ',domain
+                    `(loop for ,var in ,domain
                            thereis ,(translate body flag))))
                  (eff
-                  `(loop for ,var in ',domain
+                  `(loop for ,var in ,domain
                          thereis ,(let ((*within-quantifier* t))
                                     (translate body 'eff))))))
-              ((and (null queries) (empty-quantifier-collection-p static-collection))
+              ((and (null dynamic) (empty-quantifier-collection-p static-collection))
                (translate-empty-static-quantifier body flag nil))
               (t
                (ecase flag
                  (pre
                   ;; Query semantics - return T if any instantiation satisfies body, NIL otherwise
                   (let ((*within-quantifier* t))
-                    `(let ((collection ,(if queries
-                                          `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                          `',static-collection)))
+                    `(let ((collection ,collection-form))
                        (if (and collection (caar collection))
                            (apply #'some (lambda (&rest args)
                                           (destructuring-bind ,pre-param-?vars args
@@ -778,9 +808,7 @@ predicates stay unknown because their argument may or may not be an instance."
                            nil))))
                  (eff
                   ;; Assertion semantics - execute body for suitable instantiations
-                  `(let ((collection ,(if queries
-                                        `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                        `',static-collection)))
+                  `(let ((collection ,collection-form))
                      (if (and collection (caar collection))
                          (apply #'some (lambda (&rest args)
                                         (destructuring-bind ,pre-param-?vars args
@@ -802,27 +830,25 @@ predicates stay unknown because their argument may or may not be an instance."
       (warn "Found FORALL statement in effect; DOALL is often intended: ~A" form))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((*var-type-env* (append (mapcar #'cons (alexandria:flatten pre-param-?vars) (flatten-param-types pre-param-types)) *var-type-env*)))
-        (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+        (let* ((dynamic (dynamic-quantifier-domain-p pre-param-types))
                (type-inst (instantiate-type-spec pre-param-types))
-               (static-collection (unless queries
-                                    (ut::transpose (eval-instantiated-spec type-inst)))))
-          (multiple-value-bind (var domain static-single-p)
-              (and (null queries)
-                   (static-single-quantifier-domain pre-param-?vars pre-param-types))
+               (static-collection (unless dynamic
+                                    (ut::transpose (eval-instantiated-spec type-inst))))
+               (collection-form (quantifier-collection-form type-inst dynamic static-collection)))
+          (multiple-value-bind (var domain single-p)
+              (single-quantifier-domain pre-param-?vars pre-param-types)
             (cond
-              ((and static-single-p (null domain))
+              ((and single-p (null domain))
                (translate-empty-static-quantifier body flag t))
-              ((and (null queries) (empty-quantifier-collection-p static-collection))
+              ((and (null dynamic) (empty-quantifier-collection-p static-collection))
                (translate-empty-static-quantifier body flag t))
               (t
                ;; Translation-time binding affects the translate call below
                (let ((*within-quantifier* t))
-                 (if static-single-p
-                     `(loop for ,var in ',domain
+                 (if single-p
+                     `(loop for ,var in ,domain
                             always ,(translate body flag))
-                     `(let ((collection ,(if queries
-                                           `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                           `',static-collection)))
+                     `(let ((collection ,collection-form))
                         (if (and collection (caar collection))
                             (apply #'every (lambda (&rest args)
                                             (destructuring-bind ,pre-param-?vars args
@@ -841,28 +867,26 @@ predicates stay unknown because their argument may or may not be an instance."
       (push 'standard parameters))
     (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params parameters)
       (let ((*var-type-env* (append (mapcar #'cons (alexandria:flatten pre-param-?vars) (flatten-param-types pre-param-types)) *var-type-env*)))
-        (let* ((queries (intersection (alexandria:flatten pre-param-types) *query-names*))
+        (let* ((dynamic (dynamic-quantifier-domain-p pre-param-types))
                (type-inst (instantiate-type-spec pre-param-types))
-               (static-collection (unless queries
-                                    (ut::transpose (eval-instantiated-spec type-inst)))))
-          (multiple-value-bind (var domain static-single-p)
-              (and (null queries)
-                   (static-single-quantifier-domain pre-param-?vars pre-param-types))
+               (static-collection (unless dynamic
+                                    (ut::transpose (eval-instantiated-spec type-inst))))
+               (collection-form (quantifier-collection-form type-inst dynamic static-collection)))
+          (multiple-value-bind (var domain single-p)
+              (single-quantifier-domain pre-param-?vars pre-param-types)
             (cond
-              ((and static-single-p (null domain))
+              ((and single-p (null domain))
                (translate-empty-static-quantifier body flag t))
-              ((and (null queries) (empty-quantifier-collection-p static-collection))
+              ((and (null dynamic) (empty-quantifier-collection-p static-collection))
                (translate-empty-static-quantifier body flag t))
               (t
                ;; Translation-time binding affects the translate call below
                (let ((*within-quantifier* t))
-                 (if static-single-p
-                     `(dolist (,var ',domain t)
+                 (if single-p
+                     `(dolist (,var ,domain t)
                         ,(translate body flag))
                      `(progn
-                        (let ((collection ,(if queries
-                                             `(ut::transpose (eval-instantiated-spec ',type-inst state))
-                                             `',static-collection)))
+                        (let ((collection ,collection-form))
                           (when (and collection (caar collection))
                             (apply #'mapc (lambda (&rest args)
                                            (destructuring-bind ,pre-param-?vars args

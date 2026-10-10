@@ -316,7 +316,7 @@
                  (error "Expecting ~A to be a ?var or ?var-list in ~A" item pre-parameter-list)))
           (1 (or (when (type-or-query-or-either-p item)
                    (setf state 0))
-                 (error "Expecting ~A to be a type, query-list, or either-list in ~A"
+                 (error "Expecting ~A to be a type, query-list, either-list, or $variable in ~A"
                         item pre-parameter-list))))))
 
 
@@ -1009,7 +1009,10 @@
 
 
 (defun type-or-query-or-either-p (item)
+  "Whether ITEM can be the domain of a ?var in a precondition or quantifier parameter list.
+   A $variable domain holds a runtime list; CREATE-ACTION rejects it in action parameters."
   (or (nth-value 1 (gethash item *types*))  ;type
+      ($varp item)  ;$variable holding a list
       (and (listp item)
            (or (member (first item) *query-names*)  ;query
                (and (eql (first item) 'either)  ;combo type

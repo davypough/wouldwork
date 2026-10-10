@@ -303,7 +303,9 @@ Apply these in order; an earlier priority wins when two conflict.
    decisions in the spec analysis, not in the file.
 4. **Wouldwork idioms.** Express logic with Wouldwork statements (`exists`,
    `forall`, `doall`, `if`, `bind`, queries and updates) rather than equivalent
-   Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step.
+   Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step. A
+   quantifier can range over a list held in a `$` variable (Section 4.10), so a loop
+   over a state-dependent list needs no `ww-loop`.
 
 ### 2.2 Choose the authoring approach
 
@@ -386,7 +388,8 @@ distinct spatial allocations remain distinct.
 
 **Local choices.** When an action would otherwise test every object in the problem to
 find the few relevant ones, consider static per-location lists built once at
-initialization, so the action considers only local candidates.
+initialization, so the action considers only local candidates. The action binds the
+local list and iterates it directly, e.g. `(doall (?plate $plates) ...)`.
 
 **Reductions.** Keep intended abilities distinct from the transitions retained in a
 reduced search model. An agreed proof may justify omitting an ability without changing
@@ -1049,7 +1052,16 @@ A list of variables whose values are captured for the solution trace:
 - **Query-domain arguments are not evaluated.** The query receives its argument forms
   literally, so `(doall (?p (local-plates $area)) ...)` passes the symbol `$AREA`,
   not its value. Use a query domain only with no arguments or constant ones; to
-  iterate a list that depends on a bound variable, bind the list first and use `ww-loop`.
+  iterate a list that depends on a bound variable, bind the list first and use a
+  `$`-variable domain.
+- **`$`-variable domain.** `(doall (?p $plates) ...)` iterates the list held in
+  `$plates` when the quantifier runs, so the list may depend on the current state:
+  `(bind (area-plates $area $plates))` first, or `(setq $plates (some-query? ...))`.
+  It works in `exists`, `forall` and `doall` (including `combination` headers) in
+  preconditions, effects, queries, updates, goals and constraints — but not in action
+  parameter lists, where no `$` variable is yet bound (an error). The loop variable
+  takes each element in order and has no declared type. An empty or unbound (NIL)
+  list gives `exists` false, `forall` true and no `doall` iterations.
 - **Performance note:** For dynamic query types, nested `doall`s with a guard
   are more efficient than `(doall (combination (?a ?b) (dynamic-query)) ...)`
   because `combination`/`standard` perform runtime product/dedup on every call.

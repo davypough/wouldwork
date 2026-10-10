@@ -666,6 +666,10 @@
                  (if (symbolp prior-item)  ;single prior ?variable
                    (collecting item into types)
                    (appending (make-list (length prior-item) :initial-element item) into types)))
+              (($varp item)  ;$variable holding a runtime list of instances
+                 (if (symbolp prior-item)  ;single prior ?variable
+                   (collecting item into types)
+                   (appending (make-list (length prior-item) :initial-element item) into types)))
               ((eql (first item) 'either)  ;combo type
                  (let* ((new-type (intern (ut::interleave+ (ut::sort-symbols (cdr item)))))
                         (type-instances (mapcar (lambda (type) (gethash type *types*)) (cdr item)))
@@ -694,7 +698,8 @@
    subparameter list and is flattened in turn. Any other list is a single type-spec for
    one ?var -- a query-call form, the only kind of list that reaches this function
    intact, since an inline either-combo is already normalized to a synthesized type
-   symbol by DISSECT-PRE-PARAMS -- and is kept as one unit rather than descended into."
+   symbol by DISSECT-PRE-PARAMS -- and is kept as one unit rather than descended into.
+   A $variable domain is likewise kept as one unit; its type resolves to :unknown."
   (mapcan (lambda (item)
             (cond ((member item *parameter-headers*) nil)
                   ((and (consp item) (member (car item) *parameter-headers*))
@@ -774,6 +779,8 @@
                  (collecting (gethash item *types*)))
               ((and (listp item)  ;collect dynamic query
                     (member (first item) *query-names*))
+                 (collecting item))
+              (($varp item)  ;collect $variable domain, evaluated at runtime
                  (collecting item))
               ((and (listp item)
                     (member (first item) *parameter-headers*))

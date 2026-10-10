@@ -269,10 +269,19 @@
           (*min-steps-fallback-sample-interval* 1)
           (*threads* 0))
       (not (min-steps-fallback-adaptive-p)))
-    (let ((legacy-params
-            (append (subseq *default-parameters* 0 14) '(t nil t))))
-      (equal (migrate-retired-recorder-settings legacy-params)
-             *default-parameters*))
+    ;; Current boolean settings must not be mistaken for the retired recorder layout.
+    (loop for cycle-check in '(nil t)
+          always
+          (loop for prefix-pruning in '(nil t)
+                always
+                (let ((saved-params
+                        (append (subseq *default-parameters* 0 14)
+                                (list 5 prefix-pruning cycle-check))))
+                  (and
+                    (equal (migrate-retired-recorder-settings saved-params)
+                           saved-params)
+                    (equal (normalize-persisted-problem-parameters saved-params)
+                           saved-params)))))
     (equal
       (normalize-persisted-problem-parameters
         (append (subseq *default-parameters* 0 14) '(t 5 512 64)))

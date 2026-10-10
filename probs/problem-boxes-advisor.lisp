@@ -105,26 +105,25 @@
     (assert (setq $site 'ground)
             (loc $box $area)
             (not (holding ?agent $box)))
-    (ww-loop for $plate in $plates
-             when (cleartop? $plate)
-               do (assert (setq $site $plate)
-                          (loc $box $area)
-                          (on $box $plate)
-                          (not (holding ?agent $box))))))
+    (doall (?plate $plates)
+      (if (cleartop? ?plate)
+        (assert (setq $site ?plate)
+                (loc $box $area)
+                (on $box ?plate)
+                (not (holding ?agent $box)))))))
 
 ;;; Cross an open incident gate in either direction, carrying any held box.
 ;;; Each gate's open test belongs to that gate's crossing, so it sits in the loop.
 (define-action cross-gate 1
   (?agent agent)
   (bind (loc ?agent $area))
-  (?agent "through" $via "from" $area "to" $to)
+  (?agent "through" ?gate "from" $area "to" $to)
   (do
     (bind (area-gates $area $gates))
-    (ww-loop for $gate in $gates
-             when (gate-open? $gate)
-               do (assert (setq $via $gate)
-                          (setq $to (opposite-area $gate $area))
-                          (loc ?agent $to)))))
+    (doall (?gate $gates)
+      (if (gate-open? ?gate)
+        (assert (setq $to (opposite-area ?gate $area))
+                (loc ?agent $to))))))
 
 (define-init
   (loc agent1 area1)

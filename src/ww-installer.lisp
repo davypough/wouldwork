@@ -695,6 +695,9 @@
   (unless (member (first pre-params) *parameter-headers*)
     (push 'standard pre-params))
   (multiple-value-bind (pre-param-?vars pre-param-types) (dissect-pre-params pre-params)
+    (ut::if-it (remove-if-not #'$varp (flatten-param-types pre-param-types))
+      (error "$variable domain ~A in the parameter list of action ~A; a $variable domain is allowed only in exists/forall/doall"
+             ut::it name))
     (let ((eff-param-vars (remove-if #'stringp eff-params)))  ;pure var list, connectives stripped
       (let* ((flat-pre-param-?vars (alexandria:flatten pre-param-?vars))
              (*var-type-env* (append (mapcar #'cons flat-pre-param-?vars (flatten-param-types pre-param-types))
