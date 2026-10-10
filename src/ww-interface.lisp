@@ -429,17 +429,17 @@ is staged again.
 
 
 (defun load-problem (problem-name-str)
-  "Stage a named or project-relative problem file, then reload Wouldwork.
+  "Stage a named or project-relative problem file, then reload Wouldwork once.
+   The prescan in ww-preliminaries sets *threads* from the problem's top-level
+   declaration before the system compiles, so no rebuild is needed afterward.
+   Signals an error if the problem load changed the compilation mode anyway.
    Returns T once the problem is loaded, NIL if it could not be staged."
   (reject-worker-read-write 'load-problem)
   (when (ensure-problem-staged problem-name-str)
-    (let ((mode (current-generated-read-mode)))
-      (asdf:load-system :wouldwork :force t)
-      ;; A problem can declare its own worker count. Rebuild outside the
-      ;; first ASDF operation if that declaration changed compilation mode.
-      (unless (eq mode (current-generated-read-mode))
-        (asdf:load-system :wouldwork :force t))
-      t)))
+    (asdf:load-system :wouldwork :force t)
+    (unless (eq *load-read-mode* (current-generated-read-mode))
+      (error "*threads* changed during problem load; declare (ww-set *threads* N) as a top-level form."))
+    t))
 
 
 (declaim (ftype (function () t) solve))  ;function ww-solve located in searcher.lisp

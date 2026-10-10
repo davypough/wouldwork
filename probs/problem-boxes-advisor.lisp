@@ -22,7 +22,7 @@
 (ww-set *tree-or-graph* graph)
 (ww-set *symmetry-pruning* t)
 (ww-set *depth-cutoff* 0)
-(ww-set *threads* 16)
+(ww-set *threads* 16)  ;for max speed
 
 
 (define-types

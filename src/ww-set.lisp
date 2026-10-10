@@ -110,8 +110,9 @@
           (let ((crossing-boundary (or (and (zerop *threads*) (> ',val 0))
                                        (and (zerop ',val) (> *threads* 0)))))
             (setf ,param ',val)
-            ;; Problem declarations run inside ASDF. The staging entry point
-            ;; completes any required mode rebuild after that load returns.
+            ;; Problem declarations run inside ASDF. The prescan in ww-preliminaries
+            ;; has already applied a top-level declaration, so this setf changes
+            ;; nothing during staging.
             (unless *ww-loading*
               (save-globals)
               (if crossing-boundary

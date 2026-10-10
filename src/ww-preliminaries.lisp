@@ -31,6 +31,12 @@
   "Completed generated-code mode, or NIL until the compilation pass succeeds.")
 
 
+(defvar *load-read-mode* nil
+  "Generated-read mode in effect when the system files were last compiled.  Set at load
+   time in this file, before the later files compile; load-problem compares it with the
+   mode after the problem has loaded.")
+
+
 (defun current-generated-read-mode ()
   (if (zerop *threads*) :serial :worker-capable))
 
@@ -525,7 +531,8 @@
                    setf'd to a fresh hash table so the flag reflects the current *threads*.
      CLEARED    -- tables with a fixed or absent :synchronized flag; clrhash suffices.
    This function executes AFTER read-init-vals has restored *threads* from
-   vals.lisp, so that the recreated tables carry the correct :synchronized value."
+   vals.lisp, or the problem prescan has set it from the staged problem, so that
+   the recreated tables carry the correct :synchronized value."
   ;; CLEARED: fixed-size tables, write-only during init, lock-free during search
   (reject-worker-read-write 'reset-global-hash-tables)
   (setf *generated-read-mode* nil)
@@ -698,6 +705,21 @@
         (string *problem-name*)))))
 
 
+(defun declared-threads (problem-file)
+  "Return N from the last top-level (ww-set *threads* N) form in PROBLEM-FILE, or 0 if
+   there is none.  Matches on symbol names, so the result does not depend on which
+   package the reader interns into."
+  (let ((*package* (find-package :ww))
+        (threads 0))
+    (with-open-file (stream problem-file :direction :input)
+      (loop for form = (read stream nil nil)
+            while form
+            when (and (string= (tech-form-head-name form) "WW-SET")
+                      (string= (symbol-name (second form)) "*THREADS*"))
+              do (setf threads (third form))))
+    threads))
+
+
 (defvar *staging-trace-already-shown* nil
   "T immediately after the explicit-name branch of ensure-problem-staged has
    printed *tech-inclusion-trace*, so the reload it's about to trigger via
@@ -771,7 +793,18 @@
   (ensure-problem-staged))
 
 
-;; Call AFTER read-init-vals has restored *threads* from vals.lisp, so that
-;; recreated :synchronized tables reflect the correct value for this session.
+;; Set *threads* before the later files compile their *threads*-dependent macros.
+;; With vals.lisp absent (stage, ww-reset, fresh quickload), take it from the staged
+;; problem's top-level (ww-set *threads* N); otherwise keep the value read-init-vals
+;; restored.  Record the resulting mode for load-problem's check.
+(eval-when (:load-toplevel :execute)
+  (let ((root (asdf:system-source-directory :wouldwork)))
+    (unless (probe-file (instance-vals-file root))
+      (setf *threads* (declared-threads (instance-problem-file root))))
+    (setf *load-read-mode* (current-generated-read-mode))))
+
+
+;; Call AFTER *threads* is final for this load (restored by read-init-vals or set by
+;; the prescan above), so recreated :synchronized tables reflect the correct value.
 (eval-when (:load-toplevel :execute)
   (reset-global-hash-tables))

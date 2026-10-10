@@ -1102,8 +1102,12 @@ treat their arguments as read-only and be safe to call concurrently."
 
 ;; Reset parameters to defaults when vals.lisp doesn't exist
 ;; This ensures clean initialization for new problems without carrying over
-;; settings from previous problem.lisp files
+;; settings from previous problem.lisp files.  *threads* is kept: the prescan in
+;; ww-preliminaries has just set it from the staged problem, and the remaining
+;; system files compile according to it.
 (eval-when (:load-toplevel :execute)
   (let ((vals-file (instance-vals-file (asdf:system-source-directory :wouldwork))))
     (unless (probe-file vals-file)
-      (reset-problem-parameters-to-defaults))))
+      (let ((threads *threads*))
+        (reset-problem-parameters-to-defaults)
+        (setf *threads* threads)))))
