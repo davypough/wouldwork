@@ -5,10 +5,10 @@ Preparing this handoff does not invoke the search advisor or authorize experimen
 
 RECORDS
 Requirements: problem-analysis.txt
-Current implementation and evidence: spec-analysis-current.txt
+Current implementation and evidence: spec-analysis.txt
 Specification: ../../../probs/problem-boxes-advisor.lisp
-Earlier counts/occupancy revision and its checks: spec-analysis-2026-10-09-
-before-consolidation.txt and git history (commit ec7b9ab and earlier).
+Earlier counts/occupancy revision and its checks: git history (commit ec7b9ab
+and earlier).
 
 DELIVERED MODEL
 Path B specification, no include-tech. Named boxes: (loc object $area),

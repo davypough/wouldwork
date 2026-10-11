@@ -1,6 +1,6 @@
 ;;; Filename: problem-boxes-advisor.lisp
 
-;;; Boxes problem, built with the spec advisor (see doc/problems/boxes/).
+;;; Boxes problem, built with the spec advisor (see doc/problems/boxes-advisor/).
 ;;; The agent carries boxes onto pressure plates to open gates and reach area4.
 ;;;
 ;;; Design notes:
@@ -66,7 +66,7 @@
 ;;; A gate is open while a box is on its plate.
 (define-query gate-open? (?gate gate)
   (do (bind (controls $plate ?gate))
-      (not (cleartop? $plate))))
+      (bind (on $box $plate))))
 
 
 ;;; Placeholder estimate of steps still needed, never too high: crossings

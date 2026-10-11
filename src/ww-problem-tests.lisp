@@ -422,7 +422,7 @@
 
 (defun test-topo ()
   "Stage every probs/problem-*-topo.lisp and check the geometry it derives against a
-   recorded expectation.  These five are the live Talos work, and none of them is in
+   recorded expectation.  These problems are the live Talos work, and none of them is in
    (TEST-TALOS) -- which is how problem-phobia-topo staged with an initialization error
    across two whole phases before anyone noticed.  Staging alone runs every init check and
    every coordinate derivation and the universal terrain invariant.  The suite then applies

@@ -1,6 +1,17 @@
 BOXES — CONSOLIDATED PROBLEM ANALYSIS
 Revision: 2026-10-09
-Status: Analysis complete and ready for the spec advisor within the scope below.
+Status: Final. These are the agreed requirements implemented by
+probs/problem-boxes-advisor.lisp; see spec-analysis.txt for the
+implementation and spec-analysis-search-handoff.txt for optional search work.
+
+Agreed change after the spec-advisor handoff, 2026-10-10: named boxes with
+engine symmetry pruning replaced the counts/occupancy representation (the
+named-box alternative in section 3), so solutions name actual boxes. Legality,
+costs, given objects, and the shortest-path objective are unchanged.
+
+Cleanup, 2026-10-11: superseded working records (pre-spec snapshot, analysis
+history, withdrawn draft record, counts-model spec record) were removed; they
+remain in git history.
 
 1. SCOPE, SOURCES, AND AUTHORIZATION
 
@@ -14,15 +25,9 @@ number of boxes, areas, plate/gate pairs, and connections without new mechanics.
 Exact target sizes are not required for structural analysis; no performance or
 maximum-size guarantee is made.
 
-Authorized work completed: analysis, incremental record keeping, consolidation,
-readiness review, and the requested problem-advisor agenda improvements. No
-problem specification or its dependencies have been inspected, written, loaded,
-replayed, or searched. Generic engine and advisor documents were inspected.
-Next-stage specification work, comparison, and measurements need authorization.
-
-History: problem-analysis-2026-10-09-history.txt preserves the complete record
-before consolidation, including superseded recommendations and dialogue evidence.
-Snapshot: problem-analysis-2026-10-09-before-spec.txt preserves this handoff.
+Work completed: problem analysis (problem advisor), then specification
+building (spec advisor). The user's earlier probs/problem-boxes.lisp was not
+read during analysis or specification building.
 
 2. AGREED PROBLEM AND ANSWER
 
@@ -68,9 +73,10 @@ Sufficient conceptual state for the reduced search:
 - Whether the agent carries a box.
 
 Conserve the total number of boxes. Derive gate openness from occupied plates;
-there is no persistent gate memory. Box names may be retained in the executable
-representation and representative path, but must not create semantically distinct
-search arrangements. No elapsed time, route history, or exact walking coordinates
+there is no persistent gate memory. Anonymous instructions are accepted, so box
+names need not occur in changing state or the returned path. If names are retained,
+they must remain consistent and must not create semantically distinct search
+arrangements. No elapsed time, route history, or exact walking coordinates
 are needed under these rules. Accumulated action count is a path cost, not a new
 physical arrangement; duplicate handling must preserve a cheaper arrival.
 
@@ -81,8 +87,9 @@ choice suffices for identical loose boxes in the same area. Do not impose a fixe
 box order or prohibit box recovery.
 
 Alternative: retain named box locations throughout and use canonical state keys
-for equivalence. The spec advisor selects the concrete representation; either
-choice must support consistent named instructions for the returned path.
+for equivalence. The spec advisor first implemented counts and occupancy with
+anonymous instructions; on 2026-10-10 the user switched to this named-box
+alternative, using the engine's symmetry pruning for equivalence.
 
 4. JUSTIFIED REDUCTIONS AND TERMINATION
 
@@ -107,8 +114,10 @@ adding more objects and connections under the same rules does not invalidate it.
 
 R2 — Ignore permutations of interchangeable box identities.
 Exchanging labels preserves legality, goals, and costs. Equivalent arrangements
-may share search work. Retain a representative path that names real boxes
-consistently. This removes label permutations, not different spatial allocations.
+may share search work. Retain an executable representative path with unambiguous
+pickup sources and placement destinations; physical box names are optional under
+the agreed output clarification. This removes label permutations, not different
+spatial allocations.
 Do not assume distinct areas or gates are interchangeable without a separate proof.
 
 R3 — Remove positive-cost cycles in complete arrangements.
@@ -169,7 +178,7 @@ Growth dimensions and required responses:
 For A areas, P plates, B boxes, k occupied plates and c carried boxes (0 or 1),
 there are binomial(B-k-c+A-1, A-1) loose-box distributions for each legal occupied
 plate subset. This is a combinatorial count, not a reachable-state measurement.
-The previous labelled full-model bound (A+P)*(A+P+1)^B is retained in history;
+The previous labelled full-model bound (A+P)*(A+P+1)^B is retained in git history;
 the reduced model removes label permutations and agent plate occupancy.
 
 Safe initial guidance:
@@ -211,7 +220,8 @@ and proper completion remain necessary for a runtime optimality claim.
 B/S: src/ww-searcher.lisp — on-current-path, process-successors.
 Planning/tree mode checks ancestor databases. Sufficiency of the encoded state is
 a spec obligation. Graph-mode cheapest-arrival/reopening behavior remains a
-focused search-advisor audit before relying on scaled duplicate sharing.
+focused source and correctness audit by the spec advisor if duplicate sharing is
+selected for implementation; its performance tradeoffs belong to the search advisor.
 
 B/S: src/ww-symmetry.lisp — detect-symmetry-groups,
 use-canonical-symmetry-p, filter-symmetric-instantiations.
@@ -247,13 +257,16 @@ This is not a runtime or speedup claim, and authorizes no run.
 
 Problem advisor: meaning, sufficient state, growth drivers, reductions and proof
 obligations, capability feasibility, readiness, and evidence limits.
-Spec advisor: concrete predicates/actions/queries, faithful implementation and
-appropriately authorized correctness checks; return consequential semantic gaps.
-Search advisor: concrete strategy/settings, cost-aware duplicates, symmetry,
-bounds, preliminary performance probes, tuning, and memory/runtime tradeoffs.
+Spec advisor: concrete predicates/actions/queries, faithful implementation,
+justified enhancements for the larger family (including suitable bounds,
+symmetry or duplicate handling), and authorized correctness/integration checks;
+return consequential semantic gaps. Select concrete enhancements interactively.
+Search advisor: performance evaluation of the implemented model and enhancements,
+strategy/settings comparisons, bounded probes, tuning, and memory/runtime tradeoffs.
 Solving advisor: optional constraint-led milestones if justified; retain the
 objective or seek an explicit agreed tradeoff. Handoffs are optional and may
-return findings upstream, coordinated through existing consultant procedures.
+return findings upstream for user agreement. Each advisor stands on its own;
+no consultant coordination is required.
 
 Benchmarks normally belong with the search advisor after an executable faithful
 model exists. The spec advisor may perform focused correctness/smoke checks and
@@ -261,10 +274,12 @@ refer performance questions. Do not create a benchmark spec merely to complete
 problem analysis. Future measurements need a question, scope, limits, metrics,
 and authorization. Structural reasoning supplies no measured scalability claim.
 
-Record integration: existing advisors use Analysis.txt and Handoff.md. This
-problem-analysis.txt is the agreed analysis input; downstream work should link
-and reuse it rather than repeat intake or silently establish conflicting rules.
-Automatic cross-advisor record integration has not been implemented.
+Records: problem-analysis.txt owns agreed requirements and structural reasoning.
+The spec advisor uses spec-analysis- records, and the search advisor uses
+search-analysis- records, in this directory. A later solving phase uses Briefing.md
+for its analysis and Handoff.md for progress, linking upstream records. Each phase
+reuses prior decisions without repeating intake or establishing conflicting rules.
+Record synchronization is explicit, not automatic.
 
 9. ACCEPTANCE CRITERIA FOR THE SPEC-ADVISOR HANDOFF
 
@@ -306,18 +321,12 @@ optional advanced optimizations, and their concrete engine choices are deferred
 with owners above; they are not promised capabilities of a finished spec.
 
 User agreement was given incrementally, including approval of consolidation and
-the general plate-action elimination. This consolidated revision is ready for
-review and a separately authorized spec-advisor handoff. It does not claim that
-the user has separately reviewed every editorial sentence or optional setting.
-
-Next step: authorize spec-advisor work, stating whether to compare an existing
-specification or author one. Preserve the dated snapshot before either activity.
-No problem spec has yet been read; no implementation or search is authorized by
-this completion statement.
+the general plate-action elimination. The spec advisor has since implemented
+this analysis; no further problem-advisor work is pending.
 
 11. CORRECTION HISTORY AND ADVISOR REVIEW
 
-The full pre-consolidation history is retained in the linked history record.
+The full pre-consolidation history is retained in git history.
 Key supersessions:
 - Any-route interpretation became one shortest path with explicit action units.
 - Area-only full modeling gave way to agent plate status when activation was
@@ -335,6 +344,7 @@ Key supersessions:
 Advisor process changes authorized and implemented in doc/problem-advisor.md:
 explicit final consolidation/readiness agenda, proof-led identification of useless
 actions, downstream benchmark ownership, and clear scoped completion messages.
-No other advisor documents were modified. Broader automatic handoff integration
-remains future work. No temporary files or directories were created; history and
-pre-specification snapshot are intentional retained evidence.
+At that earlier analysis stage, no other advisor documents were modified.
+Subsequent approved work revised spec-advisor.md into a six-step interactive
+authoring procedure and aligned the advisors' standalone record and handoff rules.
+consultant.md is retained as a historical experiment, not a coordinating authority.

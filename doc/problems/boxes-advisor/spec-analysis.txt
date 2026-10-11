@@ -1,22 +1,22 @@
 BOXES -- CURRENT SPECIFICATION ANALYSIS
 Revision: 2026-10-10 (named boxes with symmetry pruning)
-Status: Specification complete for the agreed scope; optional search-advisor handoff ready.
+Status: Final. Specification complete for the agreed scope; optional search-advisor handoff ready.
 Specification: ../../../probs/problem-boxes-advisor.lisp
 Handoff: spec-analysis-search-handoff.txt
 History: the counts/occupancy model and its full check record are preserved in
-spec-analysis-2026-10-09-before-consolidation.txt and in git (commit ec7b9ab and
-earlier). This file describes only the current named-box revision.
+git (commit ec7b9ab and earlier). This file describes only the current named-box
+revision.
 
 1. AUTHORITY AND SCOPE
 
-Requirements: problem-analysis.txt. Preserved incoming agreement:
-problem-analysis-2026-10-09-before-spec.txt. Withdrawn drafting history:
-spec-analysis-withdrawn-2026-10-09.txt.
+Requirements: problem-analysis.txt. Earlier working records (pre-spec
+snapshot, analysis history, withdrawn draft, counts-model record) were
+removed 2026-10-11 and remain in git history.
 
 The specification was authored section by section with the user's review.
-Comparison with the user's earlier probs/problem-boxes.lisp is now authorized and
-under way (2026-10-10) as a review of the spec advisor itself; findings that
-change the advisor are recorded in doc/spec-advisor.md, not here.
+Comparison with the user's earlier probs/problem-boxes.lisp (from 2026-10-10)
+reviews the spec advisor itself; findings that change the advisor are
+recorded in doc/spec-advisor.md, not here.
 
 2. CURRENT MODEL AND REQUIREMENT MAPPING
 
@@ -106,6 +106,9 @@ Requirement -> implementation:
   as interchangeable rows of type BOX; AGENT1 and AREA4 excluded as goal-
   referenced; global (closed-list) strategy. (The start-state bound of 2
   reported then came from the since-removed crossing-distance bound.)
+- 2026-10-11: GATE-OPEN? simplified to look up the box on the gate's plate
+  directly, replacing a negation of CLEARTOP?; same meaning. Restaging not
+  yet reported.
 - Not yet recorded for this revision: state/time counts and bound
   evaluation/prune counters.
 
@@ -115,5 +118,5 @@ Requirement -> implementation:
   memory, 16-thread benefit) is unmeasured; owner is the search advisor.
 - Authored input assumes boxes start on the ground; a box starting on a plate
   or in hand needs its ON or HOLDING fact (and no LOC for a held box).
-- Next: continue the comparison with probs/problem-boxes.lisp, one issue at a
-  time, to refine doc/spec-advisor.md.
+- Next: none for the spec advisor. Optional search-advisor work starts from
+  spec-analysis-search-handoff.txt.

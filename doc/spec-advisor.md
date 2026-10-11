@@ -77,7 +77,7 @@ work not already authorized. Identify:
   dependency reading; preserve deferred comparison boundaries.
 - The section agenda (step 3) and a first view of the enhancements (step 4); the
   particular enhancements are selected interactively as their prerequisites become clear.
-- The active `spec-analysis-` record (Section 3.2) and expected deliverables:
+- The active `spec-analysis.txt` record (Section 3.2) and expected deliverables:
   specification, requirement mapping, check results and limitations, and a handoff
   for the optional search-advisor phase.
 - Which checks are included, who runs them, and their limits (Section 3.1).
@@ -307,8 +307,11 @@ Apply these in order; an earlier priority wins when two conflict.
    without saving repeated work.
 3. **Simplicity.** Within those choices, keep the specification as small and plain
    as possible: no defensive checks (Section 2.5), no query that merely wraps a single
-   lookup, and no `ww-set` for a default the spec does not rely on. Record the reasons for such
-   decisions in the spec analysis, not in the file.
+   lookup, and no `ww-set` for a default the spec does not rely on. Reduce each logical
+   statement to its simplest equivalent form: cancel double negations, including a
+   negation of a query that itself negates; drop tests implied by others; and prefer a
+   direct lookup to a combination of queries that yields the same answer. Record the
+   reasons for such decisions in the spec analysis, not in the file.
 4. **Wouldwork idioms.** Express logic with Wouldwork statements (`exists`,
    `forall`, `doall`, `if`, `bind`, queries and updates) rather than equivalent
    Common Lisp. Use plain Lisp only where no Wouldwork form expresses the step. A
@@ -580,12 +583,13 @@ limits, but must not be presented as current after changes.
 ### 3.2 Specification analysis records
 
 Store the spec advisor's records in the same `doc/problems/<problem-name>/`
-directory as the problem advisor's, with the `spec-analysis-` prefix: for example
-`spec-analysis-current.txt` for the active record,
-`spec-analysis-YYYY-MM-DD-before-revision.txt` for a preserved snapshot, and the same
-prefix with a descriptive suffix for supporting documents. Reuse the existing active
-record rather than creating one per exchange, and identify it explicitly when linking
-it from another advisor's documents. Do not use the generic `Analysis.txt`; existing
+directory as the problem advisor's. The active record is always named
+`spec-analysis.txt`, matching the problem advisor's `problem-analysis.txt`.
+Supporting documents use the `spec-analysis-` prefix with a descriptive suffix: for
+example `spec-analysis-YYYY-MM-DD-before-revision.txt` for a preserved snapshot and
+`spec-analysis-search-handoff.txt` for the handoff. Reuse the existing active record
+rather than creating one per exchange, and link it by name from other advisors'
+documents. Do not use the generic `Analysis.txt`; existing
 records keep their provenance and are not renamed by this convention.
 
 Record implementation decisions, section review status, user corrections, checks and
@@ -604,7 +608,7 @@ records with the user's agreement; unaffected evidence remains available.
 
 ### 3.3 Specification analysis template
 
-Use the relevant fields within the active `spec-analysis-` record, linking established
+Use the relevant fields within the active `spec-analysis.txt` record, linking established
 requirements in the problem advisor's analysis rather than repeating intake or creating
 a second requirements account. Keep sources and certainty alongside claims. Omit
 irrelevant fields; keep consequential unknowns explicit. Update it throughout the

@@ -23,13 +23,13 @@ authorize a full solve.
 
 **Entry and return.** Read the selected question, objective, relevant record entries,
 current artifacts, and approval limits. Reuse current evidence instead of repeating
-completed phases. Read the supplied `problem-analysis.txt`, current `spec-analysis-`
+completed phases. Read the supplied `problem-analysis.txt`, `spec-analysis.txt`
 record, and specification handoff when available. Preserve their objective, reduction
 premises, growth dimensions, and validation limits. The spec advisor implements and
 checks suitable enhancements; this advisor measures, compares, and tunes them.
-Write findings to `doc/problems/<problem-name>/search-analysis-current.txt` for short
-and sustained work alike, or reuse the identified active `search-analysis-` record.
-Use that prefix for supporting evidence and handoff documents. Link upstream records
+Write findings to `doc/problems/<problem-name>/search-analysis.txt` for short
+and sustained work alike, reusing that record when it already exists.
+Use the `search-analysis-` prefix for supporting evidence and handoff documents. Link upstream records
 rather than duplicating requirements. Older `Analysis.txt` records retain their own
 status; do not resume withdrawn work or migrate unrelated records automatically.
 Return the conclusion, evidence and scope, assumptions, unresolved issues, affected
@@ -841,7 +841,7 @@ Recorded here, not yet made in the Manual:
 ## 8. Report to the user
 
 Use only the report fields needed for the selected procedure and objective. They summarize
-findings in the active `search-analysis-` record, not four mandatory reports or a second record. Include supporting
+findings in the active `search-analysis.txt` record, not four mandatory reports or a second record. Include supporting
 evidence, scope, uncertainties, affected dependencies, and the recommended next action.
 State what was not run when relevant. Pause at the applicable approval boundary; omit
 irrelevant measurements rather than performing work to fill a report field.
