@@ -40,6 +40,9 @@ required. Preserve the agreed objective, reductions, evidence limits, and curren
 authorization. Ask only for missing inputs that affect this phase. A handoff does
 not itself authorize searches. Return consequential rule or objective changes to
 the relevant analysis for the user's agreement, preserving prior evidence.
+Engine capabilities this method relies on are in the [capability reference](advisor-reference.md):
+passing results between searches and checkpoints (entry F18), replay and validation (F21),
+and search hooks (F17).
 
 Gather the problem-spec path, optional corresponding diagram path or explicit
 "none", and D's non-negative maximum search depth. Check supplied files are
@@ -362,8 +365,9 @@ or with literal quoting, avoiding replacement-string substitution. Hash with
 
 `doc/problems/<problem>/` is flat (no subdirectories). The solving artifacts below
 use these names and coexist with upstream `problem-analysis.txt`, `problem-analysis-`,
-`spec-analysis-`, and `search-analysis-` records. Preserve analysis snapshots and
-historical evidence; do not delete them merely because a later phase begins.
+`spec-analysis-`, and `search-analysis-` records. Preserve historical evidence; do
+not delete it merely because a later phase begins. (Pre-specification and
+spec-analysis snapshots are removed at the spec advisor's wrap-up.)
 `Briefing.md` owns the solving analysis and log; `Handoff.md` links upstream records
 and owns current solving progress, not the original requirements. State lives in the
 Handoff; the Briefing's log retains provenance and results. The method-level

@@ -2,7 +2,7 @@
 
 Status: Operational procedure, with consolidation/readiness and downstream measurement guidance updated 2026-10-09 from the boxes consultation. Earlier development included source-based diagnostic feasibility review; live dialogue has since supplied corrections, not comprehensive effectiveness validation. Historical development documents were retired after their active guidance was incorporated here.
 
-For consultation, use the procedure below and consult the [capability reference](problem-advisor-reference.md) when relevant. For dialogue evaluation, let the user choose a problem and disclose relevant prior exposure, including use as an advisor example. A fresh session or strict blind-evaluation arrangement is not required. Develop the analysis from the user's description without filling gaps from prior source knowledge; read the selected spec only after the analysis is preserved and comparison is approved.
+For consultation, use the procedure below and consult the [capability reference](advisor-reference.md) when relevant. For dialogue evaluation, let the user choose a problem and disclose relevant prior exposure, including use as an advisor example. A fresh session or strict blind-evaluation arrangement is not required. Develop the analysis from the user's description without filling gaps from prior source knowledge; read the selected spec only after the analysis is preserved and comparison is approved.
 
 ## Purpose and entry
 
@@ -75,6 +75,8 @@ Use the problem's facts to address the applicable issues:
 
 These are reasoning prompts for the advisor, not a checklist to read to the user. Simple problems may settle most of them from the initial description.
 
+When forward search from the start state looks too deep, too wide, or too costly, consider the alternative approaches in the [capability reference](advisor-reference.md), entry F22 (backward search, enumeration, macro actions, relaxation, milestones).
+
 A reduction needs a soundness or coverage argument appropriate to the requested answers. Reaching the same final arrangement does not alone justify discarding a route if intermediate legality, cost, or sequence identity matters. A successful milestone does not establish that the remaining resources permit continuation. Keep optional reductions provisional when their obligations remain unproved.
 
 Actively look for actions whose only effects cannot help the objective. Explain whether deleting or replacing them preserves legal continuations and improves or preserves cost. Distinguish an instance-specific argument from one that holds as existing quantities and connections grow. Preserve the original ability in the intended rules while documenting its omission from the search. Once an action is proved unnecessary, do not keep asking about details that affect only that omitted action.
@@ -89,7 +91,7 @@ Preserve the existing optional handoffs from spec advisor to search advisor and 
 
 ### Map the design to current Wouldwork support
 
-Inspect current source for consequential capability claims. Record the file, symbol, verification date, relevant conditions, and evidence limits. Use the [capability reference](problem-advisor-reference.md) as a starting point. Older documentation is a pointer, not proof of current behavior; recheck affected claims when source changes or a proposed use goes beyond the recorded contract.
+Inspect current source for consequential capability claims. Record the file, symbol, verification date, relevant conditions, and evidence limits. Use the [capability reference](advisor-reference.md) as a starting point. Older documentation is a pointer, not proof of current behavior; recheck affected claims when source changes or a proposed use goes beyond the recorded contract.
 
 Use these support labels independently of evidence status:
 
@@ -210,7 +212,7 @@ At completion, report the record's location and status, the agreed design or blo
 
 Evaluate one user-chosen problem at a time. Record dialogue friction and proposed advisor improvements in the problem's analysis record as they arise, without interrupting each useful exchange to discuss redesign. Propose advisor changes before editing them.
 
-When the analysis is agreed or genuinely blocked, save the current record and preserve a dated copy in the same problem directory, for example `problem-analysis-2026-10-08-before-spec.txt`. Record whether it is agreed or blocked and why. Use a distinct suffix if a snapshot with that name already exists; never overwrite an earlier snapshot. Report its location and stop for approval before reading the actual spec or its problem-specific dependencies.
+When the analysis is agreed or genuinely blocked, save the current record and preserve a dated copy in the same problem directory, for example `problem-analysis-2026-10-08-before-spec.txt`. Record whether it is agreed or blocked and why. Use a distinct suffix if a snapshot with that name already exists; never overwrite an earlier snapshot. The spec advisor deletes the snapshot at its wrap-up, once the specification is accepted. Report its location and stop for approval before reading the actual spec or its problem-specific dependencies.
 
 After comparison is approved, read the spec and relevant dependencies and compare them against the preserved snapshot. Record findings separately from that snapshot, distinguishing missing intake information, advisor mistakes, legitimate alternative designs, implementation discrepancies, and possible spec improvements. Ask the user to resolve conflicts in intent; source behavior does not override the agreed intent. Source comparison alone does not prove model fidelity, search correctness, or performance.
 

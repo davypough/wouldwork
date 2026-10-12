@@ -74,9 +74,16 @@
                    (apply-depth-first-init-delta state baseline-idb changes))
                   (list
                    ;; Backtracking algorithm: changes contains (forward-list inverse-list)
-                   ;; Apply forward operations sequentially to state database
+                   ;; Apply the dynamic forward operations to the state database;
+                   ;; static ones were already written to *static-db*
                    (let ((forward-list (first changes)))
-                     (revise (problem-state.idb state) forward-list)
+                     (revise (problem-state.idb state)
+                             (remove-if-not (lambda (literal)
+                                              (gethash (car (if (eql (car literal) 'not)
+                                                              (second literal)
+                                                              literal))
+                                                       *relations*))
+                                            forward-list))
                      ;; Update global databases using proper update mechanism
                      ;; This correctly handles fluent extraction and storage
                      (dolist (forward-op forward-list)

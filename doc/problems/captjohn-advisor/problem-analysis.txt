@@ -185,7 +185,7 @@ AGREEMENT AND HANDOFF
       (ww-set *algorithm* depth-first) -> graph + MIN-LENGTH ->
       (solve-subgoal <facts> <route goal>).
   Acceptance criteria: see VALIDATION PLAN.
-  Snapshot: problem-analysis-2026-10-11-before-spec.txt
+  Snapshot: deleted at the spec advisor's wrap-up (2026-10-12).
   Next step (not yet authorized): spec advisor writes the spec, or
   comparison with any existing captjohn spec.
 

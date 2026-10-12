@@ -7,6 +7,19 @@
 ;;; one king move at a time, that never revisits a cell or steps onto a guard,
 ;;; visits every crew mate, and ends on the Wasp.
 ;;;
+;;; REPL entries:
+;;; (stage captjohn-advisor)
+;;; (ww-set *algorithm* backtracking)
+;;; (solve)
+;;; (unless (eql (length *unique-solution-states*) 1)
+;;;   (error "There is more than possible one grid assignment."))
+;;; (setf *captjohn-layout* (list-database (problem-state.idb (solution.goal (first *solution-paths*)))))
+;;; (ww-set *algorithm* depth-first)
+;;; (ww-set *tree-or-graph* graph)
+;;; (ww-set *solution-type* min-length)
+;;; (ww-set *depth-cutoff* 6)
+;;; (solve-subgoal *captjohn-layout* (route-complete?))
+;;;
 ;;; Design notes:
 ;;; - Two searches share this file: placement finds every layout, then the route
 ;;;   search starts from the saved layout.
@@ -17,6 +30,10 @@
 ;;;   neighboring grass wait until the grid is full.
 ;;; - Each cell's neighbors are listed once at the start, so clues and moves
 ;;;   look only at nearby cells.
+;;; - A route is dropped as soon as a crew mate or the ship it still needs is
+;;;   walled off by guards and the cells John has already crossed.
+;;; - A quick count of the moves a route still needs drops routes that cannot
+;;;   beat the best one found.
 
 
 (in-package :ww)
@@ -138,6 +155,69 @@
                                    (member $crew $around)))))))))))
 
 
+;;; Goal of the route search: John stands on the ship.
+(define-query route-complete? ()
+  (and (bind (located ship $ship))
+       (john-cell $ship)))
+
+
+;;; True when John can no longer reach an unvisited crew mate or the ship;
+;;; never true during placement.
+(define-query prune-state? ()
+  (and (not (bind (next-to-place $next)))
+       (bind (john-cell $john))
+       (do (assign $reached (reachable-cells $john nil))
+           (or (exists (?crew crew)
+                 (and (bind (located ?crew $crew-cell))
+                      (not (visited $crew-cell))
+                      (not (member $crew-cell $reached))))
+               (and (bind (located ship $ship))
+                    (not (member $ship $reached)))))))
+
+
+;;; Adds ?cell and every cell John can still reach from it to ?reached, moving
+;;; through unvisited cells without a guard; the route ends on the ship, so
+;;; nothing is reached through it.
+(define-query reachable-cells (?cell ?reached)
+  (do (assign $reached (cons ?cell ?reached))
+      (if (not (and (bind (located $occupant ?cell))
+                    (vessel $occupant)))
+        (do (bind (king-neighbors ?cell $cells))
+            (doall (?next $cells)
+              (if (and (not (member ?next $reached))
+                       (not (visited ?next))
+                       (not (and (bind (located $occupant ?next))
+                                 (guard $occupant))))
+                (assign $reached (reachable-cells ?next $reached))))))
+      $reached))
+
+
+;;; Fewest moves John still needs, counting king moves while ignoring guards
+;;; and visited cells: the longest trip via an uncollected crew mate to the
+;;; ship, but at least one move per uncollected crew mate plus one onto the
+;;; ship; 0 during placement.
+(define-query min-steps-remaining? ()
+  (if (bind (next-to-place $next))
+    0
+    (do (bind (john-cell $john))
+        (bind (cell-position> $john $john-row $john-col $john-index))
+        (bind (located ship $ship))
+        (bind (cell-position> $ship $ship-row $ship-col $ship-index))
+        (assign $count (if (eql $john $ship) 0 1))
+        (assign $distance (max (abs (- $ship-row $john-row))
+                               (abs (- $ship-col $john-col))))
+        (doall (?crew crew)
+          (do (bind (located ?crew $crew-cell))
+              (if (not (or (visited $crew-cell) (eql $crew-cell $john)))
+                (do (bind (cell-position> $crew-cell $row $col $index))
+                    (assign $count (1+ $count))
+                    (assign $distance
+                            (max $distance
+                                 (+ (max (abs (- $row $john-row)) (abs (- $col $john-col)))
+                                    (max (abs (- $ship-row $row)) (abs (- $ship-col $col))))))))))
+        (max $count $distance))))
+
+
 (define-update check-clues! ()
   (if (clue-broken?)
     (inconsistent-state)))
@@ -153,20 +233,20 @@
     (if (bind (after-same-kind> $token $earlier))
       (do (bind (located $earlier $earlier-cell))
           (bind (cell-position> $earlier-cell $row $col $floor)))
-      (setq $floor 0))
+      (assign $floor 0))
     (doall (?cell cell)
       (if (and (not (fixed-grass ?cell))
                (not (bind (located $occupant ?cell)))
                (bind (cell-position> ?cell $row $col $index))
                (> $index $floor))
-        (assert (setq $cell ?cell)
+        (assert (assign $cell ?cell)
                 (located $token ?cell)
                 (if (bind (next-in-order> $token $following))
                   (next-to-place $following)
                   (not (next-to-place $token)))
                 (if (captain $token)
                   (john-cell ?cell))
-                (check-clues!))))))
+                (finally (check-clues!)))))))
 
 
 ;;; Move John one king step to an unvisited cell that holds no guard; the
@@ -185,7 +265,7 @@
                           (forall (?crew crew)
                             (and (bind (located ?crew $crew-cell))
                                  (or (visited $crew-cell) (eql $crew-cell $from)))))))
-          (assert (setq $to ?cell)
+          (assert (assign $to ?cell)
                   (visited $from)
                   (john-cell ?cell))))))
 
@@ -207,7 +287,7 @@
   (product ?row coordinate ?col coordinate)
   (always-true)
   ()
-  (assert (setq $cell (cell-name ?row ?col))
+  (assert (assign $cell (cell-name ?row ?col))
           (cell-position> $cell ?row ?col (+ (* (1- ?row) *captjohn-grid-size*) ?col))))
 
 
@@ -223,17 +303,18 @@
               (mv-assign ($row-gap $col-gap)
                          (values (abs (- $other-row $row)) (abs (- $other-col $col))))
               (if (and (<= $row-gap 1) (<= $col-gap 1) (different ?other ?cell))
-                (setq $king (cons ?other $king)))
+                (assign $king (cons ?other $king)))
               (if (and (= $row-gap 1) (= $col-gap 0))
-                (setq $vertical (cons ?other $vertical)))
+                (assign $vertical (cons ?other $vertical)))
               (if (and (= $row-gap 1) (= $col-gap 1))
-                (setq $diagonal (cons ?other $diagonal)))))
+                (assign $diagonal (cons ?other $diagonal)))))
         (vertical-neighbors ?cell $vertical)
         (diagonal-neighbors ?cell $diagonal)
         (king-neighbors ?cell $king))))
 
 
 ;;; Every token is placed; the clue checks have already dropped any layout
-;;; that breaks a clue.
+;;; that breaks a clue. This goal is for placement only; the route search
+;;; takes route-complete? as its goal at the REPL.
 (define-goal
   (not (bind (next-to-place $next))))

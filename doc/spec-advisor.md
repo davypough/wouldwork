@@ -19,7 +19,8 @@
 
 **How to use this document.** Follow Part 1 step by step. Part 2 (Sections 2.x) governs
 every design decision made along the way, Part 3 (Sections 3.x) governs every check and
-record, and Part 4 (Sections 4.x) is the reference for writing the forms themselves.
+record, and Part 4 (Sections 4.x) is the reference for writing the forms themselves. Run
+the checklist in Section 4.15 before staging each draft.
 
 **Companion documents.** [working-reference-builder.md](problem-analysis/spec-building/working-reference-builder.md) makes the model's behavior
 readable so the user can compare it with their intent.
@@ -167,7 +168,8 @@ placeholder in a single query that reads facts already present, with no setup
 actions or helpers, and that the given instance exercises; for example, the steps
 the goal visibly still requires from the current state. Record the design of a stronger bound or heuristic as a
 search-advisor question: its value depends on measured pruning against its cost,
-which the spec advisor cannot establish.
+which the spec advisor cannot establish. When and in which order each search hook is called
+in each driver is in the [capability reference](advisor-reference.md), entry F17.
 
 Propose a short enhancement agenda. For each candidate, explain the growth problem it
 addresses, its prerequisites, the intended benefit, its cost or complexity, and its
@@ -264,7 +266,7 @@ evidence; it is not a second requirements record or a competing work agenda.
 | Handoff content | What the next advisor needs |
 |---|---|
 | Scope and status | Complete, partial, or blocked; the covered problem family; proposed next question; what work is and is not authorized. |
-| Requirements and provenance | Current problem analysis, preserved pre-specification snapshot, current spec analysis, and any agreed corrections. |
+| Requirements and provenance | Current problem analysis, current spec analysis, and any agreed corrections. |
 | Delivered model | Specification path and identifiable tested revision; relevant dependencies and environment; staging instructions and actual test settings. |
 | Objective and representation | Answer identity, cost units, goal, sufficient state, action granularity, and the mapping to the agreed requirements. |
 | Reductions and enhancements | Implemented mechanisms, enabled configuration, correctness arguments and premises, interaction constraints, and exercise evidence. |
@@ -366,6 +368,9 @@ whether Wouldwork's CSP specialization fits; the desired output alone is not eno
 Explain the choice from the characterization rather than asking the user to choose an
 engine label. Use the [search advisor](search-advisor.md) for consequential strategy
 questions, retaining provisional choices until their prerequisites are established.
+Approaches other than forward search (backward search, enumeration, macro actions,
+relaxation, milestones) and what each requires of the spec are summarized in the
+[capability reference](advisor-reference.md), entry F22.
 
 ### 2.3 Representation
 
@@ -535,7 +540,7 @@ Preserve the scope of each argument: a proof for the supplied instance is not
 automatically valid for the growing family. Do not use a known solution as a general
 rule or silently change the objective to make an enhancement applicable.
 
-Consult the problem advisor's [capability reference](problem-advisor-reference.md) selectively and verify consequential
+Consult the [advisor capability reference](advisor-reference.md) selectively and verify consequential
 hook and compatibility assumptions against current source within the authorized scope.
 Documented availability is not proof that a particular formula or encoding is correct.
 Investigate an uncertain capability before relying on it; engine changes require their
@@ -595,16 +600,24 @@ records keep their provenance and are not renamed by this convention.
 Record implementation decisions, section review status, user corrections, checks and
 their results, unresolved issues, and the next authorized step. Link the incoming
 `problem-analysis.txt` and its preserved snapshots rather than duplicating their
-agreed requirements, and leave the original snapshot unchanged. Return consequential
+agreed requirements, and leave the snapshot unchanged while the specification is
+being built. Return consequential
 changes to those requirements for agreement; do not silently establish different rules
 in the spec analysis. This advisor owns its implementation agenda and evidence; no
 consultant or shared coordination record is required.
 
 At final review, consolidate the active record into one current account of the model,
-decisions, evidence, and unresolved matters. Preserve superseded claims and useful
-evidence in clearly marked history or linked records, and do not leave obsolete
-questions marked pending. A correction reopens affected conclusions in the linked
-records with the user's agreement; unaffected evidence remains available.
+decisions, evidence, and unresolved matters. Keep superseded claims and useful
+evidence in a clearly marked history section of the active record, and do not leave
+obsolete questions marked pending. A correction reopens affected conclusions in the
+linked records with the user's agreement; unaffected evidence remains available.
+
+**Wrap-up.** Once the specification is accepted, delete the problem advisor's
+pre-specification snapshot (`problem-analysis-*-before-spec.txt`) and any
+`spec-analysis-` snapshots made during this phase; the current `problem-analysis.txt`
+and the consolidated `spec-analysis.txt` carry the agreed account forward. Remove
+references to the deleted files from the remaining records and note the deletion in
+the history section.
 
 ### 3.3 Specification analysis template
 
@@ -620,7 +633,7 @@ PROBLEM / REVISION / AUTHORIZED SCOPE:
    - Approved edits, source reading, checks, operator, and limits.
 
 INPUT ANALYSIS AND OBJECTIVE:
-   - Current problem-analysis path and preserved snapshot path.
+   - Current problem-analysis path and preserved snapshot path (until wrap-up).
    - Links to agreed rules, objective, answer identity, reductions, and growth analysis.
    - Consequential corrections and their agreement status.
 
@@ -656,7 +669,7 @@ HANDOFF AND NEXT STEP:
 
 CORRECTIONS AND HISTORY:
    - Superseded conclusion, reason, affected decisions, retained evidence.
-   - Links to preserved records; leave the original problem-analysis snapshot intact.
+   - Links to preserved records; snapshots are deleted at wrap-up (Section 3.2).
 ```
 
 
@@ -705,7 +718,7 @@ them does not matter.
 ```lisp
 (ww-set *problem-name* <symbol>)          ; e.g., match3a
 (ww-set *problem-type* planning)          ; or csp (constraint satisfaction)
-(ww-set *solution-type* <type>)           ; first, every, all-paths, min-length,
+(ww-set *solution-type* <type>)           ; first, every, count, all-paths, min-length,
                                           ; min-time, min-value, max-value, or integer N
 (ww-set *tree-or-graph* <mode>)           ; tree or graph
 (ww-set *depth-cutoff* <integer>)         ; max search depth (0 = no limit)
@@ -718,19 +731,22 @@ so the file states the intended configuration (`*problem-name*` is always requir
 Omit a setting the specification does not depend on; `(stage ...)` resets it to its
 default.
 
-**Three parameters must NOT appear in a problem file. Each signals an error if it
+**Two parameters must NOT appear in a problem file. Each signals an error if it
 does:**
 
 | Parameter | Why |
 |---|---|
 | `*debug*` | gates conditional compilation |
-| `*algorithm*` | selects which translations are generated |
 | `*probe*` | gates conditional compilation, and validates against loaded actions |
 
 Each requires recompilation to take effect, and the problem file is read during the
-very compile it would need to influence. Set all three at the REPL after staging; each
-triggers an automatic reload. `*problem-name*` is the mirror-image case — it must be
-set in the problem file and is refused at the REPL.
+very compile it would need to influence. Set both at the REPL after staging; each
+triggers an automatic reload. `*algorithm*` may be written in the problem file: it
+applies on a fresh `(stage ...)`, and set at the REPL it reloads the system.
+`*problem-name*` is the mirror-image case — it must be set in the problem file and is
+refused at the REPL. Which settings apply immediately, which reload, and how `stage`,
+`refresh` and `vals.lisp` combine them: [capability reference](advisor-reference.md),
+entry F19.
 
 Note also that on an ordinary load, a saved `vals.lisp` overrides the problem file's
 `ww-set` values. Use `(stage <problem>)` to get the problem's own intended settings.
@@ -816,7 +832,8 @@ relation must name different objects; `(separates gate1 area1 area1)` is an erro
 A trailing `:bijective` keyword declares a one-to-one pairing of two fluent arguments, eg
 `(controls $plate $gate :bijective)`. Either side can be looked up from the other, and
 `define-init` may not pair one object with two partners. Any other trailing keyword is an
-error.
+error. How both kinds are stored, and how bijective facts appear in a listed state (as
+`CONTROLS1`/`CONTROLS2` index facts): [capability reference](advisor-reference.md), entry F20.
 
 
 ### 4.5 Technology Includes (`include-tech`) — Path A
@@ -865,7 +882,7 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
 | Prefix | Meaning | Scope |
 |--------|---------|-------|
 | `?var` | Parameter variable | Bound by action/quantifier domains or passed to a query/update |
-| `$var` | Local/scratch variable | Bound by `setq`, `bind`, `let`, `mv-assign` |
+| `$var` | Local/scratch variable | Bound by `assign`, `mv-assign`, `bind`, `let` |
 
 - Action and quantifier `?variables` have domains and iterate over their instances.
 - Query/update `?variables` may independently declare a Wouldwork object type, but
@@ -874,12 +891,12 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
   query/update formal parameters.
 - Every `$variable` starts as `nil` in each call of an action, query, or update, so
   never initialize one to `nil`.
-- Set one `$variable` per `setq`. To set several at once, use
-  `(mv-assign ($a $b) (values x y))`; a multi-pair `(setq $a x $b y)` registers
-  only `$a`.
-- The variable checker accepts a `$variable` only when some `setq`, `assign`,
+- Set a `$variable` with `(assign $a x)`, the preferred replacement for `setq`. To set
+  several at once, use `(mv-assign ($a $b) (values x y))`; a multi-pair
+  `(setq $a x $b y)` registers only `$a`.
+- The variable checker accepts a `$variable` only when some `assign`, `setq`,
   `mv-assign`, `bind`, or `let` sets it. A list built only with `push` is reported as
-  unknown; accumulate with `(setq $list (cons item $list))` instead.
+  unknown; accumulate with `(assign $list (cons item $list))` instead.
 
 
 ### 4.7 Query Functions (`define-query`)
@@ -919,7 +936,7 @@ Read-only functions that examine state. Cannot modify the database.
 - Body is translated in `pre` (precondition/read) context.
 - Return value is the value of the last expression in the body.
 - Can use all DSL operators: `bind`, `exists`, `forall`, `doall`, `ww-loop`,
-  `setq`, `do`, `if`, `cond`, `let`, `mv-assign`, etc.
+  `assign`, `mv-assign`, `do`, `if`, `cond`, `let`, etc.
 - Query functions call other queries freely, including forward references to queries
   defined later in the file.
 - Use `(return-from <name> <value>)` for early return.
@@ -1016,7 +1033,7 @@ Boolean expressions in read-only (`pre`) context. Key operators:
 - `(forall (?v type) <body>)` — Universal: true if all instances satisfy body.
 - `(different ?a ?b)` — Symbol inequality.
 - Standard CL: `and`, `or`, `not`, `if`, `cond`, `=`, `<`, `>`, `eql`, etc.
-- `setq` — Capture intermediate values for use in effects.
+- `assign` — Capture intermediate values for use in effects.
 
 #### Effects
 
@@ -1037,7 +1054,7 @@ State modifications. The effect body starts in `pre` context and shifts to
   at staging. When an effect has several asserts, each needs its own `finally`.
 - **Multiple `assert` blocks**: An action can contain multiple `assert` blocks
   (e.g., inside `doall`), each generating a separate successor state.
-- **`setq` in effects**: `(setq $place 'ground)` captures values for the
+- **`assign` in effects**: `(assign $place 'ground)` captures values for the
   description-variables trace.
 - **`if` in effects**: `(if <test> <then> <else>)` tests the state being updated and
   selects which statements to assert, so one action can cover several variant cases
@@ -1088,7 +1105,7 @@ A list of variables whose values are captured for the solution trace:
   `$`-variable domain.
 - **`$`-variable domain.** `(doall (?p $plates) ...)` iterates the list held in
   `$plates` when the quantifier runs, so the list may depend on the current state:
-  `(bind (area-plates $area $plates))` first, or `(setq $plates (some-query? ...))`.
+  `(bind (area-plates $area $plates))` first, or `(assign $plates (some-query? ...))`.
   It works in `exists`, `forall` and `doall` (including `combination` headers) in
   preconditions, effects, queries, updates, goals and constraints — but not in action
   parameter lists, where no `$` variable is yet bound (an error). The loop variable
@@ -1222,3 +1239,36 @@ skips them, preserving whatever you set at the REPL.
 Both `stage` and `refresh` force a full recompile and reload of Wouldwork, including
 any changed `src/` or `tech/` file, so after editing an engine, technology, or problem
 file, `(stage X)` alone suffices; no separate `ql:quickload` is needed.
+
+
+### 4.15 Before staging: syntax checklist
+
+Check each draft against these points before staging it. Each line names the section
+with the details.
+
+1. The first line is exactly `;;; Filename: problem-<name>.lisp` (three semicolons),
+   naming the file itself. Staging matches that prefix, and a copy that keeps the
+   original's line silently stages the original (4.1).
+2. `define-types` comes before every `include-tech` (4.5).
+3. In a relation, the type after each `$` must be a `define-types` type or one of the
+   Common Lisp types Wouldwork accepts (`fixnum`, `integer`, `rational`, `real`,
+   `number`, `symbol`, `string`, `list`, `hash-table`, and similar). Inside `(either ...)`
+   the types are all fluent or all non-fluent, and only `define-types` types are allowed.
+   A relation has at most 5 non-fluent arguments (4.4).
+4. Two or more arguments of the same type, fluents included, make a relation symmetric;
+   end the name in `>` for a one-way relation (4.4).
+5. Query, update, and quantifier bodies are a single expression; group statements with
+   `(do ...)` (4.7, 4.10).
+6. Update names end in `!`; query and update parameters are `?` variables only (4.7, 4.8).
+7. Set `$` variables with `assign` or `mv-assign`, never `setq` or a `push`-only list,
+   and never initialize them to `nil` (4.6).
+8. `finally` and `next` go inside the `assert` they belong to (4.9).
+9. `$` variables in an action's description list are set in the precondition or inside
+   the `assert` (2.4).
+10. Query-domain arguments are not evaluated: bind the list first, then iterate a
+    `$`-variable domain (4.10).
+11. Computed relation keys must be valid instances of their type (4.13).
+12. Init actions read dynamic facts through a query, are silently skipped when a
+    parameter type has no instances, and run in file order (4.11).
+13. `*debug*` and `*probe*` never appear in a spec file (4.2).
+14. The goal given to `solve-subgoal` is never quoted ([capability reference](advisor-reference.md), entry F18).

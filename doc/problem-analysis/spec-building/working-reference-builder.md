@@ -13,10 +13,11 @@ intent-versus-model comparison with the relevant rules and entities. Consult cur
 sources and `tech/Talos Technology  Summary.txt` for relation semantics.
 
 Return the selected findings and their evidence, scope, unresolved issues, and affected
-dependencies to the [consultant](../../consultant.md) through the specification advisor.
-Use `doc/problems/<problem-name>/Analysis.txt` even for a short review. If the detailed
-reference needs its own artifact, use `Working-Reference.txt` in that directory and link
-it from Analysis.txt. Maintain one agenda and reuse unaffected current evidence.
+dependencies to the [specification advisor](../../spec-advisor.md). Use
+`doc/problems/<problem-name>/spec-analysis.txt` even for a short review. If the detailed
+reference needs its own artifact, use `spec-analysis-working-reference.txt` in that
+directory and link it from spec-analysis.txt. Maintain one agenda and reuse unaffected
+current evidence.
 
 > **Status:** Sections 1–3 were rewritten against the current `tech/` relation vocabulary. The previous version used retired area/interface relations (`in-area`, `interface`, `traversable>`, `in-los-group`, `reachable-via`) and an older LOS representation. The current system reuses `los-via` as one unified symmetric endpoint relation. Discipline rule 4 and Section 8 were revised: geometry is spec fact in coordinate-derived problems and is no longer quarantined by default.
 

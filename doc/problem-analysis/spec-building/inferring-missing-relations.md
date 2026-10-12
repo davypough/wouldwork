@@ -11,10 +11,10 @@ to explain the current model first. Its intent comparison supplies requirements 
 its world-mode section supplies state-dependent evidence, with reachability claims qualified by
 their actual verification. Consult current technology sources for the mechanics involved.
 
-Record results in `doc/problems/<problem-name>/Analysis.txt`, with a linked text artifact
-only if detailed evidence warrants one. Return the discrepancy, tested explanations,
-evidence and limits, proposed correction, and affected dependencies through the specification
-advisor to the [consultant](../../consultant.md). Reopen affected conclusions after a
+Record results in `doc/problems/<problem-name>/spec-analysis.txt`, with a linked
+`spec-analysis-` text artifact only if detailed evidence warrants one. Return the
+discrepancy, tested explanations, evidence and limits, proposed correction, and affected
+dependencies to the [specification advisor](../../spec-advisor.md). Reopen affected conclusions after a
 correction and preserve unrelated evidence. Investigating an omission does not authorize
 editing the spec or launching a search.
 

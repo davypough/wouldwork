@@ -182,8 +182,9 @@ changes in the same run go into that copy.  A change that needs a separate varia
   a line or two of general terms rather than problem-specific details or counts
   (`problem-crossword5-11-1.lisp`).
 - A `ww-set` goes in the spec's `ww-set` block, replacing any existing value for that setting.
-- REPL-only settings (`*algorithm*`, `*debug*`, `*probe*`) are never written
-  to the spec; give the REPL form instead. `*threads*` may be declared in the
+- `*debug*` and `*probe*` are REPL-only and never written to the spec; give the REPL
+  form instead. `*algorithm*` may be written in the spec (it applies on a fresh `stage`)
+  or set at the REPL, which reloads the system ([capability reference](advisor-reference.md), entry F19). `*threads*` may be declared in the
   spec when the user wants a machine-specific default; otherwise set it at the REPL.
   Never declare it in a spec meant for chained `(solve-subgoal <goal>)`, which errors
   unless `*threads*` is 0.
@@ -234,7 +235,7 @@ changes in the same run go into that copy.  A change that needs a separate varia
   Backtracking is not inherently serial: `dfs` in `src/ww-searcher.lisp` dispatches
   to `process-partitioned-parallel-bt` when threads are enabled (source checked
   2026-10-09, not a runtime test). Verify the selected features and helper state against
-  current source; consult the [capability reference](problem-advisor-reference.md).
+  current source; consult the [capability reference](advisor-reference.md).
 - **Deep runs** (substantial full solves, backward searches to the memory limit,
   enumerator layers, `every` searches feeding `freq`): only when the user asks for one (step
   11) or an explicitly approved run plan, normally at the user's REPL. The assistant supplies the exact
@@ -318,7 +319,7 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 |---|---|---|---|---|
 | S1 | **Brute force, iterative deepening** | A useful baseline when its cost fits the objective and budget | `first` at approved cutoffs; propose further depths only when needed; test shortest length only if requested | Exponential in depth |
 | S2 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with auto-wait or objects created during search (section 5) |
-| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking is serial only and supports `prune-state?` and move lower bounds (see section 5 for unsupported hooks); the order matters; with forward checking the goal must test the constraints (note 1) |
+| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking runs serial or parallel and supports all four search hooks ([capability reference](advisor-reference.md), compatibility review and entry F17); the order matters; with forward checking the goal must test the constraints (note 1) |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
 | S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
@@ -457,7 +458,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | Setting | Values (default) | Choose |
 |---|---|---|
 | `*problem-type*` | planning, csp (planning) | csp only for assignments (Q1).  csp forces tree search |
-| `*algorithm*` **REPL** | depth-first, backtracking (depth-first) | backtracking for CSP, or a tree with no repeats where memory is tight; otherwise depth-first.  An error if set in the spec |
+| `*algorithm*` **REPL** | depth-first, backtracking (depth-first) | backtracking for CSP, or a tree with no repeats where memory is tight; otherwise depth-first.  In the spec it applies on a fresh `stage`; at the REPL it reloads (reference entry F19) |
 | `*solution-type*` | first, N, every, all-paths, min-length, min-time, min-value, max-value (first) | from Q2.  `first` at fixed length.  `every` gives one path per goal state; `all-paths` every distinct path to every goal, but only serial depth-first graph search with a depth cutoff (otherwise it falls back to `every`) |
 | `*tree-or-graph*` | tree, graph (graph) | graph when states repeat (Q4: repeated-state percentage high); tree when they rarely do, with happenings, or for better parallel speedup |
 | `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (S4) |
@@ -481,6 +482,10 @@ Set the two after `(ww-set *threads* N)`, e.g. `(setf *min-tasks* 32 *tasks-per-
 `*debug*` and `*probe*` are diagnostic, REPL-only, and not search choices.
 
 ### 4.1 Search hooks
+
+When and in which order each hook is called in each driver, and the conditions under which
+it can prune, are in the [capability reference](advisor-reference.md), entry F17.  The table
+below adds this advisor's usage notes.
 
 Defined in the spec as `define-query` with these reserved names; the state is supplied.
 
@@ -544,7 +549,10 @@ Under `*threads*` > 0 the hooks must be pure functions of the state: any global 
 
 ## 5. Conflicts and automatic adjustments (from `ww-initialize.lisp`)
 
-- **Backtracking** forces tree search; is an error with `*threads*` > 0 or with happenings; and
+The engine contracts behind these points are in the [capability reference](advisor-reference.md):
+its compatibility review, and entry F19 for which settings reload or are refused.
+
+- **Backtracking** forces tree search; runs serial or parallel; is an error with happenings; and
   supports `prune-state?`, move lower bounds, and `bounding-function?` before generating
   choices, including at the initial state. `heuristic?` orders choices across actions and parameter combinations.
   Move lower bounds can prune against a depth cutoff or an existing `min-length`

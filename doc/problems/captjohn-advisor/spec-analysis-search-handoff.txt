@@ -1,0 +1,59 @@
+SEARCH-ADVISOR HANDOFF - captjohn-advisor (2026-10-12)
+
+SCOPE AND STATUS
+  Specification complete for the agreed scope (3x3 instance; design aimed at
+  larger grids with the same clue kinds); stages without warnings.
+  Search-advisor phase not yet authorized.
+  Proposed first question: on a hand-placed larger layout, how much do the
+  dead-end cut and the remaining-moves bound each save in route time, and
+  does either cost more than it saves?
+
+REQUIREMENTS AND PROVENANCE
+  problem-analysis.txt (rev 2);
+  spec-analysis.txt (consolidated 2026-10-12).
+
+DELIVERED MODEL
+  probs/problem-captjohn-advisor.lisp, revision of 2026-10-12. Staging and
+  the two-search REPL sequence are in the file header. Tested at the
+  user's Windows REPL, 16 threads.
+
+OBJECTIVE AND REPRESENTATION
+  Placement: every layout satisfying clues 1-8 (expected exactly one);
+    identical tokens interchangeable. Route: one shortest route in king
+    moves from John to the ship, visiting every crew mate, never a guard
+    or a revisited cell. Cost 1 per move.
+  State: token->cell layout (bijective), next token (placement only),
+    John's cell and visited cells (route). Actions: place, move.
+
+ENHANCEMENTS (enabled)
+  Dead-end cut (prune-state? + reachable-cells): drops a route once an
+    unvisited crew mate or the ship cannot be reached through unvisited,
+    guard-free cells. Sound; one grid sweep per expansion.
+  Remaining-moves bound (min-steps-remaining?): max of the king-distance
+    trip John->crew->ship over uncollected crew (or John->ship) and
+    uncollected crew + 1. Admissible; prunes only with a depth cutoff or
+    after a first route.
+  Both inert during placement.
+
+VALIDATION
+  Placement: 1 layout (hand-checked). Route: 6 moves, same path in all
+  runs. Route states: 48 no hooks, 40 dead-end cut, 37 both
+  (min-steps pruned 11). Final run 0.003 s, completed normally.
+
+GROWTH AND OPEN PERFORMANCE QUESTIONS (predictions, not measurements)
+  Growth: grid size, guard and crew counts; route states grow with the
+    number of visited-cell sets.
+  - Benefit and overhead of each hook on larger grids (both on, each off).
+  - Reached set kept as a list: cost grows with grid size; a cheaper
+    set representation may matter on large grids.
+  - Stronger remaining-moves bound (a tour through all remaining crew)
+    against its cost.
+  - Graph memory for the route on larger grids.
+  - Placement order (guards, John, ship, crew) - provisional.
+  A larger instance needs a hand-placed layout fed straight to the route
+  search: the clue lines contain 3x3 instance data (column 3, R1C2,
+  crew1 in clue 6, placement depth 6).
+
+REMAINING ISSUES
+  - "Passing" = stepping onto a guard (tentative; affects move and
+    reachable-cells only).
