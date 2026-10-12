@@ -762,7 +762,6 @@
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
                                          (let (updated-dbs 
-                                               followups 
                                                ,@(set-difference (set-difference eff-extra-$vars eff-args) eff-extra-?vars))
                                            (declare (ignorable ,@eff-extra-$vars))
                                            ,(translate effect 'pre)  ;start as pre, shift to eff in assert

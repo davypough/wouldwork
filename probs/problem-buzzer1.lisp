@@ -152,7 +152,8 @@
                         (loc $cargo $area)
                         (on $cargo ?box)
                         (elevation $cargo (1+ $h-box))
-                        (assign $place ?box))))
+                        (assign $place ?box)
+                        (finally (propagate-changes!)))))
             ;; Can put cargo=box on a buzzer or mine
             (doall (?rover (either buzzer mine))
               (if (and (box $cargo)
@@ -164,13 +165,14 @@
                         (loc $cargo $area)
                         (supports ?rover $cargo)
                         (elevation $cargo 1)  ;box on buzzer = elevation 1
-                        (assign $place ?rover))))
+                        (assign $place ?rover)
+                        (finally (propagate-changes!)))))
             ;; Can put cargo=box on the ground
             (assert (not (holds ?agent $cargo))
                     (loc $cargo $area)
                     (elevation $cargo 0)
-                    (assign $place 'ground))))
-      (finally (propagate-changes!))))
+                    (assign $place 'ground)
+                    (finally (propagate-changes!)))))))
 
 
 (define-action pickup-cargo
@@ -211,8 +213,8 @@
                         (t
                            ;; Box was on ground - just remove on relationship for cargo
                            (if (bind (on $above-cargo ?box))
-                             (not (on $above-cargo ?box))))))))
-      (finally (propagate-changes!))))
+                             (not (on $above-cargo ?box)))))
+                  (finally (propagate-changes!)))))))
 
 
 (define-action jump-to-place
@@ -233,14 +235,15 @@
                     (not (on ?agent $old-box)))
                   (on ?agent ?box)
                   (elevation ?agent (1+ $h-box))  ;standing on a box sets agent elevation to box_elevation + 1
-                  (assign $place ?box))))
+                  (assign $place ?box)
+                  (finally (propagate-changes!)))))
       ;; Can jump to the ground
       (if (> $h-agent 0)
         (assert (elevation ?agent 0)
                 (if (bind (on ?agent $box))
                   (not (on ?agent $box)))
-                (assign $place 'ground)))
-      (finally (propagate-changes!))))
+                (assign $place 'ground)
+                (finally (propagate-changes!))))))
 
 
 (define-action move
@@ -254,8 +257,8 @@
         (if (and (different ?area2 $area1)
                  (accessible ?agent $area1 ?area2)
                  (safe ?area2))
-          (assert (loc ?agent ?area2))))
-      (finally (propagate-changes!))))
+          (assert (loc ?agent ?area2)
+                  (finally (propagate-changes!)))))))
 
 
 ;;;; INITIALIZATION ;;;;

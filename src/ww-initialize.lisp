@@ -85,8 +85,6 @@
   (when (and (eq *algorithm* 'backtracking)
              (member *solution-type* '(min-length min-time min-value max-value)))
     (format t "~%Note: Backtracking with *solution-type* ~A uses user bounding-function? and move lower bounds, but has no automatic objective-bound pruning.~%" *solution-type*))
-  (when (and (eq *algorithm* 'backtracking) (eq *problem-type* 'planning))  ;unchanged
-    (format t "~%Note: Backtracking works better with a CSP (constraint satisfaction problem) than a PLANNING problem.~%"))  ;unchanged
   (when (and (eq *problem-type* 'csp) (eq *tree-or-graph* 'graph))
     (setf *tree-or-graph* 'tree)
     (format t "~%Note: Setting *tree-or-graph* to tree (CSP problems have no repeated states).~%"))

@@ -977,7 +977,8 @@ predicates stay unknown because their argument may or may not be an instance."
 
 
 (defun translate-assert (form flag)
-  "For depth-first, translate an assert while carrying the active state hash components."
+  "For depth-first, translate an assert while carrying the active state hash components.
+   Each assert collects only its own followups."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
     (pre `(let* ((canonical-p (use-canonical-symmetry-p))
@@ -993,7 +994,8 @@ predicates stay unknown because their argument may or may not be an instance."
                                           (problem-state.fixed-idb-hash effect-state)))
                   (*symmetry-idb-acc* (when canonical-p
                                         (problem-state.symmetry-idb effect-state)))
-                  (*symmetry-idb-touched-p* nil))
+                  (*symmetry-idb-touched-p* nil)
+                  (followups nil))
               ,@(mapcar (lambda (statement)
                           ;; Bind read-mode to nil only for direct assert statements
                           (let ((*proposition-read-mode* nil))
@@ -1023,10 +1025,10 @@ predicates stay unknown because their argument may or may not be an instance."
 (defun translate-assert-bt (form flag)
   "For backtracking with incremental updates, translates an assert statement.
    Applies updates directly to state (incremental) while tracking both forward 
-   and inverse operations."
+   and inverse operations. Each assert collects only its own followups."
   (ecase flag
     (eff (error "Nested ASSERT statements not allowed:~%~A" form))
-    (pre `(let (forward-list inverse-list)
+    (pre `(let (forward-list inverse-list followups)
             (declare (special forward-list inverse-list))
             ;; Execute each statement, applying updates incrementally to state
             ,@(mapcar (lambda (statement)
@@ -1040,7 +1042,7 @@ predicates stay unknown because their argument may or may not be an instance."
                                          '$objective-value
                                          0.0) 
                                :instantiations (list ,@*eff-param-vars*) 
-                               :followups (reverse followups)
+                               :followups (nreverse followups)
                                ,@(when *has-sim-state*
                                    '(:sim-state $sim-state)))
                   updated-dbs)
@@ -1267,8 +1269,11 @@ predicates stay unknown because their argument may or may not be an instance."
 
 
 (defun translate-followup (form flag)
-  ;Processes a trigger followup form for next & finally.
-  (declare (ignore flag))
+  "Processes a trigger followup form for next & finally.
+   Each assert captures its followups when it builds its update, so a followup
+   outside an assert would be silently dropped."
+  (unless (eq flag 'eff)
+    (error "~A must appear inside an ASSERT:~%~S" (car form) form))
   (let ((base-form (second form)))
     `(push (list ',(car base-form) ,@(cdr base-form)) followups)))
 

@@ -1,0 +1,165 @@
+PROBLEM / REVISION / AUTHORIZED SCOPE
+  Active record: doc/problems/captjohn-advisor/spec-analysis.txt
+  Specification: probs/problem-captjohn-advisor.lisp (new; not yet written).
+  Approved 2026-10-11: write the new spec section by section with user review;
+    source reading limited to the open parallel-uniqueness question and engine
+    details a section depends on; checks run by the user at the REPL from
+    supplied expressions (per-section staging, validation-plan checks, final
+    bounded run of each phase at user-supplied depth cutoffs); final
+    search-advisor handoff. Existing probs/problem-captjohn.lisp not read
+    (comparison deferred).
+
+INPUT ANALYSIS AND OBJECTIVE
+  Current: doc/problems/captjohn-advisor/problem-analysis.txt (revision 2).
+  Snapshot: problem-analysis-2026-10-11-before-spec.txt (identical at intake).
+  Objective, answer identity, D1-D11: as agreed there.
+  Noted at intake: the WOULDWORK MAPPING line "algorithm depth-first" for both
+    phases predates the D11 correction; D11 governs (backtracking placement,
+    depth-first route). No effect on the file (*algorithm* is set at the REPL).
+  D3 (ordered identical tokens) retained over engine symmetry pruning.
+
+REPRESENTATION AND AUTHORING APPROACH
+  Path B (hand-authored, no include-tech), problem-type planning.
+  State: each token's cell and the reverse cell->token occupant table (grass
+    = no occupant); the next token to place (exists only during placement);
+    John's cell and the cells he has left (route). Crew counted as visited
+    when left or currently occupied by John.
+  Phase fact dropped (user accepted 2026-10-11): place action requires a
+    next token, move action requires none; the final placement also tests
+    the grass clues, so every completed layout is the placement goal; goal
+    states are not expanded under backtracking (ww-backtracker.lisp
+    explore-choice-bt / accept-goal-bt), so no moves occur in the placement
+    run regardless of cutoff. Route run starts from the saved layout, which
+    has no next token.
+  Cost 1 per action. File settings (placement): planning, every, tree,
+    depth cutoff = token count. Route settings and *algorithm* via REPL.
+  Clues: one line per clue over reusable relation queries (user chose
+    2026-10-11); a data-driven clue interpreter rejected as excess machinery.
+  Section 2 (accepted 2026-10-11, written):
+    Cells R<row>C<col> generated from *captjohn-grid-size*; row 1 top,
+      column 1 left. Token kinds as types (captain, vessel, guard, crew);
+      clue lines quantify over kinds.
+    Layout = one bijective relation (located $token $cell) serving both the
+      token->cell and cell->occupant lookups (replaces the two relations
+      described in section 1; same content). Grass = no occupant.
+    John's current cell is a separate fact (john-cell), so the layout stays
+      fixed during the route and John may stand on a crew or ship cell
+      without a second occupant.
+    Static, derived by init actions: cell-position (row, col, row-major
+      index); vertical, diagonal, king neighbor lists. Authored: placement
+      order (next-in-order), same-kind ordering (after-same-kind), fixed
+      grass (clue 7).
+    clue-broken? : one line per clue, each broken only when its tokens are
+      placed and its test fails; clues 4 and 6 only when no next token.
+      Order-independent, so D4 can change without editing clues.
+    Fluent names are types (ww-installer.lisp normalize-fluent-spec strips
+      the $; ww-validator.lisp check-proposition checks values against it):
+      cell-position uses $coordinate $coordinate $fixnum, neighbor lists
+      $list (user caught the undeclared $index/$cells, 2026-10-11).
+    Engine detail relied on: the standard parameter header drops tuples with
+      equal values (ww-support.lisp get-pre-lambda-arg-lists), so the
+      row x column init action uses the product header; multi-variable
+      guard quantifiers (standard) give ordered distinct pairs.
+
+SECTION REVIEW AND REQUIREMENT MAPPING
+  Agenda: 1 representation and settings; 2 grid objects and clue relations;
+    3 place action; 4 move action; 5 initial state; 6 the two goals;
+    then enhancements D9 dead-end prune, D10 distance bound.
+  Status: sections 1-3 accepted and written 2026-10-11. Section 3: place
+    action (precondition: a next token; effect: one alternative per empty,
+    non-fixed-grass cell above the same-kind predecessor's index; advances
+    or clears next-to-place; records john-cell when placing John) and
+    check-clues! (finally: inconsistent-state when clue-broken?).
+    Section 4 accepted and written 2026-10-11: move action (precondition: no
+    next token, John's current cell; effect: one alternative per king
+    neighbor not visited and either empty, a crew cell, or the ship with
+    every crew cell visited or being left; marks the left cell visited and
+    updates john-cell). "Passing" = stepping onto a guard (tentative); a
+    diagonal squeeze rule would add one test here.
+    Sections 5-6 accepted and written 2026-10-11: define-init authors only
+    next-to-place guard1, the placement order chain, same-kind ordering
+    (guard2>guard1, crew2>crew1) and fixed grass R1C2; positions and
+    neighbor lists derived. Placement goal: no next token. Route goal given
+    at the REPL (solve-subgoal takes a literal goal form). defvar
+    *captjohn-layout* holds the saved layout facts across the algorithm
+    reload.
+  Documented REPL sequence (to be confirmed by the checks):
+    (stage captjohn-advisor)
+    (ww-set *algorithm* backtracking)
+    (solve)
+    (length *unique-solution-states*)          ; expect 1
+    (setf *captjohn-layout* (list-database (problem-state.idb (solution.goal (first *solution-paths*)))))
+    (ww-set *algorithm* depth-first)
+    (ww-set *tree-or-graph* graph)
+    (ww-set *solution-type* min-length)
+    (ww-set *depth-cutoff* <route depth>)
+    (solve-subgoal *captjohn-layout* (and (bind (located ship $ship)) (john-cell $ship)))
+
+CHECKS AND EVIDENCE
+  Staging, sections 1-3 (user, Windows REPL, 2026-10-11): first attempts
+    failed on the variable checker (multi-pair setq; then mv-assign and push
+    unrecognized). After the validator fix and spec edits, staging
+    completed; static grid facts inspected with list-static-db: nine
+    cell-position facts (row-major index 1-9); neighbor lists correct
+    (e.g. R2C2: 8 king, vertical R1C2 R3C2, diagonal the four corners;
+    corners and edges reduced accordingly). Warning-free status not yet
+    explicitly confirmed.
+  Source review 2026-10-11 (open issue from problem analysis):
+    Parallel backtracking uniqueness. Workers register through
+    register-parallel-solution-bt (ww-parallel-backtracker.lisp), which calls
+    record-solution-bt under *best-solution-lock*; afterwards
+    finalize-parallel-search-results (ww-parallel.lisp, called from
+    ww-searcher.lisp for *threads* > 0) rebuilds *unique-solution-states* from
+    *solution-paths* keyed on goal idb. Conclusion: the uniqueness count is
+    valid with 16 threads. Evidence: source only.
+  Symmetry pruning under backtracking filters symmetric action-parameter
+    instantiations (visit-generated-choices-bt, filter-symmetric-instantiations).
+
+READINESS AND OPEN ISSUES
+  - "passing" interpretation tentative (affects move action only).
+  - Parallel BT uniqueness: resolved by source review (above).
+  - Engine fix (user-directed 2026-10-11): ww-validator.lisp
+    check-variable-names, get-assert-established-$vars and the effect-shadow
+    walker now accept mv-assign (the current form of legacy mvsetq);
+    doc/spec-advisor.md updated to name mv-assign. A $var set only by push
+    is still unrecognized; the spec accumulates with (setq $x (cons ...)).
+  - Engine gap (open; proposal for the user): under backtracking, finally
+    (and next) followups are silently ignored. Candidate fixes: process
+    followups in the backtracker, or signal an error at translation when an
+    action uses finally/next with *algorithm* backtracking.
+  - Pending check: list-database prints the bijective located relation as
+    its two index relations (LOCATED1/LOCATED2); the saved layout fact list
+    may need converting to (located ...) facts before solve-subgoal
+    (make-start-state-from-facts requires declared dynamic relations).
+  - Engine change (user-directed 2026-10-11): removed the staging note
+    "Backtracking works better with a CSP than a PLANNING problem"
+    (ww-initialize.lisp); misleading, since backtracking's real limit is
+    tree search (no repeated-state detection), not the problem type.
+  - doc/spec-advisor.md corrected (user, 2026-10-11): $vars start nil;
+    one variable per setq, mv-assign for several; push alone not accepted
+    by the variable checker; stage/refresh force a full reload.
+
+HANDOFF AND NEXT STEP
+  Next: user review of section 1.
+
+CORRECTIONS AND HISTORY
+  2026-10-11 First placement run failed: (> 1 nil) in PLACE-EFF-FN for guard1.
+    Cause: static relations with two arguments of the same type (fluent
+    positions included) are symmetric (ww-installer.lisp symmetric-type-
+    indexes; ww-support.lisp add-proposition adds all permutations), so
+    (after-same-kind guard2 guard1) also asserted (after-same-kind guard1
+    guard2) and guard1 looked for an unplaced predecessor; next-in-order
+    and cell-position (row/col both $coordinate) had the same exposure.
+    Fix: renamed to cell-position>, next-in-order>, after-same-kind>
+    (directional). doc/spec-advisor.md 4.4 now notes that fluent
+    arguments count toward symmetry.
+  2026-10-11 Second placement run (backtracking, 16 threads, EVERY, depth 6)
+    completed but recorded 5,040 unique layouts = 8*7*6*5*4*3/4, i.e. no
+    clue pruning at all. Cause: the backtracker ignores finally followups
+    (translate-assert-bt records followups but no backtracking code
+    processes update.followups; only ww-planner.lisp process-followups and
+    solution replay do), so check-clues! never ran during search; the
+    printed path showed INCONSISTENT-STATE only because the display replays
+    followups. Fix: check-clues! is now called directly as the last
+    statement of the place assert (works under both algorithms; reads the
+    already-applied writes).

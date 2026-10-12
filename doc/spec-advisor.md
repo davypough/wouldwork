@@ -807,7 +807,9 @@ Relations that never change. Asserted in `define-init` and stored separately.
 #### Symmetric and bijective relations
 
 A relation with two or more arguments of the same type (eg, `(separates gate area area)`)
-is symmetric: asserting one order also asserts the other. Suffix the name with `>` to make
+is symmetric: asserting one order also asserts the other. Fluent arguments count by their
+type name, so `(next token $token)` and `(position cell $coordinate $coordinate)` are
+symmetric too, and their fluent values get swapped. Suffix the name with `>` to make
 it directional. In `define-init`, the interchangeable non-fluent positions of a symmetric
 relation must name different objects; `(separates gate1 area1 area1)` is an error.
 
@@ -863,13 +865,21 @@ failure modes in engine terms (Stage 2, and Traps 1–3).
 | Prefix | Meaning | Scope |
 |--------|---------|-------|
 | `?var` | Parameter variable | Bound by action/quantifier domains or passed to a query/update |
-| `$var` | Local/scratch variable | Bound by `setq`, `bind`, `let`, `mvsetq` |
+| `$var` | Local/scratch variable | Bound by `setq`, `bind`, `let`, `mv-assign` |
 
 - Action and quantifier `?variables` have domains and iterate over their instances.
 - Query/update `?variables` may independently declare a Wouldwork object type, but
   they are passed by the caller rather than instantiated by the function.
 - `$variables` hold local or computed Lisp values. They are not permitted as
   query/update formal parameters.
+- Every `$variable` starts as `nil` in each call of an action, query, or update, so
+  never initialize one to `nil`.
+- Set one `$variable` per `setq`. To set several at once, use
+  `(mv-assign ($a $b) (values x y))`; a multi-pair `(setq $a x $b y)` registers
+  only `$a`.
+- The variable checker accepts a `$variable` only when some `setq`, `assign`,
+  `mv-assign`, `bind`, or `let` sets it. A list built only with `push` is reported as
+  unknown; accumulate with `(setq $list (cons item $list))` instead.
 
 
 ### 4.7 Query Functions (`define-query`)
@@ -909,7 +919,7 @@ Read-only functions that examine state. Cannot modify the database.
 - Body is translated in `pre` (precondition/read) context.
 - Return value is the value of the last expression in the body.
 - Can use all DSL operators: `bind`, `exists`, `forall`, `doall`, `ww-loop`,
-  `setq`, `do`, `if`, `cond`, `let`, `mvsetq`, etc.
+  `setq`, `do`, `if`, `cond`, `let`, `mv-assign`, etc.
 - Query functions call other queries freely, including forward references to queries
   defined later in the file.
 - Use `(return-from <name> <value>)` for early return.
@@ -1022,7 +1032,9 @@ State modifications. The effect body starts in `pre` context and shifts to
 - **`assert`**: Groups writes into a single state transition. Copies state first
   (for depth-first search).
 - **`finally`**: Schedules an update function to run after the assert completes.
-  Typically used for `(finally (propagate-changes!))`.
+  Typically used for `(finally (propagate-changes!))`. It must appear inside the
+  `assert` it belongs to; a `finally` (or `next`) outside any assert is an error
+  at staging. When an effect has several asserts, each needs its own `finally`.
 - **Multiple `assert` blocks**: An action can contain multiple `assert` blocks
   (e.g., inside `doall`), each generating a separate successor state.
 - **`setq` in effects**: `(setq $place 'ground)` captures values for the
@@ -1177,7 +1189,7 @@ extension — so the object is reachable only through a predicate test or a quer
 Arbitrary CL code is allowed in query/update bodies: `push`, `incf`, `cons`,
 `member`, `make-hash-table`, `gethash`, `setf`, `format`, `maphash`,
 `lambda`, `funcall`, `mapcar`, `some`, `every`, `sqrt`, `abs`, `min`, `max`,
-`values`, `multiple-value-setq` (via `mvsetq`), etc.
+`values`, `multiple-value-setq` (via `mv-assign`), etc.
 
 Functions defined with `defun`/`defparameter` at top level are available
 globally (they are standard CL, not translated by the DSL).
@@ -1189,7 +1201,7 @@ These are reference commands, not an instruction to execute every command or an
 authorization to stage or solve. Use only the operations covered by the agreed scope.
 
 ```lisp
-(progn (ql:quickload :wouldwork) (in-package :ww))
+(progn (ql:quickload :wouldwork) (in-package :ww))   ; start a session
 (stage match3a)                  ; stage a problem without solving it
 (solve)                          ; solve the currently staged problem
 (run match3a)                    ; stage and solve in one step
@@ -1206,3 +1218,7 @@ no zero-argument `(run)`; use `(solve)` to solve what is already staged.
 
 `(stage X)` applies the problem file's own `ww-set` settings. `(refresh)` deliberately
 skips them, preserving whatever you set at the REPL.
+
+Both `stage` and `refresh` force a full recompile and reload of Wouldwork, including
+any changed `src/` or `tech/` file, so after editing an engine, technology, or problem
+file, `(stage X)` alone suffices; no separate `ql:quickload` is needed.

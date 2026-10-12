@@ -284,8 +284,9 @@
                        (case (first item)
                          ((setq setf assign ww-assign)
                           (when (symbolp (second item)) (push (second item) valid-vars)))
-                         (mvsetq      (alexandria:appendf valid-vars
-                                        (remove-if-not #'varp (second item))))
+                         ((mv-assign mvsetq)
+                          (alexandria:appendf valid-vars
+                                              (remove-if-not #'varp (second item))))
                          (ww-loop     (when (eq (second item) 'for)
                                         (typecase (third item)
                                           (symbol (push (third item) valid-vars))
@@ -331,7 +332,7 @@
 
 (defun get-assert-established-$vars (assert-form)
   "Returns the $-variables established by SETQ, SETF, ASSIGN, WW-ASSIGN,
-   MVSETQ, BIND, or LET occurring anywhere within ASSERT-FORM's own body
+   MV-ASSIGN, MVSETQ, BIND, or LET occurring anywhere within ASSERT-FORM's own body
    (including nested inside IF/COND/DO). Mirrors the statement forms
    recognized by CHECK-VARIABLE-NAMES, restricted here to $-variables."
   (let (established)
@@ -341,7 +342,7 @@
                          ((setq setf assign ww-assign)
                           (when ($varp (second item))
                             (push (second item) established)))
-                         (mvsetq
+                         ((mv-assign mvsetq)
                           (alexandria:appendf established
                                               (remove-if-not #'$varp (second item))))
                          ((bind let)
@@ -391,14 +392,14 @@
 ;;;
 ;;; Walks an action's effect body looking for `bind` forms that overwrite
 ;;; a $-variable whose value came from the precondition or from an earlier
-;;; setq/mvsetq in the same lexical scope. Such overwrites are usually a
+;;; setq/mv-assign in the same lexical scope. Such overwrites are usually a
 ;;; bug: the original value is silently lost. Reuse of $-variables across
 ;;; separate `bind` statements is a permitted idiom and is not flagged.
 ;;; ====================================================================
 
 (defun walk-effect-shadow (action-name form owned)
   "Recursive walker over effect-body subforms. OWNED is the set of $-vars
-   already written by the precondition or by a prior setq/mvsetq in the
+   already written by the precondition or by a prior setq/mv-assign in the
    current lexical scope. A bind that targets a $-var in OWNED produces
    a shadowing warning. Bind itself does not extend OWNED, since reuse
    of $-variables across separate binds is permitted. Returns the updated
@@ -409,7 +410,7 @@
          (process-shadow-bind action-name form owned))
         ((eq (first form) 'setq)
          (process-shadow-setq action-name form owned))
-        ((member (first form) '(mvsetq multiple-value-setq))
+        ((member (first form) '(mv-assign mvsetq multiple-value-setq))
          (process-shadow-mvsetq action-name form owned))
         ((eq (first form) 'let)
          (process-shadow-let action-name form owned))
@@ -450,7 +451,7 @@
               (terpri *error-output*)
               (warn "Fluent-variable overwrite in action ~A:~% ~
                      ~S writes to ~A,~% ~
-                     which was already set by the precondition or an earlier setq/mvsetq.~% ~
+                     which was already set by the precondition or an earlier setq/mv-assign.~% ~
                      Unless the overwrite is intentional, delete this bind statement.~%"
                     action-name form arg arg))))
     owned))
@@ -469,9 +470,9 @@
 
 
 (defun process-shadow-mvsetq (action-name form owned)
-  "Walks mvsetq's value sub-form, then adds all $-variable targets to
-   OWNED so subsequent bind statements can detect a shadow against them.
-   mvsetq itself does not warn."
+  "Walks an mv-assign (or legacy mvsetq) value sub-form, then adds all
+   $-variable targets to OWNED so subsequent bind statements can detect a
+   shadow against them. The assignment itself does not warn."
   (let* ((vars (second form))
          (val (third form))
          (after-val (walk-effect-shadow action-name val owned))

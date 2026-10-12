@@ -21,6 +21,7 @@
   (value 0)       ; Objective value returned by this effect
   (heuristic 0)   ; Cached score when choices are ordered
   parent-metadata ; Name, time, value, heuristic and arguments restored by undo
+  followups       ; (fn . args) next & finally calls run after the forward update
   pre-applied-p)  ; T when effect already applied to *backtrack-state*
 
 
@@ -146,17 +147,6 @@
     (list unique-count xor-hash sum-hash)))
 
 
-(defun bt-choice-inconsistent-p (choice)
-  "Return T when CHOICE encodes the inconsistent-state marker.
-   Supports both incremental list updates and snapshot hash-table updates."
-  (let ((update (choice.forward-update choice)))
-    (etypecase update
-      (list
-       (member '(inconsistent-state) update :test #'equal))
-      (hash-table
-       (gethash (convert-to-integer-memoized '(inconsistent-state)) update)))))
-
-
 (defun apply-update-forward-bt (update)
   "Apply UPDATE to *backtrack-state*.
    UPDATE may be a forward-op list or a hash-table idb snapshot."
@@ -185,18 +175,30 @@
   (setf (choice.pre-applied-p choice) nil))
 
 (defun apply-choice-database-bt (choice)
-  "Capture fresh undo records whenever a literal choice is reapplied."
+  "Capture fresh undo records whenever a literal choice is reapplied.
+   Followups run after the forward update, inside the same undo frame."
   (if (hash-table-p (choice.forward-update choice))
-      (apply-update-forward-bt (choice.forward-update choice))
+      (progn (apply-update-forward-bt (choice.forward-update choice))
+             (apply-choice-followups-bt choice))
       (let* ((frame (begin-bt-undo (problem-state.idb *backtrack-state*)))
              (*bt-undo-frame* frame)
              (complete nil))
         (unwind-protect
             (progn (apply-update-forward-bt (choice.forward-update choice))
+                   (apply-choice-followups-bt choice)
                    (setf (choice.undo-frame choice) frame complete t))
           (unless complete
             (restore-bt-undo frame)
             (invalidate-problem-state-hash *backtrack-state*))))))
+
+
+(defun apply-choice-followups-bt (choice)
+  "Run CHOICE's next & finally followup calls against *backtrack-state*.
+   Writes are trailed by any active *bt-undo-frame*."
+  (when (choice.followups choice)
+    (dolist (followup (choice.followups choice))
+      (apply (car followup) *backtrack-state* (cdr followup)))
+    (invalidate-problem-state-hash *backtrack-state*)))
 
 
 (defun search-backtracking ()
@@ -389,7 +391,7 @@
     (return-from score-choice-bt nil))
   (when (register-choice-bt choice action level nil)
     (unwind-protect
-        (if (bt-choice-inconsistent-p choice)
+        (if (state-is-inconsistent *backtrack-state*)
             (progn (increment-global *inconsistent-states-dropped* 1) nil)
             (let ((score (funcall (symbol-function 'heuristic?) *backtrack-state*)))
               (check-type score real)
@@ -408,7 +410,7 @@
   (when (register-choice-bt choice action level)
     (unwind-protect
         (cond
-          ((bt-choice-inconsistent-p choice)
+          ((state-is-inconsistent *backtrack-state*)
            (increment-global *inconsistent-states-dropped* 1)
            nil)
           ((search-prefix-pruned-p
@@ -447,6 +449,7 @@
                             (apply effect-fn *backtrack-state* precondition-result)))
                (choices (build-choices-bt action updates pre-idb level)))
           (when (and (= (length choices) 1) (choice.pre-applied-p (first choices)))
+            (apply-choice-followups-bt (first choices))
             (setf (choice.undo-frame (first choices)) frame retained t))
           choices)
       (unless retained
@@ -468,6 +471,7 @@
                    :forward-sig (and cycle-p (update-set-signature forward))
                    :inverse-sig (and cycle-p (update-set-signature inverse))
                    :level level :value (update.value update)
+                   :followups (update.followups update)
                    :pre-applied-p (and incremental-p single-p)))))
 
 (defun build-choices-bt (action updates pre-idb level)
@@ -693,11 +697,14 @@
 
 
 (defun detect-path-cycle (new-choice)
-  "Check if new-choice immediately undoes the last choice using set-based comparison"
+  "Check if new-choice immediately undoes the last choice using set-based comparison.
+   Skipped when either choice has followups, whose writes have no literal record."
   (when (cycle-check-enabled-bt)
     (let ((last-choice (first *choice-stack*)))
     ;; Check if new forward-update matches last inverse-update (set comparison)
-      (when last-choice
+      (when (and last-choice
+                 (null (choice.followups new-choice))
+                 (null (choice.followups last-choice)))
         (let ((new-forward (choice.forward-update new-choice))
               (last-inverse (choice.inverse-update last-choice)))
           (and (listp new-forward)
