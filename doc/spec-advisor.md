@@ -22,13 +22,14 @@ every design decision made along the way, Part 3 (Sections 3.x) governs every ch
 record, and Part 4 (Sections 4.x) is the reference for writing the forms themselves. Run
 the checklist in Section 4.15 before staging each draft.
 
-**Companion documents.** [working-reference-builder.md](problem-analysis/spec-building/working-reference-builder.md) makes the model's behavior
-readable so the user can compare it with their intent.
-[inferring-missing-relations.md](problem-analysis/spec-building/inferring-missing-relations.md) helps investigate a discrepancy,
-including a suspected omission; it does not assume every difficult problem needs another relation.
-The advisor introduces each companion when useful; the user need not invoke them separately.
-Both contain Talos-specific detail: adapt their review questions to other problems without
-importing Talos mechanics. For the technology library,
+**Companion documents.** For Talos problems, [talos-reference.md](talos-reference.md)
+explains the movement, reach and sight relations (Part 1), builds a working reference that
+makes the model's behavior readable so the user can compare it with their intent (Part 2),
+and investigates a discrepancy, including a suspected omission, without assuming every
+difficult problem needs another relation (Part 3). The advisor introduces each part when
+useful; the user need not invoke it separately. For other problems, apply Section 2.6
+directly without importing Talos mechanics. The engine's capabilities are in the
+[capability reference](advisor-reference.md). For the technology library,
 `tech/README.html`; for relation signatures, `tech/Talos Technology  Summary.txt`; for
 what the engine does at load time, [loading and initialization](load-ordering/loading-and-initialization.md).
 
@@ -492,13 +493,13 @@ have been compared, and use these questions throughout the interview and review:
 | Clarity | Do the user and advisor mean the same thing by each rule? | Concrete examples, boundary cases, and explicit unresolved questions |
 
 For each important rule, explain what is allowed, what is forbidden, and what changes
-afterward, using the reference builder's categories as an internal checklist. Use
+afterward, using the working reference's categories (Talos reference, Part 2) as an internal checklist. Use
 supplied answers and clearly label deductions; do not guess consequential intent. Skip
 irrelevant features and stop questioning an issue once its possible answers no longer
 change the design. Record requirements as confirmed, provisional, contradicted, or
 unresolved, with their source.
 
-Use the reference builder when useful to explain the modeled rules, objects, initial
+Use the working reference (Talos reference, Part 2) when useful to explain the modeled rules, objects, initial
 conditions, and goal. After authorized staging, incorporate inspected derived facts;
 label unstaged predictions as predictions. Map important requirements to their
 implementation and identify omissions, extra behavior, and uncertainty.
@@ -506,7 +507,7 @@ implementation and identify omissions, extra behavior, and uncertainty.
 **Investigating a discrepancy.** Use focused allowed, forbidden, boundary, and invariant
 checks rather than a full solve. Consider extra permissions, wrong conditions,
 initialization or loading faults, misunderstood rules, and intentional reductions as
-well as missing relations; use the missing-relations companion where appropriate. A
+well as missing relations; for a Talos problem use Part 3 of the Talos reference. A
 failed search alone does not diagnose an omission. Present intended and observed
 behavior, evidence, and the proposed correction before implementing it, then refresh
 affected explanations and repeat the relevant approved checks.

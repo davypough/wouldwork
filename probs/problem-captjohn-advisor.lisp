@@ -12,7 +12,7 @@
 ;;; (ww-set *algorithm* backtracking)
 ;;; (solve)
 ;;; (unless (eql (length *unique-solution-states*) 1)
-;;;   (error "There is more than possible one grid assignment."))
+;;;   (error "There is more than one possible grid assignment."))
 ;;; (setf *captjohn-layout* (list-database (problem-state.idb (solution.goal (first *solution-paths*)))))
 ;;; (ww-set *algorithm* depth-first)
 ;;; (ww-set *tree-or-graph* graph)
