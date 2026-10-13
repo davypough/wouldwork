@@ -37,6 +37,11 @@
   "Most recently generated enum-actions (ACTION structs) for CSP enumeration.")
 
 
+(defparameter *enum-csp-search-active* nil
+  "True while %ENUMERATE-STATE-CSP runs WW-SOLVE.  Its paths are enum assignment steps,
+   not replayable actions, so PRINTOUT-SOLUTION skips the path display.")
+
+
 (defparameter *enumerator-action-settings* nil
   "Most recently used keyword settings for CSP action generation (for reporting).")
 
@@ -1459,9 +1464,7 @@ EXTRA-PARTNERS are unioned before filtering/sorting."
    Returns a sorted proposition list that is the lex minimum over all
    group permutations.  Handles multiple disjoint groups sequentially."
   (let* ((base-rels (get-base-relations))
-         (props (remove-if-not
-                 (lambda (p) (member (car p) base-rels :test #'eq))
-                 (list-database (problem-state.idb state))))
+         (props (enum-base-props-of (list-database (problem-state.idb state)) base-rels))
          (current (sort (copy-list props) #'string< :key #'prin1-to-string)))
     (dolist (group groups current)
       (let ((best current))
@@ -1473,6 +1476,22 @@ EXTRA-PARTNERS are unioned before filtering/sorting."
             (when (string< (prin1-to-string sorted) (prin1-to-string best))
               (setf best sorted))))
         (setf current best)))))
+
+
+(defun enum-base-props-of (props base-rels)
+  "Return the base-relation propositions in PROPS (a LIST-DATABASE list).
+   A bijective relation is stored only as two index facts (REL1, REL2) holding the
+   same arguments; its REL1 fact is returned as (REL . args) and its REL2 fact is
+   dropped, so the relation (eg HOLDING) counts once under its own name."
+  (let ((out nil))
+    (dolist (p props (nreverse out))
+      (let ((canon (gethash (car p) *bijective-canonical*)))
+        (cond (canon
+               (when (and (eql (cdr canon) 1)
+                          (member (car canon) base-rels :test #'eq))
+                 (push (cons (car canon) (cdr p)) out)))
+              ((member (car p) base-rels :test #'eq)
+               (push p out)))))))
 
 
 (defun enum-count-canonical-uniques (&optional (states *enumerated-goal-states*)

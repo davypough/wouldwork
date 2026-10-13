@@ -388,8 +388,7 @@ worker must print exactly as the caller does for its keys to match the reachable
   "Return sorted base-relation propositions from STATE."
   (let ((rels (or base-relations (get-base-relations))))
     (sort
-     (remove-if-not (lambda (p) (member (car p) rels :test #'eq))
-                    (list-database (problem-state.idb state)))
+     (enum-base-props-of (list-database (problem-state.idb state)) rels)
      (lambda (x y)
        (string< (prin1-to-string x)
                 (prin1-to-string y))))))
@@ -484,23 +483,23 @@ worker must print exactly as the caller does for its keys to match the reachable
 
 
 (defun fps-base-prop-set (state base-relations)
-  "Return an EQUAL hash table holding STATE's base-relation propositions."
+  "Return an EQUAL hash table holding STATE's base-relation propositions
+   (bijective relations under their own name, see ENUM-BASE-PROPS-OF)."
   (let ((set (make-hash-table :test 'equal)))
-    (dolist (p (list-database (problem-state.idb state)) set)
-      (when (member (car p) base-relations :test #'eq)
-        (setf (gethash p set) t)))))
+    (dolist (p (enum-base-props-of (list-database (problem-state.idb state)) base-relations) set)
+      (setf (gethash p set) t))))
 
 
 (defun fps-idb-base-props-match-p (idb base-relations frontier-props)
-  "True iff IDB's base-relation propositions are exactly the set FRONTIER-PROPS
-   (built by FPS-BASE-PROP-SET).  Stops at the first proposition not in the set,
-   so a mismatch costs no key building."
+  "True iff IDB's base-relation propositions (see ENUM-BASE-PROPS-OF) are exactly
+   the set FRONTIER-PROPS (built by FPS-BASE-PROP-SET).  Stops at the first
+   proposition not in the set, so a mismatch costs no key building."
   (let ((count 0))
-    (dolist (p (list-database idb) (= count (hash-table-count frontier-props)))
-      (when (member (car p) base-relations :test #'eq)
-        (unless (gethash p frontier-props)
-          (return nil))
-        (incf count)))))
+    (dolist (p (enum-base-props-of (list-database idb) base-relations)
+               (= count (hash-table-count frontier-props)))
+      (unless (gethash p frontier-props)
+        (return nil))
+      (incf count))))
 
 
 (defun fps-idb-full-prop-key (idb)
@@ -751,19 +750,27 @@ worker must print exactly as the caller does for its keys to match the reachable
     copy))
 
 
-(defun fps-forward-per-object-store-validated-predecessor (leaf pred-key frontier-key action
-                                                     upd next-state reachable layer-table stats)
+(defun fps-forward-per-object-store-validated-predecessor (leaf action upd next-state
+                                                           reachable layer-table stats)
   "Store validated predecessor LEAF and its action/path metadata for per-object CSP flow.
-   Uses successor-aware witness selection within FRONTIER-KEY bucket."
+   The reachable set and layer table are keyed by canonical key (connector-renamed
+   twins share one entry).  NEXT-STATE has the frontier state's base facts, so its
+   canonical key finds the frontier's entry; successor-aware witness selection
+   keeps the paths that replay from NEXT-STATE."
   (let* ((inst (update.instantiations upd))
          (action-form (cons (action.name action) inst))
-         (target-entry (gethash frontier-key reachable))
+         (target-entry (gethash (enum-solution-state-key next-state) reachable))
          (target-paths (and target-entry
                             (fps-target-witness-paths-for-successor target-entry
                                                                     next-state))))
     (when target-paths
-      (let* ((stored (copy-problem-state leaf))
+      (let* ((pred-key (enum-solution-state-key leaf))
+             (stored (copy-problem-state leaf))
              (existing (gethash pred-key layer-table)))
+        (when (gethash pred-key reachable)
+          (incf (fps-layer-stats-collision-reachable-count stats)))
+        (when existing
+          (incf (fps-layer-stats-collision-layer-count stats)))
         (incf (fps-layer-stats-validated-count stats))
         (dolist (target-path target-paths)
           (setf existing
@@ -772,8 +779,8 @@ worker must print exactly as the caller does for its keys to match the reachable
         t))))
 
 
-(defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key frontier-props
-                                            action reachable base-relations layer-table stats)
+(defun fps-forward-per-object-process-update (upd leaf frontier-props action reachable
+                                              base-relations layer-table stats)
   "Process one update from per-object forward validation. Returns T when frontier is reached."
   (if (update-is-inconsistent upd)
       nil
@@ -785,8 +792,7 @@ worker must print exactly as the caller does for its keys to match the reachable
           (let ((next-state (make-problem-state :idb changes
                                                 :hidb (problem-state.hidb leaf))))
             (if (fps-forward-per-object-store-validated-predecessor
-                 leaf pred-key frontier-key action upd next-state
-                 reachable layer-table stats)
+                 leaf action upd next-state reachable layer-table stats)
                 t
                 nil))
           (progn
@@ -794,9 +800,9 @@ worker must print exactly as the caller does for its keys to match the reachable
             nil))))))
 
 
-(defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key frontier-props action
-                                       reachable base-relations layer-table stats)
-  "Validate one novel per-object CSP leaf and store it when ACTION reaches FRONTIER-KEY.
+(defun fps-forward-per-object-validate-leaf (leaf frontier-props action reachable
+                                             base-relations layer-table stats)
+  "Validate one novel per-object CSP leaf and store it when ACTION reaches the frontier state.
    Errors are not caught: a failing candidate stops the layer where it fails."
   (bw-normalize! leaf)
   (when (fps-state-feasible-p leaf)
@@ -813,7 +819,7 @@ worker must print exactly as the caller does for its keys to match the reachable
                         (apply (action.eff-defun-name action) leaf pre-result))))
               (dolist (upd updated-dbs)
                 (when (fps-forward-per-object-process-update
-                       upd leaf pred-key frontier-key frontier-props action reachable
+                       upd leaf frontier-props action reachable
                        base-relations layer-table stats)
                   (return-from validate t))))))))))
 
@@ -821,8 +827,8 @@ worker must print exactly as the caller does for its keys to match the reachable
 (defun fps-forward-per-object-handle-leaf (leaf leaf-key frontier-key frontier-props action
                                      reachable base-relations layer-table stats seen)
   "Handle one per-object CSP leaf: skip a leaf already handled for this frontier
-   state and ACTION (object sets overlap), then dedupe checks plus validation for
-   novel candidates."
+   state and ACTION (object sets overlap), skip a leaf equal to the frontier state,
+   then validate.  Collisions are counted on validated predecessors (canonical keys)."
   (let ((seen-key (concatenate 'string (symbol-name (action.name action)) " " leaf-key)))
     (unless (gethash seen-key seen)
       (setf (gethash seen-key seen) t)
@@ -832,16 +838,11 @@ worker must print exactly as the caller does for its keys to match the reachable
         (cond
           ((string= pred-key frontier-key) nil)
           (t
-           (when (gethash pred-key reachable)
-             (incf (fps-layer-stats-collision-reachable-count stats)))
-           (when (gethash pred-key layer-table)
-             (incf (fps-layer-stats-collision-layer-count stats)))
            (incf (fps-layer-stats-feasible-count stats))
            (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
            ;; Even on collisions, validate to accumulate additional witnesses.
            (fps-forward-per-object-validate-leaf
-            leaf pred-key frontier-key frontier-props action reachable
-            base-relations layer-table stats)))))))
+            leaf frontier-props action reachable base-relations layer-table stats)))))))
 
 
 (defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key frontier-props
@@ -1236,7 +1237,7 @@ worker must print exactly as the caller does for its keys to match the reachable
             (when (fps-state-feasible-p pred)
               (incf (fps-layer-stats-feasible-count stats))
               (incf (gethash (car action-form) (fps-layer-stats-op-feasible stats) 0))
-              (let ((pred-key (fps-state-base-prop-key pred base-relations)))
+              (let ((pred-key (enum-solution-state-key pred)))
                 (when (gethash pred-key reachable)
                   (incf (fps-layer-stats-collision-reachable-count stats)))
                 (when (gethash pred-key (fps-layer-stats-layer-table stats))
@@ -1268,7 +1269,7 @@ worker must print exactly as the caller does for its keys to match the reachable
           (let ((next-key (fps-state-base-prop-key next-state base-relations)))
             (if (string= next-key target-key)
                 (progn
-                  (let* ((target-entry (gethash target-key reachable))
+                  (let* ((target-entry (gethash (enum-solution-state-key next-state) reachable))
                          (target-paths (and target-entry
                                             (fps-target-witness-paths-for-successor
                                              target-entry next-state))))
@@ -1368,16 +1369,15 @@ worker must print exactly as the caller does for its keys to match the reachable
 (defun fps-complete-layer (layer-table reachable start-time norm-direction layer
                            raw-count feasible-count validated-count diagnostics)
   "Merge LAYER-TABLE into REACHABLE, print layer summary and diagnostics,
-   update *BACKWARD-REACHABLE-SET*.  Returns the count of newly added states."
+   update *BACKWARD-REACHABLE-SET*.  Returns the count of newly added states.
+   Only keys not yet reachable are added; an existing entry keeps the witnesses of
+   the layer that first reached it, so every stored witness depth is the state's
+   shortest backward distance."
   (let ((new-count 0))
     (maphash (lambda (key entry)
-               (let ((existing (gethash key reachable)))
-                 (if existing
-                     (setf (gethash key reachable)
-                           (fps-merge-witness-entries existing entry))
-                     (progn
-                       (setf (gethash key reachable) entry)
-                       (incf new-count)))))
+               (unless (gethash key reachable)
+                 (setf (gethash key reachable) entry)
+                 (incf new-count)))
              layer-table)
     (let ((elapsed (/ (- (get-internal-real-time) start-time)
                       internal-time-units-per-second)))
@@ -1418,7 +1418,7 @@ worker must print exactly as the caller does for its keys to match the reachable
                            ;; Auto-seed from enumerated goal states
                            (let ((ht (make-hash-table :test 'equal)))
                              (dolist (gs *enumerated-goal-states*)
-                               (let ((key (fps-state-base-prop-key gs base-relations)))
+                               (let ((key (enum-solution-state-key gs)))
                                  (let ((existing (gethash key ht)))
                                    (setf (gethash key ht)
                                          (if existing
@@ -1433,7 +1433,7 @@ worker must print exactly as the caller does for its keys to match the reachable
       (:backward
        ;; Seed layer 0: goal states with empty action paths
        (dolist (gs *enumerated-goal-states*)
-         (let ((key (fps-state-base-prop-key gs base-relations)))
+         (let ((key (enum-solution-state-key gs)))
            (let ((existing (gethash key reachable)))
              (setf (gethash key reachable)
                    (if existing
@@ -1480,7 +1480,12 @@ worker must print exactly as the caller does for its keys to match the reachable
                     (hash-table-count reachable) (1- layer))))
         (when interrupted
           (return))
-        ;; Layer completed — merge, report, check saturation
+        ;; Layer completed — next frontier is the states not already reachable
+        ;; (collect before the merge), then merge, report, check saturation
+        (setf frontier (loop for key being the hash-keys of layer-table
+                               using (hash-value entry)
+                             unless (gethash key reachable)
+                               collect (fps-entry-primary-state entry)))
         (let ((new-count (fps-complete-layer layer-table reachable start-time
                                              norm-direction layer
                                              raw-count feasible-count validated-count
@@ -1490,8 +1495,6 @@ worker must print exactly as the caller does for its keys to match the reachable
             (format t "~&[find-predecessors ~S] Saturated - no new states at layer ~D.~%"
                     norm-direction layer)
             (return))
-          (setf frontier (loop for entry being the hash-values of layer-table
-                               collect (fps-entry-primary-state entry)))
           (unless (y-or-n-p "Continue to layer ~D? " (1+ layer))
             (return)))))
     (format t "~&[find-predecessors ~S] Done. *backward-reachable-set* contains ~:D states.~%"
@@ -1507,9 +1510,11 @@ worker must print exactly as the caller does for its keys to match the reachable
 (defun fps-meeting-point-entry-for-state (state &optional
                                                 (reachable-set *backward-reachable-set*)
                                                 (base-relations (get-base-relations)))
-  "Return the reachable-set witness entry list for STATE, or NIL."
+  "Return the reachable-set witness entry list for STATE, or NIL.
+   The reachable set is keyed by canonical key, so a connector-renamed twin matches."
+  (declare (ignore base-relations))
   (fps-normalize-witness-entry
-   (gethash (fps-state-base-prop-key state base-relations) reachable-set)))
+   (gethash (enum-solution-state-key state) reachable-set)))
 
 
 (defun fps-default-meeting-point-min-depth ()
@@ -2134,7 +2139,8 @@ worker must print exactly as the caller does for its keys to match the reachable
                    :idb-hash nil))
             (setf *solution-paths* nil
                   *unique-solution-states* nil)
-            (ww-solve)
+            (let ((*enum-csp-search-active* t))
+              (ww-solve))
             ;; Truncate if user requested N (kept for backward compatibility).
             (let* ((uniq *unique-solution-states*)
                    (uniq2 (if (integerp requested-solution-type)

@@ -1897,9 +1897,12 @@ different acceptable milestone state."
 
 (defun printout-solution (soln)
   (declare (type solution soln))
-  (printout-solution-with-states soln)
-  (dolist (printer *solution-report-printers*)
-    (funcall (symbol-function printer) soln)))
+  (if *enum-csp-search-active*
+      (format t "~%(Enumerator assignment path, not replayable; display skipped.)~%")
+      (progn
+        (printout-solution-with-states soln)
+        (dolist (printer *solution-report-printers*)
+          (funcall (symbol-function printer) soln)))))
 
 
 (defun printout-solution-with-states (soln)

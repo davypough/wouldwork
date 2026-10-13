@@ -191,3 +191,94 @@ PHASE 3 RE-MEASUREMENT (2026-10-13, 16 threads)
     Caution: in an image that had already run find-goal-states, layer 1 and two thread-count
       reloads, the same layer-2 test took 409 s serial / 129 s at 16 threads, with system time
       dominating (about 2.6 s per GB consed).  Time comparisons need a fresh image.
+
+REPLAY DISPLAY AND FRONTIER FIXES (2026-10-13, engine edits approved; fresh image, 16 threads)
+  Replay failure in find-goal-states' "minimum path" display: enum actions are built with no
+    effect variables (install-enum-action), but their steps are recorded with an argument, so
+    the replay's argument-count check failed at step 1.  New *enum-csp-search-active*
+    (ww-enumerator-build.lisp), bound to T around ww-solve in %enumerate-state-csp;
+    printout-solution prints a one-line "display skipped" note while it is set.  Verified.
+  Frontier fix (%find-predecessors-fn): the next layer's frontier was every key in the layer
+    table, including predecessors already reachable (already expanded earlier).  Now only keys
+    not yet reachable, collected before the merge.
+  Results:
+    find-goal-states: 5,828, 177 s.
+    Layer 1: raw 23,854,012, feasible 23,737,452, validated 20,659, 4,055 new (9,883 total),
+      959 s (was 4,634 s before the fact-set fix).
+    Layer 2: frontier 4,055 (was 5,527), raw 18,006,715, feasible 17,925,615, validated 38,670,
+      3,125 new (13,008 total), 722 s (was 969 s).
+  Run-to-run variation: layer 1 new count 4,054 / 4,043 / 4,055 over three runs with the same
+    validated count.  Cause: canonical dedupe keeps whichever connector-renamed twin the
+    parallel search records first, while the reachable set is keyed by the plain base key, so
+    which predecessors collide with goal states varies.  The reachable set may also hold
+    connector-renamed duplicates.  Not yet measured.
+
+CANONICAL REACHABLE-SET KEYS (2026-10-13, engine edit approved; fresh image, 16 threads)
+  Measured first: the 13,008-state plain-keyed reachable set held 8,493 distinct states up to
+    connector renaming (35% twins).  Plain keys also risked missing meetings: goal states keep
+    one twin per class, so a forward state that is a renamed twin of a backward state would
+    not be found.
+  Change (src/ww-enumerator-run.lisp): reachable set and layer tables keyed by
+    enum-solution-state-key (canonical; same key as find-goal-states' dedupe), in seeding,
+    forward store, backward direction and the meeting-point lookup.  Witnesses stay concrete,
+    each paired with its own state.  Collision diagnostics now count validated predecessors.
+  Results:
+    Layer 1: raw 23,854,012, feasible 23,737,452, validated 20,659, 1,674 new (7,502 total),
+      960 s.
+    Layer 2: frontier 1,674, raw 7,109,082, feasible 7,075,602, validated 32,547, 991 new
+      (8,493 total), 291 s (was 722 s).
+  8,493 equals the measured canonical count of the plain-keyed set: no state class lost.
+  Backward growth per layer: 5,828 goals, +1,674, +991.
+
+BACKWARD LAYERS 1-5 (2026-10-13, canonical keys, fresh image, 16 threads)
+  layer  frontier   new      total    validated   raw          time     new per frontier state
+  1      5,828      1,674    7,502    20,659      23,854,012   966 s    0.29
+  2      1,674        991    8,493    32,547       7,109,082   292 s    0.59
+  3        991      2,113   10,606     6,462       4,440,443   196 s    2.1
+  4      2,113     11,524   22,130    21,778       9,696,557   377 s    5.5
+  5     11,524     77,224   99,354   146,767      52,423,874  1982 s    6.7
+  Total about 63 min after find-goal-states.  Growth stays small for two layers (states near
+  the goal configuration), then approaches forward branching (x5.5 to x6.7).  Time per frontier
+  state about 0.17 s from layer 4 on.  Layer 6 projected: about 77k states x 0.17 s = 3.6 h,
+  about 500k new states.
+
+KNOWN-PLAN CHECK AGAINST THE 5-LAYER BACKWARD SET (2026-10-13)
+  State after k steps of the known 15-step plan, looked up by canonical key; stored witness
+  path lengths:
+    k=8 none; k=9 (5 5 5 5); k=10..12 all 5; k=13 (5 5 5 5 4 4 4 4); k=14 (3 3 3 3 3 3 2 2);
+    k=15 (2 2 2 2 2 2 2 2)
+  k=9 first appears at layer 5: the state after 9 plan steps is at most 5 steps from a goal,
+    so a plan of at most 14 steps exists (the known plan's last 6 steps are not shortest).
+    "At most" because of the known missed-predecessor limitation (pickup's erased pairings
+    to other connectors are not restored).
+  Witness depths are wrong for k=13..15 (true depths <= 2, 1, 0): fps-complete-layer merges a
+    layer's witnesses into entries that already exist, adding longer paths; the witness cap (8)
+    keeps the newest, so the shortest (first-layer) witnesses are evicted.  The meeting-point
+    goal and guided suffix use the maximum stored depth, so depths read high.
+
+SHORTEST-WITNESS FIX (2026-10-13, engine edit approved; fps-complete-layer)
+  fps-complete-layer adds only keys not yet reachable; an existing entry keeps the witnesses
+  of the layer that first reached it (stored depth = shortest backward distance).
+  Rerun, fresh image, 16 threads: layers 1-5 new/total counts unchanged (1,674 ... 99,354);
+    layer times 968 / 292 / 197 / 376 / 1977 s.  (Layer 5 raw 52,424,528 vs 52,423,874 before,
+    same validated and new counts: the frontier's concrete twin representatives vary.)
+  Known plan, steps 8..15: (8 NIL) (9 5) (10 4) (11 3) (12 3) (13 2) (14 1) (15 0).
+    Steps 11 and 12 are both 3 from the goal (one wasted step); the 9-step prefix plus 5
+    backward steps gives a plan of at most 14 steps.
+  Meet-in-the-middle implication: every path to the goal passes through a distance-5 state,
+    so (solve-meeting-point :depth-cutoff 9 :min-backward-depth 5) should find a 14-step plan.
+
+MEET-IN-THE-MIDDLE, FIRST RUN (2026-10-13, 16 threads, same image as the 5 layers)
+  (solve-meeting-point :depth-cutoff 9 :solution-type first :min-backward-depth 5):
+    1,196 s real, 9,987 s CPU (1,570 s system), 8.8 TB consed.  33,053 meeting solutions,
+    none extended ("failed replaying all witness suffixes ... PRECONDITION-FAILURE").
+  Guided suffix from the known plan's 9-step state (distance 5): 66 actions apply; the plan's
+    step 10 reaches depth 4; the walk dies after 3 nodes (no depth-2 successor of a depth-3 state).
+  Cause: the plan's 11-step state shares its canonical key with witness states in which agent1
+    holds a connector, while in the plan state agent1 holds nothing.  holding is a bijective
+    base relation stored only as index facts HOLDING1/HOLDING2; every base-fact extractor
+    (enum-state-base-props, enum-canonical-base-key, fps-base-prop-set,
+    fps-idb-base-props-match-p) keeps facts whose relation name is a base relation, so holding
+    is invisible to every key and to the successor match.  States differing only in what the
+    agent holds were merged, and predecessors were validated against holding-variants of the
+    frontier state.  All goal-state and layer counts so far are affected.
