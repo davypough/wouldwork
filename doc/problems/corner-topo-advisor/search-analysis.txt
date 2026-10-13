@@ -169,3 +169,25 @@ PARALLEL FIND-PREDECESSORS (2026-10-12, engine edit approved; src/ww-enumerator-
     both: 333 unique predecessors, raw 251,840, feasible 250,560, validated 2,131
   Speed-up 5.6x; limited by allocation contention (about 7 GB consed per frontier state) and
   the uneven finish of 64 tasks on 16 threads.
+
+PHASE 3 RE-MEASUREMENT (2026-10-13, 16 threads)
+  find-goal-states: 5,828 goal states (matches serial), 178 s real vs 23 min serial (7.8x),
+    2,769 s CPU, 1.5 TB consed.
+  Known final state is among the goal states only as a connector-renamed twin (plain base key
+    misses it; enum-solution-state-key, the canonical key, matches 1).  Checks against the
+    reachable set must use canonical keys.
+  find-predecessors layer 1 (all 5 actions, from 5,828 goal states):
+    raw 23,854,012, feasible 23,737,452, validated 20,659, 4,054 new unique (9,882 total),
+    4,633.6 s (77 min).  The known plan's penultimate state is present (canonical match 1).
+  Successor check by fact set (2026-10-13, engine edit approved; src/ww-enumerator-run.lisp):
+    A profile showed fps-idb-base-prop-key (a printed sorted key built for every successor, only
+    to compare with the frontier key) consed 5.0 of 6.4 GB per frontier state.  Replaced by
+    fps-base-prop-set (once per frontier state) and fps-idb-base-props-match-p (stops at the
+    first fact not in the frontier's set).  Results unchanged.
+    Single state (known final state), serial: 11.8 s -> 4.9 s, 6.4 GB -> 1.39 GB consed.
+    Layer 2 from the 64 layer-1 states, fresh image: serial 201.3 s -> 68.7 s (3.9 s system);
+      16 threads 36.2 s -> 10.8 s (6.4x over serial, 14 s system); 447 GB -> 101 GB consed;
+      333 unique, as before.
+    Caution: in an image that had already run find-goal-states, layer 1 and two thread-count
+      reloads, the same layer-2 test took 409 s serial / 129 s at 16 threads, with system time
+      dominating (about 2.6 s per GB consed).  Time comparisons need a fresh image.

@@ -483,6 +483,26 @@ worker must print exactly as the caller does for its keys to match the reachable
                      (prin1-to-string y)))))))
 
 
+(defun fps-base-prop-set (state base-relations)
+  "Return an EQUAL hash table holding STATE's base-relation propositions."
+  (let ((set (make-hash-table :test 'equal)))
+    (dolist (p (list-database (problem-state.idb state)) set)
+      (when (member (car p) base-relations :test #'eq)
+        (setf (gethash p set) t)))))
+
+
+(defun fps-idb-base-props-match-p (idb base-relations frontier-props)
+  "True iff IDB's base-relation propositions are exactly the set FRONTIER-PROPS
+   (built by FPS-BASE-PROP-SET).  Stops at the first proposition not in the set,
+   so a mismatch costs no key building."
+  (let ((count 0))
+    (dolist (p (list-database idb) (= count (hash-table-count frontier-props)))
+      (when (member (car p) base-relations :test #'eq)
+        (unless (gethash p frontier-props)
+          (return nil))
+        (incf count)))))
+
+
 (defun fps-idb-full-prop-key (idb)
   "Return canonical full-prop key computed directly from IDB hash-table."
   (prin1-to-string
@@ -752,8 +772,8 @@ worker must print exactly as the caller does for its keys to match the reachable
         t))))
 
 
-(defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key action
-                                            reachable base-relations layer-table stats)
+(defun fps-forward-per-object-process-update (upd leaf pred-key frontier-key frontier-props
+                                            action reachable base-relations layer-table stats)
   "Process one update from per-object forward validation. Returns T when frontier is reached."
   (if (update-is-inconsistent upd)
       nil
@@ -761,21 +781,20 @@ worker must print exactly as the caller does for its keys to match the reachable
     (when (hash-table-p changes)
       (incf (fps-layer-stats-apply-success-count stats))
       (incf (gethash (action.name action) (fps-layer-stats-op-success stats) 0))
-      (let ((next-key (fps-idb-base-prop-key changes base-relations)))
-        (if (string= next-key frontier-key)
-            (let ((next-state (make-problem-state :idb changes
-                                                  :hidb (problem-state.hidb leaf))))
-              (if (fps-forward-per-object-store-validated-predecessor
-                   leaf pred-key frontier-key action upd next-state
-                   reachable layer-table stats)
-                  t
-                  nil))
-            (progn
-              (incf (fps-layer-stats-key-mismatch-count stats))
-              nil)))))))
+      (if (fps-idb-base-props-match-p changes base-relations frontier-props)
+          (let ((next-state (make-problem-state :idb changes
+                                                :hidb (problem-state.hidb leaf))))
+            (if (fps-forward-per-object-store-validated-predecessor
+                 leaf pred-key frontier-key action upd next-state
+                 reachable layer-table stats)
+                t
+                nil))
+          (progn
+            (incf (fps-layer-stats-key-mismatch-count stats))
+            nil))))))
 
 
-(defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key action
+(defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key frontier-props action
                                        reachable base-relations layer-table stats)
   "Validate one novel per-object CSP leaf and store it when ACTION reaches FRONTIER-KEY.
    Errors are not caught: a failing candidate stops the layer where it fails."
@@ -794,13 +813,13 @@ worker must print exactly as the caller does for its keys to match the reachable
                         (apply (action.eff-defun-name action) leaf pre-result))))
               (dolist (upd updated-dbs)
                 (when (fps-forward-per-object-process-update
-                       upd leaf pred-key frontier-key action reachable
+                       upd leaf pred-key frontier-key frontier-props action reachable
                        base-relations layer-table stats)
                   (return-from validate t))))))))))
 
 
-(defun fps-forward-per-object-handle-leaf (leaf leaf-key frontier-key action reachable
-                                     base-relations layer-table stats seen)
+(defun fps-forward-per-object-handle-leaf (leaf leaf-key frontier-key frontier-props action
+                                     reachable base-relations layer-table stats seen)
   "Handle one per-object CSP leaf: skip a leaf already handled for this frontier
    state and ACTION (object sets overlap), then dedupe checks plus validation for
    novel candidates."
@@ -821,12 +840,12 @@ worker must print exactly as the caller does for its keys to match the reachable
            (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
            ;; Even on collisions, validate to accumulate additional witnesses.
            (fps-forward-per-object-validate-leaf
-            leaf pred-key frontier-key action reachable
+            leaf pred-key frontier-key frontier-props action reachable
             base-relations layer-table stats)))))))
 
 
-(defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key actions
-                                           reachable base-relations
+(defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key frontier-props
+                                           actions reachable base-relations
                                            problem-actions object-set
                                            stats seen)
   "Per-object-set CSP expansion of predecessors for FRONTIER-STATE via ACTIONS.
@@ -844,7 +863,7 @@ worker must print exactly as the caller does for its keys to match the reachable
        (let ((leaf-key (fps-state-full-prop-key leaf)))
          (dolist (action actions)
            (fps-forward-per-object-handle-leaf
-            leaf leaf-key frontier-key action reachable
+            leaf leaf-key frontier-key frontier-props action reachable
             base-relations layer-table stats seen)))))))
 
 
@@ -1118,6 +1137,7 @@ worker must print exactly as the caller does for its keys to match the reachable
    An action applies to an object set when any member is in the action's object set
    (or the action has none).  Returns T when TARGET produced a validated predecessor."
   (let ((target-key (fps-state-base-prop-key target base-relations))
+        (target-props (fps-base-prop-set target base-relations))
         (pre-validated (fps-layer-stats-validated-count stats))
         (seen (make-hash-table :test #'equal)))
     (dolist (rg rels-groups)
@@ -1133,7 +1153,7 @@ worker must print exactly as the caller does for its keys to match the reachable
                          collect action)))
             (when applicable-actions
               (fps-expand-one-state-forward-per-object-csp
-               target target-key applicable-actions reachable base-relations
+               target target-key target-props applicable-actions reachable base-relations
                problem-actions object-set stats seen))))))
     (> (fps-layer-stats-validated-count stats) pre-validated)))
 
