@@ -1,5 +1,5 @@
 ;;; corner-topo -- complete validated solution, 15 actions.
-;;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T
+;;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T; solution validators accepted
 ;;; To re-validate: (stage corner-topo), then evaluate this form separately.
 (validate-solution :verbose
   (1 (pickup-connector > agent1 picks up connector1 at location1))

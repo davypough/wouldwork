@@ -83,6 +83,8 @@ Actively look for actions whose only effects cannot help the objective. Explain 
 
 Separate semantic settings, which follow from the agreed meaning of an answer, from provisional performance choices, which need later measurement. A finite cutoff can define a bounded investigation; it does not by itself establish that no unrestricted solution exists.
 
+Keep the analysis at the level of problem characterization. Record invariants and structural facts that hold for every plan and affect representation, such as a condition every goal state must satisfy or a route that is never usable. A solution mechanism, plan sketch, length bound, or milestone belongs to the solving and search advisors. When one becomes apparent, record it briefly under hints for downstream advisors, with its premises and verification status, and do not develop it further. A modeling decision such as the choice of standing locations should rest on problem facts, not on a particular solution route.
+
 ### Place implementation and measurements downstream
 
 The problem advisor owns structural reasoning, search requirements, justified reductions, capability feasibility, and evidence limits. Preliminary benchmarks are not a routine intake or completion requirement. Normally the spec advisor produces or reviews an executable, faithful model and performs appropriately authorized correctness checks; the search advisor then owns bounded performance probes, strategy comparisons, and tuning. Record useful measurement questions for that handoff rather than creating a benchmark spec during analysis. If an exceptional measurement would resolve a genuine analysis blocker, explain why, define its scope and limits, and obtain separate authorization.
@@ -156,6 +158,9 @@ OPEN ISSUES AND CAPABILITY GAPS
 VALIDATION PLAN
   Fidelity examples; reduction checks; growth dimensions and instance family.
   Proposed later experiments: question, limits, metrics, interpretation.
+HINTS FOR DOWNSTREAM ADVISORS (when applicable)
+  Solution mechanisms, plan sketches, length bounds, milestones noticed but not developed.
+  Premises and verification status of each.
 AGREEMENT AND HANDOFF
   User-confirmed decisions; readiness and covered scope; remaining blockers.
   Requirement-to-design obligations for spec writing or review.

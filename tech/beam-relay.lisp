@@ -125,11 +125,16 @@
   ;; COMPUTE-RELAY-LIGHTING skips it: the pairings outlast the carry while the beam does
   ;; not, and setting the connector down revives whatever those retained pairings can still
   ;; light.  A connector riding a held tray, or a box on one, keeps its beam instead, since
-  ;; relocation keeps that connector's HAS-LOCATION.
+  ;; relocation keeps that connector's HAS-LOCATION.  Offered only when the connector has a
+  ;; pairing to retain; without one it would duplicate PICKUP-CONNECTOR's successor exactly.
   1
   (?agent agent ?connector connector)
   (and (bind (has-location ?agent $a-location))
        (bind (has-location ?connector $connector-location))
+       (or (exists (?t terminus)
+             (paired ?connector ?t))
+           (exists (?c connector)
+             (paired ?c ?connector)))
        (pickup-clear ?agent $a-location ?connector $connector-location))
   (">" ?agent "picks up" ?connector "retaining pairings at" $a-location)
   (assert (holding ?agent ?connector)

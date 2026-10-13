@@ -1,0 +1,173 @@
+PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
+  Problem: corner-topo-advisor (reanalysis of corner-topo; lives alongside it).
+  Revision: 2, 2026-10-12. Status: analysis complete; ready for the spec advisor.
+  Record: doc/problems/corner-topo-advisor/problem-analysis.txt
+  Snapshot: deleted at spec wrap-up 2026-10-12 (see spec-analysis.txt history).
+  Sources: user description; doc/problems/corner-topo/diagram.jpg; probs/problem-corner-topo.lisp;
+    doc/problems/corner-topo/{Briefing.md, Handoff.md, Actions.lisp, Validation.txt} (reference only);
+    tech/ and src/ source as cited below.
+  Prior exposure: the old corner-topo spec, analysis and validated 15-action plan were read for reference at
+    the user's direction, so no blind comparison boundary applies.
+  Scope: problem analysis only. Spec writing, staging, replay and search are not authorized by this record.
+
+AGREED PROBLEM DESCRIPTION (agreed by user 2026-10-12)
+  Geometry (fixed givens, from the diagram and old spec): boundary rectangle (0,0)-(12,11). A partition at
+    x=8, bottom to top: wall2 (8,0)-(8,3), gate1 (8,3)-(8,11/2), wall1 (8,11/2)-(8,8), window1 (8,8)-(8,11).
+    Walls block walking and sight; window1 blocks walking only; gate1 blocks both while closed.
+  Sides: east = location1 (9,1), location2 (9,8), location3 (10,9); west = location4 (6,8).
+    gate1 is the only walking route between the sides, and it is open exactly while receiver1 is active.
+  Apparatus (fixed): transmitter1 red (11,1/10); transmitter2 blue (10,1/10); receiver1 red (81/10,1);
+    receiver2 red (7,109/10); receiver3 blue (1,109/10).
+  Movable: agent1 starts at location1; connector1/2/3 start unpaired at location1/2/3.
+  Operations: exactly as tech/ defines them (doc/talos-reference.md section 1.8): move,
+    pickup-connector, pickup-connector-retaining-pairings, put-connector, connect-connector.
+  Beam rules: cut model -- two live beams that cross are both cut (tech/beam-crossing.lisp); bodies occlude.
+  Standing locations: location1-4 as above (D4). Adding locations is permitted in principle as a modeling
+    choice; none is proposed.
+  Goal (final state only): agent1 at location4, receiver2 active (red), receiver3 active (blue). What
+    agent1 holds and the states of receiver1/gate1 are irrelevant.
+
+USER OBJECTIVE AND ANSWER IDENTITY
+  A minimum-length action sequence; any one shortest plan is acceptable. Each action costs 1; a move to any
+  currently walkable location is one action regardless of route. Connector names are irrelevant to answer
+  identity.
+  Underlying aim (user): structure the representation so a minimal solution can be found efficiently.
+  A validated 15-action plan exists (old corner-topo); its minimality has not been established.
+
+INTENDED RULES AND EXAMPLES
+  Allowed:
+    A1 With nothing else paired, connector3 at location3 connected to {transmitter1, receiver2, receiver1}
+       lights receiver2 and receiver1 red and opens gate1 (no crossing among those three beams).
+    A2 A connector picked up with pickup-connector-retaining-pairings and put down again relights through
+       its retained pairings, if they are still visible and uncut.
+    A3 A connect pairs termini visible from any location agent1 can currently walk to; the beam carries a
+       hue only if live visibility from the placement holds.
+    A4 A move from location2 to location4 through an open gate1 is one action.
+  Forbidden / no effect:
+    F1 Picking up or connecting a connector anywhere but agent1's own location.
+    F2 Connecting at a location that already holds a lit connector.
+    F3 Walking through window1, or through gate1 while closed.
+    F4 Crossing beams: connector at location1 paired {transmitter1} and connector at location2 paired
+       {transmitter2} cut each other at (9.94,0.58); neither connector is lit by that beam.
+    F5 A relay reached by red and blue in the same lighting layer stays unlit; a later-arriving hue is
+       ignored.
+  Invariant (D1): no goal state has receiver1 lit or gate1 open.
+
+CURRENT IMPLEMENTATION
+  Old spec probs/problem-corner-topo.lisp encodes the same geometry and technologies; corner-topo-advisor has
+  no spec yet. Whether to copy and rename it (problem-corner-topo-advisor.lisp) or write anew is the spec
+  advisor's decision.
+
+STRUCTURE AND GROWTH
+  Single fixed instance; no larger family expected.
+  Plans are long (a 15-action plan is known; see hints), so sequence length is the main difficulty.
+  State: agent location and holding; connector locations and PAIRED facts; derived color, crossing-active,
+  receiver activity and gate status. No time or history dependence.
+
+JUSTIFIED DESIGN (agreed by user 2026-10-12)
+  D1 Separation (deduction, geometry-dependent): receiver1 lit red and a complete blue chain
+    transmitter2 -> ... -> receiver3 can never coexist. Any red chain from transmitter1 to receiver1 together
+    with the floor encloses transmitter2, so every blue chain leaving transmitter2 crosses it and the
+    crossing cuts both. Consequences for every plan:
+    - In every goal state gate1 is closed; the final red and blue chains cannot route through gate1.
+    - The last walk west happens with blue incomplete; every action after it is taken at location4
+      (identity reach).
+    Role: a property of the rules, used as a fidelity check, not as an added constraint.
+  D4 Standing locations: location1-3 must remain standing spots because connectors start there and pickup
+    requires the agent at the connector's location; location4 is the goal location. Whether added locations
+    could shorten a plan is left to the solving advisor.
+
+WOULDWORK MAPPING (agreed by user 2026-10-12; source-checked that date)
+  M1 Walking, partition, gate route -> walkability (derived from wall/gate/window segments). B; S: authored
+     segment and location coordinates.
+  M2 gate1 open exactly while receiver1 active -> gate tech (controls ((receiver1)) gate1 normal). B; S: fact.
+  M3 Connector actions incl. retaining pickup -> tech/beam-relay.lisp define-actions pickup-connector,
+     pickup-connector-retaining-pairings, put-connector, connect-connector; all present whenever beam-relay
+     is included. B.
+  M4 Cut model and body occlusion -> beam-crossing with -beam-crossing-coordinates (crossing pool minted at
+     init from coordinates); *beam-occlusion-tolerance* 1/2. B; S: apparatus/location coordinates.
+  M5 Lighting order and hue conflicts -> compute-relay-lighting. B.
+  M6 Goal -> define-goal. S.
+  M7 Shortest plan -> *solution-type* min-length with depth-first graph search; src/ww-searcher.lisp
+     better-than-closed reopens a closed state revisited at a shallower depth, so merging states keeps
+     shortest plans. B.
+  M8 Interchangeable connectors -> *symmetry-pruning* t (src/ww-symmetry.lisp). Sound for this answer
+     identity. B; detection for this spec not yet confirmed (validation item V3).
+  M9 D1 -> no mapping required.
+  No capability gaps.
+
+INITIAL SETTINGS AND DEFERRED MEASUREMENTS
+  Semantic: *problem-type* planning; *solution-type* min-length; *tree-or-graph* graph.
+  Provisional: *symmetry-pruning* t; *max-connector-pairings* 3 (tech default); *depth-cutoff* set by the
+    user from the problem's maximum search depth.
+  Parallel: (ww-set *threads* 16) baseline. Compatible: depth-first graph search runs in parallel, the
+    crossing cache is registered as a worker read memo (beam-crossing.lisp), and no serial-only feature is
+    required. Exception: chained one-argument solve-subgoal, if the solving advisor uses it, must be serial.
+  Deferred to the search advisor: the depth at which a single search is practical, and whether a milestone
+    decomposition or a lower bound (topo-lower-bound) is needed.
+
+EVIDENCE
+  Source behavior (2026-10-12): tech/beam-relay.lisp, tech/beam-crossing.lisp, tech/-pickup.lisp,
+    tech/-mobility-action.lisp, tech/-beam-occlusion.lisp (summarized in doc/talos-reference.md 1.8);
+    src/ww-searcher.lisp (closed-state reopening).
+  Deduction (2026-10-12): segment intersections computed exactly from the coordinates above, e.g.
+    T1-L4 x T2-L2 (9.75,2.08); T1-L4 x L3-R1 (8.74,3.68); T1-L4 x L2-R1 (8.49,4.06); L1-L4 x L3-R1
+    (8.42,2.35); T2-L4 x L3-R1 (8.56,2.94); T1-L1 x T2-L2 (9.94,0.58); T2-L2 x L3-R1 (9.27,5.91);
+    no crossing among T1-L3, L3-R2, L2-R3, T2-L2, L3-L2. D1 rests on this geometry.
+  Prior measurement (old spec, 2026-09-30): the 15-action plan replays to the goal under
+    probs/problem-corner-topo.lisp. Not yet repeated for corner-topo-advisor.
+  Limits: no staging, replay or search of corner-topo-advisor; occlusion margins not checked.
+
+OPEN ISSUES AND CAPABILITY GAPS
+  No analysis blockers.
+  Deferred (solving advisor): whether added standing locations could shorten a plan.
+  Deferred (search advisor): search depth practicality, milestones, lower bound.
+
+VALIDATION PLAN (for the spec advisor; requires its own authorization)
+  V1 Fidelity examples: reproduce A1-A4 and F1-F5 on the staged spec.
+  V2 Crossing pool: confirm the minted crossings include the intersections listed under EVIDENCE.
+  V3 Symmetry: confirm connector1-3 form one symmetry group (M8).
+  V4 Replay the old 15-action plan (doc/problems/corner-topo/Actions.lisp) as an allowed example; check that
+     its final state has gate1 closed (D1).
+  V5 Occlusion: confirm which body positions block which beams within tolerance 1/2.
+
+HINTS FOR DOWNSTREAM ADVISORS
+  Unverified deductions; reviewed by user 2026-10-12, not checked by replay or search. Not developed further
+  here (problem-advisor scope).
+  H-terminal: the only mechanism found for completing blue from location4 is picking up a connector at
+    location4 whose transmitter1->location4 beam cuts transmitter2->location2 at (9.75,2.08), east of gate1,
+    so the cut holds while gate1 is closed. Rejected alternatives: a relay at location4 fed through window1
+    (its feed is always cut first by the red chain to receiver1); a fourth relay role (needs 4 connectors).
+  H-trips: the cutter must be placed on an earlier trip, giving walks west, east, west. While it is in
+    place, the only current opener avoiding its beam is a connector at location1 paired {transmitter1,
+    receiver1}, which must later move because transmitter1->location1 cuts the blue feed at (9.94,0.58).
+  H-length: counting required pickups, connects and moves gives 15 for the current locations, matching the
+    old validated plan. Candidate milestones: cutter set at location4; agent back east; final east setup.
+  H-locations: under H-terminal and H-trips, added locations do not appear to shorten a plan.
+
+AGREEMENT AND HANDOFF
+  User-confirmed: problem description, objective and answer identity, D1, D4, Wouldwork mapping and settings
+    (all 2026-10-12).
+  Readiness: all eight criteria met; no analysis blockers. Covered scope: the whole problem.
+  Requirement-to-design obligations for the spec advisor:
+    R1 Encode the agreed geometry and initial state exactly (coordinates above); no added locations.
+    R2 Include gate, beam-relay, beam-crossing, walkability and visibility techs, so all five actions and the
+       cut model are available (M1-M5).
+    R3 Goal is final-state only: agent1 at location4, receiver2 and receiver3 active.
+    R4 Settings per INITIAL SETTINGS; depth cutoff from the user.
+    R5 Pass V1-V5 before the spec is accepted.
+  Persistence: record and dated snapshot saved 2026-10-12.
+  Next step (needs separate authorization): spec advisor consultation for corner-topo-advisor.
+
+DIALOGUE EVALUATION
+  - Scope drift: the analysis moved into solution mechanisms and length bounds (solving/search advisor
+    work). Resolved by moving them to hints and adding a scope paragraph to problem-advisor.md
+    (user-approved 2026-10-12).
+  - Friction: the beam-relay and crossing operations had to be rederived from source; resolved by adding
+    doc/talos-reference.md section 1.8 (user-approved 2026-10-12).
+  - Comparison boundary: not applicable; the old spec was read up front at the user's direction.
+
+CORRECTIONS
+  2026-10-12: earlier D2 (terminal mechanism) and D3 (lower bound 15) were removed from the design and
+    moved to hints as out of scope; D4's justification no longer relies on them. Content retained under
+    HINTS FOR DOWNSTREAM ADVISORS.

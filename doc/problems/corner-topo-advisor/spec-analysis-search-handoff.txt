@@ -1,0 +1,58 @@
+CORNER-TOPO-ADVISOR -- SPEC ADVISOR HANDOFF TO SEARCH ADVISOR (2026-10-12)
+
+SCOPE AND STATUS
+  Specification complete for the whole problem (single fixed instance), pending user acceptance.
+  Authorized next: nothing yet. Proposed first question: is a depth-15 min-length search practical with
+  16 threads, and does including tech topo-lower-bound make the difference?
+
+REQUIREMENTS AND PROVENANCE
+  problem-analysis.txt (revision 2, 2026-10-12); spec-analysis.txt (active, details and evidence C1-C5).
+
+DELIVERED MODEL
+  probs/problem-corner-topo-advisor.lisp; techs gate, beam-relay, beam-crossing, walkability, visibility.
+  Depends on tech/beam-relay.lisp as edited 2026-10-12 (E2).
+  Stage: (stage corner-topo-advisor), then (ww-set *threads* 16), (solve).
+  Tested settings: planning, min-length, graph, *depth-cutoff* 5, *symmetry-pruning* t,
+  *max-connector-pairings* 3, *threads* 16 (Windows) and 0 (Linux container).
+
+OBJECTIVE AND REPRESENTATION
+  Shortest plan, unit cost; connector names irrelevant. Goal: agent1 at location4, receiver2 and
+  receiver3 active. State: positions, holding, paired facts; colors, receiver activity, gate status and
+  crossing activity derived by propagation. Walkability, sightlines, 37 crossings derived at init.
+
+REDUCTIONS AND ENHANCEMENTS
+  E1 symmetry pruning over connector1-3 (detected; exercised).
+  E2 retaining pickup offered only when the connector has a pairing (exact-duplicate removal; exercised).
+  Semantic settings: min-length, graph. Provisional: depth cutoff, symmetry pruning, pairings limit 3.
+
+VALIDATION
+  Windows staging clean; depth-5 run completed, no solution, 32,475 states in 0.3 s (16 threads).
+  V1-V5 fidelity checks passed (A3 scoped). Old 15-action plan replays to the goal (gate1 closed at end).
+
+GROWTH AND OPEN PERFORMANCE QUESTIONS
+  Difficulty is plan length (15 known). connect-connector dominates branching (up to 63 choices at one
+  location; ~70% of successors at depth 3). Repeats pruned ~62% at depth 5.
+  Candidates: topo-lower-bound; any sound narrowing of connect choices; milestone decomposition per
+  analysis hints H-terminal/H-trips (note: shortest segments do not guarantee a shortest whole plan).
+
+REMAINING ISSUES
+  No blockers. 298 inconsistent states abandoned per depth-5 run (not investigated). Occlusion margin
+  0.486 vs tolerance 1/2. Whether 15 is minimal is open.
+
+ALTERNATIVE STRATEGIES (workflow agreed with user 2026-10-12)
+  The spec advisor built for forward search only. The search advisor first tests whether depth-15
+  forward search (optionally with topo-lower-bound) is tractable. If it concludes it is intractable, it
+  explores other approaches (advisor-reference F22) itself. If one looks promising, it either suggests
+  returning to the spec advisor or edits the spec directly within the search-advisor session.
+  Spec advisor's unmeasured fit assessment (deduction only):
+   - Backward search + forward meet: poor fit (goal states not explicit; pickup/connect not exact
+     inverses).
+   - Backward enumeration / meet-in-the-middle: most plausible alternative (goal given by positions and
+     pairings, colors derived; D1 narrows goal states); needs base-relation/goal-filter additions.
+     Precedent: end of probs/problem-corner.lisp.
+   - Macros: questionable (single instance, no small versions; a macro must count its base actions or
+     min-length changes meaning).
+   - Relaxation: possible if propagation cost dominates (~170 us/state measured overall at depth 5,
+     Linux, serial). Precedent: probs/problem-corner-relaxed.lisp.
+   - Milestones: plausible per analysis hints but forfeit the shortest-plan guarantee, which conflicts
+     with testing whether 15 is minimal.

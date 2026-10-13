@@ -2,9 +2,10 @@
 
 Companion to the [specification advisor](spec-advisor.md) for Talos problems built on the
 `tech/` technology library. Part 1 explains how the movement, reach, and sight relations
-work. Part 2 builds a readable working reference of what a specification actually models,
-so the user can compare it with what they intend. Part 3 investigates a discrepancy
-between intent and model, including a suspected missing relation or location.
+work, and how beam relay and crossing operations behave. Part 2 builds a readable working
+reference of what a specification actually models, so the user can compare it with what
+they intend. Part 3 investigates a discrepancy between intent and model, including a
+suspected missing relation or location.
 
 **Where this fits.** The spec advisor introduces Part 2 during drafting and after staging,
 and Part 3 when comparison with user intent reveals a discrepancy. The general rules for
@@ -173,6 +174,65 @@ groups in the current representation; each entry is one endpoint pair.
 
 Walking, reach, and sight are distinct graphs with distinct passability rules; a fact true in
 one is routinely false in the others.
+
+### 1.8 Beam relay and crossing operations
+
+Source-checked 2026-10-12 against `tech/beam-relay.lisp`, `tech/beam-crossing.lisp`,
+`tech/-pickup.lisp`, `tech/-mobility-action.lisp`, `tech/-beam-occlusion.lisp`, and
+`tech/-beam-los-coordinates.lisp`. Recheck an affected claim when those files change.
+
+**Moving.** `move` (`-mobility-action.lisp`) takes the agent in one action to any location
+in `mobility-results`, so a multi-segment route through intermediate locations costs one
+action.
+
+**Connector actions** (`beam-relay.lisp`). Each costs one action.
+
+- `pickup-connector`: `pickup-clear` requires an empty-handed agent, a reachable connector
+  (identity reach unless a reach technology is installed), and vertical reach. The action
+  removes every `paired` fact on the connector, in both directions.
+- `pickup-connector-retaining-pairings`: the same lift, but every `paired` fact survives.
+  It is offered only when the connector has at least one pairing, since otherwise it
+  duplicates `pickup-connector` exactly.
+  A held connector has no `has-location` and so emits no beam. Setting it down again with
+  `put-connector` revives whatever its retained pairings can still light.
+- `put-connector`: sets the held connector down at a reachable location without adding
+  pairings.
+- `connect-connector`: sets the held connector down at a reachable location and pairs it
+  with 1 to `*max-connector-pairings*` termini (default 3) in a single action.
+  - **Termini:** a terminus qualifies when it is structurally visible (`potentially-visible`)
+    from any location the agent can currently move to (`mobility-locations`), not
+    necessarily from the placement location. Whether the beam actually carries a hue is
+    decided later by live beam visibility from the placement.
+  - **Connector termini:** a connector terminus must sit at a different location.
+  - **Placement restriction:** `connectable-location` forbids placement where another
+    connector is already lit.
+
+**Lighting** (`compute-relay-lighting`). Hues spread breadth-first from the transmitters,
+one relay link per layer.
+
+- A link carries a hue only if it is paired, beam-visible, and not cut.
+- A relay reached in one layer by a single hue takes that hue. If two different hues reach
+  it in the same layer, it stays unlit. Hues arriving in later layers are ignored.
+- Only one lit connector counts per location.
+- A receiver is active when a relay of its chroma is paired with it and has a visible,
+  uncut beam to it.
+
+**Crossings** (`beam-crossing.lisp`).
+
+- **When a crossing activates:** when both of its beams are live and each reaches it uncut.
+  - A transmitter-to-connector beam is live whenever the pairing exists.
+  - A beam leaving a connector is live only while that connector is lit.
+- **What stops a beam short of a crossing:** an earlier active crossing on the same beam,
+  or a closed gate that lies before the crossing (`beam-crossings-before-gate>`).
+- **Effect:** an active crossing cuts each whole beam through it, so the relay or receiver
+  at its far end gets nothing from that beam.
+- **Resolution:** the active set is iterated to a fixed point. Oscillating sets are
+  arbitrated by keeping first the crossing whose farther beam source is nearer the
+  transmitters. An unresolvable set marks the state inconsistent.
+
+**Occlusion.** A beam-blocker (agent, box, jammer, or connector) whose location lies within
+`*beam-occlusion-tolerance*` (default 1/2) of a beam's line, and whose base-to-top span
+covers the beam's elevation there, blocks that beam.
 
 ---
 

@@ -1,0 +1,137 @@
+PROBLEM / REVISION / AUTHORIZED SCOPE
+  Record: doc/problems/corner-topo-advisor/spec-analysis.txt (active).
+  Specification: probs/problem-corner-topo-advisor.lisp (new file, written fresh; not a copy).
+  Approved 2026-10-12 (user): the scope below, bundling drafting, incremental staging, checks V1-V5
+    and the final bounded run.
+    - Source reading: old spec probs/problem-corner-topo.lisp (guidance only; givens copied from it),
+      tech/README.html and relevant tech headers.
+    - Assistant-run: staging and V1-V5 (incl. V4 replay of the old 15-action plan) on a Linux SBCL
+      copy of the checkout (AGENTS.md cloud recipe). No search beyond bounded smoke runs.
+    - User-run on Windows: final staging confirmation and bounded run.
+    - Depth: *depth-cutoff* 5 while building (expected to find no solution); depth 15 later, after
+      enhancements, to test whether 15 is minimal for this configuration.
+    - User direction: improve on the old spec's search efficiency and representational simplicity
+      where possible.
+
+INPUT ANALYSIS AND OBJECTIVE
+  problem-analysis.txt (revision 2, 2026-10-12).
+  Obligations R1-R5; objective min-length, unit cost, connector names irrelevant. No corrections yet.
+
+REPRESENTATION AND AUTHORING APPROACH
+  Path A (Talos tech/). Techs: gate, beam-relay, beam-crossing, walkability, visibility (R2, M1-M5).
+  Reachability deliberately not included: beam-relay's nested -reachability gives identity reach (F1).
+  Semantic settings: planning, min-length, graph.  *max-connector-pairings* 3 written explicitly
+    (equals tech default; A1 relies on a 3-way connect).
+  Provisional: *depth-cutoff* 5; *symmetry-pruning* t (M8).  *threads* 16 set at the REPL.
+  Dropped from old spec: *progress-reporting-interval* (not relied on; adaptive default).
+
+SECTION REVIEW AND REQUIREMENT MAPPING
+  S1 Settings, types, includes -- proposed and approved 2026-10-12; written. Types are the givens
+     (R1); includes per R2.
+  S2 Initial state + derived-state init action + goal -- proposed and approved 2026-10-12; written.
+     Givens copied unchanged from the analysis (R1); boundary-wall retained because the walking
+     derivation needs it to close the x=8 partition. INITIALIZE-DERIVED-STATE runs one propagation
+     (the engine does not). Goal per R3. User confirmed required starting facts: agent1 holds
+     nothing; connectors located, unpaired, uncolored.
+
+ENHANCEMENTS FOR THE LARGER FAMILY
+  Single fixed instance (analysis); enhancements target sequence length / branching.
+  E1 Symmetry pruning over connector1-3 -- enabled (*symmetry-pruning* t). Engine detected the intended
+     single group (C1); exercised in search: 724 duplicates pruned at depth 5 (C3), 554 after E2 (C4).
+  E2 Retaining pickup only when there is a pairing to retain -- implemented 2026-10-12 (user-approved) in
+     tech/beam-relay.lisp PICKUP-CONNECTOR-RETAINING-PAIRINGS precondition: some (paired ?connector ?t)
+     or (paired ?c ?connector). Correctness: with no paired fact on the connector, both pickups write
+     identical facts (holding, location retracted, support retracted) at the same cost, so the removed
+     successor is an exact duplicate; no state or cost is lost. Applies to every beam-relay problem.
+     doc/talos-reference.md 1.8 updated. Evidence C4. Measured effect small (see C4).
+  Not adopted:
+   - Narrowing connect-connector choices (up to 63 per location; 70% of successors). No sound dominance
+     found: extra pairings add beams that can cut others (the hinted solution relies on a cutter beam),
+     and fewer pairings can lose needed links. Deferred to the search advisor.
+   - Remaining-steps bound (min-steps-remaining?). A simple goal-reading placeholder cannot count the
+     move and the relighting separately (a move can unblock a beam: location1 occludes
+     transmitter2->location4), so the only sound simple form is 1-if-unmet, which adds nothing over the
+     depth cutoff. topo-lower-bound is the candidate; deferred to the search advisor (analysis already
+     defers it).
+
+CHECKS AND EVIDENCE
+  C1 Staging, 2026-10-12, assistant, cloud container SBCL 2.2.9 (AGENTS.md recipe), fresh process.
+     Stages and initializes: init actions DERIVE-LOS-FROM-SEGMENTS, ESTABLISH-BEAM-COORDINATES,
+     DERIVE-BEAM-CROSSINGS-BEFORE-GATE, DERIVE-WALKING-FROM-SEGMENTS, INITIALIZE-DERIVED-STATE ran.
+     Derived driver: UPDATE-GATE-STATUS! UPDATE-RELAY-STATUS! UPDATE-RECEIVER-STATUS!
+     UPDATE-CROSSING-STATUS! ENFORCE-THREAT-SAFETY!. Symmetry: one family, connector1-3 (V3 passes
+     for detection). No init-check errors. 15 compile WARNINGs, all the known SBCL 2.2.9 ww-set
+     constant-type warnings (AGENTS.md); Windows confirmation still required for warning-free acceptance.
+  C2 Fidelity checks V1, V2, V4, V5, 2026-10-12, assistant, same environment, spec revision with the
+     user's formatting edits (staged copy taken 14:09). Method: successor enumeration from *start-state*
+     (helper replicating the validator's precondition/effect replay), no search.
+     V1 Allowed:
+       A1 move loc1->loc3, pickup connector3, connect at loc3 {transmitter1 receiver2 receiver1}:
+          connector3 red, receiver1 and receiver2 active, gate1 open. PASS.
+       A2 from A1, retaining pickup: pairings kept, no color, receivers inactive, gate closed; put back
+          at loc3: relit, gate open. PASS.
+       A3 holding connector1 at loc1 (gate closed): 63 connect choices = every 1-3 subset of
+          {transmitter1-2, receiver1-3, connector2, connector3}. Consistent with A3; a terminus visible
+          only from a non-placement vantage was not constructed (all east locations see all apparatus).
+          PARTIAL (scoped).
+       A4 from A1, at loc2: move (walk location2 (gate1) location4) offered and applied. PASS.
+     V1 Forbidden:
+       F1 start: only connector1 pickups offered. PASS.
+       F2 from A1 with connector2 in hand back at loc3: no connect-connector successors. PASS.
+       F3 gate closed: from loc1/loc2/loc3 no move to location4 (window1 not walkable). PASS.
+       F4 connector1@loc1 {transmitter1} red alone; adding connector2@loc2 {transmitter2}: neither
+          colored. PASS.
+       F5 connector2@loc2 {transmitter1 transmitter2}: uncolored. connector2@loc2 {transmitter2} then
+          connector3@loc3 {transmitter1 connector2}: connector2 blue, connector3 red. PASS.
+     V2 37 crossings minted. All seven analysis intersections present at the stated points
+       (crossing1, 7, 8, 12, 13, 18, 36); none among T1-L3, L3-R2, L2-R3, T2-L2, L3-L2 pairwise. PASS.
+     V4 Old 15-action plan (doc/problems/corner-topo/Actions.lisp) replays: success, goal satisfied.
+       Final state has no (open gate1) and no (active receiver1) -- consistent with D1. PASS.
+     V5 Derived los-via: the only location occluder on any sightline is location1 on
+       transmitter2-location4 (with gate1). Independent distance check: location1 lies 0.486 from that
+       segment (tolerance 1/2, narrow margin); all other location-to-relay-sightline distances >= 0.72.
+       Direct apparatus-apparatus pairs within 1/2 of location1 (T1-R1, T2-R1, T2-R3) are not beams in
+       this problem (no fixed couplings). PASS.
+     Observation for step 4: connect-connector at one location can emit up to 63 successors.
+  C3 Bounded smoke run + branching profile, 2026-10-12, assistant, same environment, spec revision staged
+     14:48. Settings: as file (min-length, graph, depth 5, symmetry t, pairings 3), *threads* 0.
+     Result: completed normally, no solution (expected at depth 5); 33,166 states, 5.5 s, 62.8% repeats
+     pruned, 724 symmetry duplicates pruned, 298 inconsistent states abandoned, no errors.
+     Branching by action over distinct states (enumeration helper, depths 0-3): at depth 3 (411 states)
+     connect-connector 4133 of 5901 successors (70%); pickup-connector and
+     pickup-connector-retaining-pairings always equal in count (423 each).
+  C4 After E2 (tech/beam-relay.lisp edited 15:17), assistant, same environment, fresh processes:
+     - V1/V2/V4/V5 rerun: identical results except start state no longer offers the retaining pickup
+       (connector1 unpaired). Old 15-action plan still replays to the goal.
+     - Depth-5 smoke: 32,607 states (was 33,166), 4.8 s, no solution, no errors, 298 inconsistent
+       abandoned. Branching at depth 3: retaining pickups 252 (was 423).
+     - crelay-topo accepted 87-action plan (uses retaining pickups) replays: success, goal satisfied.
+     - (test-topo): 6 problems, 0 failures.
+  C5 Final bounded run, 2026-10-12, user, Windows/Quicklisp SBCL: (stage corner-topo-advisor),
+     (ww-set *threads* 16), (solve). Completed normally at depth 5, no solution (expected), 32,475 states,
+     0.3 s real, 298 inconsistent abandoned, 512 symmetry duplicates pruned, no errors. Staging on
+     Windows: no warnings reported by the user.
+
+READINESS AND OPEN ISSUES
+  Delivered: probs/problem-corner-topo-advisor.lisp (revision of 2026-10-12, with user's formatting
+    edits) plus tech/beam-relay.lisp E2 change.
+  Requirement mapping: R1 givens in define-types/define-init (S1, S2); R2 techs included (S1);
+    R3 define-goal (S2); R4 settings (S1; depth 5 provisional); R5 V1-V5 passed (C2, C4; A3 scoped).
+  Acceptance: model reviewed section by section; enhancements E1-E2 implemented and exercised; Windows
+    staging clean and bounded run error-free (C5). Accepted by the user 2026-10-12.
+  Limitations: A3 only partly exercised (no vantage-only terminus exists here); V5 margin 0.486 vs
+    tolerance 1/2 (geometry-sensitive); "298 inconsistent states abandoned" not investigated (arises
+    from propagation inside the technologies; does not affect replay of the known plan).
+  Deferred (search advisor): practicality of depth 15; topo-lower-bound; connect branching; whether 15
+    is minimal for this configuration.
+
+HANDOFF AND NEXT STEP
+  Handoff: spec-analysis-search-handoff.txt.
+  Proposed first search-advisor question: can a depth-15 min-length search complete in practical time
+  with 16 threads, and does including topo-lower-bound make the difference?
+  Not authorized: the depth-15 search itself.
+  Alternative strategies: workflow and fit assessment recorded in the handoff (user-agreed 2026-10-12).
+
+CORRECTIONS AND HISTORY
+  2026-10-12: specification accepted; wrap-up deleted the pre-spec snapshot
+    problem-analysis-2026-10-12-before-spec.txt (it was identical to problem-analysis.txt).

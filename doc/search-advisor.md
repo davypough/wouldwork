@@ -12,6 +12,8 @@
 > the disagreements are listed in section 7. Process and evidence guidance integrated
 > with the consultant experiment on 2026-10-07, superseded by standalone record and
 > handoff guidance on 2026-10-09. Neither was a fresh audit of every technical claim.
+> Boundary with the solving advisor revised 2026-10-12: this advisor no longer chooses
+> milestones.  Strategy table (section 3) completed against source 2026-10-12.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -20,6 +22,15 @@ Conditional analysis is useful, but resolve consequential model uncertainty befo
 on its results. A probe exposing a discrepancy returns it to the user as a specification
 topic for the spec advisor; pause dependent work and preserve unaffected evidence. This procedure does not
 authorize a full solve.
+
+**Opening.** Read AGENTS.md. When the handoff or spec path has not already been supplied,
+begin with exactly:
+
+> Welcome to the Wouldwork Search Advisor. Please share the path to your specification handoff (as prepared by the Wouldwork Specification Advisor), or to the problem specification you want to search.
+
+When the path is already supplied, acknowledge it and use it without asking the user to
+repeat it. Do not precede the greeting with a summary of this document or a development
+review.
 
 **Entry and return.** Read the selected question, objective, relevant record entries,
 current artifacts, and approval limits. Reuse current evidence instead of repeating
@@ -39,14 +50,22 @@ reopen affected conclusions and checks, and preserve independent evidence. Obtai
 user's agreement before relying on changed requirements or objectives. No consultant
 or shared coordination record is required.
 
-**When one search appears impractical.** If evidence suggests one search is unlikely to
-finish within the available budget, propose an optional solving-advisor handoff to the user
-with its supporting estimates and uncertainty. A short probe is not proof that no single
-search can finish. The [solving advisor](solving-advisor.md) supplies a constraint-led
-dialogue: the user and assistant agree one
-subgoal at a time, check it against the problem's static constraints, realize it with a
-bounded search, and finally validate the whole chained path.  It was built for Talos problems,
-but its subgoal dialogue applies to any problem with milestones (Q16).
+**When one search appears impractical.** Every strategy in this advisor has the engine
+produce one complete plan from the start to the full goal, keeping the objective's meaning
+(a shortest plan stays shortest): tuning and pruning forward search, symmetry, lower bounds,
+macro actions, relaxation, bidirectional search and enumerator meet-in-the-middle.  If
+evidence suggests the current forward search is unlikely to finish within the available
+budget, try the strategies here that fit before anything else.  A strategy that needs a
+separate spec gets a numbered copy when it re-encodes the same rules and goal (section 1.1);
+when it changes the rules, the goal or the level of detail, return it to the user as a
+specification topic for the spec advisor.  A short probe is not proof that no single search
+can finish.  Only when no strategy here looks feasible, propose the
+[solving advisor](solving-advisor.md) to the user as a last resort, with the supporting
+estimates and uncertainty.  There the user and assistant choose milestones one subgoal at a
+time, check each against the problem's static constraints, realize it with a bounded search
+(possibly a different strategy for each stretch), and finally validate the whole chained
+path.  Its result usually carries no guarantee about the whole plan: shortest stretches need
+not make a shortest plan.  This advisor does not choose milestones itself.
 
 ---
 
@@ -241,7 +260,7 @@ changes in the same run go into that copy.  A change that needs a separate varia
   11) or an explicitly approved run plan, normally at the user's REPL. The assistant supplies the exact
   forms and what to paste back, and never raises the depth or thread count silently.  A spec
   copy written for a deep run leaves `*progress-reporting-interval*` unset (section 4).
-- **Multi-step strategies** (S7 macros, S8 subgoaling, S9 relaxation, S10 bidirectional, S11
+- **Multi-step strategies** (S7 macros, S9 relaxation, S10 bidirectional, S11
   enumerator): guide one step at a time.  Give the forms for the step, wait for its result,
   check it, then give the next.  Keep the forms of each step so the run can be repeated.
 
@@ -265,11 +284,11 @@ of a result belong here.  The notes below the table give the details and measure
 | Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (S5) |
 | Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (S5) |
 | Q11 | For min/max-value, can an optimistic value of a partial state be computed cheaply? | spec, user | `bounding-function?` (S4) |
-| Q12 | Can goal states be listed explicitly, and can every action be reversed? | spec | bidirectional search (S10) |
-| Q13 | Is the goal described by base facts (positions, pairings) from which the derived facts follow? | spec: `propagate-changes!`, derived relations | enumerator meet-in-the-middle (S11) |
+| Q12 | Can goal states be listed explicitly, and can every action be reversed? | spec | bidirectional search (S10); if either fails, S11 when Q13 holds |
+| Q13 | Is the goal described by base facts (positions, pairings) from which the derived facts follow? | spec: `propagate-changes!`, derived relations | enumerator meet-in-the-middle (S11); goal-state enumeration (S14) when only the arrangement is wanted |
 | Q14 | Is the work per state dominated by working out derived facts? | probe: states per second, compared with a problem without propagation | relaxation (S9) |
 | Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (S7) |
-| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | subgoaling (S8) |
+| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | nothing here; noted for the solving advisor, used only if every strategy here fails (S8) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
 | Q18 | Do objects carry names the puzzle never uses, is the same fact stored more than once, or are some objects ruled out of every action by static facts? (note 6) | spec | re-encoding (section 1.1): record only what matters |
 
@@ -312,8 +331,9 @@ of a result belong here.  The notes below the table give the details and measure
 
 ## 3. Strategies
 
-Listed roughly from cheapest to most effort.  Most combine: parallel with pruning, macros with
-heuristics, subgoals with any of them.  The notes below the table give the details.
+S1 to S12 are listed roughly from cheapest to most effort; S13 to S15 were added later.
+Most combine: parallel with pruning, macros with
+heuristics.  The notes below the table give the details.
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
@@ -321,14 +341,22 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
 | S2 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with auto-wait or objects created during search (section 5) |
 | S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking runs serial or parallel and supports all four search hooks ([capability reference](advisor-reference.md), compatibility review and entry F17); the order matters; with forward checking the goal must test the constraints (note 1) |
 | S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
-| S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
+| S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries; `define-constraint` for a rule every state must keep (a successor breaking it is discarded as it is generated); for Talos problems, `(include-tech topo-lower-bound)` (section 4.1) | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
 | S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
 | S7 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
-| S8 | **Subgoaling (goal chaining)** | One search cannot reach the goal, and Q16 gives milestones | `(solve-subgoal <goal>)` (chained, serial only: it errors unless `*threads*` is 0), or the two-argument checkpoint form `(solve-subgoal <start> <goal>)` (serial or parallel), with `ww-undo`, checkpoint export and import; `solve-via-strategy` for a registered multi-phase strategy | A milestone reached the wrong way can block the rest.  The solving-advisor is the worked-out interactive form (note 7) |
+| S8 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md), whose dialogue chooses the milestones and realizes them with `solve-subgoal` (and registered multi-phase strategies, `define-strategy` and `solve-via-strategy`) | Usually gives up any guarantee about the whole plan; a milestone reached the wrong way can block the rest (note 7) |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
-| S10 | **Bidirectional search** | Q12 yes, and depth is the obstacle | a backward spec searched with `every`, then a forward search whose goal calls `(backward-path-exists state)` (note 6) | A second spec to write and keep consistent; memory for the backward layer (note 6) |
-| S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states can be generated from base facts | `define-base-relation` (plus optional `define-goal-filter`, `state-feasible?`); `(find-goal-states)`, `(find-predecessors)`, `(solve-meeting-point :depth-cutoff N :solution-type first)` (see the end of `problem-corner.lisp`) | Backward layers can explode; constrain base relations early |
-| S12 | **Randomized and branch-restricted runs** | Exploring a huge space for any solution, or splitting work by hand | `*randomize-search*` t (repeat runs); `*branch*` n explores only the nth first move | A failed run proves nothing.  Ignored when `heuristic?` is defined |
+| S10 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
+| S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time, and `(solve-meeting-point :depth-cutoff N :solution-type first)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; confirm first that the backward step reproduces a known plan's last step (note 8) |
+| S12 | **Randomized and branch-restricted runs** | Exploring a huge space for any solution, or splitting work by hand | `*randomize-search*` t (repeat runs); `*branch*` n explores only the nth first move | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined.  With `min-length`, the best of the per-branch results is the overall shortest, but the total work is unchanged |
+| S13 | **Backtracking driver** | Memory, not time, limits graph search, and states rarely repeat by different routes; or CSP (S3) | `*algorithm*` backtracking (section 4): one state is changed and undone in place instead of copied; `*bt-cycle-check*` t also rejects a state already on the current path | Tree search only: no closed table, so a state reached by different routes is expanded again; all four hooks apply; serial or parallel; not with happenings (section 5) |
+| S14 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
+| S15 | **Action-set reduction** | One action's job can be done by others at no extra length, and that action adds many successors | A spec copy without the action, or with a narrower precondition, plus a written replacement argument (note 9) | Changes the rules: with the argument it is a re-encoding (section 1.1), without it a specification topic for the spec advisor.  Without the argument the reduced model still finds valid plans, but proves no minimum and no absence |
+
+Wouldwork has no breadth-first or best-first (A*) driver.  Experimental and not offered:
+`src/ww-backward.lisp` (one-step regression, not integrated with search) and
+`src/ww-novelty.lisp` (retired, not loaded).  The capability reference, entry F22, lists the
+same approaches with their entry points.
 
 1. **CSP.**  Define the actions so that each one's inputs are fixed by earlier actions (a
    carry chain runs from the units column), with the most constraining variables first.
@@ -368,10 +396,13 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
    spec clears them.  The reported plan is the forward path followed by the reversed backward
    path, renumbered to follow on; replay it with `validate-action-sequence`.  Triangle at
    N = 6, split 12 + 7: the backward search collected 16,253 boards in 8,865 program cycles,
-   and the forward search met one in about 20.
-7. **Subgoaling.**  Choose milestones as resting states the next step needs, and measure each
-   with `solve-subgoal`.  crelay-topo (2026-10-06, two recorder cycles in 28 moves against a
-   hand plan's 31): (a) Name the precondition the next step needs, not its end product:
+   and the forward search met one in about 20.  A forward `first` search stops at its first
+   meeting, so for a shortest plan every smaller total d1 + d2 must also fail to meet (at
+   fixed length, as here, any meeting is shortest).
+7. **Milestones (lessons for the solving advisor).**  Choose milestones as resting states the
+   next step needs, and measure each with `solve-subgoal`.  crelay-topo (2026-10-06, two
+   recorder cycles in 28 moves against a hand plan's 31): (a) Name the precondition the next
+   step needs, not its end product:
    "agent1 at location6" (inside the alcove) took 10 moves and the search found the means
    itself, while "box1 at location7" (the box out of the alcove) straight after leg 1 found
    nothing in 10 minutes.  (b) Size each leg to about 10 moves for `first`, 6 to 9 for
@@ -380,6 +411,42 @@ heuristics, subgoals with any of them.  The notes below the table give the detai
    wasted moves.  (d) Add `(recorder-cycle-ended)` only where a cycle should close; legs may
    run inside one cycle.  (e) When a leg stalls, split it at its hard precondition rather
    than raising the cutoff.
+8. **Enumerator meet-in-the-middle.**  Three steps, all in the one staged spec.  (a)
+   `find-goal-states` builds every combination of the declared base facts within their
+   limits, works out the derived facts once for each, and keeps those meeting the goal (and
+   the goal filter).  (b) `find-predecessors` works backward a layer at a time: for each state
+   in the current layer it proposes earlier states that one ordinary action could turn into
+   it, and keeps a proposal only if applying that action forward really does, so the spec's
+   own rules decide and no reverse actions are needed.  It asks before each layer, so the
+   growth can be watched and stopped.  (c) `solve-meeting-point` searches forward from the
+   start for any state in the backward set (by default one from the deepest completed layer),
+   attaches the recorded backward steps, and keeps only plans that meet the original goal.
+   Without a `state-feasible?` hook a generated goal state need not be reachable; the meeting
+   search decides that.  As with S10, a first meeting does not by itself make the joined plan
+   shortest.  Precedent: the commented-out section at the end of `problem-corner.lisp`,
+   written for the older corner model; its goal filter names the known solution's layout.
+   `find-predecessors` tries every action in the spec by default; `:actions` takes a list of
+   action names to narrow it.  History (2026-10-12): it first picked actions by fixed names
+   from the older corner model and re-guessed one object at a time, so on
+   corner-topo-advisor-1 (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
+   candidates in 14 minutes and kept none, although the known plan's last step is a valid
+   predecessor.  Both are fixed (a held connector is now re-guessed together with its
+   holder); re-measurement pending.  Before relying on this strategy, confirm that the
+   backward step reproduces a known plan's last step.
+9. **Action-set reduction.**  Dropping or narrowing an action keeps a shortest-plan or
+   no-solution result valid only if every plan using it can be rewritten, at the same length
+   or shorter, as one that does not.  Argue it action by action: name the replacement steps,
+   and check that they are always available (preconditions, limits such as a pairing cap) and
+   leave nothing different that later steps could depend on (beams created, objects moved,
+   colors changed).  A known solution that uses the action rules it out at once.  Count first
+   how many successors the action adds: removing a rarely chosen action cannot pay.
+   corner-topo-advisor: the single-terminus connect is used by the known 15-action plan; the
+   retaining pickup is replaceable by a plain pickup and a reconnect except when the connector
+   has more than 3 links; a plain put-down has no general replacement, since connecting instead
+   creates beams that can cut others; together they add only 5 to 20% of the successors,
+   against 70% from connect choices.  The exact-duplicate case needs no argument: the
+   retaining pickup is offered only when there is a pairing to retain
+   (`tech/beam-relay.lisp`, 2026-10-12).
 
 ### 3.1 Choosing
 
@@ -390,13 +457,15 @@ Start at the first row that applies; the fallback column is the escalation order
 | Assignment, one action per variable (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first provides automatic objective bounds; backtracking supports user bounds) |
 | Assignment, one action, every variable set (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first; tree search (note 1) | S5 dead-state pruning (an open variable with no value left); a completion check when some variables are left for a later fill (note 3) |
 | Assignment, one action choosing a subset (knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states (note 2) | S5 bound; S2 |
-| Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S8 with time-tagged milestones |
+| Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S5 lower bound or dead-state pruning (section 4.1) |
 | b^d modest (Q6) | S1, then S4 if a best solution is wanted | S2 |
 | Fixed length (Q5) | S1 at the exact length with S5 dead-state pruning and symmetry | S10 (exhausting the remaining length proves a position dead); S7 |
-| Large, reversible, with a distance measure (Q8) | S5 lower bound if the distance never overestimates and the shortest path is wanted; S6 only if a timed probe shows the ordering faster; S2 | S8 at bottlenecks |
-| Large, reversible, no distance | S2 | S10 if Q12; S7 |
-| Expensive derived state (Q14) | S9 | S11; S8 |
-| Too deep for one search, with milestones (Q16) | S8 | S10 or S11 for the last stretch |
+| Large, reversible, with a distance measure (Q8) | S5 lower bound if the distance never overestimates and the shortest path is wanted; S6 only if a timed probe shows the ordering faster; S2 | S10 if Q12; S11 if Q13 |
+| Large, reversible, no distance | S2 | S10 if Q12; S7; S15 when one action dominates the branching |
+| Expensive derived state (Q14) | S9 | S11 |
+| Too deep for one search | S10 if Q12, S11 if Q13: each splits the depth between two searches | S7; then propose the solving advisor as a last resort (S8) |
+| Graph search runs out of memory, states rarely repeat | S13 with S5 pruning | S10 or S11 |
+| Only an end arrangement is wanted, described by base facts | S14, or S3 with one action per variable | S5 |
 
 1. **Ordered open list.**  Each fill removes its variable from the list, and the goal is the
    empty list.  Each state is then reached by one path, so graph search's table would only
@@ -749,7 +818,7 @@ regime it lands in:
 | Within time and memory | the current settings |
 | Within memory, too slow | S2 parallel; S6 if solutions are plentiful; S5 pruning |
 | Exceeds memory | tree search with S5 pruning, or S10/S11 to split the depth; a leaner encoding (Q18) |
-| Exceeds both by orders of magnitude | S8 milestones through the solving-advisor's dialogue, or a different formulation |
+| Exceeds both by orders of magnitude | a different formulation (S9, S10, S11, or a leaner encoding, Q18); if none is feasible, the solving advisor as a last resort (S8) |
 
 A heuristic (S6) only reorders the search.  It shortens a `first` search when solutions are
 plentiful, but when they are scarce or absent the search must cover most or all of the space

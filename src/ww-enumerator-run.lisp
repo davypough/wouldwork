@@ -16,6 +16,14 @@ By default diagnostics are suppressed and only layer summary lines are printed."
   "Maximum witness count stored per backward-reachable key.
 Set to NIL for no cap.")
 
+(defparameter *fps-worker-inherited-specials*
+  '(*package* *standard-output* *print-pretty* *print-case* *print-circle* *print-escape*
+    *print-readably* *print-base* *print-radix* *print-length* *print-level* *print-lines*
+    *print-right-margin* *print-array* *print-gensym* *read-default-float-format*)
+  "Specials that parallel FIND-PREDECESSORS workers rebind to the caller's values.
+New threads see only global values, and predecessor keys are printed strings, so a
+worker must print exactly as the caller does for its keys to match the reachable set.")
+
 (defmacro find-goal-states (&rest raw-args)
   "User-facing macro wrapper for FIND-GOAL-STATES-FN.
    Automatically quotes goal-spec, relation symbols/lists, and algorithm/solution-type symbols.
@@ -85,12 +93,13 @@ Set to NIL for no cap.")
 
 
 (defmacro find-predecessors (&key
-                               (action-families :auto action-families-supplied-p)
+                               (actions :all actions-supplied-p)
                                (direction 'forward direction-supplied-p))
   "User-facing macro wrapper for FIND-PREDECESSORS-FN.
-   Automatically quotes literal symbols/lists for :ACTION-FAMILIES and :DIRECTION,
+   Automatically quotes literal symbols/lists for :ACTIONS and :DIRECTION,
    so users can write e.g. (find-predecessors :direction forward
-                                              :action-families (move pickup))."
+                                              :actions (move pickup-connector)).
+   :ACTIONS defaults to every action in the problem (see ENUM-SELECT-ACTIONS)."
   (flet ((literal-symbol-p (form)
            (and (symbolp form)
                 (not (keywordp form))
@@ -106,9 +115,9 @@ Set to NIL for no cap.")
                  ((literal-list-p form) `',form)
                  (t form))))
       `(find-predecessors-fn
-        ,@(if action-families-supplied-p
-              `(:action-families ,(maybe-quote action-families))
-              '(:action-families :auto))
+        ,@(if actions-supplied-p
+              `(:actions ,(maybe-quote actions))
+              '(:actions :all))
         ,@(if direction-supplied-p
               `(:direction ,(maybe-quote direction))
               '(:direction 'forward))))))
@@ -130,11 +139,11 @@ Set to NIL for no cap.")
                         :sort-key sort-key))
 
 
-(defun find-predecessors-fn (&key (action-families :auto)
+(defun find-predecessors-fn (&key (actions :all)
                                   (direction 'forward))
   "Top-level API wrapper. Full implementation is defined below in
    %FIND-PREDECESSORS-FN to keep call flow top-down in this file."
-  (%find-predecessors-fn :action-families action-families
+  (%find-predecessors-fn :actions actions
                          :direction direction))
 
 
@@ -268,25 +277,37 @@ Set to NIL for no cap.")
             t))))))))
 
 
-(defun enum-normalize-action-families (action-families)
-  "Normalize ACTION-FAMILIES to plain symbols MOVE, PICKUP, CONNECT.
-   Accepts either plain symbols or keywords; NIL/ALL means all families."
-  (let* ((families0 (fgs-ensure-list action-families))
-         (families (mapcar (lambda (fam)
-                             (cond
-                               ((or (eq fam 'move) (eq fam :move)) 'move)
-                               ((or (eq fam 'pickup) (eq fam :pickup)) 'pickup)
-                               ((or (eq fam 'connect) (eq fam :connect)) 'connect)
-                               ((or (eq fam 'all) (eq fam :all)) 'all)
-                               (t fam)))
-                           families0)))
-    (if (or (null families) (member 'all families))
-        '(move pickup connect)
-        families)))
+(defun enum-select-actions (actions names)
+  "Select ACTION structs from ACTIONS named by NAMES.
+   NAMES :ALL (or NIL, or a list containing ALL) selects every action.  Otherwise
+   each name is an action name or an older corner-model alias: PICKUP means
+   PICKUP-CONNECTOR, CONNECT means CONNECT-TO-1/2/3-TERMINUS.  Keywords are
+   accepted for any name.  A name matching no action in ACTIONS is an error."
+  (let ((name-list (fgs-ensure-list names))
+        (wanted nil))
+    (when (or (null name-list)
+              (some (lambda (name) (string= name "ALL")) name-list))
+      (return-from enum-select-actions (copy-list actions)))
+    (dolist (name name-list)
+      (let* ((sym (intern (symbol-name name) *package*))
+             (expanded (case sym
+                         (pickup '(pickup-connector))
+                         (connect '(connect-to-1-terminus
+                                    connect-to-2-terminus
+                                    connect-to-3-terminus))
+                         (otherwise (list sym)))))
+        (unless (some (lambda (n) (find n actions :key #'action.name :test #'eq))
+                      expanded)
+          (error "FIND-PREDECESSORS: no action named ~S in this problem." name))
+        (setf wanted (union wanted expanded :test #'eq))))
+    (remove-if-not (lambda (a) (member (action.name a) wanted :test #'eq))
+                   actions)))
 
 
 (defun enum-action-in-family-p (action-name family)
-  "True iff ACTION-NAME belongs to FAMILY (MOVE, PICKUP, CONNECT)."
+  "True iff ACTION-NAME belongs to FAMILY (MOVE, PICKUP, CONNECT).
+   Used only by the :BACKWARD direction, whose regressions exist only for the
+   older corner model's actions."
   (case family
     (move (eql action-name 'move))
     (pickup (eql action-name 'pickup-connector))
@@ -296,31 +317,6 @@ Set to NIL for no cap.")
                        connect-to-3-terminus)
                      :test #'eq))
     (otherwise nil)))
-
-
-(defun enum-select-actions-by-family (actions action-families)
-  "Select ACTION structs from ACTIONS whose names match ACTION-FAMILIES.
-   ACTION-FAMILIES may include MOVE/PICKUP/CONNECT/ALL (or keyword variants)."
-  (let* ((families (enum-normalize-action-families action-families)))
-    (remove-if-not
-     (lambda (a)
-       (some (lambda (fam)
-               (enum-action-in-family-p (action.name a) fam))
-             families))
-     actions)))
-
-
-(defun enum-default-action-families-from-actions (actions)
-  "Infer default predecessor action families from ACTIONS.
-   Returns a list subset of (MOVE PICKUP CONNECT), preserving that order."
-  (let ((families nil))
-    (when (some (lambda (a) (enum-action-in-family-p (action.name a) 'move)) actions)
-      (push 'move families))
-    (when (some (lambda (a) (enum-action-in-family-p (action.name a) 'pickup)) actions)
-      (push 'pickup families))
-    (when (some (lambda (a) (enum-action-in-family-p (action.name a) 'connect)) actions)
-      (push 'connect families))
-    (nreverse families)))
 
 
 (defun enum-action-instantiated-forms (action state)
@@ -653,15 +649,21 @@ Set to NIL for no cap.")
    Enum-action names follow ENUM-<REL>-<KEY>.  For each enum-action, try each
    relation in MODIFIED-RELS as prefix ENUM-<rel>-; the remainder after the
    prefix is the key-object symbol.  Groups are returned in order of first
-   appearance of each key-object.
-   Returns: ((KEY1 ea1 ea2 ...) (KEY2 ea3 ea4 ...) ...)"
-  (let ((result nil))
+   appearance of each key-object.  An enum-action named exactly ENUM-<REL> has no
+   key object (eg a bijective relation enumerated as one assignment).
+   Returns two values: ((KEY1 ea1 ea2 ...) (KEY2 ea3 ea4 ...) ...) and the
+   unkeyed enum-actions as ((REL . ea) ...)."
+  (let ((result nil)
+        (unkeyed nil))
     (dolist (ea enum-actions)
       (let* ((name-str (symbol-name (action.name ea)))
              (key-sym nil))
         (dolist (rel modified-rels)
           (let* ((prefix (concatenate 'string "ENUM-" (symbol-name rel) "-"))
                  (prefix-len (length prefix)))
+            (when (string= name-str prefix :end2 (1- prefix-len))
+              (push (cons rel ea) unkeyed)
+              (return))
             (when (and (> (length name-str) prefix-len)
                        (string= name-str prefix :end1 prefix-len))
               (setf key-sym (intern (subseq name-str prefix-len) *package*))
@@ -671,17 +673,61 @@ Set to NIL for no cap.")
             (if entry
                 (nconc entry (list ea))
                 (push (list key-sym ea) result))))))
-    (nreverse result)))
+    (values (nreverse result) (nreverse unkeyed))))
 
 
-(defun fps-build-per-object-csp-start-state (frontier-state key-object modified-rels)
-  "Copy FRONTIER-STATE and delete only KEY-OBJECT's propositions in MODIFIED-RELS.
-   All other objects' propositions remain intact, providing context for :REQUIRES
+(defun fps-build-object-sets (key-groups unkeyed modified-rels)
+  "Build the object sets whose base facts one predecessor guess re-enumerates.
+   Each set is (MEMBERS CLEAR-SPEC ENUM-ACTIONS), where CLEAR-SPEC is a list of
+   (OBJECT . RELATIONS) naming the facts cleared before enumeration.
+   Every key object in KEY-GROUPS forms a single set over the keyed relations.
+   Every value (HOLDER HELD) of an UNKEYED relation (eg bijective HOLDING) forms a
+   pair set: HELD is re-enumerated in all MODIFIED-RELS, HOLDER only in that
+   relation, whose enumeration is restricted to the pair's own link or none."
+  (let ((keyed-rels (set-difference modified-rels (mapcar #'car unkeyed) :test #'eq))
+        (sets nil))
+    (dolist (group key-groups)
+      (push (list (list (car group))
+                  (list (cons (car group) keyed-rels))
+                  (cdr group))
+            sets))
+    (dolist (entry unkeyed)
+      (dolist (tuple (action.precondition-args (cdr entry)))
+        (unless (eq (first tuple) :unassigned)
+          (let ((holder (first tuple))
+                (held (second tuple))
+                (restricted (copy-action (cdr entry))))
+            (setf (action.precondition-args restricted) (list tuple '(:unassigned)))
+            (push (list (list holder held)
+                        (list (list holder (car entry)) (cons held modified-rels))
+                        (append (cdr (assoc held key-groups :test #'eq))
+                                (list restricted)))
+                  sets)))))
+    (nreverse sets)))
+
+
+(defun fps-build-per-object-csp-start-state (frontier-state clear-spec)
+  "Copy FRONTIER-STATE and delete the facts named by CLEAR-SPEC, a list of
+   (OBJECT . RELATIONS).  A fact is deleted when its relation is listed for an
+   object that is its key (first argument), or, for a bijective relation, any of
+   its arguments.  Bijective facts are deleted through the relation's own name, so
+   both index facts go.  All other facts remain, providing context for :REQUIRES
    constraint pruning during CSP enumeration."
-  (let ((copy (copy-problem-state frontier-state)))
-    (bw--delete-props-matching!
-     copy (lambda (p) (and (member (car p) modified-rels :test #'eq)
-                           (eql (second p) key-object))))
+  (let* ((copy (copy-problem-state frontier-state))
+         (idb (problem-state.idb copy))
+         (doomed nil))
+    (dolist (p (list-database idb))
+      (let ((rel (or (car (gethash (car p) *bijective-canonical*)) (car p))))
+        (when (some (lambda (entry)
+                      (and (member rel (cdr entry) :test #'eq)
+                           (if (gethash rel *bijective-relations*)
+                               (member (car entry) (cdr p) :test #'eq)
+                               (eql (second p) (car entry)))))
+                    clear-spec)
+          (pushnew (cons rel (cdr p)) doomed :test #'equal))))
+    (dolist (p doomed)
+      (delete-proposition p idb))
+    (invalidate-problem-state-hash copy)
     copy))
 
 
@@ -731,75 +777,75 @@ Set to NIL for no cap.")
 
 (defun fps-forward-per-object-validate-leaf (leaf pred-key frontier-key action
                                        reachable base-relations layer-table stats)
-  "Validate one novel per-object CSP leaf and store it when ACTION reaches FRONTIER-KEY."
-  (handler-case
-      (progn
-        (bw-normalize! leaf)
-        (when (fps-state-feasible-p leaf)
-          (maybe-propagate-changes! leaf)
-          (block validate
-            (incf (fps-layer-stats-novel-validation-attempts stats))
-            (incf (gethash (action.name action) (fps-layer-stats-op-attempts stats) 0))
-            (dolist (pre-args (get-precondition-args action leaf))
-              (let ((pre-result (apply (action.pre-defun-name action) leaf pre-args)))
-                (when pre-result
-                  (let ((updated-dbs
-                          (if (eql pre-result t)
-                              (funcall (action.eff-defun-name action) leaf)
-                              (apply (action.eff-defun-name action) leaf pre-result))))
-                    (dolist (upd updated-dbs)
-                      (when (fps-forward-per-object-process-update
-                             upd leaf pred-key frontier-key action reachable
-                             base-relations layer-table stats)
-                        (return-from validate t)))))))))
-        nil)
-    (error ()
-      (incf (fps-layer-stats-apply-fail-count stats))
-      (incf (gethash (action.name action) (fps-layer-stats-op-fail stats) 0))
-      nil)))
+  "Validate one novel per-object CSP leaf and store it when ACTION reaches FRONTIER-KEY.
+   Errors are not caught: a failing candidate stops the layer where it fails."
+  (bw-normalize! leaf)
+  (when (fps-state-feasible-p leaf)
+    (maybe-propagate-changes! leaf)
+    (block validate
+      (incf (fps-layer-stats-novel-validation-attempts stats))
+      (incf (gethash (action.name action) (fps-layer-stats-op-attempts stats) 0))
+      (dolist (pre-args (get-precondition-args action leaf))
+        (let ((pre-result (apply (action.pre-defun-name action) leaf pre-args)))
+          (when pre-result
+            (let ((updated-dbs
+                    (if (eql pre-result t)
+                        (funcall (action.eff-defun-name action) leaf)
+                        (apply (action.eff-defun-name action) leaf pre-result))))
+              (dolist (upd updated-dbs)
+                (when (fps-forward-per-object-process-update
+                       upd leaf pred-key frontier-key action reachable
+                       base-relations layer-table stats)
+                  (return-from validate t))))))))))
 
 
-(defun fps-forward-per-object-handle-leaf (leaf frontier-key action reachable
-                                     base-relations layer-table stats)
-  "Handle one per-object CSP leaf: dedupe checks plus validation for novel candidates."
-  (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
-    (incf (fps-layer-stats-raw-count stats))
-    (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
-    (cond
-      ((string= pred-key frontier-key) nil)
-      (t
-       (when (gethash pred-key reachable)
-         (incf (fps-layer-stats-collision-reachable-count stats)))
-       (when (gethash pred-key layer-table)
-         (incf (fps-layer-stats-collision-layer-count stats)))
-       (incf (fps-layer-stats-feasible-count stats))
-       (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
-       ;; Even on collisions, validate to accumulate additional witnesses.
-       (fps-forward-per-object-validate-leaf
-        leaf pred-key frontier-key action reachable
-        base-relations layer-table stats)))))
+(defun fps-forward-per-object-handle-leaf (leaf leaf-key frontier-key action reachable
+                                     base-relations layer-table stats seen)
+  "Handle one per-object CSP leaf: skip a leaf already handled for this frontier
+   state and ACTION (object sets overlap), then dedupe checks plus validation for
+   novel candidates."
+  (let ((seen-key (concatenate 'string (symbol-name (action.name action)) " " leaf-key)))
+    (unless (gethash seen-key seen)
+      (setf (gethash seen-key seen) t)
+      (let ((pred-key (fps-state-base-prop-key leaf base-relations)))
+        (incf (fps-layer-stats-raw-count stats))
+        (incf (gethash (action.name action) (fps-layer-stats-op-raw stats) 0))
+        (cond
+          ((string= pred-key frontier-key) nil)
+          (t
+           (when (gethash pred-key reachable)
+             (incf (fps-layer-stats-collision-reachable-count stats)))
+           (when (gethash pred-key layer-table)
+             (incf (fps-layer-stats-collision-layer-count stats)))
+           (incf (fps-layer-stats-feasible-count stats))
+           (incf (gethash (action.name action) (fps-layer-stats-op-feasible stats) 0))
+           ;; Even on collisions, validate to accumulate additional witnesses.
+           (fps-forward-per-object-validate-leaf
+            leaf pred-key frontier-key action reachable
+            base-relations layer-table stats)))))))
 
 
 (defun fps-expand-one-state-forward-per-object-csp (frontier-state frontier-key actions
                                            reachable base-relations
-                                           problem-actions key-object
-                                           object-enum-actions modified-rels
-                                           stats)
-  "Per-object CSP expansion of predecessors for FRONTIER-STATE via ACTIONS.
-   Builds a start state with only KEY-OBJECT's MODIFIED-RELS propositions
-   removed, runs CSP DFS through OBJECT-ENUM-ACTIONS, and validates each
-   leaf by forward application of every action in ACTIONS."
+                                           problem-actions object-set
+                                           stats seen)
+  "Per-object-set CSP expansion of predecessors for FRONTIER-STATE via ACTIONS.
+   OBJECT-SET is (MEMBERS CLEAR-SPEC ENUM-ACTIONS).  Builds a start state with the
+   CLEAR-SPEC facts removed, runs CSP DFS through ENUM-ACTIONS, and validates
+   each leaf by forward application of every action in ACTIONS.  SEEN records
+   the leaves already handled for FRONTIER-STATE."
   (let ((csp-start (fps-build-per-object-csp-start-state
-                    frontier-state key-object modified-rels))
+                    frontier-state (second object-set)))
         (layer-table (fps-layer-stats-layer-table stats))
         (*actions* problem-actions))
     (fps-csp-search
-     csp-start object-enum-actions
+     csp-start (third object-set)
      (lambda (leaf)
-       (dolist (action actions)
-         (fps-forward-per-object-handle-leaf
-          leaf frontier-key action reachable
-          base-relations layer-table stats))))))
+       (let ((leaf-key (fps-state-full-prop-key leaf)))
+         (dolist (action actions)
+           (fps-forward-per-object-handle-leaf
+            leaf leaf-key frontier-key action reachable
+            base-relations layer-table stats seen)))))))
 
 
 (defun fps-expand-predecessor-layer-forward-per-object-csp (frontier reachable
@@ -808,19 +854,15 @@ Set to NIL for no cap.")
                                                    selected-actions)
   "Expand one predecessor layer using per-object CSP forward candidate generation.
    Phase 1: Group selected actions by modified base-relations, build CSP
-   enum-actions once per group, partition by key-object, and filter by union
-   of action type instances.
-   Phase 2: For each frontier state x group x key-object, run per-object CSP
-   DFS once and validate each leaf against all applicable actions in the group.
+   enum-actions once per group, build object sets (single key objects, plus
+   holder-held pairs of unkeyed bijective relations), and filter by union of
+   action type instances.
+   Phase 2: For each frontier state x group x object set, run the CSP DFS once
+   and validate each leaf against all applicable actions in the group.
    Returns (values layer-table raw-count feasible-count validated-count diagnostics)."
   (let ((stats (make-fps-layer-stats))
         (frontier-count (length frontier))
-        (frontier-idx 0)
-        (last-report-time (get-internal-real-time))
-        (rels-groups nil)
-        (productive-count 0)
-        (first-productive-idx 0)
-        (last-productive-idx 0))
+        (rels-groups nil))
     ;; Phase 1: group actions by modified base-rels, build CSP enum-actions per group.
     (setf *enum-diag-printed* nil)
     (let ((rels-table (make-hash-table :test #'equal)))
@@ -834,7 +876,7 @@ Set to NIL for no cap.")
                   (obj-set (fps-action-object-set action)))
               (push (cons action obj-set)
                     (gethash sorted-rels rels-table))))))
-      ;; 1b. For each group, generate CSP enum-actions once, partition by key, filter.
+      ;; 1b. For each group, generate CSP enum-actions once, build object sets, filter.
       (maphash
        (lambda (sorted-rels action-entries)
          (setf action-entries (nreverse action-entries))
@@ -842,26 +884,28 @@ Set to NIL for no cap.")
                 (enum-actions (fps-build-predecessor-enum-actions
                                representative base-relations)))
            (when enum-actions
-             (let* ((key-groups (fps-partition-enum-actions-by-key
-                                 enum-actions sorted-rels))
-                    (any-dynamic (some (lambda (ae) (null (cdr ae)))
-                                       action-entries))
-                    (union-objects
-                      (unless any-dynamic
-                        (let ((result nil))
-                          (dolist (ae action-entries result)
-                            (dolist (obj (cdr ae))
-                              (pushnew obj result :test #'eq))))))
-                    (filtered-groups
-                      (if union-objects
-                          (remove-if-not
-                           (lambda (g)
-                             (member (car g) union-objects :test #'eq))
-                           key-groups)
-                          key-groups)))
-               (when filtered-groups
-                 (push (list sorted-rels filtered-groups action-entries)
-                       rels-groups))))))
+             (multiple-value-bind (key-groups unkeyed)
+                 (fps-partition-enum-actions-by-key enum-actions sorted-rels)
+               (let* ((any-dynamic (some (lambda (ae) (null (cdr ae)))
+                                         action-entries))
+                      (union-objects
+                        (unless any-dynamic
+                          (let ((result nil))
+                            (dolist (ae action-entries result)
+                              (dolist (obj (cdr ae))
+                                (pushnew obj result :test #'eq))))))
+                      (object-sets (fps-build-object-sets key-groups unkeyed sorted-rels))
+                      (filtered-sets
+                        (if union-objects
+                            (remove-if-not
+                             (lambda (os)
+                               (some (lambda (m) (member m union-objects :test #'eq))
+                                     (first os)))
+                             object-sets)
+                            object-sets)))
+                 (when filtered-sets
+                   (push (list sorted-rels filtered-sets action-entries)
+                         rels-groups)))))))
        rels-table))
     (setf rels-groups (sort rels-groups #'<
                             :key (lambda (rg) (length (first rg)))))
@@ -874,46 +918,56 @@ Set to NIL for no cap.")
               frontier-count))
     (dolist (rg rels-groups)
       (let ((modified-rels (first rg))
-            (key-groups (second rg))
+            (object-sets (second rg))
             (action-entries (third rg)))
-        (format t "~&  [forward]   ~S: ~D action~:P ~S, ~D key-object~:P ~S~%"
+        (format t "~&  [forward]   ~S: ~D action~:P ~S, ~D object set~:P ~S~%"
                 modified-rels
                 (length action-entries)
                 (mapcar (lambda (ae) (action.name (car ae))) action-entries)
-                (length key-groups)
-                (mapcar (lambda (g) (list (car g) (1- (length g))))
-                        key-groups))))
+                (length object-sets)
+                (mapcar (lambda (os) (list (first os) (length (third os))))
+                        object-sets))))
     (finish-output)
-    ;; Phase 2: expand each frontier state.
+    ;; Phase 2: expand each frontier state, serially or on worker threads.
+    (multiple-value-bind (productive-count first-productive-idx last-productive-idx)
+        (if (plusp *threads*)
+            (fps-expand-frontier-parallel frontier rels-groups reachable base-relations
+                                          problem-actions stats)
+            (fps-expand-frontier-serial frontier rels-groups reachable base-relations
+                                        problem-actions stats))
+      (let ((diag (fps-build-layer-diagnostics stats)))
+        (setf (getf diag :productive-frontier-count) productive-count
+              (getf diag :first-productive-frontier) first-productive-idx
+              (getf diag :last-productive-frontier) last-productive-idx
+              (getf diag :frontier-count) frontier-count)
+        (values (fps-layer-stats-layer-table stats)
+                (fps-layer-stats-raw-count stats)
+                (fps-layer-stats-feasible-count stats)
+                (fps-layer-stats-validated-count stats)
+                diag)))))
+
+
+(defun fps-expand-frontier-serial (frontier rels-groups reachable base-relations
+                                   problem-actions stats)
+  "Expand FRONTIER states in order into STATS, reporting progress every 30 seconds.
+   Returns (values productive-count first-productive-idx last-productive-idx)."
+  (let ((frontier-count (length frontier))
+        (frontier-idx 0)
+        (last-report-time (get-internal-real-time))
+        (productive-count 0)
+        (first-productive-idx 0)
+        (last-productive-idx 0))
     (dolist (target frontier)
       (incf frontier-idx)
       (when (= frontier-idx 1)
         (format t "~&  [forward] Starting frontier state 1/~:D...~%" frontier-count)
         (finish-output))
-      (let ((target-key (fps-state-base-prop-key target base-relations))
-            (pre-validated (fps-layer-stats-validated-count stats)))
-        (dolist (rg rels-groups)
-          (let ((modified-rels (first rg))
-                (key-groups (second rg))
-                (action-entries (third rg)))
-            (dolist (group key-groups)
-              (let* ((key-object (car group))
-                     (object-enum-actions (cdr group))
-                     (applicable-actions
-                       (loop for (action . obj-set) in action-entries
-                             when (or (null obj-set)
-                                      (member key-object obj-set :test #'eq))
-                             collect action)))
-                (when applicable-actions
-                  (fps-expand-one-state-forward-per-object-csp
-                   target target-key applicable-actions reachable base-relations
-                   problem-actions key-object object-enum-actions
-                   modified-rels stats))))))
-        (when (> (fps-layer-stats-validated-count stats) pre-validated)
-          (incf productive-count)
-          (when (zerop first-productive-idx)
-            (setf first-productive-idx frontier-idx))
-          (setf last-productive-idx frontier-idx)))
+      (when (fps-expand-frontier-state target rels-groups reachable base-relations
+                                       problem-actions stats)
+        (incf productive-count)
+        (when (zerop first-productive-idx)
+          (setf first-productive-idx frontier-idx))
+        (setf last-productive-idx frontier-idx))
       (let ((now (get-internal-real-time)))
         (when (or (= frontier-idx 1)
                   (>= (- now last-report-time)
@@ -928,16 +982,160 @@ Set to NIL for no cap.")
                   (hash-table-count (fps-layer-stats-layer-table stats)))
           (finish-output)
           (setf last-report-time now))))
-    (let ((diag (fps-build-layer-diagnostics stats)))
-      (setf (getf diag :productive-frontier-count) productive-count
-            (getf diag :first-productive-frontier) first-productive-idx
-            (getf diag :last-productive-frontier) last-productive-idx
-            (getf diag :frontier-count) frontier-count)
-      (values (fps-layer-stats-layer-table stats)
-              (fps-layer-stats-raw-count stats)
-              (fps-layer-stats-feasible-count stats)
-              (fps-layer-stats-validated-count stats)
-              diag))))
+    (values productive-count first-productive-idx last-productive-idx)))
+
+
+(defun fps-expand-frontier-parallel (frontier rels-groups reachable base-relations
+                                     problem-actions stats)
+  "Expand FRONTIER states on *THREADS* workers, then merge their results into STATS.
+   Each task is (INDEX . STATE).  Each worker owns its stats and layer table and only
+   reads REACHABLE.  Workers start with the caller's values of
+   *FPS-WORKER-INHERITED-SPECIALS*.  A worker error stops the run and is resignaled.
+   Returns (values productive-count first-productive-idx last-productive-idx)."
+  (let* ((queue (make-new-task-queue))
+         (results (make-array *threads* :initial-element nil))
+         (job (list :rels-groups rels-groups
+                    :reachable reachable
+                    :base-relations base-relations
+                    :problem-actions problem-actions
+                    :results results
+                    :special-values (mapcar #'symbol-value *fps-worker-inherited-specials*)
+                    :frontier-count (length frontier)
+                    :progress (list 0 (get-internal-real-time)
+                                    (sb-thread:make-mutex :name "fps-frontier-progress"))))
+         (productive-count 0)
+         (first-productive-idx 0)
+         (last-productive-idx 0))
+    (format t "~&  [forward] Expanding ~:D frontier states on ~D threads...~%"
+            (length frontier) *threads*)
+    (finish-output)
+    (tq-push-many queue (loop for target in frontier
+                              for idx from 1
+                              collect (cons idx target)))
+    (tq-signal-done queue)
+    (reset-parallel-control-flags)
+    (call-with-parallel-search-lifetime
+     (lambda ()
+       (run-parallel-worker-group
+        queue *threads*
+        :function (lambda (worker-id worker-queue)
+                    (fps-forward-per-object-worker worker-id worker-queue job)))))
+    (loop for result across results
+          do (fps-merge-layer-stats stats (first result))
+             (incf productive-count (second result))
+             (when (and (plusp (third result))
+                        (or (zerop first-productive-idx)
+                            (< (third result) first-productive-idx)))
+               (setf first-productive-idx (third result)))
+             (setf last-productive-idx (max last-productive-idx (fourth result))))
+    (values productive-count first-productive-idx last-productive-idx)))
+
+
+(defun fps-forward-per-object-worker (worker-id queue job)
+  "Worker loop for FPS-EXPAND-FRONTIER-PARALLEL: pop (INDEX . STATE) tasks from QUEUE
+   and expand each into this worker's own stats.  Saves
+   (STATS PRODUCTIVE-COUNT FIRST-PRODUCTIVE-IDX LAST-PRODUCTIVE-IDX) in JOB's results."
+  (progv *fps-worker-inherited-specials* (getf job :special-values)
+    (let ((stats (make-fps-layer-stats))
+          (productive-count 0)
+          (first-productive-idx 0)
+          (last-productive-idx 0))
+      (tq-register-worker queue)
+      (loop for task = (tq-pop-blocking queue)
+            while task
+            do (when (fps-expand-frontier-state (cdr task)
+                                                (getf job :rels-groups)
+                                                (getf job :reachable)
+                                                (getf job :base-relations)
+                                                (getf job :problem-actions)
+                                                stats)
+                 (incf productive-count)
+                 (when (or (zerop first-productive-idx)
+                           (< (car task) first-productive-idx))
+                   (setf first-productive-idx (car task)))
+                 (setf last-productive-idx (max last-productive-idx (car task))))
+               (fps-report-parallel-frontier-progress job))
+      (setf (aref (getf job :results) worker-id)
+            (list stats productive-count first-productive-idx last-productive-idx)))))
+
+
+(defun fps-report-parallel-frontier-progress (job)
+  "Count one finished frontier state for JOB; print the total at most every 30 seconds."
+  (let ((progress (getf job :progress))
+        (frontier-count (getf job :frontier-count)))
+    (sb-thread:with-mutex ((third progress))
+      (incf (first progress))
+      (let ((now (get-internal-real-time)))
+        (when (>= (- now (second progress)) (* 30 internal-time-units-per-second))
+          (format t "~&  [forward] ~:D/~:D frontier states (~,1F%)~%"
+                  (first progress) frontier-count
+                  (* 100.0 (/ (first progress) frontier-count)))
+          (finish-output)
+          (setf (second progress) now))))))
+
+
+(defun fps-merge-layer-stats (into from)
+  "Add FROM's counters, per-action tables and layer table into INTO.  Per-action
+   counts are summed, sample tables keep INTO's entry, and layer-table entries for
+   the same predecessor key have their witnesses merged."
+  (incf (fps-layer-stats-raw-count into) (fps-layer-stats-raw-count from))
+  (incf (fps-layer-stats-feasible-count into) (fps-layer-stats-feasible-count from))
+  (incf (fps-layer-stats-validated-count into) (fps-layer-stats-validated-count from))
+  (incf (fps-layer-stats-collision-reachable-count into)
+        (fps-layer-stats-collision-reachable-count from))
+  (incf (fps-layer-stats-collision-layer-count into)
+        (fps-layer-stats-collision-layer-count from))
+  (incf (fps-layer-stats-novel-validation-attempts into)
+        (fps-layer-stats-novel-validation-attempts from))
+  (incf (fps-layer-stats-apply-success-count into) (fps-layer-stats-apply-success-count from))
+  (incf (fps-layer-stats-apply-fail-count into) (fps-layer-stats-apply-fail-count from))
+  (incf (fps-layer-stats-key-mismatch-count into) (fps-layer-stats-key-mismatch-count from))
+  (dolist (accessor (list #'fps-layer-stats-op-attempts #'fps-layer-stats-op-success
+                          #'fps-layer-stats-op-fail #'fps-layer-stats-op-raw
+                          #'fps-layer-stats-op-feasible))
+    (let ((into-table (funcall accessor into)))
+      (maphash (lambda (key count)
+                 (incf (gethash key into-table 0) count))
+               (funcall accessor from))))
+  (dolist (accessor (list #'fps-layer-stats-op-sample-failure
+                          #'fps-layer-stats-op-sample-detail))
+    (let ((into-table (funcall accessor into)))
+      (maphash (lambda (key sample)
+                 (unless (nth-value 1 (gethash key into-table))
+                   (setf (gethash key into-table) sample)))
+               (funcall accessor from))))
+  (let ((into-table (fps-layer-stats-layer-table into)))
+    (maphash (lambda (key entry)
+               (setf (gethash key into-table)
+                     (fps-merge-witness-entries (gethash key into-table) entry)))
+             (fps-layer-stats-layer-table from)))
+  into)
+
+
+(defun fps-expand-frontier-state (target rels-groups reachable base-relations
+                                  problem-actions stats)
+  "Expand one frontier state TARGET over every CSP group and object set into STATS.
+   An action applies to an object set when any member is in the action's object set
+   (or the action has none).  Returns T when TARGET produced a validated predecessor."
+  (let ((target-key (fps-state-base-prop-key target base-relations))
+        (pre-validated (fps-layer-stats-validated-count stats))
+        (seen (make-hash-table :test #'equal)))
+    (dolist (rg rels-groups)
+      (let ((object-sets (second rg))
+            (action-entries (third rg)))
+        (dolist (object-set object-sets)
+          (let* ((members (first object-set))
+                 (applicable-actions
+                   (loop for (action . obj-set) in action-entries
+                         when (or (null obj-set)
+                                  (some (lambda (m) (member m obj-set :test #'eq))
+                                        members))
+                         collect action)))
+            (when applicable-actions
+              (fps-expand-one-state-forward-per-object-csp
+               target target-key applicable-actions reachable base-relations
+               problem-actions object-set stats seen))))))
+    (> (fps-layer-stats-validated-count stats) pre-validated)))
 
 
 (defun enum-proposition-holds-p (state proposition)
@@ -1172,13 +1370,14 @@ Set to NIL for no cap.")
     new-count))
 
 
-(defun %find-predecessors-fn (&key (action-families :auto)
+(defun %find-predecessors-fn (&key (actions :all)
                                    (direction 'forward))
   "Interactive iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
    DIRECTION BACKWARD regresses from the current frontier.
    DIRECTION FORWARD generates predecessors via per-object CSP enumeration
    over action-modified base relations, then validates each candidate by
    forward application.
+   ACTIONS selects the candidate last actions (see ENUM-SELECT-ACTIONS).
    When no *BACKWARD-REACHABLE-SET* exists, :FORWARD auto-seeds from goal states.
    Prompts (y-or-n-p) after each layer. Ctrl-C safely reverts to the last
    completed layer."
@@ -1191,11 +1390,7 @@ Set to NIL for no cap.")
   (let* ((norm-direction (fps-normalize-predecessor-direction direction))
          (base-relations (get-base-relations))
          (problem-actions *actions*)
-         (resolved-action-families (if (eq action-families :auto)
-                                       (enum-default-action-families-from-actions problem-actions)
-                                       action-families))
-         (families (enum-normalize-action-families resolved-action-families))
-         (selected-actions (enum-select-actions-by-family problem-actions families))
+         (selected-actions (enum-select-actions problem-actions actions))
          (reachable (ecase norm-direction
                       (:backward (make-hash-table :test 'equal))
                       (:forward

@@ -1,0 +1,171 @@
+CORNER-TOPO-ADVISOR -- SEARCH ANALYSIS (search advisor record)
+
+PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
+  Spec: probs/problem-corner-topo-advisor.lisp (accepted 2026-10-12) with tech/beam-relay.lisp E2.
+  Upstream: problem-analysis.txt (rev 2), spec-analysis.txt, spec-analysis-search-handoff.txt.
+  Scope: phase 0 (read and reason only), 2026-10-12. No runs authorized yet.
+
+OBJECTIVE
+  Shortest plan (unit cost), connector names irrelevant; establish whether 15 is minimal.
+
+PHASE 0 PROFILE (2026-10-12)
+  Answer form: a sequence of actions (spec).
+  Repeated states: yes; moves can be undone, 62% repeats pruned at depth 5 (spec record).
+  Fixed length: no (spec).
+  Interchangeable objects: connector1-3, already handled by symmetry pruning (spec record).
+  Size: about 7-8 states generated per level to depth 5 (32,475 states at depth 5); connect
+    choices dominate (spec record).
+  Generic topology lower bound (source reading, tech/topo-lower-bound.lisp): the automatically
+    registered term counts only location goals and the controllers of closed gates on the
+    route.  Here: one move to location4, plus pickup and connect for receiver1 when no
+    transmitter-to-receiver1 pairing path exists (one if a connector is held).  At most 3; the
+    receiver2/receiver3 goals contribute nothing.  Under a cutoff it can only stop expansion in
+    the last two or three levels.  Its gain is unknown and must be timed.
+  Milestones: present (analysis hints) but not this advisor's strategy.
+
+PRELIMINARY PROJECTION (deduction, not measured)
+  At 3-8 distinct new states per level beyond depth 5, depth 15 means roughly 10^9 to 10^13
+  states.  Heap is about 25 GB, so a graph search holds on the order of tens of millions of
+  states.  A single depth-15 forward search is very likely impractical unless growth beyond
+  depth 5 falls far below the measured shallow rate.
+
+PROPOSED NEXT PROBE (awaiting approval)
+  Growth probe: cutoffs 6, 7, 8 at 16 threads, min-length, on the accepted spec; record states,
+  time and repeat percentage per cutoff.  Interpretation: growth ratio per level projects
+  depth 15 time and memory; if it confirms impracticality, evaluate the direct alternatives
+  (meet-in-the-middle from goal states first, per the spec handoff).
+
+PHASE 1 GROWTH PROBE (2026-10-12, user, Windows, 16 threads, min-length, accepted spec)
+  cutoff  program cycles  states processed  time     repeats  inconsistent abandoned
+  5       --              32,475            0.3 s    --       298
+  6       12,391          126,475           0.9 s    47.1%    1,847
+  7       67,668          940,742           7.4 s    79.8%    18,702
+  8       222,156         4,087,511         39.4 s   75.6%    151,105
+  No solutions (expected).  Growth per level: time x3 to x8, cycles x3.3 to x5.5.
+  Rate about 100,000 states per second at 16 threads.
+
+FINDINGS
+  Depth-15 forward search: seven more levels at x5 to x8 per level in time gives about one
+    month to several years; stored states grow to roughly 10^9 to 10^10, far above what a 25 GB
+    heap holds (bytes per state not measured here).  Impractical by orders of magnitude.
+  Proving 15 minimal (exhausting depth 14) is the same scale.
+  Topology lower bound: at most removes the last two or three levels for states with no
+    pairing path to receiver1; realistically about one level.  Not enough.
+  First-move splitting (*branch*): min-length per first move, then the best of them, keeps
+    the shortest-plan guarantee, but the total work is unchanged.  Useful only to spread runs.
+
+DIRECTION
+  Evaluate the direct alternatives, meet-in-the-middle from generated goal states first.
+
+RELAXATION (source reading, 2026-10-12)
+  Derived facts (colors, receivers, gate, crossings) are functions of the base facts, so removing
+    them from search merges no states; loosened preconditions (e.g. gate1 open replaced by a
+    pairing-chain test) can only add states.  Saving is per-state propagation cost only (share
+    unmeasured; at most a constant factor), against a gap of thousands.
+  Relaxed rules admit every real plan, so the relaxed shortest length is a lower bound: a relaxed
+    search exhausting depth 14 would prove 15 minimal -- but it is at least as large as the real one.
+  The Talos techs propagate inside their own actions, so a relaxed variant needs problem-local
+    replacements for all connector and move actions (spec-advisor work).
+  Not recommended for this problem.
+  Observation (corrected below): probs/problem-corner-relaxed.lisp's header reports a solution
+    found in about 400 s at cutoff 14 -- a first find, not an exhausted search, on different
+    geometry.  Its model has no put-without-connect, no retaining pickup and no 1-terminus connect
+    (connect places the held connector), and its goal names the known answer's layout.
+
+ENUMERATOR DECLARATIONS (analysis, 2026-10-12; nothing written or run)
+  Base facts in this spec: has-location (agent1, connector1-3), holding (agent1 connector),
+    paired (connector terminus).  Fixed apparatus has coordinates, not has-location.
+  Declarations needed:
+    has-location: connectors may be unassigned (held), at most one.
+    holding: its own base relation, at most one connector, only one with no location.  Required
+      because :on-assign does not set facts for an unassigned key, and pickup/put/connect
+      preconditions read holding, so predecessors through those actions need it.
+    paired: up to 3 per connector (matches *max-connector-pairings*); a held connector may keep
+      pairings (retaining pickup), unlike the old model's declaration.
+  Goal filter: none needed; the spec's own goal (agent at location4, receiver2 and receiver3
+    active) is neutral.  The old corner filter named the known layout and is not reused.
+  Size estimate: agent fixed at location4; per connector 4 locations or held, 64 pairing subsets
+    (0-3 of 7 termini); about 3 x 10^7 combinations, about 5 x 10^6 after connector symmetry,
+    each propagated once: roughly 15 minutes serial at ~170 us each.  Goal-state count unknown.
+  Main risk: growth of the backward layers (forward branching here is 10-18 per level).
+  Threads: enumerator steps not checked with threads; run them serially until checked.
+
+ACTION-SET REDUCTION (analysis, 2026-10-12; nothing changed)
+  Requirement: dropping an action keeps min-length meaningful only if every shortest plan using
+    it has a replacement plan of the same length without it.  Without that argument a reduced
+    model still yields valid plans (an upper bound), but not minimality.
+  Single-terminus connect: cannot be dropped.  The known 15-action plan uses it (connector2 to
+    transmitter1 at location4, the cutter beam).
+  Retaining pickup: probably replaceable -- plain pickup, then connect at the destination to the
+    same termini, costs the same two actions -- when the connector has at most 3 links in all and
+    each terminus is connectable from there.  Exceptions (more than 3 links) exist; not proved.
+    About 4% of successors at depth 3.
+  Put without pairing: no general replacement.  Connecting instead creates beams that can cut
+    others or change colors, and an unpaired placed connector can later be linked by another
+    connector's connect.  Any proof would be geometry-specific.  At most about 15% of successors
+    at depth 3 (moves and puts together).
+  Conclusion: removing the replaceable actions saves perhaps 5-20%, not orders of magnitude.  The
+    branching is in connect choices (70%), which the spec advisor found no sound way to narrow.
+  Not recommended.  Direction: return to the enumerator meet-in-the-middle, which changes no rules.
+
+GOAL-STATE ENUMERATION (2026-10-12, user, Windows, serial, problem-corner-topo-advisor-1.lisp)
+  (find-goal-states), every: completed normally, 23 min 12 s, 162,028,700 program cycles,
+    453,021 inconsistent abandoned; 31,188 goal states before connector-symmetry dedupe,
+    5,828 after (25,360 dropped).  Holding (stored both ways) enumerated correctly.
+  Sample goal state 1: connector2 at location3 red, connector1 at location2 blue, connector3 held
+    with three retained pairings; receiver1 not active (consistent with the separation result).
+  Display quirk: the end-of-search "minimum path" display tries to replay the enumerator's
+    internal assignment steps and reports a REPLAY FAILURE; it does not affect the goal states.
+  Open: goal states needing more than 3 pairings on one connector are not generated.
+  Next: backward layer growth with find-predecessors, one layer at a time.  At 5,828 goal states,
+    a 7-layer backward half is feasible only if backward branching is low (about 3 or less);
+    a split such as forward 10-11 and backward 4-5 may be the practical one.
+
+BACKWARD LAYER 1 (2026-10-12, user, Windows, serial)
+  (find-predecessors): 5,641,504 candidates, 5,612,364 feasible, 0 validated, 859 s; reported
+    "saturated".  Wrong: the known plan's last step (pickup of connector2 at location4) is a
+    valid predecessor of a goal state.
+  Cause 1 (source, src/ww-enumerator-run.lisp enum-action-in-family-p): predecessor action
+    families are hard-coded to the old corner model's names -- move, pickup-connector,
+    connect-to-1/2/3-terminus.  put-connector, connect-connector and
+    pickup-connector-retaining-pairings are silently never considered.
+  Cause 2 (unresolved): pickup-connector also validated nothing.  Errors during validation are
+    caught and only counted (fps-forward-per-object-validate-leaf), so the reason is hidden.
+    Not yet checked whether the known plan's final state is among the 5,828 goal states.
+  Cost signal: about 970 candidates per goal state for two actions alone; connect predecessors
+    would add many more.
+  Status: engine capability gap.  Meet-in-the-middle cannot proceed on this spec without an
+    engine change (authorization needed).
+
+PREDECESSOR FIX, PHASE 1 (2026-10-12, engine edit approved; src/ww-enumerator-run.lisp)
+  Single-state test (known final state as the only frontier, move + pickup-connector):
+    before: 968 candidates, 0 validated (pickup never applicable; move applied 6 times, all to
+    other locations).  No hidden errors.
+  Move: no move predecessor exists for the known final state -- from location3 the agent cannot
+    walk to location4 after connector2's pickup.  Correct, not a bug.
+  Cause: the per-object CSP re-guessed one object at a time; undoing a pickup changes agent1's
+    holding and connector2's location/pairings together.  Holding's unkeyed enumeration step was
+    also dropped and its HOLDING1/HOLDING2 index facts never cleared.
+  Fix: object sets (single key objects plus holder-held pairs for holding).  After the fix:
+    63 pickup predecessors with connector2 at location4 and agent1 empty-handed, including the
+    known one (paired connector2 transmitter1).  Pickup branching is inherent: it erases pairings,
+    so any pairing set for the picked-up connector is a valid predecessor.
+  Limitation: pairings from other connectors to the picked-up connector are not restored.
+
+PREDECESSOR FIX, PHASE 2 (2026-10-12, engine edit approved; src/ww-enumerator-run.lisp)
+  find-predecessors now tries every action in the spec (:actions narrows by name).
+  Inferred modified base relations: pickup-connector, connect-connector (paired holding
+    has-location); pickup-connector-retaining-pairings, put-connector, move (holding has-location).
+  Single-state test (known final state, all 5 actions): raw 4,589, feasible 4,569, validated 64,
+    all pickup-connector = every pairing set of up to 3 for connector2 among its 7 partners.
+
+PARALLEL FIND-PREDECESSORS (2026-10-12, engine edit approved; src/ww-enumerator-run.lisp)
+  Frontier states are shared out across *threads* workers; each worker keeps its own results,
+  merged at the end.  Workers inherit the caller's package and print settings (keys are
+  printed strings).  bw-normalize! now adds CURRENT-BEAMS only when the problem defines it.
+  Test (layer 2 from the 64 layer-1 predecessors, all 5 actions):
+    16 threads: 36.2 s real, 472 s CPU (92 s system), 447 GB consed
+     0 threads: 201.3 s real, 201 s CPU, 447 GB consed
+    both: 333 unique predecessors, raw 251,840, feasible 250,560, validated 2,131
+  Speed-up 5.6x; limited by allocation contention (about 7 GB consed per frontier state) and
+  the uneven finish of 64 tasks on 16 threads.
