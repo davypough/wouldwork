@@ -1805,7 +1805,7 @@ worker must print exactly as the caller does for its keys to match the reachable
           (captured-rels base-relations)
           (captured-min-depth resolved-min-depth)
           (captured-original-goal-fn original-goal-fn)
-          (bridge-cache (make-hash-table :test 'equal)))
+          (bridge-cache (make-hash-table :test 'equal :synchronized (> *threads* 0))))
       (setf (symbol-function 'goal-fn)
             (lambda (state)
               (let ((entry (fps-meeting-point-entry-for-state state captured-set captured-rels)))
@@ -2035,7 +2035,11 @@ worker must print exactly as the caller does for its keys to match the reachable
                                  (depth-cutoff 12)
                                  (solution-type 'first)
                                  (min-backward-depth nil))
-  "Run WW-SOLVE to a meeting point, then expand to full start-to-goal solutions."
+  "Run WW-SOLVE to a meeting point, then expand to full start-to-goal solutions.
+   FIRST and MIN-LENGTH search as themselves, with a meeting goal that accepts only states
+   whose stored suffix reaches the original goal: FIRST stops at the first such meeting,
+   MIN-LENGTH prunes on the best depth found.  Other solution types search as EVERY.
+   Returns T; the solutions are in *SOLUTION-PATHS*."
   (let ((saved-depth-cutoff *depth-cutoff*)
         (saved-solution-type *solution-type*)
         (saved-goal-form (get 'goal-fn :form))
@@ -2044,9 +2048,12 @@ worker must print exactly as the caller does for its keys to match the reachable
     (unwind-protect
         (progn
           (install-meeting-point :min-backward-depth min-backward-depth
-                                 :original-goal-fn nil)
+                                 :original-goal-fn (when (member requested-solution-type '(first min-length))
+                                                     saved-goal-fn-def))
           (setf *depth-cutoff* depth-cutoff
-                *solution-type* 'every)
+                *solution-type* (if (member requested-solution-type '(first min-length))
+                                    requested-solution-type
+                                    'every))
           (ww-solve)
           (setf *solution-type* requested-solution-type)
           (let ((expanded-solutions nil)
@@ -2169,7 +2176,7 @@ worker must print exactly as the caller does for its keys to match the reachable
             (format t "~&[solve-meeting-point] Example full solution path:~%")
             (when (fboundp 'printout-solution)
               (printout-solution (first *solution-paths*))))
-          *solution-paths*)
+          t)
       (setf *depth-cutoff* saved-depth-cutoff
             *solution-type* saved-solution-type)
       (setf (get 'goal-fn :form) saved-goal-form)

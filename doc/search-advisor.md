@@ -347,7 +347,7 @@ heuristics.  The notes below the table give the details.
 | S8 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md), whose dialogue chooses the milestones and realizes them with `solve-subgoal` (and registered multi-phase strategies, `define-strategy` and `solve-via-strategy`) | Usually gives up any guarantee about the whole plan; a milestone reached the wrong way can block the rest (note 7) |
 | S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
 | S10 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
-| S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time, and `(solve-meeting-point :depth-cutoff N :solution-type first)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; confirm first that the backward step reproduces a known plan's last step (note 8) |
+| S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8) |
 | S12 | **Randomized and branch-restricted runs** | Exploring a huge space for any solution, or splitting work by hand | `*randomize-search*` t (repeat runs); `*branch*` n explores only the nth first move | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined.  With `min-length`, the best of the per-branch results is the overall shortest, but the total work is unchanged |
 | S13 | **Backtracking driver** | Memory, not time, limits graph search, and states rarely repeat by different routes; or CSP (S3) | `*algorithm*` backtracking (section 4): one state is changed and undone in place instead of copied; `*bt-cycle-check*` t also rejects a state already on the current path | Tree search only: no closed table, so a state reached by different routes is expanded again; all four hooks apply; serial or parallel; not with happenings (section 5) |
 | S14 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
@@ -422,8 +422,11 @@ same approaches with their entry points.
    start for any state in the backward set (by default one from the deepest completed layer),
    attaches the recorded backward steps, and keeps only plans that meet the original goal.
    Without a `state-feasible?` hook a generated goal state need not be reachable; the meeting
-   search decides that.  As with S10, a first meeting does not by itself make the joined plan
-   shortest.  Precedent: the commented-out section at the end of `problem-corner.lisp`,
+   search decides that.  With `first` and `min-length` a meeting counts only if its stored
+   suffix reaches the original goal: `first` stops at the first such meeting, which need not
+   give the shortest plan (as with S10); `min-length` prunes on the best depth found, and
+   the check ensures pruning cannot discard the only meeting at the best depth that
+   extends.  Precedent: the commented-out section at the end of `problem-corner.lisp`,
    written for the older corner model; its goal filter names the known solution's layout.
    `find-predecessors` tries every action in the spec by default; `:actions` takes a list of
    action names to narrow it.  History (2026-10-12): it first picked actions by fixed names
@@ -431,8 +434,24 @@ same approaches with their entry points.
    corner-topo-advisor-1 (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
    candidates in 14 minutes and kept none, although the known plan's last step is a valid
    predecessor.  Both are fixed (a held connector is now re-guessed together with its
-   holder); re-measurement pending.  Before relying on this strategy, confirm that the
-   backward step reproduces a known plan's last step.
+   holder).  Result (2026-10-14): 6 backward layers from the 5,828 goal states (91,886
+   states, about 1.4 h at 16 threads; layer 6 alone added 66,037), then a depth-9 forward
+   meeting search found a 14-action plan, one shorter than the known 15.  Searching as
+   `every` it ran to the cutoff (13 min, 13.0 M states, 92 meetings, all at depth 8); as
+   `min-length` the bound fell to 8 early and it finished in 3 min (3.6 M states); as
+   `first` it stopped in 1 min (1.0 M states) with a 15-action plan.  A direct forward
+   search to depth 14 was out of reach (depth 8 took 39 s, growing 5 to 8 times per level).
+   Choosing the split: meeting at the deepest layer L misses nothing, since every longer
+   plan passes through a state exactly L from the goal.  The cutoff D then covers plans up
+   to D + L.  Except under `first` and `min-length`, the forward search is exhaustive to D
+   (an `every` run at D = 10 ran out of memory here), so add backward layers before raising
+   D while layers are affordable.  Keys must include every base relation,
+   including bijective ones such as `holding`, or distinct states merge and predecessors
+   are checked against the wrong state (fixed 2026-10-14).  Missed predecessors (a plain
+   pickup also removes other connectors' pairings to the picked-up one) make stored
+   distances upper bounds, so "shortest" holds only for the backward set as built.  Before
+   relying on this strategy, confirm that the backward step reproduces a known plan's last
+   step.
 9. **Action-set reduction.**  Dropping or narrowing an action keeps a shortest-plan or
    no-solution result valid only if every plan using it can be rewritten, at the same length
    or shorter, as one that does not.  Argue it action by action: name the replacement steps,

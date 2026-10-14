@@ -310,3 +310,50 @@ MEET-IN-THE-MIDDLE, DEPTH 10 (2026-10-14, same image as the 5 post-fix layers)
     the exhaustive search ends).
   Next: 6 backward layers (plan step 9 expected at depth 6), then depth-9 meeting run.
     Deferred until the backward set can be saved to and loaded from a file.
+
+BACKWARD LAYER 6 (2026-10-14, fresh image, 16 threads, resumed from the saved 3-layer file)
+  load-predecessors (corner-topo-advisor-1-predecessors-3.lisp) then find-predecessors to 6.
+  Layer 6: 27,564,396 raw, 127,887 validated, 66,037 new unique (91,886 total), 1,227 s.
+    Saved file: 252,833,898 bytes, 2.5 s.
+  Layer 6 adds 10x the states of layer 5 (6,504): the backward frontier is widening fast,
+    so further backward layers get expensive in states and file size.
+  Known plan, steps 8..15: (8 NIL) (9 6) (10 5) (11 4) (12 3) (13 2) (14 1) (15 0).
+    Step 9 is at distance 6 as expected; plan steps 9..15 are shortest.
+  Next: (solve-meeting-point :depth-cutoff 9 :solution-type first :min-backward-depth 6).
+
+MEET-IN-THE-MIDDLE, DEPTH 9 x 6 LAYERS (2026-10-14, 16 threads, same image as layer 6)
+  (solve-meeting-point :depth-cutoff 9 :solution-type min-length), default min depth 6:
+    forward search 781 s real, 9,376 s CPU, 8.35 TB consed; 13.0 M states, 76.9% repeated,
+    1.62 M canonical duplicates pruned.  Whole call 788 s (extension about 7 s).
+  92 meetings, all at forward depth 8; all 92 extended; shortest full plan 14 steps
+    (8 forward + 6 backward), one step shorter than the known 15-step plan.
+  Plan: pickup C1, walk L1-L2, connect C1 (R3 R1 T2), pickup C2, walk L2-L3,
+    connect C2 (C1 R1 T1), pickup C3, walk L3-L4 via gate1, connect C3 (T1), walk L4-L3,
+    pickup C2, connect C2 (C1 R2 T1), walk L3-L4, pickup-connector-retaining-pairings C3.
+  The known plan meets distance 6 at step 9; this plan reaches it at step 8.
+  Comparison: earlier forward search to depth 8 alone took 39 s, with x5..x8 per level, so a
+    direct forward search to 14 was out of reach; backward 6 layers (about 1.4 h) plus a
+    13-min forward search found it.
+  solve-meeting-point-fn now returns T (solutions in *solution-paths*).
+
+MEET-IN-THE-MIDDLE AS MIN-LENGTH (2026-10-14, fresh image, 16 threads, loaded 6-layer file)
+  Change: solve-meeting-point-fn searches as MIN-LENGTH when min-length is requested, with a
+    meeting goal that requires bridgeability (stored suffix reaches the original goal);
+    bridge cache synchronized.  Other solution types still search as EVERY.
+  (solve-meeting-point :depth-cutoff 9 :solution-type min-length):
+    bounds printed: 9, then 8.  2 solutions recorded (depths 9 and 8), both extended.
+    Forward search 181.5 s real, 2,321 s CPU, 2.05 TB consed; 3.60 M states, 78.0% repeated.
+    Whole call 181.7 s.  Same 14-step plan.
+  Against the exhaustive EVERY run (781 s, 13.0 M states, 8.35 TB): 4.3x faster, 3.6x fewer
+    states, 4.1x less consing.  Once the depth-8 bound is set the search only seeks depth-7
+    meetings, so the 14-step plan is shortest for this backward set.
+
+MEET-IN-THE-MIDDLE AS FIRST (2026-10-14, fresh image, 16 threads, loaded 6-layer file)
+  Change: FIRST also searches as itself, with the bridgeability meeting goal.
+  (solve-meeting-point :depth-cutoff 9 :solution-type first):
+    stopped at the first extendable meeting, forward depth 9: 58.2 s, 0.97 M states,
+    0.62 TB consed.  15-step plan (9 + 6), different from the known 15-step plan.
+  Summary of the three meeting modes at D = 9, L = 6:
+    every       781 s  13.0 M states  92 meetings  shortest 14
+    min-length  182 s   3.6 M states   2 meetings  14 (proved shortest for this set)
+    first        58 s   1.0 M states   1 meeting   15
