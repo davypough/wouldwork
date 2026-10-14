@@ -282,3 +282,31 @@ MEET-IN-THE-MIDDLE, FIRST RUN (2026-10-13, 16 threads, same image as the 5 layer
     is invisible to every key and to the successor match.  States differing only in what the
     agent holds were merged, and predecessors were validated against holding-variants of the
     frontier state.  All goal-state and layer counts so far are affected.
+
+HOLDING FIX TEST (2026-10-14, fresh image, 16 threads)
+  enum-base-props-of: REL1 index facts -> (REL . args), so holding enters every key and the
+  successor match.  Plan state after 9 steps now shows (HOLDING AGENT1 CONNECTOR1).
+  find-goal-states: 5,828 goal states (canonical dedupe dropped 25,360); unchanged, so goal
+    states were not affected by the merge.
+  Backward layers (new unique / total, time):
+    1: 3,855 / 9,683    1065 s   (23.9 M raw, 21,877 validated)
+    2: 3,758 / 13,441    761 s
+    3: 2,471 / 15,912    788 s
+    4: 3,433 / 19,345    488 s
+    5: 6,504 / 25,849    622 s   (total 3,724 s)
+  Layer totals are about 1/4 of the pre-fix figures (99,354 at layer 5): the pre-fix runs
+    validated predecessors against holding-variants of the frontier, admitting false ones.
+  Known plan, steps 8..15: (8 NIL) (9 NIL) (10 5) (11 4) (12 3) (13 2) (14 1) (15 0).
+    Each step has one depth and the depth falls by exactly 1 per step: plan steps 10..15
+    are shortest.  Step 9 is beyond layer 5, so the earlier "plan of at most 14 steps"
+    conclusion was an artifact of the holding-blind keys.  Distance of step 9 is 6
+    (or a missed predecessor; see the pickup limitation).
+  Holding fix: closed.
+
+MEET-IN-THE-MIDDLE, DEPTH 10 (2026-10-14, same image as the 5 post-fix layers)
+  (solve-meeting-point :depth-cutoff 10 :solution-type first :min-backward-depth 5):
+    heap exhausted after about 2,550 s.  Last progress: 34.3 M states, 5.4 M closed entries,
+    84% repeated, b* 5.56, 154 meeting solutions, none extended (extension runs only after
+    the exhaustive search ends).
+  Next: 6 backward layers (plan step 9 expected at depth 6), then depth-9 meeting run.
+    Deferred until the backward set can be saved to and loaded from a file.
