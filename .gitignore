@@ -13,3 +13,4 @@ tmp/
 *.log
 .aider.tags.cache.v4/
 *.fasl
+/*-predecessors-*

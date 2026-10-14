@@ -94,12 +94,16 @@ worker must print exactly as the caller does for its keys to match the reachable
 
 (defmacro find-predecessors (&key
                                (actions :all actions-supplied-p)
-                               (direction 'forward direction-supplied-p))
+                               (direction 'forward direction-supplied-p)
+                               (layers 1)
+                               (save t))
   "User-facing macro wrapper for FIND-PREDECESSORS-FN.
    Automatically quotes literal symbols/lists for :ACTIONS and :DIRECTION,
    so users can write e.g. (find-predecessors :direction forward
                                               :actions (move pickup-connector)).
-   :ACTIONS defaults to every action in the problem (see ENUM-SELECT-ACTIONS)."
+   :ACTIONS defaults to every action in the problem (see ENUM-SELECT-ACTIONS).
+   :LAYERS is the number of new layers to compute before returning (default 1).
+   :SAVE (default T) calls SAVE-PREDECESSORS after each layer that adds states."
   (flet ((literal-symbol-p (form)
            (and (symbolp form)
                 (not (keywordp form))
@@ -120,7 +124,9 @@ worker must print exactly as the caller does for its keys to match the reachable
               '(:actions :all))
         ,@(if direction-supplied-p
               `(:direction ,(maybe-quote direction))
-              '(:direction 'forward))))))
+              '(:direction 'forward))
+        :layers ,layers
+        :save ,save))))
 
 
 (defun find-goal-states-fn (goal-spec &key (algorithm *algorithm*) (solution-type 'every)
@@ -140,11 +146,15 @@ worker must print exactly as the caller does for its keys to match the reachable
 
 
 (defun find-predecessors-fn (&key (actions :all)
-                                  (direction 'forward))
+                                  (direction 'forward)
+                                  (layers 1)
+                                  (save t))
   "Top-level API wrapper. Full implementation is defined below in
    %FIND-PREDECESSORS-FN to keep call flow top-down in this file."
   (%find-predecessors-fn :actions actions
-                         :direction direction))
+                         :direction direction
+                         :layers layers
+                         :save save))
 
 
 (defun enumerate-state (goal-spec &key (algorithm *algorithm*) (solution-type 'first)
@@ -1391,16 +1401,20 @@ worker must print exactly as the caller does for its keys to match the reachable
 
 
 (defun %find-predecessors-fn (&key (actions :all)
-                                   (direction 'forward))
-  "Interactive iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
+                                   (direction 'forward)
+                                   (layers 1)
+                                   (save t))
+  "Iterative predecessor enumeration from *ENUMERATED-GOAL-STATES*.
    DIRECTION BACKWARD regresses from the current frontier.
    DIRECTION FORWARD generates predecessors via per-object CSP enumeration
    over action-modified base relations, then validates each candidate by
    forward application.
    ACTIONS selects the candidate last actions (see ENUM-SELECT-ACTIONS).
-   When no *BACKWARD-REACHABLE-SET* exists, :FORWARD auto-seeds from goal states.
-   Prompts (y-or-n-p) after each layer. Ctrl-C safely reverts to the last
-   completed layer."
+   When no *BACKWARD-REACHABLE-SET* exists, :FORWARD auto-seeds from goal states;
+   otherwise it resumes from the entries at the deepest stored depth.
+   Computes LAYERS new layers, then returns (earlier on saturation).
+   When SAVE is true, each layer that adds states is saved with SAVE-PREDECESSORS.
+   Ctrl-C safely reverts to the last completed layer."
   (unless *enumerated-goal-states*
     (format t "~&[find-predecessors] No goal states. Run (find-goal-states) first.~%")
     (return-from %find-predecessors-fn nil))
@@ -1429,27 +1443,30 @@ worker must print exactly as the caller does for its keys to match the reachable
          (frontier nil)
          (layer 0)
          (completed-layers 0))
-    (ecase norm-direction
-      (:backward
-       ;; Seed layer 0: goal states with empty action paths
-       (dolist (gs *enumerated-goal-states*)
-         (let ((key (enum-solution-state-key gs)))
-           (let ((existing (gethash key reachable)))
-             (setf (gethash key reachable)
-                   (if existing
-                       (fps-entry-add-witness existing gs nil)
-                       (fps-make-witness-entry gs nil))))))
-       (setf *backward-reachable-set* reachable)
-       (format t "~&[find-predecessors ~S] Layer 0 (goals): ~:D unique states seeded.~%"
-               norm-direction
-               (hash-table-count reachable)))
-      (:forward
-       (format t "~&[find-predecessors ~S] Starting from reachable set: ~:D states.~%"
-               norm-direction
-               (hash-table-count reachable))))
-    ;; Seed frontier from reachable set (both directions use same pattern)
+    (when (eq norm-direction :backward)
+      ;; Seed layer 0: goal states with empty action paths
+      (dolist (gs *enumerated-goal-states*)
+        (let ((key (enum-solution-state-key gs)))
+          (let ((existing (gethash key reachable)))
+            (setf (gethash key reachable)
+                  (if existing
+                      (fps-entry-add-witness existing gs nil)
+                      (fps-make-witness-entry gs nil))))))
+      (setf *backward-reachable-set* reachable)
+      (format t "~&[find-predecessors ~S] Layer 0 (goals): ~:D unique states seeded.~%"
+              norm-direction
+              (hash-table-count reachable)))
+    ;; Resume from the deepest stored layer (depth 0 for a fresh set)
+    (setf layer (loop for entry being the hash-values of reachable
+                      maximize (fps-entry-max-depth entry)))
+    (setf completed-layers layer)
     (setf frontier (loop for entry being the hash-values of reachable
-                         collect (fps-entry-primary-state entry)))
+                         when (= (fps-entry-max-depth entry) layer)
+                           collect (fps-entry-primary-state entry)))
+    (when (eq norm-direction :forward)
+      (format t "~&[find-predecessors ~S] Starting from reachable set: ~:D states, depth ~D, ~:D frontier states.~%"
+              norm-direction
+              (hash-table-count reachable) layer (length frontier)))
     ;; Iterative expansion
     (loop
       (incf layer)
@@ -1495,7 +1512,9 @@ worker must print exactly as the caller does for its keys to match the reachable
             (format t "~&[find-predecessors ~S] Saturated - no new states at layer ~D.~%"
                     norm-direction layer)
             (return))
-          (unless (y-or-n-p "Continue to layer ~D? " (1+ layer))
+          (when save
+            (save-predecessors))
+          (when (zerop (decf layers))
             (return)))))
     (format t "~&[find-predecessors ~S] Done. *backward-reachable-set* contains ~:D states.~%"
             norm-direction
@@ -1505,6 +1524,209 @@ worker must print exactly as the caller does for its keys to match the reachable
                 :completed-layers completed-layers
                 :reachable-count (hash-table-count *backward-reachable-set*)))
     t))
+
+
+(defun save-predecessors (&optional path)
+  "Save *BACKWARD-REACHABLE-SET* and *ENUMERATED-GOAL-STATES* to PATH as readable data.
+   PATH defaults to <project root>/<problem-name>-predecessors-<layers>.lisp, where
+   <layers> is the deepest stored depth.  The file is written to a temporary sibling
+   and renamed over PATH, so an interrupted save leaves any earlier file intact.
+   Problems with happenings are not supported (the hidb is not saved)."
+  (when *happening-names*
+    (error "SAVE-PREDECESSORS: problems with happenings are not supported."))
+  (let* ((reachable *backward-reachable-set*)
+         (layers (loop for entry being the hash-values of reachable
+                       maximize (fps-entry-max-depth entry)))
+         (target (if path
+                     (merge-pathnames (pathname path) *default-pathname-defaults*)
+                     (merge-pathnames (format nil "~(~A~)-predecessors-~D.lisp" *problem-name* layers)
+                                      (asdf:system-source-directory :wouldwork))))
+         (start-time (get-internal-real-time)))
+    (write-predecessors-file target layers)
+    (format t "~&[save-predecessors] Saved ~:D entries (~D layers) and ~:D goal states to ~A (~:D bytes, ~,1Fs).~%"
+            (hash-table-count reachable)
+            layers
+            (length *enumerated-goal-states*)
+            target
+            (with-open-file (s target :element-type '(unsigned-byte 8))
+              (file-length s))
+            (/ (- (get-internal-real-time) start-time)
+               internal-time-units-per-second))
+    target))
+
+
+(defun write-predecessors-file (target layers)
+  "Atomically replace TARGET with the backward reachable set as readable data."
+  (let ((temporary (subgoal-progress-temporary-pathname target))
+        (completed nil))
+    (unwind-protect
+        (progn
+          (with-open-file (stream temporary :direction :output :if-exists :error
+                                            :if-does-not-exist :create)
+            (write-predecessors-data stream layers))
+          (uiop:rename-file-overwriting-target temporary target)
+          (setf completed t))
+      (unless completed
+        (uiop:delete-file-if-exists temporary)))))
+
+
+(defun write-predecessors-data (stream layers)
+  "Write one form per line: the header plist, one fact list per goal state, then one
+   (KEY ((FACTS . PATH) ...)) form per reachable entry.  FACTS is the LIST-DATABASE of
+   the witness idb; PATH is its action forms toward the goal."
+  (let ((reachable *backward-reachable-set*))
+    (format stream ";;; Wouldwork backward reachable set (find-predecessors)~%")
+    (format stream ";;; Forms: header plist, goal-state fact lists, then (key ((facts . path) ...)) entries.~%")
+    (format stream ";;; Restore with LOAD-PREDECESSORS after staging the same problem.~2%")
+    (with-standard-io-syntax
+      (let ((*package* (find-package :ww))
+            (*print-pretty* nil)
+            (*print-readably* nil))
+        (prin1 (list :format-version 1
+                     :problem *problem-name*
+                     :saved (multiple-value-bind (sec min hour day month year)
+                                (decode-universal-time (get-universal-time))
+                              (format nil "~D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D"
+                                      year month day hour min sec))
+                     :goal (getf (get 'find-goal-states :last-report) :goal)
+                     :base-relations (get-base-relations)
+                     :groups *enumerator-detected-groups*
+                     :symmetric-relations *enumerator-detected-symmetric-relations*
+                     :completed-layers layers
+                     :entry-count (hash-table-count reachable)
+                     :goal-state-count (length *enumerated-goal-states*))
+               stream)
+        (terpri stream)
+        (dolist (gs *enumerated-goal-states*)
+          (prin1 (list-database (problem-state.idb gs)) stream)
+          (terpri stream))
+        (maphash (lambda (key entry)
+                   (prin1 (list key
+                                (mapcar (lambda (w)
+                                          (cons (list-database (problem-state.idb (car w)))
+                                                (cdr w)))
+                                        entry))
+                          stream)
+                   (terpri stream))
+                 reachable)))))
+
+
+(defun load-predecessors (&key path verify)
+  "Restore *BACKWARD-REACHABLE-SET* and *ENUMERATED-GOAL-STATES* saved by SAVE-PREDECESSORS
+   into a freshly staged problem.  PATH defaults to the highest-numbered
+   <problem-name>-predecessors-<layers>.lisp in the project root.  The header must match the
+   staged problem, and the interchangeable groups, recomputed from the goal, must match the
+   saved ones.  Keys are recomputed under the caller's print settings, as FIND-PREDECESSORS
+   made them.  When VERIFY is true, every witness path is replayed and must reach a state
+   satisfying GOAL-FN.  Afterwards (find-predecessors) continues from the deepest layer."
+  (let ((source (if path
+                    (merge-pathnames (pathname path) *default-pathname-defaults*)
+                    (first (sort (directory (merge-pathnames
+                                             (format nil "~(~A~)-predecessors-*.lisp" *problem-name*)
+                                             (asdf:system-source-directory :wouldwork)))
+                                 #'>
+                                 :key (lambda (p)
+                                        (let ((name (pathname-name p)))
+                                          (parse-integer name :start (1+ (position #\- name :from-end t)))))))))
+        (start-time (get-internal-real-time)))
+    (unless source
+      (error "LOAD-PREDECESSORS: no ~(~A~)-predecessors-*.lisp file in the project root."
+             *problem-name*))
+    (multiple-value-bind (header goal-fact-lists entry-forms)
+        (read-predecessors-file source)
+      (let ((goal (getf header :goal))
+            (layers (getf header :completed-layers)))
+        (unless (eql (getf header :format-version) 1)
+          (error "LOAD-PREDECESSORS: unsupported format version ~S." (getf header :format-version)))
+        (unless (eq (getf header :problem) *problem-name*)
+          (error "LOAD-PREDECESSORS: file is for problem ~S, staged problem is ~S."
+                 (getf header :problem) *problem-name*))
+        (unless (equal goal (get 'goal-fn :form))
+          (error "LOAD-PREDECESSORS: saved goal ~S differs from the staged goal ~S."
+                 goal (get 'goal-fn :form)))
+        (unless (equal (getf header :base-relations) (get-base-relations))
+          (error "LOAD-PREDECESSORS: saved base relations ~S differ from the staged ~S."
+                 (getf header :base-relations) (get-base-relations)))
+        (let ((ctx (enum-compute-context goal :skip-fixed-maps t)))
+          (unless (and (= (length (getf ctx :interchangeable-groups)) (length (getf header :groups)))
+                       (every #'alexandria:set-equal (getf ctx :interchangeable-groups) (getf header :groups)))
+            (error "LOAD-PREDECESSORS: recomputed groups ~S differ from the saved ~S."
+                   (getf ctx :interchangeable-groups) (getf header :groups)))
+          (setf *enumerator-detected-groups* (getf header :groups)
+                *enumerator-detected-symmetric-relations* (getf ctx :symmetric-relations)))
+        (let ((goal-states (mapcar #'enum-make-state-from-propositions goal-fact-lists))
+              (reachable (rebuild-predecessor-entries entry-forms verify)))
+          (unless (= (loop for entry being the hash-values of reachable
+                           maximize (fps-entry-max-depth entry))
+                     layers)
+            (error "LOAD-PREDECESSORS: deepest stored depth differs from the header's ~D layers."
+                   layers))
+          (setf *enumerated-goal-states* goal-states
+                *backward-reachable-set* reachable
+                (get 'find-goal-states :last-report) (fgs-build-report goal goal-states)
+                (get 'find-predecessors :last-report) (list :direction :forward
+                                                            :completed-layers layers
+                                                            :reachable-count (hash-table-count reachable)))
+          (format t "~&[load-predecessors] Loaded ~:D entries (~D layers) and ~:D goal states from ~A~:[~;, verified~] (~,1Fs).~%"
+                  (hash-table-count reachable)
+                  layers
+                  (length goal-states)
+                  source
+                  verify
+                  (/ (- (get-internal-real-time) start-time)
+                     internal-time-units-per-second))
+          (loop for depth from 0 to layers
+                do (format t "~&[load-predecessors]   depth ~D: ~:D entries~%"
+                           depth
+                           (loop for entry being the hash-values of reachable
+                                 count (= (fps-entry-max-depth entry) depth))))
+          source)))))
+
+
+(defun read-predecessors-file (source)
+  "Read SOURCE with reader evaluation disabled.  Returns three values: the header plist,
+   the goal-state fact lists, and the (KEY ((FACTS . PATH) ...)) entry forms."
+  (with-open-file (stream source :direction :input)
+    (with-standard-io-syntax
+      (let* ((*package* (find-package :ww))
+             (*read-eval* nil)
+             (eof (gensym "EOF"))
+             (header (read stream))
+             (goal-fact-lists (loop repeat (getf header :goal-state-count)
+                                    collect (read stream)))
+             (entry-forms (loop for form = (read stream nil eof)
+                                until (eq form eof)
+                                collect form)))
+        (unless (= (length entry-forms) (getf header :entry-count))
+          (error "LOAD-PREDECESSORS: ~A has ~:D entries; its header says ~:D."
+                 source (length entry-forms) (getf header :entry-count)))
+        (values header goal-fact-lists entry-forms)))))
+
+
+(defun rebuild-predecessor-entries (entry-forms verify)
+  "Return an EQUAL reachable table built from ENTRY-FORMS, each (KEY ((FACTS . PATH) ...)).
+   Each witness state is rebuilt from FACTS and must reproduce KEY and FACTS' count.
+   When VERIFY is true, each PATH must replay from its state to a state satisfying GOAL-FN."
+  (let ((reachable (make-hash-table :test 'equal)))
+    (dolist (form entry-forms reachable)
+      (destructuring-bind (key witnesses) form
+        (setf (gethash key reachable)
+              (mapcar (lambda (witness)
+                        (let ((state (enum-make-state-from-propositions (car witness))))
+                          (unless (string= (enum-solution-state-key state) key)
+                            (error "LOAD-PREDECESSORS: rebuilt key differs from stored key ~S." key))
+                          (unless (= (hash-table-count (problem-state.idb state)) (length (car witness)))
+                            (error "LOAD-PREDECESSORS: rebuilt idb has ~D entries, ~D facts stored, for key ~S."
+                                   (hash-table-count (problem-state.idb state)) (length (car witness)) key))
+                          (when verify
+                            (let ((validation (validate-action-sequence state (cdr witness)
+                                                                        :goal-test (symbol-function 'goal-fn))))
+                              (unless (and (action-sequence-validation-success-p validation)
+                                           (action-sequence-validation-goal-satisfied-p validation))
+                                (error "LOAD-PREDECESSORS: path ~S does not reach the goal from its state (key ~S)."
+                                       (cdr witness) key))))
+                          (cons state (cdr witness))))
+                      witnesses))))))
 
 
 (defun fps-meeting-point-entry-for-state (state &optional
