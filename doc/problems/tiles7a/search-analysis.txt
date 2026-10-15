@@ -50,3 +50,51 @@ writing any spec code.
 Regenerate (from the wouldwork root):
   python doc/problems/tiles7a/distance-table-check.py 3 3 LELL 3HOR DTEE
   python doc/problems/tiles7a/distance-table-check.py 0 0 DELL CANE LTEE
+
+
+Relaxed lower bound (h-max, LM-cut) (2026-10-15)
+------------------------------------------------
+Question: does a relaxed version of the puzzle (an empty cell stays empty, a
+piece once somewhere stays there) give a lower bound that pays for itself,
+against the yellow tile's Manhattan distance?
+
+Finding: it is the strongest sound bound tried on tiles7a, but far too
+costly per state.  Not worth using here.
+
+Start-state bounds (relaxed-bound-check.py, independent of wouldwork):
+  target   Manhattan   h-max   LM-cut   best distance table   known optimum
+  3,3          7         10       11            7-8                22
+  2,2          8         12       15             -                  -
+  0,0         13         16       19          14-16                 -
+  from the 3,3 checkpoint to 2,2: Manhattan 2, h-max 4, LM-cut 6, optimum 48.
+LM-cut counts the pieces that must move out of the yellow tile's way at
+least once; the distance tables lost that because removing pieces removes
+the crowding.  It misses that cells refill, so its gap to the optimum grows
+as the board gets more crowded.
+
+In wouldwork: probs/problem-tiles7a-heuristic-2.lisp declares the relaxed
+model with declare-relaxed-model (src/ww-relaxed-heuristics.lisp); the engine
+evaluates its LM-cut value as the lower bound.  Linux VM, SBCL 2.6.9, serial:
+  stage            heuristic-1 (Manhattan)          heuristic-2 (LM-cut)
+  start -> 3,3     3,440 cycles, 0.04 s, 22 moves   1,403 cycles, 3.8 s, 22 moves
+  3,3 -> 2,2       238,333 cycles, 1,366,691 states, not finished: 311,628 states
+                   4.6 s, 48 moves                  in 150 s, still in the first
+                                                    of 5 initial branches
+  user's REPL, 16 threads, start -> 3,3: 22 moves, 624 cycles, 2.4 s.
+  one evaluation at the start state: LM-cut 3.6 ms, h-max 0.14 ms; the search
+  spends about 3 microseconds per state.  Profile: the repeated h-max passes
+  of LM-cut's rounds about 56%, the before-goal zone about 22%.
+
+Lesson beyond tiles7a: a relaxed bound pays only where states are expensive
+to generate or the bound is close to the true distance.  In a cheap, crowded
+sliding-block puzzle it is 1000 times the cost of a distance per state and
+prunes little where the distance is small but the solution long; making the
+evaluator 5 to 10 times faster would not close a gap of about 60 times.
+Pre-check: run the independent script on the start state and a checkpoint,
+and compare the bound with the existing one and the per-state cost with the
+search's states per second, before writing the spec's relaxed model.
+
+Regenerate:
+  python doc/problems/tiles7a/relaxed-bound-check.py probs/problem-tiles7a-heuristic-1.lisp 3 3
+  REPL: (stage tiles7a-heuristic-2) (solve), then (ww-set *depth-cutoff* 48)
+  and (solve-subgoal (loc Y 2 2)); compare with tiles7a-heuristic-1.

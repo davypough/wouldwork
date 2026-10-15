@@ -1006,3 +1006,85 @@ remains :UNKNOWN to candidate screening."
           :ignore-unreachable t
           :validate (not (relaxed-hmax-model.validated-p model))))
       0)))
+
+
+;;; Spec-declared relaxed models.  A problem outside Talos opts in by calling
+;;; DECLARE-RELAXED-MODEL with three function names; the engine then compiles the model
+;;; backward from the active goal (rebuilt when a subgoal changes it) and registers its
+;;; LM-cut value as an automatic lower bound on the moves remaining.  Soundness is the
+;;; spec's obligation: every real move must be matched by a relaxed operator needing no
+;;; more facts than the move requires and producing every fact the move makes true;
+;;; the state facts must include every true fact the operators read; the goal facts must
+;;; hold in every goal state.  Delete effects are never modeled.
+
+
+(defparameter *spec-relaxed-model-functions* nil
+  "The staged spec's (OPERATORS STATE-FACTS GOAL-FACTS) function names, or NIL.")
+
+
+(defparameter *spec-relaxed-all-operators* nil
+  "Every relaxed operator returned by the spec's OPERATORS query, built once per staging.")
+
+
+(defparameter *spec-relaxed-goals* nil
+  "The goal facts for which the cached slice below was compiled.")
+
+
+(defparameter *spec-relaxed-relevance* nil
+  "Backward relevance compilation of *SPEC-RELAXED-ALL-OPERATORS* for *SPEC-RELAXED-GOALS*.")
+
+
+(defparameter *spec-relaxed-indexed-model* nil
+  "Indexed form of the relevant operator slice, shared by every evaluation for that goal.")
+
+
+(defun declare-relaxed-model (operators state-facts goal-facts)
+  "Declare the staged spec's relaxed model and register its LM-cut lower bound.
+OPERATORS is a query returning a list of RELAXED-HMAX-OPERATORs that depends only on
+static facts; STATE-FACTS is a query returning the facts true in a state; GOAL-FACTS is
+a function of the goal form returning the facts every goal state contains."
+  (reject-worker-read-write 'declare-relaxed-model)
+  (setf *spec-relaxed-model-functions* (list operators state-facts goal-facts)
+        *spec-relaxed-all-operators* nil
+        *spec-relaxed-goals* nil
+        *spec-relaxed-relevance* nil
+        *spec-relaxed-indexed-model* nil)
+  (register-relaxed-hmax-model-builder 'build-spec-relaxed-model)
+  (register-min-steps-remaining-contributor 'spec-relaxed-lm-cut-bound :priority 10))
+
+
+(defun spec-relaxed-lm-cut-bound (state)
+  "Admissible LM-cut lower bound on the moves remaining, for registration as a contributor."
+  (registered-relaxed-lm-cut-bound state *goal*))
+
+
+(defun build-spec-relaxed-model (state goal)
+  "Return the spec's relaxed model for STATE, sliced backward from GOAL's facts."
+  (when *happening-names*
+    (error "A spec-declared relaxed model cannot represent happenings: ~S" *happening-names*))
+  (destructuring-bind (operators state-facts goal-facts) *spec-relaxed-model-functions*
+    (unless *spec-relaxed-all-operators*
+      (setf *spec-relaxed-all-operators*
+              (validate-relaxed-hmax-operators (funcall operators state))))
+    (let ((goals (funcall goal-facts goal)))
+      (unless (equal goals *spec-relaxed-goals*)
+        (setf *spec-relaxed-goals* (copy-list goals)
+              *spec-relaxed-relevance*
+                (compile-relaxed-hmax-relevance *spec-relaxed-all-operators* goals)
+              *spec-relaxed-indexed-model*
+                (compile-relaxed-indexed-model
+                  (relaxed-hmax-relevance.operators *spec-relaxed-relevance*)
+                  goals :validate nil)))
+      (make-relaxed-hmax-model
+        :facts (relaxed-hmax-relevant-facts (funcall state-facts state) *spec-relaxed-relevance*)
+        :operators (relaxed-hmax-relevance.operators *spec-relaxed-relevance*)
+        :goals goals
+        :validated-p t
+        :indexed-model *spec-relaxed-indexed-model*))))
+
+
+;; The cached model holds structures and tables; each parallel worker rebuilds its own.
+(register-worker-read-memo '*spec-relaxed-all-operators* :nil)
+(register-worker-read-memo '*spec-relaxed-goals* :nil)
+(register-worker-read-memo '*spec-relaxed-relevance* :nil)
+(register-worker-read-memo '*spec-relaxed-indexed-model* :nil)

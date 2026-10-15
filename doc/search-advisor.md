@@ -20,7 +20,9 @@
 > 2026-10-15.  Failed-state memory (B5, note 12) implemented and measured on sentry
 > 2026-10-15.  Current-path check made sound with happenings, and failed-state memory
 > made the default with happenings, 2026-10-15.  Independent-move reordering (B4, note 13)
-> made available as a spec idiom and measured on knap19, 2026-10-15.
+> made available as a spec idiom and measured on knap19, 2026-10-15.  Relaxed bounds (B7,
+> note 14) opened to any problem through `declare-relaxed-model` and measured on tiles7a,
+> 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -391,7 +393,7 @@ S14 = C5, S15 = B17.
 | B4 | **Independent-move reordering** | Independent moves made in different orders reach the same state: above all an action choosing members of a set (knap19's `put`) | Spec idiom: the action may choose only an object numbered above every one already chosen, with A3 tree search (`problem-knap19-1.lisp`, note 13).  *Proposed:* an engine version for independent moves in general | Two moves are independent when either order is legal and ends in the same state; argue it for the action before relying on it (note 13).  The engine version would need each action's read and write facts |
 | B5 | **Failed-state memory** | Tree search with a depth cutoff (forced by happenings, or chosen) where states repeat | `(ww-set *failed-state-memory* t)` (REPL or spec).  A state whose subtree reaches no goal is recorded with its moves left; a repeat with no more moves left is skipped.  The key holds each happening's place in its cycle, not absolute time, so repeats are found at different depths (note 12) | Requires a depth cutoff and replaces the check against states on the current path, so every-solution runs also count plans that revisit a state (the goal states are the same).  An error at search start with graph search, csp, backtracking, auto-wait, min-time and value objectives, and path-dependent validators.  One entry per failed state.  Sentry: about 4 times less work for the shortest plan; less where many subtrees reach a goal |
 | B6 | **Lower bound on moves** | Q9: a cheap bound that never overestimates | `min-steps-remaining?` (section 4.1: distance plus obligations, exact bounds); for Talos problems, `(include-tech topo-lower-bound)` | Must never overestimate; consulted only with a depth cutoff, or after a solution under `min-length` or `first`; check it against runs without it (section 4.1) |
-| B7 | **Relaxed h-max and LM-cut bounds** | Q9 with no hand-written bound | Available only inside `topo-lower-bound` (Talos), which registers a relaxed model with `src/ww-relaxed-heuristics.lisp`.  *Proposed: opening it to other problems* | Outside Talos each kind of problem needs its own model builder |
+| B7 | **Relaxed h-max and LM-cut bounds** | Q9, where states are costly to generate or a cheaper bound is far below the true distance | Talos: `topo-lower-bound`.  Other problems: the spec describes a relaxed version of its moves and calls `declare-relaxed-model` (`problem-tiles7a-heuristic-2.lisp`, note 14); the engine adds its LM-cut value as an automatic bound | The spec must argue that every real move is allowed in the relaxed version; it cannot be built from the actions automatically.  Refused with happenings.  Costly: tiles7a 3.6 ms per state against 3 microseconds of search, 60 times slower overall despite a stronger bound (note 14) |
 | B8 | **Exact-distance tables** | Large reversible problems whose reduced version keeps the problem's crowding: the untracked objects can stay as indistinguishable blanks because they share one shape and set of moves (the 15-puzzle's unit tiles) | *Proposed; not available.*  First a pre-check with an independent script: build one-, two- and three-object tables and compare the start state's bound with the existing bound.  Only if it rises clearly, search the reduced version backward once, store its distances, and use them as B6 (note 11) | Removing untracked objects is always sound but removes the crowding; merging them is sound only for identical shapes and moves; the table grows 25 to 50 times per tracked piece (tiles7a) |
 | B9 | **Value bound** | Q11: an optimistic value of a partial state is cheap | `bounding-function?` returning `(values cost upper)` (section 4.1; `problem-knap19.lisp`) | `upper` must be reachable; ordered completions (section 4.1); the incumbent starts at 1,000,000 (section 5) |
 | B10 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
@@ -632,6 +634,25 @@ same approaches with their entry points.
    where independence depends on which facts each move reads and writes, the engine version
    (sleep sets) remains proposed.
 
+14. **Relaxed bounds outside Talos.**  The relaxed puzzle keeps what each move needs and
+   produces but never takes a fact away: a cell once empty stays empty.  Its LM-cut cost
+   never exceeds the real distance when every real move is allowed in it, and it counts
+   obligations a distance misses (the pieces that must move out of the way).  It cannot be
+   built from Wouldwork actions automatically: their effects can compute whole lists (tiles7a
+   keeps its empty cells as one sorted list), and a missed effect would overestimate.  So
+   the spec lists its relaxed moves and its state's facts and calls `declare-relaxed-model`.
+   Where it is weak: wherever the difficulty is interference expressed by a negative
+   condition (hanoi's smaller disk on top, blocks' clear top), which the relaxation drops;
+   hanoi's bound is the number of disks off target against 2^n - 1.  tiles7a (2026-10-15,
+   `doc/problems/tiles7a/search-analysis.txt`): start bound 11 against Manhattan 7
+   (optimum 22), and 6 against 2 from the 3,3 checkpoint (48 moves).  The first stage fell
+   from 3,440 to 1,403 program cycles but rose from 0.04 to 3.8 s; the 48-move stage took
+   4.6 s with Manhattan and had not finished a fifth of its work in 150 s with LM-cut.  One
+   evaluation costs 3.6 ms (h-max 0.14 ms) against about 3 microseconds per state.  Use it
+   only where states are expensive to generate or the cheap bound is far from the truth
+   along the whole search, and check both with the independent script first
+   (`relaxed-bound-check.py` in that folder).
+
 ### 3.1 Choosing
 
 Three tables, used in order.  **Setup** gives the configuration for the problem's situation
@@ -664,7 +685,7 @@ get their checks (section 4.1) before a result relies on them.
 |---|---|---|
 | Interchangeable objects (Q7) | B16 re-encoding, else B1 symmetry pruning | the same probe on both specs (section 1.1); symmetry timed with and without (note 3 of section 3) |
 | A distance measure (Q8) | B10 heuristic ordering | `first` and the optimizing search timed with and without (note 4 of section 3) |
-| No hand-written bound, Talos problem (Q9) | B7 relaxed bounds (through `topo-lower-bound`) | `min-length` lengths agree with and without; timed |
+| No adequate hand-written bound (Q9) | B7 relaxed bounds (Talos: `topo-lower-bound`; otherwise a spec relaxed model) | first an independent script for the bound at the start and a checkpoint and its cost per state against the search's states per second (note 14); then `min-length` lengths agree with and without; timed |
 | Unused names, duplicated facts, objects ruled out by static facts (Q18) | B16 re-encoding | the same probe on both specs (section 1.1) |
 | Recurring moves in small versions (Q15) | B18 macro actions | D5 on a small version, then timed at two sizes (note 5 of section 3) |
 | One action dominates the branching | B17 action-set reduction | count the successors it adds; a replacement argument (note 9 of section 3) |
@@ -831,6 +852,16 @@ a leg ending at a lift location costs no move); an ON goal on a support with a f
 routes as a location goal; a plate press costs 1 when a second agent (a recording ghost counts)
 exists.  Gears, wall and angled blowers still disable it.  Its route relaxation ignores height,
 so it read 1 for a leg needing a raised launch point that took 10 moves.
+
+**Spec relaxed model.**  Any problem without happenings can supply its own relaxed model
+(B7, note 14): `(declare-relaxed-model 'moves-query 'state-facts-query 'goal-facts-function)`.
+The first query returns `relaxed-hmax-operator`s (`:name`, `:preconditions`, `:effects`,
+facts compared with `equal`) and may read only static facts; the second returns the facts
+true in a state; the function maps the goal form to the facts every goal state holds
+(`'list` when the goal is one literal).  The engine slices the model backward from the goal,
+rebuilds it when a subgoal changes the goal, and registers the LM-cut value as a contributor
+evaluated before `min-steps-remaining?`.  It never overestimates if every real move needs at
+least one relaxed move's preconditions and produces all its effects.
 
 Under `*threads*` > 0 the hooks must be pure functions of the state: any global a hook reads and writes is shared by every worker.
 
