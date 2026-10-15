@@ -257,7 +257,10 @@
   (when (bt-worker-stop-p)
     (return-from backtrack nil))
 
-  ;; Match EXPAND: prune descendants, not a goal already accepted by the caller.
+  ;; Match EXPAND: stop at the time limit, and prune descendants, not a goal already  ;CHANGED
+  ;; accepted by the caller.  ;CHANGED
+  (when (search-time-limit-reached-p)  ;CHANGED
+    (return-from backtrack nil))  ;CHANGED
   ;; This also checks the initial state before generating any choices.
   (when (and (fboundp 'prune-state?)
              (funcall (symbol-function 'prune-state?) *backtrack-state*))

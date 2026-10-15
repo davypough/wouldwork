@@ -142,6 +142,8 @@ must return unknown rather than :IMPOSSIBLE.")
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
   (when *failed-state-memory*
     (format t "~&  *FAILED-STATE-MEMORY* => ~A" *failed-state-memory*))
+  (when (plusp *time-limit*)  ;CHANGED
+    (format t "~&  *TIME-LIMIT* => ~A sec" *time-limit*))  ;CHANGED
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
              (gethash 'recorder *types*))
     (format t "~&  *MAX-RECORDER-CYCLES* => ~A"
@@ -302,6 +304,12 @@ must return unknown rather than :IMPOSSIBLE.")
 (sb-ext:defglobal *depth-cutoff-truncated* nil
   "Whether the depth cutoff cut off a node that still had successors, leaving part
    of the search space unexplored.  Only then is an exhausted search inconclusive.")
+
+(sb-ext:defglobal *search-deadline* nil  ;CHANGED
+  "Internal real time after which the current search stops expanding states, or nil.")
+
+(sb-ext:defglobal *time-limit-reached* nil  ;CHANGED
+  "Whether the current search stopped at *time-limit*, leaving it inconclusive.")
 
 (sb-ext:defglobal *num-init-successors* 0
   "The number of branches completed so far from the start state.")
@@ -698,6 +706,11 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *randomize-search* nil  ;
   "Set to t or nil.")
 
+
+(defvar *time-limit* 0  ;CHANGED
+  "Seconds after which a search stops expanding states, leaving it inconclusive;
+   0 for no limit.")
+
 (defvar *branch* 0  ;
   "If n>0, explore only the nth branch from the *start-state*; n<1 explores all branches.")
 
@@ -779,6 +792,7 @@ treat their arguments as read-only and be safe to call concurrently."
     (*progress-first-report* . 10)
     (*randomize-search*)
     (*branch* . 0)
+    (*time-limit* . 0)  ;CHANGED
     (*probe*)
     (*symmetry-pruning*)
     (*debug* . 0)

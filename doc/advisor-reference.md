@@ -255,7 +255,7 @@ Goal states are accepted when generated, before any of these checks, so no hook 
 
 | Group | Settings |
 |---|---|
-| Applied immediately | `*depth-cutoff*`, `*solution-type*`, `*tree-or-graph*` (not GRAPH under backtracking), `*randomize-search*`, `*branch*`, `*auto-wait*`, `*progress-reporting-interval*`, the recorder settings, `*bt-cycle-check*`, the parallel tuning settings |
+| Applied immediately | `*depth-cutoff*`, `*solution-type*`, `*tree-or-graph*` (not GRAPH under backtracking), `*randomize-search*`, `*branch*`, `*time-limit*`, `*auto-wait*`, `*progress-reporting-interval*`, the recorder settings, `*bt-cycle-check*`, the parallel tuning settings |
 | Reload Wouldwork | `*algorithm*` (switching to backtracking also sets TREE), `*problem-type*`, `*symmetry-pruning*`, `*debug*`, `*probe*`, and `*threads*` when it crosses 0 (a change between positive counts does not reload) |
 | Spec file only | `*problem-name*` |
 | Error in a spec file | `*debug*`, `*probe*` |
@@ -312,7 +312,7 @@ An `*algorithm*` written in a spec applies on a fresh `stage` (as in `problem-qu
 | Relaxation | Working out derived facts dominates the cost | a separate, weaker spec whose goal checks the true conditions last | A candidate to check against the original spec | problem-corner-relaxed |
 | Goal chaining and milestones | One search cannot reach the goal, but natural resting states exist | `solve-subgoal` in both forms, checkpoints; F11, F18 | Each segment at best optimal; the whole path is not shown shortest | crelay-topo, captjohn-advisor |
 | Named multi-phase strategies | A reusable milestone sequence applies under stated conditions | `define-strategy`, `solve-via-strategy`, `list-strategies`; the heuristic is disabled during its phases | As for goal chaining | none in probs/ |
-| Randomized or single-branch runs | Probing a huge space for any solution, or splitting work by hand | `*randomize-search*` (ignored when `heuristic?` exists), `*branch*` | A failed run proves nothing | — |
+| Randomized, restarted or single-branch runs | Probing a huge space for any solution or a best value, or splitting work by hand | `*randomize-search*` (ignored when `heuristic?` exists), `(solve-restarts runs seconds)` with `*time-limit*`, `*branch*` | A failed run proves nothing | — |
 
 Experimental and not offered: `ww-backward.lisp` (one-step regression, not integrated with search) and `ww-novelty.lisp` (retired, not loaded).
 

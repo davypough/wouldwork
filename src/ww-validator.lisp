@@ -935,6 +935,9 @@
     (*branch* (unless (typep val 'fixnum)
                 (error "Can't set *branch* to ~S. Must be an integer
                         where n < 1 means search all branches." val)))
+    (*time-limit* (unless (and (realp val) (>= val 0))  ;CHANGED
+                    (error "Can't set *time-limit* to ~S. Must be a number of seconds,
+                            where 0 means no time limit." val)))  ;CHANGED
     (*debug* (unless (or (and (typep val 'fixnum) (>= val 0) (<= val 5)) (= val 0.5))
                 (error "Can't set *debug* to ~S. Must be an integer between 0 and 5." val)))
     (*probe* (unless (or (null val)

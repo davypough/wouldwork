@@ -67,3 +67,40 @@ Fixed-time run, user's machine: 16 threads, (setf *min-tasks* 32 *tasks-per-thre
 Lesson: arc consistency alone lets 10-20% of uncompletable placements through (analytic
 check above), and a best-value search ends on exactly those grids, so the partial check did
 worse than both alternatives.  Its value here is inside the exact completion check.
+
+2026-10-15  Restarts: repeated short randomized runs against one long run
+-------------------------------------------------------------------------
+Question: does restarting (new random early placements) beat one long run, whose workers
+each make one dive and never revisit their early placements (~3,000 expansions per worker
+in 5 minutes against ~70 slots)?
+Setup, user's machine: 16 threads, (setf *search-completion-budget* 2000),
+(setf *min-tasks* 32 *tasks-per-thread* 2); each run stopped by a temporary prune-state?
+deadline of 30 s; *random-state* seeded (sb-ext:seed-random-state (+ (* 100 batch) i)),
+batches 1-3, i = 0-9.  Words placed per run (every best grid passes the completion check):
+  batch 1: 17 20 19 18 19 17 18 18 18 21   best 21, mean 18.5
+  batch 2: 17 17 17 20 17 19 17 18 17 19   best 20, mean 17.8
+  batch 3: 18 17 18 19 18 19 19 17 17 18   best 19, mean 18.0
+  baseline, three 5-minute runs (same settings): 18 19 19, mean 18.7
+Finding: a 30-second run averages 18.1 words, nearly what a 5-minute run reaches, so the
+extra time of a long run adds under one word; ten restarts in the same 5 minutes gave
+21, 20 and 19 (21 is the best grid found so far).  The value of a run is mostly set by its
+early placements, so spreading the time over many random starts beats one long run.  This
+holds whenever tasks are too large to finish in the run time, as in every larger instance.
+Open: the best restart length (30 s was not tuned).
+Built (2026-10-15): *time-limit* (seconds, 0 = none; a stopped run reports "Search stopped at
+the time limit" and its outcome reason is TIME-LIMIT, never exhausted) and
+(solve-restarts runs seconds [first-seed]), which seeds run i with first-seed + i, prints
+each run's result, and keeps the best run's *best-states*.  Checked in the Linux VM: two
+serial series with first seed 100 (10 s runs) both gave 18 and 16 and kept the 18; a 2-thread
+run stopped at 8.0 s; backtracking honours the limit; (test) 27 problems, 0 failures.
+Restart length, user's machine, same settings: (solve-restarts 30 10 1000), (... 2000),
+(... 3000), three series of thirty 10-second runs (5 minutes each):
+  seeds 1000-1029: best 18, mean 15.4
+  seeds 2000-2029: best 18, mean 14.9
+  seeds 3000-3029: best 18, mean 15.0
+Against ten 30-second runs (best 21, 20, 19; mean 18.1) and one 5-minute run (18, 19, 19).
+Finding: 10 seconds is too short; a run spends its first seconds on task generation and the
+first dive, and a 10-second run averages 3 words fewer than a 30-second one.  Restarts pay
+only once each run is long enough for its dive to place most of the words it will place;
+here 30 seconds was, and beat both shorter and longer runs.  Lengths between 30 seconds and
+5 minutes are untested.

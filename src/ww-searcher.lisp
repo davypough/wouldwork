@@ -521,11 +521,14 @@
       (if *shutdown-requested*
         :shutdown
         (let ((condition
-                (if (and *solution-paths* (solution-count-reached-p))
-                  'first
-                  'exhausted)))
+                (cond ((and *solution-paths* (solution-count-reached-p)) 'first)  ;CHANGED
+                      (*time-limit-reached* 'time-limit)  ;CHANGED
+                      (t 'exhausted))))  ;CHANGED
           (summarize-search-results condition)
-          (if (eq condition 'first) :solution-limit-reached :exhausted))))))
+          (ecase condition  ;CHANGED
+            (first :solution-limit-reached)  ;CHANGED
+            (time-limit :time-limit)  ;CHANGED
+            (exhausted :exhausted)))))))  ;CHANGED
 
 
 (defun auto-wait-debug-find-prop (props pred &rest prefix)
@@ -1630,6 +1633,8 @@ different acceptable milestone state."
             (format t "~2%Search ended after finding ~D solution~:P (as requested)." 
                     (length *solution-paths*))
             (format t "~2%Search ended with first solution found."))))
+    (time-limit  ;CHANGED
+      (format t "~2%Search stopped at the time limit of ~A sec; it is not exhaustive." *time-limit*))  ;CHANGED
     (exhausted
       (format t "~2%~A search process completed normally." *algorithm*)
       (when (eql *solution-type* 'count)
@@ -2187,11 +2192,16 @@ different acceptable milestone state."
           (if (> *threads* 0)
             (format t "~%working with ~D thread(s)...~2%" *threads*)
             (format t "~%working...~2%"))
+          (setf *time-limit-reached* nil  ;CHANGED
+                *search-deadline* (when (plusp *time-limit*)  ;CHANGED
+                                    (+ (get-internal-real-time)  ;CHANGED
+                                       (round (* *time-limit* internal-time-units-per-second)))))  ;CHANGED
           (setf dfs-result (time (dfs))
                 completed t))
+      (setf *search-deadline* nil)  ;CHANGED
       (setf *solutions-valid*
             (and completed
-                 (member dfs-result '(:solution-limit-reached :exhausted))
+                 (member dfs-result '(:solution-limit-reached :exhausted :time-limit))  ;CHANGED
                  (not (null *solution-paths*))))
       (when completed
         (setf *last-search-outcome*

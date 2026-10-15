@@ -9,21 +9,11 @@
 > `ww-searcher.lisp`, `ww-planner.lisp`, `ww-parallel.lisp`, `ww-parallel-infrastructure.lisp`,
 > `ww-validator.lisp`, `ww-support.lisp` and the enumerator,
 > and against the *Wouldwork User Manual (26.8)*, Part 3.  Where they disagree the source wins;
-> the disagreements are listed in section 7. Process and evidence guidance integrated
-> with the consultant experiment on 2026-10-07, superseded by standalone record and
-> handoff guidance on 2026-10-09. Neither was a fresh audit of every technical claim.
-> Boundary with the solving advisor revised 2026-10-12: this advisor no longer chooses
-> milestones.  Strategy table (section 3) completed against source 2026-10-12, and
-> regrouped into setup, enhancements, restructuring and probing and partitioned runs, and section 3.1 split into
-> setup, enhancements to test and escalation, 2026-10-14.  Deduced facts (Q19, B19, note 10
-> of section 3) added 2026-10-15.  Exact-distance tables (B8, note 11) assessed on tiles7a
-> 2026-10-15.  Failed-state memory (B5, note 12) implemented and measured on sentry
-> 2026-10-15.  Current-path check made sound with happenings, and failed-state memory
-> made the default with happenings, 2026-10-15.  Independent-move reordering (B4, note 13)
-> made available as a spec idiom and measured on knap19, 2026-10-15.  Relaxed bounds (B7,
-> note 14) opened to any problem through `declare-relaxed-model` and measured on tiles7a,
-> 2026-10-15.  Arc consistency (B15, note 15) made available as an engine library and
-> measured on donald and crossword15-18, 2026-10-15.
+> the disagreements are listed in section 7.  Boundary with the solving advisor revised
+> 2026-10-12: this advisor no longer chooses milestones.  Section 3 regrouped 2026-10-14;
+> its gaps filled 2026-10-15, each entry checked against source and measured on a problem
+> recorded in `doc/problems/` (notes 10 to 16 of section 3).  Still proposed: B4's engine
+> version, B8 and D4.  The history is in git.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -41,6 +31,24 @@ begin with exactly:
 When the path is already supplied, acknowledge it and use it without asking the user to
 repeat it. Do not precede the greeting with a summary of this document or a development
 review.
+
+**Three ways in.**
+- *A specification handoff from the spec advisor.*  The handoff and the upstream records
+  (`problem-analysis.txt`, `spec-analysis.txt`) supply the objective, reductions, growth
+  dimensions and validation limits; phase 0 reuses them and asks only for what is missing.
+- *An existing spec alone.*  With no upstream record, phase 0 settles the objective, the
+  maximum depth and the time available with the user (step 4).  Fidelity is unchecked: a
+  doubt about the rules or the goal goes to the user as a specification topic for the spec
+  advisor, not assumed away.  Open `search-analysis.txt` with a line saying the spec came
+  without a handoff.
+- *A hard subgoal from the solving advisor.*  The same spec; the start is the solving
+  advisor's accepted checkpoint, the goal its agreed subgoal, the depth the user's maximum.
+  Findings go in the problem's own `search-analysis.txt`, in a section named for the
+  subgoal, and the result returns to the solving advisor: a realized segment, or a bounded
+  failure with its growth per level and the depths reached.  Inside a subgoal this advisor
+  does not choose milestones or change the rules.  The hand-off supplies its inputs, so it
+  skips the greeting.  *Pending the solving advisor's revision:* which checkpoint forms and
+  which strategies work from a checkpoint start; until then confirm each with the user.
 
 **Entry and return.** Read the selected question, objective, relevant record entries,
 current artifacts, and approval limits. Reuse current evidence instead of repeating
@@ -423,10 +431,10 @@ S14 = C5, S15 = B17.
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
-| D1 | **Randomized runs** | Exploring a huge space for any solution | `*randomize-search*` t, with repeated runs | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined |
+| D1 | **Randomized runs** | Exploring a huge space for any solution | `*randomize-search*` t, with repeated runs; for many short runs use D3 | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined |
 | D2 | **Branch-restricted runs** | Splitting work by hand, or solving one first move at a time when memory limits a whole search | `*branch*` n explores only the nth first move | With `min-length`, the best of the per-branch results is the overall shortest, but the total work is unchanged |
-| D3 | **Randomized restarts across threads** | As D1, using every thread | *Proposed; not available.*  Each thread follows its own random order | A failed run proves nothing |
-| D4 | **Beam search** | A fast candidate solution in a huge space | *Proposed; not available.*  A width limit on heuristic depth-first search | Incomplete: a failure proves nothing |
+| D3 | **Randomized restarts** | Any solution or a best value in a huge space whose tasks cannot finish in the run time | `(solve-restarts runs seconds)` with `*randomize-search*` t: repeated runs, each stopped at `*time-limit*` and seeded in turn; a goal problem stops at the first solution, a best-value problem keeps the best run's states (note 16) | A failed series proves nothing; not with `heuristic?` |
+| D4 | **Beam search** | A fast candidate in a huge space, where a measure of a partial state is shown to predict the final result | *Proposed; not available.*  Keeps only the best few states at each depth, by that measure.  Before building it, check on recorded runs that the measure at mid-depth predicts the best final result | Incomplete: a failure proves nothing; drops the states that a plan needing temporary setbacks passes through (tiles7a's distance, note 4) |
 | D5 | **Move-pattern frequencies** | Q15 | `(freq 2 3)` after an `every` search of a small version | Feeds B18 |
 | D6 | **Forward and backward branching** | Q12 yes; deciding between C2 and C3 | first check whether a backward move is a forward move on a transformed state; if not, compare the states per level with the forward spec and with the backward spec (section 6.1) | Needs the backward spec first |
 | D7 | **Prove-to-find ratio** | Choosing a regime (A4) | time `first` and an exhaustive run on the same model (section 3.2) | Near 1: a heuristic will not help |
@@ -614,7 +622,6 @@ same approaches with their entry points.
    memory, sentry every solution at 16 rose from 4,698 to 16,028 program cycles (same 33
    paths) and mine1's first solution from 16,667 to 605,169; with memory, 1,083 and 3,000.
    `doc/problems/mine1/search-analysis.txt`.
-
 13. **Independent-move reordering.**  When moves commute, graph search expands each state
    once but still generates it once per order of its last moves and discards the copies
    against the closed table; tree search would follow every order.  Fixing one order of
@@ -634,7 +641,6 @@ same approaches with their entry points.
    matters most where the bound prunes little (knap30).  For general planning problems,
    where independence depends on which facts each move reads and writes, the engine version
    (sleep sets) remains proposed.
-
 14. **Relaxed bounds outside Talos.**  The relaxed puzzle keeps what each move needs and
    produces but never takes a fact away: a cell once empty stays empty.  Its LM-cut cost
    never exceeds the real distance when every real move is allowed in it, and it counts
@@ -670,6 +676,22 @@ same approaches with their entry points.
    completion check (18 to 19).  A best-value search ends on exactly the uncompletable grids
    a partial check lets through.  Use it where it decides the problem, or inside an exact
    check (B14's completion solver starts with it), not as a cheaper stand-in for one.
+16. **Randomized restarts.**  When tasks are too large to finish, each parallel worker makes
+   one dive and backtracks only near the bottom, so a run's early choices stay fixed for the
+   whole run.  Every worker already follows its own random order (all share one random
+   state), so a per-thread order adds nothing; restarting adds new early choices.
+   `(solve-restarts runs seconds [first-seed])` runs `solve` up to RUNS times under
+   `*time-limit*` SECONDS, run i seeded FIRST-SEED + i (a run repeats exactly from its seed
+   only serially), prints each run's result and seed, stops a goal problem at the first run
+   with a solution, and leaves a best-value problem's best run in `*best-states*`.
+   crossword15-18 (2026-10-15, 16 threads, completion check on every placement,
+   `doc/problems/crossword15-18/search-analysis.txt`): a 30-second run averaged 18.1 listed
+   words against 18.7 for a 5-minute run, and ten 30-second runs gave 21, 20 and 19 against
+   18, 19 and 19 for one 5-minute run each; thirty 10-second runs did worse than either
+   (mean 15.1, best 18 in each of three series).  A run must be long enough for its dive to
+   place most of what it will place, and no longer: find the length at which a single run's
+   result levels off (here 30 seconds was close to a 5-minute run, 10 seconds was 3 words
+   short), then spend the time on as many runs of that length as it allows.
 
 ### 3.1 Choosing
 
@@ -708,7 +730,7 @@ get their checks (section 4.1) before a result relies on them.
 | Recurring moves in small versions (Q15) | B18 macro actions | D5 on a small version, then timed at two sizes (note 5 of section 3) |
 | One action dominates the branching | B17 action-set reduction | count the successors it adds; a replacement argument (note 9 of section 3) |
 | Waiting matters with happenings (Q3) | A7: the `wait` action or `*auto-wait*` | the same probe timed with each (section 5) |
-| Any solution in a huge space | D1 randomized runs | repeated runs; a failure proves nothing |
+| Any solution or a best value in a huge space | D3 randomized restarts | ten short runs against one long run of the same total time; a failure proves nothing (note 16 of section 3) |
 | Tree search (forced or chosen) where states repeat | B5 failed-state memory | the same `min-length` or every-solution run with and without; the best length and the goal states must agree (note 12 of section 3) |
 | A fact about every solution or goal state proved by reasoning, or a hand plan (Q19) | B19 deduced facts, in the form that removes work | every state of a known plan passes; the same probe with and without (note 10 of section 3) |
 
@@ -790,7 +812,8 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (A4) |
 | `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports the groups found, and suggests turning it off if none |
 | `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for auto-wait and problems that create objects during search |
-| `*randomize-search*` | t, nil (nil) | D1 only |
+| `*randomize-search*` | t, nil (nil) | D1 and D3 only |
+| `*time-limit*` | seconds; 0 = none (0) | a bounded probe or run; a run stopped by it reports "stopped at the time limit" and proves nothing (D3) |
 | `*branch*` | n (0 = all) | D2 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
@@ -990,24 +1013,14 @@ re-expanded at every level, so a lower bound (section 4.1) or a dead-state prune
 remedy, with failed-state memory (B5) for states reached again by other routes.
 
 **Time-limited probes.** If depth alone may be expensive, agree a time bound before running.
-One possible mechanism is a temporary `prune-state?` that stops further expansion after
-a deadline; the search then unwinds and reports any candidates found. This is cooperative
-stopping, not a hard wall-clock limit: initialization, an in-progress expansion, and
-unwinding can take additional time. A deadline-pruned run is truncated, even if its summary
-looks exhausted; it establishes no exhaustive bound or optimum.
-
-```lisp
-(defvar *deadline* (+ (get-internal-real-time) (* 60 internal-time-units-per-second)))
-(defun prune-state? (state) (declare (ignore state)) (> (get-internal-real-time) *deadline*))
-```
-
-Reset `*deadline*` before each run and restore the original hook afterwards (use
-`fmakunbound` only if there was no original hook); the deadline test only
-reads a global, so it is safe under threads.  A spec that defines its own `prune-state?`
-needs the deadline test added to it instead.  Before each repeated run with
-`*randomize-search*`, seed the random state, `(setf *random-state* (make-random-state t))`:
-SBCL starts every session with the same one, so runs in fresh sessions would repeat each
-other.
+`(ww-set *time-limit* <seconds>)` stops expansion after that time; the search then unwinds
+and reports any candidates found, under "Search stopped at the time limit".  This is
+cooperative stopping, not a hard wall-clock limit: initialization, an in-progress expansion,
+and unwinding can take additional time.  A stopped run establishes no exhaustive bound or
+optimum; a search that ends before the limit is reported as usual.  Set it back to 0
+afterwards.  Before each repeated run with `*randomize-search*`, seed the random state,
+`(setf *random-state* (make-random-state t))`: SBCL starts every session with the same one,
+so runs in fresh sessions would repeat each other.  `solve-restarts` (D3) does both.
 
 For macro candidates (Q15): solve a small version with `every`, then `(freq 2 3)`.
 
@@ -1040,7 +1053,7 @@ lower bound, since paths through repeated states are cut.
 
 | Density | Means | Favours |
 |---|---|---|
-| Many goal states, found by many workers | Solutions are plentiful | `first`; D1 randomized runs; no heuristic needed |
+| Many goal states, found by many workers | Solutions are plentiful | `first`; D3 randomized restarts; no heuristic needed |
 | Few goal states, deep in the space | A needle in a haystack | B2 dead-state pruning; C3 bidirectional; B10 if a distance measure exists |
 | None after complete bounded coverage | No accepted solution within that model and cutoff, subject to sound pruning | Reconsider the strategy or propose a justified model check or changed bound |
 
@@ -1079,7 +1092,7 @@ serial 36,326.  For exact counts, compare serial runs (`(ww-set *threads* 0)`).
 | Exhausted with pruning, symmetry, or other restrictions | Scope the claim to the justified coverage and equivalence; unsupported pruning cannot establish absence or optimality |
 | Exhausted with `*branch*` or a relaxed spec | A result about that restricted or altered search; transfer to the original problem requires a separate argument.  When every first move was searched with `*branch*`, the runs together cover the whole search, and the best of their `min-length` results is the overall shortest |
 | Plan found by meeting a backward search (C3, C4) | A valid plan once replayed from the start; shortest only if every smaller total also failed to meet (C3), or only for the backward set as built (C4, note 8) |
-| Out of memory, interrupted, or deadline-pruned | No new exhaustive bound; preserve candidates already found and any independently established evidence |
+| Out of memory, interrupted, or stopped at the time limit | No new exhaustive bound; preserve candidates already found and any independently established evidence |
 
 Record the starting state, model revision, settings, cutoff, termination, and validation
 scope with the result. Optimality requires a completed search or other valid argument
@@ -1108,7 +1121,7 @@ regime it lands in:
 | Projection | Mitigation |
 |---|---|
 | Within time and memory | the current settings |
-| Within memory, too slow | A6 parallel; B10 if solutions are plentiful; B2 and B6 pruning |
+| Within memory, too slow | A6 parallel; B10 if solutions are plentiful; B2 and B6 pruning; D3 restarts when any solution or a good value, not a proof, is wanted |
 | Exceeds memory | tree search or backtracking (A2) with B2 and B6 pruning; one first move at a time (D2); C3/C4 to split the depth; a leaner encoding (B16) |
 | Exceeds both by orders of magnitude | a different formulation (C1, C2, C3, C4, or a leaner encoding, B16); if none is feasible, the solving advisor as a last resort (C6) |
 

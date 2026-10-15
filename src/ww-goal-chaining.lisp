@@ -66,7 +66,7 @@
 
 (defparameter *goal-chain-setting-symbols*
   '(*depth-cutoff* *algorithm* *tree-or-graph* *problem-type* *solution-type*
-    *randomize-search* *branch* *symmetry-pruning* *auto-wait*
+    *randomize-search* *branch* *time-limit* *symmetry-pruning* *auto-wait*  ;CHANGED
     *auto-wait-max-time* *min-steps-pruning-enabled*)
   "Generic settings whose values affect milestone feasibility or search order.")
 

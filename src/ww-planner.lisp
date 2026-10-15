@@ -416,8 +416,15 @@
 (defun expand (current-node)  ;called from df-bnb1
   "Returns the new states."
   (declare (type node current-node))   
-  (unless (and (fboundp 'prune-state?) (funcall (symbol-function 'prune-state?) (node.state current-node))) ;don't expand state further if bounded 
+  (unless (or (search-time-limit-reached-p)  ;CHANGED
+              (and (fboundp 'prune-state?) (funcall (symbol-function 'prune-state?) (node.state current-node)))) ;don't expand state further if bounded  ;CHANGED
     (generate-children current-node)))
+
+
+(defun search-time-limit-reached-p ()  ;CHANGED
+  "True once a search has run past its *time-limit* deadline; records that it stopped there."
+  (when (and *search-deadline* (> (get-internal-real-time) *search-deadline*))  ;CHANGED
+    (setf *time-limit-reached* t)))  ;CHANGED
 
 
 (defun estimate-to-goal (state)

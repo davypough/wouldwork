@@ -118,6 +118,8 @@ THE LIST OF WOULDWORK COMMANDS RECOGNIZED IN THE REPL:
                                    nil (standard depth-first search)>)
        (ww-set *branch* <number (eg, search only branch 1 (first) of 10 initial branches) or
                          0 (search all branches)>)
+       (ww-set *time-limit* <seconds after which a search stops, leaving it inconclusive, or
+                             0 (no time limit)>)
        (ww-set *debug* <one of 0 (no debugging), 1-4 (increasing debugging info),
                                5 (step through search)>)
        (ww-set *symmetry-pruning* <t (prune symmetric states) or
@@ -506,6 +508,62 @@ is staged again.
       (when *solutions-valid*
         (setf *final-goal* nil))
       *solution-paths*)))
+
+
+(defun solve-restarts (runs seconds &optional (first-seed (random 1000000 (make-random-state t))))  ;CHANGED
+  "Solves the staged problem up to RUNS times, each a randomized search stopped after
+   SECONDS, the runs seeded FIRST-SEED, FIRST-SEED + 1, and so on.  A problem with a goal
+   stops at the first run that finds a solution; a best-value problem keeps the best run's
+   states in *best-states*.  Every run is inconclusive: a series that finds nothing proves
+   nothing."
+  (check-type runs (integer 1))  ;CHANGED
+  (check-type seconds (real (0)))  ;CHANGED
+  (unless *randomize-search*  ;CHANGED
+    (error "SOLVE-RESTARTS needs (ww-set *randomize-search* t)."))  ;CHANGED
+  (when (fboundp 'heuristic?)  ;CHANGED
+    (error "SOLVE-RESTARTS: heuristic? overrides *randomize-search*, so the runs would repeat each other."))  ;CHANGED
+  (let ((*time-limit* seconds)  ;CHANGED
+        (results nil)  ;CHANGED
+        (best-states nil))  ;CHANGED
+    (loop for seed from first-seed below (+ first-seed runs)  ;CHANGED
+          do (push (solve-restart-run seed) results)  ;CHANGED
+          unless (boundp 'goal-fn)  ;CHANGED
+            do (setf best-states (restart-best-states best-states))  ;CHANGED
+          until (and (boundp 'goal-fn) *solution-paths*))  ;CHANGED
+    (when best-states  ;CHANGED
+      (setf *best-states* best-states))  ;CHANGED
+    (format t "~2%Restarts: ~D run~:P of ~A sec each~%" (length results) seconds)  ;CHANGED
+    (loop for (seed result) in (reverse results)  ;CHANGED
+          for run from 1  ;CHANGED
+          do (format t "~&  run ~D  seed ~D  ~A~%" run seed result))  ;CHANGED
+    (format t "~&~A~%" (if (boundp 'goal-fn)  ;CHANGED
+                         "Restarts stop at the first run with a solution."  ;CHANGED
+                         "The best run's states are in *best-states*."))  ;CHANGED
+    (values)))  ;CHANGED
+
+
+(defun solve-restart-run (seed)  ;CHANGED
+  "Solves once from a random state seeded by SEED; returns (SEED result-description)."
+  (setf *random-state* (sb-ext:seed-random-state seed))  ;CHANGED
+  (solve)  ;CHANGED
+  (list seed  ;CHANGED
+        (cond ((not (boundp 'goal-fn))  ;CHANGED
+               (format nil "best value ~A" (problem-state.value (first *best-states*))))  ;CHANGED
+              (*solution-paths*  ;CHANGED
+               (format nil "solution of ~D steps"  ;CHANGED
+                       (reduce #'min *solution-paths* :key #'solution.depth)))  ;CHANGED
+              (t "no solution"))))  ;CHANGED
+
+
+(defun restart-best-states (best-states)  ;CHANGED
+  "Returns the last run's *best-states* if its best state beats that of BEST-STATES (nil at
+   the start), otherwise BEST-STATES."
+  (if (or (null best-states)  ;CHANGED
+          (funcall (ecase *solution-type* (max-value #'>) (min-value #'<))  ;CHANGED
+                   (problem-state.value (first *best-states*))  ;CHANGED
+                   (problem-state.value (first best-states))))  ;CHANGED
+    *best-states*  ;CHANGED
+    best-states))  ;CHANGED
 
 
 (defun list-all-problems (&optional (prettyp nil))
