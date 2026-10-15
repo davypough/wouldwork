@@ -945,6 +945,8 @@
                         whose second element is a list of instances for that action,
                         whose third element is the depth>0,
                         and whose optional fourth element is how many times to skip over previous instances." val)))
+    (*failed-state-memory* (unless (typep val 'boolean)
+                             (error "Can't set *failed-state-memory* to ~S. Must be either T or NIL." val)))
     (*auto-wait* (unless (typep val 'boolean)
                    (error "Can't set *auto-wait* to ~S. Must be either T or NIL." val))
                  (when val  ; Only check dependencies when enabling

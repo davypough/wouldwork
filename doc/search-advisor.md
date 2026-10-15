@@ -16,7 +16,9 @@
 > milestones.  Strategy table (section 3) completed against source 2026-10-12, and
 > regrouped into setup, enhancements, restructuring and probing and partitioned runs, and section 3.1 split into
 > setup, enhancements to test and escalation, 2026-10-14.  Deduced facts (Q19, B19, note 10
-> of section 3) added 2026-10-15.
+> of section 3) added 2026-10-15.  Exact-distance tables (B8, note 11) assessed on tiles7a
+> 2026-10-15.  Failed-state memory (B5, note 12) implemented and measured on sentry
+> 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -385,10 +387,10 @@ S14 = C5, S15 = B17.
 | B2 | **Dead-state pruning** | Q10: some states can be proved dead | `prune-state?` (section 4.1) | Must be **sound**: a test that rejects a live state silently discards solutions (note 3) |
 | B3 | **State constraints** | A rule every state must keep | `define-constraint`: a successor breaking it is discarded as it is generated | Must be a true rule of the puzzle, not a guess |
 | B4 | **Independent-move reordering** | Tree search or backtracking, where independent moves made in different orders reach the same state | *Proposed; not available.*  A canonical order for independent moves, generalizing the ordered completions of section 4.1 and B12 | Needs a definition of when two actions are independent |
-| B5 | **Failed-state memory** | Tree search or backtracking, where states repeat | *Proposed; not available.*  Record states proven to fail with k moves left, and skip them when reached again with k or fewer | Memory for the recorded states, less than graph search's full table |
+| B5 | **Failed-state memory** | Tree search with a depth cutoff (forced by happenings, or chosen) where states repeat | `(ww-set *failed-state-memory* t)` (REPL or spec).  A state whose subtree reaches no goal is recorded with its moves left; a repeat with no more moves left is skipped.  The key holds each happening's place in its cycle, not absolute time, so repeats are found at different depths (note 12) | Requires a depth cutoff and replaces the check against states on the current path, so every-solution runs also count plans that revisit a state (the goal states are the same).  An error at search start with graph search, csp, backtracking, auto-wait, min-time and value objectives, and path-dependent validators.  One entry per failed state.  Sentry: about 4 times less work for the shortest plan; less where many subtrees reach a goal |
 | B6 | **Lower bound on moves** | Q9: a cheap bound that never overestimates | `min-steps-remaining?` (section 4.1: distance plus obligations, exact bounds); for Talos problems, `(include-tech topo-lower-bound)` | Must never overestimate; consulted only with a depth cutoff, or after a solution under `min-length` or `first`; check it against runs without it (section 4.1) |
 | B7 | **Relaxed h-max and LM-cut bounds** | Q9 with no hand-written bound | Available only inside `topo-lower-bound` (Talos), which registers a relaxed model with `src/ww-relaxed-heuristics.lisp`.  *Proposed: opening it to other problems* | Outside Talos each kind of problem needs its own model builder |
-| B8 | **Exact-distance tables** | Large reversible problems whose reduced version, tracking only some objects, can be searched exhaustively | *Proposed; not available.*  Search the reduced version backward once, store its distances, and use them as B6 | Memory for the table; sound only if the reduction never overestimates |
+| B8 | **Exact-distance tables** | Large reversible problems whose reduced version keeps the problem's crowding: the untracked objects can stay as indistinguishable blanks because they share one shape and set of moves (the 15-puzzle's unit tiles) | *Proposed; not available.*  First a pre-check with an independent script: build one-, two- and three-object tables and compare the start state's bound with the existing bound.  Only if it rises clearly, search the reduced version backward once, store its distances, and use them as B6 (note 11) | Removing untracked objects is always sound but removes the crowding; merging them is sound only for identical shapes and moves; the table grows 25 to 50 times per tracked piece (tiles7a) |
 | B9 | **Value bound** | Q11: an optimistic value of a partial state is cheap | `bounding-function?` returning `(values cost upper)` (section 4.1; `problem-knap19.lisp`) | `upper` must be reachable; ordered completions (section 4.1); the incumbent starts at 1,000,000 (section 5) |
 | B10 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
 | B11 | **Action definition order** | Always with csp (A1); any search whose first solution depends on the order | define the actions with the most constraining first (note 1) | DONALD: 424 program cycles right to left, 1,440 left to right (note 1) |
@@ -578,6 +580,29 @@ same approaches with their entry points.
    bound).  The enumerator meet-in-the-middle found a 14-action plan that opens the gate,
    cutter in place, with connectors at location2 and location3.  As a pruning rule or a
    bound, either hint would have discarded the shortest plan.
+11. **Exact-distance tables.**  A reduced puzzle gives a sound bound when every real move
+   is one reduced move or none.  Removing objects meets that, since it only frees room;
+   merging objects into indistinguishable ones meets it only when they share the same
+   moves.  tiles7a (2026-10-15, `doc/problems/tiles7a/search-analysis.txt`): its pieces all
+   differ in shape, so only removal applies.  Tracking the yellow tile and three pieces
+   gave 2.56 million reduced states and a start bound of 7 for the goal at 3,3, equal to
+   the Manhattan distance (optimum 22); for the goal at 0,0, 1.97 million states and a bound
+   of 16 against Manhattan 13.  The puzzle is hard because it is crowded (9 empty cells in
+   64), and removing pieces removes the crowding: each tracked piece added at most about one
+   move while multiplying the table 25 to 50 times.  The pre-check script
+   (`distance-table-check.py` in that folder) settled this in minutes, before any spec code.
+12. **Failed-state memory.**  Tree search expands a state again each time it is reached;
+   with repeating happenings the distinct states are bounded by the board states times the
+   cycle length, while the paths grow exponentially with depth.  The memory saves work where
+   the search must prove failure: the proof part of a shortest-plan search, or every
+   solution at the optimum's cutoff.  Subtrees that reach a goal are not recorded.  Sentry
+   (2026-10-15, serial, with the distance-plus-obligations bound; shortest plan 16):
+   `min-length` at cutoff 18, 2,719 program cycles without and 671 with; at 22, 2,939 and
+   848; every solution at 16, 4,698 and 1,083 with the same 33 paths; at 18, 33,954 and
+   18,247, the same 8 goal states but 1,285 paths against 470, the extra ones revisiting a
+   state.  An independent Python count of the sentry states (`repeat-state-check.py`) first
+   showed the repetition: 6.0 million paths for 1,496 distinct states at cutoff 16 without
+   the bound.  The gain grows with depth.  `doc/problems/sentry/search-analysis.txt`.
 
 ### 3.1 Choosing
 
@@ -617,6 +642,7 @@ get their checks (section 4.1) before a result relies on them.
 | One action dominates the branching | B17 action-set reduction | count the successors it adds; a replacement argument (note 9 of section 3) |
 | Waiting matters with happenings (Q3) | A7: the `wait` action or `*auto-wait*` | the same probe timed with each (section 5) |
 | Any solution in a huge space | D1 randomized runs | repeated runs; a failure proves nothing |
+| Tree search (forced or chosen) where states repeat | B5 failed-state memory | the same `min-length` or every-solution run with and without; the best length and the goal states must agree (note 12 of section 3) |
 | A fact about every solution or goal state proved by reasoning, or a hand plan (Q19) | B19 deduced facts, in the form that removes work | every state of a known plan passes; the same probe with and without (note 10 of section 3) |
 
 **Escalation.**
@@ -699,6 +725,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*branch*` | n (0 = all) | D2 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
+| `*failed-state-memory*` | t, nil (nil) | t for tree search with a depth cutoff where states repeat (B5); turns off the check against states on the current path |
 | `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10): about 12 reports in 12 hours, serial or parallel; an integer N reports every N states |
 | `*max-recorder-cycles*` | integer, nil (1) | Talos recorder: recordings allowed in one path |
 | `*recorder-prefix-pruning*` | t, nil (nil) | Talos recorder: also reject open recordings that can no longer replay |
@@ -750,7 +777,8 @@ and it rarely survives a change to the family (there is no such formula for 4 pe
 **Distance plus obligations.**  With a depth cutoff at or near the optimum, a lower bound cuts
 detours: a move that does not reduce the bound uses up slack and is soon pruned.  It applies to
 tree and graph search alike.  When tree search is forced (happenings, csp), repeated states
-cannot be closed, and the bound is the main remedy; under graph search it also prunes the
+cannot be closed, and the bound is the main remedy, complemented by failed-state memory (B5);
+under graph search it also prunes the
 detours by which a closed state is reached again and reopened.  tiles7a (graph search, cutoff
 22 = optimum): the yellow tile's distance to its goal alone cut `min-length` from 49,767
 program cycles in 2.1 s to 12,869 in 0.3 s, and the search cut off at 21 proved 22 optimal in
@@ -831,7 +859,10 @@ its compatibility review, and entry F19 for which settings reload or are refused
   `every`; a problem that creates objects during search (the corner family's beams) declares
   `(ww-set *search-registers-dynamic-objects* (beam))` and runs serially (see
   `problem-corner.lisp`); `*debug*` above 1 is reset to 1; symmetry statistics are
-  approximate.  All search hooks, `*randomize-search*` and `*branch*` apply.
+  approximate.  All search hooks, `*randomize-search*` and `*branch*` apply.  A spec `wait`
+  action that asserts `(waiting)` currently fails under threads ("rejected
+  STATIC-FACT-UPDATE": `waiting` is installed as a static relation), so such problems
+  (sentry) run serially until this is fixed (2026-10-15).
 
 ---
 
@@ -875,7 +906,7 @@ repeated-state percentage.  Probe by exhausting successive cutoffs: the ratio of
 cycles per level is the effective branching, the first cutoff that yields a solution bounds
 the optimum, and density is the goal states and paths found per cutoff.  Undone moves are
 re-expanded at every level, so a lower bound (section 4.1) or a dead-state prune is the main
-remedy.
+remedy, with failed-state memory (B5) for states reached again by other routes.
 
 **Time-limited probes.** If depth alone may be expensive, agree a time bound before running.
 One possible mechanism is a temporary `prune-state?` that stops further expansion after

@@ -247,6 +247,9 @@
       (multiple-value-bind (donated remaining)
           (extract-donation-nodes local-stack num-to-donate)
         (when donated
+          ;; Donated subtrees leave this worker, so no path entry here can prove failure
+          (when *failed-state-memory*
+            (taint-failed-state-path))
           ;; Push donated nodes to task queue
           (tq-push-many task-queue donated)
           ;; Update stats
@@ -660,6 +663,8 @@
            (type problem-state goal-state)
            (type list path)
            (type fixnum worker-id))
+  (when *failed-state-memory*
+    (mark-goal-ancestors current-node))
   (when (eql *solution-type* 'count)
     (when (count-accepted-goal)
       (setf *count-example* (make-search-solution path goal-state)))

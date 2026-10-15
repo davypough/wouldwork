@@ -257,7 +257,8 @@
   (state (make-problem-state) :type problem-state)    ;problem state
   (depth 0 :type fixnum)           ;depth in the search tree
   (parent nil :type (or null node list))  ;this node's parent
-  (wait-tried nil :type boolean))  ;tracks if backtrack-wait has been attempted
+  (wait-tried nil :type boolean)  ;tracks if backtrack-wait has been attempted
+  (goal-below nil :type boolean))  ;failed-state memory: a goal was found in this node's subtree
 
 
 (defun node-parents-list (node)

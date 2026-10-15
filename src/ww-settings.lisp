@@ -140,6 +140,8 @@ must return unknown rather than :IMPOSSIBLE.")
     (format t "~&  *BT-CYCLE-CHECK* => ~A" *bt-cycle-check*))
   (when *happening-names*
     (format t "~&  *AUTO-WAIT* => ~A" *auto-wait*))
+  (when *failed-state-memory*
+    (format t "~&  *FAILED-STATE-MEMORY* => ~A" *failed-state-memory*))
   (when (and (member "recorder" *spliced-tech-names* :test #'string=)
              (gethash 'recorder *types*))
     (format t "~&  *MAX-RECORDER-CYCLES* => ~A"
@@ -713,6 +715,17 @@ treat their arguments as read-only and be safe to call concurrently."
 (defvar *symmetry-pruning* nil
   "When T, detect symmetry families and prune symmetric actions or states.")
 
+(defvar *failed-state-memory* nil
+  "When T, depth-first tree search records states whose subtrees failed, with the moves
+   left, and skips them when reached again with no more moves left.")
+
+(defvar *failed-state-table* (make-hash-table :test 'equal)
+  "Failed-state memory: key -> list of (idb . moves-left).  Bound per parallel worker.")
+
+(defvar *failed-state-path* nil
+  "Failed-state memory: expanded nodes on the current path, deepest first, as
+   (node . path-dependent-p).  Bound per parallel worker.")
+
 (defvar *max-recorder-cycles* 1
   "Maximum START-RECORDER actions in one search path, or NIL for no limit.")
 
@@ -776,6 +789,7 @@ treat their arguments as read-only and be safe to call concurrently."
     (*max-recorder-cycles* . 1)
     (*recorder-prefix-pruning*)
     (*auto-wait*)
+    (*failed-state-memory*)
     (*max-connector-pairings*)
     (*split-depth-max* . 20)
     (*tasks-per-thread* . 8)
@@ -1050,6 +1064,16 @@ treat their arguments as read-only and be safe to call concurrently."
 (sb-ext:defglobal *lower-bound-pruned* 0
   "Count of nodes pruned by any min-steps-remaining lower bound.")
 (declaim (type fixnum *lower-bound-pruned*))
+
+
+(sb-ext:defglobal *failed-states-recorded* 0
+  "Count of states recorded by failed-state memory.")
+(declaim (type fixnum *failed-states-recorded*))
+
+
+(sb-ext:defglobal *failed-states-skipped* 0
+  "Count of nodes skipped by failed-state memory.")
+(declaim (type fixnum *failed-states-skipped*))
 
 
 (sb-ext:defglobal *bounding-pruned* 0

@@ -1,0 +1,113 @@
+sentry -- search analysis
+=========================
+
+Failed-state memory (2026-10-15)
+--------------------------------
+Question: with happenings, search is forced to tree mode, so a state reached
+again is expanded again.  Do states (including the sentry's position in its
+cycle) actually repeat often enough to justify remembering states proven to
+fail with k moves left and skipping them when reached again with k or fewer?
+
+Spec: probs/problem-sentry.lisp (spec's wait action, min-steps-remaining?
+distance plus obligations).  Optimum 16 moves.
+
+Independent check (repeat-state-check.py, Python, no wouldwork runs).  The
+model reproduces wouldwork's 33 solution paths at cutoff 16.  Its expansion
+counts exceed wouldwork's program cycles (6.0 M against 733 k without the
+bound, 9,668 against 4,698 with it), mainly because it omits wouldwork's
+check against states already on the current path; the ratios below are far
+larger than that difference.
+
+  every solution, tree search, depth-first
+  cutoff  bound   paths      distinct      distinct      expanded with memory
+                  expanded   (state,time)  (state,phase)  (time key / phase key)
+  15      no      2,026,458      1,113          822         1,113 / 1,103
+  15      yes         4,269        144          118           144 /   144
+  16      no      6,013,221      1,496        1,054         1,651 / 1,608
+  16      yes         9,668        207          168           362 /   362
+  18      no     66,334,675      2,946        1,798         8,574 / 8,313
+  18      yes       130,562        518          391         6,146 / 6,146
+
+Findings:
+- Repetition is massive: paths exceed distinct states by thousands of times
+  without the bound, 20 to 30 times with it.
+- At cutoff 15 (the proof part of a min-length search at 16) memory reduces
+  the search to the distinct states.  At 16 and 18 subtrees that reach a goal
+  are not recorded, so the saving is smaller (27 and 21 times with the bound).
+- Every sentry action lasts 1 time unit, so time equals depth.  The sentry's
+  phase is its event index, already in the state, so absolute time need not
+  be in the key: (state, phase) is up to 1.6 times smaller than (state, time)
+  and catches repeats reached at different depths.
+- Beyond sentry: graph search is refused with happenings only because its
+  closed table ignores time.  With repeating happenings the distinct states
+  are bounded by the board states times the cycle length, while paths grow
+  exponentially, so the gain grows with depth and problem size.
+
+Side observation (not pursued): wouldwork's on-current-path check compares
+idbs only, so it treats two states with the sentry in the same area but at
+different points of its cycle as equal.  Here it lost no solutions (33 paths
+in both), but in general it can drop a state whose future differs.
+
+Engine change (approved 2026-10-15): setting *failed-state-memory* (default
+nil), src/ww-failed-state-memory.lisp.  Key: idb hash (idb compared with
+equalp), whether the state was reached by a wait, and each happening's event
+index, direction and time to its next event.  A node is recorded when its
+subtree finishes with no goal, with moves left = current limit - depth (limit
+= depth cutoff, under min-length one less than the best solution's length,
+taken at exit).  Not recorded: subtrees with a goal; subtrees in which a
+successor was dropped for repeating an ancestor above the node (the failure
+depends on the path); in parallel, subtrees partly donated to other workers.
+Serial: one table; parallel: one table per worker, no locks.  Refused (error
+at search start) with graph search, csp, backtracking, auto-wait, min-time and
+value objectives, solution or prefix validators, goal-chain rejectors and
+successor policies.
+
+Parallel runs fail before any memory code runs: the spec's wait action asserts
+(waiting), which the installer registers as a static relation, so each wait
+writes the static database, and parallel workers refuse that ("Worker read
+snapshots are frozen; rejected STATIC-FACT-UPDATE").  Sentry runs serially
+until that is fixed (a separate engine issue).
+
+Wouldwork measurements (serial, every solution, cutoff 16, with the bound):
+  memory off   33 paths (3 unique)   4,698 program cycles   0.138 s
+  memory on    33 paths (3 unique)   3,040 program cycles   0.090 s
+               recorded 47 states, skipped 772 nodes
+Same solutions.  Saving only 1.5 times, against 27 times in the Python model.
+Cause: wouldwork's check against states already on the current path fires
+often in sentry (it compares idbs only, so a state at a different point of the
+sentry's cycle counts as a repeat), and each hit marks the path entries below
+the repeated ancestor as path-dependent, so few failures are recorded.  The
+Python model has no such check and reproduces the same 33 paths.
+
+Revision (2026-10-15, approved): with *failed-state-memory* t the check against
+states on the current path is turned off (serial, root-task generation and
+workers) and a depth cutoff is required.  A node on the path is never recorded,
+so a repeat of it is expanded again with fewer moves left and the cutoff ends
+the descent; no recorded failure then depends on the path.  Trade-off: every-
+solution runs may count plans that revisit a state.
+Measurements (serial, every solution, cutoff 16, with the bound):
+  memory off   33 paths (3 unique)   4,698 program cycles   0.137 s
+  memory on    33 paths (3 unique)   1,083 program cycles   0.024 s
+               recorded 137 states, skipped 208 nodes
+Same solutions; 4.3 times fewer program cycles, 5.7 times faster.  The
+remaining gap to the Python model (362) is not yet explained.
+
+Further measurements (2026-10-15, serial, with the bound; run by Claude in a
+Linux SBCL 2.6.9 copy of this checkout, which reproduces the counts above
+exactly):
+  every solution, cutoff 18
+    memory off   470 paths (8 unique)     33,954 program cycles   0.8 s
+    memory on  1,285 paths (8 unique)     18,247 program cycles   0.3 s
+                 recorded 287 states, skipped 1,342 nodes
+    The same 8 goal states.  The extra paths revisit a state, which the
+    on-path check used to drop (1,285 also in the Python model).  Saving is
+    smaller because many subtrees reach a goal and are not recorded.
+  min-length (shortest plan, 16 in all runs)
+    cutoff 18   memory off 2,719 program cycles   on 671 (recorded 127, skipped 201)
+    cutoff 22   memory off 2,939 program cycles   on 848 (recorded 143, skipped 247)
+    About 4 times fewer program cycles at either cutoff.
+
+Conclusion: failed-state memory is sound on sentry (same optimum, same goal
+states) and cuts the work about 4 times wherever the search must prove
+failures (shortest plan, or every solution at the optimum's cutoff).  The
+gain is limited where many subtrees contain goals.

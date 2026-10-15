@@ -132,6 +132,7 @@
                   ;; Tree search: check for cycle on current path
                   (when (eql *tree-or-graph* 'tree)
                     (when (and (eql *problem-type* 'planning)
+                               (not *failed-state-memory*)  ;failed-state memory handles repeats itself
                                (on-current-path succ-state node))
                       (incf *repeated-states*)
                       (finalize-duplicate-depth (1+ (node.depth node)))
@@ -210,6 +211,7 @@
         (prev-expansion-depth (node.depth task-node))) ; Reset per task, not per worker
     (declare (type fixnum cycles-since-refresh cycles-since-donation-check
                    prev-expansion-depth))
+    (setf *failed-state-path* nil)
 
     (loop
       ;; Check termination conditions
@@ -247,6 +249,8 @@
           (when (> backtrack-distance 0)
             (ws-record-backtrack stats backtrack-distance))
           (setf prev-expansion-depth current-depth)
+          (when *failed-state-memory*
+            (close-failed-state-path current-depth))
 
           ;; Depth cutoff check
           (when (and (> *depth-cutoff* 0)
@@ -274,6 +278,12 @@
           ;; Applies to min-length, min-time, min-value, max-value
           (unless (node-can-improve-bound-p current-node local-bound)
             (return-from :next-iteration nil))
+
+          ;; Failed-state memory: skip a state already proven to fail, else enter the path
+          (when *failed-state-memory*
+            (when (failed-state-skip-p current-node)
+              (return-from :next-iteration nil))
+            (push (cons current-node nil) *failed-state-path*))
 
           ;; Expand node
           (let ((succ-states (expand current-node)))
@@ -382,6 +392,7 @@
         ;; === TREE SEARCH ===
         (when (eql *tree-or-graph* 'tree)
           (when (and (eql *problem-type* 'planning)
+                     (not *failed-state-memory*)  ;failed-state memory handles repeats itself
                      (on-current-path succ-state current-node))
             (ws-inc-repeated stats)
             (ws-finalize-duplicate-path stats succ-depth)
@@ -464,7 +475,9 @@
   (tq-register-worker task-queue)
   
   (let ((stats (get-worker-stats worker-id))
-        (tasks-completed 0))
+        (tasks-completed 0)
+        (*failed-state-table* (make-hash-table :test 'equal))
+        (*failed-state-path* nil))
     
     (handler-bind 
         ((error (lambda (c)

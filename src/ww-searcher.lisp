@@ -414,6 +414,9 @@
       (return-from dfs :invalid-start)))
   (setf *hybrid-mode* (initialize-hybrid-mode))
   (reset-search-successor-pruners)
+  (when *failed-state-memory*
+    (validate-failed-state-memory-settings))
+  (reset-failed-state-memory)
   (setf *open* 
       (hs::make-hstack :table (make-hash-table :test 'eql
                                                :synchronized nil)
@@ -753,7 +756,9 @@
        (when (> backtrack-distance 0)
          (incf *accumulated-backtrack-distance* backtrack-distance)
          (incf *num-backtracks*))
-       (setf *prev-expansion-depth* current-depth)))
+       (setf *prev-expansion-depth* current-depth)
+       (when *failed-state-memory*
+         (close-failed-state-path current-depth))))
    (when *probe*
      (apply #'probe current-node *probe*))
    (iter
@@ -790,6 +795,13 @@
       (return-from df-bnb1 nil))
     (when (eql (bounding-function current-node) 'kill-node)
       (return-from df-bnb1 nil))
+    (when *failed-state-memory*
+      (when (failed-state-skip-p current-node)
+        (narrate "State skipped by failed-state memory"
+                 (node.state current-node)
+                 (node.depth current-node))
+        (return-from df-bnb1 nil))
+      (push (cons current-node nil) *failed-state-path*))
     ;; Backtrack-triggered wait check
     ;; If this node was re-pushed with wait-tried=T, all regular successors were exhausted.
     ;; Now try waiting as a "second chance" before truly backtracking.
@@ -969,7 +981,8 @@ different acceptable milestone state."
               )))
         (unless (boundp 'goal-fn)
           (process-min-max-value succ-state))
-        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning))
+        (when (and (eql *tree-or-graph* 'tree) (eql *problem-type* 'planning)
+                   (not *failed-state-memory*))  ;failed-state memory handles repeats itself
           (when (on-current-path succ-state current-node)
             (increment-global *repeated-states*)
             (finalize-duplicate-depth succ-depth)
@@ -1658,6 +1671,9 @@ different acceptable milestone state."
   (when (> *inconsistent-states-dropped* 0)
     (format t "~%~%Abandoned ~D inconsistent state~:P."
             *inconsistent-states-dropped*))
+  (when *failed-state-memory*
+    (format t "~2%Failed-state memory recorded ~:D state~:P and skipped ~:D node~:P."
+            *failed-states-recorded* *failed-states-skipped*))
   (when (> *bounding-pruned* 0)
     (format t "~2%Bounding function pruned ~:D node~:P, ~,1F% of total states."
             *bounding-pruned*
@@ -1822,6 +1838,8 @@ different acceptable milestone state."
 (defun register-solution (goal-node)
   "Records the path ending at GOAL-NODE as a solution."
   (declare (type node goal-node))
+  (when *failed-state-memory*
+    (mark-goal-ancestors goal-node))
   (when (eql *solution-type* 'count)
     (when (count-accepted-goal)
       (setf *count-example*
