@@ -16,3 +16,17 @@ Results (every solution):
 Arc consistency makes the search almost free of backtracking, at 2.5 times the constraint
 checks; since each wouldwork state costs far more than a constraint check, it should pay.
 One size only: the lesson is structural (column sums with carries propagate strongly).
+
+2026-10-15  Arc consistency in wouldwork (library src/ww-arc-consistency.lisp)
+------------------------------------------------------------------------------
+Spec: probs/problem-donald-1.lisp (problem-donald.lisp plus an update after each column that
+narrows every remaining list to a fixpoint: six column-sum constraints, each column's letters
+different, and the all-different rule; an empty list asserts (inconsistent-state)).
+Runs: *solution-type* every, *threads* 16, user's Windows machine (confirmed in the Linux VM).
+  donald     424 program cycles, 425 states, solution at depth 5, 0.003 s
+  donald-1     4 program cycles,   5 states, solution at depth 1, 0.003 s;
+             17 inconsistent children abandoned before becoming states
+Same single solution: 526485 + 197485 = 723970.  After the first column (D=5, T=0) the
+propagation fixes every letter and carry, so the goal holds at depth 1 (the Python check
+counted 10 states because it still walked the remaining columns).  Times are too small to
+compare; the lesson is structural: column sums with carries propagate strongly.

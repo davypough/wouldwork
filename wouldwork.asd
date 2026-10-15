@@ -100,6 +100,7 @@
 		                     (:file "ww-validator")
 		                     (:file "ww-frequencies")
 		                     (:file "ww-support")
+                             (:file "ww-arc-consistency")
 		                     (:file "ww-happenings")
 		                     (:file "ww-translator")
 		                     (:file "ww-init-validator")

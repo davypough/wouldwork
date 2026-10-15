@@ -5,7 +5,8 @@
 ;;; keep the best fill found.  (analyze) then fills the remaining slots from the dictionary,
 ;;; and (repair) keeps as many of the best grid's listed words as the dictionary can complete.
 ;;; Setting *search-completion-budget* after staging makes the search itself keep every grid
-;;; completable, so (analyze) succeeds on the best grid directly.
+;;; completable, so (analyze) succeeds on the best grid directly; setting it to
+;;; :arc-consistency gives a cheaper, partial check (see the design notes).  ;CHANGED
 
 ;;; Design notes:
 ;;; - One decision per step, in a fixed order.  Each step decides one slot, so every grid
@@ -17,6 +18,13 @@
 ;;; - Look ahead.  A word is rejected at once if a crossing it changes can no longer become
 ;;;   a dictionary word.  Each crossing is checked on its own, so a grid can still fail to
 ;;;   complete where open slots conflict with each other.
+;;; - Arc consistency as a middle setting.  Narrowing the open slots' words against each  ;CHANGED
+;;;   other until nothing changes, without trying any word, catches most placements that  ;CHANGED
+;;;   cannot be completed, at about a tenth of the full check's cost.  It never rejects a  ;CHANGED
+;;;   completable grid, but lets some uncompletable ones through, and a best-value search  ;CHANGED
+;;;   ends on exactly those, so in practice it did worse than either other setting.  The  ;CHANGED
+;;;   narrowing is the engine's library  ;CHANGED
+;;;   (src/ww-arc-consistency.lisp); the full check uses it too.  ;CHANGED
 ;;; - Completion as a separate solver.  Whether the open slots can all be filled together is
 ;;;   a search of its own: slots keep the sets of words still possible, a choice in one slot
 ;;;   narrows its crossings until nothing changes, the slot with fewest words is chosen next,
@@ -25,9 +33,9 @@
 ;;;   fewer grids) or runs once after the search (many grids, listed words dropped to fit).
 ;;; - Indexed dictionary.  The dictionary is stored as one set of words per length,
 ;;;   position and letter; checking a pattern combines a few sets instead of walking a tree.
-;;; - Listed words count as fill words.  Some listed words are not in the dictionary, so  ;CHANGED
-;;;   they are added to it; otherwise a slot that could still take one would be judged    ;CHANGED
-;;;   unfillable, and good grids would be rejected.                                         ;CHANGED
+;;; - Listed words count as fill words.  Some listed words are not in the dictionary, so
+;;;   they are added to it; otherwise a slot that could still take one would be judged
+;;;   unfillable, and good grids would be rejected.
 ;;; - Optimistic bound.  A cheap estimate of the best a state could still reach cuts off
 ;;;   branches that cannot beat the best found so far; it must never underestimate.
 ;;; - Lean state.  Small facts and counts, rather than tables copied at every step.
@@ -40,6 +48,8 @@
 ;;;   (setf *min-tasks* 32 *tasks-per-thread* 2) after (ww-set *threads* 16)): 18, 19 and 19
 ;;;   words in three runs, about 50,000 program cycles each; (analyze) completed every best grid.
 ;;; - No check, then (repair): 24 words placed, 17 kept, about 22 million program cycles.
+;;; - Arc consistency only (same tuning): 18 words placed, about 240,000 program cycles;  ;CHANGED
+;;;   (analyze) found no completion and (repair) kept 15.  ;CHANGED
 ;;; - Grid size is the limit: each check fills the whole open grid, so states per minute fall
 ;;;   about 50 times from a 23-slot grid to this 70-slot one.  Doubling the word list adds
 ;;;   about one word.  Seed *random-state* before each run, or fresh sessions repeat a run.
@@ -204,7 +214,8 @@
 
 
 (defparameter *search-completion-budget* nil
-  "Words a completion check may try before a placement is rejected; nil for no check.")
+  "Check on each placement: nil for none, :arc-consistency for propagation only, or the
+   words a completion check may try before a placement is rejected.")  ;CHANGED
 
 
 (defparameter *listed-strings* (mapcar #'string *words*))
@@ -223,7 +234,7 @@
 
 
 (defparameter *dictionary* (make-hash-table)
-  "Length -> vector of the dictionary words of that length, each also reversed, and the listed words.")  ;CHANGED
+  "Length -> vector of the dictionary words of that length, each also reversed, and the listed words.")
 
 
 (defparameter *letter-sets* (make-hash-table :test #'equal)
@@ -232,19 +243,19 @@
 
 (defun read-dictionary (dictionary-file)
   ;Collects the dictionary words of the field lengths, forwards and reversed, by length,
-  ;then the listed words not already among them, so an open slot may still take one.  ;CHANGED
+  ;then the listed words not already among them, so an open slot may still take one.
   (let ((lengths (remove-duplicates (mapcar #'second *fields*)))
         (by-length (make-hash-table))
-        (present (make-hash-table :test #'equal)))  ;CHANGED
+        (present (make-hash-table :test #'equal)))
     (dolist (word (uiop:read-file-lines dictionary-file))
       (when (member (length word) lengths)
         (push word (gethash (length word) by-length))
         (push (reverse word) (gethash (length word) by-length))
-        (setf (gethash word present) t  ;CHANGED
-              (gethash (reverse word) present) t)))  ;CHANGED
-    (dolist (word *listed-strings*)  ;CHANGED
-      (when (and (member (length word) lengths) (not (gethash word present)))  ;CHANGED
-        (push word (gethash (length word) by-length))))  ;CHANGED
+        (setf (gethash word present) t
+              (gethash (reverse word) present) t)))
+    (dolist (word *listed-strings*)
+      (when (and (member (length word) lengths) (not (gethash word present)))
+        (push word (gethash (length word) by-length))))
     (maphash (lambda (len words)
                (setf (gethash len *dictionary*) (coerce words 'vector)))
              by-length)))
@@ -331,13 +342,12 @@
   ;Fills every open field of texts (a vector of field texts by field number) with dictionary
   ;words.  Returns :complete and the fills as a list of (field word), :impossible if no
   ;completion exists, or :unknown if more than budget words were tried.
-  (let ((*completion-budget* budget)
-        (domains (initial-domains texts))
-        (links (open-links texts)))
-    (if (and (full-fields-valid texts)
-             (loop for domain across domains never (and domain (zerop (bit-count domain))))
-             (propagate domains links (open-numbers domains)))
-      (let ((solved (catch :out-of-budget (search-completion domains links (open-numbers domains)))))
+  (let* ((*completion-budget* budget)
+         (links (open-links texts))  ;CHANGED
+         (network (links-network links))  ;CHANGED
+         (domains (consistent-domains texts network)))  ;CHANGED
+    (if domains  ;CHANGED
+      (let ((solved (catch :out-of-budget (search-completion domains network links (open-numbers domains)))))  ;CHANGED
         (cond ((eq solved :unknown) :unknown)
               (solved (values :complete
                               (loop for domain across solved
@@ -349,7 +359,42 @@
       :impossible)))
 
 
-(defun search-completion (domains links fields)
+(defun consistent-domains (texts network)  ;CHANGED
+  ;The open fields' word domains narrowed to arc consistency, or nil if some full field is  ;CHANGED
+  ;not a word or some open field is left with no word.  ;CHANGED
+  (let ((domains (initial-domains texts)))  ;CHANGED
+    (and (full-fields-valid texts)  ;CHANGED
+         (loop for domain across domains never (and domain (zerop (bit-count domain))))  ;CHANGED
+         (propagate-network network domains :all)  ;CHANGED
+         domains)))  ;CHANGED
+
+
+(defun links-network (links)  ;CHANGED
+  ;One constraint per open field: its words' letters at each open crossing cell restrict  ;CHANGED
+  ;the crossing field's words.  It reads only its own field, so it reruns when that changes.  ;CHANGED
+  (make-constraint-network  ;CHANGED
+    (length links)  ;CHANGED
+    (loop for field-links across links  ;CHANGED
+          for n from 0  ;CHANGED
+          when field-links  ;CHANGED
+            collect (make-narrowing-constraint (list n) (field-narrower n field-links)))))  ;CHANGED
+
+
+(defun field-narrower (source field-links)  ;CHANGED
+  ;Narrowing function for the constraint of field number source.  ;CHANGED
+  (lambda (domains)  ;CHANGED
+    (let ((changed nil))  ;CHANGED
+      (loop for (target index cross-index length cross-length) in field-links  ;CHANGED
+            for target-domain = (svref domains target)  ;CHANGED
+            when (restrict target-domain cross-length cross-index  ;CHANGED
+                           (letter-mask (svref domains source) length index))  ;CHANGED
+              do (if (find 1 target-domain)  ;CHANGED
+                   (push target changed)  ;CHANGED
+                   (return :empty))  ;CHANGED
+            finally (return changed)))))  ;CHANGED
+
+
+(defun search-completion (domains network links fields)  ;CHANGED
   ;Assigns the given open fields, one word at a time, propagating each.  Fields that share
   ;no open cell are solved separately, so a failure in one never retries the others.
   ;Returns the solved domains, or nil.
@@ -358,13 +403,13 @@
     (cond ((null unresolved) domains)
           ((rest components)
            (dolist (component components domains)
-             (setf domains (search-completion domains links component))
+             (setf domains (search-completion domains network links component))  ;CHANGED
              (unless domains
                (return nil))))
-          (t (assign-fewest domains links unresolved)))))
+          (t (assign-fewest domains network links unresolved)))))  ;CHANGED
 
 
-(defun assign-fewest (domains links fields)
+(defun assign-fewest (domains network links fields)  ;CHANGED
   ;Tries each word of the field with the fewest words left, then solves the rest.
   (let* ((field-number (first (sort (copy-list fields) #'< :key (lambda (n) (bit-count (svref domains n))))))
          (domain (svref domains field-number)))
@@ -376,8 +421,8 @@
              (let ((trial (map 'vector (lambda (d) (and d (copy-seq d))) domains)))
                (fill (svref trial field-number) 0)
                (setf (sbit (svref trial field-number) k) 1)
-               (when (propagate trial links (list field-number))
-                 (let ((solved (search-completion trial links fields)))
+               (when (propagate-network network trial (list field-number))  ;CHANGED
+                 (let ((solved (search-completion trial network links fields)))  ;CHANGED
                    (when solved
                      (return solved))))))))
 
@@ -398,23 +443,6 @@
                                      (push cross-number frontier))))
                (push group groups)))
     groups))
-
-
-(defun propagate (domains links queue)
-  ;Removes from each open field the words whose letter at a crossing cell the crossing field
-  ;no longer allows, until nothing changes.  Starts from the field numbers in queue.  Returns
-  ;nil if some field is left with no word.
-  (loop while queue
-        do (let ((source (pop queue)))
-             (loop for (target index cross-index length cross-length) in (svref links source)
-                   for target-domain = (svref domains target)
-                   when (restrict target-domain cross-length cross-index
-                                  (letter-mask (svref domains source) length index))
-                     do (unless (find 1 target-domain)
-                          (return-from propagate nil))
-                        (unless (member target queue)
-                          (push target queue)))))
-  t)
 
 
 (defun initial-domains (texts)
@@ -522,7 +550,7 @@
         (return sum)))))
 
 
-(defun place-word (word field texts)  ;CHANGED: moved here, above its first use in completable?
+(defun place-word (word field texts)
   ;A copy of texts with word written into field and its crossing cells.
   (let ((new (copy-seq texts)))
     (setf (svref new (gethash field *field-numbers*)) word)
@@ -595,11 +623,12 @@
 
 
 (define-query completable? (?word ?field)
-  ;True if the grid with the word placed can be completed from the dictionary within
-  ;*search-completion-budget* tries.
-  (eq (complete-grid (place-word (string ?word) ?field (get-field-texts?))
-                     *search-completion-budget*)
-      :complete))
+  ;True if the grid with the word placed passes the check *search-completion-budget* sets:  ;CHANGED
+  ;arc consistency alone, or completion from the dictionary within that many tries.  ;CHANGED
+  (do (setf $texts (place-word (string ?word) ?field (get-field-texts?)))  ;CHANGED
+      (if (eq *search-completion-budget* :arc-consistency)  ;CHANGED
+        (consistent-domains $texts (links-network (open-links $texts)))  ;CHANGED
+        (eq (complete-grid $texts *search-completion-budget*) :complete))))  ;CHANGED
 
 
 (define-query bounding-function? ()

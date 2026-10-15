@@ -22,7 +22,8 @@
 > made the default with happenings, 2026-10-15.  Independent-move reordering (B4, note 13)
 > made available as a spec idiom and measured on knap19, 2026-10-15.  Relaxed bounds (B7,
 > note 14) opened to any problem through `declare-relaxed-model` and measured on tiles7a,
-> 2026-10-15.
+> 2026-10-15.  Arc consistency (B15, note 15) made available as an engine library and
+> measured on donald and crossword15-18, 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -401,7 +402,7 @@ S14 = C5, S15 = B17.
 | B12 | **Ordered list of open variables** | Assignment with one action over every variable (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first (section 3.1, note 1) | Each state is reached by one path, so use tree search |
 | B13 | **Forward checking** | Assignments where earlier values narrow later domains | `define-update` narrowing the remaining domains as values are assigned (`problem-captjohn.lisp`) | The goal must test the constraints themselves (note 1) |
 | B14 | **Completion check** | The search sets only some variables and leaves the rest for a later fill | a completion solver run on every placement (section 3.1, note 3) | Its own cost per placement; may need parallel tuning (section 4) |
-| B15 | **Arc consistency** | Assignments where forward checking leaves many doomed values | *Proposed; not available.*  Propagation to a fixpoint as a reusable library, generalizing B14's solver | |
+| B15 | **Arc consistency** | Assignments whose constraints link several variables (column sums, crossings), so one assignment leaves values no completion can use | the spec states its variables, domains and constraints to `src/ww-arc-consistency.lisp` and calls `propagate-network` from a `define-update` after each assignment, asserting `(inconsistent-state)` when it fails (`problem-donald-1.lisp`; note 15) | Sound by construction.  Pays where it decides the problem or inside an exact check (B14's solver uses it); as a partial check under a best-value search it did worse than no check (note 15) |
 | B16 | **Representation changes** | Q18, or a probe showing wasted states | a re-encoded spec copy (section 1.1) | The copy's reachable states and goals must correspond to the original's within the tested scope |
 | B17 | **Action-set reduction** | One action's job can be done by others at no extra length, and that action adds many successors | A spec copy without the action, or with a narrower precondition, plus a written replacement argument (note 9) | Changes the rules: with the argument it is a re-encoding (section 1.1), without it a specification topic for the spec advisor.  Without the argument the reduced model still finds valid plans, but proves no minimum and no absence |
 | B18 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` (D5) | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
@@ -652,6 +653,23 @@ same approaches with their entry points.
    only where states are expensive to generate or the cheap bound is far from the truth
    along the whole search, and check both with the independent script first
    (`relaxed-bound-check.py` in that folder).
+15. **Arc consistency.**  Each constraint removes the values that no combination of the
+   other variables' values supports, and the removals repeat until nothing changes; a
+   variable left with no value kills the branch before it becomes a state.  The library
+   (`src/ww-arc-consistency.lisp`) takes the spec's numbered variables, a vector of domains
+   (lists or bit-vectors) and its constraints: either a test of a full combination (list
+   domains; the library finds the support) or the spec's own narrowing function.
+   `propagate-network` returns nil when a domain empties, and the update then asserts
+   `(inconsistent-state)`.  Sound by construction: only unsupported values go.  donald
+   (2026-10-15, `doc/problems/donald/search-analysis.txt`): every solution in 4 program
+   cycles against 424, with 17 children dropped before becoming states; the first column
+   fixes every letter.  crossword15-18 (5 minutes, 16 threads,
+   `doc/problems/crossword15-18/search-analysis.txt`): as the only check on each placement,
+   about 240,000 program cycles and 18 listed words placed, but the best grid had no
+   completion and repair kept 15, fewer than no check then repair (17) or the full
+   completion check (18 to 19).  A best-value search ends on exactly the uncompletable grids
+   a partial check lets through.  Use it where it decides the problem, or inside an exact
+   check (B14's completion solver starts with it), not as a cheaper stand-in for one.
 
 ### 3.1 Choosing
 
@@ -668,7 +686,7 @@ get their checks (section 4.1) before a result relies on them.
 
 | Situation | Setup | Add |
 |---|---|---|
-| Assignment, one action per variable (Q1) | A1 csp; A4 (for value optimization, depth-first provides automatic objective bounds; backtracking supports user bounds) | B11 action order; B13 forward checking; B9 if a best value is wanted |
+| Assignment, one action per variable (Q1) | A1 csp; A4 (for value optimization, depth-first provides automatic objective bounds; backtracking supports user bounds) | B11 action order; B13 forward checking; B15 arc consistency when constraints link several variables; B9 if a best value is wanted |
 | Assignment, one action, every variable set (a crossword's slots) | A3 tree search | B12 ordered open list (note 1); B2 dead-state pruning (an open variable with no value left); B14 when some variables are left for a later fill (note 3) |
 | Assignment, one action choosing a subset (knap19's `put`) | A5, or A4 if a best one is wanted; B4 ascending order with A3 tree search, so each subset is reached once (note 13 of section 3) | B9 bound; A6 |
 | Only an end arrangement is wanted, described by base facts | C5, or A1 with one action per variable | B2 |
@@ -728,7 +746,9 @@ get their checks (section 4.1) before a result relies on them.
    recorded state is completable, at far fewer states (5 minutes at 16 threads: 48,000 to
    54,000 program cycles against 22 million, and 18, 19, 19 listed words); or search as
    before and afterwards drop words from the best state until it completes (24 placed, 17
-   kept).  Checking every placement did better and leaves no repair step.
+   kept).  Checking every placement did better and leaves no repair step.  Arc consistency
+   alone as the check (`*search-completion-budget*` `:arc-consistency`) did worse than both:
+   15 words kept (note 15 of section 3).
 
 ### 3.2 Search regimes and their trade-offs
 
@@ -783,7 +803,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 Leave the parallel tuning settings (`*split-depth-max*`, `*tasks-per-thread*`, `*min-tasks*`,
 `*num-closed-shards*`, work donation) at their defaults unless a measurement says otherwise.
 One that does: when each expansion is slow, the serial split into at least `*min-tasks*`
-(256) tasks can use the whole run (crossword15-18-2 with a 0.1 s completion check per
+(256) tasks can use the whole run (crossword15-18 with a 0.1 s completion check per
 placement: the split took all of a 40 s run at 2 threads, and 3.4 s with `*min-tasks*` 8).
 Set the two after `(ww-set *threads* N)`, e.g. `(setf *min-tasks* 32 *tasks-per-thread* 2)`.
 `*debug*` and `*probe*` are diagnostic, REPL-only, and not search choices.

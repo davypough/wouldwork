@@ -48,3 +48,22 @@ such a listed word was rejected (best grids could be missed).  Fixed 2026-10-15:
 read-dictionary adds the listed words not already present, so every check sees them.
 Checked: "BRERRABB??" now fits; arc consistency and completion timings unchanged (above).
 crossword5-11-1 is not affected (all its listed words are in the dictionary).
+
+2026-10-15  Arc consistency as a search setting (library src/ww-arc-consistency.lisp)
+------------------------------------------------------------------------------------
+The spec's propagation now runs on the engine library: one constraint per open slot,
+restricting each crossing slot by its letters at the shared cell.  Checked exact against
+the previous code: 150 random grids (seed 42, 1 to 14 random listed placements), identical
+complete-grid verdicts (108 complete, 42 impossible) and identical narrowed domains, same
+time (4.7 to 4.8 s for all 150, Linux VM).  2 of the 42 impossible grids pass arc consistency.
+
+New setting *search-completion-budget* :arc-consistency (propagation only, no word tried).
+Fixed-time run, user's machine: 16 threads, (setf *min-tasks* 32 *tasks-per-thread* 2),
+*random-state* seeded 1, stopped after about 5 minutes (368 s):
+  arc consistency only   ~240,000 program cycles (~362,000 states, ~1,100 states/s)
+                         best grid 18 listed words; (analyze) :IMPOSSIBLE; (repair) kept 15
+  full check (2000)      48,000 to 54,000 program cycles; 18, 19, 19 words, all completable
+  no check, then repair  ~22 million program cycles; 24 placed, 17 kept
+Lesson: arc consistency alone lets 10-20% of uncompletable placements through (analytic
+check above), and a best-value search ends on exactly those grids, so the partial check did
+worse than both alternatives.  Its value here is inside the exact completion check.
