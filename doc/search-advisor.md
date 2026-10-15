@@ -18,7 +18,8 @@
 > setup, enhancements to test and escalation, 2026-10-14.  Deduced facts (Q19, B19, note 10
 > of section 3) added 2026-10-15.  Exact-distance tables (B8, note 11) assessed on tiles7a
 > 2026-10-15.  Failed-state memory (B5, note 12) implemented and measured on sentry
-> 2026-10-15.
+> 2026-10-15.  Current-path check made sound with happenings, and failed-state memory
+> made the default with happenings, 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -603,6 +604,12 @@ same approaches with their entry points.
    state.  An independent Python count of the sentry states (`repeat-state-check.py`) first
    showed the repetition: 6.0 million paths for 1,496 distinct states at cutoff 16 without
    the bound.  The gain grows with depth.  `doc/problems/sentry/search-analysis.txt`.
+   With happenings, use it by default: the check against states on the current path now
+   also compares each happening's place in its cycle (equal positions at different points
+   of a patrol have different futures), which is sound but keeps many more states.  Without
+   memory, sentry every solution at 16 rose from 4,698 to 16,028 program cycles (same 33
+   paths) and mine1's first solution from 16,667 to 605,169; with memory, 1,083 and 3,000.
+   `doc/problems/mine1/search-analysis.txt`.
 
 ### 3.1 Choosing
 
@@ -623,7 +630,7 @@ get their checks (section 4.1) before a result relies on them.
 | Assignment, one action, every variable set (a crossword's slots) | A3 tree search | B12 ordered open list (note 1); B2 dead-state pruning (an open variable with no value left); B14 when some variables are left for a later fill (note 3) |
 | Assignment, one action choosing a subset (knap19's `put`) | A5, or A4 if a best one is wanted; A3 graph search: other orders of the same choices close as repeated states (note 2) | B9 bound; A6 |
 | Only an end arrangement is wanted, described by base facts | C5, or A1 with one action per variable | B2 |
-| Happenings (Q3) | A5 in tree mode; A7 | B6 lower bound or B2 dead-state pruning (section 4.1) |
+| Happenings (Q3) | A5 in tree mode; A7; B5 failed-state memory with a depth cutoff (note 12) | B6 lower bound or B2 dead-state pruning (section 4.1) |
 | Fixed length (Q5) | A5 at the exact length, `first` | B2 dead-state pruning |
 | b^d modest (Q6) | A5, then A4 if a best solution is wanted | A6 |
 | Large, reversible, with a distance that never overestimates (Q8, Q9) | A4 `min-length` with an A5 cutoff; A6 | B6 lower bound |
@@ -725,7 +732,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*branch*` | n (0 = all) | D2 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
-| `*failed-state-memory*` | t, nil (nil) | t for tree search with a depth cutoff where states repeat (B5); turns off the check against states on the current path |
+| `*failed-state-memory*` | t, nil (nil) | t for tree search with a depth cutoff where states repeat (B5), and by default with happenings; turns off the check against states on the current path |
 | `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10): about 12 reports in 12 hours, serial or parallel; an integer N reports every N states |
 | `*max-recorder-cycles*` | integer, nil (1) | Talos recorder: recordings allowed in one path |
 | `*recorder-prefix-pruning*` | t, nil (nil) | Talos recorder: also reject open recordings that can no longer replay |
@@ -825,6 +832,11 @@ its compatibility review, and entry F19 for which settings reload or are refused
 - **csp** forces tree search, whatever `*tree-or-graph*` says.
 - **Happenings with graph search** are reported as an error: states cannot be closed when time
   matters.
+- **Happenings and the current-path check** (tree search, failed-state memory off): a state
+  counts as a repeat of one on the current path only if each happening is also at the same
+  place in its cycle and both were or were not reached by a wait (2026-10-15).  This is
+  sound but prunes far less than the earlier facts-only test, so turn on failed-state memory
+  (B5), which replaces the check (note 12).
 - **`heuristic?` with `*randomize-search*`**: randomization is ignored.
 - **`*auto-wait*` or the spec's `wait` action: use one, not both.**  Both let time pass.  A
   `wait` action is an ordinary successor at every state, lasting until the next event, and is

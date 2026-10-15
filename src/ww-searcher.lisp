@@ -1457,18 +1457,24 @@ different acceptable milestone state."
 
 (defun on-current-path (succ-state current-node)
   "Determines if a successor is already on the current path from the start state.
-   Uses cached idb-hash for O(1) comparison with equalp verification on hash collision."
+   Uses cached idb-hash for O(1) comparison with equalp verification on hash collision.
+   With happenings, equal idbs can have different futures, so a match also needs the
+   same failed-state key (each happening's phase and whether reached by a wait)."  ;CHANGED
   (ensure-idb-hash succ-state)  ; ensure hash is cached
-  (when (iter (for node initially current-node then (node.parent node))
-              (while node)
-              (for node-state = (node.state node))  ; bind node-state for clarity
-              (ensure-idb-hash node-state)  ; ensure hash is cached
-              (thereis (and (= (problem-state.idb-hash succ-state)  ; hash comparison first
-                              (problem-state.idb-hash node-state))
-                           (equalp (problem-state.idb succ-state)  ; equalp only on collision
-                                  (problem-state.idb node-state)))))
-    (narrate "State already on current path" succ-state (1+ (node.depth current-node)))
-    t))
+  (let ((succ-key (when *happening-names*  ;CHANGED
+                    (failed-state-key succ-state))))  ;CHANGED
+    (when (iter (for node initially current-node then (node.parent node))  ;CHANGED: indented
+                (while node)
+                (for node-state = (node.state node))  ; bind node-state for clarity
+                (ensure-idb-hash node-state)  ; ensure hash is cached
+                (thereis (and (= (problem-state.idb-hash succ-state)  ; hash comparison first
+                                 (problem-state.idb-hash node-state))
+                              (or (null succ-key)  ;CHANGED
+                                  (equal succ-key (failed-state-key node-state)))  ;CHANGED
+                              (equalp (problem-state.idb succ-state)  ; equalp only on collision
+                                      (problem-state.idb node-state)))))
+      (narrate "State already on current path" succ-state (1+ (node.depth current-node)))
+      t)))  ;CHANGED
 
 
 (defun update-search-tree (state depth message)

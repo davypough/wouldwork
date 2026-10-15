@@ -1,0 +1,26 @@
+mine1 search analysis
+
+Spec: probs/problem-mine1.lisp (tree, first solution, depth cutoff 16, a wait
+action asserting (waiting), happenings).
+
+Parallel wait fix (2026-10-15): the wait action no longer writes the static
+database, so mine1 runs with threads.  First solution, 16 steps, serial and
+16 threads.  Details in doc/problems/sentry/search-analysis.txt.
+
+Current-path check with happenings (2026-10-15): the check now also compares
+each happening's place in its cycle and the wait flag.  First solution at
+cutoff 16, program cycles (Linux SBCL 2.6.9):
+  before the change, serial            16,667
+  before the change, 16 threads        67,213
+  after, serial                       605,169
+  after, 16 threads                   387,468
+  after, without the wait flag        386,932 (serial)
+  after, failed-state memory on         3,000 (serial; recorded 824 states,
+                                        skipped 1,115 nodes)
+All runs: one 16-step solution.  Failed-state memory replaces the check and
+is the setting to use for this problem.
+
+Forms:
+  (stage mine1)
+  (ww-set *failed-state-memory* t)
+  (solve)

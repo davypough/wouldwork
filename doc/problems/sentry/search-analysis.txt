@@ -130,3 +130,20 @@ Serial counts unchanged.  In parallel, memory saves little here because each
 worker keeps its own table and sentry's search is small (worker search about
 60 ms either way).  mine1 (also a wait action): first solution, 16 steps,
 serial and 16 threads.
+
+Current-path check with happenings (2026-10-15, approved)
+With failed-state memory off, tree search drops a successor whose facts equal
+a state on the current path.  Facts alone are not enough here: sentry1 at
+area6 may be heading to area5 or to area7.  on-current-path (ww-searcher.lisp)
+now also requires the same failed-state key (each happening's index, time to
+next event and direction, and whether reached by a wait) when the problem has
+happenings.  Measurements (with the bound; Linux SBCL 2.6.9), program cycles
+before -> after:
+  every solution, cutoff 16, serial       4,698 -> 16,028   33 paths (3 unique)
+  every solution, cutoff 16, 16 threads   2,421 ->  6,951   33 paths (3 unique)
+  min-length, cutoff 18, serial           2,719 ->  7,885   16 moves
+  min-length, cutoff 18, 16 threads               ->  4,832   16 moves
+Without the wait flag in the comparison: every solution at 16, 12,047.
+The old test pruned states with different futures; it lost no plans here, by
+luck.  Failed-state memory replaces the check, so with memory on the counts are
+unchanged (1,083 at 16).  Use the memory by default with happenings.
