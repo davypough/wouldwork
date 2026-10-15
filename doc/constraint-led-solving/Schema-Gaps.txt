@@ -107,3 +107,23 @@ procedure: doc/solving-advisor.md, Subgoal dialogue step 2 (look ahead; preserve
 replace, restore when relied on, or deliberately abandon).  BT can expose a
 support loss for one supplied event.  Automatic derivation of continuation
 prerequisites is not implemented or authorized.
+
+NEED -- Extending a checkpoint with a validated path (2026-10-15)
+-----------------------------------------------------------------
+Origin       Solving-advisor revision, 2026-10-15 (routes for realizing a
+             subgoal).  Development need, not a schema gap; not approved.
+Need         A subgoal realized other than by the checkpoint form of
+             solve-subgoal (by hand, by restarts, by the enumerator, or in a
+             spec copy) yields a path but no checkpoint.  Recorder problems
+             need the checkpoint, whose history the recorder's validators
+             judge, to start the next subgoal.
+Scope        A function taking a checkpoint and an action list that replays
+             the list from the checkpoint's endpoint and returns a new
+             checkpoint with the segment as its last phase, refusing a
+             failing action as validate-action-sequence does.
+Dependencies src/ww-search-checkpoint.lisp (phases built as in
+             solve-search-checkpoint), validate-action-sequence.
+Acceptance   On a recorder problem, a hand-derived segment added this way
+             exports and imports like a searched one, and the next
+             checkpoint search from it finds the same result as from a
+             searched checkpoint at the same endpoint.

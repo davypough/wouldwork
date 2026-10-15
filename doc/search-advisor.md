@@ -13,7 +13,9 @@
 > 2026-10-12: this advisor no longer chooses milestones.  Section 3 regrouped 2026-10-14;
 > its gaps filled 2026-10-15, each entry checked against source and measured on a problem
 > recorded in `doc/problems/` (notes 10 to 16 of section 3).  Still proposed: B4's engine
-> version, B8 and D4.  The history is in git.
+> version, B8 and D4.  Hand-off with the solving advisor settled 2026-10-15 (the third way
+> in, *When one search appears impractical*, section 8); the milestone lessons moved there.
+> The history is in git.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -42,13 +44,20 @@ review.
   advisor, not assumed away.  Open `search-analysis.txt` with a line saying the spec came
   without a handoff.
 - *A hard subgoal from the solving advisor.*  The same spec; the start is the solving
-  advisor's accepted checkpoint, the goal its agreed subgoal, the depth the user's maximum.
-  Findings go in the problem's own `search-analysis.txt`, in a section named for the
-  subgoal, and the result returns to the solving advisor: a realized segment, or a bounded
-  failure with its growth per level and the depths reached.  Inside a subgoal this advisor
-  does not choose milestones or change the rules.  The hand-off supplies its inputs, so it
-  skips the greeting.  *Pending the solving advisor's revision:* which checkpoint forms and
-  which strategies work from a checkpoint start; until then confirm each with the user.
+  advisor's accepted endpoint, the goal its agreed subgoal, the depth the user's maximum,
+  with the result of the plain search already tried.  The hand-off supplies these inputs, so
+  it skips the greeting and phase 0's questions.  Findings go in the problem's own
+  `search-analysis.txt`, in a section headed `Subgoal SG<n>: <endpoint in a few words>`,
+  numbered as in the solving advisor's subgoal log.  Any strategy here may be used, with its
+  settings, search hooks that remain sound for the subgoal, and numbered spec copies that
+  re-encode the same rules.  How to start a search from an endpoint (checkpoint, state or
+  fact list), which form a Talos recorder problem needs, and why a lower bound written for
+  the final goal must be switched off unless argued for the subgoal are in the solving
+  advisor's *Starting a search from an endpoint*.  Inside a subgoal this advisor does not
+  split it into milestones (it reports any hard precondition it saw instead), change the
+  rules or the goal, raise the depth, or edit the original spec, and it writes none of the
+  solving advisor's records (`Actions.lisp`, `Checkpoint.txt`, the Briefing, the Handoff).
+  It returns a path, or a bounded failure with the fields of the hand-off (section 8).
 
 **Entry and return.** Read the selected question, objective, relevant record entries,
 current artifacts, and approval limits. Reuse current evidence instead of repeating
@@ -88,12 +97,14 @@ separate spec gets a numbered copy when it re-encodes the same rules and goal (s
 when it changes the rules, the goal or the level of detail, return it to the user as a
 specification topic for the spec advisor.  A short probe is not proof that no single search
 can finish.  Only when no strategy here looks feasible, propose the
-[solving advisor](solving-advisor.md) to the user as a last resort, with the supporting
-estimates and uncertainty.  There the user and assistant choose milestones one subgoal at a
-time, check each against the problem's static constraints, realize it with a bounded search
-(possibly a different strategy for each stretch), and finally validate the whole chained
-path.  Its result usually carries no guarantee about the whole plan: shortest stretches need
-not make a shortest plan.  This advisor does not choose milestones itself.
+[solving advisor](solving-advisor.md) to the user as a last resort, and end
+`search-analysis.txt` with a section *Hand-off to the solving advisor* (section 8): the
+solving advisor reads its findings instead of asking again.  There the user and assistant
+choose subgoals one at a time, check each against the problem's rules (and, for Talos
+problems, its static constraints), realize each by hand, by one search, or by handing a hard
+subgoal back here (the third way in, above), and finally validate the whole stitched path.
+Its result usually carries no guarantee about the whole plan: shortest subgoals need not
+make a shortest plan.  This advisor does not choose milestones itself.
 
 ---
 
@@ -318,10 +329,10 @@ of a result belong here.  The notes below the table give the details and measure
 | Q13 | Is the goal described by base facts (positions, pairings) from which the derived facts follow? | spec: `propagate-changes!`, derived relations | enumerator meet-in-the-middle (C4); goal-state enumeration (C5) when only the arrangement is wanted |
 | Q14 | Is the work per state dominated by working out derived facts? | probe: states per second, compared with a problem without propagation | relaxation (C1) |
 | Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (B18) |
-| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | nothing here; noted for the solving advisor, used only if every strategy here fails (C6) |
+| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | — | moved to the solving advisor (*Choosing a subgoal*), which uses them only after this advisor hands over (C6) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
 | Q18 | Do objects carry names the puzzle never uses, is the same fact stored more than once, or are some objects ruled out of every action by static facts? (note 6) | spec | re-encoding (section 1.1): record only what matters |
-| Q19 | Can a fact about every solution or every goal state be proved from the rules and the geometry (an invariant, a dead state, a count of required steps), or a plan worked out by hand? (note 7) | spec, user: a written argument | B19: a cutoff from a replayed plan, pruning, a lower bound, or a goal-state filter; a necessary step is only noted for the solving advisor (Q16) |
+| Q19 | Can a fact about every solution or every goal state be proved from the rules and the geometry (an invariant, a dead state, a count of required steps), or a plan worked out by hand? (note 7) | spec, user: a written argument | B19: a cutoff from a replayed plan, pruning, a lower bound, or a goal-state filter; a necessary step goes into the hand-off to the solving advisor (section 8) |
 
 1. **Assignments.**  csp fixes the order by depth: at depth n, while n is below the number of
    actions, only the nth defined action is tried (`generate-children` in `ww-planner.lisp`),
@@ -425,7 +436,7 @@ S14 = C5, S15 = B17.
 | C3 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
 | C4 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8) |
 | C5 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
-| C6 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md), whose dialogue chooses the milestones and realizes them with `solve-subgoal` (and registered multi-phase strategies, `define-strategy` and `solve-via-strategy`) | Usually gives up any guarantee about the whole plan; a milestone reached the wrong way can block the rest (note 7) |
+| C6 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md) with the hand-off of section 8; its dialogue chooses the subgoals and realizes each by hand, by one search, or by handing a hard subgoal back here (the third way in) | Usually gives up any guarantee about the whole plan; a subgoal reached the wrong way can block the rest (note 7) |
 
 **D. Probing and partitioned runs**
 
@@ -500,18 +511,8 @@ same approaches with their entry points.
    its cost (340,038 boards backward from 33 against 291,987 forward from the hole at 11;
    `doc/problems/triangle-xyz-6/search-analysis.txt`).  Where such a mirror holds, split the
    depth (C3) instead.
-7. **Milestones (lessons for the solving advisor).**  Choose milestones as resting states the
-   next step needs, and measure each with `solve-subgoal`.  crelay-topo (2026-10-06, two
-   recorder cycles in 28 moves against a hand plan's 31): (a) Name the precondition the next
-   step needs, not its end product:
-   "agent1 at location6" (inside the alcove) took 10 moves and the search found the means
-   itself, while "box1 at location7" (the box out of the alcove) straight after leg 1 found
-   nothing in 10 minutes.  (b) Size each leg to about 10 moves for `first`, 6 to 9 for
-   `min-length`; cost grew about 2.6 times per move.  (c) Use the final resting state, not a
-   waypoint: a leg that set the box down was followed by one that picked it up again, 2
-   wasted moves.  (d) Add `(recorder-cycle-ended)` only where a cycle should close; legs may
-   run inside one cycle.  (e) When a leg stalls, split it at its hard precondition rather
-   than raising the cutoff.
+7. **Milestones.**  The lessons on choosing milestones (crelay-topo, 2026-10-06) moved to
+   the solving advisor, *Choosing a subgoal*, on 2026-10-15.
 8. **Enumerator meet-in-the-middle.**  Three steps, all in the one staged spec.  (a)
    `find-goal-states` builds every combination of the declared base facts within their
    limits, works out the derived facts once for each, and keeps those meeting the goal (and
@@ -583,7 +584,7 @@ same approaches with their entry points.
    passes it; run a short probe with and without, comparing counts and best length.  Keep it
    only if it removes states and the timing shows a gain.  (d) A fact the rules already
    enforce removes nothing; a fact true only of the expected answer narrows the search to
-   that answer (C4).  Necessary steps and milestones go to the solving advisor (Q16, C6).
+   that answer (C4).  Necessary steps go into the hand-off to the solving advisor (section 8).
    corner-topo-advisor (2026-10-12 to 14): the problem analysis proved that receiver1 lit
    red and a complete blue chain to receiver3 cannot coexist, so gate1 is closed in every
    goal state.  True, but it follows from the rules, so no enumerated goal state violates it
@@ -1279,4 +1280,20 @@ FURTHER:      options beyond this run, each with a descriptive topic name, a pla
               do it only if ..., or leave it); none is started without the user's go-ahead.
               Proposed entries of section 3, not yet available, appear only here, as
               engine changes
+```
+
+**Hand-off to the solving advisor** (the last section of `search-analysis.txt` when no
+strategy here looks feasible; the same fields report a bounded failure on a subgoal, in
+that subgoal's section)
+
+```
+SPEC:         the spec and any spec copy the decisive runs used; the maximum depth
+RUNS:         each decisive run: start, settings, cutoff, how it ended, growth per level
+              and the depth reached
+STRATEGIES:   each strategy tried and why it failed or was not feasible, with the number
+              behind it
+DEAD STATES:  states or kinds of state shown dead, with the argument or the run
+NECESSARY:    steps every solution must take and hard preconditions observed, each marked
+              proved, measured or suspected
+ESTIMATE:     the projection that one search cannot finish, as a range
 ```
