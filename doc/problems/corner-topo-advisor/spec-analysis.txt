@@ -115,6 +115,9 @@ CHECKS AND EVIDENCE
 READINESS AND OPEN ISSUES
   Delivered: probs/problem-corner-topo-advisor.lisp (revision of 2026-10-12, with user's formatting
     edits) plus tech/beam-relay.lisp E2 change.
+  Superseded 2026-10-14: replaced by the search advisor's revision (formerly
+    problem-corner-topo-advisor-1.lisp), which adds enumerator declarations only; rules and goal
+    unchanged.  See search-analysis.txt, SPEC CONSOLIDATION.
   Requirement mapping: R1 givens in define-types/define-init (S1, S2); R2 techs included (S1);
     R3 define-goal (S2); R4 settings (S1; depth 5 provisional); R5 V1-V5 passed (C2, C4; A3 scoped).
   Acceptance: model reviewed section by section; enhancements E1-E2 implemented and exercised; Windows

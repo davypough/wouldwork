@@ -14,6 +14,10 @@
 ;;;   - All mechanics come from the shared Talos technologies; this file adds no actions.
 ;;;   - The connectors are interchangeable, so arrangements differing only in connector
 ;;;     names are treated as one state.
+;;;   - Meet in the middle: the file also declares which facts make up a state (where things
+;;;     are, what is held, which connectors are paired).  The goal states can then be
+;;;     generated directly and worked backward from, so the search from the start only has
+;;;     to reach one of them.  The rules and the goal are unchanged.
 
 
 (in-package :ww)
@@ -89,3 +93,35 @@
   (and (has-location agent1 location4)
        (active receiver2)
        (active receiver3)))
+
+
+;;;; ENUMERATOR DECLARATIONS ;;;;
+;;;; Used only by find-goal-states, find-predecessors and solve-meeting-point.
+
+
+;; Where the agent and each connector are.  A connector with no location is being held,
+;; and at most one can be.
+(define-base-relation has-location
+  :allow-unassigned (:types connector)
+  :max-unassigned (:types connector 1))
+
+
+;; What the agent holds: nothing, or one connector.
+(define-base-relation holding
+  :allow-unassigned t)
+
+
+;; Each connector's pairings, up to the connect limit.  A held connector may keep its
+;; pairings (retaining pickup).
+(define-base-relation (paired ?connector ?terminus)
+  :max-per (?connector 3))
+
+
+;; Consistency only, not a guess at the answer: every connector is either at a location or
+;; held, never both.
+(define-goal-filter consistent-holding
+  (forall (?c connector)
+    (or (and (bind (has-location ?c $loc))
+             (not (holding agent1 ?c)))
+        (and (not (bind (has-location ?c $loc)))
+             (holding agent1 ?c)))))

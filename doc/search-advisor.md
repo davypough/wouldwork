@@ -13,7 +13,10 @@
 > with the consultant experiment on 2026-10-07, superseded by standalone record and
 > handoff guidance on 2026-10-09. Neither was a fresh audit of every technical claim.
 > Boundary with the solving advisor revised 2026-10-12: this advisor no longer chooses
-> milestones.  Strategy table (section 3) completed against source 2026-10-12.
+> milestones.  Strategy table (section 3) completed against source 2026-10-12, and
+> regrouped into setup, enhancements, restructuring and probing and partitioned runs, and section 3.1 split into
+> setup, enhancements to test and escalation, 2026-10-14.  Deduced facts (Q19, B19, note 10
+> of section 3) added 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -41,7 +44,17 @@ checks suitable enhancements; this advisor measures, compares, and tunes them.
 Write findings to `doc/problems/<problem-name>/search-analysis.txt` for short
 and sustained work alike, reusing that record when it already exists.
 Use the `search-analysis-` prefix for supporting evidence and handoff documents. Link upstream records
-rather than duplicating requirements. Older `Analysis.txt` records retain their own
+rather than duplicating requirements.  The problem folder holds all of the problem's solving
+information: findings, probe results and solutions.  Large data files (saved predecessor
+layers, saved state codes) stay out of it, where the engine writes them (`save-predecessors`
+writes to the wouldwork root, which git ignores); the record keeps their results instead:
+counts, timings, the file name and the forms that regenerate them.  Record every probe's
+finding, including searches that run out or stall, with its start, settings and cutoff:
+growth per depth level, the depth reached in the time available and states shown dead may
+later serve the [solving advisor](solving-advisor.md).  A complete solution found here goes
+in the folder's `Actions.lisp`, which writes `Validation.txt` when replayed (the solving
+advisor's Records format); such a problem needs no solving advisor.
+Older `Analysis.txt` records retain their own
 status; do not resume withdrawn work or migrate unrelated records automatically.
 Return the conclusion, evidence and scope, assumptions, unresolved issues, affected
 dependencies, and recommended next action. Stop when the question is answered, needs
@@ -53,7 +66,7 @@ or shared coordination record is required.
 **When one search appears impractical.** Every strategy in this advisor has the engine
 produce one complete plan from the start to the full goal, keeping the objective's meaning
 (a shortest plan stays shortest): tuning and pruning forward search, symmetry, lower bounds,
-macro actions, relaxation, bidirectional search and enumerator meet-in-the-middle.  If
+macro actions, relaxation, backward and bidirectional search, and enumerator meet-in-the-middle.  If
 evidence suggests the current forward search is unlikely to finish within the available
 budget, try the strategies here that fit before anything else.  A strategy that needs a
 separate spec gets a numbered copy when it re-encodes the same rules and goal (section 1.1);
@@ -142,6 +155,8 @@ No build, no staging and no runs: read, reason, and ask.
    search), say in a sentence before the list why it is or is not changed.  The items cover:
    - choices that live in the spec: the strategy where it is a spec setting (`*problem-type*`
      csp, `*tree-or-graph*`, `*solution-type*`, symmetry), and action order (section 3);
+   - the candidates in section 3.1's *Enhancements to test* that the findings support, each
+     with the probe that decided it;
    - representation changes (Q18) and refactorings of unusual constructions (section 1.1);
    - search hooks (section 4.1), each with its soundness argument;
    - with happenings, how time passes: the spec's `wait` action or `*auto-wait*`, never both
@@ -260,7 +275,7 @@ changes in the same run go into that copy.  A change that needs a separate varia
   11) or an explicitly approved run plan, normally at the user's REPL. The assistant supplies the exact
   forms and what to paste back, and never raises the depth or thread count silently.  A spec
   copy written for a deep run leaves `*progress-reporting-interval*` unset (section 4).
-- **Multi-step strategies** (S7 macros, S9 relaxation, S10 bidirectional, S11
+- **Multi-step strategies** (B18 macros, C1 relaxation, C2 backward, C3 bidirectional, C4
   enumerator): guide one step at a time.  Give the forms for the step, wait for its result,
   check it, then give the next.  Keep the forms of each step so the run can be repeated.
 
@@ -274,23 +289,24 @@ of a result belong here.  The notes below the table give the details and measure
 | Id | Question | How settled | What it decides |
 |---|---|---|---|
 | Q1 | Is the answer a sequence of moves, or an assignment (each variable set once, order irrelevant)?  If an assignment, is there one action per variable, or one action over all of them? (note 1) | spec | `*problem-type*`; the assignment cases of section 3.1 |
-| Q2 | What is wanted: any one solution, N, every, every path, or a best one (fewest steps, least time, min/max value)? | user | `*solution-type*`; optimization (S4) |
+| Q2 | What is wanted: any one solution, N, every, every path, or a best one (fewest steps, least time, min/max value)? | user | `*solution-type*`; optimization (A4) |
 | Q3 | Are there happenings or patrollers? | spec: `define-happening`, `define-patroller` | tree search; `*auto-wait*`; no backtracking |
 | Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? (note 2) | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits |
 | Q5 | Does some quantity change by a fixed amount on every move, **and** does the goal fix its final value? (note 3) | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2) |
 | Q6 | How large is the space, and how much work does each expansion cost? (note 4) | spec, probe | whether brute force can finish (roughly under a billion program cycles); finer actions, or `bind` for parameters the state fixes |
-| Q7 | Are there interchangeable objects: one type, identical static facts, not named by the goal, and taken by the actions as typed parameters (`?peg peg`)? (note 5) | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (S5); Q18 instead if the names serve no purpose |
-| Q8 | Is there a cheap measure of how close a state is to the goal, and does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (S6), kept only if a timed probe shows it faster; if it never overestimates, also try it as `min-steps-remaining?` (Q9) |
-| Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (S5) |
-| Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (S5) |
-| Q11 | For min/max-value, can an optimistic value of a partial state be computed cheaply? | spec, user | `bounding-function?` (S4) |
-| Q12 | Can goal states be listed explicitly, and can every action be reversed? | spec | bidirectional search (S10); if either fails, S11 when Q13 holds |
-| Q13 | Is the goal described by base facts (positions, pairings) from which the derived facts follow? | spec: `propagate-changes!`, derived relations | enumerator meet-in-the-middle (S11); goal-state enumeration (S14) when only the arrangement is wanted |
-| Q14 | Is the work per state dominated by working out derived facts? | probe: states per second, compared with a problem without propagation | relaxation (S9) |
-| Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (S7) |
-| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | nothing here; noted for the solving advisor, used only if every strategy here fails (S8) |
+| Q7 | Are there interchangeable objects: one type, identical static facts, not named by the goal, and taken by the actions as typed parameters (`?peg peg`)? (note 5) | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (B1); Q18 instead if the names serve no purpose |
+| Q8 | Is there a cheap measure of how close a state is to the goal, and does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (B10), kept only if a timed probe shows it faster; if it never overestimates, also try it as `min-steps-remaining?` (Q9) |
+| Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (B6) |
+| Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (B2) |
+| Q11 | For min/max-value, can an optimistic value of a partial state be computed cheaply? | spec, user | `bounding-function?` (B9) |
+| Q12 | Can goal states be listed explicitly, and can every action be reversed? | spec | bidirectional or backward search (C3, C2); if either fails, C4 when Q13 holds |
+| Q13 | Is the goal described by base facts (positions, pairings) from which the derived facts follow? | spec: `propagate-changes!`, derived relations | enumerator meet-in-the-middle (C4); goal-state enumeration (C5) when only the arrangement is wanted |
+| Q14 | Is the work per state dominated by working out derived facts? | probe: states per second, compared with a problem without propagation | relaxation (C1) |
+| Q15 | Do the same few moves recur together in solutions of small versions? | probe: `freq` on every solution of a small version | macro actions (B18) |
+| Q16 | Are there natural milestones every solution must pass (a gate opened, an object placed)? | spec, user | nothing here; noted for the solving advisor, used only if every strategy here fails (C6) |
 | Q17 | Does the problem use the Talos recorder or connectors? | spec: `include-tech` | recorder and connector limits (section 4) |
 | Q18 | Do objects carry names the puzzle never uses, is the same fact stored more than once, or are some objects ruled out of every action by static facts? (note 6) | spec | re-encoding (section 1.1): record only what matters |
+| Q19 | Can a fact about every solution or every goal state be proved from the rules and the geometry (an invariant, a dead state, a count of required steps), or a plan worked out by hand? (note 7) | spec, user: a written argument | B19: a cutoff from a replayed plan, pruning, a lower bound, or a goal-state filter; a necessary step is only noted for the solving advisor (Q16) |
 
 1. **Assignments.**  csp fixes the order by depth: at depth n, while n is below the number of
    actions, only the nth defined action is tried (`generate-children` in `ww-planner.lisp`),
@@ -326,32 +342,87 @@ of a result belong here.  The notes below the table give the details and measure
    five identical squares as one sorted list of cells, moved by their own action whose
    parameter comes from a query: shortest solution 3,440 program cycles in 0.1 s, against 3,649
    in 0.4 s with symmetry pruning (both with a lower bound).
+7. **Deduced facts.**  A deduction is a claim, not a result: its value is a smaller search,
+   its risk a missed case.  Ask of each what it would remove.  A fact the rules already
+   enforce removes nothing: corner-topo-advisor's "gate1 is closed in every goal state"
+   follows from the rules, so as a goal filter it would drop none.  Section 3, note 10.
 
 ---
 
 ## 3. Strategies
 
-S1 to S12 are listed roughly from cheapest to most effort; S13 to S15 were added later.
-Most combine: parallel with pruning, macros with
-heuristics.  The notes below the table give the details.
+The entries fall into four groups.  **A, search setup:** what the engine runs, one choice
+per row.  **B, enhancements:** additions to a chosen setup, each accepted or rejected on its
+own (pruning B1 to B5, bounds B6 to B9, ordering B10 to B12, assignment propagation B13 to
+B15, encoding B16 to B18, deduction B19).  **C, restructuring:** a separate spec or a multi-step procedure,
+guided one step at a time.  **D, probing and partitioned runs:** runs made to learn something,
+or to split one search into parts.
+Most combine: parallel with pruning, macros with heuristics.  Section 3.1 says which entries are adopted directly and which are tested first.  Entries marked *Proposed* are
+not available; mention them only under FURTHER (section 8).  The notes below the tables give
+the details.
+
+Earlier records use former ids: S1 = A5, S2 = A6, S3 = A1, S4 = A4 and B9, S5 = B1, B2, B3
+and B6, S6 = B10, S7 = B18, S8 = C6, S9 = C1, S10 = C3, S11 = C4, S12 = D1 and D2, S13 = A2,
+S14 = C5, S15 = B17.
+
+**A. Search setup**
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
-| S1 | **Brute force, iterative deepening** | A useful baseline when its cost fits the objective and budget | `first` at approved cutoffs; propose further depths only when needed; test shortest length only if requested | Exponential in depth |
-| S2 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with auto-wait or objects created during search (section 5) |
-| S3 | **CSP (fixed-order assignment)** | Q1: one action per variable | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (note 1) | Backtracking runs serial or parallel and supports all four search hooks ([capability reference](advisor-reference.md), compatibility review and entry F17); the order matters; with forward checking the goal must test the constraints (note 1) |
-| S4 | **Optimization** | Q2 asks for a best solution | `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert); `bounding-function?` for value problems | Must search until the bound is proved, so far more work than `first`; pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
-| S5 | **Pruning hooks** | Q7, Q9 or Q10 answered yes | `*symmetry-pruning*` t; `min-steps-remaining?` or `prune-state?` as queries; `define-constraint` for a rule every state must keep (a successor breaking it is discarded as it is generated); for Talos problems, `(include-tech topo-lower-bound)` (section 4.1) | Must be **sound**; time symmetry as well as counting what it saves (note 3) |
-| S6 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
-| S7 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` after an `every` search of a small version | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
-| S8 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md), whose dialogue chooses the milestones and realizes them with `solve-subgoal` (and registered multi-phase strategies, `define-strategy` and `solve-via-strategy`) | Usually gives up any guarantee about the whole plan; a milestone reached the wrong way can block the rest (note 7) |
-| S9 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
-| S10 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
-| S11 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8) |
-| S12 | **Randomized and branch-restricted runs** | Exploring a huge space for any solution, or splitting work by hand | `*randomize-search*` t (repeat runs); `*branch*` n explores only the nth first move | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined.  With `min-length`, the best of the per-branch results is the overall shortest, but the total work is unchanged |
-| S13 | **Backtracking driver** | Memory, not time, limits graph search, and states rarely repeat by different routes; or CSP (S3) | `*algorithm*` backtracking (section 4): one state is changed and undone in place instead of copied; `*bt-cycle-check*` t also rejects a state already on the current path | Tree search only: no closed table, so a state reached by different routes is expanded again; all four hooks apply; serial or parallel; not with happenings (section 5) |
-| S14 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
-| S15 | **Action-set reduction** | One action's job can be done by others at no extra length, and that action adds many successors | A spec copy without the action, or with a narrower precondition, plus a written replacement argument (note 9) | Changes the rules: with the argument it is a re-encoding (section 1.1), without it a specification topic for the spec advisor.  Without the argument the reduced model still finds valid plans, but proves no minimum and no absence |
+| A1 | **Problem type: planning or csp** | csp for Q1: one action per variable; otherwise planning | `*problem-type*` csp; `*depth-cutoff*` 0; actions defined in the order they should run (B11, note 1) | csp forces tree search; backtracking runs serial or parallel and supports all four search hooks ([capability reference](advisor-reference.md), compatibility review and entry F17); the order matters; with forward checking (B13) the goal must test the constraints (note 1) |
+| A2 | **Driver: depth-first or backtracking** | Backtracking when memory, not time, limits graph search and states rarely repeat by different routes; or with csp (A1) | `*algorithm*` backtracking (section 4): one state is changed and undone in place instead of copied; `*bt-cycle-check*` t also rejects a state already on the current path | Tree search only: no closed table, so a state reached by different routes is expanded again; all four hooks apply; serial or parallel; not with happenings (section 5) |
+| A3 | **Tree or graph search** | Graph when states repeat (Q4); tree when they rarely do, with happenings, or for better parallel speedup | `*tree-or-graph*` (section 4) | Graph search costs memory for its closed table, shared under a lock in parallel; csp and backtracking force tree search; happenings with graph search are an error (section 5) |
+| A4 | **Solution regime** | Q2: one solution, N, every, every path, or a best one (fewest steps, least time, min/max value) | `*solution-type*` `first`, N, `every`, `all-paths`; or `min-length`, `min-time` (action durations), `min-value`/`max-value` (assign `$objective-value` in each assert), with B9 for value problems | Optimizing must search until the bound is proved, so far more work than `first` (section 3.2); pointless at fixed length (Q5); set a cutoff when moves can be undone (note 2) |
+| A5 | **Depth cutoff and iterative deepening** | A useful baseline when its cost fits the objective and budget; an exact cutoff for a known or fixed length (Q5) | `*depth-cutoff*`; `first` at approved cutoffs; propose further depths only when needed; test shortest length only if requested | Exponential in depth.  B6 prunes before a first solution only with a cutoff |
+| A6 | **Parallel search** | The space is large (depth-first or backtracking search) | `(ww-set *threads* N)` at the REPL | Best with tree search; graph search shares a locked closed table.  Not with auto-wait or objects created during search (section 5) |
+| A7 | **How time passes with happenings** | Q3, when waiting may be needed | the spec's `wait` action, or `*auto-wait*` (section 4); never both | Time the same probe with each and keep the cheaper (sentry: the `wait` action about 6 times cheaper); `*auto-wait*` needs tree, serial, depth-first (section 5) |
+
+**B. Enhancements**
+
+| Id | Strategy | Use when | How | Cost and cautions |
+|---|---|---|---|---|
+| B1 | **Symmetry pruning** | Q7: interchangeable objects | `*symmetry-pruning*` t; staging reports the groups found | Time it as well as counting what it saves (note 3); drops symmetric variants under `every` (section 5); a re-encoding (B16) is often cheaper |
+| B2 | **Dead-state pruning** | Q10: some states can be proved dead | `prune-state?` (section 4.1) | Must be **sound**: a test that rejects a live state silently discards solutions (note 3) |
+| B3 | **State constraints** | A rule every state must keep | `define-constraint`: a successor breaking it is discarded as it is generated | Must be a true rule of the puzzle, not a guess |
+| B4 | **Independent-move reordering** | Tree search or backtracking, where independent moves made in different orders reach the same state | *Proposed; not available.*  A canonical order for independent moves, generalizing the ordered completions of section 4.1 and B12 | Needs a definition of when two actions are independent |
+| B5 | **Failed-state memory** | Tree search or backtracking, where states repeat | *Proposed; not available.*  Record states proven to fail with k moves left, and skip them when reached again with k or fewer | Memory for the recorded states, less than graph search's full table |
+| B6 | **Lower bound on moves** | Q9: a cheap bound that never overestimates | `min-steps-remaining?` (section 4.1: distance plus obligations, exact bounds); for Talos problems, `(include-tech topo-lower-bound)` | Must never overestimate; consulted only with a depth cutoff, or after a solution under `min-length` or `first`; check it against runs without it (section 4.1) |
+| B7 | **Relaxed h-max and LM-cut bounds** | Q9 with no hand-written bound | Available only inside `topo-lower-bound` (Talos), which registers a relaxed model with `src/ww-relaxed-heuristics.lisp`.  *Proposed: opening it to other problems* | Outside Talos each kind of problem needs its own model builder |
+| B8 | **Exact-distance tables** | Large reversible problems whose reduced version, tracking only some objects, can be searched exhaustively | *Proposed; not available.*  Search the reduced version backward once, store its distances, and use them as B6 | Memory for the table; sound only if the reduction never overestimates |
+| B9 | **Value bound** | Q11: an optimistic value of a partial state is cheap | `bounding-function?` returning `(values cost upper)` (section 4.1; `problem-knap19.lisp`) | `upper` must be reachable; ordered completions (section 4.1); the incumbent starts at 1,000,000 (section 5) |
+| B10 | **Heuristic ordering** | Q8 yes and the first solution is wanted fast | define `heuristic?`; lower values are explored first | Orders successors only; time it against no ordering (note 4) |
+| B11 | **Action definition order** | Always with csp (A1); any search whose first solution depends on the order | define the actions with the most constraining first (note 1) | DONALD: 424 program cycles right to left, 1,440 left to right (note 1) |
+| B12 | **Ordered list of open variables** | Assignment with one action over every variable (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first (section 3.1, note 1) | Each state is reached by one path, so use tree search |
+| B13 | **Forward checking** | Assignments where earlier values narrow later domains | `define-update` narrowing the remaining domains as values are assigned (`problem-captjohn.lisp`) | The goal must test the constraints themselves (note 1) |
+| B14 | **Completion check** | The search sets only some variables and leaves the rest for a later fill | a completion solver run on every placement (section 3.1, note 3) | Its own cost per placement; may need parallel tuning (section 4) |
+| B15 | **Arc consistency** | Assignments where forward checking leaves many doomed values | *Proposed; not available.*  Propagation to a fixpoint as a reusable library, generalizing B14's solver | |
+| B16 | **Representation changes** | Q18, or a probe showing wasted states | a re-encoded spec copy (section 1.1) | The copy's reachable states and goals must correspond to the original's within the tested scope |
+| B17 | **Action-set reduction** | One action's job can be done by others at no extra length, and that action adds many successors | A spec copy without the action, or with a narrower precondition, plus a written replacement argument (note 9) | Changes the rules: with the argument it is a re-encoding (section 1.1), without it a specification topic for the spec advisor.  Without the argument the reduced model still finds valid plans, but proves no minimum and no absence |
+| B18 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` (D5) | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
+| B19 | **Deduced facts** | Q19: a fact proved by reasoning from the rules and the geometry, or a plan worked out by hand | Each fact in the form that removes work (note 10): a hand plan replayed with `validate-solution` sets the `*depth-cutoff*` (A5); a dead state becomes `prune-state?` (B2) or a constraint (B3); a count of required steps becomes `min-steps-remaining?` (B6); a property of every goal or reachable state becomes a goal filter or `state-feasible?` (C4) | Unsound if a case was missed, and solutions are then lost silently; a hand plan's length is an upper bound, never a proof of minimum; a fact the rules already enforce removes nothing |
+
+**C. Restructuring**
+
+| Id | Strategy | Use when | How | Cost and cautions |
+|---|---|---|---|---|
+| C1 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
+| C2 | **Backward search** | Q12 yes, a backward move is not just a forward move on a transformed state, and the backward branching is clearly smaller than the forward (D6) | the backward spec of C3, with the original start state as its goal, searched alone; reverse its plan, stage the forward spec and replay it (note 6) | As C3; a separate spec to keep consistent, checked as a re-encoding (section 1.1) |
+| C3 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
+| C4 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8) |
+| C5 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
+| C6 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md), whose dialogue chooses the milestones and realizes them with `solve-subgoal` (and registered multi-phase strategies, `define-strategy` and `solve-via-strategy`) | Usually gives up any guarantee about the whole plan; a milestone reached the wrong way can block the rest (note 7) |
+
+**D. Probing and partitioned runs**
+
+| Id | Strategy | Use when | How | Cost and cautions |
+|---|---|---|---|---|
+| D1 | **Randomized runs** | Exploring a huge space for any solution | `*randomize-search*` t, with repeated runs | A failed run proves nothing; randomizing is ignored when `heuristic?` is defined |
+| D2 | **Branch-restricted runs** | Splitting work by hand, or solving one first move at a time when memory limits a whole search | `*branch*` n explores only the nth first move | With `min-length`, the best of the per-branch results is the overall shortest, but the total work is unchanged |
+| D3 | **Randomized restarts across threads** | As D1, using every thread | *Proposed; not available.*  Each thread follows its own random order | A failed run proves nothing |
+| D4 | **Beam search** | A fast candidate solution in a huge space | *Proposed; not available.*  A width limit on heuristic depth-first search | Incomplete: a failure proves nothing |
+| D5 | **Move-pattern frequencies** | Q15 | `(freq 2 3)` after an `every` search of a small version | Feeds B18 |
+| D6 | **Forward and backward branching** | Q12 yes; deciding between C2 and C3 | first check whether a backward move is a forward move on a transformed state; if not, compare the states per level with the forward spec and with the backward spec (section 6.1) | Needs the backward spec first |
+| D7 | **Prove-to-find ratio** | Choosing a regime (A4) | time `first` and an exhaustive run on the same model (section 3.2) | Near 1: a heuristic will not help |
 
 Wouldwork has no breadth-first or best-first (A*) driver.  Experimental and not offered:
 `src/ww-backward.lisp` (one-step regression, not integrated with search) and
@@ -399,6 +470,21 @@ same approaches with their entry points.
    and the forward search met one in about 20.  A forward `first` search stops at its first
    meeting, so for a shortest plan every smaller total d1 + d2 must also fail to meet (at
    fixed length, as here, any meeting is shortest).
+   **Backward alone (C2).**  Give the backward spec the original start state as its goal and
+   search it alone; then `(defparameter *backward-plan* (reverse (solution.path (first
+   *solution-paths*))))`, stage the forward spec, and `(%validate-solution *backward-plan*
+   nil)`.  Name each reverse action and its recorded arguments as the forward action, so the
+   reversed plan reads as forward moves.  The replay checks the forward spec's own goal, so a
+   forward spec whose goal is a meeting test reports the replay as partial; read the final
+   state instead.  `problem-triangle-xyz-backward-1.lisp` (2026-10-15, N = 6, last peg at 33):
+   340,027 program cycles, 0.8 sec, one 19-jump plan that replays to the single peg at 33.
+   Before writing a backward spec, check whether undoing a move is a forward move on a
+   transformed state.  In peg solitaire, undoing a jump is a jump on the board with pegs and
+   holes swapped, so a backward search from a last peg at p is a forward search from a single
+   hole at p; backward search alone gains nothing for any N, only the end position changes
+   its cost (340,038 boards backward from 33 against 291,987 forward from the hole at 11;
+   `doc/problems/triangle-xyz-6/search-analysis.txt`).  Where such a mirror holds, split the
+   depth (C3) instead.
 7. **Milestones (lessons for the solving advisor).**  Choose milestones as resting states the
    next step needs, and measure each with `solve-subgoal`.  crelay-topo (2026-10-06, two
    recorder cycles in 28 moves against a hand plan's 31): (a) Name the precondition the next
@@ -424,14 +510,14 @@ same approaches with their entry points.
    Without a `state-feasible?` hook a generated goal state need not be reachable; the meeting
    search decides that.  With `first` and `min-length` a meeting counts only if its stored
    suffix reaches the original goal: `first` stops at the first such meeting, which need not
-   give the shortest plan (as with S10); `min-length` prunes on the best depth found, and
+   give the shortest plan (as with C3); `min-length` prunes on the best depth found, and
    the check ensures pruning cannot discard the only meeting at the best depth that
    extends.  Precedent: the commented-out section at the end of `problem-corner.lisp`,
    written for the older corner model; its goal filter names the known solution's layout.
    `find-predecessors` tries every action in the spec by default; `:actions` takes a list of
    action names to narrow it.  History (2026-10-12): it first picked actions by fixed names
    from the older corner model and re-guessed one object at a time, so on
-   corner-topo-advisor-1 (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
+   corner-topo-advisor (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
    candidates in 14 minutes and kept none, although the known plan's last step is a valid
    predecessor.  Both are fixed (a held connector is now re-guessed together with its
    holder).  Result (2026-10-14): 6 backward layers from the 5,828 goal states (91,886
@@ -466,25 +552,82 @@ same approaches with their entry points.
    against 70% from connect choices.  The exact-duplicate case needs no argument: the
    retaining pickup is offered only when there is a pairing to retain
    (`tech/beam-relay.lisp`, 2026-10-12).
+10. **Deduced facts.**  Reasoning about the rules and the geometry is cheap and can shorten
+   any search, but only through a use the engine checks; it is not a strategy of its own,
+   since proving a plan shortest by reasoning takes the case analysis the search performs.
+   (a) A hand plan is replayed to the goal (`validate-solution` with its action forms, or
+   `validate-action-sequence`).  Its length is an upper bound and sets the cutoff of a
+   shortest-plan search (note 2); it proves no minimum.  (b) A dead-state or invariant
+   argument becomes `prune-state?` (B2) or `define-constraint` (B3); a count of the steps
+   every remaining plan needs becomes `min-steps-remaining?` (B6); a property of every goal
+   state becomes a goal filter, and of every reachable state `state-feasible?` (C4).  The
+   enumerator applies both to complete, propagated states, so they save the work that
+   follows a removed state, not its own propagation; `state-feasible?` also screens the
+   predecessors of every backward layer, where removals compound.  (c) Before relying on
+   one: write the argument out case by case; check that every state of a known valid plan
+   passes it; run a short probe with and without, comparing counts and best length.  Keep it
+   only if it removes states and the timing shows a gain.  (d) A fact the rules already
+   enforce removes nothing; a fact true only of the expected answer narrows the search to
+   that answer (C4).  Necessary steps and milestones go to the solving advisor (Q16, C6).
+   corner-topo-advisor (2026-10-12 to 14): the problem analysis proved that receiver1 lit
+   red and a complete blue chain to receiver3 cannot coexist, so gate1 is closed in every
+   goal state.  True, but it follows from the rules, so no enumerated goal state violates it
+   and as a filter it would remove nothing.  Its hints
+   then reasoned that, with the cutter at location4 in place, only a connector at location1
+   could open the gate, and counted 15 actions as the length (first recorded as a lower
+   bound).  The enumerator meet-in-the-middle found a 14-action plan that opens the gate,
+   cutter in place, with connectors at location2 and location3.  As a pruning rule or a
+   bound, either hint would have discarded the shortest plan.
 
 ### 3.1 Choosing
 
-Start at the first row that applies; the fallback column is the escalation order.
+Three tables, used in order.  **Setup** gives the configuration for the problem's situation
+and the enhancements that need no measurement.  For a straightforward problem (b^d modest,
+Q6, or a short known depth) it is the whole recommendation: one configuration and its REPL
+forms, with no probes unless a run fails.  **Enhancements to test** lists, for a complex
+problem, each further candidate with the probe that decides it; each becomes its own item in
+phase 2.  **Escalation** applies when a projection (section 6.3) says the improved forward
+search will not finish; take its rows in order.  Pruning and bounds adopted directly still
+get their checks (section 4.1) before a result relies on them.
 
-| Situation | Primary | Then |
+**Setup.**  Start at the first row that applies.
+
+| Situation | Setup | Add |
 |---|---|---|
-| Assignment, one action per variable (Q1) | S3, with symmetry if Q7 | S4 for value optimization (depth-first provides automatic objective bounds; backtracking supports user bounds) |
-| Assignment, one action, every variable set (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first; tree search (note 1) | S5 dead-state pruning (an open variable with no value left); a completion check when some variables are left for a later fill (note 3) |
-| Assignment, one action choosing a subset (knap19's `put`) | S1, or S4 if a best one is wanted, in graph search: other orders of the same choices close as repeated states (note 2) | S5 bound; S2 |
-| Happenings (Q3) | S1 in tree mode, `*auto-wait*` if waiting matters | S5 lower bound or dead-state pruning (section 4.1) |
-| b^d modest (Q6) | S1, then S4 if a best solution is wanted | S2 |
-| Fixed length (Q5) | S1 at the exact length with S5 dead-state pruning and symmetry | S10 (exhausting the remaining length proves a position dead); S7 |
-| Large, reversible, with a distance measure (Q8) | S5 lower bound if the distance never overestimates and the shortest path is wanted; S6 only if a timed probe shows the ordering faster; S2 | S10 if Q12; S11 if Q13 |
-| Large, reversible, no distance | S2 | S10 if Q12; S7; S15 when one action dominates the branching |
-| Expensive derived state (Q14) | S9 | S11 |
-| Too deep for one search | S10 if Q12, S11 if Q13: each splits the depth between two searches | S7; then propose the solving advisor as a last resort (S8) |
-| Graph search runs out of memory, states rarely repeat | S13 with S5 pruning | S10 or S11 |
-| Only an end arrangement is wanted, described by base facts | S14, or S3 with one action per variable | S5 |
+| Assignment, one action per variable (Q1) | A1 csp; A4 (for value optimization, depth-first provides automatic objective bounds; backtracking supports user bounds) | B11 action order; B13 forward checking; B9 if a best value is wanted |
+| Assignment, one action, every variable set (a crossword's slots) | A3 tree search | B12 ordered open list (note 1); B2 dead-state pruning (an open variable with no value left); B14 when some variables are left for a later fill (note 3) |
+| Assignment, one action choosing a subset (knap19's `put`) | A5, or A4 if a best one is wanted; A3 graph search: other orders of the same choices close as repeated states (note 2) | B9 bound; A6 |
+| Only an end arrangement is wanted, described by base facts | C5, or A1 with one action per variable | B2 |
+| Happenings (Q3) | A5 in tree mode; A7 | B6 lower bound or B2 dead-state pruning (section 4.1) |
+| Fixed length (Q5) | A5 at the exact length, `first` | B2 dead-state pruning |
+| b^d modest (Q6) | A5, then A4 if a best solution is wanted | A6 |
+| Large, reversible, with a distance that never overestimates (Q8, Q9) | A4 `min-length` with an A5 cutoff; A6 | B6 lower bound |
+| Large, reversible, no distance | A6 | |
+| Graph search runs out of memory, states rarely repeat | A2 backtracking; A6 | B2 |
+
+**Enhancements to test.**
+
+| Trigger | Candidate | Deciding probe |
+|---|---|---|
+| Interchangeable objects (Q7) | B16 re-encoding, else B1 symmetry pruning | the same probe on both specs (section 1.1); symmetry timed with and without (note 3 of section 3) |
+| A distance measure (Q8) | B10 heuristic ordering | `first` and the optimizing search timed with and without (note 4 of section 3) |
+| No hand-written bound, Talos problem (Q9) | B7 relaxed bounds (through `topo-lower-bound`) | `min-length` lengths agree with and without; timed |
+| Unused names, duplicated facts, objects ruled out by static facts (Q18) | B16 re-encoding | the same probe on both specs (section 1.1) |
+| Recurring moves in small versions (Q15) | B18 macro actions | D5 on a small version, then timed at two sizes (note 5 of section 3) |
+| One action dominates the branching | B17 action-set reduction | count the successors it adds; a replacement argument (note 9 of section 3) |
+| Waiting matters with happenings (Q3) | A7: the `wait` action or `*auto-wait*` | the same probe timed with each (section 5) |
+| Any solution in a huge space | D1 randomized runs | repeated runs; a failure proves nothing |
+| A fact about every solution or goal state proved by reasoning, or a hand plan (Q19) | B19 deduced facts, in the form that removes work | every state of a known plan passes; the same probe with and without (note 10 of section 3) |
+
+**Escalation.**
+
+| Situation | First | Then |
+|---|---|---|
+| Too deep for one search | C4 if Q13 (corner-topo-advisor: a 14-step plan where direct search reached depth 8), C3 if Q12: each splits the depth between two searches | B18; then propose the solving advisor as a last resort (C6) |
+| Large and reversible | C3, or C2 when D6 shows backward branching much smaller (Q12) | C4 if Q13; B18; B17 |
+| Fixed length (Q5) | C3 (exhausting the remaining length proves a position dead) | B18 |
+| Expensive derived state (Q14) | C1 | C4 |
+| Memory limits even tree search | D2, one first move at a time | C3 or C4 |
 
 1. **Ordered open list.**  Each fill removes its variable from the list, and the goal is the
    empty list.  Each state is then reached by one path, so graph search's table would only
@@ -492,10 +635,10 @@ Start at the first row that applies; the fallback column is the escalation order
    22 to 25 program cycles with the slots taken along the crossings; filling all the acrosses
    first (which never cross each other) checks nothing for 11 steps, and did not finish in 5
    minutes.
-2. **Not S3.**  csp fixes the action only while the depth is below the number of actions, so a
+2. **Not A1.**  csp fixes the action only while the depth is below the number of actions, so a
    single `put` is fixed at depth 0 alone and every later depth tries all orders, in tree
    search.  If the spec has one action per variable group but no order (the original donald),
-   use S3 rather than graph search: graph search closes the reordered states, but csp never
+   use A1 rather than graph search: graph search closes the reordered states, but csp never
    generates them (donald, every solution: tree 165,978 program cycles, graph 17,239, csp
    1,441).
 3. **Variables left for a later fill.**  When the search sets only some variables and leaves
@@ -520,10 +663,10 @@ magnitude.  Report the regimes the user might want with their costs, measured wh
 
 | Regime | Setting | Must cover | Cost and what decides it | The result means |
 |---|---|---|---|---|
-| Find one | `first` | until the first goal | depends on density and on ordering (S6, action order); falls steeply with many solutions | a valid answer; nothing about others |
+| Find one | `first` | until the first goal | depends on density and on ordering (B10, B11); falls steeply with many solutions | a valid answer; nothing about others |
 | Prove (no solution, or uniqueness) | `first` exhausted without a goal for absence; exhaustive enumeration for uniqueness | the relevant model space, less what justified pruning removes | the size of the space; ordering does not reduce exhaustive coverage | a scoped model claim, subject to coverage and the chosen equivalence of solutions (section 6.2) |
 | Every solution | `every`, `all-paths` | the whole space | as prove, plus memory for the solutions recorded | every goal state (every path with `all-paths`) |
-| Best | `min-length`, `min-value`, ... | until the bound is proved | as prove, less what the bound prunes (S4) | the optimum, if run to completion |
+| Best | `min-length`, `min-value`, ... | until the bound is proved | as prove, less what the bound prunes (B6, B9) | the optimum, if run to completion |
 
 The ratio of prove to find is itself a measurement: near 1 means solutions are scarce or
 found late, so a heuristic will not help; a large ratio means a `first` search is cheap but a
@@ -549,11 +692,11 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*algorithm*` **REPL** | depth-first, backtracking (depth-first) | backtracking for CSP, or a tree with no repeats where memory is tight; otherwise depth-first.  In the spec it applies on a fresh `stage`; at the REPL it reloads (reference entry F19) |
 | `*solution-type*` | first, N, every, all-paths, min-length, min-time, min-value, max-value (first) | from Q2.  `first` at fixed length.  `every` gives one path per goal state; `all-paths` every distinct path to every goal, but only serial depth-first graph search with a depth cutoff (otherwise it falls back to `every`) |
 | `*tree-or-graph*` | tree, graph (graph) | graph when states repeat (Q4: repeated-state percentage high); tree when they rarely do, with happenings, or for better parallel speedup |
-| `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (S4) |
+| `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (A4) |
 | `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports the groups found, and suggests turning it off if none |
 | `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for auto-wait and problems that create objects during search |
-| `*randomize-search*` | t, nil (nil) | S12 only |
-| `*branch*` | n (0 = all) | S12 only |
+| `*randomize-search*` | t, nil (nil) | D1 only |
+| `*branch*` | n (0 = all) | D2 only |
 | `*auto-wait*` | t, nil (nil) | happenings where waiting may be needed and the spec has no `wait` action (section 5); try without first, since it enlarges the search.  Tree, serial, depth-first only |
 | `*auto-wait-max-time*` | integer (100) | with `*auto-wait*` |
 | `*progress-reporting-interval*` | nil or integer (nil) | nil reports on a time schedule whose gaps double, starting at `*progress-first-report*` seconds (10): about 12 reports in 12 hours, serial or parallel; an integer N reports every N states |
@@ -579,10 +722,10 @@ Defined in the spec as `define-query` with these reserved names; the state is su
 
 | Hook | Returns | Used by | Notes |
 |---|---|---|---|
-| `heuristic?` | a number, lower = more promising | depth-first, serial and parallel; backtracking | ordering only (S6). Backtracking scores all sibling choices on a temporary state copy, then explores lowest first; ties retain generation order. Without a heuristic it retains streaming generation |
-| `prune-state?` | true to stop expanding the state | depth-first, serial and parallel; backtracking | must be sound (S5); stops descendants, not acceptance of an already reached goal |
+| `heuristic?` | a number, lower = more promising | depth-first, serial and parallel; backtracking | ordering only (B10). Backtracking scores all sibling choices on a temporary state copy, then explores lowest first; ties retain generation order. Without a heuristic it retains streaming generation |
+| `prune-state?` | true to stop expanding the state | depth-first, serial and parallel; backtracking | must be sound (B2); stops descendants, not acceptance of an already reached goal |
 | `min-steps-remaining?` | a lower bound on moves to the goal | depth-first, serial and parallel; backtracking | consulted only with a depth cutoff, or after a solution under `min-length` or `first`; must never overestimate. Backtracking uses the same registered contributors, aggregate fallback, serial adaptive sampling, and pruning counters. In parallel it runs at task splitting and in every worker, without the serial adaptive sampling |
-| `bounding-function?` | `(values cost upper)` for value optimization, both in minimizing terms (a max-value problem returns both negated) | depth-first, serial and parallel; backtracking | `cost` is an optimistic bound: never worse than the best value any completion of the state can reach.  `upper` is the value of one completion that can actually be reached; the smallest `upper` seen becomes the incumbent, and a node is pruned when its `cost` is worse than it.  An `upper` that cannot actually be reached prunes the true optimum.  States the search records as best never tighten the incumbent; only `upper` does.  See `problem-knap19.lisp` (S4).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
+| `bounding-function?` | `(values cost upper)` for value optimization, both in minimizing terms (a max-value problem returns both negated) | depth-first, serial and parallel; backtracking | `cost` is an optimistic bound: never worse than the best value any completion of the state can reach.  `upper` is the value of one completion that can actually be reached; the smallest `upper` seen becomes the incumbent, and a node is pruned when its `cost` is worse than it.  An `upper` that cannot actually be reached prunes the true optimum.  States the search records as best never tighten the incumbent; only `upper` does.  See `problem-knap19.lisp` (B9).  In parallel it runs at task splitting and in every worker; the shared bound is updated without a lock, so a race can only loosen it (sound, less pruning).  A hook that keeps its own state in globals (for example, a bound memoized across calls) is shared by all threads and is not thread-safe |
 
 Global invariants (`define-invariant`) are also checked during parallel root-task
 generation, before a successor can become a task or an accepted goal, as well as
@@ -623,7 +766,9 @@ the adjacency relation rather than writing them by hand.
 
 **Generic topology bound.**  A problem that includes `topo-lower-bound` gets an automatic
 finite-resource contributor, with no `min-steps-remaining?` of its own and consulted under the
-same conditions.  To run without it, stage, then `(setf *min-steps-remaining-contributors*
+same conditions.  The technology also provides relaxed h-max and LM-cut bound queries
+(`topo-relaxed-hmax-bound`, `topo-relaxed-lm-cut-bound`), built on
+`src/ww-relaxed-heuristics.lisp` (B7).  To run without it, stage, then `(setf *min-steps-remaining-contributors*
 nil)`; `min-length` must give the same lengths with and without it.  Fixes from crelay-topo
 (2026-10-06): a fixed floor blower no longer disables it (its stream is a gate-free route, and
 a leg ending at a lift location costs no move); an ON goal on a support with a fixed position
@@ -754,6 +899,21 @@ other.
 
 For macro candidates (Q15): solve a small version with `every`, then `(freq 2 3)`.
 
+**Forward and backward branching (D6).**  Decides between backward search (C2) and
+bidirectional search (C3) once a backward spec exists.  First check whether undoing a move is
+a forward move on a transformed state (peg solitaire: pegs and holes swapped); if so, the two
+directions are the same search from different starts and backward search alone gains nothing
+(note 6).  Otherwise exhaust the same small cutoffs, such as 3 and 4, with each spec, using a
+goal not reached at that depth, and compare how **Total states processed** grows per level.
+When every plan has the same length, one `min-length` run at that length per spec expands
+nearly the whole reachable space, and its program cycles give the total in one run
+(triangle-xyz-6: 340,027 cycles against 340,038 reachable backward boards).  Backward search alone pays only when the backward growth
+is clearly smaller over the whole depth; otherwise split the depth (C3), giving the backward
+search the depth its growth affords.  For the enumerator (C4), the backward growth is the size
+of each new layer that `find-predecessors` reports, against the forward growth per level
+(corner-topo-advisor: forward 5 to 8 times per level, out of reach at 14; six backward
+layers and a 9-level forward search found a 14-step plan).
+
 **Answer-ordered data.**  A `first` search that finishes almost at once may only be following
 the order of the spec's data.  crossword13 listed each word in the position of its slot, so
 the first word tried always fitted: 22 program cycles, while a run with `*randomize-search*` t
@@ -768,8 +928,8 @@ lower bound, since paths through repeated states are cut.
 
 | Density | Means | Favours |
 |---|---|---|
-| Many goal states, found by many workers | Solutions are plentiful | `first`; S12 randomized runs; no heuristic needed |
-| Few goal states, deep in the space | A needle in a haystack | S5 dead-state pruning; S10 bidirectional; S6 if a distance measure exists |
+| Many goal states, found by many workers | Solutions are plentiful | `first`; D1 randomized runs; no heuristic needed |
+| Few goal states, deep in the space | A needle in a haystack | B2 dead-state pruning; C3 bidirectional; B10 if a distance measure exists |
 | None after complete bounded coverage | No accepted solution within that model and cutoff, subject to sound pruning | Reconsider the strategy or propose a justified model check or changed bound |
 
 A value problem with no goal (every state is a candidate) has no goal states to count.  Its
@@ -805,7 +965,8 @@ serial 36,326.  For exact counts, compare serial runs (`(ww-set *threads* 0)`).
 | Exhausted with no accepted goal, depth bounded otherwise | No solution in the covered model scope; a longer one may exist |
 | Exhausted entire reachable model space with no accepted goal | No model solution, provided coverage and pruning justify that conclusion |
 | Exhausted with pruning, symmetry, or other restrictions | Scope the claim to the justified coverage and equivalence; unsupported pruning cannot establish absence or optimality |
-| Exhausted with `*branch*` or a relaxed spec | A result about that restricted or altered search; transfer to the original problem requires a separate argument |
+| Exhausted with `*branch*` or a relaxed spec | A result about that restricted or altered search; transfer to the original problem requires a separate argument.  When every first move was searched with `*branch*`, the runs together cover the whole search, and the best of their `min-length` results is the overall shortest |
+| Plan found by meeting a backward search (C3, C4) | A valid plan once replayed from the start; shortest only if every smaller total also failed to meet (C3), or only for the backward set as built (C4, note 8) |
 | Out of memory, interrupted, or deadline-pruned | No new exhaustive bound; preserve candidates already found and any independently established evidence |
 
 Record the starting state, model revision, settings, cutoff, termination, and validation
@@ -835,13 +996,13 @@ regime it lands in:
 | Projection | Mitigation |
 |---|---|
 | Within time and memory | the current settings |
-| Within memory, too slow | S2 parallel; S6 if solutions are plentiful; S5 pruning |
-| Exceeds memory | tree search with S5 pruning, or S10/S11 to split the depth; a leaner encoding (Q18) |
-| Exceeds both by orders of magnitude | a different formulation (S9, S10, S11, or a leaner encoding, Q18); if none is feasible, the solving advisor as a last resort (S8) |
+| Within memory, too slow | A6 parallel; B10 if solutions are plentiful; B2 and B6 pruning |
+| Exceeds memory | tree search or backtracking (A2) with B2 and B6 pruning; one first move at a time (D2); C3/C4 to split the depth; a leaner encoding (B16) |
+| Exceeds both by orders of magnitude | a different formulation (C1, C2, C3, C4, or a leaner encoding, B16); if none is feasible, the solving advisor as a last resort (C6) |
 
-A heuristic (S6) only reorders the search.  It shortens a `first` search when solutions are
+A heuristic (B10) only reorders the search.  It shortens a `first` search when solutions are
 plentiful, but when they are scarce or absent the search must cover most or all of the space
-anyway, so only fewer states (S5 pruning, a leaner encoding, S10) or less memory per state
+anyway, so only fewer states (B2 and B6 pruning, a leaner encoding, C3) or less memory per state
 helps.
 
 Say whether the density is likely to hold at the larger size; a solution count that falls
@@ -990,5 +1151,7 @@ SCALING:      a small table: each way the problem grows, the cost growth per ste
 MEANING:      one line: what a solution, or a search that runs out, proves
 FURTHER:      options beyond this run, each with a descriptive topic name, a plain-language
               description of what it is and what it would gain, and a recommendation (do it,
-              do it only if ..., or leave it); none is started without the user's go-ahead
+              do it only if ..., or leave it); none is started without the user's go-ahead.
+              Proposed entries of section 3, not yet available, appear only here, as
+              engine changes
 ```

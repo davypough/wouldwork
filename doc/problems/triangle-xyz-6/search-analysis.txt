@@ -1,0 +1,50 @@
+triangle-xyz-6 -- search analysis
+=================================
+
+Backward search alone and forward/backward branching (2026-10-15)
+-----------------------------------------------------------------
+Question: does searching backward from the last peg ever beat searching
+forward, for this puzzle at any N?
+
+Finding (holds for every N): undoing a jump on a board is the same as making
+a forward jump on the board with pegs and holes swapped.  So a backward search
+from a last peg at position p is exactly a forward search from a starting
+board whose only hole is at p.  Backward search is never a different kind of
+search here; its cost depends only on where the last peg ends compared with
+the starting hole.  Both directions cross the same wide middle levels.
+
+Distinct boards per level (level-counts.py, independent of wouldwork):
+  N = 6 forward from hole 11:
+    1 2 8 43 232 1038 3752 10540 23466 41627 57275 59443 46385 27956
+    13288 5032 1514 329 49 7                               total 291,987
+  N = 6 backward from last peg 33:
+    1 4 20 107 508 1993 6364 16253 33239 53811 67394 64204 47616 28228
+    13347 5046 1518 329 49 7                               total 340,038
+  Backward from last peg 11 (the starting hole) reproduces the forward counts
+  exactly, at N = 5 and N = 6, as the swap argument predicts.
+  N = 6 last-peg positions reachable from hole 11: 11 14 22 25 33 41 52.
+  N = 5: 11 14 33 41.
+  Backward level 7 from 33 = 16,253, matching the recorded meeting-board count.
+
+Wouldwork run, backward alone (probs/problem-triangle-xyz-backward-1.lisp):
+  (stage triangle-xyz-backward-1)
+  (ww-set *threads* 16)
+  (solve)
+  graph search, min-length, depth cutoff 19, 16 threads:
+  program cycles 340,027; total states processed 2,299,098; repeated states
+  pruned 85.2%; 0.8 sec; one 19-jump plan.  The program cycles match the
+  340,038 reachable backward boards: min-length at a fixed plan length expands
+  essentially the whole backward space.
+
+Replay of the reversed plan on the forward spec:
+  (defparameter *backward-plan* (reverse (solution.path (first *solution-paths*))))
+  (stage triangle-xyz-forward)
+  (%validate-solution *backward-plan* nil)
+  All 19 jumps executed; final board (occupied p33), peg-count 1.  (Reported
+  as partial because the forward spec's own goal is a meeting board.)
+
+Conclusion: backward search alone does not pay for this puzzle.  For the end
+at 33 it costs 16% more than forward (340,038 against 291,987 boards); for
+any end position it equals a forward search from a different hole.  Where
+forward search alone is too deep, splitting the depth (bidirectional) is
+the formulation to try, not backward search alone.

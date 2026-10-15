@@ -1,7 +1,8 @@
 CORNER-TOPO-ADVISOR -- SEARCH ANALYSIS (search advisor record)
 
 PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
-  Spec: probs/problem-corner-topo-advisor.lisp (accepted 2026-10-12) with tech/beam-relay.lisp E2.
+  Spec: probs/problem-corner-topo-advisor.lisp (accepted 2026-10-12; enumerator declarations
+    added 2026-10-14, see SPEC CONSOLIDATION) with tech/beam-relay.lisp E2.
   Upstream: problem-analysis.txt (rev 2), spec-analysis.txt, spec-analysis-search-handoff.txt.
   Scope: phase 0 (read and reason only), 2026-10-12. No runs authorized yet.
 
@@ -357,3 +358,12 @@ MEET-IN-THE-MIDDLE AS FIRST (2026-10-14, fresh image, 16 threads, loaded 6-layer
     every       781 s  13.0 M states  92 meetings  shortest 14
     min-length  182 s   3.6 M states   2 meetings  14 (proved shortest for this set)
     first        58 s   1.0 M states   1 meeting   15
+
+SPEC CONSOLIDATION (2026-10-14, user)
+  problem-corner-topo-advisor-1.lisp renamed to problem-corner-topo-advisor.lisp, replacing
+    the 2026-10-12 spec; *problem-name* is now corner-topo-advisor.  The only difference
+    from the replaced spec is the enumerator declarations (has-location, holding, paired,
+    consistent-holding) and a design note; rules and goal unchanged.
+  Entries above naming corner-topo-advisor-1 refer to this same spec under its old name.
+  Saved predecessor files carry the problem name and are checked on load, so files saved
+    as corner-topo-advisor-1-predecessors-*.lisp no longer load; regenerate them.
