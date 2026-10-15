@@ -25,6 +25,9 @@
 ;;;   fewer grids) or runs once after the search (many grids, listed words dropped to fit).
 ;;; - Indexed dictionary.  The dictionary is stored as one set of words per length,
 ;;;   position and letter; checking a pattern combines a few sets instead of walking a tree.
+;;; - Listed words count as fill words.  Some listed words are not in the dictionary, so  ;CHANGED
+;;;   they are added to it; otherwise a slot that could still take one would be judged    ;CHANGED
+;;;   unfillable, and good grids would be rejected.                                         ;CHANGED
 ;;; - Optimistic bound.  A cheap estimate of the best a state could still reach cuts off
 ;;;   branches that cannot beat the best found so far; it must never underestimate.
 ;;; - Lean state.  Small facts and counts, rather than tables copied at every step.
@@ -220,7 +223,7 @@
 
 
 (defparameter *dictionary* (make-hash-table)
-  "Length -> vector of the dictionary words of that length, each also reversed.")
+  "Length -> vector of the dictionary words of that length, each also reversed, and the listed words.")  ;CHANGED
 
 
 (defparameter *letter-sets* (make-hash-table :test #'equal)
@@ -228,13 +231,20 @@
 
 
 (defun read-dictionary (dictionary-file)
-  ;Collects the dictionary words of the field lengths, forwards and reversed, by length.
+  ;Collects the dictionary words of the field lengths, forwards and reversed, by length,
+  ;then the listed words not already among them, so an open slot may still take one.  ;CHANGED
   (let ((lengths (remove-duplicates (mapcar #'second *fields*)))
-        (by-length (make-hash-table)))
+        (by-length (make-hash-table))
+        (present (make-hash-table :test #'equal)))  ;CHANGED
     (dolist (word (uiop:read-file-lines dictionary-file))
       (when (member (length word) lengths)
         (push word (gethash (length word) by-length))
-        (push (reverse word) (gethash (length word) by-length))))
+        (push (reverse word) (gethash (length word) by-length))
+        (setf (gethash word present) t  ;CHANGED
+              (gethash (reverse word) present) t)))  ;CHANGED
+    (dolist (word *listed-strings*)  ;CHANGED
+      (when (and (member (length word) lengths) (not (gethash word present)))  ;CHANGED
+        (push word (gethash (length word) by-length))))  ;CHANGED
     (maphash (lambda (len words)
                (setf (gethash len *dictionary*) (coerce words 'vector)))
              by-length)))
@@ -512,6 +522,18 @@
         (return sum)))))
 
 
+(defun place-word (word field texts)  ;CHANGED: moved here, above its first use in completable?
+  ;A copy of texts with word written into field and its crossing cells.
+  (let ((new (copy-seq texts)))
+    (setf (svref new (gethash field *field-numbers*)) word)
+    (loop for (cross-field cross-index index) on (second (assoc field *crosscuts*)) by #'cdddr
+          for cross-number = (gethash cross-field *field-numbers*)
+          do (setf (svref new cross-number)
+                   (replace (copy-seq (svref new cross-number)) word
+                            :start1 cross-index :start2 index :end2 (1+ index))))
+    new))
+
+
 ;---------------- types and relations ---------------------
 
 
@@ -703,15 +725,3 @@
     (loop for (field word) in placements
           do (setf texts (place-word word field texts)))
     texts))
-
-
-(defun place-word (word field texts)
-  ;A copy of texts with word written into field and its crossing cells.
-  (let ((new (copy-seq texts)))
-    (setf (svref new (gethash field *field-numbers*)) word)
-    (loop for (cross-field cross-index index) on (second (assoc field *crosscuts*)) by #'cdddr
-          for cross-number = (gethash cross-field *field-numbers*)
-          do (setf (svref new cross-number)
-                   (replace (copy-seq (svref new cross-number)) word
-                            :start1 cross-index :start2 index :end2 (1+ index))))
-    new))

@@ -1,0 +1,18 @@
+donald -- search analysis records
+==================================
+
+2026-10-15  Arc consistency: analytic check (search advisor, arc consistency gap)
+---------------------------------------------------------------------------------
+Script: donald_ac.py (independent Python), python3 donald_ac.py
+Model: the spec (csp, columns right to left, forward checking removes an assigned digit from
+the other letters).  Compared with the same search plus arc consistency after each column:
+each column sum keeps only values with a supporting combination, and a letter with one
+digit left removes it from the others, repeated until nothing changes.
+
+Results (every solution):
+  forward checking only   426 states, 10,842 constraint checks, 1 solution
+  plus arc consistency     10 states, 27,414 constraint checks, 1 solution
+                           (16 children found dead before expansion; 74 values removed)
+Arc consistency makes the search almost free of backtracking, at 2.5 times the constraint
+checks; since each wouldwork state costs far more than a constraint check, it should pay.
+One size only: the lesson is structural (column sums with carries propagate strongly).

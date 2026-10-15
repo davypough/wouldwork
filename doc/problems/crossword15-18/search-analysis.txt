@@ -1,0 +1,50 @@
+crossword15-18 -- search analysis records
+==========================================
+
+2026-10-15  Arc consistency: analytic check (search advisor, arc consistency gap)
+---------------------------------------------------------------------------------
+Question: along the spec's search, how many placements that the spec's crossing check accepts
+can never be completed, how many of those does arc consistency (propagation over crossing
+letters to a fixpoint) remove, and at what cost per state?  Two sizes of the crossword family:
+crossword5-11-1 (5x5, 10 slots) and crossword15-18 (15x15, 70 slots).
+
+Method: cwdict_ac.py (independent Python).  Random paths follow the spec's slot order; at each
+step up to 8 (15x15) or 20 (5x5) listed words passing the spec's crossing check are tested:
+arc consistency over all open slots, then, if it passes, an exact completion search (budget
+2000 words, fewest values first, propagation after each choice).  Paths are extended only with
+completable placements (the regime of the checked search).  Open-slot domains: dictionary
+words (forwards and reversed) plus unused listed words.
+  python3 cwdict_ac.py probs/problem-crossword15-18.lisp src/English-words-455K.txt SEED PATHS PER-STEP
+  (DUMP=grids15.lisp writes each tested grid with its verdict, for the SBCL timing.)
+
+Results (counts of placements the spec accepts):
+  5x5,  seed 1, 20 paths:  283 accepted; 7 uncompletable (2.5%); arc consistency removes all 7.
+  15x15, seed 2, 7 paths: 1082 accepted; 615 uncompletable (57%); arc consistency removes 482
+                          (78%); 133 pass it but have no completion; 4 unknown at the budget.
+                          Open-slot values fall 45% (1.67e9 to 0.93e9 summed over samples).
+  15x15, seed 3, 3 paths:  395 accepted; 159 uncompletable (40%); arc consistency removes 145
+                          (91%); 14 pass it but have no completion; 5 unknown.
+  The share of doomed placements grows steeply with grid size; arc consistency catches most.
+
+Cost (SBCL 2.6.9 in the Linux VM, time15.lisp + time15b.lisp on the 395 dumped grids, using
+the spec's own initial-domains / propagate / complete-grid):
+  arc consistency alone        2.1 to 4.8 ms per placement (2.3 ms on completable grids)
+  complete-grid (budget 2000)  2.0 ms where arc consistency already fails, 30 ms on
+                               completable grids, 115 ms on budget-limited ones
+  plain search                 about 0.2 ms per state per thread (22 million program cycles
+                               in 5 minutes at 16 threads, design notes)
+  So arc consistency alone is a middle setting: about 10 times a plain state, about 13 times
+  cheaper than the full check, leaving 10-20% of the uncompletable placements.  The spec's
+  completion check already starts with this propagation.
+
+crossword13 (word list only, cw13_ac.py): the spec's search is already free of dead ends (24
+states, first solution); arc consistency at the start cuts the values from 181 to 23 (solves
+it) but saves no states.
+
+Soundness finding and fix: 33 of the 138 listed words (e.g. BRERRABBIT, AUNTAUDREY,
+UNITEDWAY) are not in the dictionary, yet the crossing check and the completion solver
+judged open slots by dictionary words only, so a placement whose crossing could still take
+such a listed word was rejected (best grids could be missed).  Fixed 2026-10-15:
+read-dictionary adds the listed words not already present, so every check sees them.
+Checked: "BRERRABB??" now fits; arc consistency and completion timings unchanged (above).
+crossword5-11-1 is not affected (all its listed words are in the dictionary).
