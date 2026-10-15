@@ -9,8 +9,8 @@ Stage and solve normally. The worker-read optimization defaults to T after STAGE
 there is no per-problem enablement command and no problem-name whitelist.
 The problem's ordinary worker-count setting still controls whether search is
 serial or parallel. Serial searches use the specialized canonical read code
-without copying worker views. Parallel backtracking uses the same worker views;
-its PATH cycle-check mode remains serial.
+without copying worker views. Parallel backtracking, including its PATH
+cycle-check mode, uses the same worker views.
 
 ```lisp
 (asdf:load-system :wouldwork :force t)
@@ -38,7 +38,7 @@ The experiment's Claustro/Corner name checks, specific objective/mode whitelist,
 and blanket callback/happening exclusions are removed. The engine creates views
 for parallel depth-first and backtracking worker groups regardless of problem name, planning/CSP,
 tree/graph or solution objective. Existing engine constraints still apply, such
-as serial PATH-mode backtracking and serial automatic waiting; snapshots do not turn a
+as serial automatic waiting; snapshots do not turn a
 serial-only algorithm into a parallel one.
 
 Each technology registers its own memo policy when its spliced code loads.
