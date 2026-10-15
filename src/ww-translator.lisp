@@ -226,25 +226,27 @@
    For backtracking: applies changes incrementally while tracking forward and inverse.
    Routes static relations to *static-db* and dynamic relations to state idb."
   (declare (special forward-list inverse-list))
-  (if (write-operation-p flag)
-    (let ((db (if (gethash (car form) *relations*)              ; ← changed: dispatch on relation type
-                  `(problem-state.idb state)
-                  '*static-db*)))
-      (if (eq *algorithm* 'backtracking)
-        ;; Backtracking with incremental updates
-        `(if (and (boundp 'forward-list) (boundp 'inverse-list))
-           (multiple-value-bind (forward inverse) 
-               (update-bt ,db ,(translate-list form flag))     ; ← changed: use db
-             ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
-             (push forward forward-list)
-             (when inverse (push inverse inverse-list)))
-           ;; No active incremental-update context (eg, standalone propagation update):
-           ;; apply directly without logging forward/inverse operations.
-           (update ,db ,(translate-list form flag)))            ; ← changed: use db
-        ;; Depth-first algorithm
-        `(update ,db ,(translate-list form flag))))             ; ← changed: use db
-    ;; Read operation
-    (translate-proposition form flag)))
+  (cond ((and (write-operation-p flag) (eql (car form) 'waiting))  ;CHANGED
+           nil)  ;CHANGED: (waiting) only marks a wait action; nothing is stored
+        ((write-operation-p flag)  ;CHANGED
+           (let ((db (if (gethash (car form) *relations*)              ; ← changed: dispatch on relation type
+                         `(problem-state.idb state)
+                         '*static-db*)))
+             (if (eq *algorithm* 'backtracking)
+               ;; Backtracking with incremental updates
+               `(if (and (boundp 'forward-list) (boundp 'inverse-list))
+                  (multiple-value-bind (forward inverse) 
+                      (update-bt ,db ,(translate-list form flag))     ; ← changed: use db
+                    ;; UPDATE-BT applies the forward operation immediately and also returns inverse.
+                    (push forward forward-list)
+                    (when inverse (push inverse inverse-list)))
+                  ;; No active incremental-update context (eg, standalone propagation update):
+                  ;; apply directly without logging forward/inverse operations.
+                  (update ,db ,(translate-list form flag)))            ; ← changed: use db
+               ;; Depth-first algorithm
+               `(update ,db ,(translate-list form flag)))))             ; ← changed: use db
+        ;; Read operation
+        (t (translate-proposition form flag))))  ;CHANGED
 
 
 (defun translate-negative-relation (form flag)

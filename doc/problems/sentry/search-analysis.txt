@@ -111,3 +111,22 @@ Conclusion: failed-state memory is sound on sentry (same optimum, same goal
 states) and cuts the work about 4 times wherever the search must prove
 failures (shortest plan, or every solution at the optimum's cutoff).  The
 gain is limited where many subtrees contain goals.
+
+Parallel wait fix (2026-10-15, approved)
+The spec's wait action asserts (waiting).  Since the translator began sending
+writes to relations not declared dynamic into the static database, every wait
+wrote (waiting) there: harmless serially (nothing reads the fact; the repeat-
+wait refusal tests the state's name), but refused in parallel workers.  Fix:
+translate-positive-relation (ww-translator.lisp) compiles an asserted
+(waiting) to nothing, so the spec idiom stays valid and no fact is stored.
+Measurements (every solution, cutoff 16, with the bound; Linux SBCL 2.6.9):
+  serial     memory off   33 paths (3 unique)   4,698 program cycles
+             memory on    33 paths (3 unique)   1,083 program cycles
+                          recorded 137 states, skipped 208 nodes
+  16 threads memory off   33 paths (3 unique)   2,421 program cycles
+             memory on    33 paths (3 unique)   2,276 program cycles
+                          recorded 837 states, skipped 1,898 nodes
+Serial counts unchanged.  In parallel, memory saves little here because each
+worker keeps its own table and sentry's search is small (worker search about
+60 ms either way).  mine1 (also a wait action): first solution, 16 steps,
+serial and 16 threads.

@@ -859,10 +859,7 @@ its compatibility review, and entry F19 for which settings reload or are refused
   `every`; a problem that creates objects during search (the corner family's beams) declares
   `(ww-set *search-registers-dynamic-objects* (beam))` and runs serially (see
   `problem-corner.lisp`); `*debug*` above 1 is reset to 1; symmetry statistics are
-  approximate.  All search hooks, `*randomize-search*` and `*branch*` apply.  A spec `wait`
-  action that asserts `(waiting)` currently fails under threads ("rejected
-  STATIC-FACT-UPDATE": `waiting` is installed as a static relation), so such problems
-  (sentry) run serially until this is fixed (2026-10-15).
+  approximate.  All search hooks, `*randomize-search*` and `*branch*` apply.
 
 ---
 
