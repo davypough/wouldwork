@@ -19,7 +19,8 @@
 > of section 3) added 2026-10-15.  Exact-distance tables (B8, note 11) assessed on tiles7a
 > 2026-10-15.  Failed-state memory (B5, note 12) implemented and measured on sentry
 > 2026-10-15.  Current-path check made sound with happenings, and failed-state memory
-> made the default with happenings, 2026-10-15.
+> made the default with happenings, 2026-10-15.  Independent-move reordering (B4, note 13)
+> made available as a spec idiom and measured on knap19, 2026-10-15.
 
 **Scope.** Choose an efficient search approach for the user's objective, with explicit
 assumptions about the model. Fidelity review belongs to the [specification advisor](spec-advisor.md).
@@ -387,7 +388,7 @@ S14 = C5, S15 = B17.
 | B1 | **Symmetry pruning** | Q7: interchangeable objects | `*symmetry-pruning*` t; staging reports the groups found | Time it as well as counting what it saves (note 3); drops symmetric variants under `every` (section 5); a re-encoding (B16) is often cheaper |
 | B2 | **Dead-state pruning** | Q10: some states can be proved dead | `prune-state?` (section 4.1) | Must be **sound**: a test that rejects a live state silently discards solutions (note 3) |
 | B3 | **State constraints** | A rule every state must keep | `define-constraint`: a successor breaking it is discarded as it is generated | Must be a true rule of the puzzle, not a guess |
-| B4 | **Independent-move reordering** | Tree search or backtracking, where independent moves made in different orders reach the same state | *Proposed; not available.*  A canonical order for independent moves, generalizing the ordered completions of section 4.1 and B12 | Needs a definition of when two actions are independent |
+| B4 | **Independent-move reordering** | Independent moves made in different orders reach the same state: above all an action choosing members of a set (knap19's `put`) | Spec idiom: the action may choose only an object numbered above every one already chosen, with A3 tree search (`problem-knap19-1.lisp`, note 13).  *Proposed:* an engine version for independent moves in general | Two moves are independent when either order is legal and ends in the same state; argue it for the action before relying on it (note 13).  The engine version would need each action's read and write facts |
 | B5 | **Failed-state memory** | Tree search with a depth cutoff (forced by happenings, or chosen) where states repeat | `(ww-set *failed-state-memory* t)` (REPL or spec).  A state whose subtree reaches no goal is recorded with its moves left; a repeat with no more moves left is skipped.  The key holds each happening's place in its cycle, not absolute time, so repeats are found at different depths (note 12) | Requires a depth cutoff and replaces the check against states on the current path, so every-solution runs also count plans that revisit a state (the goal states are the same).  An error at search start with graph search, csp, backtracking, auto-wait, min-time and value objectives, and path-dependent validators.  One entry per failed state.  Sentry: about 4 times less work for the shortest plan; less where many subtrees reach a goal |
 | B6 | **Lower bound on moves** | Q9: a cheap bound that never overestimates | `min-steps-remaining?` (section 4.1: distance plus obligations, exact bounds); for Talos problems, `(include-tech topo-lower-bound)` | Must never overestimate; consulted only with a depth cutoff, or after a solution under `min-length` or `first`; check it against runs without it (section 4.1) |
 | B7 | **Relaxed h-max and LM-cut bounds** | Q9 with no hand-written bound | Available only inside `topo-lower-bound` (Talos), which registers a relaxed model with `src/ww-relaxed-heuristics.lisp`.  *Proposed: opening it to other problems* | Outside Talos each kind of problem needs its own model builder |
@@ -611,6 +612,26 @@ same approaches with their entry points.
    paths) and mine1's first solution from 16,667 to 605,169; with memory, 1,083 and 3,000.
    `doc/problems/mine1/search-analysis.txt`.
 
+13. **Independent-move reordering.**  When moves commute, graph search expands each state
+   once but still generates it once per order of its last moves and discards the copies
+   against the closed table; tree search would follow every order.  Fixing one order of
+   independent moves generates each state exactly once, so tree search needs no closed table.
+   Soundness: argue that any two of the moves are independent (either order is legal and ends
+   in the same state), so every reachable state is reached in the canonical order.  For
+   knap19's `put`, the contents, load and worth are the same either way, and if both orders
+   fit, every intermediate load fits, since loads only grow.  A bound that already assumes
+   the order (ordered completions, section 4.1) stays consistent with it.  knap19 (2026-10-15,
+   `doc/problems/knap19/search-analysis.txt`): an independent count gave 36,326 packings, all
+   but 18 reachable in more than one order; unordered graph search generated 231,159 states
+   for them (6.4 times; knap30 6.3 times), tree search with unordered puts would follow about
+   1.5 billion paths.  `problem-knap19-1.lisp` (ascending puts, tree search): without the
+   bound 36,326 states generated and expanded, 0.1 s against 0.3 s; with it 432 program
+   cycles as before (456 states generated against 432), best value unchanged.  The waste
+   factor is the average number of items chosen, so the gain grows with larger subsets and
+   matters most where the bound prunes little (knap30).  For general planning problems,
+   where independence depends on which facts each move reads and writes, the engine version
+   (sleep sets) remains proposed.
+
 ### 3.1 Choosing
 
 Three tables, used in order.  **Setup** gives the configuration for the problem's situation
@@ -628,7 +649,7 @@ get their checks (section 4.1) before a result relies on them.
 |---|---|---|
 | Assignment, one action per variable (Q1) | A1 csp; A4 (for value optimization, depth-first provides automatic objective bounds; backtracking supports user bounds) | B11 action order; B13 forward checking; B9 if a best value is wanted |
 | Assignment, one action, every variable set (a crossword's slots) | A3 tree search | B12 ordered open list (note 1); B2 dead-state pruning (an open variable with no value left); B14 when some variables are left for a later fill (note 3) |
-| Assignment, one action choosing a subset (knap19's `put`) | A5, or A4 if a best one is wanted; A3 graph search: other orders of the same choices close as repeated states (note 2) | B9 bound; A6 |
+| Assignment, one action choosing a subset (knap19's `put`) | A5, or A4 if a best one is wanted; B4 ascending order with A3 tree search, so each subset is reached once (note 13 of section 3) | B9 bound; A6 |
 | Only an end arrangement is wanted, described by base facts | C5, or A1 with one action per variable | B2 |
 | Happenings (Q3) | A5 in tree mode; A7; B5 failed-state memory with a depth cutoff (note 12) | B6 lower bound or B2 dead-state pruning (section 4.1) |
 | Fixed length (Q5) | A5 at the exact length, `first` | B2 dead-state pruning |
