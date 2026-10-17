@@ -1,5 +1,5 @@
 # crelay-topo — Handoff
-Updated 2026-10-17.  Status: REOPENED — independent re-derivation; cycle-2 endpoint accepted (28 actions), cycle 3 next.
+Updated 2026-10-17 (R1 re-check).  Status: REOPENED — independent re-derivation; cycle-2 endpoint accepted (28 actions), cycle 3 next.
 Problem spec: probs/problem-crelay-topo-1.lisp (same rules as probs/problem-crelay-topo.lisp; cutoff 12, min-length, design notes).
 Corresponding diagram: doc/problems/crelay-topo/crelay-topo-diagram.png.
 Maximum search depth: 12, set 2026-10-16.
@@ -11,12 +11,11 @@ Maximum search depth: 12, set 2026-10-16.
                    records are kept for history only, renamed with the prefix prior-solution-
                    (Briefing.md, Handoff.md, Actions.lisp, Validation.txt).  Do not read them for
                    this work.  Do not load prior-solution-Actions.lisp: it overwrites Validation.txt.
-## Next step       Paused 2026-10-17 for engine work: a one-step predecessor tool to check the
-                   backward analysis (project doc claude/state-predecessors-plan.md; continuation
-                   prompt claude/state-predecessors-continuation-prompt.md).  Then resume the
-                   Briefing's "Backward analysis, second pass" at step 4 (from the revised C3:
-                   agent1 at location15 carrying tray1 with box1 and connector1, connector1 the
-                   last relay).  The earlier "one body short" count is superseded.
+## Next step       D: approve the fix plan for the predecessor tool's settling gap (project doc
+                   claude/settling-predecessors-plan.md, 2026-10-17); A then implements it and re-runs
+                   the S4 hand-over check.  After that, continue the Briefing's "Backward analysis,
+                   second pass" at step 4 from the revised C3.  Steps 1-3 re-checked with R1 on
+                   2026-10-17 (verdicts in the Briefing).
 ## State           Actions.lisp: SG1, SG2, 28 actions, replayed 2026-10-16 (success).  Endpoint: agent1
                    at location1, empty-handed; connector1 on plate1 (gate1 open); box1 on plate2 (gate3
                    open); tray1 on the ground at location7; gate2, gate5 open; recorder cycle 2 closed.

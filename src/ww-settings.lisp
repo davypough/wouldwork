@@ -161,6 +161,32 @@ Technologies register them, so the enumerator stays problem-neutral.")
   function-name)
 
 
+(sb-ext:defglobal *predecessor-leaf-expanders* nil
+  "Problem-local expanders for guessed predecessor states, keyed by action.
+
+An alist of (ACTION-NAME . FUNCTION-NAME).  The function takes one normalized guessed
+state and returns a list of further guessed states (fresh copies) that the same action
+might also have turned into the state after, eg a rider back on a tray the action set
+down.  It may over-propose; forward validation decides.  FIND-PREDECESSORS validates
+each one like the guessed state itself.  Technologies register them, so the
+enumerator stays problem-neutral.")
+
+
+(defun register-predecessor-leaf-expander (action-name function-name)
+  "Register FUNCTION-NAME as a problem-local predecessor-leaf expander for ACTION-NAME."
+  (reject-worker-read-write 'register-predecessor-leaf-expander)
+  (unless (and (symbolp function-name) (fboundp function-name))
+    (error "Predecessor-leaf expander requires a defined function: ~S"
+           function-name))
+  (when (member (cons action-name function-name) *predecessor-leaf-expanders*
+                :test #'equal)
+    (error "Predecessor-leaf expander registered twice: ~S for ~S"
+           function-name action-name))
+  (setf *predecessor-leaf-expanders*
+        (append *predecessor-leaf-expanders* (list (cons action-name function-name))))
+  function-name)
+
+
 (unless (boundp '*probe*)
   (defvar *probe* nil
     "Inserts a probe to stop processing at a specific state."))

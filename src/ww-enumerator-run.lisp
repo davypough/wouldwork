@@ -816,31 +816,51 @@ worker must print exactly as the caller does for its keys to match the reachable
 
 (defun fps-forward-per-object-validate-leaf (leaf frontier-props action reachable
                                              base-relations layer-table stats)
-  "Validate one novel per-object CSP leaf and store it when ACTION reaches the frontier state.
-   Registered predecessor-leaf normalizers first correct LEAF in place; a leaf then
-   rejected by a registered predecessor-leaf screen is dropped before propagation.
-   Errors are not caught: a failing candidate stops the layer where it fails."
+  "Validate one novel per-object CSP leaf, and the variants the predecessor-leaf
+   expanders registered for ACTION propose from it, storing each one ACTION turns into
+   the frontier state.  Registered predecessor-leaf normalizers first correct LEAF in
+   place, and each variant.  Returns T when any candidate reached the frontier state."
   (dolist (normalizer *predecessor-leaf-normalizers*)
     (funcall (symbol-function normalizer) leaf))
-  (when (some (lambda (screen) (funcall (symbol-function screen) leaf))
+  (let ((variants nil)
+        (reached nil))
+    (dolist (entry *predecessor-leaf-expanders*)
+      (when (eql (car entry) (action.name action))
+        (setf variants (append variants (funcall (symbol-function (cdr entry)) leaf)))))
+    (dolist (variant variants)
+      (dolist (normalizer *predecessor-leaf-normalizers*)
+        (funcall (symbol-function normalizer) variant)))
+    (dolist (candidate (cons leaf variants) reached)
+      (when (fps-forward-per-object-validate-candidate
+             candidate frontier-props action reachable base-relations layer-table stats)
+        (setf reached t)))))
+
+
+(defun fps-forward-per-object-validate-candidate (candidate frontier-props action reachable
+                                                  base-relations layer-table stats)
+  "Validate one normalized guessed predecessor CANDIDATE and store it when ACTION
+   reaches the frontier state.  A candidate rejected by a registered predecessor-leaf
+   screen is dropped before propagation.  Errors are not caught: a failing candidate
+   stops the layer where it fails."
+  (when (some (lambda (screen) (funcall (symbol-function screen) candidate))
               *predecessor-leaf-screens*)
-    (return-from fps-forward-per-object-validate-leaf nil))
-  (bw-normalize! leaf)
-  (when (fps-state-feasible-p leaf)
-    (maybe-propagate-changes! leaf)
+    (return-from fps-forward-per-object-validate-candidate nil))
+  (bw-normalize! candidate)
+  (when (fps-state-feasible-p candidate)
+    (maybe-propagate-changes! candidate)
     (block validate
       (incf (fps-layer-stats-novel-validation-attempts stats))
       (incf (gethash (action.name action) (fps-layer-stats-op-attempts stats) 0))
-      (dolist (pre-args (get-precondition-args action leaf))
-        (let ((pre-result (apply (action.pre-defun-name action) leaf pre-args)))
+      (dolist (pre-args (get-precondition-args action candidate))
+        (let ((pre-result (apply (action.pre-defun-name action) candidate pre-args)))
           (when pre-result
             (let ((updated-dbs
                     (if (eql pre-result t)
-                        (funcall (action.eff-defun-name action) leaf)
-                        (apply (action.eff-defun-name action) leaf pre-result))))
+                        (funcall (action.eff-defun-name action) candidate)
+                        (apply (action.eff-defun-name action) candidate pre-result))))
               (dolist (upd updated-dbs)
                 (when (fps-forward-per-object-process-update
-                       upd leaf frontier-props action reachable
+                       upd candidate frontier-props action reachable
                        base-relations layer-table stats)
                   (return-from validate t))))))))))
 

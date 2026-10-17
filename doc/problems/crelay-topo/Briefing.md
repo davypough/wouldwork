@@ -305,6 +305,14 @@ true.
   plates when the current recording started (only while that recording is open).  A stack
   presses only the plate under its bottom object.
 
+- R1 (A, 2026-10-17, measured; crelay-topo-2, SBCL 2.2.9 container).  S1: agent1 just walked
+  location16 -> location19; box1, connector1, tray1 on plates 6, 7, 8; no recording.  4
+  predecessors, all option (a): agent1 walks in through gate9 from location16, 17, 18 or 21
+  (correction: location21 too, not only 16-18).  S1r: the same with a recording open, the plates
+  pressed by copies and the real objects loose at location21: 17 predecessors, the same 4 plus 13
+  ghost moves far away that change nothing needed.  No unlisted way in.  (b) cannot show here (no
+  ghost in the plate room); its exclusion still rests on reading.  VERDICT: CONFIRMED for (a).
+
 **Step 2.**  C1: agent1 in the plate room; plates 6, 7, 8 each pressed by a body other than
 agent1.
 - E2 is the last action that made either part true.  R2, writers of a pressed plate: putting or
@@ -328,6 +336,17 @@ agent1.
       pressed.
 - In (ii) and (iii) the plate room must already hold, besides agent1 and its load, two
   pressing bodies; in (i) three.  Every option needs earlier crossings of gate8 or copies.
+
+- R1 (A, 2026-10-17, measured).  S2: agent1 at location16 empty-handed, having just put box1 on
+  plate6; connector1 on plate7, tray1 on plate8; recording open; receiver1 lit by copies outside
+  (connector1* raised on box1* at location9, paired to transmitter1 and receiver1; tray1* on
+  plate3); switch2 on.  29 predecessors.  Those that make C1 true: agent1 walks in through gate7
+  and gate8 from location11, 12 or 13 (option i); agent1 puts box1 on plate6, connector1 on
+  plate7 or tray1 on plate8 (option ii); agent1 walks back from location19 (the goal was already
+  reached, so not a new case).  The rest keep C1 true (agent1 moving inside, stepping off box1)
+  or are ghost moves.  No entry from location15 is listed: agent1 standing there blocks this
+  beam, as measured on 2026-10-16.  Option (iii) needs a tray left on the ground and is not in
+  this state; R4 of 2026-10-17 confirms it.  VERDICT: CONFIRMED, no unlisted option.
 
 **Step 3.**  From here a step is a crossing of gate8, not a single action: moves, puts and
 pickups inside the plate room rearrange what is there but bring nothing in.
@@ -364,6 +383,29 @@ pickups inside the plate room rearrange what is there but bring nothing in.
 - C3 (revised): agent1 at location15 (or location11-13 with switch2 on), about to cross, carrying
   load L; inside S; S and L plus copies on plates 6-8 give three pressing bodies; receiver1 lit
   at the crossing, possibly through a connector in L.
+
+- R1 (A, 2026-10-17, measured).  Four states:
+  - S3a (the tool's own test): agent1 has just walked location15 -> location16 with tray1, box1
+    and connector1.  19 predecessors; the only one with objects outside before is that crossing.
+  - S3b: box1 on plate6, agent1 has just walked back out to location15, empty-handed.  25
+    predecessors, none with box1 outside before: nothing is placed across gate8 by reach.
+  - S5: just before S3a (agent1 at location15 with the loaded tray, receiver1 lit).  17
+    predecessors; receiver1 goes from dark to lit only by agent1 walking into location15 through
+    gate7 from location11-13 carrying the loaded tray: connector1 rides in as the last relay.  So
+    the revised C3 ("possibly through a connector in L") is the case the tool finds.
+  - S4 (the hand-over): agent1 holding tray1 and agent1* at location5; agent1* has just put
+    tray1* down, so box1 with connector1 settled onto tray1.  First run: 27 predecessors, the
+    true one (box1 on tray1* before) MISSING, since the tool copied each rider's support from the
+    state; and two impossible entries (the ghost standing on the live box1 or the held tray1).
+    Re-run after the fix (Schema-Gaps, "Predecessors where a rider changes support by settling"):
+    27 predecessors, the hand-over listed, the two impossible entries gone, and one new entry
+    the rules allow (agent1 standing on tray1* and stepping down as it is set down).  The
+    hand-over is the only listed way box1 comes onto tray1; every other entry has it there
+    already.  Direct placements onto tray1: none listed (agent1 cannot hold two things; a ghost
+    may not use a live object).
+  VERDICT: "every body inside entered with agent1 through gate8" and the C3 beam option are
+  CONFIRMED.  "A rider gets on tray1 only by a ghost hand-over" is CONFIRMED for one step from
+  S4 (placement and settling); a recording stop is not covered by the tool.
 
 ## Contracts
 

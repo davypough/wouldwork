@@ -177,3 +177,43 @@ Feasibility  2026-10-17, A, SBCL 2.2.9 container, uncommitted scripts only.
              claude/state-predecessors-plan.md.
 Status       Done 2026-10-17 (find-state-predecessors; plan
              claude/state-predecessors-plan.md); the acceptance case is listed.
+
+NEED -- Predecessors where a rider changes support by settling (2026-10-17)
+Origin       crelay-topo R1 re-check of the backward analysis (Briefing,
+             "Backward analysis, second pass", R1 verdicts).  State S4 in
+             crelay-topo-2: agent1 holding tray1 and agent1* at location5;
+             agent1* has just put tray1* on the ground, so box1 (with
+             connector1 on it) settled from tray1* onto tray1.  The replay
+             succeeds, but find-state-predecessors (27 predecessors) does not
+             list the true one (agent1* holding tray1* with box1 on it).  It
+             lists only "agent1* puts down an empty tray1*", with box1 already
+             on tray1.
+Need         A one-step predecessor list that includes actions whose effect
+             moves an object the action does not name: a rider landing on a
+             different support when its tray is set down (-support-settling).
+             Today each action re-guesses only its own objects (PUT-TRAY:
+             agent and tray), and the rider normalizer fixes riders'
+             locations, not their supports, so a rider's ON in the
+             predecessor is always copied from S.
+Also seen    Spurious predecessors in the same list: agent1* standing on the
+             live box1 or on the live tray1 held by agent1, then jumping off.
+             A ghost may not use a live support, so those states cannot occur;
+             the placement screen does not reject them.  Harmless for R1 (an
+             over-long list), but noise.
+Proposed scope  For PUT-TRAY (and any action ending in settling), also re-guess
+             the ON of objects resting on the agent's held tray, or of
+             objects whose support in S is a tray held at the agent's
+             location; screen ghost-on-live-support guesses.
+Dependencies src/ww-enumerator-run.lisp (object sets per action);
+             tech/-support-motion.lisp (rider normalizer);
+             tech/-physical-init-checks.lisp (placement screen);
+             tech/-recorder-core.lisp (support-use-allowed).
+Acceptance   For S4 above, the list includes PUT-TRAY by agent1* with box1
+             on tray1* before, and no predecessor puts agent1* on a live
+             object.
+Status       Done 2026-10-17 (plan claude/settling-predecessors-plan.md):
+             PUT-TRAY's predecessor-leaf expander guesses riders back onto
+             the set-down tray, and the placement check rejects an object on
+             a mobile support of the other recorder layer.  S4: 27, the true
+             one listed, the two ghost-on-live entries gone; S6: 8 (was 7),
+             the true one listed.  Recording stops still not covered.

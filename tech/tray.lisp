@@ -79,3 +79,6 @@
            do (assert (assign $place $placement-option)
                       (place-held-object! ?agent ?tray ?location $placement-option)
                       (finally (propagate-changes!)))))
+
+
+(register-predecessor-leaf-expander 'put-tray 'released-tray-rider-variants)

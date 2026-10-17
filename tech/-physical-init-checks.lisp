@@ -194,6 +194,25 @@
               holder holder-location object tray-location)))))))
 
 
+(define-init-check-helper init-check-support-side-allowed
+    (literal object support holders live-objects ghost-objects)
+  "Reject an object resting on a mobile support of the other recorder layer, as
+   SUPPORT-USE-ALLOWED does: a ghost never on a live support, a live object on a ghost
+   support only when it is a tray a ghost agent holds (rule 19).  Fixed supports are
+   on neither layer and shared."
+  (when (or (and (gethash object ghost-objects)
+                 (gethash support live-objects))
+            (and (gethash object live-objects)
+                 (gethash support ghost-objects)
+                 (not (and (init-type-member-p support 'tray)
+                           (gethash (gethash support holders) ghost-objects)))))
+    (fail-init-check
+      literal
+      "~%DEFINE-INIT places an object on a mobile support of the other recorder layer.~%~
+       Object:  ~S~%Support: ~S"
+      object support)))
+
+
 (define-init-check-helper init-check-held-object-not-on
     (literal object support held-objects)
   (when (gethash object held-objects)
@@ -304,6 +323,7 @@
         (positions (init-literal-map 'has-position literals 1 2))
         (on-map (init-literal-map 'on literals 1 2))
         (held-objects (init-held-objects literals))
+        (holders (init-literal-map 'holding literals 2 1))
         (live-objects (init-recording-live-objects literals))
         (ghost-objects (init-recording-ghost-objects literals))
         (support-occupants (make-hash-table :test #'equal)))
@@ -322,6 +342,8 @@
           (init-check-held-object-not-on
             literal object support held-objects)
           (init-check-tray-support-held literal support held-objects)
+          (init-check-support-side-allowed
+            literal object support holders live-objects ghost-objects)
           (when location-consistency-required-p
             (init-check-support-occupants-compatible
               literal object support support-occupants live-objects ghost-objects)

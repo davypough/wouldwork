@@ -377,4 +377,20 @@ PREDECESSOR SCREEN AND NORMALIZER (2026-10-17, user, Windows, fresh image, 16 th
     location4); put-connector overwrites the stale location, so forward validation had
     accepted it.  The earlier backward layers 1-6, and meeting results stated relative to
     them ("proved shortest for this set"), rest on sets that include such states;
-    regenerate before relying on them.
+    regenerate before relying on them.  (Done the same day: next entry; the 14-step result
+    is re-confirmed.)
+
+BACKWARD LAYERS 1-6 AND MEETING, RE-RUN WITH SCREEN (2026-10-17, user, Windows, fresh image,
+16 threads)
+  find-goal-states 5,828; find-predecessors :layers 6 (new / total; pre-screen run in brackets):
+    1: 1,048 / 6,876     [3,855 / 9,683]
+    2:   250 / 7,126     [3,758 / 13,441]
+    3:   372 / 7,498     [2,471 / 15,912]
+    4: 1,341 / 8,839     [3,433 / 19,345]
+    5: 4,095 / 12,934    [6,504 / 25,849]
+    6: 16,164 / 29,098   [66,037 / 91,886]
+  Saved files corner-topo-advisor-predecessors-1..6.lisp, layer 6 65 MB (was 253 MB).
+  (solve-meeting-point :depth-cutoff 9 :solution-type min-length), min backward depth 6:
+    178.8 s, 3.61 M states, 77.7% repeated, 2 solutions (as before: 181.5 s, 3.60 M).
+    Same 14-step plan (8 forward + 6 backward), step for step; shortest for this backward set,
+    now one containing only physically possible states.
