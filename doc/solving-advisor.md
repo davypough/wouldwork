@@ -40,6 +40,10 @@ A checks these documents rather than asking D what they contain.
   advisor's recorded findings are evidence, and are used.
 - Use plain language and the problem's location names, without invented area
   labels. Ask one question at a time, skipping information already supplied.
+- D prefers simple, user-friendly discussion in the problem's own domain terms (in Talos
+  problems: recording and playback, real and ghost objects, plates pressed, beams lit),
+  not engine terms (views, shadow relations, predicates, query names). Keep the engine
+  detail in the records' source citations, and give it in discussion only when D asks.
 - Nothing in the wouldwork directory is sealed. Files may be read in full without
   permission or disclosure. A new seal applies only at D's explicit request; record
   its date, scope and reason in the affected problem's Handoff (or here for a
@@ -120,6 +124,9 @@ questions.
    **CONSISTENT** (allowed by named rows), **CONTRADICTED** (forbidden by a named
    fact), or **NEEDS** (a named prerequisite). CONSISTENT is not a realizable plan.
    Keep whose idea it was; user guesses remain conditional, retractable premises.
+   A CONTRADICTED verdict, or any option ruled out, names the check that supports
+   it (*Checking reasoning*, below); an elimination resting only on reading is
+   marked so and is the first candidate for a check.
    Check each state the subgoal must pass through (in Talos problems, what must hold
    while a barrier is crossed) apart from the final state. A change needed only on
    the way must later be undone (in Talos problems pairings persist, so a link
@@ -170,6 +177,41 @@ plan's 31), moved here from the search advisor:
   subgoal*, route 3).
 - In Talos recorder problems, add `(recorder-cycle-ended)` only where a cycle should
   close; legs may run inside one cycle.
+
+## Checking reasoning
+
+Backward analysis, case splits and counting arguments are fast but fallible: a case can
+be missed because the list of options was drawn from what A or D believed the actions
+allow rather than from the rules.  These checks test such reasoning against the engine.
+They are general; the examples come from the problems where each was learned.  Record
+each check with its verdict in the Briefing, next to the claim it tests.
+
+| ID | Check | Use when | How | Limits |
+|---|---|---|---|---|
+| R1 | **One-step backward check** | An argument names a decisive step (the last action that makes a needed fact true) and lists the ways it can happen | Build a concrete state just after the step; list every one-step predecessor the actions allow; confirm each fits a listed option.  An unlisted predecessor is a missed case | Covers one step only.  No ready tool yet starts from a single given state (development need in Schema-Gaps.txt, 2026-10-17); meanwhile approximate with R2 and R3 |
+| R2 | **Support tree** | Listing the ways a step can happen, and any claim that some fact can never become true | For every fact the condition needs, derived ones included (a gate open, a device active), trace in the tech or spec every effect that asserts it, including indirect ones (propagation, settling, cascades, effects of other actors), and follow each derived fact down to the base facts it rests on (a device active rests on its source's place, height and links; a place can come from being carried).  Write the tree down before listing options | Shows which mechanisms exist, not whether their preconditions can be reached in play.  Applied to the wrong fact it misses cases: check the fact the step needs, not a neighbouring one |
+| R3 | **Every actor present** | A search is used to show that something cannot be done | The start state must include every actor, object and phase that could supply the capability; otherwise the result holds only for that narrower setting.  Say which were left out | A completed search is still a bound relative to its start and cutoff |
+| R4 | **Short mechanism replay** | An argument relies on, or excludes, one mechanic | Replay one to three actions from a hand-built state (`make-start-state-from-facts`, `validate-action-sequence`) and read the resulting facts | Proves the mechanic from that state, not that the state is reachable |
+| R5 | **Premise ledger** | A counting, budget or impossibility argument | List every premise, each marked read (with its source) or measured.  When a solution is known or expected, an impossible result means a premise is wrong: test the least certain one first with R2 to R4 | The ledger finds no premise by itself; it orders the checks |
+| R6 | **Probe the eliminated option** | An option was ruled out by reasoning | Start from the state most favourable to that option and search for the fact it would need | Bounded by the cutoff; a success refutes the elimination, a failure only supports it |
+| R7 | **Test-point sweep** | A claim that no place, position or value works | On a spec copy, add test points (locations, coordinates, parameter values) and query the relevant relation for each | The original spec is never changed; a copy needs its own problem name and file header |
+| R8 | **Role overlap** | A counting, budget or allocation argument that assigns objects to roles | For every pair of roles, ask whether one object can fill both at once (cargo and carrier, load and relay, keeper and relay), and check each yes against the rules (R2, R4) | Counting arguments silently assume disjoint roles; an overlap can remove the shortage |
+
+Standing rule: when a step turns up a mechanism the analysis had not listed, redo the
+option lists of the earlier steps with it before going on.  Until R1 has a tool, the nearest
+substitute at a decisive step is a small exhaustive search from a hand-built state with every
+actor present (R3).
+
+Examples (crelay-topo, 2026-10-16 to 17).  The options for the last crossing of gate8
+assumed agent1 carries one object; probe CARRY confirmed it by an exhaustive search, but
+without a recording running (an R3 failure).  R2 on the tray rules found a second way to
+load a held tray, settling when another agent sets its own tray down, and R4 confirmed it
+in two actions.  A body count (R5) had come out one short, which pointed at the gap.  R1
+would have shown agent1 approaching gate8 with a loaded tray as a predecessor.  R7 checked
+72 test points for a ground connector that sees the receiver.  Later the step-3 beam condition assumed the
+beam's bodies were outside agent1's load; R2 had been applied to what can be carried, not to
+what can light the receiver, and a connector riding the carried tray turned out to be the last
+relay (R4 confirmed it; an R8 overlap of load and relay).
 
 ## Realizing a subgoal
 

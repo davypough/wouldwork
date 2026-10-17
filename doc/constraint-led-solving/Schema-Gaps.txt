@@ -127,3 +127,51 @@ Acceptance   On a recorder problem, a hand-derived segment added this way
              exports and imports like a searched one, and the next
              checkpoint search from it finds the same result as from a
              searched checkpoint at the same endpoint.
+
+NEED -- One-step predecessors of a given state (2026-10-17)
+-----------------------------------------------------------
+Origin       crelay-topo, 2026-10-17: a case split on the last crossing of
+             gate8 missed a way through (agent1 carrying a loaded tray).
+             Supports doc/solving-advisor.md, Checking reasoning, R1.
+             Development need, not a schema gap; not approved.
+Need         List every state from which one ordinary action leads to a
+             given concrete state, with that action, so a case split at a
+             decisive step can be checked against the rules.
+Scope        A function taking a state, and optionally an action-name list,
+             returning (predecessor action) pairs, each confirmed by applying
+             the action forward, as find-predecessors does for its layers.
+             Must work for any problem, including recorder states (open
+             cycle, ghost objects, recording-view facts).
+Dependencies src/ww-enumerator-run.lisp (find-predecessors' proposal and
+             forward confirmation, which today start from goal states);
+             src/ww-backward.lisp (experimental one-step regression).
+Acceptance   Given, in crelay-topo-1, agent1 at location16 holding tray1
+             with box1 on it and connector1 on box1 (gate7 and gate8 open),
+             the result includes agent1 at location13 holding the same
+             loaded tray, by a move through gate7 and gate8.
+Feasibility  2026-10-17, A, SBCL 2.2.9 container, uncommitted scripts only.
+             (1) corner-topo-advisor: seeding find-predecessors with one state
+             (*enumerated-goal-states* = (list S), *backward-reachable-set* nil),
+             S = start state after picking up connector1.  First run: 0
+             validated, because the seed is keyed before the interchangeable
+             connector groups are detected and later keys are canonical.  After
+             re-seeding (groups now set): 66 predecessors in 1.2 s, the start
+             state among them.  So the one-state entry point exists apart from
+             that key-ordering bug.
+             (2) crelay-topo (copy crelay-topo-e: crelay-topo-1 plus base
+             relations has-location, holding, on, paired), seed = the measured
+             loaded-tray crossing (agent1 at location16 holding tray1 with box1
+             and connector1 on it, recording open), :actions (move): the layer
+             stops with "Control stack exhausted" (probably a guessed state
+             with a support cycle reaching a recursive height query).  Also,
+             by the object sets printed, a move is re-guessed for agent1 and
+             its held tray only, not for the tray's riders, so the acceptance
+             predecessor could not be proposed even without the crash.
+             Gaps for Talos use: riders of a held tray (stacks) must be
+             re-guessed with their carrier; guessed support chains must be
+             screened for cycles before propagation; recording facts are
+             carried as context, untested.
+             Backtrace (2026-10-17): the crash is TOP recursing through tray1 ->
+             box1 -> agent1 -> tray1, a guessed state with agent1 standing on a
+             support under the tray it holds.  Plan: project doc
+             claude/state-predecessors-plan.md.

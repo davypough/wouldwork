@@ -7,8 +7,9 @@
 ;;;     a single search over the whole plan (some 80 moves) is far out of reach.
 ;;;   - A milestone names a resting state that later steps depend on (an object on a plate,
 ;;;     a gate held open), plus (recorder-cycle-ended) when the next leg needs the recorder.
-;;;   - Each SOLVE-SUBGOAL may use exactly one new recorder cycle; the recorder cap stays
-;;;     unlimited so the chain as a whole can use as many as it needs.
+;;;   - A SOLVE-SUBGOAL leg may stay inside a recorder cycle, close one, or span cycles;
+;;;     milestones partway through a cycle are expected.  The recorder cap stays unlimited
+;;;     so the chain as a whole can use as many cycles as it needs.
 ;;;   - The depth cutoff is a per-leg default of about one searchable leg; raise it at the
 ;;;     REPL for a longer leg.
 ;;;   - The generic lower bound reads the active subgoal, so it prunes every leg.
