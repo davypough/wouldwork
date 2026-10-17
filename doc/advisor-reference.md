@@ -42,6 +42,7 @@ Problem-specific recommendations drawn from these entries remain deductions cond
 | F20 | Symmetric and bijective relations as stored facts | `>` suffix, `:bijective`, index facts |
 | F21 | Replaying and validating a path | `validate-solution`, `validate-action-sequence`, validators, checkpoints |
 | F22 | Ways Wouldwork can approach a problem | CSP, backward search, enumerator, macros, relaxation, milestones, strategies |
+| F23 | Which states lead to this one in one step | `find-state-predecessors`, predecessor-leaf screens and normalizers |
 
 ## Entries
 
@@ -169,7 +170,7 @@ Problem-specific recommendations drawn from these entries remain deductions cond
 
 **Trigger and question:** Goal arrangements may be few or easier to describe than routes. Is generating endings cheaper, and can predecessor relationships be justified?
 
-**Consequences and support:** B: base-relation schemas, goal enumeration, predecessor entry points, and meeting-point search. S: schemas, filters, feasibility logic, state keys, and witnesses. A: investigate unsupported inverse/domain requirements only after a focused audit. A satisfying ending is not necessarily reachable; enumerating all endings may itself be too large. The feasibility helper accepts a consistent state when no custom hook exists, which supplies no reachability proof. Other approaches, including backward search with a forward meeting search: F22.
+**Consequences and support:** B: base-relation schemas, goal enumeration, predecessor entry points, and meeting-point search. S: schemas, filters, feasibility logic, state keys, and witnesses. A: investigate unsupported inverse/domain requirements only after a focused audit. A satisfying ending is not necessarily reachable; enumerating all endings may itself be too large. The feasibility helper accepts a consistent state when no custom hook exists, which supplies no reachability proof. Guessed predecessors pass through the same normalizers and screens; for one given state see F23. Other approaches, including backward search with a forward meeting search: F22.
 
 **Evidence and assumptions:** [ww-enumerator-build.lisp](../src/ww-enumerator-build.lisp): `define-base-relation`; [ww-enumerator-run.lisp](../src/ww-enumerator-run.lisp): `find-goal-states-fn`, `find-predecessors-fn`, `fps-state-feasible-p`, `solve-meeting-point-fn`. Inspection confirms these entry points and the stated feasibility behavior, not universal inverse support or exhaustive reachability. **Proposed check:** audit a selected domain's schema, predecessor generation, key equivalence, and forward witness before recommending the method concretely.
 
@@ -319,6 +320,21 @@ Experimental and not offered: `ww-backward.lisp` (one-step regression, not integ
 **Evidence and assumptions:** the symbols named in the table, in particular [ww-planner.lisp](../src/ww-planner.lisp): `generate-children`; [ww-support.lisp](../src/ww-support.lisp): `get-state-codes`, `backward-path-exists`; [ww-enumerator-run.lisp](../src/ww-enumerator-run.lisp): `find-goal-states`, `find-predecessors`, `solve-meeting-point`; [ww-enumerator-build.lisp](../src/ww-enumerator-build.lisp): `define-base-relation`, `define-goal-filter`; [ww-frequencies.lisp](../src/ww-frequencies.lisp): `freq`; [ww-advisor.lisp](../src/ww-advisor.lisp): `define-strategy`, `solve-via-strategy`. Entry points confirmed in source; none was run for this entry. Measured costs and lessons are in [search-advisor.md](search-advisor.md) Section 3. **Proposed check:** before committing to an approach, state the problem property it relies on (reversible moves, explicit goals, recurring patterns, milestones) and confirm it on a small instance.
 
 *Verified 2026-10-12.*
+
+### F23 — Which states lead to this one in one step?
+
+**Trigger and question:** An argument names a decisive step and lists the ways it can happen (solving advisor R1). Which one-step predecessors do the rules actually allow?
+
+**Consequences and support:** B: `(find-state-predecessors state &key actions)` returns every pair (predecessor action) whose action, applied forward, reproduces STATE, and prints each with the facts that differ from STATE, base facts first. S: the spec declares base relations (`define-base-relation`). Technologies register a normalizer (`register-predecessor-leaf-normalizer`; Talos riders follow their carrier) and a screen (`register-predecessor-leaf-screen`; Talos rejects guesses failing the DEFINE-INIT placement check, eg a support cycle or a held object with a location).
+
+- STATE must be propagated: a `validate-action-sequence` result, or a hand-built state after one replayed action.
+- Only base facts are re-guessed; the rest is copied from STATE. An action that changes no base fact (a switch, a recording start or stop) is never listed.
+- Guesses stay within the base relations' limits (`:max-per`, `:allow-unassigned`).
+- Interchangeable objects are not merged. One serial layer; `*enumerated-goal-states*`, `*backward-reachable-set*` and the save files are untouched.
+
+**Evidence and assumptions:** [ww-enumerator-run.lisp](../src/ww-enumerator-run.lisp): `find-state-predecessors`, `fps-forward-per-object-validate-leaf`; [ww-settings.lisp](../src/ww-settings.lisp): the two registries; `tech/-support-motion.lisp`: `normalize-support-rider-locations`; `tech/-physical-init-checks.lisp`: `physical-placement-impossible-p`. Measured 2026-10-17 (SBCL 2.2.9): crelay-topo-2 loaded-tray crossing of gate8, 19 predecessors including the true one; ghost step during a recording, 16 including the true one (every fact equal); corner-topo-advisor after picking up connector1, 66 including the start state. **Proposed check:** before relying on a list, confirm that the known predecessor of a replayed step appears in it.
+
+*Verified 2026-10-17.*
 
 ## Compatibility review across the selected features
 

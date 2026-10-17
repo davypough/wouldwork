@@ -117,6 +117,50 @@ must return unknown rather than :IMPOSSIBLE.")
   name)
 
 
+(sb-ext:defglobal *predecessor-leaf-screens* nil
+  "Problem-local screens for guessed predecessor states.
+
+Each entry names a function of one argument, a guessed state, that returns true
+when the state is physically impossible.  FIND-PREDECESSORS drops such a state
+before propagating it.  Technologies register the screens, so the enumerator
+stays problem-neutral.")
+
+
+(defun register-predecessor-leaf-screen (function-name)
+  "Register FUNCTION-NAME as a problem-local predecessor-leaf screen."
+  (reject-worker-read-write 'register-predecessor-leaf-screen)
+  (unless (and (symbolp function-name) (fboundp function-name))
+    (error "Predecessor-leaf screen requires a defined function: ~S"
+           function-name))
+  (when (member function-name *predecessor-leaf-screens*)
+    (error "Predecessor-leaf screen registered twice: ~S" function-name))
+  (setf *predecessor-leaf-screens*
+        (append *predecessor-leaf-screens* (list function-name)))
+  function-name)
+
+
+(sb-ext:defglobal *predecessor-leaf-normalizers* nil
+  "Problem-local normalizers for guessed predecessor states.
+
+Each entry names a function of one argument, a guessed state, that corrects in
+place the facts the rules determine from other facts (eg a rider's location from
+its carrier's).  FIND-PREDECESSORS runs them before the predecessor-leaf screens.
+Technologies register them, so the enumerator stays problem-neutral.")
+
+
+(defun register-predecessor-leaf-normalizer (function-name)
+  "Register FUNCTION-NAME as a problem-local predecessor-leaf normalizer."
+  (reject-worker-read-write 'register-predecessor-leaf-normalizer)
+  (unless (and (symbolp function-name) (fboundp function-name))
+    (error "Predecessor-leaf normalizer requires a defined function: ~S"
+           function-name))
+  (when (member function-name *predecessor-leaf-normalizers*)
+    (error "Predecessor-leaf normalizer registered twice: ~S" function-name))
+  (setf *predecessor-leaf-normalizers*
+        (append *predecessor-leaf-normalizers* (list function-name)))
+  function-name)
+
+
 (unless (boundp '*probe*)
   (defvar *probe* nil
     "Inserts a probe to stop processing at a specific state."))

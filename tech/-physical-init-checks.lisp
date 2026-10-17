@@ -22,6 +22,41 @@
   (check-init-live-cargo-physical-state literals))
 
 
+(define-init-check-helper physical-placement-impossible-p (state)
+  "Predecessor-leaf screen: true when STATE fails the DEFINE-INIT placement check, eg a
+   support cycle or a held tray under its own holder.  Such a guessed predecessor is
+   physically impossible, and propagating it can recurse without end in TOP."
+  (handler-case
+      (progn
+        (check-init-object-placement-consistency (state-placement-literals state))
+        nil)
+    (init-check-failure () t)))
+
+
+(define-init-check-helper state-placement-literals (state)
+  "STATE's dynamic facts in DEFINE-INIT form, plus the static HAS-POSITION and
+   RECORDING-COPY> facts the placement check reads.  A bijective relation's two index
+   facts become one fact under the relation's own name."
+  (let ((literals nil))
+    (dolist (proposition (list-database (problem-state.idb state)))
+      (let ((canonical (gethash (car proposition) *bijective-canonical*)))
+        (cond ((null canonical)
+               (push proposition literals))
+              ((eql (cdr canonical) 1)
+               (push (cons (car canonical) (cdr proposition)) literals)))))
+    (dolist (relation '(has-position recording-copy>) literals)
+      (when (gethash relation *static-relations*)
+        (let ((index-name (or (first (gethash relation *bijective-relations*)) relation)))
+          (dolist (object (expand-type-spec-instances*
+                            (init-relation-argument-type relation 1)))
+            (let ((value (gethash (list index-name object) *static-db*)))
+              (when value
+                (push (list* relation object value) literals)))))))))
+
+
+(register-predecessor-leaf-screen 'physical-placement-impossible-p)
+
+
 (define-init-check-helper init-object-location (object locations positions)
   (or (gethash object locations)
       (gethash object positions)))

@@ -633,11 +633,15 @@ worker must print exactly as the caller does for its keys to match the reachable
   "Build CSP enum-actions for the base relations modified by ACTION.
    Returns (values enum-actions modified-rels) or NIL if ACTION modifies no base rels.
    Binds *enumerator-base-relations* to only the modified relations, disables
-   symmetry pruning, and strips the finalize action from the generated sequence."
+   symmetry pruning, and strips the finalize action from the generated sequence.
+   Binds the detected groups and symmetric relations locally, so the caller's
+   groups (those its reachable-set keys were made with) stay in force."
   (let ((modified-rels (intersection (action.effect-adds action)
                                      base-relations :test #'eq)))
     (when modified-rels
       (let* ((*enumerator-base-relations* modified-rels)
+             (*enumerator-detected-groups* *enumerator-detected-groups*)
+             (*enumerator-detected-symmetric-relations* *enumerator-detected-symmetric-relations*)
              (*symmetry-pruning* nil)
              (*enum-residual-symmetry-enabled* nil)
              (enum-actions (generate-enum-actions :goal-form nil
@@ -813,7 +817,14 @@ worker must print exactly as the caller does for its keys to match the reachable
 (defun fps-forward-per-object-validate-leaf (leaf frontier-props action reachable
                                              base-relations layer-table stats)
   "Validate one novel per-object CSP leaf and store it when ACTION reaches the frontier state.
+   Registered predecessor-leaf normalizers first correct LEAF in place; a leaf then
+   rejected by a registered predecessor-leaf screen is dropped before propagation.
    Errors are not caught: a failing candidate stops the layer where it fails."
+  (dolist (normalizer *predecessor-leaf-normalizers*)
+    (funcall (symbol-function normalizer) leaf))
+  (when (some (lambda (screen) (funcall (symbol-function screen) leaf))
+              *predecessor-leaf-screens*)
+    (return-from fps-forward-per-object-validate-leaf nil))
   (bw-normalize! leaf)
   (when (fps-state-feasible-p leaf)
     (maybe-propagate-changes! leaf)
@@ -1524,6 +1535,70 @@ worker must print exactly as the caller does for its keys to match the reachable
                 :completed-layers completed-layers
                 :reachable-count (hash-table-count *backward-reachable-set*)))
     t))
+
+
+(defun find-state-predecessors (state &key (actions :all))
+  "List every one-step predecessor of STATE: each pair (PREDECESSOR ACTION-FORM) such
+   that applying ACTION-FORM to PREDECESSOR produces STATE, confirmed forward by the
+   spec's own rules.  ACTIONS selects the candidate actions (see ENUM-SELECT-ACTIONS).
+   Prints each pair as its action and the facts that differ from STATE.
+   Runs one FIND-PREDECESSORS layer from STATE alone, serially, with concrete keys
+   (renamed twins of interchangeable objects are listed separately) and no witness cap.
+   The goal states, the reachable set and the save file are untouched.
+   STATE must be propagated (eg a VALIDATE-ACTION-SEQUENCE result), and the problem
+   must declare base relations.  Recording facts are carried from STATE as context, so
+   predecessors across a recording start or stop are not listed."
+  (let ((base-relations (get-base-relations)))
+    (unless base-relations
+      (error "FIND-STATE-PREDECESSORS: the problem declares no base relations ~
+              (DEFINE-BASE-RELATION)."))
+    (let* ((*enumerator-detected-groups* nil)
+           (*backward-reachable-max-witnesses-per-key* nil)
+           (*threads* 0)
+           (reachable (make-hash-table :test 'equal))
+           (pairs nil))
+      (setf (gethash (enum-solution-state-key state) reachable)
+            (fps-make-witness-entry state nil))
+      (loop for entry being the hash-values
+              of (fps-expand-predecessor-layer-forward-per-object-csp
+                  (list state) reachable base-relations *actions*
+                  (enum-select-actions *actions* actions))
+            do (dolist (witness (fps-normalize-witness-entry entry))
+                 (push (list (car witness) (first (cdr witness))) pairs)))
+      (setf pairs (sort pairs #'string< :key (lambda (pair) (prin1-to-string (second pair)))))
+      (format t "~&~%[find-state-predecessors] ~D predecessor~:P.~%" (length pairs))
+      (loop for (predecessor action-form) in pairs
+            for index from 1
+            do (fsp-print-predecessor index predecessor action-form state base-relations))
+      pairs)))
+
+
+(defun fsp-print-predecessor (index predecessor action-form state base-relations)
+  "Print predecessor INDEX as ACTION-FORM followed by the facts that differ from STATE:
+   base facts first, then the other facts, each as before-only and after-only."
+  (multiple-value-bind (before-base before-other) (fsp-split-facts predecessor base-relations)
+    (multiple-value-bind (after-base after-other) (fsp-split-facts state base-relations)
+      (format t "~&~%~D. ~S~%" index action-form)
+      (format t "   base, before only:~{~%      ~S~}~%"
+              (remove-if (lambda (p) (member p after-base :test #'equal)) before-base))
+      (format t "   base, after only:~{~%      ~S~}~%"
+              (remove-if (lambda (p) (member p before-base :test #'equal)) after-base))
+      (format t "   other, before only:~{~%      ~S~}~%"
+              (remove-if (lambda (p) (member p after-other :test #'equal)) before-other))
+      (format t "   other, after only:~{~%      ~S~}~%"
+              (remove-if (lambda (p) (member p before-other :test #'equal)) after-other)))))
+
+
+(defun fsp-split-facts (state base-relations)
+  "Return STATE's base facts (a bijective relation under its own name) and its other
+   dynamic facts, each sorted by printed form."
+  (let ((props (list-database (problem-state.idb state))))
+    (values (sort (enum-base-props-of props base-relations) #'string< :key #'prin1-to-string)
+            (sort (remove-if (lambda (p)
+                               (or (member (car p) base-relations :test #'eq)
+                                   (gethash (car p) *bijective-canonical*)))
+                             props)
+                  #'string< :key #'prin1-to-string))))
 
 
 (defun save-predecessors (&optional path)

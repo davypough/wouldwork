@@ -188,7 +188,7 @@ each check with its verdict in the Briefing, next to the claim it tests.
 
 | ID | Check | Use when | How | Limits |
 |---|---|---|---|---|
-| R1 | **One-step backward check** | An argument names a decisive step (the last action that makes a needed fact true) and lists the ways it can happen | Build a concrete state just after the step; list every one-step predecessor the actions allow; confirm each fits a listed option.  An unlisted predecessor is a missed case | Covers one step only.  No ready tool yet starts from a single given state (development need in Schema-Gaps.txt, 2026-10-17); meanwhile approximate with R2 and R3 |
+| R1 | **One-step backward check** | An argument names a decisive step (the last action that makes a needed fact true) and lists the ways it can happen | Build a concrete state just after the step (replay it with `validate-action-sequence`); run `(find-state-predecessors state :actions '(<names>))`; confirm each listed predecessor fits a listed option.  An unlisted predecessor is a missed case | Covers one step only.  Lists predecessors that differ in declared base facts; actions that change only other facts, and recording starts or stops, are not listed (advisor-reference F23) |
 | R2 | **Support tree** | Listing the ways a step can happen, and any claim that some fact can never become true | For every fact the condition needs, derived ones included (a gate open, a device active), trace in the tech or spec every effect that asserts it, including indirect ones (propagation, settling, cascades, effects of other actors), and follow each derived fact down to the base facts it rests on (a device active rests on its source's place, height and links; a place can come from being carried).  Write the tree down before listing options | Shows which mechanisms exist, not whether their preconditions can be reached in play.  Applied to the wrong fact it misses cases: check the fact the step needs, not a neighbouring one |
 | R3 | **Every actor present** | A search is used to show that something cannot be done | The start state must include every actor, object and phase that could supply the capability; otherwise the result holds only for that narrower setting.  Say which were left out | A completed search is still a bound relative to its start and cutoff |
 | R4 | **Short mechanism replay** | An argument relies on, or excludes, one mechanic | Replay one to three actions from a hand-built state (`make-start-state-from-facts`, `validate-action-sequence`) and read the resulting facts | Proves the mechanic from that state, not that the state is reachable |
@@ -198,16 +198,15 @@ each check with its verdict in the Briefing, next to the claim it tests.
 | R8 | **Role overlap** | A counting, budget or allocation argument that assigns objects to roles | For every pair of roles, ask whether one object can fill both at once (cargo and carrier, load and relay, keeper and relay), and check each yes against the rules (R2, R4) | Counting arguments silently assume disjoint roles; an overlap can remove the shortage |
 
 Standing rule: when a step turns up a mechanism the analysis had not listed, redo the
-option lists of the earlier steps with it before going on.  Until R1 has a tool, the nearest
-substitute at a decisive step is a small exhaustive search from a hand-built state with every
-actor present (R3).
+option lists of the earlier steps with it before going on.
 
 Examples (crelay-topo, 2026-10-16 to 17).  The options for the last crossing of gate8
 assumed agent1 carries one object; probe CARRY confirmed it by an exhaustive search, but
 without a recording running (an R3 failure).  R2 on the tray rules found a second way to
 load a held tray, settling when another agent sets its own tray down, and R4 confirmed it
 in two actions.  A body count (R5) had come out one short, which pointed at the gap.  R1
-would have shown agent1 approaching gate8 with a loaded tray as a predecessor.  R7 checked
+shows it: `find-state-predecessors` lists agent1 approaching gate8 with the loaded tray
+(2026-10-17).  R7 checked
 72 test points for a ground connector that sees the receiver.  Later the step-3 beam condition assumed the
 beam's bodies were outside agent1's load; R2 had been applied to what can be carried, not to
 what can light the receiver, and a connector riding the carried tray turned out to be the last

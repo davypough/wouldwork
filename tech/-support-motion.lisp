@@ -87,6 +87,51 @@
              (assign $landing $surface)))
       $landing))
 
+(define-problem-helper normalize-support-rider-locations (state)
+  "Predecessor-leaf normalizer: give every object resting ON a support, and every held
+   tray, the location of the bottom of its stack, as a move would.  A guessed state then
+   needs no separate guess for riders.  A stack with a cycle, or whose bottom has no
+   location, is left unchanged for the placement screen to reject."
+  (let ((idb (problem-state.idb state))
+        (locations (make-hash-table :test #'eq))
+        (carriers (make-hash-table :test #'eq))
+        (trays (gethash 'tray *types*)))
+    (dolist (proposition (list-database idb))
+      (cond ((eql (car proposition) 'has-location)
+             (setf (gethash (second proposition) locations) (third proposition)))
+            ((eql (car proposition) 'on)
+             (setf (gethash (second proposition) carriers) (third proposition)))
+            ((and (equal (gethash (car proposition) *bijective-canonical*) '(holding . 1))
+                  (member (third proposition) trays))
+             (setf (gethash (third proposition) carriers) (second proposition)))))
+    (loop for object being the hash-keys of carriers
+          for bottom-location = (support-stack-bottom-location object carriers locations)
+          when (and bottom-location
+                    (not (eql bottom-location (gethash object locations))))
+            do (add-proposition (list 'has-location object bottom-location) idb))
+    (invalidate-problem-state-hash state)))
+
+
+(define-problem-helper support-stack-bottom-location (object carriers locations)
+  "Location of the bottom of OBJECT's stack, following CARRIERS (an ON support, or a
+   held tray's holder) down to an object with no carrier.  NIL on a cycle or when the
+   bottom has neither HAS-LOCATION nor a static HAS-POSITION."
+  (let ((seen nil)
+        (current object))
+    (loop
+      (when (member current seen)
+        (return nil))
+      (push current seen)
+      (let ((carrier (gethash current carriers)))
+        (unless carrier
+          (return (or (gethash current locations)
+                      (first (gethash (list 'has-position current) *static-db*)))))
+        (setf current carrier)))))
+
+
+(register-predecessor-leaf-normalizer 'normalize-support-rider-locations)
+
+
 (define-update land-on-support!
     (?base support-occupant ?destination location ?required-elevation)
   ;; Rest ?base, already moved to ?destination by relocate-stack!, on the first

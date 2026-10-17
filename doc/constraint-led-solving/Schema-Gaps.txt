@@ -175,3 +175,5 @@ Feasibility  2026-10-17, A, SBCL 2.2.9 container, uncommitted scripts only.
              box1 -> agent1 -> tray1, a guessed state with agent1 standing on a
              support under the tray it holds.  Plan: project doc
              claude/state-predecessors-plan.md.
+Status       Done 2026-10-17 (find-state-predecessors; plan
+             claude/state-predecessors-plan.md); the acceptance case is listed.

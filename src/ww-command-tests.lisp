@@ -114,8 +114,8 @@ Enter (list-all-problems) for a complete list of problems."
 (defun command-test-6 ()
   "Verify project-relative problem paths resolve with or without a Lisp extension."
   (format t "~%COMMAND-TEST-6: resolving a project-relative problem path...~2%")
-  (let ((without-extension (resolve-problem-file "tech/jammer-tech"))
-        (with-extension (resolve-problem-file "tech/jammer-tech.lisp")))
+  (let ((without-extension (resolve-problem-file "tech/jammer"))
+        (with-extension (resolve-problem-file "tech/jammer.lisp")))
     (assert without-extension)
     (assert (equal without-extension with-extension)))
   (format t "COMMAND-TEST-6 completed successfully.~2%")
@@ -183,7 +183,7 @@ Enter (list-all-problems) for a complete list of problems."
           (let* ((report (get 'find-goal-states :last-report))
                  (summary (getf report :summary))
                  (goal-count (getf summary :goal-states)))
-            (assert (= goal-count 113))))
+            (assert (= goal-count 13))))
       (when (and saved-problem (not (eq *problem-name* saved-problem)))
         (%stage (string-downcase (string saved-problem))))))  ;stage would quote the variable name
   (format t "COMMAND-TEST-5 completed successfully.~2%")

@@ -367,3 +367,14 @@ SPEC CONSOLIDATION (2026-10-14, user)
   Entries above naming corner-topo-advisor-1 refer to this same spec under its old name.
   Saved predecessor files carry the problem name and are checked on load, so files saved
     as corner-topo-advisor-1-predecessors-*.lisp no longer load; regenerate them.
+
+PREDECESSOR SCREEN AND NORMALIZER (2026-10-17, user, Windows, fresh image, 16 threads)
+  find-goal-states: 5,828 (unchanged).  Layer 1: 23,854,012 raw, 23,824,872 feasible,
+    6,210 validated, 1,048 new (6,876 total), 720 s; was 21,877 validated, 3,855 new,
+    1,065 s.
+  Container check (12 random forward-walk states): every predecessor removed by the screen
+    was "both held and assigned HAS-LOCATION" (eg holding connector2 with connector2 at
+    location4); put-connector overwrites the stale location, so forward validation had
+    accepted it.  The earlier backward layers 1-6, and meeting results stated relative to
+    them ("proved shortest for this set"), rest on sets that include such states;
+    regenerate before relying on them.
