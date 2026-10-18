@@ -116,8 +116,10 @@ questions.
    first subgoal working forward. D's tricks emerge through this discussion.
    Before proposing, weigh less obvious openings as well as the obvious one (in
    Talos problems: an early trip that pre-positions a device beyond a controlled
-   barrier, crossing a barrier more than once, or sacrificing a beam). Present only
-   the single best option, with which object fills each role; do not list alternatives.
+   barrier, crossing a barrier more than once, or sacrificing a beam). Present one
+   recommended option, with which object fills each role. In a backward analysis, list
+   every option the checks found and recommend exactly one (*Backward analysis*, below);
+   never offer unchecked alternatives.
 2. Restate each idea with the objects, positions and resources it relies on (in
    Talos problems: bodies, supports, devices, locations and view). Check it
    immediately against the spec, static tables or a focused query. Record
@@ -178,6 +180,68 @@ plan's 31), moved here from the search advisor:
 - In Talos recorder problems, add `(recorder-cycle-ended)` only where a cycle should
   close; legs may run inside one cycle.
 
+### Backward analysis
+
+Use when the subgoals are best found from the goal (as for crelay-topo's third cycle,
+2026-10-17 to 18).  A condition lists only the facts the remaining steps need; each step
+finds the last action that made the condition true, and the condition just before it.
+
+- **The tree.** Each condition is a node; its branches are the different last actions
+  that can make it true (from R1 and R2).  Follow one branch at a time, agreed with D;
+  keep the others in the branch tree, and return to one when a branch is
+  contradicted or runs short of resources.
+- **Records** (the Briefing's *Backward analysis*): a chain map, one row per step (what
+  must be true, and the last action that makes it true; read down for the analysis, up
+  for the forward story); in Talos recorder problems a jobs timeline (each copy's and the
+  ghost's jobs, early and late in the recording); the branch tree; and each step's card.
+- **Stopping.** Keep a gap list: what the current condition needs that the accepted
+  endpoint lacks.  When the gaps are few, write the remainder forward from the chain map
+  by hand and validate it whole from the start (*Realizing a subgoal*, route 1).
+
+Step rules:
+- A step is one action, or a short sequence with no choice inside it, replayed whole
+  (R4).  The action must appear in R1's list for the condition; anything larger is a
+  subgoal.  (crelay-topo step 5 first jumped to the ghost's whole trip.)
+- The step's action makes the fact that became true last.  List each needed-now fact
+  with the action that makes it true, work out the forced order, and take the latest.
+  (crelay-topo step 6 first proposed the ghost's arrival, missing the switch2 flip.)
+- A rule that decides a branch is replayed (R4) or cited from source before it is
+  presented, never stated from a reading of one code path.
+- A shortage flagged under Resources leads at once to a recommended backtrack to the
+  nearest open branch that could relieve it, not to further steps down the same branch.
+
+Branch tree.  The bird's-eye view of the analysis, kept in the Briefing and shown at the
+top of every step card.  Each step is headed by the question it answers, with its options
+lettered on separate lines (the same letters as the card's section 4), for example:
+```
+4  How the beam is lit at the crossing
+       a  agent1's arrival at location15 completes it  ○
+     ▶ b  the ghost completes it last  ✔ ★
+```
+Marks: ▶ the option being followed; ✔ checked; ✗ ruled out, with its reason; ○ open,
+available for backtracking; ★ a backtrack point taken; ← the current step.  When the tree
+is long, the card shows the last few steps in full and the earlier ones collapsed to their
+▶ line; the full tree is shown on request.
+
+Step card.  Present each step as one card with these numbered sections, so D can refer to
+"step 6, fact 3" or "option 6b"; add discussion only when D asks.
+0. **Branch tree**: as above, with ← at this step.
+1. **Objective**: one sentence, the state just before the step's action.
+2. **Condition**: numbered facts in two groups, *needed now* (this step explains them)
+   and *carried for later* (obligations of earlier steps, listed but not worked).
+3. **Who makes each fact true**: one line per needed-now fact naming the action that
+   makes it true, then the forced order; the step's action is the latest.
+4. **Options**: lettered (a), (b), ... from R1 and R2, each with a one-line verdict;
+   exactly one marked **recommended**.
+5. **Check**: what was run, the verdict, and any tool limit that applies (R1 does not
+   list switch toggles).
+6. **New condition**: the changes only, facts removed and added.  It becomes the next
+   card's section 2.
+7. **Resources**: changes to the jobs timeline; a shortage is flagged here with a
+   recommended backtrack point.
+8. **Tree update**: the options this step adds to the branch tree, with their marks.
+9. **D's call**: one question, accept the recommended option or name another.
+
 ## Checking reasoning
 
 Backward analysis, case splits and counting arguments are fast but fallible: a case can
@@ -188,14 +252,14 @@ each check with its verdict in the Briefing, next to the claim it tests.
 
 | ID | Check | Use when | How | Limits |
 |---|---|---|---|---|
-| R1 | **One-step backward check** | An argument names a decisive step (the last action that makes a needed fact true) and lists the ways it can happen | Build a concrete state just after the step (replay it with `validate-action-sequence`); run `(find-state-predecessors state :actions '(<names>))`; confirm each listed predecessor fits a listed option.  An unlisted predecessor is a missed case | Covers one step only.  Lists predecessors that differ in declared base facts; actions that change only other facts, and recording starts or stops, are not listed (advisor-reference F23) |
+| R1 | **One-step backward check** | An argument names a decisive step (the last action that makes a needed fact true) and lists the ways it can happen | Build a concrete state just after the step (replay it with `validate-action-sequence`); run `(find-state-predecessors state :actions '(<names>))`; confirm each listed predecessor fits a listed option.  An unlisted predecessor is a missed case | Covers one step only.  Lists predecessors that differ in declared base facts; actions that change only other facts, and recording starts or stops, are not listed (advisor-reference F23); a switch toggle is one, so a toggle step is checked with R4 |
 | R2 | **Support tree** | Listing the ways a step can happen, and any claim that some fact can never become true | For every fact the condition needs, derived ones included (a gate open, a device active), trace in the tech or spec every effect that asserts it, including indirect ones (propagation, settling, cascades, effects of other actors), and follow each derived fact down to the base facts it rests on (a device active rests on its source's place, height and links; a place can come from being carried).  Write the tree down before listing options | Shows which mechanisms exist, not whether their preconditions can be reached in play.  Applied to the wrong fact it misses cases: check the fact the step needs, not a neighbouring one |
 | R3 | **Every actor present** | A search is used to show that something cannot be done | The start state must include every actor, object and phase that could supply the capability; otherwise the result holds only for that narrower setting.  Say which were left out | A completed search is still a bound relative to its start and cutoff |
 | R4 | **Short mechanism replay** | An argument relies on, or excludes, one mechanic | Replay one to three actions from a hand-built state (`make-start-state-from-facts`, `validate-action-sequence`) and read the resulting facts | Proves the mechanic from that state, not that the state is reachable |
 | R5 | **Premise ledger** | A counting, budget or impossibility argument | List every premise, each marked read (with its source) or measured.  When a solution is known or expected, an impossible result means a premise is wrong: test the least certain one first with R2 to R4 | The ledger finds no premise by itself; it orders the checks |
 | R6 | **Probe the eliminated option** | An option was ruled out by reasoning | Start from the state most favourable to that option and search for the fact it would need | Bounded by the cutoff; a success refutes the elimination, a failure only supports it |
 | R7 | **Test-point sweep** | A claim that no place, position or value works | On a spec copy, add test points (locations, coordinates, parameter values) and query the relevant relation for each | The original spec is never changed; a copy needs its own problem name and file header |
-| R8 | **Role overlap** | A counting, budget or allocation argument that assigns objects to roles | For every pair of roles, ask whether one object can fill both at once (cargo and carrier, load and relay, keeper and relay), and check each yes against the rules (R2, R4) | Counting arguments silently assume disjoint roles; an overlap can remove the shortage |
+| R8 | **Role overlap** | A counting, budget or allocation argument that assigns objects to roles | For every pair of roles, ask whether one object can fill both at once (cargo and carrier, load and relay, keeper and relay), and check each yes against the rules (R2, R4).  Also ask whether one object fills roles one after another: in a recorder problem a copy can change jobs during the recording, so count jobs over time, not one job per copy | Counting arguments silently assume disjoint roles; an overlap can remove the shortage |
 
 Standing rule: when a step turns up a mechanism the analysis had not listed, redo the
 option lists of the earlier steps with it before going on.
@@ -211,6 +275,16 @@ shows it: `find-state-predecessors` lists agent1 approaching gate8 with the load
 beam's bodies were outside agent1's load; R2 had been applied to what can be carried, not to
 what can light the receiver, and a connector riding the carried tray turned out to be the last
 relay (R4 confirmed it; an R8 overlap of load and relay).
+
+Examples (crelay-topo backward analysis, 2026-10-18).  Step 6 first proposed the ghost's walk
+into location11-13 as the last action, missing that switch2 had to be turned on first;
+ordering the actions that make each needed fact true would have shown it.  A pairing rule
+was stated from one code path (pairing only from location9) and corrected: the engine judges
+from every spot the agent can currently reach.  A copy shortage (four jobs, three copies)
+flagged at step 5 stayed open through step 11; D's backtrack to step 4 option (b) relieved
+it, because the ghost moves copies between jobs during the recording (connector1* keeps
+gate3 open early and feeds the beam late: R8, roles in sequence).  Cycle 3 was then written
+forward from the chain map and validated on its first replay.
 
 ## Realizing a subgoal
 
@@ -361,6 +435,8 @@ Briefing.md: maximum depth (and, for Talos, the profile path and hash), then
 **Spec-diagram check** (Talos only), **Summary**, **Difficulties** (including the
 evidence carried from the search hand-off), **Contracts** (including UNCOVERED
 mechanics), **Hints** (qualified, with sources),
+**Backward analysis** (when used: chain map, jobs timeline for Talos recorder problems, gap
+list against the accepted endpoint, branch tree, and the step cards),
 **Subgoal log** (`subgoal | whose idea | check | route | result`, followed per subgoal
 by its commands, expected interpretation, the reported result and the endpoint review;
 for a subgoal handed to the search advisor, a pointer to its section of

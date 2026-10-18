@@ -285,6 +285,50 @@ confirm each fits a listed option.  To be formalized in the solving advisor (D, 
 
 ## Backward analysis, second pass (D and A, from 2026-10-17)
 
+### Chain map (current branch, updated 2026-10-18)
+
+Read down = backward from the goal; read up = the forward story.  Each line: what must be true,
+and the action that makes it true.  Details and checks are in the numbered steps below.
+
+| # | What must be true (the picture) | Last action that makes it true |
+|---|---|---|
+| 1 | agent1 at location19 | agent1 walks in through gate9 |
+| 2 | agent1 in the plate room; plates 6, 7, 8 pressed | agent1 sets box1, connector1, tray1 on the plates |
+| 3 | agent1 at location16 with tray1 (box1 on it, connector1 on box1) | agent1 walks location15 -> location16 through gate8 |
+| 4 | agent1 at location15 with the loaded tray; beam lit | the ghost connects connector1* at location9 (to repeater1, transmitter1) and steps onto plate3, after swapping tray1* onto plate2 (D's late-ghost branch) |
+| 4a | agent1 at location15 with the loaded tray; the ghost free at location12 | agent1 walks location12 -> location15 through gate7 |
+| 5 | agent1 holds the loaded tray in location11-13, real switch2 on | the hand-over: the ghost sets tray1* down beside agent1 |
+| 6 | the ghost on plate5 with the loaded tray1*; tray1 on plate4; agent1 empty-handed; switch2 off | agent1 goes through screen1, turns switch2 on, comes back, picks up tray1 |
+| 7 | the ghost in location11-13 with the loaded tray1* | the ghost walks in through gate5 |
+| 8 | box1 on tray1* with connector1 on it (paired) | agent1 at location20 connects connector1 onto box1 |
+| 9 | agent1 at location20 holding connector1; box1 on the ghost's tray at location5 | switch1 on lifts agent1 off blower1 |
+| 10 | agent1 on blower1 at location4 holding connector1 | agent1 steps onto blower1 |
+| 11 | agent1 at location4 holding connector1 | agent1 walks in with connector1 (from where: open; see below) |
+
+Open branches recorded for backtracking: step 1 (b) riding the ghost's tray; step 4 (a) the beam
+completed by agent1's own arrival; step 5 agent1 carried into location11-13 on the ghost's tray;
+step 9 jumping into the stream from box1; step 11 connector1 picked up at location4 or brought
+from location3, 5, 7, 8, 10 or 11-13.  Step 11's reason (connector1* left at location9 as the
+feed) no longer applies on the late-ghost branch, so where connector1 comes from is open again.
+
+### Jobs timeline for copies and the ghost's body (current branch)
+
+| Copy or body | Early in the recording | Late in the recording |
+|---|---|---|
+| box1* | on plate1: lets the ghost out of location1 | stays |
+| connector1* | on plate2: keeps gate3 open | the beam feed at location9 |
+| tray1* | carries box1 and connector1 to location11-13 | on plate2, replacing connector1* |
+| the ghost's body | on plate5 while agent1 flips switch2 | on plate3 for the beam |
+
+### Gap list against the cycle-2 endpoint
+
+Endpoint: agent1 at location1, empty-handed; connector1 on plate1; box1 on plate2; tray1 on the
+ground at location7; switch1 and switch2 off; no recording.  The branch needs at recording start:
+box1 on plate1 and connector1 on plate2 (so their copies take those jobs), or the roles swapped
+with the swap of step 4 done at plate1 instead (not yet checked); tray1 where the ghost can fetch
+its copy (location7 fits).
+
+
 Redone one step at a time, each step with the checks of the solving advisor's *Checking
 reasoning*.  C_k is the condition the remaining steps need; E_k the last action that made it
 true.
@@ -394,18 +438,221 @@ pickups inside the plate room rearrange what is there but bring nothing in.
     gate7 from location11-13 carrying the loaded tray: connector1 rides in as the last relay.  So
     the revised C3 ("possibly through a connector in L") is the case the tool finds.
   - S4 (the hand-over): agent1 holding tray1 and agent1* at location5; agent1* has just put
-    tray1* down, so box1 with connector1 settled onto tray1.  First run: 27 predecessors, the
-    true one (box1 on tray1* before) MISSING, since the tool copied each rider's support from the
-    state; and two impossible entries (the ghost standing on the live box1 or the held tray1).
-    Re-run after the fix (Schema-Gaps, "Predecessors where a rider changes support by settling"):
-    27 predecessors, the hand-over listed, the two impossible entries gone, and one new entry
-    the rules allow (agent1 standing on tray1* and stepping down as it is set down).  The
-    hand-over is the only listed way box1 comes onto tray1; every other entry has it there
-    already.  Direct placements onto tray1: none listed (agent1 cannot hold two things; a ghost
-    may not use a live object).
+    tray1* down, so box1 with connector1 settled onto tray1.  First run: the true predecessor was
+    missing (the tool did not guess riders back onto a set-down tray).  Re-run 2026-10-17 after
+    the fix (project doc claude/settling-predecessors-plan.md, commit 3f6b597): 27 predecessors.
+    The only one with box1 not on tray1 before is the hand-over itself (box1 on tray1*, held by
+    agent1*).  Also listed: agent1 riding tray1* while the ghost holds it and dropping to the
+    ground when it is set down (a live agent on a ghost-held tray, the mechanism of step 1 (b)),
+    and the ghost setting down an empty tray1*.  The impossible entries (ghost standing on the
+    live box1 or tray1) are gone.
+  - S6 (re-check of step 2 option iii, after the fix): agent1 at location16 has just put tray1 on
+    the ground and box1 settled onto plate6.  8 predecessors; plate6 becomes pressed only by
+    agent1 putting box1 on it or by setting down tray1 with box1 riding (option iii).
   VERDICT: "every body inside entered with agent1 through gate8" and the C3 beam option are
-  CONFIRMED.  "A rider gets on tray1 only by a ghost hand-over" is CONFIRMED for one step from
-  S4 (placement and settling); a recording stop is not covered by the tool.
+  CONFIRMED.  "A rider gets on tray1 only by a ghost hand-over" is CONFIRMED: the hand-over is
+  the only predecessor that puts box1 on tray1.
+
+**Step 4.**  C3 (revised, best case measured): agent1 at location15 holding tray1 with box1 on
+it and connector1 on box1, connector1 paired to receiver1 and repeater1; connector1* at
+location9 paired to transmitter1 and repeater1; a copy on plate3; receiver1 lit.  E4 is the last
+action that made C3 true.
+- R2, by reading: receiver1 rests on every link of the chain (connector1*, repeater1, connector1,
+  gate4 open by plate3).  The base facts under it change by agent1 arriving at location15 with
+  connector1 riding (the chain needs connector1 there), by a body arriving on plate3, or by a
+  connector being placed or paired.  switch2 does not touch the beam.
+- R1, measured 2026-10-17 (crelay-topo-2): S5 (the C3 state, ghost far away): receiver1 goes
+  from dark to lit only by agent1 walking location11/12/13 -> location15 through gate7 with the
+  loaded tray.  S7 (agent1 waiting at location15 with the loaded tray; the ghost at location10
+  has just put box1* on plate3): 10 predecessors; receiver1 comes on either by that walk or by
+  the ghost's put onto plate3.  No other way is listed.
+- E4 options: (a) agent1 walks into location15 from location11-13 through gate7 carrying the
+  loaded tray, completing the beam as it arrives; (b) agent1 waits at location15 with the loaded
+  tray and the ghost completes the beam (a copy put on plate3).
+- Two rules read here that shape the next step [tech switch.lisp, -recorder-switch-shadow]:
+  switch2 is worked only from location14 (profile R4), reached only through screen1, so only
+  empty-handed; holding things does not stop toggling.  The ghost keeps its own memory of the
+  switch, seeded from the real switch when recording starts: a toggle by agent1 changes only the
+  real switch, while a ghost toggle changes both.  So after agent1 turns switch2 on during a
+  recording, the ghost still finds gate5 open and gate7 closed.  Measured in S7: the ghost walks
+  location12/13 -> location10 through gate5 while the real switch2 is on.
+- C4: agent1 holding tray1 loaded (box1, connector1 on box1, connector1 paired to receiver1 and
+  repeater1), with the real switch2 on, either (a) in location11-13 with the feed ready
+  (connector1* at location9 paired to transmitter1 and repeater1, a copy on plate3), or (b)
+  already at location15 with the ghost bringing the plate3 copy.  Both need agent1 in
+  location11-13 holding the loaded tray while the real switch2 is on.
+- Difficulty for step 5 (by reading): agent1 holding the loaded tray cannot turn switch2 on itself
+  (screen1), cannot set the tray down without its riders dropping off (S6, R4), and cannot come
+  back into location11-13 from location8-10 once the real switch2 is on (gate5).  So either the
+  ghost turns switch2 on while agent1 waits in location11-13 with the load, or the load is made
+  in location11-13 after agent1 has turned switch2 on: the ghost, whose gate5 stays open, brings
+  tray1* with box1 and connector1 riding and hands them over there.
+
+**Step 5.**  Objective: find the state just before the action that gives agent1 the loaded tray
+in location11-13 with the real switch2 on (C4).
+- E5 (D, 2026-10-18, from A's step-4 suggestion): the hand-over.  The ghost, holding tray1* with
+  box1 on it and connector1 on box1, sets tray1* down beside agent1, who holds the empty tray1;
+  box1 and connector1 settle onto tray1.
+- R4/R1, measured 2026-10-18 (crelay-topo-2): at location12, with the real switch2 on and the
+  ghost's memory of it off, the hand-over replays.  19 predecessors; the only one that puts box1
+  on tray1 is the ghost setting tray1* down with box1 on it.
+- C5: in location11-13, the ghost holding tray1* with box1 and connector1 riding (connector1
+  already paired to receiver1 and repeater1 for step 4), agent1 holding the empty tray1, the real
+  switch2 on, the ghost's memory of switch2 still off (so gate5 stays open for the ghost), and
+  whatever the later steps still need (the beam's feed and plate3 body for step 4).
+- Other ending noted, not taken: agent1 riding tray1* while holding the loaded tray is carried
+  into location11-13 by the ghost through gate5 (measured 2026-10-17).
+- Look-ahead for steps 6 on (A, 2026-10-17; measured where marked): getting the ghost to C5 from
+  its start looks one copy short.  It starts empty-handed at location1 [read]; crossing gate1 and
+  gate3 needs copies on plate1 and plate2 (a real object does not open a gate for the ghost
+  [measured]); it carries tray1*; and step 4's beam needs a feed connector copy at location8 or
+  9.  Four jobs for box1*, connector1*, tray1*.  connector1* on plate2 cannot also be the feed:
+  from location7 its beam does not reach repeater1 [measured].  To be worked through step by step.
+- Also measured 2026-10-17: a connector set down at location7, 8 or 9 can be paired to
+  transmitter1, receiver1 and repeater1; screen1 stops agent1 whenever it holds the tray, and
+  empty-handed it passes and toggles switch2; a rider on the ghost's tray passes the gates the
+  ghost can pass (not yet used in steps 1-4; standing rule).
+
+**Step 6.**  Objective (D's point, 2026-10-18): before the hand-over, agent1 must turn switch2
+on; find the state just before that.
+- Order: agent1 must enter location11-13 while the real switch2 is still off (gate5), so the flip
+  comes after agent1's arrival; the ghost's gate5 stays open either way, so it can arrive first
+  and wait.  Turning switch2 on needs agent1 empty-handed at location14 (screen1) with plates 4
+  and 5 pressed (gate6).
+- R4, measured 2026-10-18 (crelay-topo-2): start with the recording open, the real switch2 off,
+  tray1 on plate4 (location13), the ghost standing on plate5 (location12) holding tray1* with box1
+  and connector1 riding, agent1 empty-handed at location12.  Replayed: agent1 walks through gate6
+  and screen1 to location14, toggles switch2, walks back to location13, picks up tray1 from
+  plate4, walks to location12; the ghost puts tray1* down.  Result: agent1 holds tray1 with box1
+  and connector1, switch2 on, gate7 open, and gate5 still open in the ghost's view.  6 actions.
+  The ghost's own body is the plate5 keeper, so gate6 costs no copy.
+- C6: in location11-13 with the real switch2 off: agent1 empty-handed; tray1 on plate4; the ghost
+  on plate5 holding tray1* with box1 on it and connector1 on box1 (connector1 paired to
+  receiver1 and repeater1); plus what step 4 still needs later (feed connector at location8 or 9,
+  a body on plate3).
+
+**Step 7.**  Objective: find the state just before the ghost walks into location11-13 through
+gate5 carrying the loaded tray1* (agreed with D 2026-10-18 as the last event before C6; agent1
+and tray1 can come in earlier through gate5 while the real switch2 is off).
+- R1, measured 2026-10-18 (crelay-topo-2): S9, the ghost has just walked location9 -> location12
+  through gate5 with tray1* (box1 and connector1 riding); agent1 at location12, tray1 on plate4,
+  switch2 off in both views, copies on plates 1 and 2.  27 predecessors.  The only ones that bring
+  the loaded ghost into location11-13 are the ghost's own walks through gate5 with tray1*: from
+  location8, 9 or 10, or in one longer walk from location3, 4, 5 or 7 (through gate3 too) or
+  location1 or 2 (through gate1 and gate3).  The rest are moves inside location11-13, agent1's
+  moves, and agent1 putting tray1 on plate4.  VERDICT: CONFIRMED, no other way in.
+- C7: the ghost outside location11-13 holding tray1* with box1 and connector1 riding, with the
+  gates on its way open in its own view (gate5 by its memory of switch2 off; gate3 and gate1 by
+  copies on plates 2 and 1 if it starts west of them); agent1 and tray1 in location11-13 (or
+  still able to enter while the real switch2 is off); plus step 4's later needs (feed connector at
+  location8 or 9, a body on plate3).
+
+**Step 8.**  Objective: find the state just before connector1 gets onto box1 riding the ghost's
+tray1*, already paired to receiver1 and repeater1 as step 4 needs (D, 2026-10-18).
+- E8: agent1, at location20 (the top of blower1's stream; it stands on blower1 at location4 and is
+  lifted when switch1 is on, as in SG2), connects connector1 onto box1 at location5, pairing it to
+  repeater1 and receiver1 in the same action.  A grounded agent cannot reach a held tray's top.
+- Pairing rule (D, 2026-10-18, correcting his earlier remark): a connector can be paired with any
+  terminus visible from anywhere the agent can get to at the moment it is connected.  This is the
+  engine's rule (CONNECTABLE-TERMINUS judges from every spot the agent can currently walk to).  So
+  no earlier pairing at location9 is needed.  The longer route (connect at location9, pick up
+  keeping the pairings, put onto box1 from location20) also works.
+- R4, measured 2026-10-18 (crelay-topo-2): recording open, agent1 at location4 holding unpaired
+  connector1, the ghost at location5 holding tray1* with box1 on it.  agent1 steps onto blower1,
+  toggles switch1 (lifted to location20), and connects connector1 onto box1 at location5 to
+  (repeater1 receiver1): connector1 on box1, paired to both.  Also measured: a connector1 already
+  paired to all three, put onto box1 from location20, keeps its pairings.  (A hand-built agent1 at
+  location20 with the blower off is unphysical: it drops to location4 on the first propagation.)
+- R1, measured 2026-10-18 (state after the connect): 17 predecessors.  Those that put connector1 on
+  box1: CONNECT-CONNECTOR from location20 (four variants, by which pairings connector1 already
+  had) and PUT-CONNECTOR of a connector1 already paired to both.  The rest are ghost moves.
+  VERDICT: CONFIRMED.
+- C8: agent1 at location20 (on the stream, switch1 on) holding connector1; the ghost at location5
+  holding tray1* with box1 on it; tray1 still to be brought into location11-13 while the real
+  switch2 is off; plus step 4's later needs (feed connector at location8 or 9, a body on plate3).
+- Look-ahead: if connector1 stands paired at location9 when a recording starts, its copy
+  connector1* starts there with the same pairings, which is the feed step 4 needs.
+
+**Step 9.**  Objective: find the state just before agent1 arrives at location20 holding connector1
+while box1 already rides the ghost's tray1* at location5.
+- E9 (agreed with D 2026-10-18): the lift.  switch1 turns on while agent1 stands on blower1 at
+  location4 holding connector1.
+- R4, measured 2026-10-18: from agent1 at location4 holding connector1 (recording open, the ghost
+  at location5 holding tray1* with box1 on it, switch1 off), agent1 steps onto blower1 and toggles
+  switch1 itself: agent1 at location20, blower1 blowing, the real gate2 closed (the ghost's view
+  keeps gate2 open: its memory of switch1 is off).  Holding cargo does not stop toggling.
+- R1, measured 2026-10-18 (state after the lift): 43 predecessors.  Toggles change no base fact,
+  so the lift itself is not listed (tool limit; the replay above is its check).  Listed ways
+  agent1 gets to location20: jumping into the stream from box1 on the ghost's tray at location5.
+  The rest keep agent1 at location20 (picking connector1 up there, in variants) or are ghost moves.
+  VERDICT: CONFIRMED for the lift by replay; one alternative way up noted.
+- C9: agent1 standing on blower1 at location4 holding connector1, switch1 off; the ghost at
+  location5 holding tray1* with box1 on it; plus the later needs above.  box1 got onto tray1*
+  earlier, also from location20, so agent1 has been up once before, come down and fetched
+  connector1.
+
+**Step 10.**  Objective: find the state just before agent1 stands on blower1 at location4 holding
+connector1 with switch1 off, while the ghost holds tray1* with box1 on it at location5 (C9).
+- E10 (agreed with D 2026-10-18): agent1 steps onto blower1 at location4 carrying connector1.
+- R4/R1, measured 2026-10-18 (crelay-topo-2): the step replays.  On the state after it, 43
+  predecessors.  Those that make C9 true: the step itself (from the ground at location4), or
+  agent1 already standing on blower1 picking connector1 up from location4 or location5 (30
+  variants by where it lay and which pairings it had; picking up clears them).  The rest are
+  ghost moves.  VERDICT: CONFIRMED.
+- C10: agent1 at location4 on the ground holding connector1, switch1 off; the ghost at location5
+  holding tray1* with box1 on it; plus the later needs (tray1 into location11-13 while the real
+  switch2 is off; feed connector at location8 or 9; a body on plate3).  Before this, agent1 has
+  put box1 onto tray1* from location20, come down, switch1 has gone off, and agent1 has fetched
+  connector1.
+
+How to read these steps (D and A, 2026-10-18): the backward analysis follows a branching tree.
+Each node is a condition (only the facts the remaining steps need); its branches are the different
+last actions that can make it true (from R1 and R2).  One branch is followed at a time, agreed with
+D; the others are recorded so we can backtrack to them when a branch is contradicted.  The search
+backward stops at a condition reachable forward from the accepted 28-action endpoint.
+
+**Step 11.**  Objective: find the state just before agent1 arrives at location4 holding connector1
+with switch1 off, while the ghost holds tray1* with box1 on it at location5 (C10).
+- E11 (agreed with D 2026-10-18): agent1 walks from location9 through gate3 to location4 carrying
+  connector1.  Reason for this branch: if connector1 stood at location9 when the recording began,
+  its copy connector1* stays there as step 4's beam feed.
+- R4/R1, measured 2026-10-18 (crelay-topo-2; box1* on plate2 keeping gate3 open, connector1* at
+  location9 paired to transmitter1 and repeater1): the walk replays.  On the state after it, 66
+  predecessors.  Branches that make C10 true: agent1 walking in carrying connector1 from
+  location3, 5, 7, 8, 9 or 10, or from location11-13 through gate5 and gate3, or jumping down from
+  location6; or agent1 at location4 picking connector1 up there (variants by where it lay).
+  Stepping off blower1 keeps C10.  The rest are ghost moves.  VERDICT: CONFIRMED; the branch taken
+  is one of those listed.
+- C11: agent1 at location9 holding connector1, switch1 off; gate3 open for agent1 (a body on
+  plate2); the ghost at location5 holding tray1* with box1 on it; connector1* at location9 paired
+  to transmitter1 and repeater1 (the feed); plus the later needs (tray1 into location11-13 while
+  the real switch2 is off; a body on plate3 at agent1's last crossing).
+- Copies in use on this branch: box1* on plate2, connector1* at location9, tray1* with the ghost.
+  The ghost must still have got past gate1 to reach location5, which needs a copy on plate1: the
+  four-for-three shortage (step 5 look-ahead) will meet this branch at the ghost's walk out of
+  location1, the likely point to backtrack from.
+
+**Branch change at step 4: the ghost completes the beam last (D, 2026-10-18).**  D: the last
+thing the ghost does in the recording is to put connector1* at location9, paired to transmitter1
+and repeater1, and then stand on plate3, while agent1 waits at location15 with the loaded tray.
+This is step 4's option (b).  It removes the four-for-three shortage because the ghost moves
+copies between jobs during the recording: connector1* keeps gate3 open early and becomes the feed
+late; tray1* carries the load and then takes over plate2; the ghost's own body presses plate3.
+- R4, measured 2026-10-18 (crelay-topo-2), from the moment after the hand-over: agent1 at
+  location15 holding tray1 with box1 and connector1 (connector1 paired to repeater1 and
+  receiver1), the real switch2 on; the ghost empty-handed at location12 with tray1* on the ground
+  there; box1* on plate1; connector1* on plate2.  The ghost picks up tray1*, walks location12 ->
+  location7 through gate5 and gate3, puts tray1* down, picks up connector1* (from plate2), puts it
+  down, puts tray1* on plate2, picks connector1* up again, walks location7 -> location9 through
+  gate3, connects connector1* on the ground to (repeater1 transmitter1), walks to location10 and
+  steps onto plate3.  connector1*, repeater1 and connector1 turn red, gate4 and gate8 open, and
+  agent1 walks location15 -> location16 through gate8 with all three real objects.  13 actions.
+- Copies on this branch: box1* on plate1 (the ghost's way out of location1), connector1* on plate2
+  then the feed at location9, tray1* the carrier then the plate2 keeper; the ghost's body on plate5
+  (step 6) and on plate3 (now).  The real objects at recording start would then be box1 on plate1
+  and connector1 on plate2.  The cycle-2 endpoint has them the other way round (connector1 on
+  plate1, box1 on plate2); then the same swap would happen at plate1 (location2) instead, with a
+  longer ghost walk.  Not yet checked.
 
 ## Contracts
 
@@ -421,6 +668,7 @@ None.  Hints from the earlier solution are excluded by the objective.
 |---|---|---|---|---|
 | SG1: connector1 on plate1, recorder cycle ended | D and A | search | one search | ACCEPTED 2026-10-16, 9 actions |
 | SG2: box1 on plate2, recorder cycle ended | D and A | search | two searches (2a, 2b) | ACCEPTED 2026-10-16, 10 + 9 = 19 actions (28) |
+| SG3: cycle 3 to the goal (agent1 at location19) | D and A, from the backward analysis | R1/R4 per step; full replay | by hand | CANDIDATE 2026-10-18, 51 actions (79); validated from the start |
 
 **Regenerated 2026-10-16** with the checkpoint form (SOLVE-SUBGOAL <checkpoint> <goal>), serial,
 SBCL 2.2.9 container, from (stage crelay-topo-1):
@@ -432,6 +680,29 @@ SBCL 2.2.9 container, from (stage crelay-topo-1):
   the final resting state; the total is the same.
 Replay of Actions.lisp from the start, 2026-10-16: SUCCESS-P T, 28 actions, goal not yet
 satisfied (expected).  Checkpoint.txt holds the endpoint.
+
+**SG3 (2026-10-18).**  Written by hand from the backward analysis's current branch (chain map,
+read upward), starting at the cycle-2 endpoint.  The copies start where cycle 2 left the real
+objects: connector1* on plate1 (the ghost's way out of location1), box1* on plate2 (gate3),
+tray1* at location7 (the ghost's tray).  The ghost's tray swap of step 4 is done at plate1
+(location2): tray1* takes over plate1 and connector1* goes to location9.  Outline:
+1. Recording starts; the ghost fetches tray1* and waits at location5.
+2. agent1 takes box1 from plate2 (box1* keeps gate3), rides blower1 up to location20, puts box1
+   on tray1*, comes down; fetches connector1 from plate1 (connector1* keeps gate1), rides up again
+   and connects connector1 onto box1 to (repeater1 receiver1).
+3. The ghost carries the load through gate3 and gate5 to location12 and stands on plate5.
+4. agent1 brings tray1 to plate4 (location13), goes through gate6 and screen1, turns switch2 on,
+   comes back to location13, picks up tray1, and walks to location12 beside the ghost; the ghost
+   sets tray1* down (hand-over: riders settle only onto surfaces at that same location); agent1
+   walks to location15.
+5. The ghost picks up tray1*, walks to location2, swaps tray1* onto plate1 for connector1*, walks
+   to location9, connects connector1* to (repeater1 transmitter1), and stands on plate3.
+6. agent1 crosses gate8 with all three real objects, sets box1 (with connector1) on plate6 by
+   putting tray1 down, connector1 on plate7, tray1 on plate8, and walks through gate9 to
+   location19.
+Replay, 2026-10-18 (SBCL 2.2.9 container): after (stage crelay-topo-1), loading Actions.lisp gives
+79 actions, SUCCESS-P T, GOAL-CHECKED-P T, GOAL-SATISFIED-P T; VALIDATE-RECORDER-SOLUTION
+ACCEPTED; Validation.txt written (container copy).  It was right the first time.
 
 The 2026-10-06 measurements (serial goal chaining) are kept below for comparison.
 
@@ -457,4 +728,8 @@ doc/solving-advisor.md, *Choosing a subgoal*.
 
 ## Result
 
-Open.
+2026-10-18: a complete solution of 79 actions (SG1 9, SG2 19, SG3 51), validated from the start in
+the container (SBCL 2.2.9): goal satisfied and the recorder's solution validator accepted.  SG3 is
+a candidate until D replays Actions.lisp on Windows, which writes Validation.txt.  Derived
+independently of the earlier 87-action solution: cycles 1-2 by searches, cycle 3 from the backward
+analysis (steps 1-11 with R1/R4 checks and D's late-ghost branch).  No claim of shortest length.
