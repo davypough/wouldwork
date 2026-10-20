@@ -49,6 +49,11 @@
   "Maps action-name to list of parameter indices that have symmetric types.")
 
 
+(defparameter *symmetry-safety-report* nil
+  "The last flow check: an alist of (family . spot texts) in detection order, ending with
+   (:all . spot texts) for spots that affect every family.")
+
+
 (sb-ext:defglobal *symmetry-pruning-count* 0
   "Count of action instantiations pruned due to symmetry during search.")
 (declaim (type fixnum *symmetry-pruning-count*))
@@ -125,6 +130,7 @@
           (remove-duplicate-symmetry-families families))
     (rebuild-symmetry-lookups)
     (identify-symmetric-action-parameters)
+    (setf *symmetry-safety-report* (check-symmetry-family-flow *symmetry-families*))
     (prune-inoperative-symmetry-groups)
     *symmetry-groups*))
 
@@ -600,21 +606,34 @@
 
 
 (defun prune-inoperative-symmetry-groups ()
-  "Keep only operative families whose every transition use is permutation-safe.
-   A single identity-sensitive action use invalidates a family for global
-   canonicalization, even when another action could use that family safely."
+  "Keep only families whose every action use is permutation-safe, and that some action
+   parameter ranges over or that the flow check passes clean.  A single identity-sensitive
+   action use invalidates a family for global canonicalization, even when another action
+   could use that family safely."
   (setf *symmetry-families*
-        (remove-if-not
-          (lambda (family)
-            (let ((group (symmetry-family-objects family)))
-              (and (some (lambda (action)
-                           (action-uses-group-soundly-p action group))
-                         *actions*)
-                   (every (lambda (action)
-                            (action-uses-group-entirely-safely-p action group))
-                          *actions*))))
-          *symmetry-families*))
+        (remove-if-not (lambda (family)
+                         (member (symmetry-family-status family)
+                                 '(:kept-clean :kept-flagged :query-only-clean)))
+                       *symmetry-families*))
   (rebuild-symmetry-lookups))
+
+
+(defun symmetry-family-status (family)
+  "Classify FAMILY by the action-parameter checks and the flow check (report only):
+   :UNSAFE-ACTION, :KEPT-CLEAN, :KEPT-FLAGGED, :QUERY-ONLY-CLEAN or :QUERY-ONLY-FLAGGED."
+  (let ((group (symmetry-family-objects family))
+        (clean (and (null (rest (assoc family *symmetry-safety-report*)))
+                    (null (rest (assoc :all *symmetry-safety-report*))))))
+    (cond ((notevery (lambda (action)
+                       (action-uses-group-entirely-safely-p action group))
+                     *actions*)
+           :unsafe-action)
+          ((some (lambda (action)
+                   (action-uses-group-soundly-p action group))
+                 *actions*)
+           (if clean :kept-clean :kept-flagged))
+          (clean :query-only-clean)
+          (t :query-only-flagged))))
 
 
 (defun action-uses-group-soundly-p (action group)
@@ -674,6 +693,796 @@
              (type-has-symmetric-objects-p subtype symmetric-types))
            (cdr type-spec)))
     (t nil)))
+
+
+;;;; SAFETY FLOW CHECK ;;;;
+;;; Follows every family's members through the code the search runs: action parameters,
+;;; preconditions and effects, query and update bodies (interprocedurally), the goal, the
+;;; propagation driver and the search hooks.  A value's taint is the list of families
+;;; whose members it may hold.  A use is a spot when a member reaches something not known
+;;; to be name-free: a plain Lisp function or Lisp operator outside the allow lists, a
+;;; literal member name, or a dot-product quantifier.  Plain Lisp reached with the
+;;; position is checked against the boundary rule: it may pass the position on to queries
+;;; and updates, or to other plain Lisp that does the same, and nothing else; a query
+;;; result that may hold members, handed back into plain Lisp, is a spot as well.
+;;; Report only: families are not dropped on the check's account, except a family no
+;;; action parameter ranges over, which is kept only when the check passes it clean.
+
+
+(defparameter *flow-value-operators*
+  '(list list* cons append nconc first second third fourth fifth sixth last butlast rest
+    car cdr caar cadr cdar cddr caddr cdddr cadddr copy-list copy-tree reverse nreverse
+    remove delete remove-duplicates delete-duplicates union intersection set-difference
+    adjoin member find assoc rassoc values identity progn prog1 prog2 when unless and or
+    do block the locally return pop alexandria:flatten alexandria:ensure-list)
+  "Name-free operators whose result carries their arguments' taint.")
+
+
+(defparameter *flow-predicate-operators*
+  '(eq eql equal different not null endp consp listp atom symbolp numberp integerp subsetp
+    length count position print always-true error
+    + - * / = /= < > <= >= min max abs 1+ 1- floor ceiling round truncate mod rem expt
+    sqrt zerop plusp minusp)
+  "Operators whose result never holds a family member and that never reveal a member's
+   name: predicates, ERROR (which ends the search alike in every renamed position), and
+   numeric operators, which signal an error on an object rather than read its name.")
+
+
+(defparameter *flow-index-operators*
+  '(nth nthcdr)
+  "Name-free list accessors whose first argument is an index that must not be a member.")
+
+
+(defparameter *flow-mapping-operators*
+  '(mapcar mapc mapcan maplist mapcon some every notany notevery remove-if remove-if-not
+    delete-if delete-if-not find-if find-if-not position-if count-if member-if)
+  "Name-free operators that apply a function argument to list elements.")
+
+
+(defparameter *flow-engine-state-readers* nil
+  "Engine functions allowed to receive the position: content-based snapshots.")
+
+
+(defparameter *flow-hook-names*
+  '(heuristic? prune-state? bounding-function? min-steps-remaining?)
+  "Search hooks evaluated on positions during search.")
+
+
+(defvar *flow-families* nil
+  "The families under check.")
+
+
+(defvar *flow-member-families* nil
+  "Maps each family member to the list of its one family.")
+
+
+(defvar *flow-formal-taints* nil
+  "Maps (query-or-update . formal) to the taint reaching that formal from any call.")
+
+
+(defvar *flow-return-taints* nil
+  "Maps a query or update to the taint of the values it returns.")
+
+
+(defvar *flow-reached* nil
+  "Queries and updates reached from the search's code.")
+
+
+(defvar *flow-changed* nil
+  "Set when a reached set or a formal or return taint grows during a pass.")
+
+
+(defvar *flow-spots* nil
+  "Maps a spot key (kind detail owner) to its families, or :ALL.")
+
+
+(defvar *flow-owner* nil
+  "Text naming the definition being walked.")
+
+
+(defvar *flow-function* nil
+  "The query or update whose body is being walked, for RETURN-FROM.")
+
+
+(defvar *flow-env* nil
+  "Maps each variable of the body being walked to its taint, over all its assignments.")
+
+
+(defvar *flow-env-changed* nil
+  "Set when a variable's taint grows during a walk.")
+
+
+(defvar *flow-lisp-definitions* nil
+  "Maps each plain Lisp function defined in the staged problem file to its lambda list
+   and body.")
+
+
+(defvar *flow-state-checks* nil
+  "The (function . position) pairs already checked for receiving the position.")
+
+
+(defvar *flow-callbacks* nil
+  "The (plain Lisp function . query or update) pairs where Lisp calls back into spec code.")
+
+
+(defvar *flow-registered-names* nil
+  "An alist of (function name . registry variables) for each function name quoted in the
+   problem file's top-level forms outside definitions, such as a provider registration.
+   The registry variables are the special variables the registering function's body
+   names, or the variable a DEFPARAMETER or DEFVAR defines.  A callback through a variable
+   in plain Lisp may reach the names registered into a special variable its function names.")
+
+
+(defvar *flow-position-taints* nil
+  "Caches the taint of each relation argument position.")
+
+
+(defun check-symmetry-family-flow (families)
+  "Run the flow check over FAMILIES and return the report alist (see
+   *SYMMETRY-SAFETY-REPORT*).  Passes repeat until no reached set or taint grows; every
+   spot recorded on the way stays valid, since taints only grow."
+  (let ((*flow-families* families)
+        (*flow-member-families* (make-hash-table :test #'eq))
+        (*flow-formal-taints* (make-hash-table :test #'equal))
+        (*flow-return-taints* (make-hash-table :test #'eq))
+        (*flow-reached* (make-hash-table :test #'eq))
+        (*flow-spots* (make-hash-table :test #'equal))
+        (*flow-state-checks* (make-hash-table :test #'equal))
+        (*flow-callbacks* (make-hash-table :test #'equal))
+        (*flow-position-taints* (make-hash-table :test #'equal))
+        (*flow-lisp-definitions* nil)
+        (*flow-registered-names* nil)
+        (*flow-changed* t))
+    (multiple-value-setq (*flow-lisp-definitions* *flow-registered-names*)
+      (read-flow-lisp-definitions))
+    (dolist (family families)
+      (dolist (object (symmetry-family-objects family))
+        (setf (gethash object *flow-member-families*) (list family))))
+    (loop while *flow-changed*
+          do (setf *flow-changed* nil)
+             (dolist (action *actions*)
+               (let ((*flow-owner* (format nil "action ~(~A~)" (action.name action)))
+                     (*flow-function* nil))
+                 (flow-walk-to-fixpoint (list (action.precondition-form action)
+                                              (action.effect-form action))
+                                        (action.precondition-params action)
+                                        nil)))
+             (when *goal*
+               (let ((*flow-owner* "the goal")
+                     (*flow-function* nil))
+                 (flow-walk-to-fixpoint (list *goal*) nil nil)))
+             (flow-reach-hooks)
+             (dolist (name (loop for name being the hash-keys of *flow-reached* collect name))
+               (flow-analyze-spec-function name)))
+    (maphash (lambda (pair present)
+               (declare (ignore present))
+               (let ((taint (gethash (cdr pair) *flow-return-taints*)))
+                 (when taint
+                   (flow-spot :callback pair nil taint))))
+             *flow-callbacks*)
+    (flow-report families)))
+
+
+(defun read-flow-lisp-definitions ()
+  "Return a table of every plain Lisp function the staged problem file defines, mapping
+   its name to (lambda-list . body), and the alist of registered names (see
+   *FLOW-REGISTERED-NAMES*).  A later definition replaces an earlier one, as at load."
+  (let ((table (make-hash-table :test #'eq))
+        (registrations nil)
+        (*package* (find-package :ww)))
+    (with-open-file (in (instance-problem-file (asdf:system-source-directory :wouldwork)))
+      (loop for form = (read in nil in)
+            until (eq form in)
+            do (cond ((not (consp form)))
+                     ((and (member (first form) '(defun define-problem-helper))
+                           (symbolp (second form)))
+                      (setf (gethash (second form) table) (cddr form)))
+                     ((not (or (eq (first form) 'defmacro)
+                               (eql 0 (search "DEFINE-" (tech-form-head-name form)))))
+                      (push form registrations)))))
+    (values table
+            (loop for form in registrations
+                  for registry = (if (member (first form) '(defparameter defvar))
+                                   (list (second form))
+                                   (flow-special-variables (rest (gethash (first form) table))))
+                  when registry
+                    append (loop for symbol in (alexandria:flatten (rest form))
+                                 when (and (symbolp symbol)
+                                           (or (member symbol *query-names*)
+                                               (member symbol *update-names*)
+                                               (gethash symbol table)))
+                                   collect (cons symbol registry))))))
+
+
+(defun flow-special-variables (tree)
+  "Return the special variables, named with earmuffs, occurring anywhere in TREE."
+  (remove-duplicates
+    (remove-if-not (lambda (symbol)
+                     (and (symbolp symbol)
+                          (let ((name (symbol-name symbol)))
+                            (and (> (length name) 2)
+                                 (char= (char name 0) #\*)
+                                 (char= (char name (1- (length name))) #\*)))))
+                   (alexandria:flatten tree))))
+
+
+(defun flow-reach-hooks ()
+  "Reach the search hooks: a hook query as spec code, a plain Lisp hook as a function
+   receiving the position."
+  (dolist (name (append *flow-hook-names*
+                        (mapcar #'second *min-steps-remaining-contributors*)))
+    (cond ((member name *query-names*)
+           (flow-reach name))
+          ((gethash name *flow-lisp-definitions*)
+           (flow-check-state-passing name 0 "the search hooks")))))
+
+
+(defun flow-analyze-spec-function (name)
+  "Walk query or update NAME's body with its formals' taints, and record its return taint."
+  (let* ((*flow-owner* (format nil "~:[update~;query~] ~(~A~)" (member name *query-names*) name))
+         (*flow-function* name)
+         (result (flow-walk-to-fixpoint
+                   (list (get name :raw-body))
+                   nil
+                   (mapcar (lambda (formal)
+                             (cons formal (gethash (cons name formal) *flow-formal-taints*)))
+                           (get name :raw-args)))))
+    (flow-merge-table *flow-return-taints* name result)))
+
+
+(defun flow-walk-to-fixpoint (forms parameters bindings)
+  "Walk FORMS in a fresh environment until no variable's taint grows, after binding the
+   quantifier-style PARAMETERS and the (variable . taint) BINDINGS.  Return the taint of
+   the last form.  A variable keeps the union of all its assignments, so walk order is
+   irrelevant."
+  (let ((*flow-env* (make-hash-table :test #'eq))
+        (*flow-env-changed* t)
+        (result nil))
+    (loop while *flow-env-changed*
+          do (setf *flow-env-changed* nil)
+             (loop for (variable . taint) in bindings
+                   do (flow-env-merge variable taint))
+             (when parameters
+               (flow-bind-parameters parameters))
+             (dolist (form forms)
+               (setf result (flow-walk form))))
+    result))
+
+
+(defun flow-walk (form)
+  "Walk spec FORM, recording spots, and return its taint."
+  (cond ((symbolp form) (flow-walk-symbol form))
+        ((atom form) nil)
+        ((not (alexandria:proper-list-p form))
+         (union (flow-walk (car form)) (flow-walk (cdr form))))
+        ((not (symbolp (first form)))
+         (flow-walk-forms form))
+        (t (case (first form)
+             (quote (flow-walk-literal-tree (second form)))
+             (function (flow-walk-function-argument form nil nil))
+             (declare nil)
+             (bind (flow-walk-relation (second form))
+                   nil)
+             ((exists exist forsome forall forevery doall)
+              (flow-bind-parameters (second form))
+              (flow-walk (third form))
+              nil)
+             ((assert next finally) (flow-walk-forms (rest form))
+                                    nil)
+             ((ww-loop loop) (flow-walk-loop form))
+             ((assign setq setf) (flow-walk-assignment form))
+             ((mv-assign multiple-value-bind destructuring-bind) (flow-walk-multiple-binding form))
+             ((let let*) (flow-walk-let form))
+             (dolist (flow-env-merge (first (second form)) (flow-walk (second (second form))))
+                     (flow-walk-forms (cddr form)))
+             ((push pushnew) (flow-walk-push form))
+             (if (flow-walk (second form))
+                 (union (flow-walk (third form)) (flow-walk (fourth form))))
+             (cond (loop for clause in (rest form)
+                         append (flow-walk-forms clause)))
+             ((case ecase) (flow-walk (second form))
+                           (loop for clause in (cddr form)
+                                 append (flow-walk-forms (rest clause))))
+             (return-from (flow-walk-return form))
+             (lambda (flow-walk-lambda form nil))
+             ((funcall apply) (flow-walk-funcall form))
+             (t (flow-walk-call form))))))
+
+
+(defun flow-walk-call (form)
+  "Walk a call FORM: a relation, a query or update, or a Lisp operator."
+  (let ((head (first form)))
+    (if (or (gethash head *relations*) (gethash head *static-relations*))
+      (progn (flow-walk-relation form)
+             nil)
+      (flow-call-taint head (rest form)
+                       (flow-walk-arguments (rest form)
+                                            (member head *flow-mapping-operators*))))))
+
+
+(defun flow-call-taint (head argforms taints)
+  "Return the taint of calling HEAD on ARGFORMS, whose taints are TAINTS, recording any
+   spot the call makes."
+  (cond ((or (member head *query-names*) (member head *update-names*))
+         (flow-spec-call-taint head
+                               (if (and argforms (eq (first argforms) 'state))
+                                 (rest taints)
+                                 taints)))
+        ((or (member head *flow-value-operators*) (member head *flow-mapping-operators*))
+         (reduce #'union taints :initial-value nil))
+        ((member head *flow-predicate-operators*)
+         nil)
+        ((member head *flow-index-operators*)
+         (when (first taints)
+           (flow-spot :lisp-call (list head (first argforms)) *flow-owner* (first taints)))
+         (reduce #'union (rest taints) :initial-value nil))
+        (t (flow-lisp-call head argforms taints))))
+
+
+(defun flow-lisp-call (head argforms taints)
+  "Record the spots of passing ARGFORMS (with TAINTS) to plain Lisp or a Lisp operator
+   HEAD: a member argument is a spot, the position is checked against the boundary rule,
+   and a quoted query or update name is a callback.  Return no taint."
+  (loop for argform in argforms
+        for taint in taints
+        for position from 0
+        do (when taint
+             (flow-spot :lisp-call (list head argform) *flow-owner* taint))
+           (when (eq argform 'state)
+             (flow-check-state-passing head position *flow-owner*))
+           (when (and (consp argform)
+                      (member (first argform) '(quote function))
+                      (symbolp (second argform)))
+             (flow-note-callback head (second argform))))
+  nil)
+
+
+(defun flow-spec-call-taint (name taints)
+  "Merge TAINTS into query or update NAME's formals, reach NAME, and return its return taint."
+  (loop for formal in (get name :raw-args)
+        for taint in taints
+        do (flow-merge-table *flow-formal-taints* (cons name formal) taint))
+  (flow-reach name)
+  (gethash name *flow-return-taints*))
+
+
+(defun flow-walk-arguments (args mapping-p)
+  "Return the taints of ARGS.  A function argument (a lambda, or a named function under a
+   mapping operator, when MAPPING-P) is applied to the union of the other arguments' taints,
+   and its taint is its result's."
+  (let* ((functional (mapcar (lambda (arg)
+                               (and (consp arg)
+                                    (or (member (first arg) '(lambda function))
+                                        (and mapping-p
+                                             (eq (first arg) 'quote)
+                                             (symbolp (second arg))
+                                             (fboundp (second arg))))))
+                             args))
+         (taints (loop for arg in args
+                       for function-p in functional
+                       collect (unless function-p (flow-walk arg))))
+         (others (reduce #'union taints :initial-value nil)))
+    (loop for arg in args
+          for function-p in functional
+          for taint in taints
+          collect (if function-p
+                    (flow-walk-function-argument arg others mapping-p)
+                    taint))))
+
+
+(defun flow-walk-function-argument (form taint mapping-p)
+  "Apply function form FORM -- (lambda ...), #'name or 'name -- to arguments of TAINT.
+   A named function is called only under a mapping operator (MAPPING-P); elsewhere a
+   query or update name is a reference reached as such."
+  (let ((target (if (eq (first form) 'lambda) form (second form))))
+    (cond ((and (consp target) (eq (first target) 'lambda))
+           (flow-walk-lambda target taint))
+          ((not (symbolp target))
+           nil)
+          (mapping-p
+           (flow-call-taint target
+                            (make-list (max 1 (length (get target :raw-args)))
+                                       :initial-element :list-element)
+                            (make-list (max 1 (length (get target :raw-args)))
+                                       :initial-element taint)))
+          ((or (member target *query-names*) (member target *update-names*))
+           (flow-reach target)
+           nil))))
+
+
+(defun flow-walk-lambda (form taint)
+  "Bind lambda FORM's parameters to TAINT, then return the taint of its body."
+  (dolist (parameter (second form))
+    (unless (member parameter lambda-list-keywords)
+      (flow-env-merge (if (consp parameter) (first parameter) parameter) taint)))
+  (flow-walk-forms (cddr form)))
+
+
+(defun flow-walk-funcall (form)
+  "FUNCALL or APPLY: a named function is called as such; a computed one is plain Lisp."
+  (let* ((function-form (second form))
+         (name (when (and (consp function-form)
+                          (member (first function-form) '(quote function symbol-function)))
+                 (let ((inner (second function-form)))
+                   (if (and (consp inner) (eq (first inner) 'quote)) (second inner) inner)))))
+    (if (and name (symbolp name))
+      (flow-call-taint name (cddr form) (flow-walk-arguments (cddr form) nil))
+      (progn (flow-walk function-form)
+             (flow-lisp-call (first form) (cddr form) (flow-walk-arguments (cddr form) nil))))))
+
+
+(defun flow-walk-relation (form)
+  "A relation FORM binds each $variable argument to the taint of its argument position."
+  (loop for arg in (rest form)
+        for index from 0
+        do (cond (($varp arg)
+                  (flow-env-merge arg (flow-relation-position-taint (first form) index)))
+                 ((consp arg)
+                  (flow-walk arg)))))
+
+
+(defun flow-relation-position-taint (relation index)
+  "Return the families a value at argument INDEX of RELATION may hold.  A static relation's
+   facts are scanned; a dynamic position holds its declared type's members, nothing for a
+   number type, and anything for any other type (a list, say)."
+  (let ((key (cons relation index)))
+    (multiple-value-bind (taint present) (gethash key *flow-position-taints*)
+      (if present
+        taint
+        (setf (gethash key *flow-position-taints*)
+              (if (gethash relation *relations*)
+                (let ((type (nth index (gethash relation *relations*))))
+                  (cond ((member type '(rational real integer fixnum number float ratio))
+                         nil)
+                        ((or (and (consp type) (eq (first type) 'either))
+                             (nth-value 1 (gethash type *types*)))
+                         (flow-type-taint type))
+                        (t *flow-families*)))
+                (flow-tree-families
+                  (loop for proposition in (list-database *static-idb*)
+                        when (eq (first proposition) relation)
+                          collect (nth (1+ index) proposition)))))))))
+
+
+(defun flow-bind-parameters (parameters)
+  "Bind quantifier-style PARAMETERS' variables to the taint of their domains.  A
+   dot-product pairs its lists by name order, so one over a family is a spot."
+  (let ((parameters (if (member (first parameters) *parameter-headers*)
+                      parameters
+                      (cons 'standard parameters))))
+    (multiple-value-bind (variables types) (dissect-pre-params parameters)
+      (let ((taints (mapcar (lambda (type)
+                              (cond (($varp type) (gethash type *flow-env*))
+                                    ((and (consp type) (member (first type) *query-names*))
+                                     (flow-walk-call type))
+                                    (t (flow-type-taint type))))
+                            (rest types))))
+        (when (and (eq (first types) 'dot-product) (some #'identity taints))
+          (flow-spot :dot-product nil *flow-owner* (reduce #'union taints :initial-value nil)))
+        (if (= (length variables) (length taints))
+          (loop for variable in variables
+                for taint in taints
+                do (flow-env-merge variable taint))
+          (dolist (variable variables)
+            (flow-env-merge variable (reduce #'union taints :initial-value nil))))))))
+
+
+(defun flow-walk-loop (form)
+  "WW-LOOP or LOOP: a FOR, AS or WITH variable takes its list's or value's taint.  The
+   result is the union of the clause forms' taints."
+  (let ((items (rest form))
+        (result nil))
+    (loop for item in items
+          for index from 0
+          do (cond ((and (member item '(for as with))
+                         (member (nth (+ index 2) items) '(in on across =)))
+                    (dolist (variable (alexandria:flatten (list (nth (1+ index) items))))
+                      (flow-env-merge variable (flow-walk (nth (+ index 3) items)))))
+                   ((consp item)
+                    (setf result (union result (flow-walk item))))))
+    result))
+
+
+(defun flow-walk-assignment (form)
+  "ASSIGN, SETQ or SETF: a variable takes the value's taint; a member stored into any
+   other place leaves spec code, so it is a spot."
+  (let ((result nil))
+    (loop for (place value) on (rest form) by #'cddr
+          do (setf result (flow-walk value))
+             (if (symbolp place)
+               (flow-env-merge place result)
+               (progn (flow-walk place)
+                      (when result
+                        (flow-spot :lisp-call (list (first form) place) *flow-owner* result)))))
+    result))
+
+
+(defun flow-walk-multiple-binding (form)
+  "MV-ASSIGN, MULTIPLE-VALUE-BIND or DESTRUCTURING-BIND: every variable takes the value
+   form's taint."
+  (let ((taint (flow-walk (third form))))
+    (dolist (variable (alexandria:flatten (second form)))
+      (unless (member variable lambda-list-keywords)
+        (flow-env-merge variable taint)))
+    (if (eq (first form) 'mv-assign)
+      taint
+      (flow-walk-forms (cdddr form)))))
+
+
+(defun flow-walk-let (form)
+  "LET or LET*: each variable takes its value's taint."
+  (dolist (binding (second form))
+    (when (consp binding)
+      (flow-env-merge (first binding) (flow-walk (second binding)))))
+  (flow-walk-forms (cddr form)))
+
+
+(defun flow-walk-push (form)
+  "PUSH or PUSHNEW: the list variable takes the item's taint; a member pushed onto any
+   other place leaves spec code, so it is a spot."
+  (let ((taint (flow-walk (second form)))
+        (place (third form)))
+    (if (symbolp place)
+      (flow-env-merge place taint)
+      (progn (flow-walk place)
+             (when taint
+               (flow-spot :lisp-call (list (first form) place) *flow-owner* taint))))
+    taint))
+
+
+(defun flow-walk-return (form)
+  "RETURN-FROM: the value is also a return value of the query or update being walked."
+  (let ((taint (flow-walk (third form))))
+    (when *flow-function*
+      (flow-merge-table *flow-return-taints* *flow-function* taint))
+    taint))
+
+
+(defun flow-walk-forms (forms)
+  "Walk FORMS and return the union of their taints."
+  (loop for form in forms
+        append (flow-walk form) into taint
+        finally (return (remove-duplicates taint))))
+
+
+(defun flow-walk-symbol (symbol)
+  "A variable's taint, or a literal member name's family, which is a spot."
+  (cond ((eq symbol 'state) nil)
+        ((nth-value 1 (gethash symbol *flow-env*)) (gethash symbol *flow-env*))
+        ((gethash symbol *flow-member-families*)
+         (flow-spot :literal symbol *flow-owner* (gethash symbol *flow-member-families*))
+         (gethash symbol *flow-member-families*))))
+
+
+(defun flow-walk-literal-tree (tree)
+  "A quoted TREE's taint: the families of any member names it holds, each a spot."
+  (let ((taint (flow-tree-families tree)))
+    (when taint
+      (flow-spot :literal tree *flow-owner* taint))
+    taint))
+
+
+(defun flow-tree-families (tree)
+  "Return the families of the members occurring anywhere in TREE."
+  (cond ((consp tree) (union (flow-tree-families (car tree)) (flow-tree-families (cdr tree))))
+        ((symbolp tree) (gethash tree *flow-member-families*))))
+
+
+(defun flow-type-taint (type-spec)
+  "Return the families with a member among TYPE-SPEC's instances."
+  (let ((instances (type-spec-instances type-spec)))
+    (unless (eq instances :unknown)
+      (flow-tree-families instances))))
+
+
+(defun flow-check-state-passing (function position via)
+  "Check plain Lisp FUNCTION, which receives the position as argument POSITION from VIA,
+   against the boundary rule.  A function without a body in the problem file (an engine
+   or Common Lisp function) may receive it only when it is an engine snapshot."
+  (let ((key (cons function position)))
+    (unless (gethash key *flow-state-checks*)
+      (setf (gethash key *flow-state-checks*) t)
+      (let* ((definition (gethash function *flow-lisp-definitions*))
+             (formal (when definition
+                       (nth position (flow-lambda-list-variables (first definition))))))
+        (cond ((member function *flow-engine-state-readers*))
+              (formal
+               (flow-walk-lisp-forms (rest definition) (list formal) function))
+              (t (flow-spot :position-passed function via :all)))))))
+
+
+(defun flow-lambda-list-variables (lambda-list)
+  "Return LAMBDA-LIST's required and optional variables in order."
+  (loop for item in lambda-list
+        until (member item '(&rest &body &key &aux))
+        unless (eq item '&optional)
+          collect (if (consp item) (first item) item)))
+
+
+(defun flow-walk-lisp-forms (forms state-variables function)
+  "Walk plain Lisp FORMS of FUNCTION, where STATE-VARIABLES hold the position."
+  (dolist (form forms)
+    (flow-walk-lisp form state-variables function)))
+
+
+(defun flow-walk-lisp (form state-variables function)
+  "Walk plain Lisp FORM of FUNCTION.  The position may appear only as an argument passed
+   on to a query or update, a callback through SYMBOL-FUNCTION, other plain Lisp that
+   follows the same rule, or an engine snapshot; any other appearance reads it."
+  (cond ((symbolp form)
+         (when (member form state-variables)
+           (flow-spot :position (list function nil) nil :all)))
+        ((atom form) nil)
+        ((not (alexandria:proper-list-p form))
+         (flow-walk-lisp (car form) state-variables function)
+         (flow-walk-lisp (cdr form) state-variables function))
+        ((eq (first form) 'declare) nil)
+        ((eq (first form) 'quote)
+         (if (symbolp (second form))
+           (flow-note-callback function (second form))
+           (let ((taint (flow-tree-families (second form))))
+             (when taint
+               (flow-spot :literal (second form) (format nil "plain Lisp ~(~A~)" function) taint)))))
+        ((eq (first form) 'function)
+         (if (symbolp (second form))
+           (flow-note-callback function (second form))
+           (flow-walk-lisp-forms (cddr (second form)) state-variables function)))
+        ((member (first form) '(let let*))
+         (flow-walk-lisp-let form state-variables function))
+        ((member (first form) '(multiple-value-bind destructuring-bind))
+         (flow-walk-lisp-forms (cddr form) state-variables function))
+        ((member (first form) '(dolist dotimes))
+         (flow-walk-lisp-forms (cons (second (second form)) (cddr form)) state-variables function))
+        ((eq (first form) 'cond)
+         (dolist (clause (rest form))
+           (flow-walk-lisp-forms clause state-variables function)))
+        ((member (first form) '(case ecase typecase etypecase))
+         (flow-walk-lisp (second form) state-variables function)
+         (dolist (clause (cddr form))
+           (flow-walk-lisp-forms (rest clause) state-variables function)))
+        ((eq (first form) 'lambda)
+         (flow-walk-lisp-forms (cddr form) state-variables function))
+        ((not (symbolp (first form)))
+         (flow-walk-lisp-forms form state-variables function))
+        ((member (first form) '(funcall apply))
+         (flow-walk-lisp-funcall form state-variables function))
+        (t (flow-walk-lisp-call (first form) (rest form) state-variables function))))
+
+
+(defun flow-walk-lisp-let (form state-variables function)
+  "A LET variable bound to the position also holds the position."
+  (let ((aliases nil))
+    (dolist (binding (second form))
+      (when (consp binding)
+        (if (member (second binding) state-variables)
+          (push (first binding) aliases)
+          (flow-walk-lisp (second binding) state-variables function))))
+    (flow-walk-lisp-forms (cddr form) (append aliases state-variables) function)))
+
+
+(defun flow-walk-lisp-funcall (form state-variables function)
+  "FUNCALL or APPLY in plain Lisp.  Through SYMBOL-FUNCTION, #' or a quoted name it is a
+   call of that function; through SYMBOL-FUNCTION of a variable it is a callback whose
+   name was quoted elsewhere; any other function value may not receive the position."
+  (let* ((function-form (second form))
+         (inner (when (consp function-form) (second function-form)))
+         (name (cond ((not (consp function-form)) nil)
+                     ((member (first function-form) '(quote function)) inner)
+                     ((and (eq (first function-form) 'symbol-function)
+                           (consp inner)
+                           (eq (first inner) 'quote))
+                      (second inner)))))
+    (cond ((and name (symbolp name))
+           (flow-walk-lisp-call name (cddr form) state-variables function))
+          ((and (consp function-form) (eq (first function-form) 'symbol-function))
+           (flow-walk-lisp (second function-form) state-variables function)
+           (let ((registries (flow-special-variables
+                               (rest (gethash function *flow-lisp-definitions*)))))
+             (loop for (name . registry) in *flow-registered-names*
+                   when (intersection registry registries)
+                     do (flow-note-callback function name)))
+           (flow-walk-lisp-call 'callback (cddr form) state-variables function))
+          (t (flow-walk-lisp function-form state-variables function)
+             (flow-walk-lisp-call (first form) (cddr form) state-variables function)))))
+
+
+(defun flow-walk-lisp-call (head args state-variables function)
+  "A call of HEAD in plain Lisp FUNCTION.  The position passes freely to a query, an
+   update or a callback, to plain Lisp that is then checked in turn, and to an engine
+   snapshot; to anything else it is read."
+  (when (or (member head *query-names*) (member head *update-names*))
+    (flow-note-callback function head))
+  (loop for arg in args
+        for position from 0
+        do (cond ((not (member arg state-variables))
+                  (flow-walk-lisp arg state-variables function))
+                 ((or (member head *query-names*) (member head *update-names*)
+                      (eq head 'callback) (member head *flow-engine-state-readers*)))
+                 ((gethash head *flow-lisp-definitions*)
+                  (flow-check-state-passing head position (format nil "plain Lisp ~(~A~)" function)))
+                 (t (flow-spot :position (list function head) nil :all)))))
+
+
+(defun flow-note-callback (function name)
+  "NAME, quoted or called in plain Lisp FUNCTION: a query or update is a callback into
+   spec code, whose results reach FUNCTION; a plain Lisp function is checked as receiving
+   the position through its parameter named STATE, if it has one."
+  (cond ((or (member name *query-names*) (member name *update-names*))
+         (flow-reach name)
+         (setf (gethash (cons function name) *flow-callbacks*) t))
+        ((gethash name *flow-lisp-definitions*)
+         (let ((position (position 'state (flow-lambda-list-variables
+                                            (first (gethash name *flow-lisp-definitions*))))))
+           (when position
+             (flow-check-state-passing name position (format nil "plain Lisp ~(~A~)" function)))))))
+
+
+(defun flow-reach (name)
+  "Mark query or update NAME reached."
+  (unless (gethash name *flow-reached*)
+    (setf (gethash name *flow-reached*) t
+          *flow-changed* t)))
+
+
+(defun flow-env-merge (variable taint)
+  "Add TAINT to VARIABLE's taint in the walk's environment."
+  (let ((old (gethash variable *flow-env*)))
+    (unless (and (nth-value 1 (gethash variable *flow-env*)) (subsetp taint old))
+      (setf (gethash variable *flow-env*) (union old taint)
+            *flow-env-changed* t))))
+
+
+(defun flow-merge-table (table key taint)
+  "Add TAINT to KEY's taint in TABLE, a formal or return taint table."
+  (let ((old (gethash key table)))
+    (unless (subsetp taint old)
+      (setf (gethash key table) (union old taint)
+            *flow-changed* t))))
+
+
+(defun flow-spot (kind detail owner taint)
+  "Record a spot of KIND with DETAIL in OWNER, affecting TAINT's families or :ALL."
+  (let* ((key (list kind detail owner))
+         (old (gethash key *flow-spots*)))
+    (setf (gethash key *flow-spots*)
+          (if (or (eq old :all) (eq taint :all)) :all (union old taint)))))
+
+
+(defun flow-report (families)
+  "Return the report alist: each family's own spot texts, then (:all . texts)."
+  (let ((entries nil))
+    (maphash (lambda (key taint)
+               (push (cons (apply #'flow-spot-text key) taint) entries))
+             *flow-spots*)
+    (setf entries (sort entries #'string< :key #'car))
+    (append (mapcar (lambda (family)
+                      (cons family
+                            (loop for (text . taint) in entries
+                                  when (and (listp taint) (member family taint))
+                                    collect text)))
+                    families)
+            (list (cons :all (loop for (text . taint) in entries
+                                   when (eq taint :all)
+                                     collect text))))))
+
+
+(defun flow-spot-text (kind detail owner)
+  "Return the text describing one spot."
+  (let ((argument (when (and (eq kind :lisp-call) (consp detail))
+                    (let ((text (format nil "~(~S~)" (second detail))))
+                      (if (> (length text) 60)
+                        (concatenate 'string (subseq text 0 57) "...")
+                        text)))))
+    (ecase kind
+      (:lisp-call (format nil "~(~A~) receives ~A, in ~A" (first detail) argument owner))
+      (:literal (format nil "literal object name in ~(~S~), in ~A" detail owner))
+      (:dot-product (format nil "dot-product quantifier over the family, in ~A" owner))
+      (:callback (format nil "plain Lisp ~(~A~) receives cargo from ~(~A~)" (car detail) (cdr detail)))
+      (:position (if (second detail)
+                   (format nil "plain Lisp ~(~A~) reads the position through ~(~A~)"
+                           (first detail) (second detail))
+                   (format nil "plain Lisp ~(~A~) reads the position" (first detail))))
+      (:position-passed (format nil "~(~A~) receives the position, in ~A" detail owner)))))
 
 
 ;;;; GENERATION-TIME FILTERING ;;;;
@@ -1222,6 +2031,49 @@
                  *symmetry-check-count*))))
 
 
+(defun report-symmetry-safety ()
+  "Run symmetry detection and the flow check on the staged problem as if
+   *SYMMETRY-PRUNING* were on, and print the report.  The problem's own symmetry
+   settings and families are left untouched."
+  (let ((*symmetry-pruning* t)
+        (*symmetry-groups* nil)
+        (*symmetry-families* nil)
+        (*object-to-symmetry-group* (make-hash-table :test #'eq))
+        (*object-to-symmetry-membership* (make-hash-table :test #'eq))
+        (*symmetric-type-parameters* (make-hash-table :test #'eq))
+        (*symmetry-safety-report* nil))
+    (detect-symmetry-groups)
+    (if (rest *symmetry-safety-report*)
+      (print-symmetry-safety-report)
+      (format t "~&No symmetry families detected.~%"))
+    (values)))
+
+
+(defun print-symmetry-safety-report ()
+  "Print the flow check's verdict and spots for every detected family (report only)."
+  (when (rest *symmetry-safety-report*)
+    (format t "~&Symmetry safety check (report only):~%")
+    (loop for (family . texts) in *symmetry-safety-report*
+          unless (eq family :all)
+            do (format t "  ~A: ~A~%"
+                       (symmetry-family.rows family)
+                       (ecase (symmetry-family-status family)
+                         (:unsafe-action "dropped (an action parameter use is unsafe)")
+                         (:kept-clean "kept; passes the full check")
+                         (:kept-flagged "kept; the full check would drop it")
+                         (:query-only-clean
+                          "kept (no action parameter ranges over it); passes the full check")
+                         (:query-only-flagged
+                          "dropped (no action parameter ranges over it); the full check flags it")))
+               (dolist (text texts)
+                 (format t "      ~A~%" text)))
+    (let ((shared (rest (assoc :all *symmetry-safety-report*))))
+      (when shared
+        (format t "  Spots affecting every family:~%")
+        (dolist (text shared)
+          (format t "      ~A~%" text))))))
+
+
 (defun find-group-type (group)
   "Find the most specific type that contains all objects in GROUP.
    Returns the type name with the smallest object count that includes all group members."
@@ -1297,6 +2149,7 @@
   (setf *symmetry-visit-active* nil)
   (when *symmetry-pruning*
     (detect-symmetry-groups)
+    (print-symmetry-safety-report)
     (when (and (boundp '*start-state*) *start-state*)
       (invalidate-problem-state-hash *start-state*))
     (cond
